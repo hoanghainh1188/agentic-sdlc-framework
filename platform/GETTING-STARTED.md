@@ -30,7 +30,7 @@ Building the platform is **internal work** with no client data, so Claude Code m
 ## Step 1. Create the repo on GitHub and push
 
 1. Create a **private** repository `agentic-sdlc-framework`. Do not add a README, licence or `.gitignore` (the repo already has them).
-   - Current repository: `github.com/harryforge/agentic-sdlc-framework`, under a **personal account** (risk accepted by Harry, 2026-09-24). Suggested mitigations: two-factor authentication on the account; give a second trusted person admin access; keep an offline mirror (`git clone --mirror`); transfer to a company organisation before any client or sales use.
+   - Current repository: `github.com/harryforge/agentic-sdlc-framework`, organization `harryforge` on the **GitHub Free** plan (Harry, 2026-09-24). Suggested mitigations: two-factor authentication for all members; a second trusted owner; an offline mirror (`git clone --mirror`); move to a company-controlled organization before any client or sales use.
 2. Unzip, copy the folder where you want it, and push **one initial commit** (the repository history starts here):
 
 ```bash
@@ -57,6 +57,12 @@ Check on GitHub:
 ## Step 2. Configure the repo
 
 Do this **after** the first push, so protection does not block it.
+
+> **GitHub Free plan:** branch protection and rulesets are **not available** for private repositories. Until the organization moves to **GitHub Team** (planned), use these compensating controls (in place since 2026-09-24):
+> - Merge settings: squash merge only; delete branch after merge (available on Free).
+> - Local `pre-push` hook that blocks direct pushes to `main` (`.git/hooks/pre-push`; install it on every machine that pushes). Bypass with `--no-verify` only in an emergency, with Harry's approval.
+> - Process: every change through a pull request, reviewed by someone other than its producer (handbook Ch.5).
+> After the upgrade: turn on the branch protection below and add Person B to the repository (GitHub does not let authors approve their own pull requests).
 
 | Setting | Value | Why |
 |---|---|---|

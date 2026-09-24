@@ -7,6 +7,7 @@
 - Ch.1, Ch.2, Ch.3 approved as v1.0 (Harry). Ch.4, Ch.5, Ch.6 approved as v1.0. Ch.8, Ch.9 approved as v1.0. Part I complete (Ch.7 pending legal review). Ch.10–12 approved. Codes table v1.1 (forced-HITL list for G3); v1.2 (dual approval at G7 for sensitive change types). Ch.13–15 awaiting Harry's comments. Ch.2: tool owners and disciplinary rules still open.
 
 ### Added / changed
+- Repository hosting clarified: organization `harryforge` on GitHub Free; branch protection unavailable; compensating controls (squash-only, delete branch on merge, local pre-push hook, PR review); upgrade to GitHub Team planned.
 - Repository history starts with one initial commit on GitHub (Harry); tag `design-v1.0` on that commit. Earlier local history and the `design-pre-handbook` tag are not published.
 - Repository: `harryforge/agentic-sdlc-framework` (renamed from `agentic-sdlc-fw`), personal account, risk accepted (Harry). GETTING-STARTED commands use the real repository.
 - `platform/GETTING-STARTED.md` rewritten: preparation, push with both tags, 44 issues, Claude Code check session, standard task loop and prompt, order after A01, handbook-change flow, how to send handbook comments. `create-issues.py` labels 12 tasks `handbook-dependent`.
