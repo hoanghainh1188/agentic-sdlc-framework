@@ -1,0 +1,53 @@
+%%{init: {"flowchart": {"wrappingWidth": 340}}}%%
+flowchart TB
+    subgraph P1["P1 Requirements"]
+        direction LR
+        A1["Agents: summarise, translate JP-EN,<br/>draft Intent Record and spec, flag gaps"]
+        G1{{"G1 Intent / Scope / Risk<br/>Human A · always HITL"}}
+        G2{{"G2 Specification<br/>Human A (B for High+) · by risk"}}
+        A1 --> G1 --> G2
+    end
+    subgraph P2["P2 Analysis and design"]
+        direction LR
+        A2["Agents: design options, draft ADR,<br/>task plan"]
+        G3{{"G3 Plan / Architecture<br/>Human B · by risk"}}
+        A2 --> G3
+    end
+    subgraph P3["P3 Coding"]
+        direction LR
+        G4{{"G4 Execution boundary<br/>Policy check · HITL for High+"}}
+        A3["Agents: code on an isolated branch,<br/>tests, open a PR"]
+        G5{{"G5 Scope drift / budget<br/>HOTL · HITL on breach"}}
+        G4 --> A3 --> G5
+    end
+    subgraph P4["P4 Testing"]
+        direction LR
+        A4["Agents: test cases,<br/>fake test data"]
+        G6{{"G6 Independent verification<br/>Automated + AUDIT / HOTL / HITL by risk"}}
+        A4 --> G6
+    end
+    subgraph P5["P5 Release"]
+        direction LR
+        G7{{"G7 Review / Merge<br/>Human B · always HITL"}}
+        A5["Agents: release record,<br/>checklist, rollback plan"]
+        G8{{"G8 Release / Learning<br/>Human B · HITL for production"}}
+        G7 --> A5 --> G8
+    end
+    subgraph P6["P6 Operations and maintenance"]
+        direction LR
+        A6["Agents: triage alerts, analyse logs,<br/>propose remediation"]
+        N6["Every production change<br/>= a new cycle, starting again at G1"]
+        A6 --> N6
+    end
+    P1 --> P2 --> P3 --> P4 --> P5 --> P6
+
+    classDef hitl fill:#FDECEA,stroke:#C0392B,color:#222
+    classDef risk fill:#FEF5E7,stroke:#CA6F1E,color:#222
+    classDef auto fill:#EAF2FB,stroke:#2E6DA4,color:#222
+    classDef ai fill:#F4F6F7,stroke:#7F8C8D,color:#222
+    classDef note fill:#FFF8E1,stroke:#B7950B,color:#222,stroke-dasharray: 4 3
+    class G1,G7,G8 hitl
+    class G2,G3,G6 risk
+    class G4,G5 auto
+    class A1,A2,A3,A4,A5,A6 ai
+    class N6 note

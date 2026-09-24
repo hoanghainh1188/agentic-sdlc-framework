@@ -1,0 +1,571 @@
+# D-03. MVP architecture
+
+| Item | Value |
+|---|---|
+| Version | 1.0 |
+| Date | 2026-09-24 |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
+| Readers | Tech lead / architect, developers, Claude Code |
+| Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
+| Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
+
+---
+
+## 1. Purpose
+
+- Describe the parts of the MVP platform, what each part does and how they talk to each other.
+- Fix the **interfaces**, so that later we can replace GitHub → GitLab, OpenHands → another agent, simple rules → OPA/Cedar without changing the core.
+- Serve as input for D-05 (data model) and D-08 (backlog).
+
+## 2. Scope
+
+- **MVP** architecture only (D-02 section 4.1).
+- The full architecture (8 planes, Signed Run Contract with KMS, multi-agent…) stays in draft v1.0 Chapter 4. The MVP **goes in the same direction**, in a lighter form.
+
+---
+
+## 3. Architecture principles
+
+| # | Principle | Source |
+|---|---|---|
+| AP1 | The platform is an **orchestration + policy + evidence layer** around existing tools. We do not rebuild Git, CI or registries | [Doc] Draft 5.1.2 |
+| AP2 | **Separate control from execution.** The agent runs in the execution part and cannot grant itself permissions | [Doc] Draft 4.4–4.6 |
+| AP3 | **Evidence and audit are kept separately** and are append-only | [Doc] Draft 4.2.3 |
+| AP4 | Everything external goes through an **interface (adapter)** | [Doc] + D-02 NFR-05 |
+| AP5 | **Gates, budgets and rules are configuration**, not hard-coded | [Proposal] For tuning in M-F |
+| AP6 | **Multi-tenant at the data layer** from day one | D-02 NFR-02 |
+| AP7 | **Modular monolith** for the MVP: few processes, clear module boundaries. Split into services when needed | [Proposal] See ADR-M01 |
+
+---
+
+## 4. Overview diagram
+
+```mermaid
+flowchart TB
+    subgraph USER["Users"]
+        CLI["CLI: sdlc"]
+        GHUI["GitHub: issue / PR<br/>/approve G3 ..."]
+    end
+
+    subgraph CP["Control plane (TypeScript, built by us)"]
+        API["API app (NestJS)<br/>REST for the CLI"]
+        WK["Workflow worker (Temporal)<br/>Gate Orchestrator G1–G8"]
+        subgraph MOD["Core modules (shared)"]
+            REG["Intent / Spec Registry"]
+            GATE["Gate Engine + Policy"]
+            COST["Cost Controller"]
+            EVD["Evidence Builder"]
+            AUD["Audit Log"]
+        end
+    end
+
+    subgraph EP["Execution plane"]
+        RUN["Runner (TypeScript)<br/>provisions sandboxes, tracks runs"]
+        subgraph SB["Sandbox (Docker, one container per run)"]
+            OH["OpenHands Agent Server<br/>+ git worktree"]
+        end
+    end
+
+    subgraph INFRA["Self-hosted infrastructure (reused)"]
+        PG[("PostgreSQL")]
+        TMP["Temporal"]
+        LL["LiteLLM Proxy"]
+        LF["Langfuse"]
+        S3[("SeaweedFS")]
+        VK["Valkey"]
+        VAULT["OpenBao<br/>secrets + Run Contract signing"]
+    end
+
+    subgraph EXT["External"]
+        GH["GitHub<br/>repo, PR, Actions CI"]
+        LLM["Models via API"]
+    end
+
+    CLI --> API
+    GHUI -. "comment /approve" .-> GH
+    WK -- "event polling (MVP)" --> GH
+    API --> MOD
+    WK --> MOD
+    API <--> TMP
+    WK <--> TMP
+    WK -- "Run Contract" --> RUN
+    RUN --> SB
+    OH -- "per-run virtual key" --> LL
+    LL --> LLM
+    LL --> LF
+    LL --> VK
+    OH -- "push branch agent/*" --> GH
+    MOD --> PG
+    EVD --> S3
+    COST <--> LL
+    WK -- "sign contract (Transit)" --> VAULT
+    RUN -- "verify, fetch short-lived secrets" --> VAULT
+```
+
+SVG version: [d11-mvp-architecture.svg](../diagrams/svg/d11-mvp-architecture.svg)
+
+---
+
+## 5. Components and responsibilities
+
+### 5.1. Processes
+
+| Process | Technology | Responsibilities |
+|---|---|---|
+| **api** | NestJS | REST API for the CLI. Authenticates users. Sends signals to workflows. (Later: receives GitHub webhooks) |
+| **worker** | Temporal worker (TS SDK) | Runs the G1–G8 workflow of each intent. Calls core modules. Waits for approvals; runs escalation timers. **Poller**: regularly asks GitHub for new comments, reviews and CI status |
+| **runner** | Node.js + Docker API | Receives the Run Contract. Creates the sandbox, worktree and virtual key. Calls the OpenHands Agent Server. Reports results |
+| **cli** | Node.js | The `sdlc` command for users |
+
+### 5.2. Core modules (shared by api and worker)
+
+| Module | Responsibilities | Data (see D-05) |
+|---|---|---|
+| Intent / Spec Registry | Create intents, link specs (path + commit + hash), plans | `intents`, `spec_refs`, `plans` |
+| Gate Engine | Evaluate gate conditions; **resolve the oversight mode** from the gate × risk matrix and change flags; check approver roles, separation of duties and dual approval; bind approvals to version, scope and expiry; record decisions | `gate_decisions` |
+| Escalation | Create escalations from triggers; route to owner / backup / governance; run acknowledge and resolve clocks (Temporal timers); freeze work on no answer; record decisions | `escalations` |
+| Agent Register | Register agents; check status, pinned model and instructions hash before a run; recertification warnings | `agents` |
+| Project AI Record | Store client consent and allowed data classes; checked at G1 and G4 | `project_ai_records` |
+| Policy | Autonomy (L0–L4), oversight matrix, model routing, file scope, forbidden actions. MVP: rules in code behind an interface | YAML config |
+| Cost Controller | Create a LiteLLM virtual key per run, set caps, read spend, warn at 80% / stop at 100% | `cost_records` |
+| Evidence Builder | Collect diff, CI, tests, scans, gate decisions → JSON + Markdown pack | `evidence` + SeaweedFS |
+| Audit Log | Append-only events, hash chain, integrity check | `audit_log` |
+| Tenancy / Auth | Tenants, projects, users, roles, GitHub account mapping, API tokens | `tenants`, `projects`, `users`, `user_identities`, `role_bindings`, `api_tokens` |
+
+### 5.3. Reused components
+
+| Component | Role | Notes |
+|---|---|---|
+| Temporal | Runs long workflows, waits for humans, resumes after failures | Self-hosted |
+| PostgreSQL | Platform data. May share a server with Temporal, LiteLLM and Langfuse, but **with separate databases** | |
+| LiteLLM Proxy | Single entry point to models. Virtual keys, budgets | See D-07 |
+| Langfuse | LLM traces, tokens | See D-07 |
+| Valkey | Rate limiting and cache for LiteLLM and Langfuse | BSD; replaces Redis for licence reasons (review R2) |
+| SeaweedFS | Stores Evidence Packs and run logs. Also used by Langfuse | S3 API, Apache 2.0. Replaces MinIO (no longer maintained, review R1) |
+| **OpenBao** (Vault-compatible) | Stores secrets. Signs Run Contracts with the Transit engine; the key never leaves OpenBao | See section 8.1 |
+| OpenHands Agent Server | Agent that writes code in the sandbox | See section 7.2 |
+| GitHub + Actions | Repo, PRs, CI, branch protection | Through a GitHub App |
+
+---
+
+## 6. G1–G8 workflow (state machine)
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft
+    Draft --> G1: submit (AI record checked)
+    G1 --> G2: approve (HITL, Person A)
+    G2 --> G3: approve / HOTL pass
+    G3 --> G4: approve plan / HOTL pass
+    G4 --> Running: agent registered + autonomy + contract OK
+    G4 --> Blocked: Critical / bad config
+    Running --> G5: run finished / cost sync
+    Running --> Stopped: kill switch / loop / timeout
+    G5 --> G3: changes outside plan
+    G5 --> Escalated: budget 100% / conflict / policy deny
+    Escalated --> Running: decision = resume (bound, not expired)
+    Escalated --> Frozen: no acknowledgement within SLA
+    Frozen --> Escalated: backup / governance acknowledges
+    G5 --> G6: pass
+    G6 --> Running: CI fail (retries left)
+    G6 --> G3: CI fail (no retries left)
+    G6 --> Escalated: critical security finding
+    G6 --> G7: pass
+    G7 --> Running: request changes
+    G7 --> G8: approved (+ 2nd approver if flagged) + merged
+    G8 --> Done: approve release (disclosure present)
+    G1 --> Rejected: reject
+    G2 --> Rejected: reject
+    G3 --> Rejected: reject
+    G8 --> Rejected: reject
+    Stopped --> Escalated: always reviewed
+    Done --> [*]
+    Rejected --> [*]
+    Blocked --> [*]
+```
+
+SVG version: [d12-gate-state-machine.svg](../diagrams/svg/d12-gate-state-machine.svg)
+
+General rules:
+- G5 is checked **when the agent finishes a run** and **at every cost sync**.
+- L1 tasks (High risk): the agent only submits a proposal → stored as evidence `proposal`, the run ends as `succeeded_proposal_only`, and the intent waits for a human decision.
+- Every state change → write `gate_decisions` + `audit_log` + a comment on the issue/PR.
+- Spec hash changed after G2 → back to G2 (FR-02). Plan hash changed after G3 → back to G3.
+- **No gate is ever auto-approved by silence.** HOTL at a human gate passes only when all policy conditions hold, and the notified person can still block within the gate's window.
+- Retry counts, thresholds, the oversight matrix and SLAs **come from per-project configuration**.
+
+### 6.1. Resolving the oversight mode
+
+```text
+mode = matrix[gate][risk_tier]                     # project config (handbook codes table §4)
+if gate == G3 and plan.change_flags ∩ FORCED_HITL_G3: mode = HITL
+if gate == G6 and security_findings.critical > 0:   mode = HITL
+if gate == G7: mode = HITL; approvals_needed = 2 if plan.change_flags ∩ DUAL_APPROVAL_G7 or risk == critical else 1
+if gate == G8 and environment == production:        mode = HITL
+```
+
+The resolved mode is stored in the gate decision. Changing the matrix is a configuration change (new `config_hash`, audit event).
+
+### 6.2. Who may approve
+
+`canApprove(gate, actor, intent, change)`:
+- the actor holds the gate's role in `role_bindings` (G1: `person_a`; G2: `person_a`, or `person_b` for High+; G3, G6 High+, G7, G8: `person_b`; second approval: `second_approver`);
+- the actor is **not the producer** of the change (commit authors, the person who started the run for that change); agents never approve;
+- for dual approval, the two approvals come from two different people.
+
+### 6.3. Approval binding and expiry
+
+Every approval stores `input_sha256` (the reviewed version), `scope` (environment, resources, allowed actions) and `expires_at`. Just before the protected action, the worker recomputes the hash and checks scope and time. Any mismatch or expiry → a `void` decision and the gate is evaluated again.
+
+### 6.4. Escalation
+
+```text
+trigger (G5 breach, critical finding, disagreement, stopped run, gate overdue…)
+→ create escalation (severity, response level, packet, owner, backup)
+→ start timers: acknowledge (SLA), resolve (SLA)
+→ no ack: remind → backup owner → governance; work stays frozen
+→ decision (resume / modify / roll back / terminate) bound to version, scope, expiry
+```
+
+- Timers are Temporal timers inside the intent workflow; they survive restarts.
+- Actions on the pre-approved **safe list** (read-only, sandbox tests, drafts) may continue while waiting; everything else is frozen.
+- Approval authority never passes back to the producer.
+- SLA defaults: Critical 15 min / 1 h; High 1 h / same working day; Medium 1 working day / 3 working days; Low 3 working days / next planned work.
+
+### 6.5. Kill switch
+
+`sdlc run kill <run>` (or a comment command) → the runner stops the sandbox, revokes the GitHub token and the LiteLLM virtual key, writes `stopped_killed`, and opens an escalation for review. Target: under 5 minutes end to end. Loop detection (more than 3 identical consecutive tool calls, or no progress within the window) stops the run as `stopped_stalled`.
+
+---
+
+## 7. Interfaces (adapters)
+
+Written in TypeScript. This is the **contract** Claude Code implements. Names may change while coding, but responsibilities must stay the same.
+
+### 7.1. Git host
+
+```ts
+interface GitHostAdapter {
+  createIssueComment(ref: RepoRef, issue: number, body: string): Promise<void>;
+  getPullRequest(ref: RepoRef, pr: number): Promise<PullRequestInfo>;
+  getChangedFiles(ref: RepoRef, pr: number): Promise<string[]>;
+  getCheckStatus(ref: RepoRef, sha: string): Promise<CheckSummary>;
+  getApprovals(ref: RepoRef, pr: number): Promise<Approval[]>;
+  getFileAtCommit(ref: RepoRef, path: string, sha: string): Promise<string>;
+  issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken>;
+  listEventsSince(ref: RepoRef, cursor: EventCursor): Promise<{ events: GitEvent[]; next: EventCursor }>; // MVP: polling
+  verifyWebhook(headers: Record<string, string>, rawBody: Buffer): GitEvent; // enabled later
+}
+```
+MVP: `GitHubAdapter` through a **GitHub App** (short-lived per-repo tokens), reading events by **polling**. MVP+1: `GitLabAdapter`, webhooks.
+
+- Polling and webhooks return the same `GitEvent` type → one handler for `/approve` commands, reviews and CI.
+- The `EventCursor` is stored per project in the database, so events are not processed twice after a restart.
+
+### 7.2. Agent
+
+```ts
+interface AgentAdapter {
+  startRun(contract: RunContract, workspace: WorkspaceInfo): Promise<AgentRunHandle>;
+  getStatus(handle: AgentRunHandle): Promise<AgentRunStatus>;
+  stop(handle: AgentRunHandle, reason: string): Promise<void>;
+  collectOutputs(handle: AgentRunHandle): Promise<AgentOutputs>; // plan, log, changed files
+}
+```
+MVP: `OpenHandsAdapter`.
+- [External] The OpenHands SDK offers Python and REST APIs. The agent can run in an ephemeral workspace (Docker/Kubernetes) through the **Agent Server**.
+- [Proposal] The platform (TypeScript) calls the **Agent Server over REST**; it does not embed the Python SDK. The Agent Server runs inside the sandbox container.
+- [Proposal] OpenHands points its model at **LiteLLM**, using the run's virtual key.
+- **PoC needed** at the start of M-C: run the Agent Server in a container, call REST from Node.js, get the log and the list of changed files.
+
+### 7.3. Policy
+
+```ts
+interface PolicyEngine {
+  maxAutonomy(input: { riskTier: RiskTier; dataClass: DataClass }): AutonomyLevel; // L0–L4 (MVP: up to L2)
+  oversightMode(input: { gate: GateCode; riskTier: RiskTier; changeFlags: ChangeFlag[]; context: GateContext }): { mode: OversightMode; approvalsNeeded: number };
+  allowedModels(input: { dataClass: DataClass; taskKind: TaskKind }): string[];
+  checkScope(input: { plannedFiles: string[]; changedFiles: string[] }): ScopeResult;
+  canApprove(input: { gate: GateCode; actor: UserId; roles: ProjectRole[]; intent: IntentSummary; producers: UserId[] }): Decision;
+  isForbidden(input: { action: AgentAction }): boolean; // handbook Ch.4 §4.7 — never overridable
+}
+```
+MVP: `SimplePolicyEngine` reading YAML. MVP+1: `OpaPolicyEngine` or `CedarPolicyEngine`.
+
+### 7.4. Model gateway and cost
+
+```ts
+interface ModelGateway {
+  createRunKey(input: { runId: string; labels: CostLabels; maxBudgetUsd: number; models: string[] }): Promise<VirtualKey>;
+  revokeKey(keyId: string): Promise<void>;
+  getSpend(keyId: string): Promise<SpendInfo>;
+}
+```
+MVP: `LiteLLMGateway`.
+
+### 7.5. Evidence storage
+
+```ts
+interface EvidenceStore {
+  put(tenantId: string, path: string, content: Buffer, contentType: string): Promise<{ uri: string; sha256: string }>;
+  get(uri: string): Promise<Buffer>;
+}
+```
+MVP: `S3EvidenceStore` (on SeaweedFS).
+
+---
+
+## 8. Run Contract (light version for the MVP)
+
+[Doc] Draft v1.0 (section 4.7) designs a **Signed Run Contract**: a digitally signed "execution contract" that the control plane issues for each run, stating what the agent may do, on which resources, for how long. The full version uses KMS/HSM and mTLS.
+
+The MVP builds a light version that **keeps the main idea**:
+
+| Field | Example |
+|---|---|
+| `run_id`, `intent_id`, `tenant_id`, `project_id` | |
+| `repo`, `base_sha`, `branch` | `agent/INT-2026-0001` |
+| `planned_files` | File list from the G3 plan |
+| `agent_id`, `agent_version`, `instructions_sha256` | From the agent register |
+| `autonomy_level` | L2 |
+| `max_tokens_usd`, `max_iterations`, `max_duration_min`, `loop_threshold` | Caps |
+| `allowed_models` | From policy |
+| `egress_allowlist` | GitHub, LiteLLM |
+| `issued_at`, `expires_at` | Short validity |
+| `signature` | **Ed25519** signature with the platform key |
+
+- The signing key lives in **OpenBao** (Transit engine). The platform sends the contract content to be signed; **the key never leaves OpenBao**.
+- The runner verifies the signature with the public key obtained from OpenBao.
+- The runner **rejects** contracts that are expired, wrongly signed, or not in the database.
+- MVP+: add revocation and scheduled key rotation, as in draft v1.0.
+
+### 8.1. Secret manager: OpenBao or HashiCorp Vault
+
+Harry's decision (2026-09-24): **run a Vault-type secret manager from the MVP**.
+
+Licence note [External]:
+
+| | HashiCorp Vault | OpenBao |
+|---|---|---|
+| Licence | Business Source License 1.1 (since Aug 2023). Not an OSI open-source licence | MPL 2.0 (open source) |
+| Origin | HashiCorp, now owned by IBM | Fork of Vault 1.14.0, under the Linux Foundation |
+| Internal use | Allowed | Allowed |
+| **Inside a product we sell** | BSL forbids offering the software as a competing product → **needs legal review** | No such restriction |
+| MVP features needed (KV, Transit, AppRole) | Yes | Yes (Vault-compatible API) |
+
+**Decision (Harry, 2026-09-24): use OpenBao.** Platform code uses the **standard Vault API**, so switching remains possible.
+
+### 8.2. Secrets stored in OpenBao
+
+| Secret | Engine | Who may read it |
+|---|---|---|
+| Run Contract signing key | Transit (non-exportable) | worker (signs), runner (reads the public key) |
+| GitHub App private key | KV | api, runner |
+| LiteLLM master key | KV | Cost Controller |
+| Model provider API keys | KV | **LiteLLM only** |
+| Database and SeaweedFS passwords | KV | The matching process |
+
+- Each process logs in to OpenBao with **AppRole**, receives a short-lived token and can read only its own secrets.
+- The agent sandbox has **no** access to OpenBao.
+
+---
+
+## 9. Security
+
+| Topic | What the MVP does |
+|---|---|
+| GitHub permissions | GitHub App with minimal permissions. Short-lived tokens, issued per run, for the run's repo only |
+| Branches | The agent only pushes `agent/*`. `main` has branch protection (D-09 section 6) |
+| Model keys | The agent only has a LiteLLM **virtual key**, with a cap, revoked when the run ends |
+| Sandbox network | Outbound to GitHub and LiteLLM only. Everything else blocked |
+| Secrets | Not in the repo, not in images. Fetched from OpenBao at runtime with short-lived tokens |
+| GitHub events | MVP: polling through the GitHub App (no inbound port). When webhooks are enabled: verify signatures, expose only `/webhooks/github` |
+| Approvers | Map GitHub accounts ↔ platform users. Check roles + block self-approval |
+| Tenant isolation | Every query filters by `tenant_id`. [Proposal] Add PostgreSQL Row-Level Security in MVP+1 |
+| Audit | Append-only, hash chain, `verify` command; kept at least 2 years |
+| Kill switch | Stop any run and revoke its credentials within 5 minutes (6.5) |
+| Agents | Only registered, active agents with a pinned model and a matching instructions hash may run |
+
+[Doc] Draft section 4.14 has a full threat model based on the OWASP Top 10 for Agentic Applications (ASI01–ASI10). Applied fully in MVP+1.
+
+---
+
+## 10. Deployment (Docker Compose, one server)
+
+| Container | Notes |
+|---|---|
+| `postgres` | Several databases: `platform`, `temporal`, `litellm`, `langfuse` |
+| `temporal` + `temporal-ui` | |
+| `litellm` + `valkey` | Valkey for rate limiting and cache (shared with Langfuse) |
+| `langfuse-web`, `langfuse-worker`, `clickhouse` | Following Langfuse's self-hosting guide |
+| `seaweedfs` | S3 API for Evidence Packs and Langfuse. Single node |
+| `openbao` | Raft storage. Needs an unseal procedure and key backup (see 10.2) |
+| `sdlc-api`, `sdlc-worker`, `sdlc-runner` | Built by us |
+| OpenHands sandbox | **Not declared up front**. The runner creates it per run and removes it afterwards |
+
+- The runner needs control of Docker to create sandboxes.
+
+### 10.1. Internal server of moderate size
+
+Harry's decision (2026-09-24): **an internal server; no need for a high spec yet**.
+
+[Proposal] To fit the server:
+- **Limit concurrent runs**: 1–2 sandboxes (configurable). A third run waits in Temporal.
+- **Docker Compose profiles**: `core` (required) and `observability` (Langfuse + ClickHouse, the heaviest part). On a small server, enable `observability` later and use LiteLLM spend data meanwhile.
+- **Temporal uses PostgreSQL**; no Elasticsearch.
+- **API models only** in the MVP. The internal server needs no GPU.
+- **Measure real resource use in M-A** before fixing the server spec. No numbers set in advance.
+- If possible, run the runner in a **separate VM** on the same server, to isolate Docker permissions.
+- **OpenBao**: needs an unseal procedure after a reboot, and unseal keys backed up somewhere safe, off the server.
+
+### 10.2. Unseal key custody and OpenBao recovery (proposal)
+
+**Why it matters:** data in OpenBao is encrypted. After a reboot, OpenBao is "sealed". The **unseal key** is needed to open it. Losing this key = losing every secret.
+
+#### Splitting the key [Proposal]
+
+- At initialisation, split the unseal key into **3 shares**. Any **2 shares** open it (Shamir 3-of-2).
+- **3 people hold the 3 shares**, one each. Nobody holds two.
+- Why 3-of-2: in a small company we must be able to unseal when one person is away, but one person alone cannot.
+
+| Share | Holder (by role) | Stored where |
+|---|---|---|
+| Share 1 | A leadership representative (e.g. director / deputy technical director) | Personal password manager + sealed printed copy in the company safe |
+| Share 2 | Tech lead / platform owner | Personal password manager + sealed printed copy in the safe |
+| Share 3 | Infrastructure operator (IT / DevOps) | Personal password manager + sealed printed copy in the safe |
+
+- Harry chooses **the actual people** for the three roles. If one person holds two roles, pick someone else for one share.
+- Printed copies: one sealed, signed and dated envelope per share. The safe has a log of who opened it and when.
+- **Never** store unseal keys on the OpenBao server itself, in the repo, in chat or in email.
+
+#### Root token
+
+- Use the **root token** (highest privilege) only for initialisation and initial configuration.
+- Once configured → **revoke the root token** immediately.
+- When needed again → generate a new root token using key shares (2 people), revoke after use. Log every occurrence in the operations log.
+- Daily work uses admin accounts with limited permissions.
+
+#### Backups
+
+| What | Frequency (proposal) | Where |
+|---|---|---|
+| OpenBao data snapshot (Raft) | Daily | Storage **off the server**, encrypted |
+| OpenBao configuration (policies, AppRoles) | On every change | Internal Git repo, **no secrets** |
+
+- A snapshot still needs the unseal key to be used → keeping the keys and keeping the snapshots are two separate jobs, and both are required.
+
+#### Recovery drills
+
+- **First drill: milestone M-A.** Set up OpenBao on a test machine, restore from a snapshot, unseal with 2 shares.
+- Then: **every 3 months**, and whenever a key holder changes.
+- When a key holder changes (leaves, changes role) → **rekey** (create a new set of shares) and destroy the old envelopes.
+
+#### After a server reboot
+
+1. The operator announces it in the internal channel.
+2. Two key holders enter their shares (remotely over a secure connection, or on site).
+3. Check that the platform processes reconnect.
+4. Record it in the operations log.
+
+[Proposal] This procedure becomes a **runbook** in the handbook (Part III, T11).
+
+#### Later (not in the MVP)
+
+- **Auto-unseal**: opens automatically at start-up using an HSM or a key-management service. More convenient, but needs extra hardware or a service. Consider it when selling to clients or running several servers.
+
+---
+
+## 11. Code layout in the monorepo
+
+```text
+platform/
+├── apps/
+│   ├── api/          # NestJS
+│   ├── worker/       # Temporal worker + G1–G8 workflow
+│   ├── runner/       # Provisions sandboxes, calls the agent
+│   └── cli/          # sdlc command
+├── packages/
+│   ├── core/         # Core modules: registry, gate, cost, evidence, audit, tenancy
+│   ├── contracts/    # Types, Run Contract, schemas
+│   ├── adapters/
+│   │   ├── git-github/
+│   │   ├── agent-openhands/
+│   │   ├── model-litellm/
+│   │   ├── evidence-s3/
+│   │   └── policy-simple/
+│   └── config/       # Reads gate, budget and rule config (YAML)
+├── deploy/
+│   └── docker-compose.yml   # + OpenBao bootstrap and backup scripts
+└── tests/
+    └── integration/  # Scenarios N1–N6, tasks T01–T10 (D-09)
+```
+
+---
+
+## 12. Architecture decisions (short ADRs)
+
+| Code | Decision | Why | Trade-off |
+|---|---|---|---|
+| ADR-M01 | Modular monolith: 4 processes sharing core modules | Small team, easy to deploy and debug | Module boundaries need discipline |
+| ADR-M02 | Temporal for the G1–G8 workflow | Waits days for humans, resumes after failures | One more piece of infrastructure to operate |
+| ADR-M03 | Approvals via GitHub comments + CLI, no web UI | No UI to build; users already know it | Harder to get an overview → use CLI + Temporal UI |
+| ADR-M04 | Call OpenHands through the Agent Server REST API | Platform is TypeScript; the OpenHands SDK is Python | Depends on the Agent Server API → pin the version |
+| ADR-M05 | Run Contracts signed with Ed25519 via **OpenBao Transit**. Secrets in OpenBao, one AppRole per process | The key never leaves the secret manager. Self-hosted. No licence issue when selling | One more system to operate (unseal, backups) |
+| ADR-M06 | Simple YAML policy behind an interface | Fast. A path to OPA/Cedar | Complex rules are hard to express |
+| ADR-M07 | G7 relies on PR approvals on GitHub | Reuses existing review | Depends on correct branch protection settings |
+| ADR-M08 | One internal server, limited concurrent runs, Compose profiles | Matches the infrastructure decision; saves cost | No failover if the server breaks → regular backups |
+| ADR-M11 | GitHub events by polling in the MVP, webhooks later | The internal server does not accept inbound internet connections | Delay of tens of seconds; uses API quota → configurable interval |
+| ADR-M13 | Oversight as a data-driven matrix (gate × risk + change flags) in project config | The handbook defines oversight by risk; tuning must not need code changes | Matrix must be validated; wrong config can loosen control → config changes audited and reviewed |
+| ADR-M14 | Escalations as part of the Temporal intent workflow (timers, signals) | Durable clocks, no extra scheduler | Workflow grows more complex → escalation logic kept in its own module with tests |
+| ADR-M15 | Minimal agent register in the platform database | Handbook requires owned, pinned, recertified agents | Recertification workflow deferred to MVP+1 |
+| ADR-M12 | SeaweedFS instead of MinIO, Valkey instead of Redis | MinIO is no longer maintained; Redis licence does not fit a product we sell | Team learns new tools; S3 API / Redis protocol unchanged, so code is unaffected |
+
+ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written during tasks A06 and C01.
+
+---
+
+## 13. Risks
+
+| Risk | Mitigation |
+|---|---|
+| OpenHands Agent Server changes its API | Pin the version. PoC at the start of M-C. Integration tests |
+| Runner has Docker access = broad power | Separate machine/VM. Minimal permissions. Log every action |
+| Modular monolith turns into a "big ball of mud" | Lint checks on module dependencies. Architecture review at every milestone |
+| Too much infrastructure on one server | Measure in M-A. Limit concurrent runs. Compose profiles |
+| Losing the OpenBao unseal key = losing all secrets | Shamir 3-of-2, 3 holders, printed copies in the safe, drills every 3 months (section 10.2) |
+| Server reboots when not enough key holders are available | The platform stays down until unsealed. Accepted for the MVP. Auto-unseal later |
+
+## 14. Open questions
+
+- ~~Where to store keys and secrets?~~ → Decided: **OpenBao** from the MVP (section 8.1).
+- ~~Which server?~~ → Decided: internal server, moderate spec (section 10.1).
+- Choose **the actual people** for the three key-holder roles (section 10.2). The procedure is proposed.
+
+## 15. References
+
+**Internal**
+- Draft v1.0: 4.2 (overall architecture), 4.4–4.6 (control/execution planes), 4.7 (Signed Run Contract), 4.14 (security), 5.1.2 (build vs buy), 5.8 (MVP).
+- design/D-01, D-02, D-07, D-09.
+
+**External** (accessed 2026-09-24)
+- OpenHands Software Agent SDK: https://github.com/OpenHands/software-agent-sdk and https://docs.openhands.dev/sdk
+- Temporal: https://temporal.io/
+- SeaweedFS: https://github.com/seaweedfs/seaweedfs
+- Valkey: https://valkey.io/
+- OpenBao: https://openbao.org/ and https://github.com/openbao/openbao
+- Vault vs OpenBao comparison (WZ-IT, Sept 2026): https://wz-it.com/en/blog/openbao-vs-vault-comparison/
+- IBM engineers hatch Linux Foundation HashiCorp Vault fork (TechTarget): https://techtarget.com/searchitoperations/news/366563095/IBM-engineers-hatch-Linux-Foundation-HashiCorp-Vault-fork
+- LiteLLM, Langfuse: see D-07.
+
+---
+
+## Version history
+
+| Version | Date | Author | Notes |
+|---|---|---|---|
+| 0.1 | 2026-09-24 | Claude (draft) | First version |
+| 0.2 | 2026-09-24 | Claude (draft) | Vault-type secret manager from the MVP (OpenBao proposed). Moderate internal server: run limits, Compose profiles |
+| 0.3 | 2026-09-24 | Claude (draft) | OpenBao confirmed. Unseal key custody, root token, backups, drills (10.2) |
+| 0.4 | 2026-09-24 | Claude (draft) | After review: SeaweedFS, Valkey, GitHub polling (ADR-M11, M12), clearer G5 and Level 1, added `api_tokens` |
+| 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: oversight resolution, 2+N approval rules, approval binding and expiry, escalation with SLA timers, kill switch, agent register, AI record; new state machine; ADR-M13…M15 |
+| 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |

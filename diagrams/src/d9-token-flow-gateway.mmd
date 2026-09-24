@@ -1,0 +1,27 @@
+%%{init: {"flowchart": {"wrappingWidth": 320}}}%%
+flowchart LR
+    subgraph PF["Platform (built by us)"]
+        RM["Run Manager<br/>labels tenant, project, intent, run, gate"]
+        CC["Cost Controller<br/>budgets per run / gate"]
+    end
+    subgraph AG["Agents and services"]
+        A1["Coding agent<br/>(OpenHands, Claude…)"]
+        A2["BMAD / Spec Kit"]
+        A3["WeKnora (RAG)"]
+    end
+    GW["LLM gateway (LiteLLM, self-hosted)<br/>virtual keys · budgets · rate limits<br/>routing · fallback · cache · logs"]
+    subgraph MD["Models"]
+        API["Models via API<br/>(Anthropic, OpenAI…)"]
+        LOC["Self-hosted models<br/>(vLLM on GPU)"]
+    end
+    OBS["Langfuse + OpenTelemetry<br/>traces, tokens, cost"]
+    RP["Cost reports<br/>per client / project / task"]
+
+    RM --> A1 & A2
+    A1 & A2 & A3 --> GW
+    CC -. "set / read budgets" .-> GW
+    GW --> API
+    GW --> LOC
+    GW --> OBS
+    OBS --> RP
+    CC --> RP

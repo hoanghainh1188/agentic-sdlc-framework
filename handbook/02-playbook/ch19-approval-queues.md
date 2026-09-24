@@ -1,0 +1,136 @@
+# Chapter 19. Approval queues and avoiding review bottlenecks
+
+> Readers: **Person A, Person B, PM/BrSE** · Reading time: about 10 minutes
+> Status: **Draft 0.1**, awaiting Harry's comments.
+
+---
+
+## 19.1. Purpose
+
+- Keep human approvals **meaningful** without letting them stop all work.
+- When agents produce more, the bottleneck moves to review. This chapter keeps that queue short.
+
+## 19.2. Scope
+
+All HITL gates and escalations (codes table §4; Chapter 6).
+
+---
+
+## 19.3. Principles
+
+1. **Only block what needs blocking.** Low-risk, reversible work does not wait for a person (HOTL or AUDIT).
+2. **Waiting must not stop independent work.** While an approval is pending, the agent continues with work that does not depend on it.
+3. **An approval is not a blank cheque.** It is bound to the exact version, scope, environment and expiry.
+4. **The queue is measured like any other system.**
+
+---
+
+## 19.4. Blocking and deferred approvals
+
+| Type | Used for | What the agent does while waiting |
+|---|---|---|
+| **Blocking** | Deleting data, production deploys, merging security changes, payments, access changes, hard-to-reverse migrations | Stops **before** the protected action |
+| **Deferred** | Low-risk or reversible steps: extra tests, documentation, sandbox improvements, draft pull requests | The step is "parked"; independent work continues |
+
+Example:
+
+```text
+                     ┌─ waiting for approval ─→ deploy
+agent plan ──────────┤
+                     ├─ run independent tests
+                     ├─ update documentation
+                     └─ prepare the rollback plan
+```
+
+Only the protected action is locked. Evidence, tests and the rollback plan are ready when the reviewer answers.
+
+---
+
+## 19.5. Keeping the queue short
+
+| Practice | How |
+|---|---|
+| **Route to the right person** | Decide the approver **before** the request is created: by change type, repository, risk tier, ownership, availability and conflicts of interest. Finding a reviewer must not become a new bottleneck |
+| **One decision packet, not raw logs** | Goal, scope, diff or action summary, risk, test and security results, expected effect, rollback plan, and **what changed since the last review** (Chapter 4 §4.5) |
+| **Batch similar low-risk requests** | Group similar items into one decision, to reduce context switching |
+| **Deadlines and backups** | Every HITL request has a deadline, a backup reviewer and an escalation path (Chapter 6 §6.5) |
+| **Share Person B's load** | A backup Person B per project; rotation for HOTL monitoring (Chapter 5) |
+| **Fix the cause of rejections** | Many rejections usually mean unclear specs or plans, not bad reviewers |
+
+**No answer never means yes.** Our rule stays: items on the pre-approved safe list may continue; everything else stays frozen until a person decides (Chapter 6 §6.5).
+
+---
+
+## 19.6. Checking an approval is still valid
+
+Just before the protected action runs, check that it matches what was approved:
+
+| Bound to | Example |
+|---|---|
+| Version or hash of the proposal | Plan v3, spec hash |
+| Exact commit or artifact | Commit `abc123`, image digest |
+| Environment | Staging, production |
+| Scope | Services, files, data affected |
+| Expiry | Valid until a given time |
+
+If anything differs → **cancel and ask again**. Three rules always hold:
+1. No valid approval → no protected action.
+2. A pending approval does not block independent work.
+3. What runs is exactly what was approved, or it needs a new approval.
+
+---
+
+## 19.7. Metrics
+
+| Metric | Meaning | Warning |
+|---|---|---|
+| Approval waiting time (median, 95th percentile) | How fast reviewers respond | Median first review above 2 hours (Chapter 8 §8.7) |
+| Queue depth | Requests waiting | Growing week after week |
+| Timeout rate | Requests not handled within SLA | Any, for High and Critical |
+| Escalation rate | Requests passed to the next level | Rising |
+| Rejection rate | Quality of proposals and specs | Rising |
+| Rework rounds before approval | Clarity of what is asked | Rising |
+
+---
+
+## 19.8. Before the platform
+
+- Use GitHub review requests and CODEOWNERS for routing; labels for risk tier.
+- Person A writes the decision packet in the PR description (template T2).
+- The weekly report (T8) lists items waiting longer than their deadline.
+
+---
+
+## 19.9. Roles and approval points
+
+| What | Who |
+|---|---|
+| Routing rules per project | Person A proposes; Person B agrees; recorded in the project AI record |
+| Backup reviewer | Named by leadership per project |
+| Safe list of actions that may continue while waiting | Leadership (Chapter 6 §6.5) |
+
+---
+
+## 19.10. Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Reviewers approve quickly to clear the queue | Decision packet; approval time and rejection rate watched; Person B's load shared |
+| Stale approvals used for changed work | Binding to version, scope, environment, expiry; re-check before acting |
+| Everything classified as "needs approval" | Oversight by risk tier; review the classification monthly |
+
+---
+
+## 19.11. References
+
+**Related documents**
+- Handbook: codes table §4; Chapters 4, 5, 6, 8, 17; templates T2, T8.
+
+---
+
+## Version history
+
+| Version | Date | Author | Notes |
+|---|---|---|---|
+| 0.0 | 2026-09-24 | — | Skeleton |
+| 0.1 | 2026-09-24 | Claude (draft) | First content |

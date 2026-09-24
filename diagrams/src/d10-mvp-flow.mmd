@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    actor A as Person A (owner)
+    actor B as Person B (approver)
+    participant P as Platform<br/>(Orchestrator + Registry)
+    participant R as Run Manager
+    participant AG as Agent (sandbox)
+    participant GW as LLM Gateway
+    participant G as Git host + CI
+
+    A->>P: Create intent + spec + data_class + budget
+    P->>P: Check project AI record (consent, data class)
+    A->>P: /approve G1, /approve G2 (Person B for High+)
+    P-->>B: Request plan approval (G3, oversight from matrix)
+    B->>P: /approve G3 (bound to plan hash, expiry)
+    P->>R: G4: registered agent, autonomy, contract, limits
+    R->>AG: Run the agent on its own branch
+    AG->>GW: Call the model (labelled tenant/intent/run)
+    GW-->>R: Tokens used
+    R->>P: G5: file scope, budget, loop detection
+    Note over P,A: Breach → escalation (SLA clocks, backup owner, freeze)
+    AG->>G: Push branch, open PR
+    G-->>P: G6: CI, test, scan results
+    P-->>B: Request review (G7) + evidence pack
+    B->>G: Approve PR (+ second approver for sensitive changes)
+    G-->>P: G7 passed (producer never counts) → merge
+    P-->>B: Request release approval (G8) + client AI disclosure
+    B->>P: /approve G8
+    P->>P: Write audit, close intent, record metrics

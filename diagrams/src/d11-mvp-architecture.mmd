@@ -1,0 +1,65 @@
+---
+config:
+  layout: elk
+  flowchart:
+    wrappingWidth: 300
+---
+flowchart TB
+    subgraph USER["Users"]
+        CLI["CLI: sdlc"]
+        GHUI["GitHub: issue / PR<br/>/approve G3 ..."]
+    end
+
+    subgraph CP["Control plane (TypeScript, built by us)"]
+        API["API app (NestJS)<br/>REST for the CLI"]
+        WK["Workflow worker (Temporal)<br/>Gate Orchestrator G1–G8"]
+        subgraph MOD["Core modules (shared)"]
+            REG["Intent / Spec Registry"]
+            GATE["Gate Engine + Policy"]
+            COST["Cost Controller"]
+            EVD["Evidence Builder"]
+            AUD["Audit Log"]
+        end
+    end
+
+    subgraph EP["Execution plane"]
+        RUN["Runner (TypeScript)<br/>provisions sandboxes, tracks runs"]
+        subgraph SB["Sandbox (Docker, one container per run)"]
+            OH["OpenHands Agent Server<br/>+ git worktree"]
+        end
+    end
+
+    subgraph INFRA["Self-hosted infrastructure (reused)"]
+        PG[("PostgreSQL")]
+        TMP["Temporal"]
+        LL["LiteLLM Proxy"]
+        LF["Langfuse"]
+        S3[("SeaweedFS")]
+        VK["Valkey"]
+        VAULT["OpenBao<br/>secrets + Run Contract signing"]
+    end
+
+    subgraph EXT["External"]
+        GH["GitHub<br/>repo, PR, Actions CI"]
+        LLM["Models via API"]
+    end
+
+    CLI --> API
+    GHUI -. "comment /approve" .-> GH
+    WK -- "event polling (MVP)" --> GH
+    API --> MOD
+    WK --> MOD
+    API <--> TMP
+    WK <--> TMP
+    WK -- "Run Contract" --> RUN
+    RUN --> SB
+    OH -- "per-run virtual key" --> LL
+    LL --> LLM
+    LL --> LF
+    LL --> VK
+    OH -- "push branch agent/*" --> GH
+    MOD --> PG
+    EVD --> S3
+    COST <--> LL
+    WK -- "sign contract (Transit)" --> VAULT
+    RUN -- "verify, fetch short-lived secrets" --> VAULT
