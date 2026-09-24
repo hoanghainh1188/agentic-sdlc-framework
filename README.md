@@ -18,7 +18,7 @@ Built for small and medium software companies working for Japanese clients. Inte
 | Repository | `agentic-sdlc-framework` |
 | Language | English (see [writing style](handbook/00-introduction/06-writing-style.md)) |
 | Handbook status | Version 1.0, all parts written. **Not yet approved as a whole**; chapter approvals are interim (see handbook contents) |
-| Repository | `github.com/harryforge/agentic-sdlc-framework` (private). Hosted under a **personal account** — risk accepted by Harry, 2026-09-24 |
+| Repository | `github.com/harryforge/agentic-sdlc-framework` (private), organization `harryforge` on the **GitHub Free** plan — no server-side branch protection; compensating controls in place; upgrade to GitHub Team planned (Harry, 2026-09-24) |
 | Platform status | Design version 1.0 approved (2026-09-24, tag `design-v1.0`). **Coding the whole backlog now**, starting with A01; rework accepted after the handbook is approved |
 | Current work | Review of the handbook as a whole (Ch.13–20, Part 0 and templates still awaiting comments) |
 | Change log | [CHANGELOG.md](CHANGELOG.md) |
