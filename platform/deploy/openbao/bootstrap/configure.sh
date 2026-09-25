@@ -109,6 +109,8 @@ else
 fi
 
 # Writing a role again keeps its role_id and the secret IDs already issued.
+# Secret IDs AND the tokens issued at login are bound to the same CIDRs: a token copied out of a
+# platform process does not work from anywhere else (task A04, design/ADR-M21 §2.5).
 for role in $roles; do
   [ -f "$dir/policies/$role.hcl" ] || fail "no policy file policies/$role.hcl for AppRole $role"
   bao write auth/approle/role/"$role" \
@@ -119,8 +121,9 @@ for role in $roles; do
     secret_id_ttl="$secret_id_ttl" \
     secret_id_num_uses=0 \
     secret_id_bound_cidrs="$cidrs" \
+    token_bound_cidrs="$cidrs" \
     bind_secret_id=true >/dev/null
-  say "approle $role written (secret IDs bound to $cidrs)"
+  say "approle $role written (secret IDs and tokens bound to $cidrs)"
 done
 
 # --- Token role for daily admin work ----------------------------------------------------------

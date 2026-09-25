@@ -66,7 +66,7 @@ Who may read what is **only** in `bootstrap/policies/<name>.hcl`. The scripts co
 
 ### 2.5. AppRoles
 
-- Each role has `token_policies=<role>`, service tokens, TTL 1h, maximum 4h. Secret IDs are valid 90 days and are bound to the Compose network subnet (`secret_id_bound_cidrs`). A secret ID used from anywhere else (for example the host, or `docker exec` into the OpenBao container) is refused.
+- Each role has `token_policies=<role>`, service tokens, TTL 1h, maximum 4h. Secret IDs are valid 90 days and are bound to the Compose network subnet (`secret_id_bound_cidrs`). Since A04, the login tokens are bound to the same subnet (`token_bound_cidrs`, ADR-M21 §2.5). A secret ID or token used from anywhere else (for example `docker exec` into the OpenBao container) is refused. **Exception found in A04:** a login from the host through the published port passes, because Docker's port proxy connects from the network gateway, which is inside the subnet (QUESTIONS #27).
 - The subnet is fixed in Compose (`SDLC_NETWORK_SUBNET`, default `172.30.0.0/24`) so that it does not change when the network is recreated. `configure` reads the subnet from the running network.
 - `configure` writes the roles again on every run. This keeps `role_id` and the secret IDs already issued (live test, AC4).
 - `configure` does **not** issue secret IDs. Delivering them to the processes belongs to A04 and to the deployment of the platform processes.
@@ -94,10 +94,11 @@ The `runner` policy can read the GitHub App private key (`kv/shared/github-app`)
 |---|---|
 | TLS on the OpenBao listeners (carried over from A02) | QUESTIONS #20 |
 | How LiteLLM reads model provider keys | QUESTIONS #1 |
-| Delivering secret IDs to processes (response wrapping, file mounts) | A04 and the deployment of the platform processes |
+| Delivering secret IDs to processes (response wrapping, file mounts) | A04 defined the client side: role ID and secret ID files (ADR-M21 §2.2). File mounts and response wrapping: deployment of the platform processes (ADR-M21 §3) |
 | Audit log rotation, off-server copy, 2-year retention | A10, E05 |
 | Real initialisation on the internal server | After the three key holders are named (runbook T11 §3) |
-| `token_bound_cidrs` on AppRole tokens (secret IDs are already bound) | Review in A04 |
+| `token_bound_cidrs` on AppRole tokens (secret IDs are already bound) | Done in A04 (decision D2, ADR-M21 §2.5) |
+| Host logins through the published port pass the CIDR check | QUESTIONS #27 |
 | Personal admin login (userpass or OIDC with `token_max_ttl` 1h), so that each admin session does not need a root token from two key holders | Decide when admin work becomes frequent (after A04) |
 
 ## 4. Alternatives not chosen
@@ -122,3 +123,4 @@ The `runner` policy can read the GitHub App private key (`kv/shared/github-app`)
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A03) | First version |
+| 0.2 | 2026-09-25 | Claude (task A04) | §2.5: tokens bound to the subnet (`token_bound_cidrs`), host exception (QUESTIONS #27); §3: open items updated |

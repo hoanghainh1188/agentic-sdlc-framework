@@ -19,6 +19,7 @@
 | ADR-M18 | [Project configuration package and message catalog](ADR-M18-config-and-message-catalog.md) (task A05) | Proposed | |
 | ADR-M19 | [OpenBao bootstrap: tool, policy layout, token handling](ADR-M19-openbao-bootstrap.md) (task A03) | Proposed | |
 | ADR-M20 | [Registry: intents, gate decisions, POLICY, void links, reason codes](ADR-M20-registry.md) (task B02) | Proposed | |
+| ADR-M21 | [OpenBao client for the platform processes](ADR-M21-openbao-client.md) (task A04) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

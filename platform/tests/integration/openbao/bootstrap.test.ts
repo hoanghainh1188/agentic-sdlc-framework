@@ -351,6 +351,15 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
       expect(r.status).not.toBe(0);
     });
 
+    it('a login token does not work outside the bound subnet (token_bound_cidrs, A04)', () => {
+      const token = loginToken('runner');
+      const lookup = 'bao read -field=policies auth/token/lookup-self';
+      expect(ok(onNetwork(lookup, `${token}\n`), 'lookup on the network').stdout).toMatch(/runner/);
+      const outside = inOpenbao(lookup, `${token}\n`);
+      expect(outside.status).not.toBe(0);
+      expect(outside.stderr).toMatch(/Code: 403/);
+    });
+
     it('worker signs a Run Contract; runner verifies it; runner and api cannot sign', () => {
       const worker = loginToken('worker');
       const sig = ok(

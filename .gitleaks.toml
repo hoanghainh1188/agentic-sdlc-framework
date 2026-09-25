@@ -15,3 +15,16 @@ description = "valkey/valkey image tag is not a secret (PR #50)"
 targetRules = ["generic-api-key"]
 regexTarget = "line"
 regexes = ['''valkey/valkey:[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?`?\s*(\|.*)?$''']
+
+# Approved by: Harry (Person B), 2026-09-25, PR #68 (task A04).
+# False positive: the unit tests of the OpenBao client (platform/tests/secrets/) use made-up
+# credentials that all contain the marker "S3CR3T", so the redaction tests can prove that no
+# secret value reaches an error or a log. Only generic-api-key matches that contain the marker,
+# in the .ts files of that one folder, are skipped. Any other value there is still reported.
+[[allowlists]]
+description = "Made-up test credentials with the S3CR3T marker in platform/tests/secrets (PR #68)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^platform/tests/secrets/[^/]+\.ts$''']
+regexTarget = "match"
+regexes = ['''S3CR3T''']

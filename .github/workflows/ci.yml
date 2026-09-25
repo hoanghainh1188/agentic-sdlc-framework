@@ -92,10 +92,11 @@ jobs:
             run=true; reason="$EVENT_NAME run"
           elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             run=true; reason="base commit unknown, running to be safe"
-          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/deploy/)" ]; then
-            run=true; reason="platform/deploy/ changed"
+          # Infrastructure (A02, A03) and the OpenBao client (A04), whose live test needs Compose.
+          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/)" ]; then
+            run=true; reason="platform/deploy/, the OpenBao client or its live test changed"
           else
-            reason="platform/deploy/ unchanged"
+            reason="platform/deploy/, the OpenBao client and its live test unchanged"
           fi
           echo "run_compose=$run" >> "$GITHUB_OUTPUT"
           echo "Compose integration job: run=$run ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -128,8 +129,8 @@ jobs:
           SDLC_WAIT_TIMEOUT: '600' # cold image pulls on GitHub runners (A02 default: 300)
         run: sh platform/deploy/scripts/up.sh core
       - run: pnpm test:integration
-      # A03: OpenBao bootstrap on its own throw-away Compose project (throw-away test keys,
-      # never printed). Separate from the core stack above.
+      # A03, A04: OpenBao bootstrap and the OpenBao client, each on its own throw-away Compose
+      # project (throw-away test keys, never printed). Separate from the core stack above.
       - run: pnpm test:openbao
       - name: Show service state and logs
         if: failure()
