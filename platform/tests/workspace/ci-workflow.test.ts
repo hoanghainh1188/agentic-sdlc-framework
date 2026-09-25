@@ -165,10 +165,11 @@ describe('AC3: Gitleaks, Semgrep and Trivy run and block critical findings', () 
     }
   });
 
-  it('gitleaks scans the full history and fails on any finding', () => {
+  it('gitleaks scans the full history of the checked-out commit and fails on any finding', () => {
     const checkout = job('gitleaks').steps.find((s) => s.uses?.startsWith('actions/checkout@'));
     expect(checkout?.with?.['fetch-depth']).toBe(0);
     expect(runText('gitleaks')).toMatch(/gitleaks" git --config \.gitleaks\.toml .*--exit-code 1/s);
+    expect(runText('gitleaks')).toContain('--log-opts HEAD'); // not --all: other branches are not this PR
   });
 
   it('semgrep fails on findings at the blocking severity', () => {

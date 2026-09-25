@@ -158,7 +158,9 @@ jobs:
       - name: Scan (any finding blocks)
         run: |
           status=0
-          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --redact --verbose --exit-code 1 \
+          # --log-opts HEAD: the full history of the checked-out commit only. The default (--all)
+          # would also scan other branches fetched by fetch-depth 0, such as open PRs of other tasks.
+          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --log-opts HEAD --redact --verbose --exit-code 1 \
             --report-format json --report-path "$RUNNER_TEMP/gitleaks.json" . || status=$?
           count=$(jq length "$RUNNER_TEMP/gitleaks.json" 2>/dev/null || echo "unknown")
           echo "### gitleaks: $count finding(s) (values redacted)" >> "$GITHUB_STEP_SUMMARY"
