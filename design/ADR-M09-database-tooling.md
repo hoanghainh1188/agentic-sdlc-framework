@@ -123,7 +123,7 @@ Implementation choices:
 - `project_configs.updated_by` may be null: the platform wrote the config itself.
 - `api_tokens` stores only the SHA-256 hash (`CHECK` on 64 lowercase hex characters). The repository rejects anything else, and the raw token never reaches the database.
 - `project_configs` and `project_ai_records` are versioned with optimistic locking: `save(…, expectedVersion)`. History goes to the audit log from A07 on.
-- `role_bindings.revoked_at` (QUESTIONS #11, approved): a role is withdrawn by setting it; revoked rows stay as history. The unique key applies to active bindings only (`WHERE revoked_at IS NULL`), so a role can be granted again. `platform_app` may update only `revoked_at`, and a `CHECK` keeps it after `created_at`. `revoke()` uses the database clock by default.
+- `role_bindings.revoked_at` (QUESTIONS #11, approved): a role is withdrawn by setting it; revoked rows stay as history. The unique key applies to active bindings only (`WHERE revoked_at IS NULL`), so a role can be granted again. `platform_app` may update only `revoked_at`, and a `CHECK` keeps it after `created_at`. `revoke()` uses the database clock by default. Raw SQL could still set `revoked_at` back to NULL; A07 adds a trigger that refuses any change once it is set (QUESTIONS #12).
 - The 1–1 tables are keyed by `project_id` alone (D-05). A cross-tenant insert into them fails on the primary key before the foreign key. It is still rejected, but with the error code `conflict` instead of `reference_not_found`.
 
 ## 3. Alternatives not chosen
