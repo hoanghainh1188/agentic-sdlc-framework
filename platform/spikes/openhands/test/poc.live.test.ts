@@ -240,7 +240,8 @@ describe.skipIf(!LIVE)('C01 live: OpenHands Agent Server controlled from Node.js
 
   it('real Claude run through LiteLLM (capped at USD 1.00)', async (context) => {
     if (!realKeyConfigured) {
-      report['realRun'] = 'skipped: POC_ANTHROPIC_API_KEY not set';
+      // Deferred in C01 (no company key yet); a condition for C05 (QUESTIONS.md #15, ADR-M10 §3).
+      report['realRun'] = 'deferred: POC_ANTHROPIC_API_KEY not set';
       context.skip();
     }
     const budget = realRunBudgetUsd(settings);

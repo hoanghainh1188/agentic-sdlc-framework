@@ -47,5 +47,6 @@ Unit tests run in `pnpm test`. The live test needs Docker and is skipped unless 
 6. Restore the product LiteLLM configuration: `pnpm compose:core`. Remove the stub model with
    `docker rm -f sdlc-poc-stub-model-1`.
 
-The real-model run is capped at USD 1.00 by the virtual key budget, and it sends only the fixture
+The real-model run is **deferred** until a company API key exists (ADR-M10 §3, QUESTIONS.md #15); it
+must pass before C05 is done. It is capped at USD 1.00 by the virtual key budget, and it sends only the fixture
 workspace (a README and one new file) to the model.

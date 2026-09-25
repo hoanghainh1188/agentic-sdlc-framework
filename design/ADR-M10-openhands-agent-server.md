@@ -5,7 +5,7 @@
 | Status | **Proposed** (task C01, PR for review) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25) |
-| Related | D-08 tasks C01, C04, C05, C11; D-02 FR-30…FR-35, FR-50, FR-51; D-03 sections 5.3, 7.2, 8, 9, 12 (ADR-M04), 13; D-07 section 3; D-01 section 5.1; ADR-M17; design/QUESTIONS.md #13 |
+| Related | D-08 tasks C01, C04, C05, C11; D-02 FR-30…FR-35, FR-50, FR-51; D-03 sections 5.3, 7.2, 8, 9, 12 (ADR-M04), 13; D-07 section 3; D-01 section 5.1; ADR-M17; design/QUESTIONS.md #13, #14, #15 |
 | Spike code | `platform/spikes/openhands/` (may be thrown away) |
 
 ## 1. Context
@@ -16,7 +16,10 @@ All sources were accessed on 2026-09-25.
 
 ## 2. Decision
 
-**Go for C05.** OpenHands Agent Server `1.48.0` can be controlled from Node.js over REST, with every model call going through LiteLLM on a per-run virtual key. The sandbox has no route out except LiteLLM, drops all capabilities and runs with a read-only root filesystem.
+**CONDITIONAL GO for C05** (Harry, 2026-09-25).
+
+- **Proven with the stub model:** OpenHands Agent Server `1.48.0` can be controlled from Node.js over REST. Every model call goes through LiteLLM on a per-run virtual key with the seven labels. The sandbox has no route out except LiteLLM, drops all capabilities and runs with a read-only root filesystem. The kill switch, the budget block and loop detection work.
+- **Condition:** one real run with Claude on a company API key must pass before C05 is done (section 3, QUESTIONS.md #15). The stub model returns scripted tool calls; it does not show how a real model uses the tools, how many tokens a task costs, or how much memory a real run needs.
 
 ### 2.1. Pinned image and licence
 
@@ -79,7 +82,7 @@ Mapping to D-05 `run_status` (spike `status-map.ts`): `finished` → `succeeded`
 | Start-up to ready | 4.5–6.8 s |
 | Stub model container | about 33 MiB |
 
-With the default of 1–2 concurrent runs, reserve about 2 GiB per sandbox (the limit) on top of the ~1.3 GiB of the `core` profile. A real model run uses more memory in the terminal tool; the real-model figures are in section 3.
+With the default of 1–2 concurrent runs, reserve about 2 GiB per sandbox (the limit) on top of the ~1.3 GiB of the `core` profile. A real model run may use more memory and time; those figures come from the deferred real run (section 3).
 
 ### 2.6. Handbook rules: config, not code
 
@@ -89,7 +92,19 @@ With the default of 1–2 concurrent runs, reserve about 2 GiB per sandbox (the 
 
 ## 3. Real-model run
 
-**Pending:** the Anthropic key is not yet in `platform/deploy/.env`. Planned run: `anthropic/claude-haiku-4-5-20251001` through LiteLLM alias `poc-claude`, key budget USD 1.00, fixture workspace only. The live test case `real Claude run through LiteLLM` fills this section.
+**Deferred** (Harry, 2026-09-25): no company Anthropic API key is available yet. C01 closes without the real run.
+
+The run is ready and must pass before C05 is done (QUESTIONS.md #15):
+
+| Item | Value |
+|---|---|
+| Model | `anthropic/claude-haiku-4-5-20251001` (small current Claude model), LiteLLM alias `poc-claude` in `litellm.poc.yaml` |
+| Key | Company API key as `POC_ANTHROPIC_API_KEY` in the Git-ignored `platform/deploy/.env`; given to LiteLLM only |
+| Cap | Per-run virtual key budget `min(budget.default_run_usd, 1.00)` = USD 1.00 |
+| Data sent | Fixture workspace only (a README and the new file); no client data |
+| How | Live test case `real Claude run through LiteLLM` (spike README); it skips while the key is missing |
+| Pass | Conversation `finished`; `hello.txt` reported as `ADDED` by `/api/git/changes`; spend at or below the cap |
+| Record here | Status, run time, number of model calls, spend, sandbox RAM during the run |
 
 ## 4. Limitations and findings for later tasks
 
