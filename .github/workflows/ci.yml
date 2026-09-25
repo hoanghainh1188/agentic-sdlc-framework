@@ -124,6 +124,8 @@ jobs:
           done
           sh platform/deploy/scripts/init-env.sh
       - name: Start the core profile and wait until healthy
+        env:
+          SDLC_WAIT_TIMEOUT: '600' # cold image pulls on GitHub runners (A02 default: 300)
         run: sh platform/deploy/scripts/up.sh core
       - run: pnpm test:integration
       - name: Show service state and logs
