@@ -42,7 +42,7 @@ Red: always approved by a person (HITL). Orange: oversight depends on risk. Blue
 | Topic | Decision | Document |
 |---|---|---|
 | Approach | Build the platform ourselves (option C). Platform first, then trial, then adjust | D-01, D-02 |
-| Codes | 6 phases P1–P6 · autonomy L0–L4 + oversight HITL/HOTL/AUDIT · 8 gates G1–G8 with risk-based oversight · 2+N team | [Codes table](handbook/00-introduction/05-codes.md) (v0.3, draft) |
+| Codes | 6 phases P1–P6 · autonomy L0–L4 + oversight HITL/HOTL/AUDIT · 8 gates G1–G8 with risk-based oversight · 2+N team | [Codes table](handbook/00-introduction/05-codes.md) (v1.3; handbook not yet approved as a whole) |
 | Architecture | Modular monolith in TypeScript: `api` (NestJS), `worker` (Temporal), `runner`, `cli` | D-03 |
 | First agent | OpenHands (Agent Server called over REST) | D-02, D-03 |
 | Git host | GitHub first (GitLab later). Events read by **polling** in the MVP | D-02, D-03 |
@@ -81,7 +81,7 @@ Red: always approved by a person (HITL). Orange: oversight depends on risk. Blue
 | M-E | Trial of T01–T10 on the sample repo; collect data | ⬜ |
 | M-F | Adjust, then trial on a real internal tool | ⬜ |
 
-All 40 tasks: [design/D-08-mvp-backlog.md](design/D-08-mvp-backlog.md).
+All 44 tasks: [design/D-08-mvp-backlog.md](design/D-08-mvp-backlog.md).
 
 ---
 

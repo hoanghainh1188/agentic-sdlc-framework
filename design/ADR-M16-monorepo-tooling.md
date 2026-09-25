@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A01, PR for review) |
+| Status | **Accepted** (Harry, 2026-09-25) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25) |
 | Related | D-03 section 11 (code layout), AP4 and AP7, D-08 task A01, NFR-04 (licences) |
@@ -98,3 +98,4 @@ Enforcement:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A01) | First version |
+| 0.2 | 2026-09-25 | Harry | Accepted with PR #46 |
