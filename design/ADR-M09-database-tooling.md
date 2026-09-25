@@ -146,7 +146,7 @@ Migration `0002-audit-log` creates `audit_log` (D-05 sections 6.7 and 7).
 - First record of a tenant: `seq = 1`, `prev_hash` = 64 zeros (`CHECK`).
 - Writes: `AuditLogRepository.append` runs in the caller's transaction (or opens one), takes `pg_advisory_xact_lock(<audit class>, hashtext(tenant_id))`, reads the tenant's last row, computes the hash and inserts. The lock is a query fragment without a table, so it passes the tenant guard.
 - **Chain link trigger** (`BEFORE INSERT`): refuses a row whose `seq` is not the tenant's last `seq + 1`, or whose `prev_hash` is not the last `hash`. It cannot recompute the SHA-256, but a writer that skipped the lock cannot create a gap or a fork. Unique `(tenant_id, seq)` stays as well.
-- Trigger errors use our own SQLSTATE codes, mapped to `DbError` codes: `SDA01` append-only → `immutable`; `SDA02` chain link → `conflict`; `SDA03` revoked role binding → `immutable`.
+- Trigger errors use our own SQLSTATE codes, mapped to `DbError` codes: `SDA01` append-only → `immutable`; `SDA02` chain link → `conflict`; `SDA03` revoked role binding → `immutable`; `SDA04` void of a non-approval → `invalid_value` (B02, ADR-M20).
 
 **What the payload may contain.** The audit log is never deleted and is kept at least 2 years (D-05 section 10, FR-44). Personal data or client data written there could never be erased (handbook Ch.7). Therefore:
 
@@ -163,6 +163,13 @@ Migration `0002-audit-log` creates `audit_log` (D-05 sections 6.7 and 7).
 |---|---|---|---|
 | `config.changed` | `project` | `version`, `config_hash` | `projectConfigs.save`, same transaction. Actor `system` when the platform writes the config |
 | `ai_record.changed` | `project` | `version` | `projectAiRecords.save`, same transaction. Never the record contents (client contact, locations) |
+| `intent.created` | `intent` | `code`, `project_id`, `risk_tier`, `data_class`, `max_autonomy` | `intents.create` (B02). Never the title or description |
+| `intent.state_changed` | `intent` | `status`, `current_gate`? | `intents.updateState` (B02) |
+| `spec.linked` | `intent` | `spec_ref_id`, `version`, `content_sha256` | `specRefs.link` (B02). Never the path or content |
+| `plan.submitted` | `intent` | `plan_id`, `version`, `plan_sha256` | `plans.submit` (B02). Never the file list or summary |
+| `gate.decided` | `intent` | `decision_id`, `gate`, `decision`, `oversight_mode`, `input_sha256`, `config_hash`, `approver_role`?, `reason_code`?, `voids_decision_id`? | `gateDecisions.decide` and `revalidateApprovals` (B02). Never a free-text reason |
+
+Fields marked `?` are optional (ADR-M20 section 2.4): left out when there is no value, never null, same format rule when present.
 
 **Integrity check (D-05 section 7.3, FR-41).**
 
@@ -199,3 +206,4 @@ Migration `0002-audit-log` creates `audit_log` (D-05 sections 6.7 and 7).
 | 0.2 | 2026-09-25 | Claude (task A06) | `role_bindings.revoked_at` (QUESTIONS #11, approved by Harry) |
 | 0.3 | 2026-09-25 | Claude (issue #55) | §2.5: `@sdlc/contracts` is the source of `data_class` and `project_role`; `vocabulary.ts` keeps DB-only lists; test of `pg_enum` against contracts |
 | 0.4 | 2026-09-25 | Claude (task A07) | §2.8 audit log: triggers, hash chain with `hash_version`, payload rule (IDs, codes, hashes, versions only; declared fields; 2048 bytes), audited config and AI record saves, `sdlc audit verify` (temporary direct DB access, B04 moves it behind the API); §2.7 QUESTIONS #12 done |
+| 0.5 | 2026-09-25 | Claude (task B02) | §2.8: registry audit actions, optional fields, `SDA04`. `gate_decisions` attaches `forbid_mutation()` (ADR-M20) |

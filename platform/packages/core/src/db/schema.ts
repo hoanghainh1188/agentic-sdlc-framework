@@ -1,15 +1,30 @@
-// Kysely types for the `platform` database (design/D-05 section 6.1, task A06).
+// Kysely types for the `platform` database (design/D-05 sections 6.1–6.3 and 6.7; A06, A07, B02).
 // Written by hand. `TABLE_COLUMNS` mirrors them at runtime; the integration tests compare both
 // with the live schema, so the types cannot drift from the migrations.
-import type { ActorType, DataClass, ProjectRole } from '@sdlc/contracts';
+import type {
+  ActorType,
+  AutonomyLevel,
+  ChangeFlag,
+  DataClass,
+  EventSource,
+  GateCheckMode,
+  GateCode,
+  GateDecision,
+  GateReasonCode,
+  IntentStatus,
+  ProjectRole,
+  RiskTier,
+} from '@sdlc/contracts';
 import type { ColumnType, Generated, Insertable, Selectable } from 'kysely';
 
 import type {
   AiAllowed,
   DisclosureFormat,
+  GateDecisionSource,
   GitProvider,
   ProdLogsAllowed,
   ProjectStatus,
+  SpecSourceTool,
   TenantStatus,
   UserStatus,
 } from './vocabulary.js';
@@ -145,6 +160,89 @@ export interface AuditLogTable {
   created_at: CreatedAt;
 }
 
+/**
+ * An intent: the only registry table that is updated (current state). History lives in
+ * `gate_decisions` and `audit_log` (D-05 section 6.2).
+ */
+export interface IntentsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  /** `INT-YYYY-NNNN`, unique within the tenant (D-02 FR-01). */
+  code: Immutable<string>;
+  project_id: Immutable<string>;
+  title: Immutable<string>;
+  description: Immutable<string>;
+  created_by: Immutable<string>;
+  risk_tier: Immutable<RiskTier>;
+  data_class: Immutable<DataClass>;
+  /** Computed by the policy engine at creation (D-02 FR-03). */
+  max_autonomy: Immutable<AutonomyLevel>;
+  budget_usd: ColumnType<string, string, never>;
+  current_gate: ColumnType<GateCode | null, never, GateCode | null>;
+  status: ColumnType<IntentStatus, never, IntentStatus>;
+  issue_number: ColumnType<number | null, number | null, number | null>;
+  pr_number: ColumnType<number | null, number | null, number | null>;
+  updated_at: ColumnType<Date, never, Date>;
+  created_at: CreatedAt;
+}
+
+/** A spec linked to an intent: path, commit and content hash, one row per version (FR-02). */
+export interface SpecRefsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  version: Immutable<number>;
+  path: Immutable<string>;
+  commit_sha: Immutable<string>;
+  content_sha256: Immutable<string>;
+  source_tool: Immutable<SpecSourceTool | null>;
+  created_at: CreatedAt;
+}
+
+/** A plan for an intent, one row per version. `change_flags` drive G3 and G7 oversight. */
+export interface PlansTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  version: Immutable<number>;
+  planned_files: Immutable<string[]>;
+  summary: Immutable<string>;
+  plan_sha256: Immutable<string>;
+  proposed_by_type: Immutable<ActorType>;
+  change_flags: Immutable<ChangeFlag[]>;
+  created_at: CreatedAt;
+}
+
+/**
+ * Append-only gate decisions (D-05 section 6.3, ADR-M20). Codes, hashes and IDs only: the human
+ * explanation stays on the Git host (`reason_ref`).
+ */
+export interface GateDecisionsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  gate: Immutable<GateCode>;
+  decision: Immutable<GateDecision>;
+  /** Resolved from the matrix at decision time; `POLICY` only for the automatic G4 check. */
+  oversight_mode: Immutable<GateCheckMode>;
+  approver_role: Immutable<ProjectRole | null>;
+  actor_type: Immutable<ActorType>;
+  decided_by: Immutable<string | null>;
+  reason_code: Immutable<GateReasonCode | null>;
+  reason_ref: Immutable<string | null>;
+  /** The bound version: hash of the gate's input (spec, plan, diff…). */
+  input_sha256: Immutable<string>;
+  scope: ColumnType<Record<string, unknown> | null, string | null, never>;
+  expires_at: Immutable<Date | null>;
+  config_hash: Immutable<string>;
+  source: Immutable<GateDecisionSource>;
+  event_source: Immutable<EventSource | null>;
+  waited_seconds: Immutable<number | null>;
+  /** Set on `void` decisions only: the approval they cancel. */
+  voids_decision_id: Immutable<string | null>;
+  created_at: CreatedAt;
+}
+
 export interface Database {
   tenants: TenantsTable;
   projects: ProjectsTable;
@@ -156,6 +254,10 @@ export interface Database {
   api_tokens: ApiTokensTable;
   git_event_cursors: GitEventCursorsTable;
   audit_log: AuditLogTable;
+  intents: IntentsTable;
+  spec_refs: SpecRefsTable;
+  plans: PlansTable;
+  gate_decisions: GateDecisionsTable;
 }
 
 export type TableName = keyof Database;
@@ -272,6 +374,70 @@ export const TABLE_COLUMNS = {
     'occurred_at',
     'created_at',
   ]),
+  intents: columns<IntentsTable>()([
+    'id',
+    'tenant_id',
+    'code',
+    'project_id',
+    'title',
+    'description',
+    'created_by',
+    'risk_tier',
+    'data_class',
+    'max_autonomy',
+    'budget_usd',
+    'current_gate',
+    'status',
+    'issue_number',
+    'pr_number',
+    'updated_at',
+    'created_at',
+  ]),
+  spec_refs: columns<SpecRefsTable>()([
+    'id',
+    'tenant_id',
+    'intent_id',
+    'version',
+    'path',
+    'commit_sha',
+    'content_sha256',
+    'source_tool',
+    'created_at',
+  ]),
+  plans: columns<PlansTable>()([
+    'id',
+    'tenant_id',
+    'intent_id',
+    'version',
+    'planned_files',
+    'summary',
+    'plan_sha256',
+    'proposed_by_type',
+    'change_flags',
+    'created_at',
+  ]),
+  gate_decisions: columns<GateDecisionsTable>()([
+    'id',
+    'tenant_id',
+    'intent_id',
+    'gate',
+    'decision',
+    'oversight_mode',
+    'approver_role',
+    'actor_type',
+    'decided_by',
+    'reason_code',
+    'reason_ref',
+    'input_sha256',
+    'scope',
+    'expires_at',
+    'config_hash',
+    'source',
+    'event_source',
+    'waited_seconds',
+    'voids_decision_id',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -289,6 +455,10 @@ export const TENANT_COLUMN = {
   api_tokens: 'tenant_id',
   git_event_cursors: 'tenant_id',
   audit_log: 'tenant_id',
+  intents: 'tenant_id',
+  spec_refs: 'tenant_id',
+  plans: 'tenant_id',
+  gate_decisions: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -301,6 +471,10 @@ export type RoleBinding = Selectable<RoleBindingsTable>;
 export type ApiToken = Selectable<ApiTokensTable>;
 export type GitEventCursor = Selectable<GitEventCursorsTable>;
 export type AuditLogRow = Selectable<AuditLogTable>;
+export type Intent = Selectable<IntentsTable>;
+export type SpecRef = Selectable<SpecRefsTable>;
+export type Plan = Selectable<PlansTable>;
+export type GateDecisionRow = Selectable<GateDecisionsTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

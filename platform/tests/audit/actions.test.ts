@@ -89,11 +89,71 @@ describe('checkAuditEvent', () => {
     };
     for (const [action, spec] of Object.entries(AUDIT_ACTIONS)) {
       const payload = Object.fromEntries(
-        Object.entries(spec.fields).map(([field, kind]) => [field, maxValue[kind]]),
+        // Optional fields (`kind?`) count at their maximum size too.
+        Object.entries(spec.fields).map(([field, declared]) => [
+          field,
+          maxValue[declared.replace('?', '') as keyof typeof maxValue],
+        ]),
       );
       expect(Buffer.byteLength(JSON.stringify(payload)), action).toBeLessThanOrEqual(
         MAX_AUDIT_PAYLOAD_BYTES,
       );
+    }
+  });
+});
+
+describe('optional audit fields (ADR-M20)', () => {
+  const decided = {
+    decision_id: SOME_ID,
+    gate: 'G3',
+    decision: 'approve',
+    oversight_mode: 'HITL',
+    input_sha256: HASH,
+    config_hash: HASH,
+  };
+
+  it('may be left out, and are returned only when present', () => {
+    expect(checkAuditEvent('gate.decided', SOME_ID, decided).payload).toEqual(decided);
+    expect(
+      checkAuditEvent('gate.decided', SOME_ID, { ...decided, approver_role: 'person_b' }).payload,
+    ).toEqual({ ...decided, approver_role: 'person_b' });
+    expect(
+      checkAuditEvent('intent.state_changed', SOME_ID, { status: 'draft', current_gate: undefined })
+        .payload,
+    ).toEqual({ status: 'draft' });
+  });
+
+  it('follow the same format rules when present, and are never null', () => {
+    for (const bad of [
+      { approver_role: null },
+      { reason_code: 'the spec is unclear' },
+      { voids_decision_id: 'not-a-uuid' },
+    ]) {
+      expect(
+        rejection(() => checkAuditEvent('gate.decided', SOME_ID, { ...decided, ...bad })),
+        JSON.stringify(bad),
+      ).toBe('invalid_value');
+    }
+  });
+
+  it('registry actions never declare a field for titles, paths, summaries or reasons', () => {
+    const fields = [
+      'intent.created',
+      'intent.state_changed',
+      'spec.linked',
+      'plan.submitted',
+      'gate.decided',
+    ].flatMap((action) => Object.keys(AUDIT_ACTIONS[action as keyof typeof AUDIT_ACTIONS].fields));
+    for (const forbidden of [
+      'title',
+      'description',
+      'path',
+      'summary',
+      'reason',
+      'reason_ref',
+      'planned_files',
+    ]) {
+      expect(fields).not.toContain(forbidden);
     }
   });
 });

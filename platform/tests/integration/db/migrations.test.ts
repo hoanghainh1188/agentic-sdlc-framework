@@ -1,6 +1,19 @@
-// D-08 A06 AC2 on a live PostgreSQL: tables, columns, enums, composite foreign keys (D-05 D2),
+// D-08 A06 AC2 (and the B02 registry tables) on a live PostgreSQL: tables, columns, enums, composite foreign keys (D-05 D2),
 // unique constraints and the privileges of the application role.
-import { ACTOR_TYPES, DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
+import {
+  ACTOR_TYPES,
+  AUTONOMY_LEVELS,
+  CHANGE_FLAGS,
+  DATA_CLASSES,
+  EVENT_SOURCES,
+  GATE_CHECK_MODES,
+  GATE_CODES,
+  GATE_DECISIONS,
+  GATE_REASON_CODES,
+  INTENT_STATUSES,
+  PROJECT_ROLES,
+  RISK_TIERS,
+} from '@sdlc/contracts';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
@@ -39,6 +52,12 @@ const UPDATABLE: Record<string, readonly string[]> = {
   git_event_cursors: ['cursor', 'last_polled_at'],
   // Append-only (D-05 D3, A07): no column is updatable.
   audit_log: [],
+  // B02: only the current state of an intent changes; history is in gate_decisions and audit_log.
+  intents: ['current_gate', 'status', 'issue_number', 'pr_number', 'updated_at'],
+  spec_refs: [],
+  plans: [],
+  // Append-only (D-05 D3, B02).
+  gate_decisions: [],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -108,6 +127,28 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     );
   });
 
+  it('the registry enums match the @sdlc/contracts lists (B02)', async () => {
+    const enums = await rows<{ name: string; values: string[] }>(sql`
+      SELECT t.typname AS name, array_agg(e.enumlabel ORDER BY e.enumsortorder)::text[] AS values
+      FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
+      JOIN pg_namespace n ON n.oid = t.typnamespace AND n.nspname = 'public'
+      GROUP BY t.typname`);
+    const byName = Object.fromEntries(enums.map((e) => [e.name, e.values]));
+    expect(byName).toMatchObject({
+      gate_code: [...GATE_CODES],
+      risk_tier: [...RISK_TIERS],
+      autonomy_level: [...AUTONOMY_LEVELS],
+      change_flag: [...CHANGE_FLAGS],
+      intent_status: [...INTENT_STATUSES],
+      gate_decision: [...GATE_DECISIONS],
+      gate_check_mode: [...GATE_CHECK_MODES],
+      gate_reason_code: [...GATE_REASON_CODES],
+      event_source: [...EVENT_SOURCES],
+    });
+    // Oversight modes alone are not stored anywhere yet, so that enum does not exist.
+    expect(byName.oversight_mode).toBeUndefined();
+  });
+
   it('the data_class, project_role and actor_type enums match the @sdlc/contracts lists', async () => {
     // The migrations keep literal values (ADR-M09 section 2.2); this catches drift from contracts.
     const enums = await rows<{ name: string; values: string[] }>(sql`
@@ -139,10 +180,16 @@ describeDb('AC2: migrations on PostgreSQL', () => {
         c.confdeltype AS on_delete
       FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace AND n.nspname = 'public'
       WHERE c.contype = 'f' AND c.conrelid::regclass::text NOT LIKE 'kysely_%'`);
-    expect(fks).toHaveLength(12);
+    expect(fks).toHaveLength(19);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
-      if (fk.parent === 'tenants') {
+      if (fk.name === 'gate_decisions_voids_fkey') {
+        // A void cancels an approval of the same tenant, intent and gate (ADR-M20).
+        expect([fk.child_cols, fk.parent_cols]).toEqual([
+          ['tenant_id', 'intent_id', 'gate', 'voids_decision_id'],
+          ['tenant_id', 'intent_id', 'gate', 'id'],
+        ]);
+      } else if (fk.parent === 'tenants') {
         expect([fk.child_cols, fk.parent_cols], fk.name).toEqual([['tenant_id'], ['id']]);
       } else {
         expect(fk.child_cols[0], fk.name).toBe('tenant_id');
@@ -171,6 +218,10 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       'public.user_identities (tenant_id, provider, external_id)',
       'public.role_bindings (tenant_id, user_id, project_id, role) WHERE (revoked_at IS NULL)',
       'public.api_tokens (token_hash)',
+      'public.intents (tenant_id, code)',
+      'public.spec_refs (tenant_id, intent_id, version)',
+      'public.plans (tenant_id, intent_id, version)',
+      'public.gate_decisions (tenant_id, voids_decision_id) WHERE (voids_decision_id IS NOT NULL)',
     ]) {
       expect(defs, expected).toContain(expected);
     }

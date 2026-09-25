@@ -8,6 +8,8 @@
 //
 // Adding an action: add it below with the smallest set of fields that makes the event
 // traceable, and a test. Reviewers check that no field can carry personal or client data.
+// A field whose kind ends with `?` is optional (ADR-M20): it may be left out, never set to null;
+// when present it follows the same format rule.
 import { DbError } from '../db/errors.js';
 import { isUuid } from '../db/tenant-id.js';
 
@@ -19,10 +21,13 @@ import { isUuid } from '../db/tenant-id.js';
  */
 export type AuditFieldKind = 'uuid' | 'sha256' | 'version' | 'code';
 
+/** A declared field: its kind, with a trailing `?` when the field is optional. */
+export type AuditFieldSpec = AuditFieldKind | `${AuditFieldKind}?`;
+
 export interface AuditActionSpec {
   /** Entity the event is about; null for events without one. `entity_id` is then null too. */
   readonly entityType: string | null;
-  readonly fields: Readonly<Record<string, AuditFieldKind>>;
+  readonly fields: Readonly<Record<string, AuditFieldSpec>>;
 }
 
 export const AUDIT_ACTIONS = {
@@ -33,16 +38,61 @@ export const AUDIT_ACTIONS = {
   },
   /** A project AI record was created or replaced (FR-19). Never the record contents. */
   'ai_record.changed': { entityType: 'project', fields: { version: 'version' } },
+  /** An intent was created (FR-01, FR-03). Never the title or description. */
+  'intent.created': {
+    entityType: 'intent',
+    fields: {
+      code: 'code',
+      project_id: 'uuid',
+      risk_tier: 'code',
+      data_class: 'code',
+      max_autonomy: 'code',
+    },
+  },
+  /** An intent moved to another status or gate. `current_gate` is left out when there is none. */
+  'intent.state_changed': {
+    entityType: 'intent',
+    fields: { status: 'code', current_gate: 'code?' },
+  },
+  /** A spec was linked to an intent (FR-02). Never the path or the content. */
+  'spec.linked': {
+    entityType: 'intent',
+    fields: { spec_ref_id: 'uuid', version: 'version', content_sha256: 'sha256' },
+  },
+  /** A plan was submitted for an intent. Never the file list or the summary. */
+  'plan.submitted': {
+    entityType: 'intent',
+    fields: { plan_id: 'uuid', version: 'version', plan_sha256: 'sha256' },
+  },
+  /** A gate decision was recorded (FR-10, FR-17). Never a free-text reason (ADR-M20). */
+  'gate.decided': {
+    entityType: 'intent',
+    fields: {
+      decision_id: 'uuid',
+      gate: 'code',
+      decision: 'code',
+      oversight_mode: 'code',
+      input_sha256: 'sha256',
+      config_hash: 'sha256',
+      approver_role: 'code?',
+      reason_code: 'code?',
+      voids_decision_id: 'uuid?',
+    },
+  },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;
 
-type FieldValue<K> = K extends 'version' ? number : string;
+type FieldValue<K> = K extends 'version' | 'version?' ? number : string;
+type Fields<A extends AuditAction> = (typeof AUDIT_ACTIONS)[A]['fields'];
+type OptionalKeys<A extends AuditAction> = {
+  [F in keyof Fields<A>]: Fields<A>[F] extends `${string}?` ? F : never;
+}[keyof Fields<A>];
 
 export type AuditPayload<A extends AuditAction> = {
-  readonly [F in keyof (typeof AUDIT_ACTIONS)[A]['fields']]: FieldValue<
-    (typeof AUDIT_ACTIONS)[A]['fields'][F]
-  >;
+  readonly [F in Exclude<keyof Fields<A>, OptionalKeys<A>>]: FieldValue<Fields<A>[F]>;
+} & {
+  readonly [F in OptionalKeys<A>]?: FieldValue<Fields<A>[F]>;
 };
 
 /** Upper bound of the canonical JSON payload, in UTF-8 bytes. */
@@ -89,8 +139,11 @@ export function checkAuditEvent(
   const extra = Object.keys(payload).filter((key) => !Object.hasOwn(spec.fields, key));
   if (extra.length > 0) throw invalid(`${action}: undeclared payload fields ${extra.join(', ')}`);
   const checked: Record<string, unknown> = {};
-  for (const [field, kind] of Object.entries(spec.fields)) {
+  for (const [field, declared] of Object.entries(spec.fields)) {
+    const optional = declared.endsWith('?');
+    const kind = (optional ? declared.slice(0, -1) : declared) as AuditFieldKind;
     const value = payload[field];
+    if (optional && value === undefined) continue;
     if (!isValidField(kind, value))
       throw invalid(`${action}: payload field ${field} must be a ${kind}`);
     checked[field] = value;

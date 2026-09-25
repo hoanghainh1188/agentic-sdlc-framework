@@ -101,6 +101,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
   - `pnpm test:db` — DB integration tests on a throw-away PostgreSQL container (or `SDLC_TEST_DATABASE_URL`, a superuser URL). CI job `db` runs it on every PR.
 - Audit log (A07, ADR-M09 §2.8): append-only, hash chain per tenant. Write only through `TenantScope.audit.append` with an action declared in `platform/packages/core/src/audit/actions.ts`; payloads hold IDs, codes, hashes and versions only (never personal or client data).
   - `pnpm sdlc audit verify [--tenant <slug>] [--json]` — check the chain (exit 1 when broken). Needs `SDLC_DB_URL` (`platform_app`). Temporary direct DB access; B04 moves it behind the API.
+- Registry (B02, `design/ADR-M20-registry.md`): intents, spec refs, plans and gate decisions through `TenantScope` or the `Registry` facade, which needs a `PolicyFactory` (the apps pass `createSimplePolicyEngine`). Gate decisions are append-only and hold codes, hashes and IDs only: `reason_code` plus an optional `https://` `reason_ref`, never free text.
 - CI: `.github/workflows/ci.yml` (A09) runs the checks above, Gitleaks, Semgrep and Trivy, and the Compose `core` integration job. Actions are pinned by commit SHA; thresholds live in the workflow `env:`.
 
 ## Current constraints
