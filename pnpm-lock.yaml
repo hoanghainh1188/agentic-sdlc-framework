@@ -97,6 +97,12 @@ importers:
 
   platform/packages/core:
     dependencies:
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@sdlc/messages':
+        specifier: workspace:*
+        version: link:../messages
       kysely:
         specifier: 0.29.6
         version: 0.29.6

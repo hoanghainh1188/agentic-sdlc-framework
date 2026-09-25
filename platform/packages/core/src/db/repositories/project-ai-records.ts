@@ -1,8 +1,9 @@
+import type { DataClass } from '@sdlc/contracts';
 import { sql } from 'kysely';
 
 import { DbError } from '../errors.js';
 import type { ProjectAiRecord } from '../schema.js';
-import type { AiAllowed, DataClass, DisclosureFormat, ProdLogsAllowed } from '../vocabulary.js';
+import type { AiAllowed, DisclosureFormat, ProdLogsAllowed } from '../vocabulary.js';
 import { TenantRepository } from './base.js';
 import { assertExpectedVersion, versionConflict } from './versioned.js';
 
