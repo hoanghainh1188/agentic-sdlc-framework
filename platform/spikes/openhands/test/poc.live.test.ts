@@ -14,6 +14,7 @@ import { PocRun, WORKING_DIR } from '../src/poc-run.ts';
 import {
   containerEnv,
   containerExists,
+  docker,
   inspect,
   listeningSockets,
   sampleStats,
@@ -120,6 +121,9 @@ describe.skipIf(!LIVE)('C01 live: OpenHands Agent Server controlled from Node.js
       (inspection['NetworkSettings'] as { Networks: Record<string, unknown> }).Networks,
     );
     expect(networks).toEqual([SANDBOX_NETWORK]);
+    expect(await docker(['network', 'inspect', SANDBOX_NETWORK, '--format', '{{.Internal}}'])).toBe(
+      'true',
+    );
     const host = inspection['HostConfig'] as Record<string, unknown>;
     expect(host['CapDrop']).toEqual(['ALL']);
     expect(host['ReadonlyRootfs']).toBe(true);

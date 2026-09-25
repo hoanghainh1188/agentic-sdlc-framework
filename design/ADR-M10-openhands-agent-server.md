@@ -61,14 +61,14 @@ Mapping to D-05 `run_status` (spike `status-map.ts`): `finished` → `succeeded`
 
 | Setting | Value | Result |
 |---|---|---|
-| Network | Only the Docker network `sdlc-poc-sandbox` (`internal: true`), shared with LiteLLM and the stub model | `curl https://api.github.com` from inside fails. No route to OpenBao, PostgreSQL or the internet |
-| Published ports | None on the sandbox | Docker does **not** publish ports for a container that is only on an internal network. The host reaches the API through a small relay container (default bridge + internal network, 127.0.0.1 only) |
+| Network | Only the Docker network `sdlc-poc-sandbox` (`internal: true`, checked at run time with `docker network inspect`), shared with LiteLLM and the stub model | Docker gives an internal network no route out. The live test also checks one probe: `curl https://api.github.com` from inside fails. OpenBao and PostgreSQL are on another network, which the sandbox does not join |
+| Published ports | None on the sandbox | Docker does **not** publish ports for a container that is only on an internal network. The host reaches the API through a small relay container (default bridge + internal network, 127.0.0.1 only; read-only, no capabilities, 128 MiB, 64 processes). The relay forwards raw TCP and is the one container on both networks: PoC only, see 4.3 |
 | Listening ports inside (from `/proc/net/tcp`; the image has no `ss` or `netstat`) | `0.0.0.0:8000` (API, uid 10001) and `127.0.0.11:<random>` (Docker's embedded DNS, not ours) | With default settings the image also listens on `0.0.0.0:8001` (VS Code server). `OH_ENABLE_VSCODE=false` removes it |
-| User, capabilities | `--user 10001:10001`, `--cap-drop ALL`, `--security-opt no-new-privileges` | Works. `no-new-privileges` also neutralises the image's passwordless `sudo` for user `openhands` |
+| User, capabilities | `--user 10001:10001`, `--cap-drop ALL`, `--security-opt no-new-privileges` | Works. User `openhands` is in group `sudo` with passwordless sudo; with `no-new-privileges` sudo refuses to run (tested: "The no new privileges flag is set, which prevents sudo from running as root") |
 | Limits | `--memory 2g --memory-swap 2g --cpus 1.5 --pids-limit 512` (spike values) | Works |
 | **Read-only root filesystem** | `--read-only` plus tmpfs `/tmp` (**with `exec`**), `/workspace` (uid 10001) and `/home/openhands` | **Works.** Without `exec` on `/tmp` the server does not start: the entrypoint is a PyInstaller binary that unpacks shared libraries to `/tmp` (`libz.so.1: failed to map segment`) |
 | Environment | Allowlist only: `SESSION_API_KEY`, `OH_SECRET_KEY`, `OH_ENABLE_VSCODE=false`, `OH_TELEMETRY_EXPORTER=none`, `DO_NOT_TRACK=1`, `OPENHANDS_SUPPRESS_BANNER=1` | FR-33 check passes |
-| Mounts | No Docker socket, no host directory | Workspace lives in tmpfs and disappears with the container |
+| Mounts (sandbox) | No Docker socket, no host directory | Workspace lives in tmpfs and disappears with the container. The PoC's relay and stub model containers mount the spike source read-only; the sandbox does not |
 
 ### 2.5. Resources (development machine, arm64, stub model)
 
@@ -96,7 +96,7 @@ With the default of 1–2 concurrent runs, reserve about 2 GiB per sandbox (the 
 ### 4.1. C05 (OpenHands adapter)
 
 1. **Send `autotitle: false`.** By default OpenHands makes one extra model call per conversation to write a title (measured: 3 calls instead of 2 for a two-step task).
-2. **OpenHands' stuck detector has fixed thresholds** (4 repeats; not configurable over REST). The platform must run its own check with the config limit (FR-35). With the handbook default (3) both trigger on the 4th identical call. With a 250 ms poll the platform interrupted after 4 identical calls; with a 500 ms poll and a fast model it overshot to 5. C11 should read events over the WebSocket (`/sockets/events/{id}`) or poll faster.
+2. **OpenHands' stuck detector has fixed thresholds** (4 repeats; not configurable over REST). The platform must run its own check with the config limit (FR-35). With the handbook default (3) both trigger on the 4th identical call. With a 250 ms poll the platform interrupted after 4 identical calls; with a 500 ms poll and a fast model it overshot to 5. C11 should read events over the WebSocket (`/sockets/events/{id}`) or poll faster. Compare tool calls by canonical arguments (string or object), as the spike's `loop-detector.ts` does.
 3. **Iteration cap is native** (`max_iterations`); the **time cap** is ours: interrupt, then kill.
 4. Keep the tool list explicit (`terminal`, `file_editor`, `task_tracker`). The server offers more tools (`browser_tool_set`, `task`, `delegate`, `workflow` and others) that we do not want at L2.
 5. The Agent Server keeps state per conversation in the container. We run **one conversation per container**, so a crash loses nothing that the platform needs: evidence is collected through the API before the container is removed.
@@ -113,7 +113,8 @@ With the default of 1–2 concurrent runs, reserve about 2 GiB per sandbox (the 
 - The runner must reach sandboxes on an internal network: either the runner itself joins that network (preferred, no published ports at all), or it uses a relay as in the PoC.
 - Read-only root works; `/tmp` needs `exec` (see 2.4). The workspace in tmpfs counts against container memory; size it for the repo (the PoC used 512 MB).
 - A custom image built from the same Dockerfile with `INSTALL_CAPABILITIES` empty (no VS Code, browser or Docker CLI) would be smaller and remove most GPL/LGPL packages. Decide in C04.
-- The spike uses the Docker CLI. C04 decides between the CLI and a Docker API client.
+- The spike uses the Docker CLI through `execFile` with argument arrays (no shell). Container names come from `randomUUID()`. When run IDs come from the Run Manager, C04 must still validate names before passing them to Docker.
+- The relay is a PoC shortcut. In C04 the runner joins the sandbox network itself, so no container bridges the two networks.
 
 ### 4.4. General
 

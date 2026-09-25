@@ -73,6 +73,7 @@ async function handleCompletion(req: IncomingMessage, res: ServerResponse): Prom
   const request = JSON.parse(await readBody(req)) as ChatRequest & { stream?: boolean };
   requestCount += 1;
   const reply = scriptedReply(request);
+  // Log tool names and delay only, never message content or arguments.
   const names = reply.toolCalls.map((c) => c.function.name).join(',');
   console.log(`stub request=${requestCount} tools=${names} delay_ms=${reply.delayMs}`);
   if (reply.delayMs > 0) await new Promise((r) => setTimeout(r, reply.delayMs));

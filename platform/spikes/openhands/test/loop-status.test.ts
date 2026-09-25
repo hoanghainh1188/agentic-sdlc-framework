@@ -29,8 +29,21 @@ describe('loop detection (FR-35) with the limit from config', () => {
   it('ignores volatile fields and prefers the raw tool-call arguments', () => {
     const other = { ...ls, action: { command: 'ls', summary: 'different words' } };
     expect(actionKey(other)).toBe(actionKey(ls));
-    const raw = { kind: 'ActionEvent', tool_name: 't', tool_call: { arguments: '{"a":1}' } };
-    expect(actionKey(raw)).toBe('t|{"a":1}');
+    const text = { kind: 'ActionEvent', tool_name: 't', tool_call: { arguments: '{"b":2,"a":1}' } };
+    const object = {
+      kind: 'ActionEvent',
+      tool_name: 't',
+      tool_call: { arguments: { a: 1, b: 2 } },
+    };
+    const different = {
+      kind: 'ActionEvent',
+      tool_name: 't',
+      tool_call: { arguments: { a: 1, b: 3 } },
+    };
+    expect(actionKey(text)).toBe(actionKey(object));
+    expect(actionKey(different)).not.toBe(actionKey(object));
+    expect(isLooping([object, text, object, text], 3)).toBe(true);
+    expect(isLooping([object, text, different, text], 3)).toBe(false);
   });
 });
 

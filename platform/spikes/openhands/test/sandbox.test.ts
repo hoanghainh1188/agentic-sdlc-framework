@@ -77,6 +77,8 @@ describe('sandbox docker run arguments', () => {
     expect(flagValue(relay, '--publish')).toEqual(['127.0.0.1::8000']);
     expect(flagValue(relay, '--env')).toEqual(['RELAY_TARGET=sdlc-poc-x:8000']);
     expect(relay).toContain('--read-only');
+    expect(flagValue(relay, '--memory')).toEqual(['128m']);
+    expect(flagValue(relay, '--pids-limit')).toEqual(['64']);
   });
 });
 
