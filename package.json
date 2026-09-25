@@ -28,6 +28,9 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@sdlc/config": "workspace:*",
+    "@sdlc/contracts": "workspace:*",
+    "@sdlc/messages": "workspace:*",
     "@types/node": "24.13.6",
     "@types/pg": "8.23.1",
     "eslint": "10.11.0",

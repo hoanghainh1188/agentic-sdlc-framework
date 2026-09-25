@@ -4,6 +4,7 @@
   "references": [
     { "path": "platform/packages/contracts" },
     { "path": "platform/packages/config" },
+    { "path": "platform/packages/messages" },
     { "path": "platform/packages/core" },
     { "path": "platform/packages/adapters/git-github" },
     { "path": "platform/packages/adapters/agent-openhands" },

@@ -3,10 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Reads and validates project configuration (YAML). See design/D-03 section 11.",
+  "description": "Reads and validates project configuration (YAML). See design/D-03 section 11, D-08 A05, ADR-M18.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
-  ]
+    "dist",
+    "defaults"
+  ],
+  "dependencies": {
+    "@sdlc/contracts": "workspace:*",
+    "@sdlc/messages": "workspace:*",
+    "yaml": "2.9.1",
+    "zod": "4.6.5"
+  }
 }

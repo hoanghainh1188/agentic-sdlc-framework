@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.0 |
+| Version | 1.1 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -141,7 +141,7 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | project_id | uuid PK, FK | |
 | version | int | Incremented on every change |
 | config_yaml | text | Gates: deadlines, retry counts, warning thresholds. Default budgets. Policy rules |
-| config_hash | char(64) | SHA-256 of `config_yaml` |
+| config_hash | char(64) | SHA-256 of the RFC 8785 canonical JSON of the **effective** configuration (defaults merged with `config_yaml`, validated). Comments, whitespace, key order and values that only repeat a default do not change it (ADR-M18) |
 | updated_by | uuid FK users | |
 
 - [Proposal] Every gate decision records the `config_hash` in force, so we know which configuration the gate ran under (supports tuning in M-F).
@@ -577,3 +577,4 @@ CREATE TRIGGER audit_log_no_update BEFORE UPDATE OR DELETE ON audit_log
 | 0.4 | 2026-09-24 | Claude (draft) | After review: `actor_type` enum with `agent`; `succeeded_proposal_only`; evidence `proposal`; `runs.triggered_by`; `git_event_cursors`; SeaweedFS |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Content unchanged |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: L0–L4, oversight_mode, 2+N roles, change flags, `project_ai_records`, `agents`, `escalations`, approval binding (scope, expiry, `void`), kill switch, retention ≥ 2 years, project purge |
+| 1.1 | 2026-09-25 | Claude (task A05), approved by Harry | §6.1 `config_hash`: hash of the effective configuration in RFC 8785 canonical JSON, not of the raw YAML text (QUESTIONS.md #8, ADR-M18) |

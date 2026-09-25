@@ -18,7 +18,12 @@
 - A06: tenant enforcement: branded `TenantId`, `PlatformDatabase.forTenant()` repositories, a tenant guard plugin (rejects queries, including JOINs, subqueries and CTEs, without the tenant condition), a short `SystemScope` (tenants, API token resolution). API tokens stored as SHA-256 hashes only.
 - A06: application role `platform_app` (init script, `PLATFORM_APP_DB_PASSWORD`): SELECT, INSERT, column-level UPDATE; no DELETE, TRUNCATE or DDL. Commands `pnpm db:migrate`, `pnpm db:status`, `pnpm test:db`; CI job `db` (throw-away PostgreSQL on every PR, part of `ci-ok`). `design/QUESTIONS.md` #11 (removing a role binding), approved: `role_bindings.revoked_at` with a partial unique index on active bindings, `revoke()`, reads return active bindings by default.
 
+- A05: `@sdlc/config` loads the project configuration: default file with the codes table values (gate × risk matrix, forced-HITL G3 and dual-approval G7 lists, SLA table, autonomy, budgets, loop limits, model routing, evidence retention 180 days, GitHub polling), partial YAML overrides, safe YAML reading, strict schema (zod), mandatory rules M1–M15 that refuse loosening, warnings for allowed loosening, and a stable `config_hash` (RFC 8785 + SHA-256). Working-time calendar with time zone, working hours and `holidays` for SLA clocks; calendar floor of 5 working days per week and 7 working hours per day (M11), warning above 20 holidays a year.
+- A05: `@sdlc/messages`, the message catalog (English; Vietnamese and Japanese can be added as JSON files). `@sdlc/contracts` gets the canonical code lists and the `ProjectConfig` types.
+- A05: codes-table drift test (default config vs codes table §3, §4, §6.3 and Ch.6 §6.4). ADR-M18 (proposed). `design/QUESTIONS.md` #5–#10, answered by Harry.
+
 ### Changed
+- A05: D-05 §6.1 v1.1: `config_hash` is the hash of the effective configuration in RFC 8785 canonical JSON (approved by Harry, 2026-09-25).
 - A09: Prettier now formats `.github/` workflow files (ADR-M16 §2.6); `render-diagrams.yml` actions pinned by commit SHA.
 - Docs fixes (found during A01 planning): README task count 44 and codes table v1.3; leftover pre-2+N roles table removed from D-02 §3.
 - ADR-M16 accepted (Harry, 2026-09-25, with PR #46); design/README.md index updated.
