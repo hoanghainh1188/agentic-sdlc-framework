@@ -74,7 +74,7 @@ Enforcement:
 ### 2.6. Documents are never touched by tools
 
 - `.prettierignore` and the ESLint `ignores` exclude `handbook/`, `design/`, `_review/`, `diagrams/`, and all Markdown files.
-- They also exclude `.github/` and `scripts/` for now. CI (A09) may bring `.github/` workflows into formatting later.
+- They also exclude `scripts/`. ESLint also excludes `.github/`. Since A09, Prettier formats the `.github/` workflow files; Markdown there stays excluded by the `*.md` rule.
 - A test (`platform/tests/workspace/ignores.test.ts`) checks that every file in those folders, and every root Markdown file, is ignored by both tools.
 
 ## 3. Alternatives not chosen
@@ -99,3 +99,4 @@ Enforcement:
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A01) | First version |
 | 0.2 | 2026-09-25 | Harry | Accepted with PR #46 |
+| 0.3 | 2026-09-25 | Claude (task A09) | §2.6: `.github/` workflows now formatted by Prettier, as foreseen |

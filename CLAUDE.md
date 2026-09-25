@@ -82,11 +82,13 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - `pnpm typecheck` — build + type-check the tests in `platform/tests/`.
 - `pnpm lint` — ESLint, type-aware, including module boundaries (`core` never imports adapters; adapters import `@sdlc/contracts` only).
 - `pnpm format` / `pnpm format:check` — Prettier. Never touches `handbook/`, `design/`, `_review/`, `diagrams/` or Markdown.
-- `pnpm test` — Vitest (all `platform/**/*.test.ts`). One file: `pnpm test platform/tests/workspace/boundaries.test.ts`.
+- `pnpm test` — Vitest (all `platform/**/*.test.ts` except integration tests). One file: `pnpm test platform/tests/workspace/boundaries.test.ts`.
+- `pnpm test:integration` — Vitest for `platform/tests/integration/**` only; needs the Compose `core` profile running (CI job `compose`).
 - `pnpm clean` — remove build output.
 - Before a PR: `pnpm build && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`.
 - New package: put it under `platform/apps/`, `platform/packages/` or `platform/packages/adapters/` with the `@sdlc/` scope, and add it to the root `tsconfig.json` references.
 - Docker Compose commands: added in A02.
+- CI: `.github/workflows/ci.yml` (A09) runs the checks above, Gitleaks, Semgrep and Trivy, and the Compose `core` integration job. Actions are pinned by commit SHA; thresholds live in the workflow `env:`.
 
 ## Current constraints
 - At most 2 sessions at the same time (a docs PR session counts as one).
