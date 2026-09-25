@@ -36,6 +36,7 @@
 - Ch.1, Ch.2, Ch.3 approved as v1.0 (Harry). Ch.4, Ch.5, Ch.6 approved as v1.0. Ch.8, Ch.9 approved as v1.0. Part I complete (Ch.7 pending legal review). Ch.10–12 approved. Codes table v1.1 (forced-HITL list for G3); v1.2 (dual approval at G7 for sensitive change types). Ch.13–15 awaiting Harry's comments. Ch.2: tool owners and disciplinary rules still open.
 
 ### Added / changed
+- render-diagrams workflow hardened: runs on pull requests only and commits SVG to the PR branch (never pushes to main); mermaid-cli pinned (11.17.0); checkout and setup-node v7 (same SHAs as ci.yml); Node 24. New static tests for all workflows: no push trigger with write access, pushes only to a PR branch, pinned global npm installs. Supersedes Dependabot #51 and #52.
 - PR template: the human-review box is separate from the AI disclosure and ticked only by the reviewer (T2 v0.3). CLAUDE.md current constraints updated (session order #55, C01, A07; merge-not-rebase rule).
 - Repository hosting clarified: organization `harryforge` on GitHub Free; branch protection unavailable; compensating controls (squash-only, delete branch on merge, local pre-push hook, PR review); upgrade to GitHub Team planned.
 - Repository history starts with one initial commit on GitHub (Harry); tag `design-v1.0` on that commit. Earlier local history and the `design-pre-handbook` tag are not published.

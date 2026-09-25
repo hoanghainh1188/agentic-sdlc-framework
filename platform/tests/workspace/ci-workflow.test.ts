@@ -100,6 +100,32 @@ describe('workflow hardening (all workflows)', () => {
     },
   );
 
+  // Every change to main goes through a reviewed pull request (CLAUDE.md "Current constraints").
+  it.each(workflows)('$file has no push trigger when it can write contents', ({ wf }) => {
+    if (wf.permissions?.contents === 'write') {
+      expect(Object.keys(wf.on)).not.toContain('push');
+    }
+  });
+
+  it.each(workflows)('$file only pushes to a pull request branch, never to main', ({ wf }) => {
+    const pushScripts = Object.values(wf.jobs).flatMap((job) =>
+      job.steps.flatMap((step) => (step.run?.includes('git push') ? [step.run] : [])),
+    );
+    for (const script of pushScripts) {
+      expect(script).toContain('git push origin "HEAD:refs/heads/${HEAD_REF}"');
+      expect(script).toContain('[ "$HEAD_REF" = "main" ]');
+    }
+  });
+
+  it.each(workflows)('$file pins the version of every global npm install', ({ wf }) => {
+    const installs = Object.values(wf.jobs).flatMap((job) =>
+      job.steps.flatMap((step) =>
+        (step.run ?? '').split('\n').filter((line) => /npm (install|i) -g/.test(line)),
+      ),
+    );
+    for (const line of installs) expect(line).toMatch(/@[\w/-]+@(\$\{\w+\}|\d+\.\d+\.\d+)/);
+  });
+
   it('ci.yml only reads the repository and no job widens permissions', () => {
     expect(ci.permissions).toEqual({ contents: 'read' });
     for (const job of Object.values(ci.jobs)) expect(job.permissions).toBeUndefined();
