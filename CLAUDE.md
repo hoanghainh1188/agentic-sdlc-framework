@@ -106,9 +106,9 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 ## Current constraints
 - At most 2 sessions at the same time (a docs PR session counts as one).
 - One task per session; each parallel session works in its own git worktree.
-- Session order: A04 and B02 now; after B02, C02 next (critical path); other tasks follow the D-08 dependencies.
+- Session order: A04 now (PR #68 in review); B02 is merged (PR #69). C02 next (critical path), as soon as A04 is merged: C02 needs A04 and B02. Other tasks follow the D-08 dependencies.
 - Conflicts with `main` on a branch under review: merge `origin/main` into the branch. Never rebase or force-push it.
-- `design/QUESTIONS.md` numbers: each session gets its own block when it is queued and uses only numbers from that block. Taken: B01 #16–#19, A03 #20, docs #21, B02 #22–#26, A04 #27–#31. Next free block: #32–#36 (then #37–#41, …).
+- `design/QUESTIONS.md` numbers: each session gets its own block when it is queued and uses only numbers from that block. Taken: B01 #16–#19, A03 #20, docs #21, B02 #22–#26 (used #22), A04 #27–#31. Next free block: #32–#36 (then #37–#41, …).
 - A04 may proceed using throw-away test keys on dev machines only. The real OpenBao initialisation on the internal server waits until the three key holders are named and TLS on port 8200 is in place (QUESTIONS #20, task A10) (remove this line when both are done).
 
 ## Decisions (see design/D-02 section 11)
