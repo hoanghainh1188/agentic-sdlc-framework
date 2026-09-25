@@ -88,6 +88,12 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - New package: put it under `platform/apps/`, `platform/packages/` or `platform/packages/adapters/` with the `@sdlc/` scope, and add it to the root `tsconfig.json` references.
 - Docker Compose commands: added in A02.
 
+## Current constraints
+- At most 2 sessions at the same time (a docs PR session counts as one).
+- One task per session; each parallel session works in its own git worktree.
+- A09 runs in parallel with A02, after the docs PR (`docs/fix-inconsistencies`) is merged.
+- A03 waits until the three OpenBao key holders are named (remove this line once they are named).
+
 ## Decisions (see design/D-02 section 11)
 - Q1 first agent: OpenHands · Q2 first Git host: GitHub (GitLab later, same interface) · Q3 language: TypeScript (Node.js) · Q5 repo language: English
 - Secret manager: OpenBao (MPL-2.0, Vault-compatible API) · Host: internal server, modest spec

@@ -40,16 +40,6 @@ The platform follows the handbook's **2+N team** (handbook Chapter 5).
 
 The **producer of a change never approves it**. One person may hold several roles on different projects, never producer and approver of the same change.
 
----|---|
-| PM / BrSE (product owner) | Create intents, approve G1, G2 |
-| Tech lead / architect | Approve G3; look at G5 when it warns |
-| Developer (code owner) | Approve G7; review PRs created by the agent |
-| QA | Look at G6 when CI fails |
-| Release owner | Approve G8 |
-| Platform admin | Configure tenants, budgets, agents, Git hosts |
-
-[Proposal] We are a small company and one person often holds several roles. The MVP **allows one person to hold several roles**, but **blocks anyone from approving their own work**.
-
 ---
 
 ## 4. Scope
