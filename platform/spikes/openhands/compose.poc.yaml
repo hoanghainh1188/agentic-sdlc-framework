@@ -1,0 +1,48 @@
+# C01 spike only (design/ADR-M10). Not part of the product deployment.
+# Use as an extra file on top of the core stack; relative paths resolve from platform/deploy:
+#   docker compose -f platform/deploy/docker-compose.yml -f platform/spikes/openhands/compose.poc.yaml \
+#     --env-file <path to platform/deploy/.env> --profile core --profile poc up -d litellm poc-stub-model
+# Restore the normal LiteLLM configuration afterwards with `pnpm compose:core`.
+
+services:
+  litellm:
+    # Spike model list (stub model + optional Claude). Same router settings as the product config.
+    volumes: !override
+      - ../spikes/openhands/litellm.poc.yaml:/app/config.yaml:ro
+    environment:
+      # Real provider key for the optional live run. Read from the Git-ignored .env only, and given
+      # to LiteLLM only: the sandbox never receives it (D-02 FR-33, FR-50).
+      POC_ANTHROPIC_API_KEY: ${POC_ANTHROPIC_API_KEY:-}
+    # LiteLLM keeps its normal network (provider access) and joins the internal sandbox network.
+    networks: [sdlc, poc-sandbox]
+
+  poc-stub-model:
+    image: node:24.21.0-alpine3.23@sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2
+    profiles: [poc]
+    restart: unless-stopped
+    # Internal network only: the stub cannot reach anything outside the sandbox network.
+    networks: [poc-sandbox]
+    user: node
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    working_dir: /app
+    volumes:
+      - ../spikes/openhands/src:/app/src:ro
+      - ../spikes/openhands/package.json:/app/package.json:ro
+    command: [node, src/stub-model.ts]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:8080/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  poc-sandbox:
+    # No route out of this network: sandboxes on it reach LiteLLM and the stub model only.
+    name: sdlc-poc-sandbox
+    internal: true

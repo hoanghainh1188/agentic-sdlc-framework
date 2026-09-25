@@ -1,0 +1,6 @@
+{
+  "name": "spike-openhands",
+  "private": true,
+  "type": "module",
+  "description": "C01 spike: control the OpenHands Agent Server from Node.js. Not part of the product; not a workspace package."
+}
