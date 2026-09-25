@@ -3,3 +3,4 @@ export * from './codes.js';
 export * from './forbidden-actions.js';
 export type * from './policy.js';
 export type * from './project-config.js';
+export type * from './secrets.js';

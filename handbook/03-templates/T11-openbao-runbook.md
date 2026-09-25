@@ -157,8 +157,8 @@ A secret ID + role ID lets a process log in as that AppRole. Treat issuing one l
 
 - Only the platform admin issues secret IDs, only for a process being deployed or rotated, and records it in the operations log (role, date, reason, accessor, not the secret ID).
 - Every issue is in the OpenBao audit log.
-- A secret ID works only from the Compose network subnet and expires after **90 days**.
-- Deliver it straight to the process configuration (task A04 defines how). Never through chat or email.
+- A secret ID works only from the Compose network subnet and expires after **90 days**. The tokens a process gets at login work only from the same subnet. Known exception: a login from the server itself through the published port `127.0.0.1:8200` passes (`design/QUESTIONS.md` #27).
+- Deliver it straight to the process as a file (section 5c). Never through chat or email.
 
 ```bash
 # role ID (not secret)
@@ -168,6 +168,21 @@ bao write -f auth/approle/role/runner/secret-id
 ```
 
 (Run inside the container, with `BAO_TOKEN` set to an admin token as above.)
+
+## 5c. How a platform process uses its credentials
+
+Each platform process (api, worker, runner, cost-controller) uses the OpenBao client `@sdlc/secrets` (design/ADR-M21). It reads these settings:
+
+| Setting | Value |
+|---|---|
+| `SDLC_OPENBAO_ADDR` | `https://<server>:8200` after A10. Before A10, only on development machines and in CI: `http://openbao:8200` together with `SDLC_OPENBAO_ALLOW_PLAINTEXT=1` |
+| `SDLC_OPENBAO_CA_CERT_FILE` | The company internal CA certificate (after A10). The client always checks the server certificate; there is no way to skip the check |
+| `SDLC_OPENBAO_ROLE_ID_FILE` | File with the role ID |
+| `SDLC_OPENBAO_SECRET_ID_FILE` | File with the secret ID: mode 600, on a tmpfs mount, readable only by the process |
+
+- The role ID and the secret ID are **files**, never environment variables: anyone allowed to run `docker inspect` can read environment variables.
+- **Rotating a secret ID** (every 90 days, section 8.1): issue a new secret ID, replace the file, then destroy the old secret ID. No restart is needed: the client reads the file again at its next login (at the latest when its token reaches the 4-hour maximum).
+- The client renews its token by itself and logs in again when needed. It never writes a token, secret ID or secret value to its logs.
 
 ## 6. Daily snapshot backup
 
@@ -248,7 +263,12 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | `a root token is required` | `configure` got an admin token or an expired token | Section 5 |
 | `a root token generation is already in progress` | An earlier `root-token` was interrupted | Inside the container: `BAO_ADDR=http://127.0.0.1:8210 bao delete sys/generate-root/attempt`, then try again |
 | `the key share was rejected` | Mistyped or old share | Try again carefully. After a rekey, old shares no longer work |
-| AppRole login fails with `permission denied` from a process | Secret ID expired (90 days), destroyed, or used outside the Compose subnet | Section 8.1; check `SDLC_NETWORK_SUBNET` |
+| A process says `AppRole login failed (HTTP status …)` | Secret ID expired (90 days), destroyed, wrong, or used outside the Compose subnet | Section 8.1; check `SDLC_NETWORK_SUBNET` and the secret ID file (section 5c) |
+| A process says `OpenBao at … is sealed` | Restart. Compose still shows OpenBao as healthy: healthy only means the API answers | Section 4 |
+| A process says `OpenBao at … is not initialised` | New, empty volume, or the wrong Compose project | Section 3. If you expected data, **stop** and check the volume |
+| A process says `The OpenBao policy of this process does not allow …` | The process asked for a path outside its policy | Correct the path in the process. Change a policy only through `bootstrap/policies/` and `configure` |
+| A process says `The certificate of OpenBao at … could not be verified` | Wrong or missing CA file, expired server certificate, or the address does not match the certificate | Check `SDLC_OPENBAO_CA_CERT_FILE` and the certificate dates (A10). Never turn the check off |
+| A process says `… does not use TLS` | `http://` address without `SDLC_OPENBAO_ALLOW_PLAINTEXT=1` | On the server: use `https://`. The flag is for development machines and CI only |
 | `no file audit device` | `openbao.hcl` changed | Restore the `audit "file"` block. OpenBao also refuses requests when it cannot write the audit log: check the `openbao-audit` volume (disk full, permissions) |
 | Compose says the network has a different configuration | `SDLC_NETWORK_SUBNET` changed | `pnpm compose:down`, then `pnpm compose:core`. Then run `configure` again (secret IDs are bound to the subnet) |
 
@@ -269,3 +289,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | Outline; content written by Claude Code in A03/A10 |
 | 0.2 | 2026-09-25 | Claude Code (task A03) | Full content. Sections 3.1, 4, 5, 5b and 8.1 tested on a development machine with throw-away keys (`bootstrap.sh`, live test `pnpm test:openbao`). Sections 6, 7 and 8.2 to be tested in A10. The real initialisation (3.2) is described, not performed |
+| 0.3 | 2026-09-25 | Claude Code (task A04) | Section 5c (client settings, credential files, secret ID rotation without restart); tokens bound to the subnet; troubleshooting rows for the client messages; host-port exception (`design/QUESTIONS.md` #27) |

@@ -166,7 +166,9 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(ciEnv.COMPOSE_FILE_PATH).toBe('platform/deploy/docker-compose.yml');
     const detect = runText('detect');
     expect(detect).toContain('[ ! -f "$COMPOSE_FILE_PATH" ]');
-    expect(detect).toContain('-- platform/deploy/');
+    expect(detect).toContain(
+      '-- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/',
+    );
     expect(detect).toContain('schedule');
   });
 

@@ -127,6 +127,15 @@ describe('OpenBao bootstrap settings (bootstrap.conf)', () => {
   });
 });
 
+describe('AppRoles (configure.sh)', () => {
+  const configure = readDeployFile('openbao/bootstrap/configure.sh');
+
+  it('binds secret IDs and login tokens to the same CIDRs (A04, ADR-M21 §2.5)', () => {
+    expect(configure).toMatch(/^\s+secret_id_bound_cidrs="\$cidrs" \\$/m);
+    expect(configure).toMatch(/^\s+token_bound_cidrs="\$cidrs" \\$/m);
+  });
+});
+
 describe('OpenBao policies', () => {
   const allPolicies = policyNames;
 
