@@ -41,6 +41,8 @@
   "config.rule.budget_stop_max": "{path}: runs must stop at {maximum} % of the budget or earlier (rule {rule}, D-07 §6).",
   "config.rule.budget_warn_before_stop": "{path}: the budget warning must come before the stop (rule {rule}, D-07 §6).",
   "config.rule.loop_max": "{path}: loop detection must stop a run after at most {maximum} identical tool calls (rule {rule}, D-02 FR-35).",
+  "config.rule.calendar_min_working_days": "{path}: the calendar needs at least {minimum} working days per week; found {found}. Fewer days would stretch SLA clocks (rule {rule}, codes table §6.3).",
+  "config.rule.calendar_min_working_hours": "{path}: a working day needs at least {minimum} working hours; found {found} minutes. Shorter days would stretch SLA clocks (rule {rule}, codes table §6.3).",
   "config.rule.sla_longer": "{path}: the {clock} time for {severity} escalations may not be longer than {limit} (rule {rule}, codes table §6.3 and handbook Ch.6 §6.4).",
   "config.rule.policy_only_g4": "{path}: POLICY (automatic policy check) is allowed only at G4, not at {gate} (rule {rule}, codes table §4).",
   "config.rule.policy_no_roles": "{path}: a POLICY check has no human roles; remove them or choose another mode (rule {rule}).",
@@ -55,5 +57,6 @@
   "config.warning.mode_loosened": "{path}: oversight loosened from {from} (codes table default) to {to}. This change must be reviewed.",
   "config.warning.approvals_reduced": "{path}: approvals reduced from {from} (default) to {to}. This change must be reviewed.",
   "config.warning.working_day_removed": "{path}: {day} is no longer a working day, so working-time clocks (SLA, gate deadlines) run longer. This change must be reviewed.",
+  "config.warning.many_holidays": "{path}: {count} holidays in {year} (more than {maximum}), so working-time clocks run longer. This change must be reviewed.",
   "config.warning.working_hours_shortened": "{path}: a working day is now {to} minutes instead of {from}, so working-time clocks run longer. This change must be reviewed."
 }

@@ -41,6 +41,7 @@ Task A05 reads the per-project configuration: the gate × risk oversight matrix,
 
 - The default file `platform/packages/config/defaults/project-config.default.yaml` holds the codes table values. Each value cites its source. Values that no document gives are marked `[Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8)` (QUESTIONS.md #9).
 - A project's YAML is a **partial override**. Mappings merge key by key. Lists, scalars, durations (`{ value, unit }`) and deadlines (`{ kind }`) replace the default value whole.
+- **Reserved key names:** the merge treats *any* mapping that has a `unit` or a `kind` key as a single value (a duration or deadline) and replaces it whole. Future configuration sections must not use `unit` or `kind` as key names in ordinary mappings, or those mappings will stop merging key by key.
 - Matrix cell: `mode` (HITL, HOTL, AUDIT, or `POLICY` = automatic policy check, G4 only; QUESTIONS.md #6), `roles`, `approvals`, and optional `on_breach` (must be HITL).
 - The working calendar (time zone, working days, working hours, `holidays`) drives the working-hour and working-day clocks. One working day = the length of the working hours. Holidays (for example Tết) are skipped.
 
@@ -49,7 +50,8 @@ Task A05 reads the per-project configuration: the gate × risk oversight matrix,
 - Rules M1–M15 are in `platform/packages/config/src/mandatory-rules.ts`, each with its source. They cover G1, G7 and production G8 HITL; the forced-HITL G3 and dual-approval G7 lists; G6 security findings; autonomy; model routing; budget thresholds; the loop limit; SLA clocks; cell structure. They also cover the three things the codes table says are never skipped (M13–M15).
 - The floors are in code on purpose, so that configuration cannot loosen them. Changing a floor needs an approved handbook change, then the design doc, then a backlog task.
 - Other loosening (for example G2 Medium HITL → HOTL) is allowed but returned as a **warning**. Callers write it to the `config.changed` audit event (ADR-M13).
-- Calendar changes that make working-time clocks run longer in real time (a working day removed, shorter working hours) are also warnings: the calendar values are pilot defaults, not handbook rules. Holidays give no warning. M11 compares clocks in the project's own calendar; a wider calendar only makes working-time clocks shorter.
+- **Calendar floor (part of M11, Harry, 2026-09-25):** M11 compares SLA clocks in the project's own calendar, so a shrunken calendar would stretch "1 working day" in real time. The calendar must therefore have **at least 5 working days per week and at least 7 working hours per day**; below that the configuration is refused (codes table §6.3).
+- Calendar changes above the floor that still make working-time clocks run longer (a working day swapped out, shorter working hours) are warnings. **More than 20 holidays in one calendar year** is also a warning. Adding working days, a longer working day, or up to 20 holidays a year gives no warning.
 - A drift test compares the default file with codes table §3, §4 and §6.3 and with handbook Ch.6 §6.4. A codes-table change must come with the matching default-config change in the same PR.
 
 ### 2.5. `config_hash`
@@ -87,3 +89,4 @@ Task A05 reads the per-project configuration: the gate × risk oversight matrix,
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A05) | First version |
+| 0.2 | 2026-09-25 | Claude (task A05) | Review of PR #53: calendar floor in M11 (5 days, 7 hours), holiday warning (> 20 a year), reserved `unit` / `kind` keys |

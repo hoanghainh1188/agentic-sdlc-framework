@@ -25,5 +25,8 @@ export {
   MAX_IDENTICAL_TOOL_CALLS,
   MAX_STOP_PERCENT,
   MAX_WARN_PERCENT,
+  MIN_WORKING_DAYS_PER_WEEK,
+  MIN_WORKING_HOURS_PER_DAY,
   MVP_MAX_AUTONOMY,
 } from './mandatory-rules.js';
+export { MAX_HOLIDAYS_PER_YEAR } from './warnings.js';

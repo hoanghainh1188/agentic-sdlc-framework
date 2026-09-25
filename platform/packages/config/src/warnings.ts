@@ -32,7 +32,8 @@ function loosenedCells(config: ProjectConfig, defaults: ProjectConfig): ConfigIs
 
 /**
  * Fewer working days or shorter working hours make working-time clocks (SLA, HOTL window, gate
- * deadline) run longer in real time. Holidays are expected and give no warning.
+ * deadline) run longer in real time. Holidays are expected; only more than 20 in one year warns.
+ * Below the floor (5 days, 7 hours) the change is refused by rule M11 instead.
  */
 function loosenedCalendar(config: ProjectConfig, defaults: ProjectConfig): ConfigIssue[] {
   const calendar = config.escalation.calendar;
@@ -50,7 +51,28 @@ function loosenedCalendar(config: ProjectConfig, defaults: ProjectConfig): Confi
           }),
         ]
       : [];
-  return [...removedDays, ...shorter];
+  return [...removedDays, ...shorter, ...manyHolidays(calendar.holidays)];
+}
+
+/** More than this many holidays in one calendar year gives a warning. */
+export const MAX_HOLIDAYS_PER_YEAR = 20;
+
+function manyHolidays(holidays: readonly string[]): ConfigIssue[] {
+  const perYear = new Map<string, number>();
+  for (const date of holidays) {
+    const year = date.slice(0, 4);
+    perYear.set(year, (perYear.get(year) ?? 0) + 1);
+  }
+  return [...perYear.entries()]
+    .filter(([, count]) => count > MAX_HOLIDAYS_PER_YEAR)
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([year, count]) =>
+      issue('config.warning.many_holidays', 'escalation.calendar.holidays', {
+        year,
+        count,
+        maximum: MAX_HOLIDAYS_PER_YEAR,
+      }),
+    );
 }
 
 export function loosenedSettings(config: ProjectConfig, defaults: ProjectConfig): ConfigIssue[] {

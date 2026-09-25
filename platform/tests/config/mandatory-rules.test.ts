@@ -227,6 +227,20 @@ const CASES: Case[] = [
     key: 'config.rule.sla_longer',
     path: 'escalation.sla.critical.resolve',
   },
+  {
+    name: 'calendar with 4 working days per week',
+    rule: 'M11',
+    yaml: 'escalation:\n  calendar:\n    working_days: [mon, tue, wed, thu]\n',
+    key: 'config.rule.calendar_min_working_days',
+    path: 'escalation.calendar.working_days',
+  },
+  {
+    name: 'calendar with 6 h 59 min working days',
+    rule: 'M11',
+    yaml: "escalation:\n  calendar:\n    working_hours: { start: '09:00', end: '15:59' }\n",
+    key: 'config.rule.calendar_min_working_hours',
+    path: 'escalation.calendar.working_hours',
+  },
   // M12: cell structure.
   {
     name: 'POLICY at G5',
@@ -385,6 +399,13 @@ describe('tightening is always allowed (AC2)', () => {
   });
 });
 
+/** `count` distinct dates in `year`, one per week starting on 2 January. */
+function holidays(year: number, count: number): string[] {
+  return Array.from({ length: count }, (_, week) =>
+    new Date(Date.UTC(year, 0, 2 + week * 7)).toISOString().slice(0, 10),
+  );
+}
+
 describe('allowed loosening is reported as a warning (ADR-M13)', () => {
   it('warns when a non-mandatory cell is loosened', () => {
     const { warnings } = loadValid(cell('G2', 'medium', '{ mode: HOTL }'));
@@ -396,12 +417,12 @@ describe('allowed loosening is reported as a warning (ADR-M13)', () => {
     );
   });
 
-  it('warns when working days are removed or working hours are shortened', () => {
+  it('warns for moderate calendar changes: a working day swapped out, shorter working hours', () => {
     const { warnings } = loadValid(
-      "escalation:\n  calendar:\n    working_days: [mon, tue, wed, thu]\n    working_hours: { start: '09:00', end: '17:00' }\n",
+      "escalation:\n  calendar:\n    working_days: [tue, wed, thu, fri, sat]\n    working_hours: { start: '09:00', end: '17:00' }\n",
     );
     expect(warnings.map((w) => [w.key, w.path, w.params])).toEqual([
-      ['config.warning.working_day_removed', 'escalation.calendar.working_days', { day: 'fri' }],
+      ['config.warning.working_day_removed', 'escalation.calendar.working_days', { day: 'mon' }],
       [
         'config.warning.working_hours_shortened',
         'escalation.calendar.working_hours',
@@ -410,11 +431,48 @@ describe('allowed loosening is reported as a warning (ADR-M13)', () => {
     ]);
   });
 
-  it('gives no warning for holidays or a longer working day', () => {
+  it('accepts the calendar floor exactly: 5 working days, 7 working hours (with a warning)', () => {
     const { warnings } = loadValid(
-      "escalation:\n  calendar:\n    holidays: [2027-02-05, 2027-02-08]\n    working_days: [mon, tue, wed, thu, fri, sat]\n    working_hours: { start: '08:00', end: '18:00' }\n",
+      "escalation:\n  calendar:\n    working_hours: { start: '09:00', end: '16:00' }\n",
+    );
+    expect(warnings.map((w) => [w.key, w.params])).toEqual([
+      ['config.warning.working_hours_shortened', { from: 540, to: 420 }],
+    ]);
+  });
+
+  it('refuses a calendar below both floors with two errors, rule M11', () => {
+    const errors = loadErrors(
+      "escalation:\n  calendar:\n    working_days: [mon]\n    working_hours: { start: '10:00', end: '11:00' }\n",
+    );
+    expect(errors.map((e) => [e.key, e.params])).toEqual([
+      ['config.rule.calendar_min_working_days', { minimum: 5, found: 1, rule: 'M11' }],
+      ['config.rule.calendar_min_working_hours', { minimum: 7, found: 60, rule: 'M11' }],
+    ]);
+  });
+
+  it('gives no warning for added working days, a longer day or up to 20 holidays a year', () => {
+    const twenty = holidays(2027, 20);
+    const { warnings } = loadValid(
+      `escalation:\n  calendar:\n    holidays: [${twenty.join(', ')}]\n    working_days: [mon, tue, wed, thu, fri, sat]\n    working_hours: { start: '08:00', end: '18:00' }\n`,
     );
     expect(warnings).toEqual([]);
+  });
+
+  it('warns when one calendar year has more than 20 holidays', () => {
+    const dates = [...holidays(2027, 21), ...holidays(2028, 20)];
+    const { warnings } = loadValid(
+      `escalation:\n  calendar:\n    holidays: [${dates.join(', ')}]\n`,
+    );
+    expect(warnings.map((w) => [w.key, w.path, w.params])).toEqual([
+      [
+        'config.warning.many_holidays',
+        'escalation.calendar.holidays',
+        { year: '2027', count: 21, maximum: 20 },
+      ],
+    ]);
+    expect(formatIssue(warnings[0]!)).toBe(
+      'escalation.calendar.holidays: 21 holidays in 2027 (more than 20), so working-time clocks run longer. This change must be reviewed.',
+    );
   });
 
   it('warns when a G3 cell moves from HITL to HOTL at Medium risk', () => {

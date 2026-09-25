@@ -33,7 +33,7 @@ escalation:
     holidays: [2027-02-05, 2027-02-08, 2027-02-09, 2027-02-10] # Tết
 ```
 
-- Mappings merge key by key. Lists, values, durations (`{ value, unit }`) and deadlines (`{ kind }`) replace the default whole.
+- Mappings merge key by key. Lists, values, durations (`{ value, unit }`) and deadlines (`{ kind }`) replace the default whole. Any mapping with a `unit` or `kind` key counts as a duration or deadline, so new settings must not use those key names for ordinary mappings.
 - Unknown settings are refused. YAML tags, duplicate keys and alias bombs are refused.
 
 | Section | Settings |
@@ -65,13 +65,13 @@ A project may tighten anything. It may **not** loosen these (rules M1–M15, sou
 | M8 | `client_restricted` self-hosted only; `prohibited` no model |
 | M9 | Budget warning ≤ 80 %, stop ≤ 100 %, warning before stop |
 | M10 | Loop limit ≤ 3 identical tool calls |
-| M11 | SLA clocks never longer than codes table §6.3 / handbook Ch.6 §6.4 |
+| M11 | SLA clocks never longer than codes table §6.3 / handbook Ch.6 §6.4; calendar floor: at least 5 working days per week and 7 working hours per day |
 | M12 | `POLICY` only at G4 and without roles; other cells need roles; approvals ≤ roles; no `viewer`; `on_breach` is HITL |
 | M13 | High and Critical: G2, G3, G6, G7, production G8 HITL; Critical non-production G8 HITL |
 | M14 | G4 High and Critical HITL |
 | M15 | G6 never `POLICY` |
 
-Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a working day removed from the calendar, or shorter working hours. Holidays give no warning.
+Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 
 ## Changing the defaults
 

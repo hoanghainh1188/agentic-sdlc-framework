@@ -13,7 +13,8 @@
 //   M8  client_restricted self-hosted only, prohibited none .......... D-07 §4
 //   M9  budget warn ≤ 80 %, stop ≤ 100 %, warn < stop ................ D-07 §6, Ch.3 §3.6
 //   M10 loop limit ≤ 3 identical tool calls .......................... D-02 FR-35, Ch.3 §3.6
-//   M11 SLA clocks never longer than the handbook .................... codes table §6.3, Ch.6 §6.4
+//   M11 SLA clocks never longer than the handbook; calendar floor .... codes table §6.3, Ch.6 §6.4
+//       (≥ 5 working days per week, ≥ 7 working hours per day)
 //   M12 cell structure (POLICY at G4 only, roles, approvals) ......... codes table §4, D-05 §5
 //   M13 human approval of high-risk effects (High/Critical HITL) ..... codes table §4 "never skipped"
 //   M14 permission before dangerous actions (G4 High/Critical HITL) .. codes table §4, Ch.13 §13.8
@@ -33,7 +34,7 @@ import type {
 } from '@sdlc/contracts';
 import { RISK_TIERS, SEVERITIES } from '@sdlc/contracts';
 
-import { durationMinutes, isWorkingUnit } from './calendar.js';
+import { durationMinutes, isWorkingUnit, workingDayMinutes } from './calendar.js';
 import { issue, type ConfigIssue } from './issues.js';
 
 export const MVP_MAX_AUTONOMY: AutonomyLevel = 'L2';
@@ -62,6 +63,13 @@ export const DUAL_APPROVAL_ROLES: readonly ProjectRole[] = ['person_b', 'second_
 export const MAX_WARN_PERCENT = 80;
 export const MAX_STOP_PERCENT = 100;
 export const MAX_IDENTICAL_TOOL_CALLS = 3;
+
+/**
+ * Calendar floor for M11. SLA clocks are compared in the project's own calendar, so a shrunken
+ * calendar would stretch "1 working day" in real time (Harry, 2026-09-25, PR #53).
+ */
+export const MIN_WORKING_DAYS_PER_WEEK = 5;
+export const MIN_WORKING_HOURS_PER_DAY = 7;
 
 /** Longest allowed SLA clocks: acknowledge from codes table §6.3, resolve from Ch.6 §6.4. */
 export const HANDBOOK_SLA: Readonly<Record<Severity, SlaEntry>> = {
@@ -275,7 +283,30 @@ export function withinDeadline(
   return durationMinutes(actual, calendar) <= durationMinutes(limit, calendar);
 }
 
-const m11: Rule = (c) =>
+function calendarFloor(calendar: WorkingCalendar): ConfigIssue[] {
+  const path = 'escalation.calendar';
+  const dayMinutes = workingDayMinutes(calendar);
+  return [
+    ...(calendar.working_days.length < MIN_WORKING_DAYS_PER_WEEK
+      ? [
+          issue('config.rule.calendar_min_working_days', `${path}.working_days`, {
+            minimum: MIN_WORKING_DAYS_PER_WEEK,
+            found: calendar.working_days.length,
+          }),
+        ]
+      : []),
+    ...(dayMinutes < MIN_WORKING_HOURS_PER_DAY * 60
+      ? [
+          issue('config.rule.calendar_min_working_hours', `${path}.working_hours`, {
+            minimum: MIN_WORKING_HOURS_PER_DAY,
+            found: dayMinutes,
+          }),
+        ]
+      : []),
+  ];
+}
+
+const slaClocks: Rule = (c) =>
   SEVERITIES.flatMap((severity) => {
     const actual = c.escalation.sla[severity];
     const limit = HANDBOOK_SLA[severity];
@@ -294,6 +325,8 @@ const m11: Rule = (c) =>
         }),
       );
   });
+
+const m11: Rule = (c) => [...calendarFloor(c.escalation.calendar), ...slaClocks(c)];
 
 function describeDeadline(deadline: Deadline): string {
   return 'kind' in deadline ? deadline.kind : `${deadline.value} ${deadline.unit}`;
