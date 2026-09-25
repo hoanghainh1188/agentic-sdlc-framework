@@ -5,3 +5,13 @@
 
 [extend]
 useDefault = true
+
+# Approved by: Harry (Person B), 2026-09-25, PR #50.
+# False positive: the Docker image name valkey/valkey:<version tag> contains "key", so
+# generic-api-key reads the tag as a key value. Only lines that name this image are skipped;
+# a real key elsewhere on such a line (e.g. in a trailing comment) is still reported.
+[[allowlists]]
+description = "valkey/valkey image tag is not a secret (PR #50)"
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+regexes = ['''valkey/valkey:[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?`?\s*(\|.*)?$''']
