@@ -12,7 +12,11 @@
 
 - [ ] No AI used
 - [ ] AI wrote **part** of this change (list below)
-- [ ] AI wrote **most / all** of this change; a human reviewed every file
+- [ ] AI wrote **most / all** of this change
+
+Human review (ticked **only by the reviewer**, when approving — never by the author or the AI):
+
+- [ ] A human reviewed every file — reviewer: <!-- name -->
 
 AI tools used: <!-- e.g. Claude Code, OpenHands (via the platform) -->
 

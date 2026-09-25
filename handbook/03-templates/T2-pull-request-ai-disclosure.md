@@ -21,6 +21,7 @@
 ## Rules
 
 - A PR without an AI disclosure → the reviewer asks for it before reading the code.
+- The "human reviewed every file" box is ticked **only by the reviewer**, when approving. The author or the AI never ticks it (producer ≠ approver, Chapter 5).
 - PRs created by the platform's agent: the platform fills in the intent and run ID (task C08 in D-08).
 
 ## Version history
@@ -30,3 +31,4 @@
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content + `.github/pull_request_template.md` |
 | 0.2 | 2026-09-24 | Claude (draft) | Translated into English |
+| 0.3 | 2026-09-25 | Claude (draft) | Human-review box separated from the AI disclosure; ticked only by the reviewer |
