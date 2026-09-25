@@ -1,0 +1,3 @@
+# Temporal dynamic configuration (task A02). Empty on purpose: server defaults.
+# Tuning belongs here, not in code.
+{}

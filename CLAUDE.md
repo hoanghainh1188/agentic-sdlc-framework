@@ -87,7 +87,12 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - `pnpm clean` — remove build output.
 - Before a PR: `pnpm build && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`.
 - New package: put it under `platform/apps/`, `platform/packages/` or `platform/packages/adapters/` with the `@sdlc/` scope, and add it to the root `tsconfig.json` references.
-- Docker Compose commands: added in A02.
+- Docker Compose (infrastructure, `platform/deploy/`, ADR-M17). Profiles: `core` (PostgreSQL, Temporal + UI, LiteLLM, Valkey, SeaweedFS, OpenBao) and `observability` (Langfuse, ClickHouse):
+  - `pnpm compose:env` — once: create `platform/deploy/.env` with random secrets (mode 600, Git-ignored). Never overwrites.
+  - `pnpm compose:core` / `pnpm compose:obs` — start `core` / `core + observability` and wait until healthy (`platform/deploy/scripts/up.sh`).
+  - `pnpm compose:down` — stop; volumes are kept. Add `-v` to the underlying command only to wipe data on a dev machine.
+  - `pnpm test:compose` — live test with Docker (throw-away project, ports +20000, cleaned up). `pnpm test` runs only the static compose checks.
+  - OpenBao "healthy" = API reachable, NOT unsealed. Pin every image to an exact version; never MinIO, Redis or Elasticsearch.
 - CI: `.github/workflows/ci.yml` (A09) runs the checks above, Gitleaks, Semgrep and Trivy, and the Compose `core` integration job. Actions are pinned by commit SHA; thresholds live in the workflow `env:`.
 
 ## Current constraints

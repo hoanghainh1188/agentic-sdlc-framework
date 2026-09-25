@@ -4,3 +4,8 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+
+# Local environment files with real values (platform/deploy/scripts/init-env.sh). Only *.env.example is committed.
+.env
+*.env
+!*.env.example
