@@ -154,6 +154,22 @@ describe('AC2: integration job runs the Compose core profile', () => {
   });
 });
 
+describe('A06: database integration job', () => {
+  it('runs the DB tests on every PR, without a skip condition, and ci-ok waits for it', () => {
+    expect(job('db').if).toBeUndefined();
+    expect(runText('db')).toContain('pnpm test:db');
+    expect(job('ci-ok').needs).toContain('db');
+  });
+
+  it('pnpm test:db uses a throw-away container and requires a database', () => {
+    const script = fs.readFileSync(path.join(root, 'platform/deploy/scripts/test-db.sh'), 'utf8');
+    expect(script).toContain('SDLC_REQUIRE_DB=1');
+    expect(script).toContain('-p 127.0.0.1::5432');
+    expect(script).toContain('postgres/init:/docker-entrypoint-initdb.d:ro');
+    expect(script).toMatch(/trap cleanup EXIT/);
+  });
+});
+
 describe('AC3: Gitleaks, Semgrep and Trivy run and block critical findings', () => {
   it('thresholds are set once, in the workflow env', () => {
     expect(ciEnv.TRIVY_BLOCK_SEVERITY).toBe('CRITICAL');

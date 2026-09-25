@@ -55,7 +55,7 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 
 | Service | Default host port | Notes |
 |---|---|---|
-| PostgreSQL | 5432 | Databases `platform`, `temporal`, `temporal_visibility`, `litellm`, `langfuse`, one owner role each |
+| PostgreSQL | 5432 | Databases `platform`, `temporal`, `temporal_visibility`, `litellm`, `langfuse`, one owner role each. The `platform` database also has the application role `platform_app` (see below) |
 | Temporal (gRPC) | 7233 | Namespace `default`; closed workflows kept 30 days |
 | Temporal UI | 8080 | |
 | LiteLLM | 4000 | No models yet (added in M-C) |
@@ -64,6 +64,37 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 | Langfuse | 3000 | `observability` profile only |
 
 Valkey, ClickHouse and the Langfuse worker publish no port.
+
+## Platform database roles
+
+The `platform` database has two roles ([ADR-M09](../../design/ADR-M09-database-tooling.md) section 2.3):
+
+| Role | Password variable | Used for |
+|---|---|---|
+| `platform` (owner) | `PLATFORM_DB_PASSWORD` | Migrations only: `SDLC_DB_MIGRATION_URL=postgres://platform:…@127.0.0.1:5432/platform pnpm db:migrate` |
+| `platform_app` | `PLATFORM_APP_DB_PASSWORD` | The platform processes. `SELECT`, `INSERT`, `UPDATE` on chosen columns; never `DELETE` or DDL |
+
+The init scripts create both roles only on an **empty** data volume. A volume created before task A06 has no `platform_app`. Add `PLATFORM_APP_DB_PASSWORD` to `.env` (for example `openssl rand -hex 24`), restart with `pnpm compose:core`, then run the idempotent script once:
+
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T postgres sh /docker-entrypoint-initdb.d/02-create-platform-app-role.sh
+```
+
+### Reset after a change to migration 0001 (development only)
+
+Migration `0001-tenancy` was changed before it was merged (task A06: `role_bindings.revoked_at`). A development database that already applied an earlier version of 0001 does not get the change: the migrator only runs migrations it has not recorded. Recreate the `platform` database, then migrate again. **This deletes all data in it.**
+
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c 'DROP DATABASE platform WITH (FORCE)' \
+  -c 'CREATE DATABASE platform OWNER platform' \
+  -c 'REVOKE ALL ON DATABASE platform FROM PUBLIC' \
+  -c 'GRANT CONNECT ON DATABASE platform TO platform_app'
+SDLC_DB_MIGRATION_URL="postgres://platform:<PLATFORM_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm db:migrate
+```
+
+Alternatively, recreate the whole Compose stack with its volumes (`docker compose … down -v`). Once 0001 is on `main` it never changes again (ADR-M09 section 2.2).
 
 ## Health: what "healthy" means
 
@@ -101,4 +132,5 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 | Command | What it checks | Needs Docker |
 |---|---|---|
 | `pnpm test` | Static checks of the compose file, `.env.example`, `init-env.sh` and `.gitignore` (`platform/tests/deploy/`) | No |
+| `pnpm test:db` | Migrations and tenant isolation on a throw-away PostgreSQL container (same image and init script). Takes about 10 seconds ([ADR-M09](../../design/ADR-M09-database-tooling.md) section 2.6) | Yes |
 | `pnpm test:compose` | Starts `core`, then `core + observability`, with a throw-away env file, its own project name and ports shifted by 20000. Checks health, databases, namespace, buckets, Valkey policy, OpenBao state, Langfuse sign-up and trace upload. Removes everything afterwards. Takes about 2–5 minutes | Yes |
