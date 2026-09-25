@@ -267,11 +267,21 @@ function securityFindingsDrift(codes: string, config: ProjectConfig): string[] {
   const rowG6 = codes.split('\n').find((line) => line.startsWith('| G6 '));
   const saysHitl = rowG6?.includes('security findings go to HITL at any tier') === true;
   const mode = config.oversight.g6_security_findings.mode;
-  return saysHitl && mode === 'HITL'
-    ? []
-    : [
-        `oversight.g6_security_findings.mode: codes table §4 row G6 says security findings go to HITL; default config has ${mode}`,
-      ];
+  const issues =
+    saysHitl && mode === 'HITL'
+      ? []
+      : [
+          `oversight.g6_security_findings.mode: codes table §4 row G6 says security findings go to HITL; default config has ${mode}`,
+        ];
+  // Row G6 also names the default threshold, e.g. "(default HIGH; CRITICAL always)".
+  const stated = /\(default (\w+);/.exec(rowG6 ?? '')?.[1]?.toLowerCase();
+  const threshold = config.oversight.g6_security_findings.min_severity;
+  if (stated !== threshold) {
+    issues.push(
+      `oversight.g6_security_findings.min_severity: codes table §4 row G6 says default ${stated ?? '(missing)'}; default config has ${threshold}`,
+    );
+  }
+  return issues;
 }
 
 /** Every difference between the handbook and `config`, one line per cell. */

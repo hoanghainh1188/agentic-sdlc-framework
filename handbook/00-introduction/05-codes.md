@@ -2,7 +2,7 @@
 
 Every code has exactly one meaning across the whole repo.
 
-> Status: **Approved** (Harry, 2026-09-24) — version 1.3 The design docs in `design/` still use the old codes and will be updated after the handbook is agreed.
+> Status: **Approved** (Harry, 2026-09-24) — version 1.4. The design docs in `design/` use these codes (design version 1.0 and later).
 
 ---
 
@@ -89,7 +89,7 @@ G1–G8 are **lifecycle checkpoints**; the **oversight mode of each gate depends
 | G3 Plan / Architecture | P2 | Is the design and plan appropriate? | HOTL | HITL | HITL | HITL | **Person B** approves design / important changes |
 | G4 Execution boundary | P3 | What may the agent do, with which permissions and budget? | Policy check | Policy check | HITL | HITL | Automatic policy; a human only for elevated permissions and High+ |
 | G5 Scope drift / budget | P3 | Is the agent staying inside plan and budget? | HOTL | HOTL | HOTL → HITL on breach | HITL | Person A (task owner) on alerts |
-| G6 Independent verification | P4 | Is there independent evidence? | Automated + AUDIT | Automated + HOTL | Automated + HITL | Automated + HITL | Checks; security findings go to HITL at any tier |
+| G6 Independent verification | P4 | Is there independent evidence? | Automated + AUDIT | Automated + HOTL | Automated + HITL | Automated + HITL | Checks; security findings go to HITL at any tier when at or above the configured severity (default HIGH; CRITICAL always) |
 | G7 Review / Merge | P5 | Do we accept the change into a protected branch? | HITL | HITL | HITL | HITL + second approver | **Person B** (never the producer) |
 | G8 Release / Learning | P5 | Should it go live? | Production: HITL · non-production: HOTL | Production: HITL | Production: HITL | HITL + business/security approval | **Person B** (+ business/security owner for Critical) |
 
@@ -182,3 +182,4 @@ This table and Chapter 6 §6.4 (which adds resolution times and who to notify) a
 | 1.1 | 2026-09-24 | Harry | Added: 7 kinds of change that always make G3 HITL |
 | 1.2 | 2026-09-24 | Harry | Added: change types that always need two approvers at G7 |
 | 1.3 | 2026-09-24 | Harry | §2.1 aligned with Ch.4 §4.7; §6.3 marked as the reference for SLAs |
+| 1.4 | 2026-09-25 | Harry | §4 row G6: severity threshold for security findings (default HIGH; CRITICAL always) — design/QUESTIONS.md #19 |

@@ -14,7 +14,7 @@ Status per section: ⬜ not written · 🟨 draft · ✅ approved (interim)
 | 0.2 Glossary | [02-glossary.md](02-glossary.md) | 🟨 v0.1 |
 | 0.3 What Agentic SDLC is | [03-what-is-agentic-sdlc.md](03-what-is-agentic-sdlc.md) | 🟨 v0.1 |
 | 0.4 Core principles | [04-core-principles.md](04-core-principles.md) | 🟨 v0.1 |
-| 0.5 Canonical codes | [05-codes.md](05-codes.md) | ✅ v1.3 |
+| 0.5 Canonical codes | [05-codes.md](05-codes.md) | ✅ v1.4 |
 | 0.6 Writing style | [06-writing-style.md](06-writing-style.md) | 🟨 |
 
 ## Part I — Policy and governance (leadership)
@@ -39,7 +39,7 @@ Status per section: ⬜ not written · 🟨 draft · ✅ approved (interim)
 | 11. Requirements | P1 · G1, G2 | [ch11](../02-playbook/ch11-p1-requirements.md) | ✅ v1.0 |
 | 12. Analysis and design | P2 · G3 | [ch12](../02-playbook/ch12-p2-analysis-and-design.md) | ✅ v1.0 |
 | 13. Coding | P3 · G4, G5 | [ch13](../02-playbook/ch13-p3-coding.md) | 🟨 v0.2 (awaiting comments) |
-| 14. Testing | P4 · G6 | [ch14](../02-playbook/ch14-p4-testing.md) | 🟨 v0.1 (awaiting comments) |
+| 14. Testing | P4 · G6 | [ch14](../02-playbook/ch14-p4-testing.md) | 🟨 v0.2 (awaiting comments) |
 | 15. Release | P5 · G7, G8 | [ch15](../02-playbook/ch15-p5-release.md) | 🟨 v0.2 (awaiting comments) |
 | 16. Operations and maintenance | P6 | [ch16](../02-playbook/ch16-p6-operations.md) | 🟨 v0.2 (awaiting comments) |
 | 17. Reviewing AI output | Used at G2, G3, G7 | [ch17](../02-playbook/ch17-reviewing-ai-output.md) | 🟨 v0.1 (awaiting comments) |
