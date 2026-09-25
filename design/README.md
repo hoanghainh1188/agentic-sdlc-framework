@@ -12,6 +12,7 @@
 | D-08 | [MVP backlog](D-08-mvp-backlog.md) · [CSV](D-08-backlog.csv) | ✅ Approved | 2026-09-24 |
 | D-09 | [Sample pilot repo: orders / inventory](D-09-sample-pilot-repo.md) | ✅ Approved | 2026-09-24 |
 | — | [Open questions raised while coding](QUESTIONS.md) | In use | |
+| ADR-M09 | [Database access and migration tooling](ADR-M09-database-tooling.md) (task A06) | Proposed | |
 | ADR-M16 | [Monorepo tooling](ADR-M16-monorepo-tooling.md) (task A01) | ✅ Accepted | 2026-09-25 |
 | ADR-M17 | [Docker Compose infrastructure](ADR-M17-compose-infrastructure.md) (task A02) | Proposed | |
 

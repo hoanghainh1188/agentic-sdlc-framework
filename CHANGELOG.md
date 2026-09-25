@@ -14,6 +14,9 @@
 
 - A09: CI workflow `ci.yml`: build, type check, lint, format check, unit tests and actionlint on every PR; Gitleaks (any finding blocks), Semgrep (`ERROR` blocks), Trivy (`CRITICAL` blocks, `HIGH` listed in the job summary); Compose `core` integration job that runs when `platform/deploy/**` changes and nightly (skipped until A02 is merged); one summary job `ci-ok`. Actions pinned by commit SHA, downloaded tools checked by SHA-256, read-only permissions.
 - A09: Dependabot (GitHub Actions and Compose images, weekly), `.github/CODEOWNERS` (inactive on GitHub Free), `pnpm test:integration`.
+- A06: data access layer in `@sdlc/core` (Kysely 0.29 + `pg` 8.23, ADR-M09 proposed). Migration `0001-tenancy`: tables `tenants`, `projects`, `project_configs`, `project_ai_records`, `users`, `user_identities`, `role_bindings`, `api_tokens`, `git_event_cursors`; enums `data_class`, `project_role`, `git_provider`; composite tenant foreign keys (D-05 D2); `ON DELETE RESTRICT`.
+- A06: tenant enforcement: branded `TenantId`, `PlatformDatabase.forTenant()` repositories, a tenant guard plugin (rejects queries, including JOINs, subqueries and CTEs, without the tenant condition), a short `SystemScope` (tenants, API token resolution). API tokens stored as SHA-256 hashes only.
+- A06: application role `platform_app` (init script, `PLATFORM_APP_DB_PASSWORD`): SELECT, INSERT, column-level UPDATE; no DELETE, TRUNCATE or DDL. Commands `pnpm db:migrate`, `pnpm db:status`, `pnpm test:db`; CI job `db` (throw-away PostgreSQL on every PR, part of `ci-ok`). `design/QUESTIONS.md` #5 (removing a role binding).
 
 ### Changed
 - A09: Prettier now formats `.github/` workflow files (ADR-M16 §2.6); `render-diagrams.yml` actions pinned by commit SHA.
