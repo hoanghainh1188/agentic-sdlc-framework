@@ -123,7 +123,7 @@ pnpm openbao:bootstrap status
 - `init` and `root-token` refuse to run when their output is redirected or piped. Shares and tokens are never written to a file.
 - `configure` is safe to run again. It needs a root token: `pnpm openbao:bootstrap root-token` makes one from 2 shares.
 - After every restart, OpenBao is sealed again: run `unseal`.
-- Settings (shares, threshold, token and secret ID lifetimes) are in `openbao/bootstrap/bootstrap.env`. Access rules are in `openbao/bootstrap/policies/*.hcl`.
+- Settings (shares, threshold, token and secret ID lifetimes) are in `openbao/bootstrap/bootstrap.conf`. Access rules are in `openbao/bootstrap/policies/*.hcl`.
 - AppRole secret IDs work only from the Compose network subnet (`SDLC_NETWORK_SUBNET`, default `172.30.0.0/24`). A stack started before A03 has no fixed subnet: run `pnpm compose:down`, then `pnpm compose:core` once.
 - The audit log is `/openbao/logs/audit.log` on the volume `openbao-audit`.
 - The real initialisation on the internal server waits until the three key holders are named (runbook T11 section 3.2).

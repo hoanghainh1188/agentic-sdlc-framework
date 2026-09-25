@@ -1,11 +1,11 @@
 // D-08 task A03: static checks of the OpenBao bootstrap (no Docker needed), design/ADR-M19.
 // The live checks are in platform/tests/integration/openbao/bootstrap.test.ts.
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { deployDir, loadCompose, parseEnvFile, readDeployFile } from './compose';
+import { deployDir, loadCompose, parseEnvFile, readDeployFile, root } from './compose';
 
 const BOOTSTRAP = path.join(deployDir, 'openbao/bootstrap.sh');
 const SCRIPTS = [
@@ -13,7 +13,7 @@ const SCRIPTS = [
   'openbao/bootstrap/configure.sh',
   'openbao/bootstrap/root-token.sh',
 ];
-const settings = parseEnvFile(readDeployFile('openbao/bootstrap/bootstrap.env'));
+const settings = parseEnvFile(readDeployFile('openbao/bootstrap/bootstrap.conf'));
 const roles = (settings.get('APPROLE_ROLES') ?? '').split(' ').filter(Boolean);
 const policyDir = path.join(deployDir, 'openbao/bootstrap/policies');
 const policyNames = fs
@@ -102,7 +102,7 @@ describe('OpenBao bootstrap scripts', () => {
   });
 });
 
-describe('OpenBao bootstrap settings (bootstrap.env)', () => {
+describe('OpenBao bootstrap settings (bootstrap.conf)', () => {
   it('uses 3 key shares with an unseal threshold of 2 (D-03 section 10.2)', () => {
     expect(settings.get('BAO_KEY_SHARES')).toBe('3');
     expect(settings.get('BAO_KEY_THRESHOLD')).toBe('2');
@@ -215,5 +215,103 @@ describe('OpenBao in Compose', () => {
     expect(parseEnvFile(readDeployFile('.env.example')).get('SDLC_NETWORK_SUBNET')).toBe(
       '172.30.0.0/24',
     );
+  });
+});
+
+// A file that exists locally but is Git-ignored (for example by the `*.env` rule) passes every
+// local test and is missing in CI. These checks fail locally for that class of error.
+describe('files used by the OpenBao bootstrap are tracked by Git', () => {
+  const tracked = new Set(
+    execFileSync('git', ['ls-files', '-z', '--', 'platform/deploy'], {
+      cwd: root,
+      encoding: 'utf8',
+    })
+      .split('\0')
+      .filter(Boolean),
+  );
+  const repoPath = (full: string): string => path.relative(root, full).split(path.sep).join('/');
+  const trackedUnder = (dir: string): string[] =>
+    [...tracked].filter((f) => f.startsWith(`${repoPath(dir)}/`));
+  const filesOnDisk = (dir: string): string[] =>
+    fs
+      .readdirSync(dir, { withFileTypes: true, recursive: true })
+      .filter((e) => e.isFile())
+      .map((e) => path.join(e.parentPath, e.name));
+
+  // Bind mounts of the openbao service: host path (under platform/deploy) → container path.
+  const mounts = (loadCompose().services.openbao?.volumes ?? [])
+    .map((v) => v.split(':'))
+    .filter(([source]) => source!.startsWith('./'))
+    .map(([source, target]) => ({ host: path.join(deployDir, source!), container: target! }));
+
+  it('every bind-mounted file and every file inside a mounted folder is tracked', () => {
+    expect(mounts.length).toBeGreaterThan(0);
+    for (const { host } of mounts) {
+      const isDir = fs.existsSync(host) && fs.statSync(host).isDirectory();
+      if (isDir) {
+        expect(trackedUnder(host).length, repoPath(host)).toBeGreaterThan(0);
+        for (const file of filesOnDisk(host))
+          expect(tracked.has(repoPath(file)), repoPath(file)).toBe(true);
+      } else {
+        expect(tracked.has(repoPath(host)), repoPath(host)).toBe(true);
+      }
+    }
+  });
+
+  it('every file the bootstrap scripts refer to is tracked', () => {
+    // Host path of a path written in a script: $deploy_dir/… on the host; $in_container/…,
+    // $dir/… and /openbao/bootstrap/… inside the container (mapped back through the mounts).
+    const bootstrapMount = mounts.find((m) => m.container === '/openbao/bootstrap');
+    expect(bootstrapMount).toBeDefined();
+    const prefixes: [RegExp, string][] = [
+      [/\$deploy_dir\/([\w./*-]+)/g, deployDir],
+      [/\$(?:in_container|dir)\/([\w./*-]+)/g, bootstrapMount!.host],
+      [/\/openbao\/bootstrap\/([\w./*-]+)/g, bootstrapMount!.host],
+    ];
+    const referenced = new Set<string>();
+    for (const script of SCRIPTS) {
+      const code = readDeployFile(script)
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('#'))
+        .join('\n');
+      for (const [pattern, base] of prefixes) {
+        for (const m of code.matchAll(pattern)) {
+          const rel = m[1]!.replace(/\/$/, '');
+          if (rel) referenced.add(repoPath(path.join(base, rel)));
+        }
+      }
+    }
+    expect([...referenced]).toEqual(
+      expect.arrayContaining([
+        'platform/deploy/openbao/bootstrap/bootstrap.conf',
+        'platform/deploy/openbao/bootstrap/configure.sh',
+        'platform/deploy/openbao/bootstrap/root-token.sh',
+      ]),
+    );
+    // The only exception: the Compose env file holds secrets. init-env.sh creates it; it must
+    // never be tracked (and is checked to be Git-ignored in compose-static.test.ts).
+    const NEVER_TRACKED = new Set(['platform/deploy/.env']);
+    for (const ref of [...referenced].filter((r) => !NEVER_TRACKED.has(r))) {
+      if (ref.includes('*')) {
+        const regex = new RegExp(`^${ref.replace(/[.]/g, '\\.').replace(/\*/g, '[^/]*')}$`);
+        expect(
+          [...tracked].some((f) => regex.test(f)),
+          ref,
+        ).toBe(true);
+      } else {
+        const isTrackedFile = tracked.has(ref);
+        const isTrackedDir = [...tracked].some((f) => f.startsWith(`${ref}/`));
+        expect(isTrackedFile || isTrackedDir, ref).toBe(true);
+      }
+    }
+  });
+
+  it('bootstrap.conf is not Git-ignored', () => {
+    const r = spawnSync(
+      'git',
+      ['check-ignore', '-q', '--no-index', 'platform/deploy/openbao/bootstrap/bootstrap.conf'],
+      { cwd: root },
+    );
+    expect(r.status).toBe(1); // 1 = not ignored
   });
 });

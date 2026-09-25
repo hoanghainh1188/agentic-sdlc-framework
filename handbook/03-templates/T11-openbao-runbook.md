@@ -84,6 +84,8 @@ What `configure` sets up (details: `design/ADR-M19-openbao-bootstrap.md`):
 - the token role `platform-admin` (tokens of at most 1 hour);
 - a check that the file audit device is on.
 
+Settings (key shares, threshold, token and secret ID lifetimes) are in `platform/deploy/openbao/bootstrap/bootstrap.conf`. Access rules are in `platform/deploy/openbao/bootstrap/policies/*.hcl`. Changes to either go through a reviewed pull request, then `configure` again.
+
 ## 4. Unseal after a server restart
 
 1. The operator announces the restart in the internal channel.

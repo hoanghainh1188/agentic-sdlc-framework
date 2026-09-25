@@ -12,7 +12,7 @@
 set -eu
 
 deploy_dir="$(cd "$(dirname "$0")/.." && pwd)"
-settings="$deploy_dir/openbao/bootstrap/bootstrap.env"
+settings="$deploy_dir/openbao/bootstrap/bootstrap.conf"
 in_container=/openbao/bootstrap
 
 usage() {

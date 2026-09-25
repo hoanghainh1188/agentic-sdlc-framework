@@ -11,7 +11,7 @@
 set -eu
 
 dir=/openbao/bootstrap
-settings="$dir/bootstrap.env"
+settings="$dir/bootstrap.conf"
 
 say() { echo "configure: $*"; }
 fail() {
@@ -20,7 +20,7 @@ fail() {
 }
 setting() {
   value="$(sed -n "s/^$1=//p" "$settings" | tail -n 1)"
-  [ -n "$value" ] || fail "setting $1 missing in bootstrap.env"
+  [ -n "$value" ] || fail "setting $1 missing in bootstrap.conf"
   printf '%s' "$value"
 }
 

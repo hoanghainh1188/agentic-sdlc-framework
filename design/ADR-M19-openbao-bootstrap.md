@@ -34,7 +34,7 @@ A03 runs on development machines with **throw-away test keys** only. The real in
 
 ### 2.3. Settings are data, not code
 
-`bootstrap/bootstrap.env` holds the values that come from the handbook and design docs. Both scripts read it with `sed`; it is never executed as shell code.
+`bootstrap/bootstrap.conf` holds the values that come from the handbook and design docs. Both scripts read it with `sed`; it is never executed as shell code.
 
 | Setting | Value | Source |
 |---|---|---|
