@@ -145,7 +145,7 @@ services:
       test: [CMD-SHELL, 'wget -q --spider "http://$$(hostname -i | cut -d" " -f1):8080/" || exit 1']
 
   valkey:
-    image: valkey/valkey:8.1.10-alpine3.24
+    image: valkey/valkey:9.1.2-alpine3.24
     profiles: [core, observability]
     restart: unless-stopped
     networks: [sdlc]
