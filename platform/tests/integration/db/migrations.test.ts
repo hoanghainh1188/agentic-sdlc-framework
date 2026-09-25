@@ -1,5 +1,6 @@
 // D-08 A06 AC2 on a live PostgreSQL: tables, columns, enums, composite foreign keys (D-05 D2),
 // unique constraints and the privileges of the application role.
+import { DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
@@ -103,6 +104,19 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     expect(Object.fromEntries(enums.map((e) => [e.name, e.values]))).toEqual(
       Object.fromEntries(Object.entries(DB_ENUMS).map(([k, v]) => [k, [...v]])),
     );
+  });
+
+  it('the data_class and project_role enums match the @sdlc/contracts lists', async () => {
+    // The migrations keep literal values (ADR-M09 section 2.2); this catches drift from contracts.
+    const enums = await rows<{ name: string; values: string[] }>(sql`
+      SELECT t.typname AS name, array_agg(e.enumlabel ORDER BY e.enumsortorder)::text[] AS values
+      FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
+      JOIN pg_namespace n ON n.oid = t.typnamespace AND n.nspname = 'public'
+      WHERE t.typname IN ('data_class', 'project_role')
+      GROUP BY t.typname`);
+    const byName = Object.fromEntries(enums.map((e) => [e.name, e.values]));
+    expect(byName.data_class).toEqual([...DATA_CLASSES]);
+    expect(byName.project_role).toEqual([...PROJECT_ROLES]);
   });
 
   it('D-05 D2: every foreign key between tenant tables includes tenant_id on both sides', async () => {

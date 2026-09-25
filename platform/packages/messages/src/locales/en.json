@@ -58,5 +58,14 @@
   "config.warning.approvals_reduced": "{path}: approvals reduced from {from} (default) to {to}. This change must be reviewed.",
   "config.warning.working_day_removed": "{path}: {day} is no longer a working day, so working-time clocks (SLA, gate deadlines) run longer. This change must be reviewed.",
   "config.warning.many_holidays": "{path}: {count} holidays in {year} (more than {maximum}), so working-time clocks run longer. This change must be reviewed.",
-  "config.warning.working_hours_shortened": "{path}: a working day is now {to} minutes instead of {from}, so working-time clocks run longer. This change must be reviewed."
+  "config.warning.working_hours_shortened": "{path}: a working day is now {to} minutes instead of {from}, so working-time clocks run longer. This change must be reviewed.",
+
+  "db.migrate.usage": "Usage: migrate-cli <latest|status>. Needs SDLC_DB_MIGRATION_URL (owner role).",
+  "db.migrate.missing_url": "SDLC_DB_MIGRATION_URL is not set.",
+  "db.migrate.applied": "Applied migration {name}.",
+  "db.migrate.failed_migration": "Migration {name} failed; it was rolled back.",
+  "db.migrate.up_to_date": "The database is up to date.",
+  "db.migrate.failed": "Migration failed: {reason}",
+  "db.status.applied": "applied  {name}  {executed_at}",
+  "db.status.pending": "pending  {name}"
 }

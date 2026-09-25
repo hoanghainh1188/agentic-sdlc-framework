@@ -23,6 +23,7 @@
 - A05: codes-table drift test (default config vs codes table §3, §4, §6.3 and Ch.6 §6.4). ADR-M18 (proposed). `design/QUESTIONS.md` #5–#10, answered by Harry.
 
 ### Changed
+- A06 follow-up (#55): the DB layer reuses `DATA_CLASSES` and `PROJECT_ROLES` from `@sdlc/contracts` (no copy in `@sdlc/core`; core no longer exports them) and the `db.*` messages move into `@sdlc/messages` (keys and placeholders in snake_case, for example `db.migrate.missing_url`, `{executed_at}`). The migrate command prints the same text. `vitest.integration.config.ts` reuses the source aliases of `pnpm test`, so the CI `db` job resolves `@sdlc/*` packages without a build. New `pnpm test:db` check: the `data_class` and `project_role` enums in PostgreSQL match the contracts lists. ADR-M09 §2.5 updated.
 - A05: D-05 §6.1 v1.1: `config_hash` is the hash of the effective configuration in RFC 8785 canonical JSON (approved by Harry, 2026-09-25).
 - A09: Prettier now formats `.github/` workflow files (ADR-M16 §2.6); `render-diagrams.yml` actions pinned by commit SHA.
 - Docs fixes (found during A01 planning): README task count 44 and codes table v1.3; leftover pre-2+N roles table removed from D-02 §3.
