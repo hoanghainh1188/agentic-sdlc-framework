@@ -13,6 +13,7 @@
 | D-09 | [Sample pilot repo: orders / inventory](D-09-sample-pilot-repo.md) | ✅ Approved | 2026-09-24 |
 | — | [Open questions raised while coding](QUESTIONS.md) | In use | |
 | ADR-M09 | [Database access and migration tooling](ADR-M09-database-tooling.md) (task A06) | Proposed | |
+| ADR-M10 | [OpenHands Agent Server: result of the C01 PoC](ADR-M10-openhands-agent-server.md) (task C01) | Proposed | |
 | ADR-M16 | [Monorepo tooling](ADR-M16-monorepo-tooling.md) (task A01) | ✅ Accepted | 2026-09-25 |
 | ADR-M17 | [Docker Compose infrastructure](ADR-M17-compose-infrastructure.md) (task A02) | Proposed | |
 | ADR-M18 | [Project configuration package and message catalog](ADR-M18-config-and-message-catalog.md) (task A05) | Proposed | |

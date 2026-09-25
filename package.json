@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b && tsc -p platform/tests/tsconfig.json",
+    "typecheck": "tsc -b && tsc -p platform/tests/tsconfig.json && tsc -p platform/spikes/openhands/tsconfig.json",
     "lint": "eslint --max-warnings 0 .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
