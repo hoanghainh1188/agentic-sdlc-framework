@@ -1,0 +1,12 @@
+{
+  "name": "@sdlc/adapter-git-github",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Git host adapter: GitHub. See design/D-03 section 7.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
+}

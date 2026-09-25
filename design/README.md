@@ -12,6 +12,7 @@
 | D-08 | [MVP backlog](D-08-mvp-backlog.md) · [CSV](D-08-backlog.csv) | ✅ Approved | 2026-09-24 |
 | D-09 | [Sample pilot repo: orders / inventory](D-09-sample-pilot-repo.md) | ✅ Approved | 2026-09-24 |
 | — | [Open questions raised while coding](QUESTIONS.md) | In use | |
+| ADR-M16 | [Monorepo tooling](ADR-M16-monorepo-tooling.md) (task A01) | 🟨 Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

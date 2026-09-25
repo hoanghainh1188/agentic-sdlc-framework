@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "files": [],
+  "references": [
+    { "path": "platform/packages/contracts" },
+    { "path": "platform/packages/config" },
+    { "path": "platform/packages/core" },
+    { "path": "platform/packages/adapters/git-github" },
+    { "path": "platform/packages/adapters/agent-openhands" },
+    { "path": "platform/packages/adapters/model-litellm" },
+    { "path": "platform/packages/adapters/evidence-s3" },
+    { "path": "platform/packages/adapters/policy-simple" },
+    { "path": "platform/apps/api" },
+    { "path": "platform/apps/worker" },
+    { "path": "platform/apps/runner" },
+    { "path": "platform/apps/cli" }
+  ]
+}
