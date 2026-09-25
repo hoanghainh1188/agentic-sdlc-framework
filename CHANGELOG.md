@@ -39,6 +39,7 @@
 - B02: audit actions `intent.created`, `intent.state_changed`, `spec.linked`, `plan.submitted`, `gate.decided`, written in the same transaction; audit fields may be optional (`kind?`). New trigger error `SDA04`. `design/QUESTIONS.md` #22 (G4 uses the stricter of stored and current `max_autonomy`). D-05 1.4, ADR-M09 0.5.
 
 ### Changed
+- CLAUDE.md `Current constraints` after B02 (PR #69): A04 in review; C02 next once A04 is merged (needs A04 and B02); B02 used QUESTIONS #22 only.
 - A03: existing development stacks need `pnpm compose:down` once, because the Compose network now has a fixed subnet. The A02 live test uses its own subnet.
 - CLAUDE.md `Current constraints` after A07: session order B01 and A03 now, then A04 and B02; A03 and A04 may use throw-away test keys on dev machines only, while the real OpenBao initialisation on the internal server still waits for the three key holders (Harry, 2026-09-25).
 - A07: D-05 v1.2 (§6.7 `hash_version`, identity `id`, nullable `entity_type` / `entity_id`, payload rule; §7.1 hashed fields). ADR-M09 v0.4. `vitest.config.ts` aliases `@sdlc/core` to its sources; the catalog "no unused keys" test also scans `platform/apps`.
