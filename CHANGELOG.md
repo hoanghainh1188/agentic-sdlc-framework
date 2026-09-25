@@ -15,7 +15,12 @@
 - A09: CI workflow `ci.yml`: build, type check, lint, format check, unit tests and actionlint on every PR; Gitleaks (any finding blocks), Semgrep (`ERROR` blocks), Trivy (`CRITICAL` blocks, `HIGH` listed in the job summary); Compose `core` integration job that runs when `platform/deploy/**` changes and nightly (skipped until A02 is merged); one summary job `ci-ok`. Actions pinned by commit SHA, downloaded tools checked by SHA-256, read-only permissions.
 - A09: Dependabot (GitHub Actions and Compose images, weekly), `.github/CODEOWNERS` (inactive on GitHub Free), `pnpm test:integration`.
 
+- A05: `@sdlc/config` loads the project configuration: default file with the codes table values (gate × risk matrix, forced-HITL G3 and dual-approval G7 lists, SLA table, autonomy, budgets, loop limits, model routing, evidence retention 180 days, GitHub polling), partial YAML overrides, safe YAML reading, strict schema (zod), mandatory rules M1–M15 that refuse loosening, warnings for allowed loosening, and a stable `config_hash` (RFC 8785 + SHA-256). Working-time calendar with time zone, working hours and `holidays` for SLA clocks.
+- A05: `@sdlc/messages`, the message catalog (English; Vietnamese and Japanese can be added as JSON files). `@sdlc/contracts` gets the canonical code lists and the `ProjectConfig` types.
+- A05: codes-table drift test (default config vs codes table §3, §4, §6.3 and Ch.6 §6.4). ADR-M18 (proposed). `design/QUESTIONS.md` #5–#10, answered by Harry.
+
 ### Changed
+- A05: D-05 §6.1 v1.1: `config_hash` is the hash of the effective configuration in RFC 8785 canonical JSON (approved by Harry, 2026-09-25).
 - A09: Prettier now formats `.github/` workflow files (ADR-M16 §2.6); `render-diagrams.yml` actions pinned by commit SHA.
 - Docs fixes (found during A01 planning): README task count 44 and codes table v1.3; leftover pre-2+N roles table removed from D-02 §3.
 - ADR-M16 accepted (Harry, 2026-09-25, with PR #46); design/README.md index updated.

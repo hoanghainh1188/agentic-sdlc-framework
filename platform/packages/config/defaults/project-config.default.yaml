@@ -1,0 +1,154 @@
+# Default project configuration (design/D-08 A05, ADR-M18).
+# Source of truth: handbook codes table, handbook/00-introduction/05-codes.md (v1.3).
+# A project's own YAML is a partial override: mappings merge into this file, lists and values replace.
+# The platform refuses overrides that loosen mandatory rules (see platform/packages/config/README.md).
+# A codes-table change must be made together with the matching change here, in the same PR
+# (platform/tests/config/codes-table-drift.test.ts checks it).
+schema_version: 1
+
+oversight:
+  # Codes table §4 (gate × risk tier).
+  # mode: HITL | HOTL | AUDIT, or POLICY (automatic policy check, G4 only; design/QUESTIONS.md #6).
+  # roles: approvers (HITL) or the people notified / sampling (HOTL, AUDIT).
+  # approvals: approvals from different people (default 1).
+  matrix:
+    G1: # §4 row G1: HITL at every tier; Person A
+      low: { mode: HITL, roles: [person_a] }
+      medium: { mode: HITL, roles: [person_a] }
+      high: { mode: HITL, roles: [person_a] }
+      critical: { mode: HITL, roles: [person_a] }
+    G2: # §4 row G2: HOTL / HITL / HITL / HITL; "Person A; Person B for High+"
+      low: { mode: HOTL, roles: [person_a] }
+      medium: { mode: HITL, roles: [person_a] }
+      high: { mode: HITL, roles: [person_b] }
+      critical: { mode: HITL, roles: [person_b] }
+    G3: # §4 row G3: HOTL / HITL / HITL / HITL; Person B
+      low: { mode: HOTL, roles: [person_b] }
+      medium: { mode: HITL, roles: [person_b] }
+      high: { mode: HITL, roles: [person_b] }
+      critical: { mode: HITL, roles: [person_b] }
+    G4: # §4 row G4: Policy check / Policy check / HITL / HITL; D-02 §6.2 "Person A for High"
+      low: { mode: POLICY }
+      medium: { mode: POLICY }
+      high: { mode: HITL, roles: [person_a] }
+      critical: { mode: HITL, roles: [person_a] } # design/QUESTIONS.md #5
+    G5: # §4 row G5: HOTL / HOTL / HOTL → HITL on breach / HITL; Person A
+      low: { mode: HOTL, roles: [person_a] }
+      medium: { mode: HOTL, roles: [person_a] }
+      high: { mode: HOTL, on_breach: HITL, roles: [person_a] }
+      critical: { mode: HITL, roles: [person_a] } # design/QUESTIONS.md #5
+    G6: # §4 row G6: Automated + AUDIT / HOTL / HITL / HITL; D-02 §6.2 "Person B for High+"
+      low: { mode: AUDIT, roles: [person_b] } # design/QUESTIONS.md #10
+      medium: { mode: HOTL, roles: [person_b] } # design/QUESTIONS.md #10
+      high: { mode: HITL, roles: [person_b] }
+      critical: { mode: HITL, roles: [person_b] }
+    G7: # §4 row G7: HITL at every tier; Critical "+ second approver"; Person B
+      low: { mode: HITL, roles: [person_b] }
+      medium: { mode: HITL, roles: [person_b] }
+      high: { mode: HITL, roles: [person_b] }
+      critical: { mode: HITL, roles: [person_b, second_approver], approvals: 2 }
+    G8: # §4 row G8; Critical "+ business/security approval" = second approver (D-02 §3)
+      production:
+        low: { mode: HITL, roles: [person_b] }
+        medium: { mode: HITL, roles: [person_b] }
+        high: { mode: HITL, roles: [person_b] }
+        critical: { mode: HITL, roles: [person_b, second_approver], approvals: 2 }
+      non_production: # §4 Low "non-production: HOTL"; Medium and High from Ch.15 §15.8 (QUESTIONS.md #7)
+        low: { mode: HOTL, roles: [person_b] }
+        medium: { mode: HOTL, roles: [person_b] }
+        high: { mode: HOTL, roles: [person_b] }
+        critical: { mode: HITL, roles: [person_b, second_approver], approvals: 2 }
+
+  # §4 "G3 is always HITL … when the change involves"; D-02 FR-15. Projects may add flags, never remove.
+  forced_hitl_g3:
+    change_flags:
+      - migration
+      - breaking_contract
+      - new_service_boundary
+      - security_boundary
+      - system_of_record
+      - prod_infrastructure
+      - core_business_rule
+
+  # §4 "G7 needs two approvers … for"; D-02 FR-16. Projects may add flags, never remove.
+  dual_approval_g7:
+    change_flags:
+      - migration
+      - payment
+      - personal_data
+      - prod_infrastructure
+      - breaking_contract
+      - safety_function
+    roles: [person_b, second_approver]
+
+  # §4 row G6 "security findings go to HITL at any tier"; Ch.14 §14.8.
+  g6_security_findings: HITL
+
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-02 FR-12; QUESTIONS.md #9.
+  hitl_gate_deadline: { value: 1, unit: working_days }
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-03 §6; QUESTIONS.md #9.
+  hotl_block_window: { value: 4, unit: working_hours }
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-02 FR-17; QUESTIONS.md #9.
+  approval_expiry: { value: 7, unit: days }
+
+autonomy:
+  # Codes table §3 "Maximum autonomy"; D-02 FR-03. The MVP never allows above L2 (D-02 §4.2).
+  max_by_risk: { low: L2, medium: L2, high: L1, critical: L0 }
+
+escalation:
+  # Acknowledge: codes table §6.3. Resolve: handbook Ch.6 §6.4.
+  sla:
+    critical:
+      acknowledge: { value: 15, unit: minutes }
+      resolve: { value: 1, unit: hours }
+    high:
+      acknowledge: { value: 1, unit: hours }
+      resolve: { kind: end_of_working_day }
+    medium:
+      acknowledge: { value: 1, unit: working_days }
+      resolve: { value: 3, unit: working_days }
+    low:
+      acknowledge: { value: 3, unit: working_days }
+      resolve: { kind: next_planned_work }
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). QUESTIONS.md #9.
+  # Working-day and working-hour clocks skip non-working days and `holidays` (local dates, e.g. Tết).
+  calendar:
+    time_zone: Asia/Ho_Chi_Minh
+    working_days: [mon, tue, wed, thu, fri]
+    working_hours: { start: '09:00', end: '18:00' }
+    holidays: []
+
+run:
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-02 FR-13; QUESTIONS.md #9.
+  g6_ci_retries: 2
+  loop_detection:
+    # D-02 FR-35; handbook Ch.3 §3.6 "more than 3 repeated identical tool calls → stop".
+    identical_tool_calls_max: 3
+    # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). FR-35; QUESTIONS.md #9.
+    no_progress_window_minutes: 15
+
+budget:
+  # D-07 §6; D-02 FR-52; handbook Ch.3 §3.6: warning at 80 %, stop at 100 %.
+  warn_percent: 80
+  stop_percent: 100
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-02 §12; QUESTIONS.md #9.
+  default_intent_usd: 10
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-02 §12; QUESTIONS.md #9.
+  default_run_usd: 2
+
+model_routing:
+  # D-07 §4. `api` for client_confidential only when the project AI record allows it (D-02 FR-19).
+  allowed_provider_types:
+    public: [api, self_hosted]
+    internal: [api, self_hosted]
+    client_confidential: [api, self_hosted]
+    client_restricted: [self_hosted]
+    prohibited: []
+
+retention:
+  # D-05 §10.1; D-02 FR-44.
+  evidence_retention_days: 180
+
+github:
+  # D-02 §6.3; ADR-M11.
+  poll_interval_seconds: 30

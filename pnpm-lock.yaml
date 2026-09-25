@@ -11,6 +11,15 @@ importers:
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.11.0)
+      '@sdlc/config':
+        specifier: workspace:*
+        version: link:platform/packages/config
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:platform/packages/contracts
+      '@sdlc/messages':
+        specifier: workspace:*
+        version: link:platform/packages/messages
       '@types/node':
         specifier: 24.13.6
         version: 24.13.6
@@ -60,11 +69,26 @@ importers:
 
   platform/packages/adapters/policy-simple: {}
 
-  platform/packages/config: {}
+  platform/packages/config:
+    dependencies:
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@sdlc/messages':
+        specifier: workspace:*
+        version: link:../messages
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
 
   platform/packages/contracts: {}
 
   platform/packages/core: {}
+
+  platform/packages/messages: {}
 
 packages:
 
@@ -875,6 +899,9 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zod@4.6.5:
+    resolution: {integrity: sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q==}
+
 snapshots:
 
   '@cacheable/memory@2.2.0':
@@ -1548,3 +1575,5 @@ snapshots:
   yaml@2.9.1: {}
 
   yocto-queue@0.1.0: {}
+
+  zod@4.6.5: {}

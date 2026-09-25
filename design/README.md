@@ -14,6 +14,7 @@
 | — | [Open questions raised while coding](QUESTIONS.md) | In use | |
 | ADR-M16 | [Monorepo tooling](ADR-M16-monorepo-tooling.md) (task A01) | ✅ Accepted | 2026-09-25 |
 | ADR-M17 | [Docker Compose infrastructure](ADR-M17-compose-infrastructure.md) (task A02) | Proposed | |
+| ADR-M18 | [Project configuration package and message catalog](ADR-M18-config-and-message-catalog.md) (task A05) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 
