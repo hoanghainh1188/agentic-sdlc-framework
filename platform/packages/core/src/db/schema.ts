@@ -96,6 +96,8 @@ export interface RoleBindingsTable {
   user_id: Immutable<string>;
   project_id: Immutable<string>;
   role: Immutable<ProjectRole>;
+  /** Set once when the role is withdrawn; never set on insert. Null = active. */
+  revoked_at: ColumnType<Date | null, never, Date>;
   created_at: CreatedAt;
 }
 
@@ -209,6 +211,7 @@ export const TABLE_COLUMNS = {
     'user_id',
     'project_id',
     'role',
+    'revoked_at',
     'created_at',
   ]),
   api_tokens: columns<ApiTokensTable>()([

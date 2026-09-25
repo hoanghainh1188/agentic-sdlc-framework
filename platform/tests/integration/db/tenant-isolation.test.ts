@@ -15,6 +15,7 @@ interface Seed {
   projectId: string;
   userId: string;
   identityId: string;
+  bindingId: string;
   tokenId: string;
   token: string;
 }
@@ -49,7 +50,11 @@ describeDb('AC3 + AC4: tenant isolation on PostgreSQL', () => {
       external_id: '1001',
       external_login: 'harry',
     });
-    await scope.roleBindings.grant({ user_id: user.id, project_id: project.id, role: 'person_a' });
+    const binding = await scope.roleBindings.grant({
+      user_id: user.id,
+      project_id: project.id,
+      role: 'person_a',
+    });
     const token = `sdlc_${slug}_secret_token`;
     const apiToken = await scope.apiTokens.create({
       user_id: user.id,
@@ -81,6 +86,7 @@ describeDb('AC3 + AC4: tenant isolation on PostgreSQL', () => {
       projectId: project.id,
       userId: user.id,
       identityId: identity.id,
+      bindingId: binding.id,
       tokenId: apiToken.id,
       token,
     };
@@ -367,6 +373,72 @@ describeDb('AC3 + AC4: tenant isolation on PostgreSQL', () => {
         }),
       ).rejects.toThrow('stop');
       expect(await a.scope.users.getByEmail('temp@example.com')).toBeUndefined();
+    });
+  });
+
+  describe('role revocation (QUESTIONS #11)', () => {
+    it('revoke hides the binding from default reads and keeps it as history', async () => {
+      const user = await a.scope.users.create({
+        display_name: 'Reviewer',
+        email: 'rev@example.com',
+      });
+      const granted = await a.scope.roleBindings.grant({
+        user_id: user.id,
+        project_id: a.projectId,
+        role: 'person_b',
+      });
+      expect(granted.revoked_at).toBeNull();
+
+      const revoked = await a.scope.roleBindings.revoke(granted.id);
+      expect(revoked?.revoked_at).toBeInstanceOf(Date);
+      expect(await a.scope.roleBindings.getById(granted.id)).toBeUndefined();
+      expect(await a.scope.roleBindings.listForUser(user.id)).toEqual([]);
+      expect(
+        (await a.scope.roleBindings.listForProject(a.projectId)).map((rb) => rb.id),
+      ).not.toContain(granted.id);
+      expect(
+        await a.scope.roleBindings.getById(granted.id, { includeRevoked: true }),
+      ).toMatchObject({ id: granted.id, revoked_at: revoked!.revoked_at });
+      // Already revoked: nothing to do.
+      expect(await a.scope.roleBindings.revoke(granted.id)).toBeUndefined();
+    });
+
+    it('the same role can be granted again after revocation, but not twice while active', async () => {
+      const user = await a.scope.users.create({
+        display_name: 'Again',
+        email: 'again@example.com',
+      });
+      const grant = () =>
+        a.scope.roleBindings.grant({ user_id: user.id, project_id: a.projectId, role: 'person_b' });
+      const first = await grant();
+      await expect(grant()).rejects.toMatchObject({ code: 'conflict' });
+      await a.scope.roleBindings.revoke(first.id);
+      const second = await grant();
+      expect(second.id).not.toBe(first.id);
+      expect((await a.scope.roleBindings.listForUser(user.id)).map((rb) => rb.id)).toEqual([
+        second.id,
+      ]);
+      expect(
+        await a.scope.roleBindings.listForUser(user.id, { includeRevoked: true }),
+      ).toHaveLength(2);
+    });
+
+    it('tenant A cannot revoke a tenant B binding', async () => {
+      expect(await a.scope.roleBindings.revoke(b.bindingId)).toBeUndefined();
+      expect(
+        await a.scope.roleBindings.getById(b.bindingId, { includeRevoked: true }),
+      ).toBeUndefined();
+      expect((await b.scope.roleBindings.getById(b.bindingId))?.revoked_at).toBeNull();
+    });
+
+    it('the database allows only revoked_at to change, and never before creation', async () => {
+      await expect(
+        sql`UPDATE role_bindings SET role = 'admin' WHERE id = ${a.bindingId}`.execute(t.appRaw),
+      ).rejects.toMatchObject({ code: '42501' });
+      await expect(
+        sql`UPDATE role_bindings SET revoked_at = created_at - interval '1 day'
+            WHERE id = ${a.bindingId}`.execute(t.appRaw),
+      ).rejects.toMatchObject({ code: '23514' });
     });
   });
 

@@ -80,6 +80,22 @@ The init scripts create both roles only on an **empty** data volume. A volume cr
 docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T postgres sh /docker-entrypoint-initdb.d/02-create-platform-app-role.sh
 ```
 
+### Reset after a change to migration 0001 (development only)
+
+Migration `0001-tenancy` was changed before it was merged (task A06: `role_bindings.revoked_at`). A development database that already applied an earlier version of 0001 does not get the change: the migrator only runs migrations it has not recorded. Recreate the `platform` database, then migrate again. **This deletes all data in it.**
+
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  -c 'DROP DATABASE platform WITH (FORCE)' \
+  -c 'CREATE DATABASE platform OWNER platform' \
+  -c 'REVOKE ALL ON DATABASE platform FROM PUBLIC' \
+  -c 'GRANT CONNECT ON DATABASE platform TO platform_app'
+SDLC_DB_MIGRATION_URL="postgres://platform:<PLATFORM_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm db:migrate
+```
+
+Alternatively, recreate the whole Compose stack with its volumes (`docker compose … down -v`). Once 0001 is on `main` it never changes again (ADR-M09 section 2.2).
+
 ## Health: what "healthy" means
 
 | Service | Healthy means |

@@ -116,14 +116,18 @@ export const migration0001Tenancy = defineMigration({
        user_id    uuid NOT NULL,
        project_id uuid NOT NULL,
        role       project_role NOT NULL,
+       -- A role is withdrawn by setting revoked_at, never by DELETE (D-05 D7; QUESTIONS #11).
+       revoked_at timestamptz,
        created_at timestamptz NOT NULL DEFAULT now(),
        CONSTRAINT role_bindings_user_fkey FOREIGN KEY (tenant_id, user_id)
          REFERENCES users (tenant_id, id) ON DELETE RESTRICT,
        CONSTRAINT role_bindings_project_fkey FOREIGN KEY (tenant_id, project_id)
          REFERENCES projects (tenant_id, id) ON DELETE RESTRICT,
-       CONSTRAINT role_bindings_tenant_id_user_id_project_id_role_key
-         UNIQUE (tenant_id, user_id, project_id, role)
+       CONSTRAINT role_bindings_revoked_after_creation CHECK (revoked_at >= created_at)
      )`,
+    // One active binding per person, project and role; revoked rows stay as history.
+    `CREATE UNIQUE INDEX role_bindings_active_key ON role_bindings (tenant_id, user_id, project_id, role)
+       WHERE revoked_at IS NULL`,
     `CREATE INDEX role_bindings_tenant_id_project_id_idx ON role_bindings (tenant_id, project_id)`,
 
     `CREATE TABLE api_tokens (
@@ -167,6 +171,7 @@ export const migration0001Tenancy = defineMigration({
        ON project_ai_records TO platform_app`,
     `GRANT UPDATE (display_name, email, status) ON users TO platform_app`,
     `GRANT UPDATE (external_login) ON user_identities TO platform_app`,
+    `GRANT UPDATE (revoked_at) ON role_bindings TO platform_app`,
     `GRANT UPDATE (last_used_at, revoked_at) ON api_tokens TO platform_app`,
     `GRANT UPDATE (cursor, last_polled_at) ON git_event_cursors TO platform_app`,
   ],

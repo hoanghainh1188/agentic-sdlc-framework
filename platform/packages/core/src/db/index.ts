@@ -12,6 +12,7 @@ export { SystemScope, type NewTenant, type ResolvedApiToken } from './system-sco
 export { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 export { hashApiToken } from './repositories/api-tokens.js';
 export type { SaveProjectConfig } from './repositories/project-configs.js';
+export type { RoleBindingQuery } from './repositories/role-bindings.js';
 export type { SaveProjectAiRecord } from './repositories/project-ai-records.js';
 export type {
   ApiToken,

@@ -123,6 +123,7 @@ Implementation choices:
 - `project_configs.updated_by` may be null: the platform wrote the config itself.
 - `api_tokens` stores only the SHA-256 hash (`CHECK` on 64 lowercase hex characters). The repository rejects anything else, and the raw token never reaches the database.
 - `project_configs` and `project_ai_records` are versioned with optimistic locking: `save(…, expectedVersion)`. History goes to the audit log from A07 on.
+- `role_bindings.revoked_at` (QUESTIONS #11, approved): a role is withdrawn by setting it; revoked rows stay as history. The unique key applies to active bindings only (`WHERE revoked_at IS NULL`), so a role can be granted again. `platform_app` may update only `revoked_at`, and a `CHECK` keeps it after `created_at`. `revoke()` uses the database clock by default.
 - The 1–1 tables are keyed by `project_id` alone (D-05). A cross-tenant insert into them fails on the primary key before the foreign key. It is still rejected, but with the error code `conflict` instead of `reference_not_found`.
 
 ## 3. Alternatives not chosen
@@ -140,10 +141,11 @@ Implementation choices:
 
 - Every later table must follow section 2.2 and the rules in the header of `0001-tenancy.ts`, and be added to `schema.ts` (types, `TABLE_COLUMNS`, `TENANT_COLUMN`). Tests fail otherwise.
 - Repository code must satisfy the tenant guard. A query the guard rejects is a bug in the repository, not in the guard.
-- `role_bindings` has no status column and `platform_app` cannot delete. Removing a role is an open question (`design/QUESTIONS.md` #5).
+- A role is withdrawn by setting `role_bindings.revoked_at`, never by `DELETE` (`design/QUESTIONS.md` #11, approved). Reads return active bindings only by default, so approval checks never see a revoked role.
 
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A06) | First version |
+| 0.2 | 2026-09-25 | Claude (task A06) | `role_bindings.revoked_at` (QUESTIONS #11, approved by Harry) |

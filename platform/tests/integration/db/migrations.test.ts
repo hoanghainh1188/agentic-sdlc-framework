@@ -33,7 +33,7 @@ const UPDATABLE: Record<string, readonly string[]> = {
   ],
   users: ['display_name', 'email', 'status'],
   user_identities: ['external_login'],
-  role_bindings: [],
+  role_bindings: ['revoked_at'],
   api_tokens: ['last_used_at', 'revoked_at'],
   git_event_cursors: ['cursor', 'last_polled_at'],
 };
@@ -152,7 +152,7 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       'public.projects (tenant_id, slug)',
       'public.users (tenant_id, lower(email))',
       'public.user_identities (tenant_id, provider, external_id)',
-      'public.role_bindings (tenant_id, user_id, project_id, role)',
+      'public.role_bindings (tenant_id, user_id, project_id, role) WHERE (revoked_at IS NULL)',
       'public.api_tokens (token_hash)',
     ]) {
       expect(defs, expected).toContain(expected);

@@ -65,6 +65,9 @@ describe('TenantScope', () => {
       () => scope.roleBindings.grant({ user_id: SOME_ID, project_id: SOME_ID, role: 'person_a' }),
       () => scope.roleBindings.listForProject(SOME_ID),
       () => scope.roleBindings.listForUser(SOME_ID),
+      () => scope.roleBindings.listForProject(SOME_ID, { includeRevoked: true }),
+      () => scope.roleBindings.getById(SOME_ID),
+      () => scope.roleBindings.revoke(SOME_ID),
       () =>
         scope.apiTokens.create({
           user_id: SOME_ID,
