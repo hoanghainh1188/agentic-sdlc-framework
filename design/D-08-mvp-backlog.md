@@ -37,7 +37,7 @@
 
 | Milestone | Content | Tasks | Sizes |
 |---|---|---|---|
-| M-A | Foundation: infrastructure, security, audit | 10 | S×6 · M×4 |
+| M-A | Foundation: infrastructure, security, audit | 10 | S×5 · M×5 |
 | M-B | Intent + G1–G3 | 12 | S×4 · M×7 · L×1 |
 | M-0 | Sample pilot repo (separate repo, right before M-C) | 4 | S×1 · M×2 · L×1 |
 | M-C | Run + G4–G6 | 11 | S×3 · M×7 · L×1 |
@@ -190,18 +190,19 @@ flowchart LR
 - [ ] AC2: Integration test job running the Compose core profile
 - [ ] AC3: Gitleaks, Semgrep, Trivy run and block critical findings
 
-#### A10. Resource measurement + backup / restore drill
+#### A10. Resource measurement + backup / restore drill + internal CA / TLS
 
 | Size | Depends on | Requirements | Code area |
 |---|---|---|---|
-| S | A03, A07 | — | platform/deploy/backup/*, handbook/03-templates/T11-openbao-runbook.md |
+| M | A03, A07 | — | platform/deploy/backup/*, platform/deploy/tls/*, handbook/03-templates/T11-openbao-runbook.md |
 
 **Acceptance criteria**
 
-- [ ] AC1: Backup script: OpenBao snapshot (Raft), PostgreSQL dump, to storage off the server
-- [ ] AC2: Restore drill succeeds on a test machine; OpenBao unsealed with 2 shares
-- [ ] AC3: Record RAM/CPU/disk usage for the core and observability profiles
-- [ ] AC4: Runbook T11 written in full
+- [ ] AC1: Internal CA + TLS on OpenBao 8200 (QUESTIONS #20): script creates the CA (5 years) and the server certificate (1 year); the CA key is kept offline; renewal steps and a 30-day reminder in T11; clients verify the CA
+- [ ] AC2: Backup script: OpenBao snapshot (Raft), PostgreSQL dump, to storage off the server
+- [ ] AC3: Restore drill succeeds on a test machine; OpenBao unsealed with 2 shares
+- [ ] AC4: Record RAM/CPU/disk usage for the core and observability profiles
+- [ ] AC5: Runbook T11 written in full
 
 > Note: Done together with the infrastructure operator
 
@@ -456,10 +457,11 @@ flowchart LR
 
 **Acceptance criteria**
 
-- [ ] AC1: Create a virtual key per run: cost cap, model list, labels tenant/project/intent/run/gate/agent/data_class
-- [ ] AC2: Revoke the key when the run ends
-- [ ] AC3: Job syncing spend from LiteLLM → `cost_records` (no duplicates)
-- [ ] AC4: Test: over budget → the request is blocked
+- [ ] AC1: LiteLLM gets provider keys from OpenBao through an OpenBao Agent sidecar (AppRole `litellm`, read-only kv/litellm/providers/*) rendered to tmpfs; no provider key in .env, the repo or an image on the server; rotation = re-render + restart (QUESTIONS #1)
+- [ ] AC2: Create a virtual key per run: cost cap, model list, labels tenant/project/intent/run/gate/agent/data_class
+- [ ] AC3: Revoke the key when the run ends
+- [ ] AC4: Job syncing spend from LiteLLM → `cost_records` (no duplicates)
+- [ ] AC5: Test: over budget → the request is blocked
 
 > Note: LiteLLM requires a database (D-07)
 
@@ -702,4 +704,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 0.1 | 2026-09-24 | Claude (draft) | First version: 40 tasks, 5 milestones |
 | 0.2 | 2026-09-24 | Claude (draft) | After review: SeaweedFS, Valkey, GitHub polling, G7 rule, M-D tasks renamed `E01…E07` |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: B01 oversight/approvers, B07 binding, new B11 escalation, B12 AI record, C10 agent register, C11 kill switch; E01 dual approval; E02/E03 disclosure; E05 retention; tests N7–N9 |
+| 1.1 | 2026-09-25 | Claude, approved by Harry | C03: provider keys via an OpenBao Agent sidecar (QUESTIONS #1). A10: internal CA and TLS on OpenBao 8200, size S → M (QUESTIONS #20) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

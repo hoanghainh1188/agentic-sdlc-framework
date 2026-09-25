@@ -51,6 +51,7 @@
 - Ch.1, Ch.2, Ch.3 approved as v1.0 (Harry). Ch.4, Ch.5, Ch.6 approved as v1.0. Ch.8, Ch.9 approved as v1.0. Part I complete (Ch.7 pending legal review). Ch.10–12 approved. Codes table v1.1 (forced-HITL list for G3); v1.2 (dual approval at G7 for sensitive change types). Ch.13–15 awaiting Harry's comments. Ch.2: tool owners and disciplinary rules still open.
 
 ### Added / changed
+- Decisions (Harry): QUESTIONS #1 — provider keys reach LiteLLM through an OpenBao Agent sidecar (tmpfs), no LiteLLM Enterprise licence (C03); #20 — internal CA and TLS on OpenBao 8200, clients always verify (A10). D-03 v1.2, D-08 v1.1 (C03, A10 criteria; A10 size M).
 - CLAUDE.md current constraints after A03: session order A04 and B02 (then C02); QUESTIONS blocks B02 #22–#26, A04 #27–#31, next free #32–#36; the real OpenBao initialisation also waits for QUESTIONS #20 (TLS).
 - Handbook: codes table v1.4 (§4 row G6) and Ch.14 v0.2 state the G6 security-finding threshold (default HIGH, CRITICAL always); the codes-table drift test also checks the default threshold. QUESTIONS #21: a G5 breach always stops the run and resuming needs a human decision at every risk tier.
 - CLAUDE.md current constraints: each session gets its own `design/QUESTIONS.md` number block (B01 #16–#19, A03 #20; next free #21–#25), after two numbering clashes between parallel sessions.
