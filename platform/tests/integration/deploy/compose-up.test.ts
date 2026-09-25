@@ -53,6 +53,11 @@ describe.skipIf(!enabled)(
       const text = fs
         .readFileSync(envFile, 'utf8')
         .replace(/^COMPOSE_PROJECT_NAME=.*$/m, `COMPOSE_PROJECT_NAME=${project}`)
+        // Own subnet too: two Compose networks cannot share one (A03, SDLC_NETWORK_SUBNET).
+        .replace(
+          /^SDLC_NETWORK_SUBNET=.*$/m,
+          `SDLC_NETWORK_SUBNET=172.30.${200 + (process.pid % 50)}.0/24`,
+        )
         .replace(
           /^(\w+_HOST_PORT)=(\d+)$/gm,
           (_, key: string, port: string) => `${key}=${Number(port) + PORT_OFFSET}`,

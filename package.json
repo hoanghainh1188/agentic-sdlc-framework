@@ -19,6 +19,8 @@
     "clean": "tsc -b --clean",
     "test:compose": "SDLC_COMPOSE_IT=1 vitest run --config vitest.integration.config.ts platform/tests/integration/deploy",
     "test:db": "platform/deploy/scripts/test-db.sh",
+    "test:openbao": "SDLC_OPENBAO_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/openbao",
+    "openbao:bootstrap": "platform/deploy/openbao/bootstrap.sh",
     "db:migrate": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js latest",
     "db:status": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js status",
     "sdlc": "tsc -b platform/apps/cli && node platform/apps/cli/dist/main.js",

@@ -106,6 +106,29 @@ SDLC_DB_MIGRATION_URL="postgres://platform:<PLATFORM_DB_PASSWORD>@127.0.0.1:5432
 
 Alternatively, recreate the whole Compose stack with its volumes (`docker compose … down -v`). Once 0001 is on `main` it never changes again (ADR-M09 section 2.2).
 
+## OpenBao: initialise, unseal, configure (task A03)
+
+OpenBao starts **uninitialised and sealed**. `openbao/bootstrap.sh` initialises it (3 key shares, any 2 unseal), unseals it and applies the configuration: KV v2, the Ed25519 Transit key `run-contract`, one AppRole per platform process, the `platform-admin` token role. Design: [ADR-M19](../../design/ADR-M19-openbao-bootstrap.md). Procedure, key custody and troubleshooting: [runbook T11](../../handbook/03-templates/T11-openbao-runbook.md).
+
+On a development machine, with **throw-away keys only**:
+
+```bash
+pnpm compose:core
+pnpm openbao:bootstrap init       # prints 3 shares and a root token ONCE, to the terminal only
+pnpm openbao:bootstrap unseal     # 2 shares, hidden input
+pnpm openbao:bootstrap configure  # root token, hidden input; revoked at the end
+pnpm openbao:bootstrap status
+```
+
+- `init` and `root-token` refuse to run when their output is redirected or piped. Shares and tokens are never written to a file.
+- `configure` is safe to run again. It needs a root token: `pnpm openbao:bootstrap root-token` makes one from 2 shares.
+- After every restart, OpenBao is sealed again: run `unseal`.
+- Settings (shares, threshold, token and secret ID lifetimes) are in `openbao/bootstrap/bootstrap.env`. Access rules are in `openbao/bootstrap/policies/*.hcl`.
+- AppRole secret IDs work only from the Compose network subnet (`SDLC_NETWORK_SUBNET`, default `172.30.0.0/24`). A stack started before A03 has no fixed subnet: run `pnpm compose:down`, then `pnpm compose:core` once.
+- The audit log is `/openbao/logs/audit.log` on the volume `openbao-audit`.
+- The real initialisation on the internal server waits until the three key holders are named (runbook T11 section 3.2).
+- TLS is off (development only): `design/QUESTIONS.md` #20.
+
 ## Health: what "healthy" means
 
 | Service | Healthy means |
@@ -115,7 +138,7 @@ Alternatively, recreate the whole Compose stack with its volumes (`docker compos
 | Temporal UI, Langfuse web and worker, ClickHouse, SeaweedFS | Their HTTP health endpoint answers |
 | Valkey | `PING` with the password returns `PONG` |
 | LiteLLM | `/health/liveliness` answers |
-| **OpenBao** | **The API is reachable. It does NOT mean initialised or unsealed.** After A02, OpenBao is uninitialised and sealed; task A03 initialises it (Shamir 3-of-2). After every restart, OpenBao is sealed again until two key holders unseal it (D-03 section 10.2). Check with `curl -s http://127.0.0.1:8200/v1/sys/seal-status` |
+| **OpenBao** | **The API is reachable. It does NOT mean initialised or unsealed.** A new volume is uninitialised and sealed; initialise it with `openbao/bootstrap.sh` (see above). After every restart, OpenBao is sealed again until two key holders unseal it (D-03 section 10.2). Check with `curl -s http://127.0.0.1:8200/v1/sys/seal-status` |
 
 ## Shared Valkey: memory limit
 
@@ -143,4 +166,5 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 |---|---|---|
 | `pnpm test` | Static checks of the compose file, `.env.example`, `init-env.sh` and `.gitignore` (`platform/tests/deploy/`) | No |
 | `pnpm test:db` | Migrations and tenant isolation on a throw-away PostgreSQL container (same image and init script). Takes about 10 seconds ([ADR-M09](../../design/ADR-M09-database-tooling.md) section 2.6) | Yes |
+| `pnpm test:openbao` | OpenBao bootstrap (A03): starts only `openbao` in a throw-away Compose project, runs `init`, `unseal`, `configure`, `root-token`, checks every AppRole's access, re-runs `configure`, then removes everything. Throw-away keys, kept in memory only. About 1 minute | Yes |
 | `pnpm test:compose` | Starts `core`, then `core + observability`, with a throw-away env file, its own project name and ports shifted by 20000. Checks health, databases, namespace, buckets, Valkey policy, OpenBao state, Langfuse sign-up and trace upload. Removes everything afterwards. Takes about 2–5 minutes | Yes |

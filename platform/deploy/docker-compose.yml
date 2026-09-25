@@ -29,11 +29,16 @@ x-healthcheck-defaults: &healthcheck-defaults
 networks:
   sdlc:
     name: ${COMPOSE_PROJECT_NAME:-sdlc}-net
+    # Fixed subnet: OpenBao AppRole secret IDs are bound to it (A03, design/ADR-M19).
+    ipam:
+      config:
+        - subnet: ${SDLC_NETWORK_SUBNET:-172.30.0.0/24}
 
 volumes:
   postgres-data:
   seaweedfs-data:
   openbao-data:
+  openbao-audit:
   valkey-data:
   clickhouse-data:
   clickhouse-logs:
@@ -247,13 +252,19 @@ services:
     profiles: [core, observability]
     restart: unless-stopped
     networks: [sdlc]
-    # Starts uninitialised and sealed; A03 initialises it. Never dev mode.
+    # Starts uninitialised and sealed. Never dev mode. Initialise, unseal and configure it with
+    # openbao/bootstrap.sh (task A03, runbook handbook/03-templates/T11-openbao-runbook.md).
     command: [server]
     environment:
       BAO_ADDR: http://127.0.0.1:8200
     volumes:
       - ./openbao/openbao.hcl:/openbao/config/openbao.hcl:ro
+      # Bootstrap scripts, settings and policies; outside /openbao/config (every .hcl file
+      # there is read as server configuration).
+      - ./openbao/bootstrap:/openbao/bootstrap:ro
       - openbao-data:/openbao/file
+      # File audit device (openbao.hcl). Its own volume, kept when the container is removed.
+      - openbao-audit:/openbao/logs
     ports:
       - ${SDLC_BIND_ADDR:-127.0.0.1}:${OPENBAO_HOST_PORT:-8200}:8200
     healthcheck:

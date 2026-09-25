@@ -1,0 +1,219 @@
+// D-08 task A03: static checks of the OpenBao bootstrap (no Docker needed), design/ADR-M19.
+// The live checks are in platform/tests/integration/openbao/bootstrap.test.ts.
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+import { deployDir, loadCompose, parseEnvFile, readDeployFile } from './compose';
+
+const BOOTSTRAP = path.join(deployDir, 'openbao/bootstrap.sh');
+const SCRIPTS = [
+  'openbao/bootstrap.sh',
+  'openbao/bootstrap/configure.sh',
+  'openbao/bootstrap/root-token.sh',
+];
+const settings = parseEnvFile(readDeployFile('openbao/bootstrap/bootstrap.env'));
+const roles = (settings.get('APPROLE_ROLES') ?? '').split(' ').filter(Boolean);
+const policyDir = path.join(deployDir, 'openbao/bootstrap/policies');
+const policyNames = fs
+  .readdirSync(policyDir)
+  .filter((f) => f.endsWith('.hcl'))
+  .map((f) => f.replace(/\.hcl$/, ''))
+  .sort();
+
+interface Rule {
+  path: string;
+  capabilities: string[];
+}
+
+/** Reads the `path "…" { capabilities = [...] }` blocks of a policy file. */
+function policyRules(name: string): Rule[] {
+  const text = fs.readFileSync(path.join(policyDir, `${name}.hcl`), 'utf8');
+  return [...text.matchAll(/path "([^"]+)"\s*\{\s*capabilities\s*=\s*\[([^\]]*)\]\s*\}/g)].map(
+    (m) => ({
+      path: m[1]!,
+      capabilities: [...m[2]!.matchAll(/"([a-z]+)"/g)].map((c) => c[1]!),
+    }),
+  );
+}
+
+/** OpenBao path matching: "+" is one segment, a trailing "*" is any suffix. */
+function matches(pattern: string, target: string): boolean {
+  const regex = pattern
+    .split('')
+    .map((ch, i) => {
+      if (ch === '+') return '[^/]+';
+      if (ch === '*' && i === pattern.length - 1) return '.*';
+      return ch.replace(/[.?^${}()|[\]\\/]/g, '\\$&');
+    })
+    .join('');
+  return new RegExp(`^${regex}$`).test(target);
+}
+
+const canRead = (name: string, target: string): boolean =>
+  policyRules(name).some((r) => matches(r.path, target) && r.capabilities.includes('read'));
+
+const runBootstrap = (args: string[], env: NodeJS.ProcessEnv = {}) =>
+  spawnSync(BOOTSTRAP, args, {
+    encoding: 'utf8',
+    env: { ...process.env, SDLC_OPENBAO_TEST: '', SDLC_ENV_FILE: '/nonexistent/.env', ...env },
+  });
+
+describe('OpenBao bootstrap scripts', () => {
+  it.each(SCRIPTS)('%s is valid POSIX sh and executable', (file) => {
+    const full = path.join(deployDir, file);
+    expect(spawnSync('sh', ['-n', full]).status).toBe(0);
+    expect(fs.statSync(full).mode & 0o111).not.toBe(0);
+  });
+
+  it('never sends init or root-token output to a file or through tee', () => {
+    for (const file of SCRIPTS) {
+      for (const line of readDeployFile(file).split('\n')) {
+        if (/operator init|root-token\.sh/.test(line) && !line.trim().startsWith('#')) {
+          expect(line, `${file}: ${line}`).not.toMatch(/\btee\b|[^2&]>\s*[^&/]|>>/);
+        }
+      }
+    }
+  });
+
+  it('--help does not mention the test-only option', () => {
+    const r = runBootstrap(['--help']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/Usage:/);
+    expect(r.stdout + r.stderr).not.toMatch(/stdout-not-tty/);
+  });
+
+  it('rejects --stdout-not-tty unless SDLC_OPENBAO_TEST=1', () => {
+    for (const cmd of ['init', 'root-token']) {
+      const r = runBootstrap([cmd, '--stdout-not-tty']);
+      expect(r.status).not.toBe(0);
+      expect(r.stderr).toMatch(/unknown option: --stdout-not-tty/);
+    }
+    // With the test variable the option is accepted; the run stops later (no env file).
+    const r = runBootstrap(['init', '--stdout-not-tty'], { SDLC_OPENBAO_TEST: '1' });
+    expect(r.stderr).not.toMatch(/unknown option/);
+    expect(r.stderr).toMatch(/not found; run scripts\/init-env\.sh first/);
+  });
+
+  it('refuses unknown commands and options', () => {
+    expect(runBootstrap(['destroy']).status).toBe(2);
+    expect(runBootstrap(['init', '--keep-token']).stderr).toMatch(/unknown option/);
+  });
+});
+
+describe('OpenBao bootstrap settings (bootstrap.env)', () => {
+  it('uses 3 key shares with an unseal threshold of 2 (D-03 section 10.2)', () => {
+    expect(settings.get('BAO_KEY_SHARES')).toBe('3');
+    expect(settings.get('BAO_KEY_THRESHOLD')).toBe('2');
+  });
+
+  it('uses an Ed25519 Transit key named run-contract (D-08 A03 AC2)', () => {
+    expect(settings.get('TRANSIT_KEY')).toBe('run-contract');
+    expect(settings.get('TRANSIT_KEY_TYPE')).toBe('ed25519');
+  });
+
+  it('has the approved token and secret ID lifetimes', () => {
+    expect(settings.get('APPROLE_TOKEN_TTL')).toBe('1h');
+    expect(settings.get('APPROLE_TOKEN_MAX_TTL')).toBe('4h');
+    expect(settings.get('APPROLE_SECRET_ID_TTL')).toBe('2160h'); // 90 days, never unlimited
+    expect(settings.get('ADMIN_TOKEN_MAX_TTL')).toBe('1h');
+    expect(settings.get('SECRET_ID_BOUND_CIDRS')).toBe('compose-network');
+  });
+
+  it('has one AppRole per platform process (AC2) and one policy per AppRole', () => {
+    expect(roles).toEqual(['api', 'worker', 'runner', 'cost-controller']);
+    expect(policyNames).toEqual([...roles, 'platform-admin'].sort());
+  });
+});
+
+describe('OpenBao policies', () => {
+  const allPolicies = policyNames;
+
+  it('every policy file parses into at least one rule', () => {
+    for (const name of allPolicies) expect(policyRules(name).length, name).toBeGreaterThan(0);
+  });
+
+  it('no policy touches sys/, Transit export, backup, restore or key changes', () => {
+    for (const name of allPolicies) {
+      for (const rule of policyRules(name)) {
+        expect(rule.path, name).not.toMatch(/^sys\/|^transit\/(export|backup|restore)\//);
+        if (rule.path.startsWith('transit/keys/'))
+          expect(rule.capabilities, name).toEqual(['read']);
+        expect(rule.capabilities, name).not.toContain('delete');
+        expect(rule.capabilities, name).not.toContain('sudo');
+      }
+    }
+  });
+
+  it('only cost-controller can read the LiteLLM master key (AC3)', () => {
+    const target = 'kv/data/cost-controller/litellm-master-key';
+    expect(roles.filter((r) => canRead(r, target))).toEqual(['cost-controller']);
+    expect(canRead('runner', target)).toBe(false);
+  });
+
+  it('no AppRole can read model provider keys yet (QUESTIONS #1)', () => {
+    expect(roles.filter((r) => canRead(r, 'kv/data/litellm/providers/anthropic'))).toEqual([]);
+  });
+
+  it('only api and runner can read the GitHub App key (D-03 section 8.2)', () => {
+    expect(roles.filter((r) => canRead(r, 'kv/data/shared/github-app'))).toEqual(['api', 'runner']);
+  });
+
+  it('each AppRole reads only its own kv subtree besides shared/github-app', () => {
+    for (const role of roles) {
+      for (const other of roles.filter((r) => r !== role)) {
+        expect(canRead(role, `kv/data/${other}/x`), `${role} → ${other}`).toBe(false);
+      }
+      expect(canRead(role, `kv/data/${role}/x`), role).toBe(true);
+    }
+  });
+
+  it('only worker can sign Run Contracts', () => {
+    const signers = roles.filter((r) =>
+      policyRules(r).some((rule) => matches(rule.path, 'transit/sign/run-contract')),
+    );
+    expect(signers).toEqual(['worker']);
+  });
+});
+
+describe('OpenBao in Compose', () => {
+  const compose = loadCompose();
+  const openbao = compose.services.openbao!;
+  const hcl = readDeployFile('openbao/openbao.hcl');
+
+  it('mounts the bootstrap folder read-only, outside the server config folder', () => {
+    expect(openbao.volumes).toContain('./openbao/bootstrap:/openbao/bootstrap:ro');
+  });
+
+  it('keeps the audit log on its own named volume', () => {
+    expect(openbao.volumes).toContain('openbao-audit:/openbao/logs');
+    expect(readDeployFile('docker-compose.yml')).toMatch(/^ {2}openbao-audit:$/m);
+  });
+
+  it('declares a file audit device in openbao.hcl, writing to the audit volume', () => {
+    expect(hcl).toMatch(
+      /audit "file" "file" \{[^}]*file_path\s*=\s*"\/openbao\/logs\/audit\.log"/s,
+    );
+  });
+
+  it('opens the key-share endpoints only on the in-container listener 127.0.0.1:8210', () => {
+    const listeners = [...hcl.matchAll(/listener "tcp" \{([^}]*)\}/g)].map((m) => m[1]!);
+    expect(listeners).toHaveLength(2);
+    const [main, keyHolder] = listeners;
+    expect(main).toMatch(/address\s*=\s*"0\.0\.0\.0:8200"/);
+    expect(main).not.toMatch(/disable_unauthed/);
+    expect(keyHolder).toMatch(/address\s*=\s*"127\.0\.0\.1:8210"/);
+    expect(keyHolder).toMatch(/disable_unauthed_generate_root_endpoints\s*=\s*false/);
+    expect(openbao.ports?.join(' ')).not.toMatch(/8210/);
+  });
+
+  it('pins the Compose network subnet that secret IDs are bound to', () => {
+    expect(readDeployFile('docker-compose.yml')).toMatch(
+      /- subnet: \$\{SDLC_NETWORK_SUBNET:-172\.30\.0\.0\/24\}/,
+    );
+    expect(parseEnvFile(readDeployFile('.env.example')).get('SDLC_NETWORK_SUBNET')).toBe(
+      '172.30.0.0/24',
+    );
+  });
+});
