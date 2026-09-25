@@ -1,0 +1,137 @@
+// Plans of an intent (design/D-05 section 6.2). One row per version; rows never change. Reading
+// the plan file from the repo belongs to B09. `change_flags` drive forced HITL at G3 and dual
+// approval at G7 through the policy engine.
+import { CHANGE_FLAGS, type ChangeFlag } from '@sdlc/contracts';
+import { sql, type Kysely } from 'kysely';
+
+import { RegistryError } from '../../registry/errors.js';
+import { DbError } from '../errors.js';
+import type { Database, Plan } from '../schema.js';
+import { AuditLogRepository } from './audit-log.js';
+import { TenantRepository } from './base.js';
+import { lockIntent } from './locks.js';
+import type { RegistryActor } from './registry-actor.js';
+
+export interface SubmitPlan extends RegistryActor {
+  /** Files or path patterns expected to change (G5 compares them with the real changes). */
+  readonly plannedFiles: readonly string[];
+  readonly summary?: string;
+  readonly planSha256: string;
+  readonly changeFlags?: readonly ChangeFlag[];
+}
+
+const SHA256 = /^[0-9a-f]{64}$/;
+const MAX_PLANNED_FILES = 1000;
+
+const SCALAR_COLUMNS = [
+  'id',
+  'tenant_id',
+  'intent_id',
+  'version',
+  'planned_files',
+  'summary',
+  'plan_sha256',
+  'proposed_by_type',
+  'created_at',
+] as const;
+// `pg` does not parse arrays of custom enum types; read them as text[].
+const changeFlags = sql<ChangeFlag[]>`change_flags::text[]`.as('change_flags');
+
+export class PlanRepository extends TenantRepository {
+  /**
+   * Stores a new plan version (latest + 1). In the same transaction, appends `plan.submitted` with
+   * the version and plan hash (never the file list or the summary).
+   */
+  async submit(intentId: string, input: SubmitPlan): Promise<Plan> {
+    const files: readonly unknown[] = input.plannedFiles;
+    if (
+      !Array.isArray(input.plannedFiles) ||
+      files.length === 0 ||
+      files.length > MAX_PLANNED_FILES ||
+      files.some(
+        (f) => typeof f !== 'string' || f.length === 0 || f.length > 1024 || f.includes('\0'),
+      )
+    ) {
+      throw invalid(`plannedFiles must hold 1 to ${String(MAX_PLANNED_FILES)} paths or patterns`);
+    }
+    if (!SHA256.test(input.planSha256)) throw invalid('planSha256 must be a SHA-256 digest');
+    const flags = [...new Set(input.changeFlags ?? [])];
+    if (flags.some((flag) => !CHANGE_FLAGS.includes(flag))) throw invalid('unknown change flag');
+    return this.run(
+      this.transactional(async (db) => {
+        await lockIntent(db, intentId);
+        const intent = await db
+          .selectFrom('intents')
+          .select('id')
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', intentId)
+          .executeTakeFirst();
+        if (!intent) throw new RegistryError('intent_not_found', `intent ${intentId} not found`);
+        const last = await db
+          .selectFrom('plans')
+          .select(sql<number | null>`max(version)`.as('version'))
+          .where('tenant_id', '=', this.tenantId)
+          .where('intent_id', '=', intentId)
+          .executeTakeFirst();
+        const plan = await db
+          .insertInto('plans')
+          .values({
+            tenant_id: this.tenantId,
+            intent_id: intentId,
+            version: (last?.version ?? 0) + 1,
+            planned_files: [...input.plannedFiles],
+            summary: input.summary ?? '',
+            plan_sha256: input.planSha256,
+            proposed_by_type: input.actorType,
+            change_flags: flags,
+          })
+          .returning([...SCALAR_COLUMNS, changeFlags])
+          .executeTakeFirstOrThrow();
+        await new AuditLogRepository(db, this.tenantId).append({
+          action: 'plan.submitted',
+          actorType: input.actorType,
+          actorId: input.actorId,
+          entityId: intentId,
+          payload: { plan_id: plan.id, version: plan.version, plan_sha256: plan.plan_sha256 },
+        });
+        return plan;
+      }),
+    );
+  }
+
+  latest(intentId: string): Promise<Plan | undefined> {
+    return this.run(latestPlan(this.db, this.tenantId, intentId));
+  }
+
+  list(intentId: string): Promise<Plan[]> {
+    return this.run(
+      this.db
+        .selectFrom('plans')
+        .select([...SCALAR_COLUMNS, changeFlags])
+        .where('tenant_id', '=', this.tenantId)
+        .where('intent_id', '=', intentId)
+        .orderBy('version')
+        .execute(),
+    );
+  }
+}
+
+/** The latest plan of an intent, on any connection (used inside gate decision transactions). */
+export function latestPlan(
+  db: Kysely<Database>,
+  tenantId: string,
+  intentId: string,
+): Promise<Plan | undefined> {
+  return db
+    .selectFrom('plans')
+    .select([...SCALAR_COLUMNS, changeFlags])
+    .where('tenant_id', '=', tenantId)
+    .where('intent_id', '=', intentId)
+    .orderBy('version', 'desc')
+    .limit(1)
+    .executeTakeFirst();
+}
+
+function invalid(message: string): DbError {
+  return new DbError('invalid_value', message);
+}

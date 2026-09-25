@@ -6,11 +6,15 @@ import { TenantGuardPlugin } from './tenant-guard-plugin.js';
 import { parseTenantId, type TenantId } from './tenant-id.js';
 import { ApiTokenRepository } from './repositories/api-tokens.js';
 import { AuditLogRepository } from './repositories/audit-log.js';
+import { GateDecisionRepository } from './repositories/gate-decisions.js';
 import { GitEventCursorRepository } from './repositories/git-event-cursors.js';
+import { IntentRepository } from './repositories/intents.js';
+import { PlanRepository } from './repositories/plans.js';
 import { ProjectAiRecordRepository } from './repositories/project-ai-records.js';
 import { ProjectConfigRepository } from './repositories/project-configs.js';
 import { ProjectRepository } from './repositories/projects.js';
 import { RoleBindingRepository } from './repositories/role-bindings.js';
+import { SpecRefRepository } from './repositories/spec-refs.js';
 import { UserIdentityRepository } from './repositories/user-identities.js';
 import { UserRepository } from './repositories/users.js';
 
@@ -29,6 +33,10 @@ export class TenantScope {
   readonly apiTokens: ApiTokenRepository;
   readonly gitEventCursors: GitEventCursorRepository;
   readonly audit: AuditLogRepository;
+  readonly intents: IntentRepository;
+  readonly specRefs: SpecRefRepository;
+  readonly plans: PlanRepository;
+  readonly gateDecisions: GateDecisionRepository;
 
   private readonly db: Kysely<Database>;
 
@@ -46,6 +54,10 @@ export class TenantScope {
     this.apiTokens = new ApiTokenRepository(this.db, this.tenantId);
     this.gitEventCursors = new GitEventCursorRepository(this.db, this.tenantId);
     this.audit = new AuditLogRepository(this.db, this.tenantId);
+    this.intents = new IntentRepository(this.db, this.tenantId);
+    this.specRefs = new SpecRefRepository(this.db, this.tenantId);
+    this.plans = new PlanRepository(this.db, this.tenantId);
+    this.gateDecisions = new GateDecisionRepository(this.db, this.tenantId);
   }
 
   /** Runs `work` in one database transaction, with repositories bound to the same tenant. */

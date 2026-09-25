@@ -12,17 +12,32 @@ export { SystemScope, type NewTenant, type ResolvedApiToken } from './system-sco
 export { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 export { hashApiToken } from './repositories/api-tokens.js';
 export type { AuditEvent } from './repositories/audit-log.js';
+export type {
+  DecideInput,
+  HumanDecisionInput,
+  RevalidateInput,
+  RevalidateResult,
+  SystemDecisionInput,
+} from './repositories/gate-decisions.js';
+export type { IntentQuery, IntentStateChange, NewIntent } from './repositories/intents.js';
+export type { SubmitPlan } from './repositories/plans.js';
+export type { RegistryActor } from './repositories/registry-actor.js';
+export { isSafeRepoPath, type LinkSpec } from './repositories/spec-refs.js';
 export type { SaveProjectConfig } from './repositories/project-configs.js';
 export type { RoleBindingQuery } from './repositories/role-bindings.js';
 export type { SaveProjectAiRecord } from './repositories/project-ai-records.js';
 export type {
   ApiToken,
   AuditLogRow,
+  GateDecisionRow,
   GitEventCursor,
+  Intent,
+  Plan,
   Project,
   ProjectAiRecord,
   ProjectConfig,
   RoleBinding,
+  SpecRef,
   Tenant,
   TenantInsert,
   User,

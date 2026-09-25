@@ -69,3 +69,65 @@ export type ProviderType = (typeof PROVIDER_TYPES)[number];
 /** Who performed an action (design/D-05 `actor_type`): audit log, gate decisions, plans. */
 export const ACTOR_TYPES = ['human', 'system', 'agent'] as const;
 export type ActorType = (typeof ACTOR_TYPES)[number];
+
+/** Lifecycle status of an intent (design/D-05 section 5 `intent_status`). */
+export const INTENT_STATUSES = [
+  'draft',
+  'in_gate',
+  'running',
+  'paused',
+  'blocked',
+  'done',
+  'rejected',
+  'cancelled',
+] as const;
+export type IntentStatus = (typeof INTENT_STATUSES)[number];
+
+/**
+ * A decision at a gate (design/D-05 section 5 `gate_decision`). Humans record `approve`, `reject`,
+ * `request_changes`, `pause` and `block`; the system records `pass`, `fail`, `block`, `pause` and
+ * `void` (an earlier approval became invalid: expired or mismatched).
+ */
+export const GATE_DECISIONS = [
+  'approve',
+  'reject',
+  'request_changes',
+  'pause',
+  'block',
+  'pass',
+  'fail',
+  'void',
+] as const;
+export type GateDecision = (typeof GATE_DECISIONS)[number];
+
+/**
+ * How a gate was checked, as stored in a gate decision: an oversight mode, or `POLICY` for the
+ * automatic policy check at G4 (design/QUESTIONS.md #6, ADR-M20). Same values as `GateCheckMode`.
+ */
+export const GATE_CHECK_MODES = ['HITL', 'HOTL', 'AUDIT', 'POLICY'] as const;
+
+/**
+ * Why a gate decision was not a plain approval or pass (design/ADR-M20). Gate decisions are kept
+ * at least 2 years and never change, so they hold a code, never free text; the human explanation
+ * stays on the Git host (`reason_ref`), where it can be edited or deleted.
+ */
+export const GATE_REASON_CODES = [
+  'spec_unclear',
+  'tests_insufficient',
+  'security_finding',
+  'out_of_scope',
+  'policy_denied',
+  'budget_exceeded',
+  'ci_failed',
+  'ai_record_missing',
+  'data_class_not_allowed',
+  'expired',
+  'input_mismatch',
+  'scope_mismatch',
+  'other',
+] as const;
+export type GateReasonCode = (typeof GATE_REASON_CODES)[number];
+
+/** How a Git host event reached the platform (design/D-05 section 5, ADR-M11). */
+export const EVENT_SOURCES = ['polling', 'webhook'] as const;
+export type EventSource = (typeof EVENT_SOURCES)[number];

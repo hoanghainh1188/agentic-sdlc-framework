@@ -5,6 +5,7 @@ export {
   type AuditAction,
   type AuditActionSpec,
   type AuditFieldKind,
+  type AuditFieldSpec,
   type AuditPayload,
 } from './actions.js';
 export {
