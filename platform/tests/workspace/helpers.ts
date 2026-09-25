@@ -17,7 +17,7 @@ export interface WorkspacePackage {
   name: string;
 }
 
-/** The packages required by design/D-03 section 11 (D-08 A01 AC2). */
+/** The packages required by design/D-03 section 11 (D-08 A01 AC2), plus `messages` (ADR-M18). */
 export const EXPECTED_PACKAGES: readonly WorkspacePackage[] = [
   { dir: 'platform/apps/api', name: '@sdlc/api' },
   { dir: 'platform/apps/worker', name: '@sdlc/worker' },
@@ -26,6 +26,7 @@ export const EXPECTED_PACKAGES: readonly WorkspacePackage[] = [
   { dir: 'platform/packages/core', name: '@sdlc/core' },
   { dir: 'platform/packages/contracts', name: '@sdlc/contracts' },
   { dir: 'platform/packages/config', name: '@sdlc/config' },
+  { dir: 'platform/packages/messages', name: '@sdlc/messages' },
   { dir: 'platform/packages/adapters/git-github', name: '@sdlc/adapter-git-github' },
   { dir: 'platform/packages/adapters/agent-openhands', name: '@sdlc/adapter-agent-openhands' },
   { dir: 'platform/packages/adapters/model-litellm', name: '@sdlc/adapter-model-litellm' },

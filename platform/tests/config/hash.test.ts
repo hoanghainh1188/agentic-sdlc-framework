@@ -1,0 +1,65 @@
+// D-08 A05 AC3: a stable `config_hash` (SHA-256) for the same content (design/D-05 section 6.1:
+// RFC 8785 canonical JSON of the effective configuration).
+import { createHash } from 'node:crypto';
+
+import { canonicalJson, computeConfigHash, defaultProjectConfig } from '@sdlc/config';
+import { describe, expect, it } from 'vitest';
+
+import { loadValid } from './helpers';
+
+/**
+ * Pinned hash of the shipped default configuration. It changes only when a default value changes.
+ * Update it in the same PR as the default change, after review.
+ */
+const DEFAULT_CONFIG_HASH = '57c71a59dd259b61d0b214f11b6917c2ef7dc7e8a1b2d1d4d875e1835a96d856';
+
+describe('config_hash (AC3)', () => {
+  it('is the pinned value for the default configuration', () => {
+    expect(loadValid().configHash).toBe(DEFAULT_CONFIG_HASH);
+  });
+
+  it('is SHA-256 of the canonical JSON of the effective configuration', () => {
+    const { config, configHash } = loadValid();
+    const expected = createHash('sha256').update(canonicalJson(config), 'utf8').digest('hex');
+    expect(configHash).toBe(expected);
+    expect(computeConfigHash(defaultProjectConfig())).toBe(expected);
+    expect(configHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('does not change with comments, whitespace, key order, quoting or flow style', () => {
+    const a = loadValid(
+      'budget:\n  warn_percent: 70\n  stop_percent: 90\nretention:\n  evidence_retention_days: 90\n',
+    );
+    const b = loadValid(
+      [
+        '# Same settings, written differently.',
+        'retention: { evidence_retention_days: 90 }   # shorter retention',
+        '',
+        'budget:',
+        '    stop_percent: 90',
+        "    warn_percent: !!int '70'",
+      ].join('\n'),
+    );
+    expect(b.configHash).toBe(a.configHash);
+  });
+
+  it('does not change when an override only repeats default values', () => {
+    const repeated = loadValid(
+      'oversight:\n  matrix:\n    G1:\n      low: { mode: HITL, roles: [person_a], approvals: 1 }\nretention:\n  evidence_retention_days: 180\n',
+    );
+    expect(repeated.configHash).toBe(DEFAULT_CONFIG_HASH);
+  });
+
+  it.each([
+    ['a matrix cell', 'oversight:\n  matrix:\n    G2:\n      low: { mode: HITL }\n'],
+    ['a budget threshold', 'budget:\n  warn_percent: 79\n'],
+    ['the evidence retention', 'retention:\n  evidence_retention_days: 181\n'],
+    ['a holiday', 'escalation:\n  calendar:\n    holidays: [2027-02-08]\n'],
+    [
+      'the order of a list',
+      'escalation:\n  calendar:\n    working_days: [tue, mon, wed, thu, fri]\n',
+    ],
+  ])('changes when %s changes', (_name, yaml) => {
+    expect(loadValid(yaml).configHash).not.toBe(DEFAULT_CONFIG_HASH);
+  });
+});

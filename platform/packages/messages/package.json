@@ -1,0 +1,12 @@
+{
+  "name": "@sdlc/messages",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Message catalog for user-facing text (design/D-02 NFR-08, ADR-M18).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
+}

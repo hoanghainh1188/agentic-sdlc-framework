@@ -29,13 +29,13 @@ Handbook and platform must stay consistent: same codes, same names for gates, au
 
 ## Language
 - Everything in this repo is English: docs, code, identifiers, commit messages, code comments.
-- User-facing messages (CLI output, PR/issue comments, Evidence Pack Markdown) are English by default and **must go through a message catalog** (i18n keys), so Vietnamese and Japanese can be added later (D-02 NFR-08). Never hard-code user-facing strings.
+- User-facing messages (CLI output, PR/issue comments, Evidence Pack Markdown) are English by default and **must go through a message catalog** (i18n keys), so Vietnamese and Japanese can be added later (D-02 NFR-08). Never hard-code user-facing strings. The catalog is `@sdlc/messages` (`platform/packages/messages/src/locales/<locale>.json`, ADR-M18).
 - Write plain English for non-native readers: @handbook/00-introduction/06-writing-style.md
 - The handbook must **not** mention the internal reference documents used to design it ("Bản chất…", `Digital_Foundry.pdf`, draft v1.0). State rules directly; cite only external sources and other repo documents.
 
 ## Repo layout
 - `platform/apps/` — api (NestJS), worker (Temporal, G1–G8 workflow + GitHub poller), runner (sandbox + OpenHands), cli
-- `platform/packages/` — core modules, contracts, adapters (git-github, agent-openhands, model-litellm, evidence-s3, policy-simple), config, secrets
+- `platform/packages/` — core modules, contracts, adapters (git-github, agent-openhands, model-litellm, evidence-s3, policy-simple), config (project configuration, ADR-M18), messages (message catalog), secrets
 - MVP is a modular monolith: keep module boundaries; core must not import adapters directly (use interfaces).
 - `platform/deploy/` — docker-compose, OpenBao bootstrap, backup scripts. `platform/tests/integration/` — scenarios N1–N6, tasks T01–T10 (D-09).
 - `design/` — approved design docs (D-xx) + `README.md` (index) + `QUESTIONS.md`. `handbook/` — process handbook for humans. `diagrams/` — Mermaid sources + SVG.
