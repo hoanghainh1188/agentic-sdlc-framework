@@ -1,31 +1,43 @@
-# Render SVG from Mermaid whenever a .mmd file changes.
+# Render SVG from Mermaid when a .mmd file changes in a pull request.
+# The rendered SVG is committed to the pull request branch, so it is reviewed with the PR.
+# This workflow never runs on main and never pushes to main: every change to main goes through a
+# reviewed pull request (CLAUDE.md, handbook Ch.2 Rule 7).
+# Note: a commit pushed with GITHUB_TOKEN does not start new workflow runs, so the SVG commit has
+# no CI run of its own. It only touches generated files under diagrams/svg.
 name: render-diagrams
 
 on:
-  push:
-    branches: [main]
-    paths: ['diagrams/src/**.mmd']
   pull_request:
     paths: ['diagrams/src/**.mmd']
 
-# Needed: the job commits the rendered SVG files back to the branch.
+# Needed: the job commits the rendered SVG files back to the pull request branch.
 permissions:
   contents: write
 
+concurrency:
+  group: render-diagrams-${{ github.head_ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned on purpose. Dependabot does not track global npm installs: update this by hand.
+  MERMAID_CLI_VERSION: 11.17.0
+
 jobs:
   render:
+    # Only branches of this repository; a branch in a fork cannot be pushed to.
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ github.head_ref }}
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 24
 
-      - name: Install mermaid-cli
-        run: npm install -g @mermaid-js/mermaid-cli
+      - name: Install mermaid-cli (pinned version)
+        run: npm install -g "@mermaid-js/mermaid-cli@${MERMAID_CLI_VERSION}"
 
       - name: Render SVG
         run: |
@@ -35,10 +47,20 @@ jobs:
             mmdc -p /tmp/puppeteer.json -i "$f" -o "diagrams/svg/$name.svg" -b white
           done
 
-      - name: Commit SVG if changed
+      - name: Commit SVG to the pull request branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
+          if [ -z "$HEAD_REF" ] || [ "$HEAD_REF" = "main" ]; then
+            echo "Refusing to push: this workflow only pushes to a pull request branch." >&2
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add diagrams/svg
-          git diff --cached --quiet || git commit -m "chore: update SVG from Mermaid"
-          git push
+          if git diff --cached --quiet; then
+            echo "SVG files are up to date."
+            exit 0
+          fi
+          git commit -m "chore: update SVG from Mermaid"
+          git push origin "HEAD:refs/heads/${HEAD_REF}"
