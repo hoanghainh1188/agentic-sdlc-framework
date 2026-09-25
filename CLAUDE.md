@@ -101,7 +101,8 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 ## Current constraints
 - At most 2 sessions at the same time (a docs PR session counts as one).
 - One task per session; each parallel session works in its own git worktree.
-- A09 runs in parallel with A02, after the docs PR (`docs/fix-inconsistencies`) is merged.
+- Session order: #55 (A06 follow-up) and C01 now; A07 after #55 is merged (A07 also covers QUESTIONS.md #12).
+- Conflicts with `main` on a branch under review: merge `origin/main` into the branch. Never rebase or force-push it.
 - A03 waits until the three OpenBao key holders are named (remove this line once they are named).
 
 ## Decisions (see design/D-02 section 11)
