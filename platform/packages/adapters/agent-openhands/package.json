@@ -1,0 +1,12 @@
+{
+  "name": "@sdlc/adapter-agent-openhands",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Agent adapter: OpenHands Agent Server. See design/D-03 section 7.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@sdlc/adapter-model-litellm",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Model gateway adapter: LiteLLM. See design/D-03 section 7.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
+}

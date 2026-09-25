@@ -1,0 +1,17 @@
+# Documents are never reformatted by tools (handbook and design docs are reviewed text).
+handbook/
+design/
+_review/
+diagrams/
+*.md
+
+# Existing files owned by other tasks (CI in A09, scripts outside the platform).
+.github/
+scripts/
+
+# Generated output
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+*.tsbuildinfo

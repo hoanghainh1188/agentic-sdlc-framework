@@ -1,0 +1,45 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+/** Walks up from the current directory to the folder that holds pnpm-workspace.yaml. */
+export function repoRoot(): string {
+  let dir = process.cwd();
+  while (!fs.existsSync(path.join(dir, 'pnpm-workspace.yaml'))) {
+    const parent = path.dirname(dir);
+    if (parent === dir) throw new Error('pnpm-workspace.yaml not found above ' + process.cwd());
+    dir = parent;
+  }
+  return dir;
+}
+
+export interface WorkspacePackage {
+  dir: string;
+  name: string;
+}
+
+/** The packages required by design/D-03 section 11 (D-08 A01 AC2). */
+export const EXPECTED_PACKAGES: readonly WorkspacePackage[] = [
+  { dir: 'platform/apps/api', name: '@sdlc/api' },
+  { dir: 'platform/apps/worker', name: '@sdlc/worker' },
+  { dir: 'platform/apps/runner', name: '@sdlc/runner' },
+  { dir: 'platform/apps/cli', name: '@sdlc/cli' },
+  { dir: 'platform/packages/core', name: '@sdlc/core' },
+  { dir: 'platform/packages/contracts', name: '@sdlc/contracts' },
+  { dir: 'platform/packages/config', name: '@sdlc/config' },
+  { dir: 'platform/packages/adapters/git-github', name: '@sdlc/adapter-git-github' },
+  { dir: 'platform/packages/adapters/agent-openhands', name: '@sdlc/adapter-agent-openhands' },
+  { dir: 'platform/packages/adapters/model-litellm', name: '@sdlc/adapter-model-litellm' },
+  { dir: 'platform/packages/adapters/evidence-s3', name: '@sdlc/adapter-evidence-s3' },
+  { dir: 'platform/packages/adapters/policy-simple', name: '@sdlc/adapter-policy-simple' },
+];
+
+export interface PackageManifest {
+  name: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+}
+
+export function readJson<T>(file: string): T {
+  return JSON.parse(fs.readFileSync(file, 'utf8')) as T;
+}

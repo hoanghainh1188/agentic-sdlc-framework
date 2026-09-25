@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- A01: TypeScript monorepo (pnpm 10 workspaces, TypeScript project references, ESLint, Prettier, Vitest). Packages `@sdlc/api`, `worker`, `runner`, `cli`, `core`, `contracts`, `config` and five `@sdlc/adapter-*` placeholders (D-03 section 11).
+- A01: module boundaries enforced by lint: `core` must not import adapters; adapters may import `@sdlc/contracts` only. Formatting and linting never touch the handbook, design docs or Markdown.
+- ADR-M16 (proposed): monorepo tooling, CommonJS output (open to change), pnpm build-script allow-list.
+- CLAUDE.md: `Commands` section filled.
+
 ## [1.3.0-review] — 2026-09-24
 
 ### Approved

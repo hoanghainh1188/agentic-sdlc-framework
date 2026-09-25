@@ -1,0 +1,6 @@
+packages:
+  - 'platform/apps/*'
+  - 'platform/packages/*'
+  - 'platform/packages/adapters/*'
+  # platform/packages/adapters itself is only a folder, not a package.
+  - '!platform/packages/adapters'

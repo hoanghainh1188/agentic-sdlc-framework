@@ -1,0 +1,12 @@
+{
+  "name": "@sdlc/worker",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Temporal worker: G1-G8 workflow and GitHub poller. See design/D-03 section 5.1.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
+}

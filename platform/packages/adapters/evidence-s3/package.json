@@ -1,0 +1,12 @@
+{
+  "name": "@sdlc/adapter-evidence-s3",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Evidence store adapter: S3 API (SeaweedFS). See design/D-03 section 7.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
+}

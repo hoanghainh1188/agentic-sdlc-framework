@@ -1,0 +1,12 @@
+{
+  "name": "@sdlc/core",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Core modules: registry, gate engine, escalation, cost, evidence, audit, tenancy. See design/D-03 section 5.2.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
+}

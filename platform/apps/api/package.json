@@ -1,0 +1,12 @@
+{
+  "name": "@sdlc/api",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "REST API for the CLI (NestJS). See design/D-03 section 5.1.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ]
+}

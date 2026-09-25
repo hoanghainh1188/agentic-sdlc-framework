@@ -76,7 +76,17 @@ Handbook and platform must stay consistent: same codes, same names for gates, au
 7. New technical decisions (library choice, etc.): write a short ADR in `design/`.
 
 ## Commands
-<!-- TODO: fill in after milestone M-A (docker compose, build, test, lint). -->
+Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packageManager`; `corepack enable` once). Tooling: `design/ADR-M16-monorepo-tooling.md`.
+- `pnpm install` — install all workspace packages (dependency install scripts are blocked unless listed in `pnpm.onlyBuiltDependencies`).
+- `pnpm build` — compile every package with TypeScript project references (`tsc -b`).
+- `pnpm typecheck` — build + type-check the tests in `platform/tests/`.
+- `pnpm lint` — ESLint, type-aware, including module boundaries (`core` never imports adapters; adapters import `@sdlc/contracts` only).
+- `pnpm format` / `pnpm format:check` — Prettier. Never touches `handbook/`, `design/`, `_review/`, `diagrams/` or Markdown.
+- `pnpm test` — Vitest (all `platform/**/*.test.ts`). One file: `pnpm test platform/tests/workspace/boundaries.test.ts`.
+- `pnpm clean` — remove build output.
+- Before a PR: `pnpm build && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`.
+- New package: put it under `platform/apps/`, `platform/packages/` or `platform/packages/adapters/` with the `@sdlc/` scope, and add it to the root `tsconfig.json` references.
+- Docker Compose commands: added in A02.
 
 ## Decisions (see design/D-02 section 11)
 - Q1 first agent: OpenHands · Q2 first Git host: GitHub (GitLab later, same interface) · Q3 language: TypeScript (Node.js) · Q5 repo language: English
