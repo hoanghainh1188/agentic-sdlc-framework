@@ -3,7 +3,7 @@
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
-import { loadErrors, loadValid } from './helpers';
+import { keysAndPaths, loadErrors, loadValid } from './helpers';
 
 const cell = (gate: string, tier: string, body: string) =>
   `oversight:\n  matrix:\n    ${gate}:\n      ${tier}: ${body}\n`;
@@ -113,9 +113,9 @@ const CASES: Case[] = [
   {
     name: 'security findings as HOTL',
     rule: 'M6',
-    yaml: 'oversight:\n  g6_security_findings: HOTL\n',
+    yaml: 'oversight:\n  g6_security_findings: { mode: HOTL }\n',
     key: 'config.rule.g6_security_hitl',
-    path: 'oversight.g6_security_findings',
+    path: 'oversight.g6_security_findings.mode',
   },
   // M7: autonomy.
   {
@@ -478,5 +478,69 @@ describe('allowed loosening is reported as a warning (ADR-M13)', () => {
   it('warns when a G3 cell moves from HITL to HOTL at Medium risk', () => {
     const { warnings } = loadValid(cell('G3', 'medium', '{ mode: HOTL }'));
     expect(warnings.map((w) => w.key)).toEqual(['config.warning.mode_loosened']);
+  });
+});
+
+// G6 security threshold (design/QUESTIONS.md #19): findings at or above `min_severity` make G6
+// HITL; a critical finding always does (rule M6).
+describe('G6 security findings threshold', () => {
+  const threshold = (value: string) =>
+    `oversight:\n  g6_security_findings:\n    min_severity: ${value}\n`;
+
+  it('defaults to HITL for findings at high or above', () => {
+    expect(loadValid().config.oversight.g6_security_findings).toEqual({
+      mode: 'HITL',
+      min_severity: 'high',
+    });
+  });
+
+  it('accepts a stricter threshold without a warning', () => {
+    for (const value of ['medium', 'low']) {
+      expect(loadValid(threshold(value)).warnings).toEqual([]);
+    }
+  });
+
+  it('warns when the threshold is raised to critical', () => {
+    const { warnings } = loadValid(threshold('critical'));
+    expect(warnings.map((w) => [w.key, w.path, w.params])).toEqual([
+      [
+        'config.warning.g6_security_threshold_raised',
+        'oversight.g6_security_findings.min_severity',
+        { from: 'high', to: 'critical' },
+      ],
+    ]);
+    expect(formatIssue(warnings[0]!)).toBe(
+      'oversight.g6_security_findings.min_severity: G6 security threshold raised from high (default) to critical, so fewer findings need a person. This change must be reviewed.',
+    );
+  });
+
+  it('refuses a severity that is not in the codes table (for example info)', () => {
+    expect(keysAndPaths(loadErrors(threshold('info')))).toEqual([
+      ['config.schema.invalid_value', 'oversight.g6_security_findings.min_severity'],
+    ]);
+  });
+
+  it('refuses the old scalar form', () => {
+    expect(
+      keysAndPaths(loadErrors('oversight:\n  g6_security_findings: HITL\n')).map(([k]) => k),
+    ).toContain('config.schema.invalid_type');
+  });
+
+  it('M6 refuses a threshold that would leave critical findings out', () => {
+    const base = loadValid().config;
+    const config = {
+      ...base,
+      oversight: {
+        ...base.oversight,
+        g6_security_findings: { mode: 'HITL', min_severity: 'none' },
+      },
+    } as unknown as typeof base;
+    expect(MANDATORY_RULES.M6!(config).map((e) => [e.key, e.path, e.params])).toEqual([
+      [
+        'config.rule.g6_security_critical',
+        'oversight.g6_security_findings.min_severity',
+        { found: 'none', severity: 'critical' },
+      ],
+    ]);
   });
 });

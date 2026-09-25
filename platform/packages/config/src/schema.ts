@@ -7,6 +7,7 @@ import {
   OVERSIGHT_MODES,
   PROJECT_ROLES,
   PROVIDER_TYPES,
+  SEVERITIES,
 } from '@sdlc/contracts';
 import type { MessageKey } from '@sdlc/messages';
 import { z } from 'zod';
@@ -129,7 +130,10 @@ export const projectConfigSchema = z.strictObject({
       change_flags: uniqueList(z.enum(CHANGE_FLAGS)),
       roles: uniqueList(role),
     }),
-    g6_security_findings: oversightMode,
+    g6_security_findings: z.strictObject({
+      mode: oversightMode,
+      min_severity: z.enum(SEVERITIES),
+    }),
     hitl_gate_deadline: duration,
     hotl_block_window: duration,
     approval_expiry: duration,

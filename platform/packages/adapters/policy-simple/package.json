@@ -3,10 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Policy engine adapter: simple YAML rules. See design/D-03 section 7.",
+  "description": "Policy engine adapter: simple rules read from the validated project configuration. See design/D-03 section 7.3, D-08 B01.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@sdlc/contracts": "workspace:*"
+  }
 }

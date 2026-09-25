@@ -35,6 +35,7 @@ Task A05 reads the per-project configuration: the gate × risk oversight matrix,
 | `@sdlc/messages` (new) | Message catalog |
 
 - The policy adapter (B01) may import `@sdlc/contracts` only (ADR-M16 §2.5). So the config **types** are in contracts, and the app passes the loaded config object to the adapter.
+- `loadProjectConfig` and `defaultProjectConfig` return a branded `ValidatedProjectConfig` (declared in contracts). Only `@sdlc/config` creates it, after the schema and M1–M15 pass. The policy adapter accepts only this type, so it never sees an unchecked configuration and never repeats the checks (B01).
 - `@sdlc/messages` is a new package that is not listed in D-03 §11. Core, config and apps import it. Adapters do not: they receive rendered text from core or the apps.
 
 ### 2.3. Configuration model
@@ -48,6 +49,7 @@ Task A05 reads the per-project configuration: the gate × risk oversight matrix,
 ### 2.4. Mandatory rules (floors in code)
 
 - Rules M1–M15 are in `platform/packages/config/src/mandatory-rules.ts`, each with its source. They cover G1, G7 and production G8 HITL; the forced-HITL G3 and dual-approval G7 lists; G6 security findings; autonomy; model routing; budget thresholds; the loop limit; SLA clocks; cell structure. They also cover the three things the codes table says are never skipped (M13–M15).
+- M6 also covers the G6 security threshold `oversight.g6_security_findings.min_severity` (default `high`): the threshold must always include critical findings. Raising the threshold (for example to `critical`) is a warning (design/QUESTIONS.md #19, B01).
 - The floors are in code on purpose, so that configuration cannot loosen them. Changing a floor needs an approved handbook change, then the design doc, then a backlog task.
 - Other loosening (for example G2 Medium HITL → HOTL) is allowed but returned as a **warning**. Callers write it to the `config.changed` audit event (ADR-M13).
 - **Calendar floor (part of M11, Harry, 2026-09-25):** M11 compares SLA clocks in the project's own calendar, so a shrunken calendar would stretch "1 working day" in real time. The calendar must therefore have **at least 5 working days per week and at least 7 working hours per day**; below that the configuration is refused (codes table §6.3).
@@ -90,3 +92,4 @@ Task A05 reads the per-project configuration: the gate × risk oversight matrix,
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A05) | First version |
 | 0.2 | 2026-09-25 | Claude (task A05) | Review of PR #53: calendar floor in M11 (5 days, 7 hours), holiday warning (> 20 a year), reserved `unit` / `kind` keys |
+| 0.3 | 2026-09-25 | Claude (task B01) | §2.2: `ValidatedProjectConfig` brand; §2.4: G6 security threshold in M6 and its warning (QUESTIONS.md #19) |
