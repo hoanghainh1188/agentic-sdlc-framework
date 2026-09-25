@@ -1,0 +1,6 @@
+# Trivy accepted exceptions (task A09). CRITICAL findings block CI.
+#
+# One ID per line. Add an entry only with a reason, a date and Person B's approval
+# in the pull request, for example:
+#   # 2026-10-01 no fix released; not reachable from our code; approved by <name> in #<PR>
+#   CVE-2026-00000

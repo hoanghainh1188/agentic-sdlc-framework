@@ -1,0 +1,17 @@
+# Dependabot version updates (task A09). Keeps the SHA-pinned actions and the
+# Compose images current. Pinning images by digest comes later (A02 review).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+
+  - package-ecosystem: docker-compose
+    directory: /platform/deploy
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore

@@ -1,0 +1,7 @@
+# Gitleaks configuration (task A09). Uses the default rules; every finding blocks CI.
+#
+# Accepted exceptions: add an allowlist entry below only with a reason, a date and
+# Person B's approval in the pull request. Never allow-list a real secret: rotate it.
+
+[extend]
+useDefault = true

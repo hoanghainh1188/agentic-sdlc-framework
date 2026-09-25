@@ -62,17 +62,19 @@ Do this **after** the first push, so protection does not block it.
 > - Merge settings: squash merge only; delete branch after merge (available on Free).
 > - Local `pre-push` hook that blocks direct pushes to `main` (`.git/hooks/pre-push`; install it on every machine that pushes). Bypass with `--no-verify` only in an emergency, with Harry's approval.
 > - Process: every change through a pull request, reviewed by someone other than its producer (handbook Ch.5).
+> - CI (`.github/workflows/ci.yml`, task A09) runs on every pull request, on every push to `main` and nightly. A red check cannot block the merge on GitHub Free: **never merge a pull request whose `ci-ok` check is red or still running**. A red run on `main` means something was merged anyway: fix it first.
+> - Security scan exceptions (`.gitleaks.toml`, `.trivyignore`, `.semgrepignore`) change only with a reason, a date and Person B's approval in the pull request.
 > After the upgrade: turn on the branch protection below and add Person B to the repository (GitHub does not let authors approve their own pull requests).
 
 | Setting | Value | Why |
 |---|---|---|
-| Branch protection on `main` | PR required; at least 1 approval; CI must pass (once CI exists after A01); no force push; dismiss stale approvals when new commits are pushed | Nobody, including AI, pushes straight to `main`; approval stays bound to what was reviewed |
+| Branch protection on `main` | PR required; at least 1 approval; required status check `ci-ok` (the one summary job of `ci.yml`); no force push; dismiss stale approvals when new commits are pushed | Nobody, including AI, pushes straight to `main`; approval stays bound to what was reviewed |
 | Merge method | Squash merge only | 1 PR = 1 commit |
 | Delete branch after merge | On | Tidy repo |
 | Access | Project members only | Internal asset |
 | Secret scanning / push protection (if your plan has it) | On | Blocks leaked secrets |
 
-CODEOWNERS is added in A01 or A09, once the folders exist.
+`.github/CODEOWNERS` (task A09) names Harry as the only owner today. GitHub ignores CODEOWNERS for private repositories on the Free plan; it takes effect after the upgrade. Add Person B then.
 
 ## Step 3. Create milestones, labels and the 44 issues
 

@@ -8,7 +8,11 @@
 - ADR-M16 (proposed): monorepo tooling, CommonJS output (open to change), pnpm build-script allow-list.
 - CLAUDE.md: `Commands` section filled.
 
+- A09: CI workflow `ci.yml`: build, type check, lint, format check, unit tests and actionlint on every PR; Gitleaks (any finding blocks), Semgrep (`ERROR` blocks), Trivy (`CRITICAL` blocks, `HIGH` listed in the job summary); Compose `core` integration job that runs when `platform/deploy/**` changes and nightly (skipped until A02 is merged); one summary job `ci-ok`. Actions pinned by commit SHA, downloaded tools checked by SHA-256, read-only permissions.
+- A09: Dependabot (GitHub Actions and Compose images, weekly), `.github/CODEOWNERS` (inactive on GitHub Free), `pnpm test:integration`.
+
 ### Changed
+- A09: Prettier now formats `.github/` workflow files (ADR-M16 §2.6); `render-diagrams.yml` actions pinned by commit SHA.
 - Docs fixes (found during A01 planning): README task count 44 and codes table v1.3; leftover pre-2+N roles table removed from D-02 §3.
 - ADR-M16 accepted (Harry, 2026-09-25, with PR #46); design/README.md index updated.
 - CLAUDE.md: new `Current constraints` section (at most 2 parallel sessions, one task per session in its own worktree, A09 in parallel with A02, A03 waits for the OpenBao key holders).

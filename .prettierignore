@@ -5,8 +5,7 @@ _review/
 diagrams/
 *.md
 
-# Existing files owned by other tasks (CI in A09, scripts outside the platform).
-.github/
+# Scripts outside the platform. .github/ workflows are formatted (A09); its Markdown is covered by *.md.
 scripts/
 
 # Generated output

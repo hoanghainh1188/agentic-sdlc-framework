@@ -1,0 +1,9 @@
+# Semgrep ignore list (task A09). This file replaces Semgrep's built-in defaults.
+# Findings at severity ERROR block CI.
+#
+# Accepted exceptions: prefer a `nosemgrep: <rule-id>` comment on the line, with a reason.
+# Add a path here only with a reason, a date and Person B's approval in the pull request.
+
+node_modules/
+dist/
+coverage/

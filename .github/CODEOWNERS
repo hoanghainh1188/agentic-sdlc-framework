@@ -1,0 +1,11 @@
+# Code owners (task A09). Harry is the only named owner today.
+# Add Person B after the GitHub Team upgrade. On the GitHub Free plan GitHub ignores this
+# file for private repositories: no automatic review requests, no enforcement.
+# Later rules win over earlier ones.
+
+*                   @hoanghainh1188
+
+/.github/           @hoanghainh1188
+/design/            @hoanghainh1188
+/handbook/          @hoanghainh1188
+/platform/deploy/   @hoanghainh1188
