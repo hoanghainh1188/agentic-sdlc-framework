@@ -7,6 +7,10 @@
 - A01: module boundaries enforced by lint: `core` must not import adapters; adapters may import `@sdlc/contracts` only. Formatting and linting never touch the handbook, design docs or Markdown.
 - ADR-M16 (proposed): monorepo tooling, CommonJS output (open to change), pnpm build-script allow-list.
 - CLAUDE.md: `Commands` section filled.
+- A02: Docker Compose infrastructure in `platform/deploy/` with profiles `core` (PostgreSQL 17 with one database and role per component, Temporal 1.31 on PostgreSQL + UI, LiteLLM, Valkey, SeaweedFS, OpenBao sealed until A03) and `observability` (Langfuse 4, ClickHouse 26.3 LTS). Images pinned to exact versions; healthchecks on every service; ports bound to 127.0.0.1.
+- A02: `init-env.sh` generates `.env` with random secrets (mode 600); `up.sh` waits for health and one-shot jobs; Langfuse open sign-up disabled, admin created by headless initialisation; Valkey `maxmemory` + `noeviction` shared by LiteLLM and Langfuse.
+- A02: static compose tests in `pnpm test`; live test `pnpm test:compose`. ADR-M17 (proposed). `design/QUESTIONS.md` #1–#4 (LiteLLM provider keys from OpenBao, sealed-OpenBao errors in A04, Dependabot for images in A09, Langfuse v4 OTLP for A08). CLAUDE.md: Docker Compose commands.
+- A02: `.gitleaks.toml` allowlist for the `valkey/valkey:<tag>` image name (false positive of `generic-api-key`), approved by Harry (Person B) on 2026-09-25 in PR #50.
 
 - A09: CI workflow `ci.yml`: build, type check, lint, format check, unit tests and actionlint on every PR; Gitleaks (any finding blocks), Semgrep (`ERROR` blocks), Trivy (`CRITICAL` blocks, `HIGH` listed in the job summary); Compose `core` integration job that runs when `platform/deploy/**` changes and nightly (skipped until A02 is merged); one summary job `ci-ok`. Actions pinned by commit SHA, downloaded tools checked by SHA-256, read-only permissions.
 - A09: Dependabot (GitHub Actions and Compose images, weekly), `.github/CODEOWNERS` (inactive on GitHub Free), `pnpm test:integration`.

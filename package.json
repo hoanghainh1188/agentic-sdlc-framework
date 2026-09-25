@@ -16,7 +16,12 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "clean": "tsc -b --clean"
+    "clean": "tsc -b --clean",
+    "test:compose": "SDLC_COMPOSE_IT=1 vitest run --config vitest.integration.config.ts platform/tests/integration/deploy",
+    "compose:env": "platform/deploy/scripts/init-env.sh",
+    "compose:core": "platform/deploy/scripts/up.sh core",
+    "compose:obs": "platform/deploy/scripts/up.sh core observability",
+    "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability down"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

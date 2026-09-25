@@ -1,0 +1,366 @@
+# Agentic SDLC platform: infrastructure (D-03 section 10, D-08 task A02, design/ADR-M17).
+#
+# Profiles:
+#   core           PostgreSQL, Temporal (+ UI), LiteLLM, Valkey, SeaweedFS, OpenBao
+#   observability  Langfuse (web + worker) and ClickHouse; reuses PostgreSQL, Valkey, SeaweedFS
+#
+# Usage (from the repo root; see platform/deploy/README.md):
+#   platform/deploy/scripts/init-env.sh           # once: creates platform/deploy/.env (mode 600)
+#   pnpm compose:core                             # core profile, waits until healthy
+#   pnpm compose:obs                              # core + observability
+#   pnpm compose:down                             # stop (volumes are kept)
+#
+# Rules:
+#   - Images are pinned to exact versions. Never use "latest" or a bare major tag.
+#   - No MinIO, no Redis, no Elasticsearch (D-01 section 5.8e, D-03 section 10.1).
+#   - Secrets come only from .env (never committed). Secret variables use ${VAR:?}, so a missing
+#     value stops Compose instead of falling back to a default.
+#   - Host ports bind to 127.0.0.1 by default (SDLC_BIND_ADDR): the server accepts no inbound
+#     internet connections (D-03 section 9).
+
+name: ${COMPOSE_PROJECT_NAME:-sdlc}
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 20s
+
+networks:
+  sdlc:
+    name: ${COMPOSE_PROJECT_NAME:-sdlc}-net
+
+volumes:
+  postgres-data:
+  seaweedfs-data:
+  openbao-data:
+  valkey-data:
+  clickhouse-data:
+  clickhouse-logs:
+
+services:
+  # ---------------------------------------------------------------- core ----
+
+  postgres:
+    image: postgres:17.11-trixie
+    profiles: [core, observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env}
+      PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD:?set PLATFORM_DB_PASSWORD in .env}
+      TEMPORAL_DB_PASSWORD: ${TEMPORAL_DB_PASSWORD:?set TEMPORAL_DB_PASSWORD in .env}
+      LITELLM_DB_PASSWORD: ${LITELLM_DB_PASSWORD:?set LITELLM_DB_PASSWORD in .env}
+      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD:?set LANGFUSE_DB_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - ${SDLC_BIND_ADDR:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:5432
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD-SHELL, pg_isready -U postgres -d postgres]
+
+  temporal-schema:
+    image: temporalio/admin-tools:1.31.2
+    profiles: [core, observability]
+    restart: 'no'
+    networks: [sdlc]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TEMPORAL_DB_PASSWORD: ${TEMPORAL_DB_PASSWORD:?set TEMPORAL_DB_PASSWORD in .env}
+    volumes:
+      - ./temporal/setup-schema.sh:/scripts/setup-schema.sh:ro
+    entrypoint: [/bin/sh, /scripts/setup-schema.sh]
+
+  temporal:
+    image: temporalio/server:1.31.2
+    profiles: [core, observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on:
+      temporal-schema:
+        condition: service_completed_successfully
+    environment:
+      DB: postgres12
+      DB_PORT: '5432'
+      POSTGRES_SEEDS: postgres
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:?set TEMPORAL_DB_PASSWORD in .env}
+      DBNAME: temporal
+      VISIBILITY_DBNAME: temporal_visibility
+      BIND_ON_IP: 0.0.0.0
+      DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/dynamicconfig/dynamicconfig.yaml
+      LOG_LEVEL: warn
+    volumes:
+      - ./temporal/dynamicconfig.yaml:/etc/temporal/dynamicconfig/dynamicconfig.yaml:ro
+    ports:
+      - ${SDLC_BIND_ADDR:-127.0.0.1}:${TEMPORAL_HOST_PORT:-7233}:7233
+    healthcheck:
+      <<: *healthcheck-defaults
+      # The server image has no Temporal CLI; the frontend gRPC port must accept connections.
+      # temporal-namespace (below) then checks real cluster health with the CLI.
+      test: [CMD-SHELL, 'nc -z "$$(hostname -i | cut -d" " -f1)" 7233']
+
+  temporal-namespace:
+    image: temporalio/admin-tools:1.31.2
+    profiles: [core, observability]
+    restart: 'no'
+    networks: [sdlc]
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      TEMPORAL_NAMESPACE_RETENTION: ${TEMPORAL_NAMESPACE_RETENTION:-30d}
+    volumes:
+      - ./temporal/create-namespace.sh:/scripts/create-namespace.sh:ro
+    entrypoint: [/bin/sh, /scripts/create-namespace.sh]
+
+  temporal-ui:
+    image: temporalio/ui:2.54.1
+    profiles: [core, observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on:
+      temporal-namespace:
+        condition: service_completed_successfully
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_DEFAULT_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+    ports:
+      - ${SDLC_BIND_ADDR:-127.0.0.1}:${TEMPORAL_UI_HOST_PORT:-8080}:8080
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD-SHELL, 'wget -q --spider "http://$$(hostname -i | cut -d" " -f1):8080/" || exit 1']
+
+  valkey:
+    image: valkey/valkey:8.1.10-alpine3.24
+    profiles: [core, observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?set VALKEY_PASSWORD in .env}
+      VALKEY_MAXMEMORY: ${VALKEY_MAXMEMORY:-256mb}
+    # noeviction is required by Langfuse (BullMQ queues). It applies to the whole server:
+    # when maxmemory is reached, writes fail for Langfuse AND LiteLLM (design/ADR-M17).
+    # The password goes into a mode-600 config file, never into the server's arguments.
+    # docker-entrypoint.sh then drops root and runs valkey-server as the valkey user.
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        umask 077 &&
+        printf 'requirepass %s\nmaxmemory %s\nmaxmemory-policy noeviction\nappendonly yes\nsave ""\n'
+        "$$VALKEY_PASSWORD" "$$VALKEY_MAXMEMORY" > /tmp/valkey.conf &&
+        chown valkey:valkey /tmp/valkey.conf &&
+        exec docker-entrypoint.sh valkey-server /tmp/valkey.conf
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$VALKEY_PASSWORD" valkey-cli ping | grep -q PONG']
+
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.102.1
+    profiles: [core, observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://litellm:${LITELLM_DB_PASSWORD:?set LITELLM_DB_PASSWORD in .env}@postgres:5432/litellm
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?set LITELLM_SALT_KEY in .env}
+      REDIS_HOST: valkey
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: ${VALKEY_PASSWORD:?set VALKEY_PASSWORD in .env}
+      STORE_MODEL_IN_DB: 'False'
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+    command: [--config, /app/config.yaml, --port, '4000', --telemetry, 'False']
+    ports:
+      - ${SDLC_BIND_ADDR:-127.0.0.1}:${LITELLM_HOST_PORT:-4000}:4000
+    healthcheck:
+      <<: *healthcheck-defaults
+      start_period: 60s
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=4)
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.47
+    profiles: [core, observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    environment:
+      # One S3 admin identity, read by SeaweedFS from these variables.
+      AWS_ACCESS_KEY_ID: ${SEAWEEDFS_S3_ACCESS_KEY:?set SEAWEEDFS_S3_ACCESS_KEY in .env}
+      AWS_SECRET_ACCESS_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?set SEAWEEDFS_S3_SECRET_KEY in .env}
+    command:
+      - server
+      - -dir=/data
+      - -ip=seaweedfs
+      - -ip.bind=0.0.0.0
+      - -master.volumeSizeLimitMB=${SEAWEEDFS_VOLUME_SIZE_LIMIT_MB:-1024}
+      - -volume.max=0
+      - -s3
+      - -s3.port=8333
+    volumes:
+      - seaweedfs-data:/data
+    ports:
+      - ${SDLC_BIND_ADDR:-127.0.0.1}:${SEAWEEDFS_S3_HOST_PORT:-8333}:8333
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        [
+          CMD-SHELL,
+          'wget -q -O /dev/null http://127.0.0.1:9333/cluster/healthz && wget -q -O /dev/null http://127.0.0.1:8333/healthz',
+        ]
+
+  seaweedfs-init:
+    image: chrislusf/seaweedfs:4.47
+    profiles: [core, observability]
+    restart: 'no'
+    networks: [sdlc]
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    environment:
+      SEAWEEDFS_BUCKETS: evidence langfuse
+    volumes:
+      - ./seaweedfs/create-buckets.sh:/scripts/create-buckets.sh:ro
+    entrypoint: [/bin/sh, /scripts/create-buckets.sh]
+
+  openbao:
+    image: openbao/openbao:2.6.3
+    profiles: [core, observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    # Starts uninitialised and sealed; A03 initialises it. Never dev mode.
+    command: [server]
+    environment:
+      BAO_ADDR: http://127.0.0.1:8200
+    volumes:
+      - ./openbao/openbao.hcl:/openbao/config/openbao.hcl:ro
+      - openbao-data:/openbao/file
+    ports:
+      - ${SDLC_BIND_ADDR:-127.0.0.1}:${OPENBAO_HOST_PORT:-8200}:8200
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Healthy = the API is reachable. It does NOT mean initialised or unsealed (see README).
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null 'http://127.0.0.1:8200/v1/sys/health?uninitcode=200&sealedcode=200&standbyok=true'
+
+  # ------------------------------------------------------- observability ----
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3.32.14
+    profiles: [observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    user: '101:101'
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+      - ./clickhouse/low-memory.xml:/etc/clickhouse-server/config.d/low-memory.xml:ro
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:8123/ping || exit 1']
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:4.45.1
+    profiles: [observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on: &langfuse-depends-on
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      seaweedfs-init:
+        condition: service_completed_successfully
+    environment: &langfuse-env
+      DATABASE_URL: postgresql://langfuse:${LANGFUSE_DB_PASSWORD:?set LANGFUSE_DB_PASSWORD in .env}@postgres:5432/langfuse
+      NEXTAUTH_URL: ${LANGFUSE_URL:-http://localhost:3000}
+      SALT: ${LANGFUSE_SALT:?set LANGFUSE_SALT in .env}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?set LANGFUSE_ENCRYPTION_KEY in .env}
+      TELEMETRY_ENABLED: 'false'
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: 'false'
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_CLUSTER_ENABLED: 'false'
+      REDIS_HOST: valkey
+      REDIS_PORT: '6379'
+      REDIS_AUTH: ${VALKEY_PASSWORD:?set VALKEY_PASSWORD in .env}
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: us-east-1
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://seaweedfs:8333
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${SEAWEEDFS_S3_ACCESS_KEY:?set SEAWEEDFS_S3_ACCESS_KEY in .env}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?set SEAWEEDFS_S3_SECRET_KEY in .env}
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: 'true'
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: us-east-1
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://seaweedfs:8333
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${SEAWEEDFS_S3_ACCESS_KEY:?set SEAWEEDFS_S3_ACCESS_KEY in .env}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?set SEAWEEDFS_S3_SECRET_KEY in .env}
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: 'true'
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+    healthcheck:
+      <<: *healthcheck-defaults
+      start_period: 60s
+      test:
+        [
+          CMD-SHELL,
+          'wget -q -O /dev/null "http://$$(hostname -i | cut -d" " -f1):3030/api/health" || exit 1',
+        ]
+
+  langfuse-web:
+    image: langfuse/langfuse:4.45.1
+    profiles: [observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on: *langfuse-depends-on
+    environment:
+      <<: *langfuse-env
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?set LANGFUSE_NEXTAUTH_SECRET in .env}
+      # No open sign-up. The only account is the admin created by headless initialisation.
+      AUTH_DISABLE_SIGNUP: 'true'
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-sdlc}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-Agentic SDLC}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-sdlc-platform}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-Agentic SDLC platform}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:?set LANGFUSE_INIT_PROJECT_PUBLIC_KEY in .env}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:?set LANGFUSE_INIT_PROJECT_SECRET_KEY in .env}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:?set LANGFUSE_INIT_USER_EMAIL in .env}
+      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-Platform admin}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:?set LANGFUSE_INIT_USER_PASSWORD in .env}
+    ports:
+      - ${SDLC_BIND_ADDR:-127.0.0.1}:${LANGFUSE_HOST_PORT:-3000}:3000
+    healthcheck:
+      <<: *healthcheck-defaults
+      start_period: 90s
+      test:
+        [
+          CMD-SHELL,
+          'wget -q -O /dev/null "http://$$(hostname -i | cut -d" " -f1):3000/api/public/health" || exit 1',
+        ]
