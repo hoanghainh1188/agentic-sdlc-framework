@@ -39,7 +39,7 @@ escalation:
 | Section | Settings |
 |---|---|
 | `oversight.matrix` | `G1`…`G7`, and `G8.production` / `G8.non_production`; each has `low`, `medium`, `high`, `critical` cells: `mode` (`HITL`, `HOTL`, `AUDIT`; `POLICY` at G4 only), `roles`, `approvals` (default 1), `on_breach` (HITL) |
-| `oversight` | `forced_hitl_g3.change_flags`, `dual_approval_g7.change_flags` and `.roles`, `g6_security_findings`, `hitl_gate_deadline`, `hotl_block_window`, `approval_expiry` |
+| `oversight` | `forced_hitl_g3.change_flags`, `dual_approval_g7.change_flags` and `.roles`, `g6_security_findings.mode` and `.min_severity`, `hitl_gate_deadline`, `hotl_block_window`, `approval_expiry` |
 | `autonomy.max_by_risk` | Maximum autonomy per risk tier |
 | `escalation` | `sla.<severity>.acknowledge` and `.resolve`; `calendar` (`time_zone`, `working_days`, `working_hours`, `holidays`) |
 | `run` | `g6_ci_retries`, `loop_detection.identical_tool_calls_max`, `loop_detection.no_progress_window_minutes` |
@@ -60,7 +60,7 @@ A project may tighten anything. It may **not** loosen these (rules M1–M15, sou
 | M2 | G7 HITL at every tier, Person B approves; Critical needs person_b + second_approver |
 | M3 | G8 production HITL at every tier, Person B; Critical needs 2 approvers |
 | M4, M5 | Forced-HITL G3 and dual-approval G7 lists keep every handbook flag (adding is allowed) |
-| M6 | G6 security findings HITL |
+| M6 | G6 security findings HITL; the `min_severity` threshold always includes critical findings |
 | M7 | Autonomy ≤ L2; Critical L0; High ≤ L1; never more autonomy for a higher risk tier |
 | M8 | `client_restricted` self-hosted only; `prohibited` no model |
 | M9 | Budget warning ≤ 80 %, stop ≤ 100 %, warning before stop |
@@ -71,7 +71,7 @@ A project may tighten anything. It may **not** loosen these (rules M1–M15, sou
 | M14 | G4 High and Critical HITL |
 | M15 | G6 never `POLICY` |
 
-Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
+Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 
 ## Changing the defaults
 

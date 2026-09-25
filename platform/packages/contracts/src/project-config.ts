@@ -71,6 +71,16 @@ export interface WorkingCalendar {
   readonly holidays: readonly string[];
 }
 
+/**
+ * Security findings at G6 (codes table §4 row G6, design/QUESTIONS.md #19). Findings at or above
+ * `min_severity` make G6 use `mode`; findings below it are recorded as evidence only. A critical
+ * finding is always at or above the threshold (rule M6 in `@sdlc/config`).
+ */
+export interface SecurityFindingsPolicy {
+  readonly mode: OversightMode;
+  readonly min_severity: Severity;
+}
+
 export interface ProjectConfig {
   readonly schema_version: 1;
   readonly oversight: {
@@ -80,7 +90,7 @@ export interface ProjectConfig {
       readonly change_flags: readonly ChangeFlag[];
       readonly roles: readonly ProjectRole[];
     };
-    readonly g6_security_findings: OversightMode;
+    readonly g6_security_findings: SecurityFindingsPolicy;
     readonly hitl_gate_deadline: Duration;
     readonly hotl_block_window: Duration;
     readonly approval_expiry: Duration;
@@ -109,3 +119,12 @@ export interface ProjectConfig {
   readonly retention: { readonly evidence_retention_days: number };
   readonly github: { readonly poll_interval_seconds: number };
 }
+
+declare const validatedConfig: unique symbol;
+
+/**
+ * A configuration that passed the schema and the mandatory rules M1–M15. Only `@sdlc/config`
+ * produces it (`loadProjectConfig`, `defaultProjectConfig`). Adapters accept this type, so they
+ * never see an unchecked configuration and never repeat the checks (ADR-M16 §2.5, ADR-M18 §2.2).
+ */
+export type ValidatedProjectConfig = ProjectConfig & { readonly [validatedConfig]: true };

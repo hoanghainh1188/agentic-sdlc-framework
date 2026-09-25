@@ -8,7 +8,8 @@
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
 //   M4  forced-HITL G3 flags contain the handbook list ............... codes table §4, D-02 FR-15
 //   M5  dual-approval G7 flags and roles contain the handbook list ... codes table §4, D-02 FR-16
-//   M6  G6 security findings HITL .................................... codes table §4 row G6, Ch.14 §14.8
+//   M6  G6 security findings HITL; critical always counts ........... codes table §4 row G6, Ch.14 §14.8,
+//                                                                     design/QUESTIONS.md #19
 //   M7  autonomy ≤ L2, Critical L0, High ≤ L1, ordered by risk ....... D-02 FR-03 and §4.2
 //   M8  client_restricted self-hosted only, prohibited none .......... D-07 §4
 //   M9  budget warn ≤ 80 %, stop ≤ 100 %, warn < stop ................ D-07 §6, Ch.3 §3.6
@@ -195,14 +196,35 @@ const m5: Rule = (c) => [
   ),
 ];
 
-const m6: Rule = (c) =>
-  c.oversight.g6_security_findings === 'HITL'
-    ? []
-    : [
-        issue('config.rule.g6_security_hitl', 'oversight.g6_security_findings', {
-          found: c.oversight.g6_security_findings,
-        }),
-      ];
+/**
+ * A security finding of this severity always makes G6 HITL, whatever `min_severity` says (M6).
+ * Escalation for a critical finding stays in the workflow (D-03 §6, task B07).
+ */
+export const ALWAYS_HITL_SECURITY_SEVERITY: Severity = 'critical';
+
+/** True when `severity` is at or above `threshold` (`SEVERITIES` lists the most severe first). */
+export function severityAtOrAbove(severity: Severity, threshold: Severity): boolean {
+  const rank = SEVERITIES.indexOf(severity);
+  return rank !== -1 && rank <= SEVERITIES.indexOf(threshold);
+}
+
+const m6: Rule = (c) => {
+  const { mode, min_severity: minSeverity } = c.oversight.g6_security_findings;
+  const path = 'oversight.g6_security_findings';
+  return [
+    ...(mode === 'HITL'
+      ? []
+      : [issue('config.rule.g6_security_hitl', `${path}.mode`, { found: mode })]),
+    ...(severityAtOrAbove(ALWAYS_HITL_SECURITY_SEVERITY, minSeverity)
+      ? []
+      : [
+          issue('config.rule.g6_security_critical', `${path}.min_severity`, {
+            found: minSeverity,
+            severity: ALWAYS_HITL_SECURITY_SEVERITY,
+          }),
+        ]),
+  ];
+};
 
 const m7: Rule = (c) => {
   const levels = c.autonomy.max_by_risk;

@@ -31,6 +31,7 @@
   "config.rule.dual_approval_flag_missing": "{path}: the change flag {flag} must stay in the dual-approval list for G7. You may add flags, not remove them (rule {rule}, codes table §4).",
   "config.rule.dual_approval_role_missing": "{path}: the role {role} must stay in the G7 dual-approval roles (rule {rule}, codes table §4).",
   "config.rule.g6_security_hitl": "{path}: security findings at G6 must be HITL; found {found} (rule {rule}, codes table §4).",
+  "config.rule.g6_security_critical": "{path}: the G6 security threshold {found} must include {severity} findings (rule {rule}, codes table §4).",
   "config.rule.autonomy_above_mvp": "{path}: autonomy {found} is above the MVP maximum {maximum} (rule {rule}, D-02 §4.2).",
   "config.rule.autonomy_critical_l0": "{path}: Critical risk must have autonomy L0; found {found} (rule {rule}, D-02 FR-03).",
   "config.rule.autonomy_high_l1": "{path}: High risk may have at most autonomy L1; found {found} (rule {rule}, D-02 FR-03).",
@@ -55,6 +56,7 @@
   "config.rule.g6_independent_verification": "{path}: G6 may not be a POLICY check at {tier} risk: independent verification is never skipped (rule {rule}, codes table §4).",
 
   "config.warning.mode_loosened": "{path}: oversight loosened from {from} (codes table default) to {to}. This change must be reviewed.",
+  "config.warning.g6_security_threshold_raised": "{path}: G6 security threshold raised from {from} (default) to {to}, so fewer findings need a person. This change must be reviewed.",
   "config.warning.approvals_reduced": "{path}: approvals reduced from {from} (default) to {to}. This change must be reviewed.",
   "config.warning.working_day_removed": "{path}: {day} is no longer a working day, so working-time clocks (SLA, gate deadlines) run longer. This change must be reviewed.",
   "config.warning.many_holidays": "{path}: {count} holidays in {year} (more than {maximum}), so working-time clocks run longer. This change must be reviewed.",

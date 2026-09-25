@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.0 |
+| Version | 1.1 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -199,12 +199,17 @@ General rules:
 ```text
 mode = matrix[gate][risk_tier]                     # project config (handbook codes table §4)
 if gate == G3 and plan.change_flags ∩ FORCED_HITL_G3: mode = HITL
-if gate == G6 and security_findings.critical > 0:   mode = HITL
+if gate == G6 and findings at or above g6_security_findings.min_severity > 0:
+                                                   mode = HITL   # default threshold: high
+if gate == G5 and limit breached:                   mode = matrix[G5][risk_tier].on_breach (if set)
 if gate == G7: mode = HITL; approvals_needed = 2 if plan.change_flags ∩ DUAL_APPROVAL_G7 or risk == critical else 1
 if gate == G8 and environment == production:        mode = HITL
 ```
 
 The resolved mode is stored in the gate decision. Changing the matrix is a configuration change (new `config_hash`, audit event).
+
+- G6 security findings (design/QUESTIONS.md #19): findings at or above `oversight.g6_security_findings.min_severity` (default `high`) make G6 HITL. A **critical** finding always makes G6 HITL; this is a mandatory rule (M6) that configuration cannot loosen. Findings below the threshold are recorded as evidence, and G6 keeps the matrix mode. The escalation for a critical finding stays in the workflow (state machine above).
+- The G7 and production G8 HITL lines are guaranteed by the mandatory rules M2 and M3, so the engine reads them from the matrix like every other cell.
 
 ### 6.2. Who may approve
 
@@ -291,6 +296,13 @@ interface PolicyEngine {
 }
 ```
 MVP: `SimplePolicyEngine` reading YAML. MVP+1: `OpaPolicyEngine` or `CedarPolicyEngine`.
+
+- The exact TypeScript interface is `PolicyEngine` in `@sdlc/contracts` (`platform/packages/contracts/src/policy.ts`, task B01). Differences from the sketch above, same responsibilities:
+  - The engine is created from a `ValidatedProjectConfig`: a configuration that `@sdlc/config` has checked against the mandatory rules M1–M15. The adapter never repeats those checks.
+  - `canApprove` receives the actor's role bindings (revoked ones never count), the producers for this gate, and the approvals already recorded. It returns the role the person approves under, or a refusal reason. POLICY and AUDIT cells have no approval step; a listed role may still approve a HOTL gate explicitly. Callers decide who the producers are for each gate; for example the intent creator is a producer at G7 but not at G1 (design/QUESTIONS.md #16).
+  - `allowedModels` filters the gateway's model list (given when the engine is created) by the provider types allowed for the data class. `taskKind` is not used in the MVP (design/QUESTIONS.md #17).
+  - `maxAutonomy` returns L0 for a data class that may go to no model (`prohibited`) (design/QUESTIONS.md #18).
+  - `isForbidden` uses the two action lists in `@sdlc/contracts` (`FORBIDDEN_AGENT_ACTIONS`, `GRANT_REQUIRED_AGENT_ACTIONS`). They are not configuration.
 
 ### 7.4. Model gateway and cost
 
@@ -568,4 +580,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 0.3 | 2026-09-24 | Claude (draft) | OpenBao confirmed. Unseal key custody, root token, backups, drills (10.2) |
 | 0.4 | 2026-09-24 | Claude (draft) | After review: SeaweedFS, Valkey, GitHub polling (ADR-M11, M12), clearer G5 and Level 1, added `api_tokens` |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: oversight resolution, 2+N approval rules, approval binding and expiry, escalation with SLA timers, kill switch, agent register, AI record; new state machine; ADR-M13…M15 |
+| 1.1 | 2026-09-25 | Claude (task B01), approved by Harry | §6.1: G6 security threshold `min_severity` (critical always HITL, rule M6) and G5 `on_breach`; §7.3: notes on the contracts `PolicyEngine` (validated config, `canApprove` inputs, model list, `prohibited` → L0, forbidden-action lists). QUESTIONS.md #16–#19 |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |
