@@ -1,5 +1,4 @@
-// A09 FAULT INJECTION (type check): a string assigned to a number must fail `pnpm build`/`typecheck`.
+// A09 FAULT INJECTION (unit test): see platform/tests/workspace/a09-fault.test.ts.
 export function a09Fault(): number {
-  const value: number = 'not a number';
-  return value;
+  return 2;
 }
