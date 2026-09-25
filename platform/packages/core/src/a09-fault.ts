@@ -1,5 +1,5 @@
-// A09 FAULT INJECTION (lint): an unused variable must fail `pnpm lint`.
+// A09 FAULT INJECTION (type check): a string assigned to a number must fail `pnpm build`/`typecheck`.
 export function a09Fault(): number {
-  const unused = 1;
-  return 2;
+  const value: number = 'not a number';
+  return value;
 }
