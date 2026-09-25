@@ -1,9 +1,23 @@
 // Vocabularies stored as PostgreSQL enums and CHECK constraints (design/D-05 section 5).
 // Canonical codes (data classes, 2+N roles, …) come from `@sdlc/contracts`; this file lists only
 // the values that exist in the database layer alone. Only the enums used by existing tables exist
-// yet (A06; `actor_type` from A07); later tasks add theirs with their tables.
+// yet (A06; `actor_type` from A07; the registry enums from B02); later tasks add theirs with their
+// tables.
 // Changing a list needs a migration: design/ADR-M09-database-tooling.md section 2.5.
-import { ACTOR_TYPES, DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
+import {
+  ACTOR_TYPES,
+  AUTONOMY_LEVELS,
+  CHANGE_FLAGS,
+  DATA_CLASSES,
+  EVENT_SOURCES,
+  GATE_CHECK_MODES,
+  GATE_CODES,
+  GATE_DECISIONS,
+  GATE_REASON_CODES,
+  INTENT_STATUSES,
+  PROJECT_ROLES,
+  RISK_TIERS,
+} from '@sdlc/contracts';
 
 export const GIT_PROVIDERS = ['github', 'gitlab'] as const;
 export type GitProvider = (typeof GIT_PROVIDERS)[number];
@@ -14,6 +28,15 @@ export const DB_ENUMS = {
   project_role: PROJECT_ROLES,
   git_provider: GIT_PROVIDERS,
   actor_type: ACTOR_TYPES,
+  gate_code: GATE_CODES,
+  risk_tier: RISK_TIERS,
+  autonomy_level: AUTONOMY_LEVELS,
+  change_flag: CHANGE_FLAGS,
+  intent_status: INTENT_STATUSES,
+  gate_decision: GATE_DECISIONS,
+  gate_check_mode: GATE_CHECK_MODES,
+  gate_reason_code: GATE_REASON_CODES,
+  event_source: EVENT_SOURCES,
 } as const;
 
 // Text columns with a CHECK constraint (D-05 section 6.1).
@@ -35,3 +58,16 @@ export type ProdLogsAllowed = (typeof PROD_LOGS_ALLOWED_VALUES)[number];
 
 export const DISCLOSURE_FORMATS = ['client_format', 'standard_note'] as const;
 export type DisclosureFormat = (typeof DISCLOSURE_FORMATS)[number];
+
+// Registry (D-05 sections 6.2 and 6.3, B02).
+export const SPEC_SOURCE_TOOLS = ['spec-kit', 'bmad', 'manual'] as const;
+export type SpecSourceTool = (typeof SPEC_SOURCE_TOOLS)[number];
+
+/** Where a gate decision came from (D-05 `gate_decisions.source`). */
+export const GATE_DECISION_SOURCES = [
+  'cli',
+  'github_comment',
+  'github_review',
+  'workflow',
+] as const;
+export type GateDecisionSource = (typeof GATE_DECISION_SOURCES)[number];

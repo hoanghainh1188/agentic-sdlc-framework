@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.3 |
+| Version | 1.4 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -84,6 +84,7 @@ Use the canonical codes (handbook/00-introduction/05-codes.md).
 | `phase_code` | `P1` … `P6` |
 | `autonomy_level` | `L0`, `L1`, `L2`, `L3`, `L4` (handbook codes table §2.1). MVP allows L0–L2 |
 | `oversight_mode` | `HITL`, `HOTL`, `AUDIT` |
+| `gate_check_mode` | `HITL`, `HOTL`, `AUDIT`, `POLICY` (automatic policy check at G4, QUESTIONS #6). Used by `gate_decisions.oversight_mode` (ADR-M20) |
 | `risk_tier` | `low`, `medium`, `high`, `critical` |
 | `data_class` | `public`, `internal`, `client_confidential` (may go to API models if the client allows), `client_restricted` (**self-hosted models only**), `prohibited` (never given to AI) |
 | `intent_status` | `draft`, `in_gate`, `running`, `paused`, `blocked`, `done`, `rejected`, `cancelled` |
@@ -99,6 +100,7 @@ Use the canonical codes (handbook/00-introduction/05-codes.md).
 | `escalation_status` | `open`, `acknowledged`, `resolved`, `closed` |
 | `git_provider` | `github` (MVP), `gitlab` (MVP+1) |
 | `event_source` | `polling`, `webhook` |
+| `gate_reason_code` | `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other` (ADR-M20) |
 
 - [Proposal] `gate_decision`: `pass` / `fail` are used by automatic gates (G4, G5, G6). The other values are used by human gates.
 - The `data_class` of an intent is set at G1 and **can never be lowered** afterwards (it can only be raised).
@@ -289,11 +291,12 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | intent_id | uuid FK | |
 | gate | gate_code | |
 | decision | gate_decision | |
-| oversight_mode | oversight_mode | Resolved from the matrix at decision time |
+| oversight_mode | gate_check_mode | Resolved from the matrix at decision time. `POLICY` only at G4, with `actor_type = system` |
 | approver_role | project_role null | Role under which the person approved |
 | actor_type | actor_type | |
 | decided_by | uuid FK users null | Null when `system` |
-| reason | text null | Required for `reject`, `request_changes`, `block`, `fail` |
+| reason_code | gate_reason_code null | Required for `reject`, `request_changes`, `block`, `fail`, `void`. **No free text**: this table is kept at least 2 years and never changes (ADR-M20) |
+| reason_ref | text null | Optional `https://` link (max 512 characters) to the Git host comment that holds the human explanation. The text stays on the Git host, where it can be edited or deleted |
 | input_sha256 | char(64) | Hash of the gate's input data (spec, plan, diff…) — the **bound version** |
 | scope | jsonb null | Environment, resources, allowed actions bound to the approval |
 | expires_at | timestamptz null | Approval validity; after it, a `void` decision is written and the gate is re-evaluated |
@@ -301,8 +304,11 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | source | text | `cli`, `github_comment`, `github_review`, `workflow` |
 | event_source | event_source null | Whether the event came from polling or a webhook |
 | waited_seconds | int null | Time spent waiting for the approver (FR-12 metric) |
+| voids_decision_id | uuid FK null | Set exactly when `decision = void`: the approval this row cancels, of the same intent and gate. Each approval is voided at most once (ADR-M20) |
 
 - Separation of duties (FR-11): the approver must hold the gate's role; the producer of the change (the run's agent, and the person who authored the commits) is never counted as approver. Dual approval (FR-16) = two `approve` rows from different people, one `person_b` and one `second_approver`. Checked by Policy `canApprove` **and** covered by tests.
+- Approval binding (FR-17): an `approve` row always has `approver_role`, `expires_at` and a HITL or HOTL mode. When the approval no longer holds (expired, other input hash, other scope), the platform writes a `void` row with `voids_decision_id` pointing to it. The approval row itself never changes (ADR-M20).
+- Agents never decide (`actor_type` is `human` or `system`). A `system` row has no `decided_by` and no `approver_role`.
 
 ### 6.4. Runs
 
@@ -585,3 +591,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.1 | 2026-09-25 | Claude (task A05), approved by Harry | §6.1 `config_hash`: hash of the effective configuration in RFC 8785 canonical JSON, not of the raw YAML text (QUESTIONS.md #8, ADR-M18) |
 | 1.2 | 2026-09-25 | Claude (task A07), approved by Harry | §6.7: `hash_version` column, `id` as identity, `entity_type` / `entity_id` nullable (both or neither), payload rule (IDs, codes, hashes, versions only); §7.1: hashed field list and versioning; §7.2: TRUNCATE trigger (ADR-M09 §2.8) |
 | 1.3 | 2026-09-25 | Claude (task B01), approved by Harry | §6.2: `intents.created_by` no longer "blocks self-approval of G1 and G7". Person A owns the intent and approves G1; the creator is a producer at G7 only (QUESTIONS.md #16) |
+| 1.4 | 2026-09-25 | Claude (task B02), approved by Harry | §5: `gate_check_mode` (adds `POLICY`, QUESTIONS #6) and `gate_reason_code`; §6.3 `gate_decisions`: `oversight_mode` uses `gate_check_mode`, free-text `reason` replaced by `reason_code` + `reason_ref`, new `voids_decision_id`; binding and actor notes (ADR-M20) |

@@ -2,9 +2,11 @@
 // A static list (no directory scan, no computed import) keeps the build simple and reviewable.
 import { migration0001Tenancy } from './0001-tenancy.js';
 import { migration0002AuditLog } from './0002-audit-log.js';
+import { migration0003Registry } from './0003-registry.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0001-tenancy': migration0001Tenancy,
   '0002-audit-log': migration0002AuditLog,
+  '0003-registry': migration0003Registry,
 };

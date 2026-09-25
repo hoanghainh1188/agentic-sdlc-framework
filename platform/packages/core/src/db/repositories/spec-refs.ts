@@ -1,0 +1,121 @@
+// Specs linked to an intent (design/D-05 section 6.2, D-02 FR-02). One row per version; rows never
+// change. Fetching the content from the Git host and re-checking the hash belong to B08.
+import { sql } from 'kysely';
+
+import { RegistryError } from '../../registry/errors.js';
+import { DbError } from '../errors.js';
+import type { SpecRef } from '../schema.js';
+import { SPEC_SOURCE_TOOLS, type SpecSourceTool } from '../vocabulary.js';
+import { AuditLogRepository } from './audit-log.js';
+import { TenantRepository } from './base.js';
+import { lockIntent } from './locks.js';
+import type { RegistryActor } from './registry-actor.js';
+
+export interface LinkSpec extends RegistryActor {
+  /** File path in the repo, relative, without `.` or `..` segments. */
+  readonly path: string;
+  readonly commitSha: string;
+  readonly contentSha256: string;
+  readonly sourceTool?: SpecSourceTool | null;
+}
+
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
+const SHA256 = /^[0-9a-f]{64}$/;
+
+/** A safe relative path: no leading slash, no backslash, no `.` or `..` segment, no NUL. */
+export function isSafeRepoPath(path: string): boolean {
+  return (
+    path.length >= 1 &&
+    path.length <= 1024 &&
+    !path.startsWith('/') &&
+    !path.includes('\\') &&
+    !path.includes('\0') &&
+    !path.split('/').some((segment) => segment === '.' || segment === '..')
+  );
+}
+
+export class SpecRefRepository extends TenantRepository {
+  /**
+   * Links a new spec version (latest + 1) to the intent. In the same transaction, appends
+   * `spec.linked` with the version and content hash (never the path or the content).
+   */
+  async link(intentId: string, input: LinkSpec): Promise<SpecRef> {
+    if (!isSafeRepoPath(input.path)) throw invalid('path must be a safe relative path');
+    if (!COMMIT_SHA.test(input.commitSha)) throw invalid('commitSha must be a 40-hex commit SHA');
+    if (!SHA256.test(input.contentSha256)) throw invalid('contentSha256 must be a SHA-256 digest');
+    const tool = input.sourceTool ?? null;
+    if (tool !== null && !SPEC_SOURCE_TOOLS.includes(tool)) throw invalid('unknown source tool');
+    return this.run(
+      this.transactional(async (db) => {
+        await lockIntent(db, intentId);
+        const intent = await db
+          .selectFrom('intents')
+          .select('id')
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', intentId)
+          .executeTakeFirst();
+        if (!intent) throw new RegistryError('intent_not_found', `intent ${intentId} not found`);
+        const last = await db
+          .selectFrom('spec_refs')
+          .select(sql<number | null>`max(version)`.as('version'))
+          .where('tenant_id', '=', this.tenantId)
+          .where('intent_id', '=', intentId)
+          .executeTakeFirst();
+        const spec = await db
+          .insertInto('spec_refs')
+          .values({
+            tenant_id: this.tenantId,
+            intent_id: intentId,
+            version: (last?.version ?? 0) + 1,
+            path: input.path,
+            commit_sha: input.commitSha,
+            content_sha256: input.contentSha256,
+            source_tool: tool,
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await new AuditLogRepository(db, this.tenantId).append({
+          action: 'spec.linked',
+          actorType: input.actorType,
+          actorId: input.actorId,
+          entityId: intentId,
+          payload: {
+            spec_ref_id: spec.id,
+            version: spec.version,
+            content_sha256: spec.content_sha256,
+          },
+        });
+        return spec;
+      }),
+    );
+  }
+
+  latest(intentId: string): Promise<SpecRef | undefined> {
+    return this.run(
+      this.db
+        .selectFrom('spec_refs')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('intent_id', '=', intentId)
+        .orderBy('version', 'desc')
+        .limit(1)
+        .executeTakeFirst(),
+    );
+  }
+
+  list(intentId: string): Promise<SpecRef[]> {
+    return this.run(
+      this.db
+        .selectFrom('spec_refs')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('intent_id', '=', intentId)
+        .orderBy('version')
+        .execute(),
+    );
+  }
+}
+
+function invalid(message: string): DbError {
+  return new DbError('invalid_value', message);
+}
