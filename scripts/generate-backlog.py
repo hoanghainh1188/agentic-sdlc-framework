@@ -56,9 +56,10 @@ t("A09","M-A","CI for the platform repo","S",["A01"],"NFR-07",".github/workflows
  ["Lint, type check and unit tests on every PR",
   "Integration test job running the Compose core profile",
   "Gitleaks, Semgrep, Trivy run and block critical findings"])
-t("A10","M-A","Resource measurement + backup / restore drill","S",["A03","A07"],"—",
- "platform/deploy/backup/*, handbook/03-templates/T11-openbao-runbook.md",
- ["Backup script: OpenBao snapshot (Raft), PostgreSQL dump, to storage off the server",
+t("A10","M-A","Resource measurement + backup / restore drill + internal CA / TLS","M",["A03","A07"],"—",
+ "platform/deploy/backup/*, platform/deploy/tls/*, handbook/03-templates/T11-openbao-runbook.md",
+ ["Internal CA + TLS on OpenBao 8200 (QUESTIONS #20): script creates the CA (5 years) and the server certificate (1 year); the CA key is kept offline; renewal steps and a 30-day reminder in T11; clients verify the CA",
+  "Backup script: OpenBao snapshot (Raft), PostgreSQL dump, to storage off the server",
   "Restore drill succeeds on a test machine; OpenBao unsealed with 2 shares",
   "Record RAM/CPU/disk usage for the core and observability profiles",
   "Runbook T11 written in full"],
@@ -158,7 +159,8 @@ t("C02","M-C","Run Contract: schema, signing, verification","M",["A04","B02"],"�
   "`run_events` is append-only"])
 t("C03","M-C","LiteLLM adapter + Cost Controller (part 1)","M",["A04","A06"],"FR-50, FR-51",
  "platform/packages/adapters/model-litellm/*, platform/packages/core/cost/*, migration cost_records",
- ["Create a virtual key per run: cost cap, model list, labels tenant/project/intent/run/gate/agent/data_class",
+ ["LiteLLM gets provider keys from OpenBao through an OpenBao Agent sidecar (AppRole `litellm`, read-only kv/litellm/providers/*) rendered to tmpfs; no provider key in .env, the repo or an image on the server; rotation = re-render + restart (QUESTIONS #1)",
+  "Create a virtual key per run: cost cap, model list, labels tenant/project/intent/run/gate/agent/data_class",
   "Revoke the key when the run ends",
   "Job syncing spend from LiteLLM → `cost_records` (no duplicates)",
   "Test: over budget → the request is blocked"],
@@ -374,6 +376,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 0.1 | 2026-09-24 | Claude (draft) | First version: 40 tasks, 5 milestones |
 | 0.2 | 2026-09-24 | Claude (draft) | After review: SeaweedFS, Valkey, GitHub polling, G7 rule, M-D tasks renamed `E01…E07` |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: B01 oversight/approvers, B07 binding, new B11 escalation, B12 AI record, C10 agent register, C11 kill switch; E01 dual approval; E02/E03 disclosure; E05 retention; tests N7–N9 |
+| 1.1 | 2026-09-25 | Claude, approved by Harry | C03: provider keys via an OpenBao Agent sidecar (QUESTIONS #1). A10: internal CA and TLS on OpenBao 8200, size S → M (QUESTIONS #20) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))

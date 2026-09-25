@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.1 |
+| Version | 1.2 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -374,11 +374,12 @@ Licence note [External]:
 | Run Contract signing key | Transit (non-exportable) | worker (signs), runner (reads the public key) |
 | GitHub App private key | KV | api, runner |
 | LiteLLM master key | KV | Cost Controller |
-| Model provider API keys | KV | **LiteLLM only** |
+| Model provider API keys | KV | **LiteLLM only**, through an OpenBao Agent sidecar (AppRole `litellm`) that renders them to a tmpfs file LiteLLM reads at start-up. No LiteLLM Enterprise licence (QUESTIONS #1) |
 | Database and SeaweedFS passwords | KV | The matching process |
 
 - Each process logs in to OpenBao with **AppRole**, receives a short-lived token and can read only its own secrets.
 - The agent sandbox has **no** access to OpenBao.
+- OpenBao listener 8200 uses **TLS** with a certificate from the company's internal CA; every client verifies it (QUESTIONS #20).
 
 ---
 
@@ -390,6 +391,7 @@ Licence note [External]:
 | Branches | The agent only pushes `agent/*`. `main` has branch protection (D-09 section 6) |
 | Model keys | The agent only has a LiteLLM **virtual key**, with a cap, revoked when the run ends |
 | Sandbox network | Outbound to GitHub and LiteLLM only. Everything else blocked |
+| TLS for internal services | OpenBao 8200: internal CA, server certificate 1 year, CA 5 years, CA key offline; clients always verify (no skip-verify). Other internal services may reuse the CA later (QUESTIONS #20) |
 | Secrets | Not in the repo, not in images. Fetched from OpenBao at runtime with short-lived tokens |
 | GitHub events | MVP: polling through the GitHub App (no inbound port). When webhooks are enabled: verify signatures, expose only `/webhooks/github` |
 | Approvers | Map GitHub accounts ↔ platform users. Check roles + block self-approval |
@@ -581,4 +583,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 0.4 | 2026-09-24 | Claude (draft) | After review: SeaweedFS, Valkey, GitHub polling (ADR-M11, M12), clearer G5 and Level 1, added `api_tokens` |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: oversight resolution, 2+N approval rules, approval binding and expiry, escalation with SLA timers, kill switch, agent register, AI record; new state machine; ADR-M13…M15 |
 | 1.1 | 2026-09-25 | Claude (task B01), approved by Harry | §6.1: G6 security threshold `min_severity` (critical always HITL, rule M6) and G5 `on_breach`; §7.3: notes on the contracts `PolicyEngine` (validated config, `canApprove` inputs, model list, `prohibited` → L0, forbidden-action lists). QUESTIONS.md #16–#19 |
+| 1.2 | 2026-09-25 | Claude, approved by Harry | §8.2: provider keys reach LiteLLM through an OpenBao Agent sidecar (tmpfs), no Enterprise licence; §8.2/§9: TLS on OpenBao 8200 with an internal CA (QUESTIONS #1, #20) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |
