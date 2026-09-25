@@ -5,6 +5,7 @@ import type { Database } from './schema.js';
 import { TenantGuardPlugin } from './tenant-guard-plugin.js';
 import { parseTenantId, type TenantId } from './tenant-id.js';
 import { ApiTokenRepository } from './repositories/api-tokens.js';
+import { AuditLogRepository } from './repositories/audit-log.js';
 import { GitEventCursorRepository } from './repositories/git-event-cursors.js';
 import { ProjectAiRecordRepository } from './repositories/project-ai-records.js';
 import { ProjectConfigRepository } from './repositories/project-configs.js';
@@ -27,6 +28,7 @@ export class TenantScope {
   readonly roleBindings: RoleBindingRepository;
   readonly apiTokens: ApiTokenRepository;
   readonly gitEventCursors: GitEventCursorRepository;
+  readonly audit: AuditLogRepository;
 
   private readonly db: Kysely<Database>;
 
@@ -43,6 +45,7 @@ export class TenantScope {
     this.roleBindings = new RoleBindingRepository(this.db, this.tenantId);
     this.apiTokens = new ApiTokenRepository(this.db, this.tenantId);
     this.gitEventCursors = new GitEventCursorRepository(this.db, this.tenantId);
+    this.audit = new AuditLogRepository(this.db, this.tenantId);
   }
 
   /** Runs `work` in one database transaction, with repositories bound to the same tenant. */

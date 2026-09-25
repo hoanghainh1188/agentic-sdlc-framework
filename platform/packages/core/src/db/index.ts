@@ -11,11 +11,13 @@ export { TenantScope } from './tenant-scope.js';
 export { SystemScope, type NewTenant, type ResolvedApiToken } from './system-scope.js';
 export { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 export { hashApiToken } from './repositories/api-tokens.js';
+export type { AuditEvent } from './repositories/audit-log.js';
 export type { SaveProjectConfig } from './repositories/project-configs.js';
 export type { RoleBindingQuery } from './repositories/role-bindings.js';
 export type { SaveProjectAiRecord } from './repositories/project-ai-records.js';
 export type {
   ApiToken,
+  AuditLogRow,
   GitEventCursor,
   Project,
   ProjectAiRecord,

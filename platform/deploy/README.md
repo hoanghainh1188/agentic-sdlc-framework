@@ -80,6 +80,16 @@ The init scripts create both roles only on an **empty** data volume. A volume cr
 docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T postgres sh /docker-entrypoint-initdb.d/02-create-platform-app-role.sh
 ```
 
+### Checking the audit log
+
+The audit log is append-only and hash-chained per tenant (ADR-M09 section 2.8). Check every tenant's chain (exit code 1 when a record was changed or removed):
+
+```bash
+SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm sdlc audit verify
+```
+
+Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. Until task B04 the command connects straight to the database; B04 moves it behind the API.
+
 ### Reset after a change to migration 0001 (development only)
 
 Migration `0001-tenancy` was changed before it was merged (task A06: `role_bindings.revoked_at`). A development database that already applied an earlier version of 0001 does not get the change: the migrator only runs migrations it has not recorded. Recreate the `platform` database, then migrate again. **This deletes all data in it.**

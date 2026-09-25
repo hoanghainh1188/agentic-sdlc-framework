@@ -1,6 +1,6 @@
 // D-08 A06 AC2 on a live PostgreSQL: tables, columns, enums, composite foreign keys (D-05 D2),
 // unique constraints and the privileges of the application role.
-import { DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
+import { ACTOR_TYPES, DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 
@@ -37,6 +37,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
   role_bindings: ['revoked_at'],
   api_tokens: ['last_used_at', 'revoked_at'],
   git_event_cursors: ['cursor', 'last_polled_at'],
+  // Append-only (D-05 D3, A07): no column is updatable.
+  audit_log: [],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -106,17 +108,18 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     );
   });
 
-  it('the data_class and project_role enums match the @sdlc/contracts lists', async () => {
+  it('the data_class, project_role and actor_type enums match the @sdlc/contracts lists', async () => {
     // The migrations keep literal values (ADR-M09 section 2.2); this catches drift from contracts.
     const enums = await rows<{ name: string; values: string[] }>(sql`
       SELECT t.typname AS name, array_agg(e.enumlabel ORDER BY e.enumsortorder)::text[] AS values
       FROM pg_type t JOIN pg_enum e ON e.enumtypid = t.oid
       JOIN pg_namespace n ON n.oid = t.typnamespace AND n.nspname = 'public'
-      WHERE t.typname IN ('data_class', 'project_role')
+      WHERE t.typname IN ('data_class', 'project_role', 'actor_type')
       GROUP BY t.typname`);
     const byName = Object.fromEntries(enums.map((e) => [e.name, e.values]));
     expect(byName.data_class).toEqual([...DATA_CLASSES]);
     expect(byName.project_role).toEqual([...PROJECT_ROLES]);
+    expect(byName.actor_type).toEqual([...ACTOR_TYPES]);
   });
 
   it('D-05 D2: every foreign key between tenant tables includes tenant_id on both sides', async () => {
@@ -136,7 +139,7 @@ describeDb('AC2: migrations on PostgreSQL', () => {
         c.confdeltype AS on_delete
       FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace AND n.nspname = 'public'
       WHERE c.contype = 'f' AND c.conrelid::regclass::text NOT LIKE 'kysely_%'`);
-    expect(fks).toHaveLength(11);
+    expect(fks).toHaveLength(12);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.parent === 'tenants') {
@@ -147,7 +150,7 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       }
     }
     // Every tenant table that has no composite parent references tenants directly.
-    for (const table of ['projects', 'users']) {
+    for (const table of ['projects', 'users', 'audit_log']) {
       expect(
         fks.some((fk) => fk.child === table && fk.parent === 'tenants'),
         table,
@@ -227,14 +230,16 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     const again = await migrateToLatest(t.owner);
     expect(again.error).toBeUndefined();
     expect(again.results).toEqual([]);
-    const down = await migrateDown(t.owner);
-    expect(down.error).toBeUndefined();
+    for (const name of Object.keys(MIGRATIONS).reverse()) {
+      const down = await migrateDown(t.owner);
+      expect(down.error, name).toBeUndefined();
+    }
     const tables = await rows<{ n: number }>(sql`
       SELECT count(*)::int AS n FROM information_schema.tables
       WHERE table_schema = 'public' AND table_name NOT LIKE 'kysely_%'`);
     expect(tables[0]!.n).toBe(0);
     const up = await migrateToLatest(t.owner);
     expect(up.error).toBeUndefined();
-    expect(up.results?.map((r) => r.status)).toEqual(['Success']);
+    expect(up.results?.map((r) => r.status)).toEqual(Object.keys(MIGRATIONS).map(() => 'Success'));
   });
 });

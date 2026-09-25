@@ -1,9 +1,10 @@
 import type { DataClass } from '@sdlc/contracts';
-import { sql } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 
 import { DbError } from '../errors.js';
-import type { ProjectAiRecord } from '../schema.js';
+import type { Database, ProjectAiRecord } from '../schema.js';
 import type { AiAllowed, DisclosureFormat, ProdLogsAllowed } from '../vocabulary.js';
+import { AuditLogRepository } from './audit-log.js';
 import { TenantRepository } from './base.js';
 import { assertExpectedVersion, versionConflict } from './versioned.js';
 
@@ -52,9 +53,31 @@ export class ProjectAiRecordRepository extends TenantRepository {
     );
   }
 
-  /** Creates version 1, or replaces version N with N + 1. Checks at G1 belong to B12. */
+  /**
+   * Creates version 1, or replaces version N with N + 1. Checks at G1 belong to B12. In the same
+   * transaction, appends an `ai_record.changed` audit event with the new version only (never the
+   * record contents: client names and consent details stay out of the audit log).
+   */
   async save(projectId: string, input: SaveProjectAiRecord): Promise<ProjectAiRecord> {
     assertExpectedVersion(input.expectedVersion);
+    return this.transactional(async (db) => {
+      const saved = await this.write(db, projectId, input);
+      await new AuditLogRepository(db, this.tenantId).append({
+        action: 'ai_record.changed',
+        actorType: 'human',
+        actorId: saved.updated_by,
+        entityId: saved.project_id,
+        payload: { version: saved.version },
+      });
+      return saved;
+    });
+  }
+
+  private async write(
+    db: Kysely<Database>,
+    projectId: string,
+    input: SaveProjectAiRecord,
+  ): Promise<ProjectAiRecord> {
     const values = {
       version: input.expectedVersion + 1,
       ai_allowed: input.aiAllowed,
@@ -68,7 +91,7 @@ export class ProjectAiRecordRepository extends TenantRepository {
     };
     if (input.expectedVersion === 0) {
       return this.run(
-        this.db
+        db
           .insertInto('project_ai_records')
           .values({ ...values, tenant_id: this.tenantId, project_id: projectId })
           .returning([...SCALAR_COLUMNS, allowedDataClasses])
@@ -80,7 +103,7 @@ export class ProjectAiRecordRepository extends TenantRepository {
       });
     }
     const updated = await this.run(
-      this.db
+      db
         .updateTable('project_ai_records')
         .set(values)
         .where('tenant_id', '=', this.tenantId)

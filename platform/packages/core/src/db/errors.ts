@@ -7,7 +7,8 @@ export type DbErrorCode =
   | 'conflict'
   | 'reference_not_found'
   | 'version_conflict'
-  | 'permission_denied';
+  | 'permission_denied'
+  | 'immutable';
 
 export class DbError extends Error {
   override readonly name = 'DbError';
@@ -49,6 +50,10 @@ const PG_ERROR_CODES: Record<string, DbErrorCode> = {
   '23502': 'invalid_value', // not_null_violation
   '22P02': 'invalid_value', // invalid_text_representation (bad UUID, bad enum value)
   '42501': 'permission_denied', // insufficient_privilege
+  // Our own codes, raised by triggers (migration 0002).
+  SDA01: 'immutable', // append-only table: UPDATE, DELETE or TRUNCATE
+  SDA02: 'conflict', // audit chain link broken: the row does not follow the tenant's last row
+  SDA03: 'immutable', // role binding already revoked
 };
 
 /** Maps a PostgreSQL error to a DbError; anything else is rethrown unchanged. */

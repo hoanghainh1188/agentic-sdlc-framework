@@ -1,7 +1,7 @@
 // Kysely types for the `platform` database (design/D-05 section 6.1, task A06).
 // Written by hand. `TABLE_COLUMNS` mirrors them at runtime; the integration tests compare both
 // with the live schema, so the types cannot drift from the migrations.
-import type { DataClass, ProjectRole } from '@sdlc/contracts';
+import type { ActorType, DataClass, ProjectRole } from '@sdlc/contracts';
 import type { ColumnType, Generated, Insertable, Selectable } from 'kysely';
 
 import type {
@@ -121,6 +121,30 @@ export interface GitEventCursorsTable {
   created_at: CreatedAt;
 }
 
+/**
+ * Append-only audit log with a per-tenant hash chain (D-05 sections 6.7 and 7, ADR-M09 section
+ * 2.8). Rows are only ever inserted, through `AuditLogRepository.append`.
+ */
+export interface AuditLogTable {
+  /** bigint identity; `pg` returns int8 as a string. */
+  id: ColumnType<string, never, never>;
+  tenant_id: Immutable<string>;
+  /** bigint, continuous per tenant from 1; `pg` returns int8 as a string. */
+  seq: ColumnType<string, number, never>;
+  hash_version: Immutable<number>;
+  actor_type: Immutable<ActorType>;
+  actor_id: Immutable<string | null>;
+  action: Immutable<string>;
+  entity_type: Immutable<string | null>;
+  entity_id: Immutable<string | null>;
+  /** IDs, codes, hashes and versions only; never personal or client data (ADR-M09 §2.8). */
+  payload: ColumnType<Record<string, unknown>, string, never>;
+  prev_hash: Immutable<string>;
+  hash: Immutable<string>;
+  occurred_at: Immutable<Date>;
+  created_at: CreatedAt;
+}
+
 export interface Database {
   tenants: TenantsTable;
   projects: ProjectsTable;
@@ -131,6 +155,7 @@ export interface Database {
   role_bindings: RoleBindingsTable;
   api_tokens: ApiTokensTable;
   git_event_cursors: GitEventCursorsTable;
+  audit_log: AuditLogTable;
 }
 
 export type TableName = keyof Database;
@@ -231,6 +256,22 @@ export const TABLE_COLUMNS = {
     'last_polled_at',
     'created_at',
   ]),
+  audit_log: columns<AuditLogTable>()([
+    'id',
+    'tenant_id',
+    'seq',
+    'hash_version',
+    'actor_type',
+    'actor_id',
+    'action',
+    'entity_type',
+    'entity_id',
+    'payload',
+    'prev_hash',
+    'hash',
+    'occurred_at',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -247,6 +288,7 @@ export const TENANT_COLUMN = {
   role_bindings: 'tenant_id',
   api_tokens: 'tenant_id',
   git_event_cursors: 'tenant_id',
+  audit_log: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -258,6 +300,7 @@ export type UserIdentity = Selectable<UserIdentitiesTable>;
 export type RoleBinding = Selectable<RoleBindingsTable>;
 export type ApiToken = Selectable<ApiTokensTable>;
 export type GitEventCursor = Selectable<GitEventCursorsTable>;
+export type AuditLogRow = Selectable<AuditLogTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

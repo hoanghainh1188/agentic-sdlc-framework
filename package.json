@@ -21,6 +21,7 @@
     "test:db": "platform/deploy/scripts/test-db.sh",
     "db:migrate": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js latest",
     "db:status": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js status",
+    "sdlc": "tsc -b platform/apps/cli && node platform/apps/cli/dist/main.js",
     "compose:env": "platform/deploy/scripts/init-env.sh",
     "compose:core": "platform/deploy/scripts/up.sh core",
     "compose:obs": "platform/deploy/scripts/up.sh core observability",
