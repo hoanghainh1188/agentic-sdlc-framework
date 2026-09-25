@@ -84,3 +84,23 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     },
   };
 }
+
+/**
+ * Runs SQL as superuser with triggers disabled (`session_replication_role = replica`): an admin
+ * editing the database directly, bypassing grants and triggers (D-08 A07 AC4).
+ */
+export async function tamper(
+  database: string,
+  statement: string,
+  values: unknown[] = [],
+): Promise<void> {
+  if (!TEST_DB_NAME.test(database)) throw new Error(`refusing to tamper with ${database}`);
+  const client = new pg.Client({ connectionString: urlFor(database) });
+  await client.connect();
+  try {
+    await client.query('SET session_replication_role = replica');
+    await client.query(statement, values);
+  } finally {
+    await client.end();
+  }
+}

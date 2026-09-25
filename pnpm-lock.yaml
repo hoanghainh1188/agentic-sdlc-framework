@@ -62,7 +62,14 @@ importers:
 
   platform/apps/api: {}
 
-  platform/apps/cli: {}
+  platform/apps/cli:
+    dependencies:
+      '@sdlc/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@sdlc/messages':
+        specifier: workspace:*
+        version: link:../../packages/messages
 
   platform/apps/runner: {}
 
@@ -97,6 +104,9 @@ importers:
 
   platform/packages/core:
     dependencies:
+      '@sdlc/config':
+        specifier: workspace:*
+        version: link:../config
       '@sdlc/contracts':
         specifier: workspace:*
         version: link:../contracts

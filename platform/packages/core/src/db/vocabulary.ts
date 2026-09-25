@@ -1,9 +1,9 @@
 // Vocabularies stored as PostgreSQL enums and CHECK constraints (design/D-05 section 5).
 // Canonical codes (data classes, 2+N roles, …) come from `@sdlc/contracts`; this file lists only
-// the values that exist in the database layer alone. Only the enums used by the tables of task A06
-// exist yet; later tasks add theirs with their tables.
+// the values that exist in the database layer alone. Only the enums used by existing tables exist
+// yet (A06; `actor_type` from A07); later tasks add theirs with their tables.
 // Changing a list needs a migration: design/ADR-M09-database-tooling.md section 2.5.
-import { DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
+import { ACTOR_TYPES, DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
 
 export const GIT_PROVIDERS = ['github', 'gitlab'] as const;
 export type GitProvider = (typeof GIT_PROVIDERS)[number];
@@ -13,6 +13,7 @@ export const DB_ENUMS = {
   data_class: DATA_CLASSES,
   project_role: PROJECT_ROLES,
   git_provider: GIT_PROVIDERS,
+  actor_type: ACTOR_TYPES,
 } as const;
 
 // Text columns with a CHECK constraint (D-05 section 6.1).

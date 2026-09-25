@@ -65,3 +65,7 @@ export type Severity = (typeof SEVERITIES)[number];
 /** Where a model runs (design/D-05 `cost_records.provider_type`, design/D-07 section 4). */
 export const PROVIDER_TYPES = ['api', 'self_hosted'] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
+
+/** Who performed an action (design/D-05 `actor_type`): audit log, gate decisions, plans. */
+export const ACTOR_TYPES = ['human', 'system', 'agent'] as const;
+export type ActorType = (typeof ACTOR_TYPES)[number];

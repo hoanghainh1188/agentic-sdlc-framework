@@ -67,5 +67,18 @@
   "db.migrate.up_to_date": "The database is up to date.",
   "db.migrate.failed": "Migration failed: {reason}",
   "db.status.applied": "applied  {name}  {executed_at}",
-  "db.status.pending": "pending  {name}"
+  "db.status.pending": "pending  {name}",
+
+  "cli.usage": "Usage: sdlc audit verify [--tenant <slug>] [--json]. Needs SDLC_DB_URL (application role platform_app).",
+  "cli.failed": "The command failed: {reason}",
+
+  "audit.verify.missing_url": "SDLC_DB_URL is not set.",
+  "audit.verify.tenant_not_found": "No tenant with the slug {slug}.",
+  "audit.verify.no_tenants": "There are no tenants to check.",
+  "audit.verify.intact": "{tenant}: audit chain intact, {count} records checked.",
+  "audit.verify.broken": "{tenant}: audit chain broken at seq {seq}: {reason}. {count} records before it are intact.",
+  "audit.verify.reason.seq_gap": "a record is missing or out of order",
+  "audit.verify.reason.prev_hash_mismatch": "prev_hash does not match the hash of the previous record",
+  "audit.verify.reason.hash_mismatch": "the record was changed after it was written (hash mismatch)",
+  "audit.verify.reason.unknown_hash_version": "the record uses an unknown hash version"
 }

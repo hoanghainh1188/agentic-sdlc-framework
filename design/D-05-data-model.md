@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.1 |
+| Version | 1.2 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -427,18 +427,20 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 
 | Column | Type | Notes |
 |---|---|---|
-| id | bigserial PK | |
+| id | bigint identity PK | Same behaviour as `bigserial` |
 | seq | bigint | Sequence number **within the tenant**, continuous, no gaps |
+| hash_version | smallint | Version of the hashed field list and canonicalisation (section 7.1). Only `1` so far |
 | actor_type | actor_type | |
-| actor_id | uuid null | |
+| actor_id | uuid null | Null for `system` |
 | action | text | `intent.created`, `gate.decided`, `run.started`, `config.changed`… |
-| entity_type, entity_id | text, uuid | |
-| payload | jsonb | Summary data. No secrets |
+| entity_type, entity_id | text null, uuid null | Both or neither: some events (tenant-level, configuration) have no single entity |
+| payload | jsonb | **Only IDs, codes, hashes and versions**, declared per action. No secrets, no personal data, no client data (see below) |
 | prev_hash | char(64) | Hash of the previous record (same tenant) |
 | hash | char(64) | Hash of this record |
 | occurred_at | timestamptz | |
 
 - Unique: (`tenant_id`, `seq`).
+- The audit log is never deleted and is kept at least 2 years (section 10), so personal or client data written there could never be erased. The platform accepts only the payload fields declared for each action, each with a strict format, and at most 2048 bytes (ADR-M09 section 2.8).
 
 ---
 
@@ -450,9 +452,10 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 
 - **One chain per tenant** [Proposal]. Reason: when selling to clients, we can export and verify one client's audit on its own.
 - `hash = SHA-256( prev_hash || canonical_json(record without the hash field) )`.
+- Hashed fields (version 1): `hash_version`, `tenant_id`, `seq`, `actor_type`, `actor_id`, `action`, `entity_type`, `entity_id`, `payload`, `occurred_at` (ISO 8601 UTC, millisecond precision), `prev_hash`. `id` and `created_at` are set by the database and are not hashed. A change to this list or to canonicalisation needs a new `hash_version`; older rows keep verifying under their own version.
 - First record of a tenant: `prev_hash` = 64 zeros.
-- `canonical_json`: sorted keys, no whitespace, times in ISO 8601 UTC. [Proposal] Use the JSON Canonicalization Scheme (RFC 8785).
-- Write each new record in **a transaction holding a per-tenant lock** (advisory lock), so two processes cannot produce the same `seq` or `prev_hash`.
+- `canonical_json`: the JSON Canonicalization Scheme (RFC 8785): sorted keys, no whitespace, times in ISO 8601 UTC. Same module as `config_hash`.
+- Write each new record in **a transaction holding a per-tenant lock** (advisory lock), so two processes cannot produce the same `seq` or `prev_hash`. An insert trigger also refuses a row that does not follow the tenant's last row.
 
 ### 7.2. Blocking updates and deletes in the database
 
@@ -464,6 +467,8 @@ END; $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER audit_log_no_update BEFORE UPDATE OR DELETE ON audit_log
   FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
+CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
+  FOR EACH STATEMENT EXECUTE FUNCTION forbid_mutation();
 -- Same for gate_decisions, run_events, cost_records.
 ```
 
@@ -578,3 +583,4 @@ CREATE TRIGGER audit_log_no_update BEFORE UPDATE OR DELETE ON audit_log
 | 0.5 | 2026-09-24 | Claude | Translated into English. Content unchanged |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: L0–L4, oversight_mode, 2+N roles, change flags, `project_ai_records`, `agents`, `escalations`, approval binding (scope, expiry, `void`), kill switch, retention ≥ 2 years, project purge |
 | 1.1 | 2026-09-25 | Claude (task A05), approved by Harry | §6.1 `config_hash`: hash of the effective configuration in RFC 8785 canonical JSON, not of the raw YAML text (QUESTIONS.md #8, ADR-M18) |
+| 1.2 | 2026-09-25 | Claude (task A07), approved by Harry | §6.7: `hash_version` column, `id` as identity, `entity_type` / `entity_id` nullable (both or neither), payload rule (IDs, codes, hashes, versions only); §7.1: hashed field list and versioning; §7.2: TRUNCATE trigger (ADR-M09 §2.8) |

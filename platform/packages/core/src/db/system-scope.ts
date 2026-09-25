@@ -45,6 +45,11 @@ export class SystemScope {
     );
   }
 
+  /** Operator commands (`sdlc audit verify`): every tenant, ordered by slug. */
+  listTenants(): Promise<Tenant[]> {
+    return run(this.db.selectFrom('tenants').selectAll().orderBy('slug').execute());
+  }
+
   getTenant(tenantId: TenantId): Promise<Tenant | undefined> {
     return run(
       this.db

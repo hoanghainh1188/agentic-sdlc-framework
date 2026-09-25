@@ -6,7 +6,14 @@
   "description": "The sdlc command-line tool. See design/D-03 section 5.1.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "sdlc": "dist/main.js"
+  },
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@sdlc/core": "workspace:*",
+    "@sdlc/messages": "workspace:*"
+  }
 }

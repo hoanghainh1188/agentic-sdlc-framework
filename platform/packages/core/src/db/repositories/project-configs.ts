@@ -1,5 +1,8 @@
+import type { Kysely } from 'kysely';
+
 import { DbError } from '../errors.js';
-import type { ProjectConfig } from '../schema.js';
+import type { Database, ProjectConfig } from '../schema.js';
+import { AuditLogRepository } from './audit-log.js';
 import { TenantRepository } from './base.js';
 import { assertExpectedVersion, versionConflict } from './versioned.js';
 
@@ -25,12 +28,33 @@ export class ProjectConfigRepository extends TenantRepository {
     );
   }
 
-  /** Creates version 1, or replaces version N with N + 1. History goes to the audit log (A07). */
+  /**
+   * Creates version 1, or replaces version N with N + 1. In the same transaction, appends a
+   * `config.changed` audit event with the new version and `config_hash` (never the config text).
+   */
   async save(projectId: string, input: SaveProjectConfig): Promise<ProjectConfig> {
     assertExpectedVersion(input.expectedVersion);
     if (!/^[0-9a-f]{64}$/.test(input.configHash)) {
       throw new DbError('invalid_value', 'configHash must be a SHA-256 hex digest');
     }
+    return this.transactional(async (db) => {
+      const saved = await this.write(db, projectId, input);
+      await new AuditLogRepository(db, this.tenantId).append({
+        action: 'config.changed',
+        actorType: saved.updated_by === null ? 'system' : 'human',
+        actorId: saved.updated_by,
+        entityId: saved.project_id,
+        payload: { version: saved.version, config_hash: saved.config_hash },
+      });
+      return saved;
+    });
+  }
+
+  private async write(
+    db: Kysely<Database>,
+    projectId: string,
+    input: SaveProjectConfig,
+  ): Promise<ProjectConfig> {
     const values = {
       config_yaml: input.configYaml,
       config_hash: input.configHash,
@@ -39,7 +63,7 @@ export class ProjectConfigRepository extends TenantRepository {
     };
     if (input.expectedVersion === 0) {
       return this.run(
-        this.db
+        db
           .insertInto('project_configs')
           .values({ ...values, tenant_id: this.tenantId, project_id: projectId })
           .returningAll()
@@ -51,7 +75,7 @@ export class ProjectConfigRepository extends TenantRepository {
       });
     }
     const updated = await this.run(
-      this.db
+      db
         .updateTable('project_configs')
         .set(values)
         .where('tenant_id', '=', this.tenantId)

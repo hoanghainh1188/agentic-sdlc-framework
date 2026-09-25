@@ -5,7 +5,7 @@
 | Status | **Proposed** (task A06, PR for review) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25) |
-| Related | D-05 sections 3, 5, 6.1, 8, 9 and 11; D-03 AP6 and section 12; D-08 task A06; ADR-M16; ADR-M17; NFR-02, NFR-04 |
+| Related | D-05 sections 3, 5, 6.1, 6.7, 7, 8, 9, 10 and 11; D-03 AP6 and section 12; D-08 tasks A06, A07; ADR-M16; ADR-M17; ADR-M18; NFR-02, NFR-04; FR-41, FR-44 |
 
 ## 1. Context
 
@@ -124,9 +124,54 @@ Implementation choices:
 - Every foreign key uses `ON DELETE RESTRICT`.
 - `project_configs.updated_by` may be null: the platform wrote the config itself.
 - `api_tokens` stores only the SHA-256 hash (`CHECK` on 64 lowercase hex characters). The repository rejects anything else, and the raw token never reaches the database.
-- `project_configs` and `project_ai_records` are versioned with optimistic locking: `save(…, expectedVersion)`. History goes to the audit log from A07 on.
-- `role_bindings.revoked_at` (QUESTIONS #11, approved): a role is withdrawn by setting it; revoked rows stay as history. The unique key applies to active bindings only (`WHERE revoked_at IS NULL`), so a role can be granted again. `platform_app` may update only `revoked_at`, and a `CHECK` keeps it after `created_at`. `revoke()` uses the database clock by default. Raw SQL could still set `revoked_at` back to NULL; A07 adds a trigger that refuses any change once it is set (QUESTIONS #12).
+- `project_configs` and `project_ai_records` are versioned with optimistic locking: `save(…, expectedVersion)`. From A07 on, each save appends an audit event in the same transaction (section 2.8).
+- `role_bindings.revoked_at` (QUESTIONS #11, approved): a role is withdrawn by setting it; revoked rows stay as history. The unique key applies to active bindings only (`WHERE revoked_at IS NULL`), so a role can be granted again. `platform_app` may update only `revoked_at`, and a `CHECK` keeps it after `created_at`. `revoke()` uses the database clock by default. Since A07, a trigger refuses any change once `revoked_at` is set, so a withdrawn role can never be reactivated, even with raw SQL or by the owner role (QUESTIONS #12).
 - The 1–1 tables are keyed by `project_id` alone (D-05). A cross-tenant insert into them fails on the primary key before the foreign key. It is still rejected, but with the error code `conflict` instead of `reference_not_found`.
+
+### 2.8. Audit log (task A07)
+
+Migration `0002-audit-log` creates `audit_log` (D-05 sections 6.7 and 7).
+
+**Append-only (D-05 D3).**
+
+- `platform_app` has only `SELECT` and `INSERT` on `audit_log`.
+- The shared trigger function `forbid_mutation()` refuses `UPDATE` and `DELETE` (row trigger) and `TRUNCATE` (statement trigger), for every role that does not bypass triggers, including the owner `platform`. Tasks B02, C02 and C03 attach the same function to `gate_decisions`, `run_events` and `cost_records`.
+- `id` is `bigint GENERATED ALWAYS AS IDENTITY` (same behaviour as `bigserial`; `platform_app` needs no sequence grant).
+
+**Hash chain (D-05 section 7.1).**
+
+- One chain per tenant. `hash = SHA-256(prev_hash || canonical_json(record))`, where `canonical_json` is RFC 8785, the same module as `config_hash` (`@sdlc/config` `canonicalJson`, ADR-M18). Core imports `@sdlc/config` for it (allowed by ADR-M16 §2.5).
+- Hashed fields, version 1: `hash_version`, `tenant_id`, `seq`, `actor_type`, `actor_id`, `action`, `entity_type`, `entity_id`, `payload`, `occurred_at` (ISO 8601 UTC, millisecond precision) and `prev_hash`. Not hashed: `id` and `created_at` (set by the database) and `hash` itself.
+- `hash_version` is stored in its own column and is part of the hashed record (Harry, 2026-09-25). A later change to the field list or to canonicalisation gets a new version, and old rows still verify under their own version. The column has a `CHECK (hash_version = 1)`; a new version needs a migration.
+- First record of a tenant: `seq = 1`, `prev_hash` = 64 zeros (`CHECK`).
+- Writes: `AuditLogRepository.append` runs in the caller's transaction (or opens one), takes `pg_advisory_xact_lock(<audit class>, hashtext(tenant_id))`, reads the tenant's last row, computes the hash and inserts. The lock is a query fragment without a table, so it passes the tenant guard.
+- **Chain link trigger** (`BEFORE INSERT`): refuses a row whose `seq` is not the tenant's last `seq + 1`, or whose `prev_hash` is not the last `hash`. It cannot recompute the SHA-256, but a writer that skipped the lock cannot create a gap or a fork. Unique `(tenant_id, seq)` stays as well.
+- Trigger errors use our own SQLSTATE codes, mapped to `DbError` codes: `SDA01` append-only → `immutable`; `SDA02` chain link → `conflict`; `SDA03` revoked role binding → `immutable`.
+
+**What the payload may contain.** The audit log is never deleted and is kept at least 2 years (D-05 section 10, FR-44). Personal data or client data written there could never be erased (handbook Ch.7). Therefore:
+
+- Audit payloads hold **only IDs, codes, hashes and versions**. Never personal data (names, emails, account names), client data, free text, configuration text or record contents.
+- `append` accepts only the fields **declared for the action** in `platform/packages/core/src/audit/actions.ts` (`AUDIT_ACTIONS`). Each field has a strict format: `uuid`, `sha256`, `version` (positive integer) or `code` (at most 64 characters, no spaces). Unknown actions, missing, extra or badly formatted fields are refused with `DbError('invalid_value')`.
+- The canonical payload must fit in 2048 bytes (`MAX_AUDIT_PAYLOAD_BYTES`).
+- The actor is checked too: `human` and `agent` need a UUID `actor_id`; `system` has none.
+- `entity_type` and `entity_id` are nullable, both or neither (`CHECK`): some events (tenant-level, configuration) have no single entity (D-05 section 6.7).
+- A new action is added to `AUDIT_ACTIONS` with the smallest set of fields that makes the event traceable, and a test. Reviewers check that no field can carry personal or client data.
+
+**Actions so far.**
+
+| Action | Entity | Payload | Written by |
+|---|---|---|---|
+| `config.changed` | `project` | `version`, `config_hash` | `projectConfigs.save`, same transaction. Actor `system` when the platform writes the config |
+| `ai_record.changed` | `project` | `version` | `projectAiRecords.save`, same transaction. Never the record contents (client contact, locations) |
+
+**Integrity check (D-05 section 7.3, FR-41).**
+
+- `TenantScope.audit.verify()` reads the tenant's rows in `seq` order, 1000 at a time, and reports the first broken record: `seq_gap`, `prev_hash_mismatch`, `hash_mismatch` or `unknown_hash_version`.
+- `sdlc audit verify [--tenant <slug>] [--json]` (`pnpm sdlc audit verify …`) checks one tenant or every tenant. Exit codes: 0 intact, 1 broken, 2 usage or setup error, 3 unexpected error. Text comes from the message catalog.
+- **Temporary:** the command connects straight to the database as `platform_app` with `SDLC_DB_URL`, because the API does not exist yet (Harry, 2026-09-25). **Task B04 moves `sdlc audit verify` behind the API.**
+- Limits: someone with owner or superuser access can rewrite the whole chain, or delete its last records, without `verify` seeing it. The daily external anchor of each tenant's last hash (D-05 section 7.4, task E05) covers this.
+
+**Role bindings (QUESTIONS #12).** Trigger `role_bindings_revocation_is_final`: once `revoked_at` is set, every `UPDATE` of the row is refused (no un-revoking, no re-revoking), for every role. `revoke()` already filters on `revoked_at IS NULL`, so it returns `undefined` for a revoked binding and never reaches the trigger.
 
 ## 3. Alternatives not chosen
 
@@ -144,6 +189,7 @@ Implementation choices:
 - Every later table must follow section 2.2 and the rules in the header of `0001-tenancy.ts`, and be added to `schema.ts` (types, `TABLE_COLUMNS`, `TENANT_COLUMN`). Tests fail otherwise.
 - Repository code must satisfy the tenant guard. A query the guard rejects is a bug in the repository, not in the guard.
 - A role is withdrawn by setting `role_bindings.revoked_at`, never by `DELETE` (`design/QUESTIONS.md` #11, approved). Reads return active bindings only by default, so approval checks never see a revoked role.
+- Every later append-only table attaches `forbid_mutation()` and gets `SELECT, INSERT` only. Every later audit event is declared in `AUDIT_ACTIONS` first (section 2.8).
 
 ## Version history
 
@@ -152,3 +198,4 @@ Implementation choices:
 | 0.1 | 2026-09-25 | Claude (task A06) | First version |
 | 0.2 | 2026-09-25 | Claude (task A06) | `role_bindings.revoked_at` (QUESTIONS #11, approved by Harry) |
 | 0.3 | 2026-09-25 | Claude (issue #55) | §2.5: `@sdlc/contracts` is the source of `data_class` and `project_role`; `vocabulary.ts` keeps DB-only lists; test of `pg_enum` against contracts |
+| 0.4 | 2026-09-25 | Claude (task A07) | §2.8 audit log: triggers, hash chain with `hash_version`, payload rule (IDs, codes, hashes, versions only; declared fields; 2048 bytes), audited config and AI record saves, `sdlc audit verify` (temporary direct DB access, B04 moves it behind the API); §2.7 QUESTIONS #12 done |

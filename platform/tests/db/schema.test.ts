@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
+import { ACTOR_TYPES, DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
 import { t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
 
@@ -79,9 +79,10 @@ describe('AC2: tenancy tables (static checks of the migration SQL)', () => {
 });
 
 describe('canonical codes come from @sdlc/contracts (no second copy in core)', () => {
-  it('uses the contracts lists for the data_class and project_role enums', () => {
+  it('uses the contracts lists for the data_class, project_role and actor_type enums', () => {
     expect(DB_ENUMS.data_class).toBe(DATA_CLASSES);
     expect(DB_ENUMS.project_role).toBe(PROJECT_ROLES);
+    expect(DB_ENUMS.actor_type).toBe(ACTOR_TYPES);
   });
 });
 

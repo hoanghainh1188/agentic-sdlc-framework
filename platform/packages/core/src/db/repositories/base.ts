@@ -14,6 +14,14 @@ export abstract class TenantRepository {
     readonly tenantId: TenantId,
   ) {}
 
+  /**
+   * Runs `work` in a database transaction: the caller's transaction when there is one (a
+   * `TenantScope.transaction`), otherwise a new one. The tenant guard stays on in both cases.
+   */
+  protected transactional<T>(work: (db: Kysely<Database>) => Promise<T>): Promise<T> {
+    return this.db.isTransaction ? work(this.db) : this.db.transaction().execute(work);
+  }
+
   /** Runs a statement and maps constraint violations to `DbError`. */
   protected async run<T>(statement: Promise<T>): Promise<T> {
     try {
