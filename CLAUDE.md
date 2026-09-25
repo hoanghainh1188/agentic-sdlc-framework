@@ -105,7 +105,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - One task per session; each parallel session works in its own git worktree.
 - Session order: B01 and A03 now; then A04 and B02 (B02 needs A07 and B01).
 - Conflicts with `main` on a branch under review: merge `origin/main` into the branch. Never rebase or force-push it.
-- `design/QUESTIONS.md` numbers: each session gets its own block when it is queued and uses only numbers from that block. Taken: B01 #16–#19, A03 #20. Next free block: #21–#25 (then #26–#30, …).
+- `design/QUESTIONS.md` numbers: each session gets its own block when it is queued and uses only numbers from that block. Taken: B01 #16–#19, A03 #20, docs #21. Next free block: #22–#26 (then #27–#31, …).
 - A03 and A04 may proceed using throw-away test keys on dev machines only. The real OpenBao initialisation on the internal server waits until the three key holders are named (remove this line once they are named).
 
 ## Decisions (see design/D-02 section 11)

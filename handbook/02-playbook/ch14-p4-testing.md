@@ -1,7 +1,7 @@
 # Chapter 14. P4 — Testing (G6)
 
 > Readers: **testers, developers, Person B** · Reading time: about 15 minutes
-> Status: **Draft 0.1**, awaiting Harry's comments.
+> Status: **Draft 0.2**, awaiting Harry's comments.
 > Section 14.10 (platform usage) is written by Claude Code together with the platform code.
 
 ---
@@ -62,7 +62,7 @@ Choose the depth by risk: Low risk needs the deterministic and security groups; 
 
 **Pass** when:
 - all required checks pass;
-- no critical finding (security findings go to HITL at any risk tier);
+- no critical finding (security findings at or above the configured severity go to HITL at any risk tier; default HIGH, and CRITICAL always);
 - the evidence is tied to the right commit;
 - every acceptance criterion traces to a passing test;
 - no test result was faked or weakened by the agent;
@@ -105,7 +105,7 @@ These become part of the **evidence pack** for the task.
 |---|---|---|---|---|
 | G6 | Automated + AUDIT | Automated + HOTL | Automated + HITL (Person B) | Automated + HITL (Person B) |
 
-Security findings: HITL at every tier.
+Security findings at or above the configured severity (default **HIGH**; **CRITICAL always**, not configurable): HITL at every tier. Lower-severity findings are kept as evidence and G6 keeps the mode above. A higher threshold rarely helps: if every PR waits for a person, reviews turn into rubber-stamping (Chapter 19).
 
 ---
 
@@ -162,3 +162,4 @@ Security findings: HITL at every tier.
 |---|---|---|---|
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content; platform usage section reserved for Claude Code |
+| 0.2 | 2026-09-25 | Claude (draft) | G6 security findings: configurable severity threshold, default HIGH, CRITICAL always (QUESTIONS #19) |
