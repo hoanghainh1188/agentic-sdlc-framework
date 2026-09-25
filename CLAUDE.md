@@ -107,10 +107,12 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 ## Current constraints
 - At most 2 sessions at the same time (a docs PR session counts as one).
 - One task per session; each parallel session works in its own git worktree.
-- Session order: A04 now (PR #68 in review); B02 is merged (PR #69). C02 next (critical path), as soon as A04 is merged: C02 needs A04 and B02. Other tasks follow the D-08 dependencies.
+- Session order: C02 (critical path; needs A04 and B02, both merged) and A11 (small; QUESTIONS #27) now. Then A10 (needs A11). Other tasks follow the D-08 dependencies.
 - Conflicts with `main` on a branch under review: merge `origin/main` into the branch. Never rebase or force-push it.
-- `design/QUESTIONS.md` numbers: each session gets its own block when it is queued and uses only numbers from that block. Taken: B01 #16–#19, A03 #20, docs #21, B02 #22–#26 (used #22), A04 #27–#31. Next free block: #32–#36 (then #37–#41, …).
-- A04 may proceed using throw-away test keys on dev machines only. The real OpenBao initialisation on the internal server waits until the three key holders are named and TLS on port 8200 is in place (QUESTIONS #20, task A10) (remove this line when both are done).
+- `design/QUESTIONS.md` numbers: each session gets its own block when it is queued and uses only numbers from that block. Taken: B01 #16–#19, A03 #20, docs #21, B02 #22–#26 (used #22), A04 #27–#31, C02 #32–#36, A11 #37–#41. Next free block: #42–#46 (then #47–#51, …).
+- ADR numbers (`design/ADR-Mnn-*.md`): assigned the same way, when a session is queued; a session that needs an ADR uses only its assigned number. Taken: up to ADR-M21. Next free: ADR-M22 (then M23, …).
+- Append-only tables (`audit_log`, `gate_decisions`, `run_events`, `cost_records`, and any later one) are kept ≥ 2 years and can never be edited or deleted, so they never hold free text or personal/client data: store codes, IDs, hashes, versions and references (for example a link to a GitHub comment) only. Explanations in words stay where they can be edited or deleted (GitHub).
+- Development uses throw-away OpenBao keys only. The real OpenBao initialisation on the internal server waits until the three key holders are named and TLS on port 8200 is in place (QUESTIONS #20, task A10) (remove this line when both are done).
 
 ## Decisions (see design/D-02 section 11)
 - Q1 first agent: OpenHands · Q2 first Git host: GitHub (GitLab later, same interface) · Q3 language: TypeScript (Node.js) · Q5 repo language: English
