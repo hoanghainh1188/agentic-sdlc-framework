@@ -128,6 +128,9 @@ jobs:
           SDLC_WAIT_TIMEOUT: '600' # cold image pulls on GitHub runners (A02 default: 300)
         run: sh platform/deploy/scripts/up.sh core
       - run: pnpm test:integration
+      # A03: OpenBao bootstrap on its own throw-away Compose project (throw-away test keys,
+      # never printed). Separate from the core stack above.
+      - run: pnpm test:openbao
       - name: Show service state and logs
         if: failure()
         run: |

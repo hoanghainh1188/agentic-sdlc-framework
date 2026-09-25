@@ -93,6 +93,8 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
   - `pnpm compose:down` — stop; volumes are kept. Add `-v` to the underlying command only to wipe data on a dev machine.
   - `pnpm test:compose` — live test with Docker (throw-away project, ports +20000, cleaned up). `pnpm test` runs only the static compose checks.
   - OpenBao "healthy" = API reachable, NOT unsealed. Pin every image to an exact version; never MinIO, Redis or Elasticsearch.
+- OpenBao (A03, `design/ADR-M19-openbao-bootstrap.md`, runbook `handbook/03-templates/T11-openbao-runbook.md`): `pnpm openbao:bootstrap init|unseal|configure|root-token|status`. Dev machines use throw-away keys only; key shares and tokens are never written to files, logs or test output. Settings in `platform/deploy/openbao/bootstrap/bootstrap.conf`, access rules in `bootstrap/policies/*.hcl`.
+  - `pnpm test:openbao` — live bootstrap test on a throw-away Compose project (needs Docker; CI `compose` job).
 - Database (A06, `design/ADR-M09-database-tooling.md`): Kysely + `pg`; migrations are plain SQL in `platform/packages/core/src/db/migrations/` (never edit a merged one). Tenant data only through `PlatformDatabase.forTenant(tenantId)`; the tenant guard rejects queries without `tenant_id = <tenant>`.
   - `pnpm db:migrate` / `pnpm db:status` — apply / list migrations. Needs `SDLC_DB_MIGRATION_URL` (owner role `platform`). The processes connect as `platform_app` (no DELETE, no DDL).
   - `pnpm test:db` — DB integration tests on a throw-away PostgreSQL container (or `SDLC_TEST_DATABASE_URL`, a superuser URL). CI job `db` runs it on every PR.

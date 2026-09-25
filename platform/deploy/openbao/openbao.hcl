@@ -1,6 +1,6 @@
-# OpenBao server configuration (D-03 sections 8.1 and 10; task A02).
-# The server starts uninitialised and sealed. Initialisation (Shamir 3-of-2),
-# Transit and AppRoles are done by the bootstrap script in task A03.
+# OpenBao server configuration (D-03 sections 8.1 and 10; tasks A02 and A03).
+# The server starts uninitialised and sealed. Initialisation (Shamir 3-of-2), Transit and
+# AppRoles are done by openbao/bootstrap.sh (task A03, design/ADR-M19).
 
 ui = false
 
@@ -10,11 +10,33 @@ storage "raft" {
   node_id = "openbao-1"
 }
 
-# TLS is off on the internal Docker network; the host port is bound to
-# 127.0.0.1 by default. TLS is an open item for task A03.
+# TLS is off on the internal Docker network; the host port is bound to 127.0.0.1 by
+# default. Accepted for development only: TLS is open item design/QUESTIONS.md #20.
 listener "tcp" {
   address     = "0.0.0.0:8200"
   tls_disable = true
+}
+
+# Key-holder listener: reachable only inside the container (docker compose exec), never from
+# the Compose network or the host. Only here are the key-share endpoints without a token open:
+# creating a new root token from key shares and rekeying (bootstrap.sh root-token, runbook T11
+# sections 5 and 8). OpenBao disables them by default (2.5+); on the main listener they stay
+# disabled.
+listener "tcp" {
+  address                                  = "127.0.0.1:8210"
+  tls_disable                              = true
+  disable_unauthed_generate_root_endpoints = false
+  disable_unauthed_rekey_endpoints         = false
+}
+
+# File audit device on its own named volume (openbao-audit). Every request and response is
+# logged; secret values are HMAC-hashed, never written in clear. Declared here, not through
+# the API. Long-term retention and copying to evidence storage: tasks A10 and E05.
+audit "file" "file" {
+  options {
+    file_path = "/openbao/logs/audit.log"
+    mode      = "0600"
+  }
 }
 
 api_addr     = "http://openbao:8200"

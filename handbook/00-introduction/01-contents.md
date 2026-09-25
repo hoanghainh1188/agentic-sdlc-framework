@@ -63,7 +63,7 @@ Chapters 11–16 follow the 9-section structure, plus "Mandatory artifacts", "To
 | T8 | Weekly pilot report | [T8](../03-templates/T8-weekly-pilot-report.md) | 🟨 v0.1 |
 | T9 | AI incident record | [T9](../03-templates/T9-ai-incident-record.md) | 🟨 v0.1 |
 | T10 | Checklist for the 8 gates | [T10](../03-templates/T10-gate-checklist.md) | 🟨 v0.1 |
-| T11 | OpenBao runbook | [T11](../03-templates/T11-openbao-runbook.md) | 🟨 outline (Claude Code, A03/A10) |
+| T11 | OpenBao runbook | [T11](../03-templates/T11-openbao-runbook.md) | 🟨 v0.2 (A03; backup, restore and rekey tested in A10) |
 | T12 | Architecture Decision Record (ADR) | [T12](../03-templates/T12-adr.md) | 🟨 v0.1 |
 | T13 | Task plan for agents | [T13](../03-templates/T13-task-plan.md) | 🟨 v0.1 |
 | T14 | Release record | [T14](../03-templates/T14-release-record.md) | 🟨 v0.1 |
