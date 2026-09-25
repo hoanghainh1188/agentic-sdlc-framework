@@ -1,12 +1,14 @@
 // D-08 A06 AC1, AC2 (static part): schema model, migration list and migration SQL.
 import fs from 'node:fs';
 import path from 'node:path';
+
+import { DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
+import { t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
 
 import { MIGRATIONS } from '../../packages/core/src/db/migrations/index.js';
 import { TABLE_COLUMNS, TENANT_COLUMN } from '../../packages/core/src/db/schema.js';
 import { DB_ENUMS } from '../../packages/core/src/db/vocabulary.js';
-import { dbMessage, DB_MESSAGES_EN } from '../../packages/core/src/db/messages.js';
 
 const repoRoot = path.resolve(__dirname, '../../..');
 const upSql = Object.values(MIGRATIONS)
@@ -14,13 +16,16 @@ const upSql = Object.values(MIGRATIONS)
   .join(';\n');
 
 describe('AC1: migration tool', () => {
-  it('uses Kysely + pg only (ADR-M09)', () => {
+  it('uses Kysely + pg only as third-party packages (ADR-M09)', () => {
     const pkg = JSON.parse(
       fs.readFileSync(path.join(repoRoot, 'platform/packages/core/package.json'), 'utf8'),
     ) as { dependencies: Record<string, string> };
-    expect(Object.keys(pkg.dependencies).sort()).toEqual(['kysely', 'pg']);
-    for (const version of Object.values(pkg.dependencies))
-      expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    const deps = Object.entries(pkg.dependencies);
+    const external = deps.filter(([name]) => !name.startsWith('@sdlc/'));
+    expect(external.map(([name]) => name).sort()).toEqual(['kysely', 'pg']);
+    for (const [, version] of external) expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    for (const [name, version] of deps.filter(([n]) => n.startsWith('@sdlc/')))
+      expect(version, name).toBe('workspace:*');
   });
 
   it('records the decision in ADR-M09', () => {
@@ -73,12 +78,35 @@ describe('AC2: tenancy tables (static checks of the migration SQL)', () => {
   });
 });
 
-describe('message catalog', () => {
-  it('fills parameters and keeps unknown ones visible', () => {
-    expect(dbMessage('db.migrate.applied', { name: '0001-tenancy' })).toBe(
+describe('canonical codes come from @sdlc/contracts (no second copy in core)', () => {
+  it('uses the contracts lists for the data_class and project_role enums', () => {
+    expect(DB_ENUMS.data_class).toBe(DATA_CLASSES);
+    expect(DB_ENUMS.project_role).toBe(PROJECT_ROLES);
+  });
+});
+
+describe('database command messages (@sdlc/messages)', () => {
+  // The exact text the migrate command printed before the messages moved to the shared catalog.
+  it('renders the same text as before', () => {
+    expect(t('db.migrate.usage')).toBe(
+      'Usage: migrate-cli <latest|status>. Needs SDLC_DB_MIGRATION_URL (owner role).',
+    );
+    expect(t('db.migrate.missing_url')).toBe('SDLC_DB_MIGRATION_URL is not set.');
+    expect(t('db.migrate.applied', { name: '0001-tenancy' })).toBe(
       'Applied migration 0001-tenancy.',
     );
-    expect(dbMessage('db.migrate.failed')).toContain('{reason}');
-    for (const text of Object.values(DB_MESSAGES_EN)) expect(text.length).toBeGreaterThan(0);
+    expect(t('db.migrate.failed_migration', { name: '0001-tenancy' })).toBe(
+      'Migration 0001-tenancy failed; it was rolled back.',
+    );
+    expect(t('db.migrate.up_to_date')).toBe('The database is up to date.');
+    expect(t('db.migrate.failed', { reason: 'boom' })).toBe('Migration failed: boom');
+    expect(
+      t('db.status.applied', { name: '0001-tenancy', executed_at: '2026-09-25T00:00:00.000Z' }),
+    ).toBe('applied  0001-tenancy  2026-09-25T00:00:00.000Z');
+    expect(t('db.status.pending', { name: '0001-tenancy' })).toBe('pending  0001-tenancy');
+  });
+
+  it('keeps a missing parameter visible', () => {
+    expect(t('db.migrate.failed')).toBe('Migration failed: {reason}');
   });
 });

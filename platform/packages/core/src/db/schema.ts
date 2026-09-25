@@ -1,15 +1,14 @@
 // Kysely types for the `platform` database (design/D-05 section 6.1, task A06).
 // Written by hand. `TABLE_COLUMNS` mirrors them at runtime; the integration tests compare both
 // with the live schema, so the types cannot drift from the migrations.
+import type { DataClass, ProjectRole } from '@sdlc/contracts';
 import type { ColumnType, Generated, Insertable, Selectable } from 'kysely';
 
 import type {
   AiAllowed,
-  DataClass,
   DisclosureFormat,
   GitProvider,
   ProdLogsAllowed,
-  ProjectRole,
   ProjectStatus,
   TenantStatus,
   UserStatus,

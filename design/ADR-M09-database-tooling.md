@@ -85,13 +85,15 @@ PostgreSQL Row-Level Security stays in MVP+1 (D-05 section 8).
 
 - Only the enums used by existing tables are created: `data_class`, `project_role` and `git_provider`. Each later task creates its enums with its tables. This keeps rework small while the handbook is not yet approved as a whole.
 - Enums hold **vocabulary** only: role names, data classes. The **rules** that use them live in project config (A05) and policy (B01): who approves which gate, which data classes need consent, SLAs.
-- `platform/packages/core/src/db/vocabulary.ts` lists the same values; a test compares them with the database.
+- **`@sdlc/contracts` (`codes.ts`) is the source of the canonical lists**: `data_class` (`DATA_CLASSES`) and `project_role` (`PROJECT_ROLES`). Core imports them; it keeps no copy (ADR-M16 §2.5 allows core to import contracts).
+- `platform/packages/core/src/db/vocabulary.ts` lists only the values that exist in the database layer alone: `git_provider` and the values of the CHECK columns (statuses, AI record values). `DB_ENUMS` maps each enum type to its list.
+- The migration SQL keeps literal values (section 2.2). Tests compare the migration SQL and the live `pg_enum` values with `DB_ENUMS`, and the live `data_class` and `project_role` values with the `@sdlc/contracts` lists, so any drift fails CI.
 
 **Changing an enum later** (for example when the handbook changes the 2+N roles):
 
 1. Add the value in a new migration: `ALTER TYPE project_role ADD VALUE 'new_role';`.
 2. PostgreSQL does not allow a new enum value to be **used in the same transaction** that added it. Each migration runs in one transaction, so a migration that adds a value must not insert or compare that value. Use it in a later migration or in application code.
-3. Add the value to `vocabulary.ts` in the same PR.
+3. Add the value to its list in the same PR: `@sdlc/contracts` (`codes.ts`) for a canonical code, `vocabulary.ts` for a value of the database layer only.
 4. To rename a value, use `ALTER TYPE … RENAME VALUE 'old' TO 'new'`.
 5. PostgreSQL cannot remove a value. Removing one means creating a new type, converting the columns, and dropping the old type. Plan it as its own migration and design review.
 
@@ -149,3 +151,4 @@ Implementation choices:
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A06) | First version |
 | 0.2 | 2026-09-25 | Claude (task A06) | `role_bindings.revoked_at` (QUESTIONS #11, approved by Harry) |
+| 0.3 | 2026-09-25 | Claude (issue #55) | §2.5: `@sdlc/contracts` is the source of `data_class` and `project_role`; `vocabulary.ts` keeps DB-only lists; test of `pg_enum` against contracts |

@@ -1,27 +1,9 @@
-// Canonical vocabularies stored as PostgreSQL enums (design/D-05 section 5, handbook codes table).
-// Only the enums used by the tables of task A06 exist yet; later tasks add theirs with their tables.
-// Changing a list here needs a migration: design/ADR-M09-database-tooling.md section 2.5.
-
-export const DATA_CLASSES = [
-  'public',
-  'internal',
-  'client_confidential',
-  'client_restricted',
-  'prohibited',
-] as const;
-export type DataClass = (typeof DATA_CLASSES)[number];
-
-// The 2+N roles (handbook Chapter 5). Which role may approve which gate is policy config (A05, B01).
-export const PROJECT_ROLES = [
-  'person_a',
-  'person_b',
-  'second_approver',
-  'pm_brse',
-  'governance',
-  'admin',
-  'viewer',
-] as const;
-export type ProjectRole = (typeof PROJECT_ROLES)[number];
+// Vocabularies stored as PostgreSQL enums and CHECK constraints (design/D-05 section 5).
+// Canonical codes (data classes, 2+N roles, …) come from `@sdlc/contracts`; this file lists only
+// the values that exist in the database layer alone. Only the enums used by the tables of task A06
+// exist yet; later tasks add theirs with their tables.
+// Changing a list needs a migration: design/ADR-M09-database-tooling.md section 2.5.
+import { DATA_CLASSES, PROJECT_ROLES } from '@sdlc/contracts';
 
 export const GIT_PROVIDERS = ['github', 'gitlab'] as const;
 export type GitProvider = (typeof GIT_PROVIDERS)[number];
