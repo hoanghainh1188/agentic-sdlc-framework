@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type { ProjectConfig } from '@sdlc/contracts';
+import type { ProjectConfig, ValidatedProjectConfig } from '@sdlc/contracts';
 
 import { computeConfigHash } from './hash.js';
 import type { ConfigIssue } from './issues.js';
@@ -23,7 +23,7 @@ export const DEFAULT_CONFIG_PATH = path.resolve(
 export type ConfigResult =
   | {
       readonly ok: true;
-      readonly config: ProjectConfig;
+      readonly config: ValidatedProjectConfig;
       /** SHA-256 (hex) of the RFC 8785 canonical JSON of `config`. */
       readonly configHash: string;
       readonly warnings: readonly ConfigIssue[];
@@ -38,18 +38,21 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-function validate(raw: unknown): { config: ProjectConfig } | { errors: ConfigIssue[] } {
+/** The only place that brands a configuration as validated: schema and M1–M15 both passed. */
+function validate(raw: unknown): { config: ValidatedProjectConfig } | { errors: ConfigIssue[] } {
   const parsed = projectConfigSchema.safeParse(raw, { reportInput: true });
   if (!parsed.success) return { errors: toConfigIssues(parsed.error.issues) };
   const config: ProjectConfig = parsed.data;
   const violations = checkMandatoryRules(config);
-  return violations.length > 0 ? { errors: violations } : { config };
+  return violations.length > 0
+    ? { errors: violations }
+    : { config: config as ValidatedProjectConfig };
 }
 
-let defaults: { raw: Record<string, unknown>; config: ProjectConfig } | undefined;
+let defaults: { raw: Record<string, unknown>; config: ValidatedProjectConfig } | undefined;
 
 /** The shipped defaults. Throws if the shipped file itself is invalid (a packaging error). */
-function loadDefaults(): { raw: Record<string, unknown>; config: ProjectConfig } {
+function loadDefaults(): { raw: Record<string, unknown>; config: ValidatedProjectConfig } {
   if (defaults === undefined) {
     const read = readYamlMapping(readFileSync(DEFAULT_CONFIG_PATH, 'utf8'));
     const result = read.ok ? validate(read.value) : { errors: read.errors };
@@ -84,6 +87,6 @@ export function loadProjectConfig(overrideYaml = ''): ConfigResult {
 }
 
 /** The default configuration (codes table values), validated and frozen. */
-export function defaultProjectConfig(): ProjectConfig {
+export function defaultProjectConfig(): ValidatedProjectConfig {
   return loadDefaults().config;
 }

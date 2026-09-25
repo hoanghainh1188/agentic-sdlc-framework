@@ -5,7 +5,7 @@ import type { ProjectConfig } from '@sdlc/contracts';
 
 import { workingDayMinutes } from './calendar.js';
 import { issue, type ConfigIssue } from './issues.js';
-import { matrixCells, MODE_STRICTNESS } from './mandatory-rules.js';
+import { matrixCells, MODE_STRICTNESS, severityAtOrAbove } from './mandatory-rules.js';
 
 function loosenedCells(config: ProjectConfig, defaults: ProjectConfig): ConfigIssue[] {
   const defaultCells = new Map(matrixCells(defaults).map((ref) => [ref.path, ref.cell]));
@@ -75,6 +75,25 @@ function manyHolidays(holidays: readonly string[]): ConfigIssue[] {
     );
 }
 
+/** A higher G6 threshold lets more security findings pass without a person (QUESTIONS.md #19). */
+function raisedSecurityThreshold(config: ProjectConfig, defaults: ProjectConfig): ConfigIssue[] {
+  const to = config.oversight.g6_security_findings.min_severity;
+  const from = defaults.oversight.g6_security_findings.min_severity;
+  return severityAtOrAbove(from, to)
+    ? []
+    : [
+        issue(
+          'config.warning.g6_security_threshold_raised',
+          'oversight.g6_security_findings.min_severity',
+          { from, to },
+        ),
+      ];
+}
+
 export function loosenedSettings(config: ProjectConfig, defaults: ProjectConfig): ConfigIssue[] {
-  return [...loosenedCells(config, defaults), ...loosenedCalendar(config, defaults)];
+  return [
+    ...loosenedCells(config, defaults),
+    ...raisedSecurityThreshold(config, defaults),
+    ...loosenedCalendar(config, defaults),
+  ];
 }

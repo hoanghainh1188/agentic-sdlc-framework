@@ -259,6 +259,21 @@ function slaDrift(codes: string, chapter: string, config: ProjectConfig): string
   });
 }
 
+/**
+ * Codes table §4 row G6: "security findings go to HITL at any tier". The threshold
+ * (`min_severity`) is a platform setting (design/QUESTIONS.md #19); the mode must match the table.
+ */
+function securityFindingsDrift(codes: string, config: ProjectConfig): string[] {
+  const rowG6 = codes.split('\n').find((line) => line.startsWith('| G6 '));
+  const saysHitl = rowG6?.includes('security findings go to HITL at any tier') === true;
+  const mode = config.oversight.g6_security_findings.mode;
+  return saysHitl && mode === 'HITL'
+    ? []
+    : [
+        `oversight.g6_security_findings.mode: codes table §4 row G6 says security findings go to HITL; default config has ${mode}`,
+      ];
+}
+
 /** Every difference between the handbook and `config`, one line per cell. */
 function driftReport(config: ProjectConfig): string[] {
   const codes = read(CODES_TABLE);
@@ -275,6 +290,7 @@ function driftReport(config: ProjectConfig): string[] {
       flagList(codes, '- **G7 needs two approvers**', ',', DUAL_APPROVAL_WORDING),
       config.oversight.dual_approval_g7.change_flags,
     ),
+    ...securityFindingsDrift(codes, config),
     ...slaDrift(codes, read(ESCALATION_CHAPTER), config),
   ];
 }

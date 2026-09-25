@@ -82,7 +82,12 @@ oversight:
     roles: [person_b, second_approver]
 
   # §4 row G6 "security findings go to HITL at any tier"; Ch.14 §14.8.
-  g6_security_findings: HITL
+  # Findings at or above min_severity make G6 HITL; lower ones are recorded as evidence only, so
+  # low / info findings do not make every PR wait for a person (Ch.19). A critical finding always
+  # makes G6 HITL (rule M6). design/QUESTIONS.md #19.
+  g6_security_findings:
+    mode: HITL
+    min_severity: high
 
   # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-02 FR-12; QUESTIONS.md #9.
   hitl_gate_deadline: { value: 1, unit: working_days }

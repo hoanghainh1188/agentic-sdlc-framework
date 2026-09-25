@@ -16,6 +16,7 @@ export {
   type ConfigResult,
 } from './load.js';
 export {
+  ALWAYS_HITL_SECURITY_SEVERITY,
   checkMandatoryRules,
   DUAL_APPROVAL_G7_FLAGS,
   DUAL_APPROVAL_ROLES,
@@ -28,5 +29,6 @@ export {
   MIN_WORKING_DAYS_PER_WEEK,
   MIN_WORKING_HOURS_PER_DAY,
   MVP_MAX_AUTONOMY,
+  severityAtOrAbove,
 } from './mandatory-rules.js';
 export { MAX_HOLIDAYS_PER_YEAR } from './warnings.js';
