@@ -3,10 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Git host adapter: GitHub. See design/D-03 section 7.",
+  "description": "Git host adapter: GitHub App, polling, comments. See design/D-03 section 7.1, D-08 B05, ADR-M23.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@sdlc/contracts": "workspace:*"
+  }
 }

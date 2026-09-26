@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.3 |
+| Version | 1.4 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -266,6 +266,13 @@ MVP: `GitHubAdapter` through a **GitHub App** (short-lived per-repo tokens), rea
 
 - Polling and webhooks return the same `GitEvent` type → one handler for `/approve` commands, reviews and CI.
 - The `EventCursor` is stored per project in the database, so events are not processed twice after a restart.
+- The exact TypeScript interface is `GitHostAdapter` in `@sdlc/contracts` (`platform/packages/contracts/src/git-host.ts`, task B05, ADR-M23). Same nine methods and parameters as above. Notes:
+  - `GitEvent` has three kinds: `comment_created`, `review_submitted`, `check_completed`. Each has a stable `id` (the same for polling and webhooks) and a `url` to store as a reference. Only a comment's `body` is free text; it is never stored in an append-only table.
+  - Only **new** comments are events; an edited comment never is (QUESTIONS #43).
+  - Actors carry the numeric account ID and `type: user | bot`. Users are mapped by the numeric ID only; bots never count as approvers (QUESTIONS #45).
+  - `EventCursor` is opaque; the adapter returns `next` and the caller (B06) stores it. A new project starts from `INITIAL_EVENT_CURSOR` (no history).
+  - `getChangedFiles` returns both paths of a renamed file and fails instead of returning a partial list. `getApprovals` returns each reviewer's latest decision, bound to the reviewed commit.
+  - Later tasks add what they need, with a D-03 update: opening a pull request (C08), revoking a short-lived token (C11), the merge event (E01).
 
 ### 7.2. Agent
 
@@ -377,7 +384,7 @@ Licence note [External]:
 | Secret | Engine | Who may read it |
 |---|---|---|
 | Run Contract signing key | Transit (non-exportable) | worker (signs), runner (reads the public key) |
-| GitHub App private key | KV | api, runner |
+| GitHub App private key | KV | api, worker (polls GitHub, posts gate comments, reads specs; QUESTIONS #42), runner |
 | LiteLLM master key | KV | Cost Controller |
 | Model provider API keys | KV | **LiteLLM only**, through an OpenBao Agent sidecar (AppRole `litellm`) that renders them to a tmpfs file LiteLLM reads at start-up. No LiteLLM Enterprise licence (QUESTIONS #1) |
 | Database and SeaweedFS passwords | KV | The matching process |
@@ -590,4 +597,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.1 | 2026-09-25 | Claude (task B01), approved by Harry | §6.1: G6 security threshold `min_severity` (critical always HITL, rule M6) and G5 `on_breach`; §7.3: notes on the contracts `PolicyEngine` (validated config, `canApprove` inputs, model list, `prohibited` → L0, forbidden-action lists). QUESTIONS.md #16–#19 |
 | 1.2 | 2026-09-25 | Claude, approved by Harry | §8.2: provider keys reach LiteLLM through an OpenBao Agent sidecar (tmpfs), no Enterprise licence; §8.2/§9: TLS on OpenBao 8200 with an internal CA (QUESTIONS #1, #20) |
 | 1.3 | 2026-09-26 | Claude (task C02), approved by Harry | §8: `schema_version`, `plan_id`, `plan_sha256`, `allowed_tools`; signed form; contract validity and clock skew from config; rejection list; key rotation (ADR-M22, QUESTIONS #33, #34) |
+| 1.4 | 2026-09-26 | Claude (task B05), approved by Harry | §7.1: notes on the contracts `GitHostAdapter` (event kinds, new comments only, numeric account IDs and bots, cursor, later additions); §8.2: the worker reads the GitHub App key (ADR-M23, QUESTIONS #42, #43, #45) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |

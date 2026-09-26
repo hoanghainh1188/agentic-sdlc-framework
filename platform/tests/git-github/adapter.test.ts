@@ -1,0 +1,263 @@
+// D-08 B05 AC3: comment on issues and pull requests; read a file at a commit. Also the other
+// read calls of D-03 §7.1 used by later tasks: pull request, changed files (G5), CI status (G6),
+// approvals (G7). Against the in-process GitHub stub.
+import { MAX_COMMENT_CHARS } from '@sdlc/adapter-git-github';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { startHarness, type Harness } from './helpers';
+import { checkRun, pull, REPO, review, SHA_A, status, user } from './stub-github';
+
+let h: Harness;
+
+beforeEach(async () => {
+  h = await startHarness();
+});
+
+afterEach(async () => {
+  await h.stub.stop();
+});
+
+describe('createIssueComment (AC3)', () => {
+  it('posts the body to the issue comments endpoint (issues and pull requests alike)', async () => {
+    h.stub.on('POST', '/repos/acme/shop/issues/12/comments', { status: 201, body: { id: 9 } });
+    await h.adapter().createIssueComment(REPO, 12, 'Gate G3: waiting for approval.');
+    const [req] = h.stub.requestsTo('POST', '/repos/acme/shop/issues/12/comments');
+    expect(req?.body).toEqual({ body: 'Gate G3: waiting for approval.' });
+    expect(req?.headers['x-github-api-version']).toBe('2022-11-28');
+    expect(req?.headers.accept).toBe('application/vnd.github+json');
+  });
+
+  it('refuses an empty or too long body and a bad issue number, without calling GitHub', async () => {
+    const a = h.adapter();
+    await expect(a.createIssueComment(REPO, 1, '  ')).rejects.toMatchObject({
+      code: 'invalid_input',
+    });
+    await expect(
+      a.createIssueComment(REPO, 1, 'x'.repeat(MAX_COMMENT_CHARS + 1)),
+    ).rejects.toMatchObject({
+      code: 'body_too_large',
+      params: { max_chars: 65_536 },
+    });
+    await expect(a.createIssueComment(REPO, 0, 'x')).rejects.toMatchObject({
+      code: 'invalid_input',
+    });
+    expect(h.stub.requests).toHaveLength(0);
+  });
+
+  it('never retries a POST after a server error (a retry could post twice)', async () => {
+    h.stub.on('POST', '/repos/acme/shop/issues/1/comments', { status: 502 });
+    await expect(h.adapter().createIssueComment(REPO, 1, 'x')).rejects.toMatchObject({
+      code: 'server_error',
+      params: { status: 502 },
+    });
+    expect(h.stub.requestsTo('POST', '/repos/acme/shop/issues/1/comments')).toHaveLength(1);
+  });
+});
+
+describe('getFileAtCommit (AC3)', () => {
+  const PATH = '/repos/acme/shop/contents/docs/specs/T06%20tax.md';
+  const raw = (bytes: Buffer) => ({
+    raw: bytes,
+    headers: { 'content-type': 'application/vnd.github.raw+json' },
+  });
+
+  it('reads the raw file at the commit, byte for byte (CRLF and BOM kept)', async () => {
+    const text = '﻿# T06 消費税計算\r\nAC1: 10% / 8%\r\n';
+    h.stub.on('GET', PATH, raw(Buffer.from(text, 'utf8')));
+    const content = await h.adapter().getFileAtCommit(REPO, 'docs/specs/T06 tax.md', SHA_A);
+    expect(content).toBe(text);
+    const [req] = h.stub.requestsTo('GET', PATH);
+    expect(req?.query.get('ref')).toBe(SHA_A);
+    expect(req?.headers.accept).toBe('application/vnd.github.raw+json');
+  });
+
+  it('refuses a file that is not UTF-8', async () => {
+    h.stub.on('GET', PATH, raw(Buffer.from([0xff, 0xfe, 0x00, 0x41])));
+    await expect(
+      h.adapter().getFileAtCommit(REPO, 'docs/specs/T06 tax.md', SHA_A),
+    ).rejects.toMatchObject({ code: 'file_not_utf8' });
+  });
+
+  it('refuses a file larger than maxFileBytes', async () => {
+    h.stub.on('GET', PATH, raw(Buffer.alloc(2048, 0x61)));
+    await expect(
+      h.adapter({ maxFileBytes: 1024 }).getFileAtCommit(REPO, 'docs/specs/T06 tax.md', SHA_A),
+    ).rejects.toMatchObject({ code: 'file_too_large', params: { max_bytes: 1024 } });
+  });
+
+  it('refuses a directory', async () => {
+    h.stub.on('GET', '/repos/acme/shop/contents/docs', { body: [{ name: 'a.md', type: 'file' }] });
+    await expect(h.adapter().getFileAtCommit(REPO, 'docs', SHA_A)).rejects.toMatchObject({
+      code: 'not_a_file',
+    });
+  });
+
+  it('maps a missing file to not_found', async () => {
+    await expect(h.adapter().getFileAtCommit(REPO, 'nope.md', SHA_A)).rejects.toMatchObject({
+      code: 'not_found',
+    });
+  });
+
+  it.each(['../secret', '/etc/passwd', 'a//b', 'a/./b', 'a\\b', ''])(
+    'refuses the path %j without calling GitHub',
+    async (path) => {
+      await expect(h.adapter().getFileAtCommit(REPO, path, SHA_A)).rejects.toMatchObject({
+        code: 'invalid_input',
+      });
+      expect(h.stub.requests).toHaveLength(0);
+    },
+  );
+
+  it('refuses a ref that is not a commit SHA (a branch name could move)', async () => {
+    await expect(h.adapter().getFileAtCommit(REPO, 'a.md', 'main')).rejects.toMatchObject({
+      code: 'invalid_input',
+      params: { field: 'sha' },
+    });
+  });
+});
+
+describe('getPullRequest and getChangedFiles', () => {
+  it('returns the pull request without its free-text title or body', async () => {
+    h.stub.on('GET', '/repos/acme/shop/pulls/7', { body: pull(7, '2026-09-26T07:00:00Z') });
+    const pr = await h.adapter().getPullRequest(REPO, 7);
+    expect(pr).toEqual({
+      number: 7,
+      state: 'open',
+      draft: false,
+      merged: false,
+      mergedAt: null,
+      mergeCommitSha: null,
+      headSha: SHA_A,
+      headRef: 'agent/INT-2026-0007',
+      baseRef: 'main',
+      author: { id: '2002', login: 'agent-bot[bot]', type: 'bot' },
+      changedFiles: 2,
+      url: 'https://github.com/acme/shop/pull/7',
+    });
+  });
+
+  it('lists changed files over all pages, with both paths of a rename', async () => {
+    h.stub.on('GET', '/repos/acme/shop/pulls/7', {
+      body: { ...pull(7, '2026-09-26T07:00:00Z'), changed_files: 3 },
+    });
+    h.stub.on('GET', '/repos/acme/shop/pulls/7/files', (req) =>
+      req.query.get('page') === '2'
+        ? { body: [{ filename: 'apps/api/src/b.ts', status: 'modified' }] }
+        : {
+            body: [
+              { filename: 'apps/web/src/a.vue', status: 'modified' },
+              {
+                filename: 'apps/api/src/new-name.ts',
+                previous_filename: 'apps/api/src/old-name.ts',
+                status: 'renamed',
+              },
+            ],
+            headers: {
+              link: `<${h.stub.address}/repos/acme/shop/pulls/7/files?per_page=100&page=2>; rel="next"`,
+            },
+          },
+    );
+    expect(await h.adapter().getChangedFiles(REPO, 7)).toEqual([
+      'apps/api/src/b.ts',
+      'apps/api/src/new-name.ts',
+      'apps/api/src/old-name.ts',
+      'apps/web/src/a.vue',
+    ]);
+  });
+
+  it('fails instead of returning a partial list (more than 3000 files, or a short list)', async () => {
+    h.stub.on('GET', '/repos/acme/shop/pulls/7', {
+      body: { ...pull(7, '2026-09-26T07:00:00Z'), changed_files: 3001 },
+    });
+    await expect(h.adapter().getChangedFiles(REPO, 7)).rejects.toMatchObject({
+      code: 'too_many_files',
+      params: { max_files: 3000 },
+    });
+    h.stub.on('GET', '/repos/acme/shop/pulls/7', {
+      body: { ...pull(7, '2026-09-26T07:00:00Z'), changed_files: 5 },
+    });
+    h.stub.on('GET', '/repos/acme/shop/pulls/7/files', { body: [{ filename: 'a.ts' }] });
+    await expect(h.adapter().getChangedFiles(REPO, 7)).rejects.toMatchObject({
+      code: 'invalid_response',
+      params: { field: 'files' },
+    });
+  });
+});
+
+describe('getCheckStatus', () => {
+  const RUNS = `/repos/acme/shop/commits/${SHA_A}/check-runs`;
+  const STATUS = `/repos/acme/shop/commits/${SHA_A}/status`;
+
+  it.each([
+    ['none', [], []],
+    [
+      'success',
+      [checkRun(1, 'lint', 'success', '2026-09-26T07:00:00Z')],
+      [status(5, 'ci/x', 'success', '2026-09-26T07:00:00Z')],
+    ],
+    [
+      'pending',
+      [checkRun(1, 'lint', null, null)],
+      [status(5, 'ci/x', 'success', '2026-09-26T07:00:00Z')],
+    ],
+    [
+      'failure',
+      [checkRun(1, 'lint', null, null), checkRun(2, 'test', 'timed_out', '2026-09-26T07:00:00Z')],
+      [],
+    ],
+    [
+      'failure',
+      [checkRun(1, 'lint', 'skipped', '2026-09-26T07:00:00Z')],
+      [status(5, 'ci/x', 'error', '2026-09-26T07:00:00Z')],
+    ],
+  ])('summarises check runs and commit statuses as %s', async (state, runs, statuses) => {
+    h.stub.on('GET', RUNS, { body: { total_count: runs.length, check_runs: runs } });
+    h.stub.on('GET', STATUS, { body: { state: 'x', statuses } });
+    const summary = await h.adapter().getCheckStatus(REPO, SHA_A);
+    expect(summary.state).toBe(state);
+    expect(summary.checks).toHaveLength(runs.length + statuses.length);
+    expect(h.stub.requestsTo('GET', RUNS)[0]?.query.get('filter')).toBe('latest');
+  });
+
+  it('refuses a ref that is not a SHA', async () => {
+    await expect(h.adapter().getCheckStatus(REPO, 'main')).rejects.toMatchObject({
+      code: 'invalid_input',
+    });
+  });
+});
+
+describe('getApprovals', () => {
+  it("counts each reviewer's latest decision, bound to the reviewed commit", async () => {
+    const b = user(3003, 'person-b');
+    const second = user(4004, 'second');
+    const other = user(5005, 'other');
+    h.stub.on('GET', '/repos/acme/shop/pulls/7/reviews', {
+      body: [
+        review(1, b, 'CHANGES_REQUESTED', '2026-09-26T06:00:00Z'),
+        review(2, b, 'APPROVED', '2026-09-26T07:00:00Z', 'c'.repeat(40)),
+        review(3, b, 'COMMENTED', '2026-09-26T07:30:00Z'), // a comment keeps the approval
+        review(4, second, 'APPROVED', '2026-09-26T06:30:00Z'),
+        review(5, second, 'CHANGES_REQUESTED', '2026-09-26T07:10:00Z'), // changed their mind
+        review(6, other, 'DISMISSED', '2026-09-26T06:00:00Z'), // a dismissed approval
+        review(7, other, 'PENDING', null), // not submitted
+      ],
+    });
+    expect(await h.adapter().getApprovals(REPO, 7)).toEqual([
+      {
+        reviewId: '2',
+        reviewer: { id: '3003', login: 'person-b', type: 'user' },
+        commitSha: 'c'.repeat(40),
+        submittedAt: '2026-09-26T07:00:00.000Z',
+        url: 'https://github.com/acme/shop/pull/7#pullrequestreview-2',
+      },
+    ]);
+  });
+
+  it('marks App and bot reviewers as bots (they never count as approvers, QUESTIONS #45)', async () => {
+    h.stub.on('GET', '/repos/acme/shop/pulls/7/reviews', {
+      body: [review(1, user(9, 'sdlc-platform[bot]', 'Bot'), 'APPROVED', '2026-09-26T07:00:00Z')],
+    });
+    const [approval] = await h.adapter().getApprovals(REPO, 7);
+    expect(approval?.reviewer.type).toBe('bot');
+  });
+});

@@ -4,6 +4,12 @@ path "kv/data/worker/*" {
   capabilities = ["read"]
 }
 
+# The GitHub App key: the worker polls GitHub, posts gate status comments and reads spec files
+# (D-03 §5.1, B06, B08; QUESTIONS #42).
+path "kv/data/shared/github-app" {
+  capabilities = ["read"]
+}
+
 path "transit/sign/run-contract" {
   capabilities = ["update"]
 }

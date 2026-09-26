@@ -472,7 +472,7 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
       },
       worker: {
         [MASTER_KEY]: 'denied',
-        [GITHUB_APP]: 'denied',
+        [GITHUB_APP]: 'allowed', // QUESTIONS #42: the worker polls GitHub
         [RUNNER_DB]: 'denied',
         [EXPORT]: 'denied',
       },

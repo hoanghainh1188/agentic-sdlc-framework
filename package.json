@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@sdlc/adapter-git-github": "workspace:*",
     "@sdlc/adapter-policy-simple": "workspace:*",
     "@sdlc/config": "workspace:*",
     "@sdlc/contracts": "workspace:*",
