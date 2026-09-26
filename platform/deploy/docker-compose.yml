@@ -64,7 +64,7 @@ services:
   # ---------------------------------------------------------------- core ----
 
   postgres:
-    image: postgres:17.11-trixie
+    image: postgres:18.4-trixie
     profiles: [core, observability]
     restart: unless-stopped
     networks: [sdlc]
