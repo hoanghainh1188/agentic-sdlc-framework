@@ -2,6 +2,7 @@
 # Compose images current. Pinning images by digest comes later (A02 review).
 version: 2
 updates:
+  # Actions: every update, including major versions, is reviewed by hand (see PR #57).
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -9,9 +10,23 @@ updates:
     commit-message:
       prefix: chore
 
+  # Compose images: patch and minor updates only. A major version (for example
+  # PostgreSQL 17 -> 18, Valkey 8 -> 9) is a planned upgrade task with its own tests,
+  # never an automatic PR (ADR-M17 pinning policy).
   - package-ecosystem: docker-compose
     directory: /platform/deploy
     schedule:
       interval: weekly
     commit-message:
       prefix: chore
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # ClickHouse numbers releases YY.M, so leaving the LTS line (26.3 -> 26.9) looks
+      # like a minor update. Stay on the LTS line: patch updates only (ADR-M17).
+      - dependency-name: 'clickhouse/clickhouse-server'
+        update-types: ['version-update:semver-minor']
+    groups:
+      # temporalio/server and temporalio/admin-tools must stay on the same version.
+      temporal:
+        patterns: ['temporalio/*']

@@ -260,6 +260,27 @@ describe('Dependabot and CODEOWNERS', () => {
     for (const update of config.updates) expect(update.schedule.interval).toBe('weekly');
   });
 
+  it('Dependabot never proposes major image updates, keeps ClickHouse on its LTS line and groups Temporal', () => {
+    type Ignore = { 'dependency-name': string; 'update-types'?: string[] };
+    const config = readYaml<{
+      updates: {
+        'package-ecosystem': string;
+        ignore?: Ignore[];
+        groups?: Record<string, { patterns: string[] }>;
+      }[];
+    }>('.github/dependabot.yml');
+    const compose = config.updates.find((u) => u['package-ecosystem'] === 'docker-compose');
+    const ignores = compose?.ignore ?? [];
+    const ignored = (name: string, type: string): boolean =>
+      ignores.some(
+        (i) => i['dependency-name'] === name && (i['update-types'] ?? []).includes(type),
+      );
+    expect(ignored('*', 'version-update:semver-major')).toBe(true);
+    expect(ignored('clickhouse/clickhouse-server', 'version-update:semver-minor')).toBe(true);
+    const patterns = Object.values(compose?.groups ?? {}).flatMap((g) => g.patterns);
+    expect(patterns).toContain('temporalio/*');
+  });
+
   it('CODEOWNERS has a default owner and names only known owners', () => {
     const rules = fs
       .readFileSync(path.join(root, '.github/CODEOWNERS'), 'utf8')
