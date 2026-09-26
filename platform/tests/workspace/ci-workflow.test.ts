@@ -167,7 +167,7 @@ describe('AC2: integration job runs the Compose core profile', () => {
     const detect = runText('detect');
     expect(detect).toContain('[ ! -f "$COMPOSE_FILE_PATH" ]');
     expect(detect).toContain(
-      '-- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/',
+      '-- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/',
     );
     expect(detect).toContain('schedule');
   });
@@ -177,6 +177,7 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(compose).toContain('platform/deploy/scripts/init-env.sh');
     expect(compose).toContain('platform/deploy/scripts/up.sh core');
     expect(compose).toContain('pnpm test:integration');
+    expect(compose).toContain('pnpm test:litellm');
     const cleanup = job('compose').steps.find((s) => s.run?.includes('down --volumes'));
     expect(cleanup?.if).toBe('always()');
   });

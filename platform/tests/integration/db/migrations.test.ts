@@ -73,6 +73,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
   run_contracts: [],
   // Append-only (D-05 D3, C02).
   run_events: [],
+  // Append-only (D-05 D3, C03).
+  cost_records: [],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -195,7 +197,7 @@ describeDb('AC2: migrations on PostgreSQL', () => {
         c.confdeltype AS on_delete
       FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace AND n.nspname = 'public'
       WHERE c.contype = 'f' AND c.conrelid::regclass::text NOT LIKE 'kysely_%'`);
-    expect(fks).toHaveLength(25);
+    expect(fks).toHaveLength(28); // C03: cost_records → projects, intents, runs
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

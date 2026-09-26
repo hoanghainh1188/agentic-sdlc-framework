@@ -92,11 +92,12 @@ jobs:
             run=true; reason="$EVENT_NAME run"
           elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             run=true; reason="base commit unknown, running to be safe"
-          # Infrastructure (A02, A03) and the OpenBao client (A04), whose live test needs Compose.
-          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/)" ]; then
-            run=true; reason="platform/deploy/, the OpenBao client or its live test changed"
+          # Infrastructure (A02, A03), the OpenBao client (A04), the LiteLLM adapter and Cost
+          # Controller (C03): their live tests need Compose.
+          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/)" ]; then
+            run=true; reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller or a live test changed"
           else
-            reason="platform/deploy/, the OpenBao client and its live test unchanged"
+            reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller and their live tests unchanged"
           fi
           echo "run_compose=$run" >> "$GITHUB_OUTPUT"
           echo "Compose integration job: run=$run ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -132,6 +133,9 @@ jobs:
       # A03, A04: OpenBao bootstrap and the OpenBao client, each on its own throw-away Compose
       # project (throw-away test keys, never printed). Separate from the core stack above.
       - run: pnpm test:openbao
+      # C03: LiteLLM with keys from OpenBao (profile "models") and the Cost Controller, on its own
+      # throw-away Compose project with a stub model (throw-away test keys, never printed).
+      - run: pnpm test:litellm
       - name: Show service state and logs
         if: failure()
         run: |

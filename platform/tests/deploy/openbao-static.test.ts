@@ -122,8 +122,8 @@ describe('OpenBao bootstrap settings (bootstrap.conf)', () => {
     expect(settings.get('SECRET_ID_BOUND_CIDRS')).toBe('compose-network');
   });
 
-  it('has one AppRole per platform process (AC2) and one policy per AppRole', () => {
-    expect(roles).toEqual(['api', 'worker', 'runner', 'cost-controller']);
+  it('has one AppRole per platform process (AC2), the LiteLLM sidecar (C03), one policy each', () => {
+    expect(roles).toEqual(['api', 'worker', 'runner', 'cost-controller', 'litellm']);
     expect(policyNames).toEqual([...roles, 'platform-admin'].sort());
   });
 });
@@ -156,14 +156,28 @@ describe('OpenBao policies', () => {
     }
   });
 
-  it('only cost-controller can read the LiteLLM master key (AC3)', () => {
+  it('only cost-controller and the LiteLLM sidecar can read the LiteLLM master key (AC3, C03)', () => {
     const target = 'kv/data/cost-controller/litellm-master-key';
-    expect(roles.filter((r) => canRead(r, target))).toEqual(['cost-controller']);
+    expect(roles.filter((r) => canRead(r, target))).toEqual(['cost-controller', 'litellm']);
     expect(canRead('runner', target)).toBe(false);
   });
 
-  it('no AppRole can read model provider keys yet (QUESTIONS #1)', () => {
-    expect(roles.filter((r) => canRead(r, 'kv/data/litellm/providers/anthropic'))).toEqual([]);
+  it('only the LiteLLM sidecar can read model provider keys and the salt key (QUESTIONS #1)', () => {
+    expect(roles.filter((r) => canRead(r, 'kv/data/litellm/providers/anthropic'))).toEqual([
+      'litellm',
+    ]);
+    expect(roles.filter((r) => canRead(r, 'kv/data/litellm/salt-key'))).toEqual(['litellm']);
+  });
+
+  it('the LiteLLM sidecar reads exactly its keys and the master key, and writes nothing (C03)', () => {
+    expect(policyRules('litellm')).toEqual([
+      { path: 'kv/data/litellm/providers/*', capabilities: ['read'] },
+      { path: 'kv/metadata/litellm/providers/*', capabilities: ['list'] },
+      { path: 'kv/data/litellm/salt-key', capabilities: ['read'] },
+      { path: 'kv/data/cost-controller/litellm-master-key', capabilities: ['read'] },
+    ]);
+    expect(canRead('litellm', 'kv/data/cost-controller/other')).toBe(false);
+    expect(canRead('litellm', 'kv/data/shared/github-app')).toBe(false);
   });
 
   it('only api and runner can read the GitHub App key (D-03 section 8.2)', () => {
@@ -171,11 +185,14 @@ describe('OpenBao policies', () => {
   });
 
   it('each AppRole reads only its own kv subtree besides shared/github-app', () => {
+    // litellm reads only the provider keys and the salt key inside its subtree (C03).
+    const own = (role: string) =>
+      role === 'litellm' ? 'kv/data/litellm/providers/x' : `kv/data/${role}/x`;
     for (const role of roles) {
       for (const other of roles.filter((r) => r !== role)) {
         expect(canRead(role, `kv/data/${other}/x`), `${role} → ${other}`).toBe(false);
       }
-      expect(canRead(role, `kv/data/${role}/x`), role).toBe(true);
+      expect(canRead(role, own(role)), role).toBe(true);
     }
   });
 

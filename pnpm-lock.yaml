@@ -11,6 +11,9 @@ importers:
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.11.0)
+      '@sdlc/adapter-model-litellm':
+        specifier: workspace:*
+        version: link:platform/packages/adapters/model-litellm
       '@sdlc/adapter-policy-simple':
         specifier: workspace:*
         version: link:platform/packages/adapters/policy-simple
@@ -87,7 +90,11 @@ importers:
 
   platform/packages/adapters/git-github: {}
 
-  platform/packages/adapters/model-litellm: {}
+  platform/packages/adapters/model-litellm:
+    dependencies:
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
 
   platform/packages/adapters/policy-simple:
     dependencies:

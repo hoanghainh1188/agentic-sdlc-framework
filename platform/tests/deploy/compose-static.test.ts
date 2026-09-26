@@ -178,10 +178,25 @@ describe('AC3: healthchecks and pinned images', () => {
 describe('AC4: no secrets in the repo', () => {
   const references = [...composeCode.matchAll(/\$\{([A-Z0-9_]+)(:[?-])?([^}]*)\}/g)];
 
+  // Development-only keys: with the profile "models" (the server) they come from OpenBao and stay
+  // empty in .env; litellm/start.sh refuses to start without either (C03, design/ADR-M24).
+  const OPTIONAL_DEV_SECRETS = ['LITELLM_MASTER_KEY', 'LITELLM_SALT_KEY'];
+
   it('requires every secret variable (${VAR:?}), with no inline default', () => {
     const secrets = references.filter((m) => isSecretName(m[1]!));
     expect(secrets.length).toBeGreaterThan(15);
-    for (const m of secrets) expect(m[2], `${m[1]} must use \${VAR:?}`).toBe(':?');
+    for (const m of secrets) {
+      if (OPTIONAL_DEV_SECRETS.includes(m[1]!)) continue;
+      expect(m[2], `${m[1]} must use \${VAR:?}`).toBe(':?');
+    }
+  });
+
+  it('the LiteLLM master and salt keys are optional and empty by default (C03)', () => {
+    for (const name of OPTIONAL_DEV_SECRETS) {
+      const found = references.filter((m) => m[1] === name);
+      expect(found.length, name).toBe(1);
+      expect([found[0]![2], found[0]![3]], name).toEqual([':-', '']);
+    }
   });
 
   it('keeps only CHANGEME placeholders for secrets in .env.example', () => {

@@ -1,5 +1,7 @@
-# LiteLLM Proxy configuration (D-07 section 3; task A02).
-# No models and no provider keys yet: models are added in M-C (C03).
+# LiteLLM Proxy configuration for development WITHOUT the Compose profile "models" (D-07 section 3;
+# tasks A02, C03). No models and no provider keys; the master key and the salt key come from .env.
+# With the profile "models" (always on the server), LiteLLM uses config.ctmpl instead, rendered by
+# the OpenBao Agent sidecar with the keys from OpenBao (start.sh, design/ADR-M24).
 # A database is mandatory: without it, budgets block nothing (D-07 section 3).
 
 model_list: []
