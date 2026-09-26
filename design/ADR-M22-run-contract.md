@@ -154,7 +154,7 @@ C02 does not check the agent register: the table comes with C10. **C06 (G4) must
 
 - D-03 version 1.3 (§8: `schema_version`, plan fields and `allowed_tools`; signed form; checks). D-05 version 1.5 (§6.4: coded `run_events` payload, `stop_reason` code, `agent_id` without a foreign key until C10, run index).
 - The default `config_hash` changes (two new `run.*` keys).
-- C04 moves the run out of `queued` atomically when it starts the sandbox, so one contract starts one sandbox. It then adds its run event types.
+- C04 moves the run out of `queued` with one conditional update (`… WHERE status = 'queued'`, checking the affected row count) before it starts the sandbox, so one contract starts at most one sandbox (QUESTIONS #35). It then adds its run event types.
 - C06 checks the agent register, the stricter autonomy (QUESTIONS #22), the AI record and the budget before it calls `issueRunContract`.
 - C10 adds the `agents` foreign key on `runs.agent_id`.
 - Revocation (`revoked_at`) and key rotation on a schedule stay MVP+ (D-03 §8).
