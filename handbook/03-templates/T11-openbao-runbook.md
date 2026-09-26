@@ -26,6 +26,8 @@ It does **not** cover the platform processes that read secrets (task A04) or TLS
 
 All commands run from the repo root on the server. They need Docker only. `pnpm openbao:bootstrap <command>` is the same as `platform/deploy/openbao/bootstrap.sh <command>`.
 
+**OpenBao publishes no port on the host** (task A11, `design/QUESTIONS.md` #27). It is reachable only on the Compose network. Every admin and key-holder step therefore runs **inside the OpenBao container**: through `pnpm openbao:bootstrap …`, or through `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao …` as shown below. Do not publish the port to make admin work easier: a static test fails when a compose file publishes port 8200 or 8210.
+
 ## 2. Roles
 
 | Role | Who | Holds | Does |
@@ -157,7 +159,8 @@ A secret ID + role ID lets a process log in as that AppRole. Treat issuing one l
 
 - Only the platform admin issues secret IDs, only for a process being deployed or rotated, and records it in the operations log (role, date, reason, accessor, not the secret ID).
 - Every issue is in the OpenBao audit log.
-- A secret ID works only from the Compose network subnet and expires after **90 days**. The tokens a process gets at login work only from the same subnet. Known exception: a login from the server itself through the published port `127.0.0.1:8200` passes (`design/QUESTIONS.md` #27).
+- A secret ID works only from the Compose network subnet and expires after **90 days**. The tokens a process gets at login work only from the same subnet. The network gateway (`SDLC_NETWORK_GATEWAY`) is left out: every process on the server reaches the containers from the gateway address, so a secret ID or token used on the server outside a container is refused (`design/QUESTIONS.md` #27, #37).
+- Trust model: this stops users of the server without root rights, and credentials that leak out of a container. Root on the server is trusted: root can `docker exec` into any container. Access to root and to Docker on the server is controlled by server administration.
 - Deliver it straight to the process as a file (section 5c). Never through chat or email.
 
 ```bash
@@ -175,7 +178,7 @@ Each platform process (api, worker, runner, cost-controller) uses the OpenBao cl
 
 | Setting | Value |
 |---|---|
-| `SDLC_OPENBAO_ADDR` | `https://<server>:8200` after A10. Before A10, only on development machines and in CI: `http://openbao:8200` together with `SDLC_OPENBAO_ALLOW_PLAINTEXT=1` |
+| `SDLC_OPENBAO_ADDR` | `https://openbao:8200` after A10 (the process runs in Compose; OpenBao publishes no host port). Before A10, only on development machines and in CI: `http://openbao:8200` together with `SDLC_OPENBAO_ALLOW_PLAINTEXT=1` |
 | `SDLC_OPENBAO_CA_CERT_FILE` | The company internal CA certificate (after A10). The client always checks the server certificate; there is no way to skip the check |
 | `SDLC_OPENBAO_ROLE_ID_FILE` | File with the role ID |
 | `SDLC_OPENBAO_SECRET_ID_FILE` | File with the secret ID: mode 600, on a tmpfs mount, readable only by the process |
@@ -263,14 +266,16 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | `a root token is required` | `configure` got an admin token or an expired token | Section 5 |
 | `a root token generation is already in progress` | An earlier `root-token` was interrupted | Inside the container: `BAO_ADDR=http://127.0.0.1:8210 bao delete sys/generate-root/attempt`, then try again |
 | `the key share was rejected` | Mistyped or old share | Try again carefully. After a rekey, old shares no longer work |
-| A process says `AppRole login failed (HTTP status …)` | Secret ID expired (90 days), destroyed, wrong, or used outside the Compose subnet | Section 8.1; check `SDLC_NETWORK_SUBNET` and the secret ID file (section 5c) |
+| A process says `AppRole login failed (HTTP status …)` | Secret ID expired (90 days), destroyed, wrong, or used outside the Compose subnet (the gateway address counts as outside) | Section 8.1; check that the process runs in a container on the Compose network, `SDLC_NETWORK_SUBNET`, `SDLC_NETWORK_GATEWAY` and the secret ID file (section 5c) |
+| `curl http://127.0.0.1:8200/…` on the server fails | OpenBao publishes no host port (by design, task A11) | `pnpm openbao:bootstrap status`, or `docker compose … exec openbao bao status` |
 | A process says `OpenBao at … is sealed` | Restart. Compose still shows OpenBao as healthy: healthy only means the API answers | Section 4 |
 | A process says `OpenBao at … is not initialised` | New, empty volume, or the wrong Compose project | Section 3. If you expected data, **stop** and check the volume |
 | A process says `The OpenBao policy of this process does not allow …` | The process asked for a path outside its policy | Correct the path in the process. Change a policy only through `bootstrap/policies/` and `configure` |
 | A process says `The certificate of OpenBao at … could not be verified` | Wrong or missing CA file, expired server certificate, or the address does not match the certificate | Check `SDLC_OPENBAO_CA_CERT_FILE` and the certificate dates (A10). Never turn the check off |
 | A process says `… does not use TLS` | `http://` address without `SDLC_OPENBAO_ALLOW_PLAINTEXT=1` | On the server: use `https://`. The flag is for development machines and CI only |
 | `no file audit device` | `openbao.hcl` changed | Restore the `audit "file"` block. OpenBao also refuses requests when it cannot write the audit log: check the `openbao-audit` volume (disk full, permissions) |
-| Compose says the network has a different configuration | `SDLC_NETWORK_SUBNET` changed | `pnpm compose:down`, then `pnpm compose:core`. Then run `configure` again (secret IDs are bound to the subnet) |
+| Compose says the network has a different configuration | `SDLC_NETWORK_SUBNET` or `SDLC_NETWORK_GATEWAY` changed | `pnpm compose:down`, then `pnpm compose:core`. Then run `configure` again (secret IDs are bound to the subnet without the gateway) |
+| `the Compose network has no fixed gateway` from `configure` | The network was created before A11 | `pnpm compose:down`, then `pnpm compose:core`, then `configure` again |
 
 ## 10. Operations log template
 
@@ -290,3 +295,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.1 | 2026-09-24 | Claude (draft) | Outline; content written by Claude Code in A03/A10 |
 | 0.2 | 2026-09-25 | Claude Code (task A03) | Full content. Sections 3.1, 4, 5, 5b and 8.1 tested on a development machine with throw-away keys (`bootstrap.sh`, live test `pnpm test:openbao`). Sections 6, 7 and 8.2 to be tested in A10. The real initialisation (3.2) is described, not performed |
 | 0.3 | 2026-09-25 | Claude Code (task A04) | Section 5c (client settings, credential files, secret ID rotation without restart); tokens bound to the subnet; troubleshooting rows for the client messages; host-port exception (`design/QUESTIONS.md` #27) |
+| 0.4 | 2026-09-26 | Claude Code (task A11) | OpenBao publishes no host port: all admin work through `docker compose exec` (section 1); gateway left out of the bound CIDRs and the trust model (section 5b, `design/QUESTIONS.md` #27, #37); `SDLC_OPENBAO_ADDR` in section 5c; troubleshooting rows |

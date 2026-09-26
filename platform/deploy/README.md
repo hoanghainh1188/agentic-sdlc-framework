@@ -14,7 +14,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 ## Requirements
 
 - Docker Engine with Docker Compose v2.24 or later.
-- `openssl` (for `init-env.sh`).
+- OpenSSL 3.x as `openssl` on the `PATH` (for `init-env.sh` and the TLS tests of `@sdlc/secrets`). On macOS, `/usr/bin/openssl` is LibreSSL, and the TLS tests stop with a message when they find it: install OpenSSL 3 (`brew install openssl@3`) and put it first (`export PATH="$(brew --prefix openssl@3)/bin:$PATH"`).
 - Node.js 24 + pnpm 10 only for the `pnpm` shortcuts and tests. The shell scripts work without them.
 
 ## Start and stop
@@ -60,10 +60,11 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 | Temporal UI | 8080 | |
 | LiteLLM | 4000 | No models yet (added in M-C) |
 | SeaweedFS S3 | 8333 | Anonymous access denied |
-| OpenBao | 8200 | See below |
 | Langfuse | 3000 | `observability` profile only |
 
-Valkey, ClickHouse and the Langfuse worker publish no port.
+Valkey, ClickHouse, the Langfuse worker and **OpenBao** publish no port.
+
+OpenBao is reachable only on the Compose network (`design/QUESTIONS.md` #27, task A11). The platform processes run in Compose and use `http://openbao:8200`. Key holders and admins work inside the container with `pnpm openbao:bootstrap …` or `docker compose … exec openbao …` (runbook T11). There is no host port for `curl`.
 
 ## Platform database roles
 
@@ -124,7 +125,8 @@ pnpm openbao:bootstrap status
 - `configure` is safe to run again. It needs a root token: `pnpm openbao:bootstrap root-token` makes one from 2 shares.
 - After every restart, OpenBao is sealed again: run `unseal`.
 - Settings (shares, threshold, token and secret ID lifetimes) are in `openbao/bootstrap/bootstrap.conf`. Access rules are in `openbao/bootstrap/policies/*.hcl`.
-- AppRole secret IDs work only from the Compose network subnet (`SDLC_NETWORK_SUBNET`, default `172.30.0.0/24`). A stack started before A03 has no fixed subnet: run `pnpm compose:down`, then `pnpm compose:core` once.
+- AppRole secret IDs and tokens work only from the Compose network subnet (`SDLC_NETWORK_SUBNET`, default `172.30.0.0/24`) **without its gateway** (`SDLC_NETWORK_GATEWAY`, default `172.30.0.1`). On a Linux host every host process reaches the containers from the gateway address, so leaving it out stops logins from the host (`design/QUESTIONS.md` #37). A stack started before A03 has no fixed subnet, and one started before A11 has no fixed gateway: run `pnpm compose:down`, then `pnpm compose:core` once, then `pnpm openbao:bootstrap configure` again.
+- A `.env` created before A11 still has `OPENBAO_HOST_PORT`: delete that line (it is not used), and add `SDLC_NETWORK_GATEWAY=172.30.0.1` (or the `.1` address of your own subnet).
 - The audit log is `/openbao/logs/audit.log` on the volume `openbao-audit`.
 - The real initialisation on the internal server waits until the three key holders are named (runbook T11 section 3.2).
 - TLS is off (development only): `design/QUESTIONS.md` #20.
@@ -138,7 +140,7 @@ pnpm openbao:bootstrap status
 | Temporal UI, Langfuse web and worker, ClickHouse, SeaweedFS | Their HTTP health endpoint answers |
 | Valkey | `PING` with the password returns `PONG` |
 | LiteLLM | `/health/liveliness` answers |
-| **OpenBao** | **The API is reachable. It does NOT mean initialised or unsealed.** A new volume is uninitialised and sealed; initialise it with `openbao/bootstrap.sh` (see above). After every restart, OpenBao is sealed again until two key holders unseal it (D-03 section 10.2). Check with `curl -s http://127.0.0.1:8200/v1/sys/seal-status` |
+| **OpenBao** | **The API is reachable. It does NOT mean initialised or unsealed.** A new volume is uninitialised and sealed; initialise it with `openbao/bootstrap.sh` (see above). After every restart, OpenBao is sealed again until two key holders unseal it (D-03 section 10.2). Check with `pnpm openbao:bootstrap status` (OpenBao publishes no host port) |
 
 ## Shared Valkey: memory limit
 

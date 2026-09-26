@@ -230,7 +230,7 @@ describe('AC4: no secrets in the repo', () => {
         expect(port, name).toMatch(/^\$\{SDLC_BIND_ADDR:-127\.0\.0\.1\}:/);
       }
     }
-    for (const name of ['valkey', 'clickhouse', 'langfuse-worker'])
+    for (const name of ['valkey', 'clickhouse', 'langfuse-worker', 'openbao'])
       expect(service(name).ports).toBeUndefined();
   });
 });

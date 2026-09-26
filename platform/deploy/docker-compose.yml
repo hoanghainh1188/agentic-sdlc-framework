@@ -29,10 +29,12 @@ x-healthcheck-defaults: &healthcheck-defaults
 networks:
   sdlc:
     name: ${COMPOSE_PROJECT_NAME:-sdlc}-net
-    # Fixed subnet: OpenBao AppRole secret IDs are bound to it (A03, design/ADR-M19).
+    # Fixed subnet and gateway: OpenBao AppRole secret IDs are bound to the subnet WITHOUT the
+    # gateway, because host processes reach containers from it (A03, A11, design/ADR-M19 §2.5).
     ipam:
       config:
         - subnet: ${SDLC_NETWORK_SUBNET:-172.30.0.0/24}
+          gateway: ${SDLC_NETWORK_GATEWAY:-172.30.0.1}
 
 volumes:
   postgres-data:
@@ -265,8 +267,8 @@ services:
       - openbao-data:/openbao/file
       # File audit device (openbao.hcl). Its own volume, kept when the container is removed.
       - openbao-audit:/openbao/logs
-    ports:
-      - ${SDLC_BIND_ADDR:-127.0.0.1}:${OPENBAO_HOST_PORT:-8200}:8200
+    # No published port (A11, design/QUESTIONS.md #27): OpenBao is reachable only on the Compose
+    # network. Key holders and admins use `docker compose exec openbao` (runbook T11).
     healthcheck:
       <<: *healthcheck-defaults
       # Healthy = the API is reachable. It does NOT mean initialised or unsealed (see README).

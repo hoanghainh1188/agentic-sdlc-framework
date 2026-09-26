@@ -35,7 +35,7 @@ Requirements beyond the backlog:
 
 | Environment variable | Meaning |
 |---|---|
-| `SDLC_OPENBAO_ADDR` | `https://host:8200` (production), `http://openbao:8200` only with the next variable |
+| `SDLC_OPENBAO_ADDR` | `https://host:8200` (production), `http://openbao:8200` only with the next variable. **Since A11:** OpenBao publishes no host port, so processes use `openbao:8200` on the Compose network (QUESTIONS #27) |
 | `SDLC_OPENBAO_ALLOW_PLAINTEXT` | `1` allows `http://` (development machines and CI only, §2.4) |
 | `SDLC_OPENBAO_CA_CERT_FILE` | PEM file of the company internal CA. When set, only this CA is trusted |
 | `SDLC_OPENBAO_ROLE_ID_FILE` | File with the AppRole role ID |
@@ -70,7 +70,7 @@ Requirements beyond the backlog:
 
 - `configure.sh` (A03) now sets `token_bound_cidrs` to the same CIDRs as `secret_id_bound_cidrs`. A token copied out of a platform process does not work from anywhere else.
 - Development machines and CI: no new friction. A token works from exactly where its secret ID already works.
-- Live check (QUESTIONS #27): a login from the **host** through the published port `127.0.0.1:8200` passes the CIDR check. Docker's port proxy connects from the network gateway (`x.x.x.1`), which is inside the bound subnet. The same holds for tokens. Decision pending; the live test documents the current behaviour.
+- Live check (QUESTIONS #27): a login from the **host** through the published port `127.0.0.1:8200` passes the CIDR check. Docker's port proxy connects from the network gateway (`x.x.x.1`), which is inside the bound subnet. The same holds for tokens. **Since A11:** no host port, and the gateway is left out of the bound CIDRs, so logins and tokens from the host are refused (QUESTIONS #27, #37, ADR-M19 §2.5).
 
 ### 2.6. No secret in logs, errors or stack traces (AC3)
 
@@ -113,3 +113,4 @@ A04 is not affected. The sidecar is OpenBao's own Agent, not this client. The `l
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A04) | First version |
+| 0.2 | 2026-09-26 | Claude (task A11), approved by Harry | §2.2, §2.5: "since A11" notes (no host port, gateway left out of the bound CIDRs; QUESTIONS #27, #37) |
