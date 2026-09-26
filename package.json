@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@sdlc/adapter-git-github": "workspace:*",
     "@sdlc/adapter-model-litellm": "workspace:*",
     "@sdlc/adapter-policy-simple": "workspace:*",
     "@sdlc/config": "workspace:*",

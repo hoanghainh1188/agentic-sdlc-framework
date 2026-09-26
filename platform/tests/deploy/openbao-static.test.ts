@@ -180,8 +180,12 @@ describe('OpenBao policies', () => {
     expect(canRead('litellm', 'kv/data/shared/github-app')).toBe(false);
   });
 
-  it('only api and runner can read the GitHub App key (D-03 section 8.2)', () => {
-    expect(roles.filter((r) => canRead(r, 'kv/data/shared/github-app'))).toEqual(['api', 'runner']);
+  it('only api, worker and runner can read the GitHub App key (D-03 section 8.2, QUESTIONS #42)', () => {
+    expect(roles.filter((r) => canRead(r, 'kv/data/shared/github-app'))).toEqual([
+      'api',
+      'worker',
+      'runner',
+    ]);
   });
 
   it('each AppRole reads only its own kv subtree besides shared/github-app', () => {
