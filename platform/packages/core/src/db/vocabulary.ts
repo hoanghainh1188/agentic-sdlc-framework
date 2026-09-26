@@ -1,7 +1,7 @@
 // Vocabularies stored as PostgreSQL enums and CHECK constraints (design/D-05 section 5).
 // Canonical codes (data classes, 2+N roles, …) come from `@sdlc/contracts`; this file lists only
 // the values that exist in the database layer alone. Only the enums used by existing tables exist
-// yet (A06; `actor_type` from A07; the registry enums from B02); later tasks add theirs with their
+// yet (A06; `actor_type` from A07; the registry enums from B02; `run_status` from C02); later tasks add theirs with their
 // tables.
 // Changing a list needs a migration: design/ADR-M09-database-tooling.md section 2.5.
 import {
@@ -17,6 +17,7 @@ import {
   INTENT_STATUSES,
   PROJECT_ROLES,
   RISK_TIERS,
+  RUN_STATUSES,
 } from '@sdlc/contracts';
 
 export const GIT_PROVIDERS = ['github', 'gitlab'] as const;
@@ -37,6 +38,7 @@ export const DB_ENUMS = {
   gate_check_mode: GATE_CHECK_MODES,
   gate_reason_code: GATE_REASON_CODES,
   event_source: EVENT_SOURCES,
+  run_status: RUN_STATUSES,
 } as const;
 
 // Text columns with a CHECK constraint (D-05 section 6.1).

@@ -90,10 +90,29 @@ function raisedSecurityThreshold(config: ProjectConfig, defaults: ProjectConfig)
       ];
 }
 
+/**
+ * Above this, a Run Contract stays usable for a long time after G4 (QUESTIONS.md #33): a warning,
+ * not an error, because a slow sandbox start may need it.
+ */
+export const MAX_CONTRACT_VALIDITY_MINUTES = 60;
+
+function longContractValidity(config: ProjectConfig): ConfigIssue[] {
+  const minutes = config.run.contract_validity_minutes;
+  return minutes > MAX_CONTRACT_VALIDITY_MINUTES
+    ? [
+        issue('config.warning.contract_validity_long', 'run.contract_validity_minutes', {
+          minutes,
+          maximum: MAX_CONTRACT_VALIDITY_MINUTES,
+        }),
+      ]
+    : [];
+}
+
 export function loosenedSettings(config: ProjectConfig, defaults: ProjectConfig): ConfigIssue[] {
   return [
     ...loosenedCells(config, defaults),
     ...raisedSecurityThreshold(config, defaults),
     ...loosenedCalendar(config, defaults),
+    ...longContractValidity(config),
   ];
 }

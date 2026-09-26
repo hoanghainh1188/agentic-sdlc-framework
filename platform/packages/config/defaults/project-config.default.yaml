@@ -131,6 +131,13 @@ run:
     identical_tool_calls_max: 3
     # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). FR-35; QUESTIONS.md #9.
     no_progress_window_minutes: 15
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-03 §8; QUESTIONS.md #33.
+  # Run Contract validity from issue to sandbox start only; the run itself is capped by its
+  # max_duration_min. Above 60 minutes gives a warning.
+  contract_validity_minutes: 15
+  # D-03 §8; ADR-M22. Tolerated clock difference between worker and runner for the "not yet
+  # valid" check only. Expiry has no tolerance.
+  contract_clock_skew_seconds: 0
 
 budget:
   # D-07 §6; D-02 FR-52; handbook Ch.3 §3.6: warning at 80 %, stop at 100 %.

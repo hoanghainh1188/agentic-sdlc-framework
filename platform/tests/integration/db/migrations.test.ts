@@ -58,6 +58,21 @@ const UPDATABLE: Record<string, readonly string[]> = {
   plans: [],
   // Append-only (D-05 D3, B02).
   gate_decisions: [],
+  // C02: the state of a run changes until it is final (trigger); its inputs never do.
+  runs: [
+    'head_sha',
+    'status',
+    'stop_reason',
+    'started_at',
+    'finished_at',
+    'iterations',
+    'killed_by',
+    'updated_at',
+  ],
+  // Written once; revocation (MVP+) will get its own grant.
+  run_contracts: [],
+  // Append-only (D-05 D3, C02).
+  run_events: [],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -180,7 +195,7 @@ describeDb('AC2: migrations on PostgreSQL', () => {
         c.confdeltype AS on_delete
       FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace AND n.nspname = 'public'
       WHERE c.contype = 'f' AND c.conrelid::regclass::text NOT LIKE 'kysely_%'`);
-    expect(fks).toHaveLength(19);
+    expect(fks).toHaveLength(25);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

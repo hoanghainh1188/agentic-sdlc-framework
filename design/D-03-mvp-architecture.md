@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.2 |
+| Version | 1.3 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -339,6 +339,9 @@ The MVP builds a light version that **keeps the main idea**:
 | `repo`, `base_sha`, `branch` | `agent/INT-2026-0001` |
 | `planned_files` | File list from the G3 plan |
 | `agent_id`, `agent_version`, `instructions_sha256` | From the agent register |
+| `schema_version` | `1` (ADR-M22) |
+| `plan_id`, `plan_sha256` | The plan approved at G3 |
+| `allowed_tools` | Agent's registered tools ∩ tools of the plan task (template T13, handbook Ch.13 G4; QUESTIONS #34) |
 | `autonomy_level` | L2 |
 | `max_tokens_usd`, `max_iterations`, `max_duration_min`, `loop_threshold` | Caps |
 | `allowed_models` | From policy |
@@ -346,9 +349,11 @@ The MVP builds a light version that **keeps the main idea**:
 | `issued_at`, `expires_at` | Short validity |
 | `signature` | **Ed25519** signature with the platform key |
 
+- The signed bytes are the RFC 8785 canonical JSON of the contract without the signature; `contract_sha256` is their SHA-256 (ADR-M22).
+- Validity (`expires_at − issued_at`) covers issue → sandbox start only: `run.contract_validity_minutes` in the project config (default 15, warning above 60; QUESTIONS #33). The run itself is capped by `max_duration_min`. `run.contract_clock_skew_seconds` (default 0) applies to the "not yet valid" check only; expiry has no tolerance.
 - The signing key lives in **OpenBao** (Transit engine). The platform sends the contract content to be signed; **the key never leaves OpenBao**.
 - The runner verifies the signature with the public key obtained from OpenBao.
-- The runner **rejects** contracts that are expired, wrongly signed, or not in the database.
+- The runner **rejects** contracts that are expired, wrongly signed, or not in the database. It also rejects contracts that differ from the stored one, are not yet valid, are revoked, or belong to a run that already left `queued`. The signature names its key version, so contracts signed before a key rotation verify until they expire (ADR-M22 §2.4).
 - MVP+: add revocation and scheduled key rotation, as in draft v1.0.
 
 ### 8.1. Secret manager: OpenBao or HashiCorp Vault
@@ -584,4 +589,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: oversight resolution, 2+N approval rules, approval binding and expiry, escalation with SLA timers, kill switch, agent register, AI record; new state machine; ADR-M13…M15 |
 | 1.1 | 2026-09-25 | Claude (task B01), approved by Harry | §6.1: G6 security threshold `min_severity` (critical always HITL, rule M6) and G5 `on_breach`; §7.3: notes on the contracts `PolicyEngine` (validated config, `canApprove` inputs, model list, `prohibited` → L0, forbidden-action lists). QUESTIONS.md #16–#19 |
 | 1.2 | 2026-09-25 | Claude, approved by Harry | §8.2: provider keys reach LiteLLM through an OpenBao Agent sidecar (tmpfs), no Enterprise licence; §8.2/§9: TLS on OpenBao 8200 with an internal CA (QUESTIONS #1, #20) |
+| 1.3 | 2026-09-26 | Claude (task C02), approved by Harry | §8: `schema_version`, `plan_id`, `plan_sha256`, `allowed_tools`; signed form; contract validity and clock skew from config; rejection list; key rotation (ADR-M22, QUESTIONS #33, #34) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |
