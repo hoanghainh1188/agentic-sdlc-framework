@@ -5,7 +5,7 @@
 | Status | **Proposed** (task A03, PR for review) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25, with changes) |
-| Related | D-03 sections 8, 8.1, 8.2, 10.2; D-08 tasks A03, A11; ADR-M05, ADR-M17; handbook Ch.3; runbook T11; QUESTIONS #1, #2, #20, #27, #37 |
+| Related | D-03 sections 8, 8.1, 8.2, 10.2; D-08 tasks A03, A11; ADR-M05, ADR-M17; handbook Ch.3; runbook T11; QUESTIONS #1, #2, #20, #27, #37, #42 |
 
 ## 1. Context
 
@@ -53,7 +53,7 @@ Who may read what is **only** in `bootstrap/policies/<name>.hcl`. The scripts co
 | Policy | KV (mount `kv/`, version 2) | Transit |
 |---|---|---|
 | `api` | `api/*`, `shared/github-app` | — |
-| `worker` | `worker/*` | sign and verify with `run-contract`; read the public key |
+| `worker` | `worker/*`, `shared/github-app` (QUESTIONS #42) | sign and verify with `run-contract`; read the public key |
 | `runner` | `runner/*`, `shared/github-app` | verify; read the public key |
 | `cost-controller` | `cost-controller/*` (includes `litellm-master-key`) | — |
 | `platform-admin` | create, read, update `kv/*` (no delete, no destroy) | read the public key |
@@ -127,3 +127,4 @@ The `runner` policy can read the GitHub App private key (`kv/shared/github-app`)
 | 0.1 | 2026-09-25 | Claude (task A03) | First version |
 | 0.2 | 2026-09-25 | Claude (task A04) | §2.5: tokens bound to the subnet (`token_bound_cidrs`), host exception (QUESTIONS #27); §3: open items updated |
 | 0.3 | 2026-09-26 | Claude (task A11), approved by Harry | §2.5: no host port (QUESTIONS #27, option A); gateway pinned and left out of the bound CIDRs, trust model (QUESTIONS #37, option A2) |
+| 0.4 | 2026-09-26 | Claude (task B05), approved by Harry | §2.4: `worker` also reads `shared/github-app` (it polls GitHub, posts gate comments, reads spec files; QUESTIONS #42) |

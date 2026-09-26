@@ -82,7 +82,7 @@ Steps:
 What `configure` sets up (details: `design/ADR-M19-openbao-bootstrap.md`):
 - KV version 2 at `kv/`;
 - Transit at `transit/`, with the Ed25519 key `run-contract` (not exportable, not deletable);
-- AppRoles `api`, `worker`, `runner`, `cost-controller`, each reading only `kv/<its name>/…` (plus `kv/shared/github-app` for `api` and `runner`);
+- AppRoles `api`, `worker`, `runner`, `cost-controller`, each reading only `kv/<its name>/…` (plus `kv/shared/github-app` for `api`, `worker` and `runner`);
 - the token role `platform-admin` (tokens of at most 1 hour);
 - a check that the file audit device is on.
 
@@ -146,12 +146,28 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 
 | Secret | Path | Read by |
 |---|---|---|
-| GitHub App private key | `kv/shared/github-app` | `api`, `runner` |
+| GitHub App private key | `kv/shared/github-app` | `api`, `worker`, `runner` |
 | LiteLLM master key | `kv/cost-controller/litellm-master-key` | `cost-controller` |
 | Database and SeaweedFS passwords of a process | `kv/<process>/…` | That process |
 | Model provider keys | `kv/litellm/providers/…` | Nobody yet (`design/QUESTIONS.md` #1) |
 
-The GitHub App key is read by the runner to create short-lived tokens. It must **never** enter an agent sandbox (task C04).
+The GitHub App key is read by `api`, by the `worker` (it polls GitHub, posts gate comments and reads spec files; `design/QUESTIONS.md` #42) and by the runner to create short-lived tokens. It must **never** enter an agent sandbox (task C04; `design/QUESTIONS.md` #44 may remove the runner's access).
+
+### The GitHub App (task B05)
+
+Create one GitHub App per installation of the platform (`design/ADR-M23-github-adapter.md` section 2.2):
+
+- Repository permissions: Metadata read, Issues read and write, Pull requests read, Checks read, Commit statuses read, Contents read. Later tasks add Contents write (C04) and Pull requests write (C08).
+- No organisation or account permissions. Webhook: off (the platform polls). Install it on **selected** repositories only.
+- Generate a private key. Store it with the App's client ID in `kv/shared/github-app` (fields `client_id` and `private_key`), then delete the downloaded `.pem` file. The admin token is typed at the hidden prompt; the key goes through stdin, never through a command-line argument:
+
+```bash
+{ read -rs t && printf '%s\n%s\n' "$t" "<client ID>" && cat /path/to/app.private-key.pem; } | \
+  docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T openbao \
+  sh -c 'read -r BAO_TOKEN && read -r CLIENT_ID && export BAO_TOKEN && bao kv put -mount=kv shared/github-app client_id="$CLIENT_ID" private_key=-'
+```
+
+- Key rotation: generate a new key in GitHub, store it the same way, wait 10 minutes (the platform reads the key again after that), then delete the old key in GitHub.
 
 ### Issuing a secret ID: sensitive, audited
 
@@ -296,3 +312,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.2 | 2026-09-25 | Claude Code (task A03) | Full content. Sections 3.1, 4, 5, 5b and 8.1 tested on a development machine with throw-away keys (`bootstrap.sh`, live test `pnpm test:openbao`). Sections 6, 7 and 8.2 to be tested in A10. The real initialisation (3.2) is described, not performed |
 | 0.3 | 2026-09-25 | Claude Code (task A04) | Section 5c (client settings, credential files, secret ID rotation without restart); tokens bound to the subnet; troubleshooting rows for the client messages; host-port exception (`design/QUESTIONS.md` #27) |
 | 0.4 | 2026-09-26 | Claude Code (task A11) | OpenBao publishes no host port: all admin work through `docker compose exec` (section 1); gateway left out of the bound CIDRs and the trust model (section 5b, `design/QUESTIONS.md` #27, #37); `SDLC_OPENBAO_ADDR` in section 5c; troubleshooting rows |
+| 0.5 | 2026-09-26 | Claude Code (task B05) | The `worker` AppRole also reads the GitHub App key `kv/shared/github-app` (`design/QUESTIONS.md` #42); section 5b: creating the GitHub App, storing and rotating its key (not yet tested with a real App) |

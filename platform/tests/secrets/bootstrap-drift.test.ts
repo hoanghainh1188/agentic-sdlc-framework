@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { DEFAULT_GITHUB_APP_SECRET_PATH } from '@sdlc/adapter-git-github';
 import { DEFAULT_MOUNTS, RUN_CONTRACT_KEY } from '@sdlc/secrets';
 import { describe, expect, it } from 'vitest';
 
@@ -34,5 +35,13 @@ describe('client defaults match the OpenBao bootstrap', () => {
     );
     expect(policy('runner')).toContain(`path "${DEFAULT_MOUNTS.transit}/keys/${RUN_CONTRACT_KEY}"`);
     expect(configure).toContain(`auth/${DEFAULT_MOUNTS.approle}/role/`);
+  });
+});
+
+describe('GitHub App key path (D-03 §8.2, B05, QUESTIONS #42)', () => {
+  it('the adapter default path is readable by api, worker and runner, and by no other role', () => {
+    const readable = `path "${DEFAULT_MOUNTS.kv}/data/${DEFAULT_GITHUB_APP_SECRET_PATH}"`;
+    for (const role of ['api', 'worker', 'runner']) expect(policy(role), role).toContain(readable);
+    expect(policy('cost-controller')).not.toContain(readable);
   });
 });
