@@ -40,7 +40,9 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
   const envFile = path.join(tmp, 'it.env');
   const project = `sdlcbao${process.pid}`;
   const network = `${project}-net`;
-  const subnet = `172.30.${100 + (process.pid % 100)}.0/24`;
+  // Subnet ranges per live test file stay disjoint: bootstrap 100–149, run-contract-signing
+  // 150–199, compose-up 200–224, secrets-client 225–249.
+  const subnet = `172.30.${100 + (process.pid % 50)}.0/24`;
   const gateway = subnet.replace(/0\/24$/, '1');
   const bootstrap = path.join(deployDir, 'openbao/bootstrap.sh');
   let image = '';
