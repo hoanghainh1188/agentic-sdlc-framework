@@ -47,6 +47,7 @@
 - C02: config `run.contract_validity_minutes` (default 15, warning above 60) and `run.contract_clock_skew_seconds` (default 0); default `config_hash` changes. Live test `platform/tests/integration/openbao/run-contract-signing.test.ts` (`pnpm test:openbao`): worker signs, runner verifies, key rotation. `design/QUESTIONS.md` #32–#35 (#35: C04 claims a run with one conditional update); D-03 1.3, D-05 1.5. CLAUDE.md: ADR numbers taken up to ADR-M22.
 
 ### Changed
+- CLAUDE.md `Current constraints` after C02 (PR #79): A11 in review and B05 now (B05 unblocks C04 on the critical path); then C04 and A10. B05 gets QUESTIONS #42–#46 and ADR-M23; C02 used #32–#35.
 - CLAUDE.md `Current constraints` after B02 (PR #69): A04 in review; C02 next once A04 is merged (needs A04 and B02); B02 used QUESTIONS #22 only.
 - A03: existing development stacks need `pnpm compose:down` once, because the Compose network now has a fixed subnet. The A02 live test uses its own subnet.
 - CLAUDE.md `Current constraints` after A07: session order B01 and A03 now, then A04 and B02; A03 and A04 may use throw-away test keys on dev machines only, while the real OpenBao initialisation on the internal server still waits for the three key holders (Harry, 2026-09-25).
