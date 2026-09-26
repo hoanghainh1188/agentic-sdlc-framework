@@ -216,6 +216,69 @@ handbook updated (approved) → design doc updated → change task added in scri
 
 ---
 
+## Step 11. Create the GitHub App (dev/test)
+
+The GitHub adapter (B05, ADR-M23) talks to GitHub through a **GitHub App**. Use a **dev/test App** that is installed on a test repository only. Production gets its own App later, with its key in the real OpenBao.
+
+Done once by the repo owner in the browser. Claude must never read or handle the private key.
+
+1. **Test repository.** Private repository `harryforge/pilot-order-inventory` with a README, and one open issue for the live test (issue #1, "Live test issue (GitHub adapter)").
+2. **Create the App:** organization settings → Developer settings → GitHub Apps → **New GitHub App** (`https://github.com/organizations/harryforge/settings/apps/new`).
+
+| Field | Value |
+|---|---|
+| GitHub App name | `harryforge-sdlc-dev` |
+| Homepage URL | `https://github.com/harryforge/agentic-sdlc-framework` |
+| Callback URL | empty |
+| Webhook → Active | **off** (the MVP polls, QUESTIONS #43, ADR-M11) |
+| Where can this App be installed | Only on this account |
+
+3. **Repository permissions** (everything else "No access"; no organization or account permissions):
+
+| Permission | Level |
+|---|---|
+| Contents | Read-only |
+| Issues | Read and write |
+| Pull requests | Read-only |
+| Checks | Read-only |
+| Commit statuses | Read-only |
+| Metadata | Read-only (automatic) |
+
+   Later tasks add only what they need: C04 Contents read and write (push `agent/*` branches), C08 Pull requests read and write.
+
+4. **Note the Client ID** (`Iv…`). It is not a secret; the adapter uses it as the JWT issuer (the numeric App ID also works).
+5. **Private key:** "Generate a private key", then move it out of Downloads, outside the repository:
+
+```bash
+mkdir -p ~/.config/sdlc-secrets && chmod 700 ~/.config/sdlc-secrets
+mv ~/Downloads/*.private-key.pem ~/.config/sdlc-secrets/github-app-dev.pem
+chmod 600 ~/.config/sdlc-secrets/github-app-dev.pem
+```
+
+   Never paste the key into a chat, commit it, or send it by e-mail or chat tools.
+6. **Install the App** on `harryforge` → **Only select repositories** → `pilot-order-inventory` only.
+7. **Live test** (optional, never in CI). Create `~/.config/sdlc-secrets/github-test-app.json` (mode 600); it holds a **path** to the key, not the key:
+
+```json
+{
+  "client_id": "Iv…",
+  "private_key_file": "/Users/<you>/.config/sdlc-secrets/github-app-dev.pem",
+  "repo": "harryforge/pilot-order-inventory",
+  "issue": 1,
+  "file_path": "README.md",
+  "commit_sha": "<40-hex commit on main>"
+}
+```
+
+```bash
+nvm use 24   # the repository needs Node 24
+SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=~/.config/sdlc-secrets/github-test-app.json \
+  pnpm exec vitest run --config vitest.integration.config.ts platform/tests/integration/github
+```
+
+   It issues a one-repository token, posts a comment on the issue, polls it back and reads a file.
+8. **OpenBao (when the worker polls GitHub, B06):** store `client_id` and `private_key` in `kv/shared/github-app` of the dev OpenBao, reading the key from the file (never typing it). The commands go in runbook T11 with B06.
+
 ## Sending handbook comments
 
 Any format works. To make changes fast, one line per comment is ideal:
