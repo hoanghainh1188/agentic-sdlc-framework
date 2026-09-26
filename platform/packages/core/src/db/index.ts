@@ -22,6 +22,7 @@ export type {
 export type { IntentQuery, IntentStateChange, NewIntent } from './repositories/intents.js';
 export type { SubmitPlan } from './repositories/plans.js';
 export type { RegistryActor } from './repositories/registry-actor.js';
+export type { StoreRunContract, StoredRunContract } from './repositories/run-contracts.js';
 export { isSafeRepoPath, type LinkSpec } from './repositories/spec-refs.js';
 export type { SaveProjectConfig } from './repositories/project-configs.js';
 export type { RoleBindingQuery } from './repositories/role-bindings.js';
@@ -37,6 +38,9 @@ export type {
   ProjectAiRecord,
   ProjectConfig,
   RoleBinding,
+  Run,
+  RunContractRow,
+  RunEventRow,
   SpecRef,
   Tenant,
   TenantInsert,

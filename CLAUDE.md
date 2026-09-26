@@ -102,6 +102,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - Audit log (A07, ADR-M09 §2.8): append-only, hash chain per tenant. Write only through `TenantScope.audit.append` with an action declared in `platform/packages/core/src/audit/actions.ts`; payloads hold IDs, codes, hashes and versions only (never personal or client data).
   - `pnpm sdlc audit verify [--tenant <slug>] [--json]` — check the chain (exit 1 when broken). Needs `SDLC_DB_URL` (`platform_app`). Temporary direct DB access; B04 moves it behind the API.
 - Registry (B02, `design/ADR-M20-registry.md`): intents, spec refs, plans and gate decisions through `TenantScope` or the `Registry` facade, which needs a `PolicyFactory` (the apps pass `createSimplePolicyEngine`). Gate decisions are append-only and hold codes, hashes and IDs only: `reason_code` plus an optional `https://` `reason_ref`, never free text.
+- Run Contracts (C02, `design/ADR-M22-run-contract.md`): the worker calls `issueRunContract` (core) with a `RunContractSigner` (`@sdlc/secrets` Transit); the runner calls `verifyRunContract` with a `RunContractVerifier`. Signed bytes = RFC 8785 canonical JSON of the contract. `run_events` payloads hold only the fields declared in `platform/packages/core/src/run-events/types.ts`; add a new event type there with a test.
 - CI: `.github/workflows/ci.yml` (A09) runs the checks above, Gitleaks, Semgrep and Trivy, and the Compose `core` integration job. Actions are pinned by commit SHA; thresholds live in the workflow `env:`.
 
 ## Current constraints

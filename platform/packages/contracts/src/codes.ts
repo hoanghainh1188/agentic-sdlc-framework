@@ -83,6 +83,37 @@ export const INTENT_STATUSES = [
 ] as const;
 export type IntentStatus = (typeof INTENT_STATUSES)[number];
 
+/** Status of an agent run (design/D-05 section 5 `run_status`). */
+export const RUN_STATUSES = [
+  'queued',
+  'provisioning',
+  'running',
+  'stopping',
+  'succeeded',
+  'succeeded_proposal_only',
+  'failed',
+  'stopped_budget',
+  'stopped_scope',
+  'stopped_timeout',
+  'stopped_stalled',
+  'stopped_killed',
+  'cancelled',
+] as const;
+export type RunStatus = (typeof RUN_STATUSES)[number];
+
+/** Final run statuses: once a run has one, the database refuses any change to it (ADR-M22). */
+export const FINAL_RUN_STATUSES = [
+  'succeeded',
+  'succeeded_proposal_only',
+  'failed',
+  'stopped_budget',
+  'stopped_scope',
+  'stopped_timeout',
+  'stopped_stalled',
+  'stopped_killed',
+  'cancelled',
+] as const satisfies readonly RunStatus[];
+
 /**
  * A decision at a gate (design/D-05 section 5 `gate_decision`). Humans record `approve`, `reject`,
  * `request_changes`, `pause` and `block`; the system records `pass`, `fail`, `block`, `pause` and
