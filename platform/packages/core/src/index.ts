@@ -2,3 +2,5 @@
 export * from './db/index.js';
 export * from './audit/index.js';
 export * from './registry/index.js';
+export * from './run-contract/index.js';
+export * from './run-events/index.js';

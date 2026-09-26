@@ -106,6 +106,10 @@ export interface ProjectConfig {
       readonly identical_tool_calls_max: number;
       readonly no_progress_window_minutes: number;
     };
+    /** Run Contract validity, from issue to sandbox start (QUESTIONS.md #33, ADR-M22). */
+    readonly contract_validity_minutes: number;
+    /** Tolerated clock difference for the "not yet valid" check only; expiry has none (ADR-M22). */
+    readonly contract_clock_skew_seconds: number;
   };
   readonly budget: {
     readonly warn_percent: number;

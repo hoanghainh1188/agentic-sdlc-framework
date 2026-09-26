@@ -79,6 +79,18 @@ export const AUDIT_ACTIONS = {
       voids_decision_id: 'uuid?',
     },
   },
+  /** A Run Contract was signed and stored for a new run (D-03 section 8, ADR-M22). */
+  'run.contract_issued': {
+    entityType: 'run',
+    fields: {
+      intent_id: 'uuid',
+      attempt: 'version',
+      contract_sha256: 'sha256',
+      key_version: 'version',
+    },
+  },
+  /** The runner refused the Run Contract of a known run; `reason` is a reject reason code. */
+  'run.contract_rejected': { entityType: 'run', fields: { reason: 'code' } },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

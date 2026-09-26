@@ -14,6 +14,9 @@ import { ProjectAiRecordRepository } from './repositories/project-ai-records.js'
 import { ProjectConfigRepository } from './repositories/project-configs.js';
 import { ProjectRepository } from './repositories/projects.js';
 import { RoleBindingRepository } from './repositories/role-bindings.js';
+import { RunContractRepository } from './repositories/run-contracts.js';
+import { RunEventRepository } from './repositories/run-events.js';
+import { RunRepository } from './repositories/runs.js';
 import { SpecRefRepository } from './repositories/spec-refs.js';
 import { UserIdentityRepository } from './repositories/user-identities.js';
 import { UserRepository } from './repositories/users.js';
@@ -37,6 +40,9 @@ export class TenantScope {
   readonly specRefs: SpecRefRepository;
   readonly plans: PlanRepository;
   readonly gateDecisions: GateDecisionRepository;
+  readonly runs: RunRepository;
+  readonly runContracts: RunContractRepository;
+  readonly runEvents: RunEventRepository;
 
   private readonly db: Kysely<Database>;
 
@@ -58,6 +64,9 @@ export class TenantScope {
     this.specRefs = new SpecRefRepository(this.db, this.tenantId);
     this.plans = new PlanRepository(this.db, this.tenantId);
     this.gateDecisions = new GateDecisionRepository(this.db, this.tenantId);
+    this.runs = new RunRepository(this.db, this.tenantId);
+    this.runContracts = new RunContractRepository(this.db, this.tenantId);
+    this.runEvents = new RunEventRepository(this.db, this.tenantId);
   }
 
   /** Runs `work` in one database transaction, with repositories bound to the same tenant. */
