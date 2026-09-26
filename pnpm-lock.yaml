@@ -14,6 +14,9 @@ importers:
       '@sdlc/adapter-git-github':
         specifier: workspace:*
         version: link:platform/packages/adapters/git-github
+      '@sdlc/adapter-model-litellm':
+        specifier: workspace:*
+        version: link:platform/packages/adapters/model-litellm
       '@sdlc/adapter-policy-simple':
         specifier: workspace:*
         version: link:platform/packages/adapters/policy-simple
@@ -94,7 +97,11 @@ importers:
         specifier: workspace:*
         version: link:../../contracts
 
-  platform/packages/adapters/model-litellm: {}
+  platform/packages/adapters/model-litellm:
+    dependencies:
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
 
   platform/packages/adapters/policy-simple:
     dependencies:

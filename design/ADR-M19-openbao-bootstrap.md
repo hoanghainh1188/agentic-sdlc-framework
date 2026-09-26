@@ -40,7 +40,7 @@ A03 runs on development machines with **throw-away test keys** only. The real in
 |---|---|---|
 | `BAO_KEY_SHARES` / `BAO_KEY_THRESHOLD` | 3 / 2 | D-03 §10.2 |
 | `TRANSIT_KEY` / `TRANSIT_KEY_TYPE` | `run-contract` / `ed25519` | D-03 §8, D-08 A03 |
-| `APPROLE_ROLES` | `api worker runner cost-controller` | D-08 A03 AC2 |
+| `APPROLE_ROLES` | `api worker runner cost-controller litellm` | D-08 A03 AC2; `litellm` since C03 (ADR-M24) |
 | `APPROLE_TOKEN_TTL` / `APPROLE_TOKEN_MAX_TTL` | 1h / 4h, renewable | [Proposal], approved |
 | `APPROLE_SECRET_ID_TTL` | 2160h (90 days). Rotated every 3 months with the access review | Handbook Ch.3; approved |
 | `SECRET_ID_BOUND_CIDRS` | `compose-network`: the subnet of the Compose network | Approved |
@@ -56,11 +56,12 @@ Who may read what is **only** in `bootstrap/policies/<name>.hcl`. The scripts co
 | `worker` | `worker/*`, `shared/github-app` (QUESTIONS #42) | sign and verify with `run-contract`; read the public key |
 | `runner` | `runner/*`, `shared/github-app` | verify; read the public key |
 | `cost-controller` | `cost-controller/*` (includes `litellm-master-key`) | — |
+| `litellm` (since C03) | read `litellm/providers/*`, list `kv/metadata/litellm/providers/`, read `litellm/salt-key` and exactly `cost-controller/litellm-master-key` | — |
 | `platform-admin` | create, read, update `kv/*` (no delete, no destroy) | read the public key |
 
 - One subtree per process: `kv/<process>/…`. Shared secrets live under `kv/shared/…`, and each policy that needs one names it explicitly.
 - No policy grants `sys/*`, Transit `export`, `backup` or `restore`, or any change to Transit keys. The key is created with `exportable=false`, `allow_plaintext_backup=false` and `deletion_allowed=false`. `configure` checks these values on every run and never changes an existing key.
-- `kv/litellm/providers/*` is reserved for model provider keys. **No AppRole reads it yet**; it waits for QUESTIONS #1 (how LiteLLM gets provider keys).
+- `kv/litellm/providers/*` holds the model provider keys. **Since C03**, only the AppRole `litellm` reads it: the OpenBao Agent sidecar of LiteLLM (QUESTIONS #1 option B, ADR-M24). The same role reads the LiteLLM master key from its one source, `kv/cost-controller/litellm-master-key`.
 - `platform-admin` is for daily work (D-03 §10.2). Its tokens come only from the token role `platform-admin`: orphan, not renewable, at most 1 hour. Issuing AppRole secret IDs is part of this policy. It is a sensitive, audited operation (runbook T11 §8).
 - Everything else (policies, mounts, AppRoles, audit) needs a root token: `configure` again.
 
@@ -95,7 +96,7 @@ The `runner` policy can read the GitHub App private key (`kv/shared/github-app`)
 | Item | Where |
 |---|---|
 | TLS on the OpenBao listeners (carried over from A02) | QUESTIONS #20 |
-| How LiteLLM reads model provider keys | QUESTIONS #1 |
+| How LiteLLM reads model provider keys | Done in C03: OpenBao Agent sidecar, AppRole `litellm` (QUESTIONS #1, ADR-M24) |
 | Delivering secret IDs to processes (response wrapping, file mounts) | A04 defined the client side: role ID and secret ID files (ADR-M21 §2.2). File mounts and response wrapping: deployment of the platform processes (ADR-M21 §3) |
 | Audit log rotation, off-server copy, 2-year retention | A10, E05 |
 | Real initialisation on the internal server | After the three key holders are named (runbook T11 §3) |
@@ -128,3 +129,4 @@ The `runner` policy can read the GitHub App private key (`kv/shared/github-app`)
 | 0.2 | 2026-09-25 | Claude (task A04) | §2.5: tokens bound to the subnet (`token_bound_cidrs`), host exception (QUESTIONS #27); §3: open items updated |
 | 0.3 | 2026-09-26 | Claude (task A11), approved by Harry | §2.5: no host port (QUESTIONS #27, option A); gateway pinned and left out of the bound CIDRs, trust model (QUESTIONS #37, option A2) |
 | 0.4 | 2026-09-26 | Claude (task B05), approved by Harry | §2.4: `worker` also reads `shared/github-app` (it polls GitHub, posts gate comments, reads spec files; QUESTIONS #42) |
+| 0.5 | 2026-09-26 | Claude (task C03), approved by Harry | §2.3, §2.4: AppRole `litellm` for the LiteLLM sidecar (provider keys, salt key, the master key path); §3 open item done (QUESTIONS #1, ADR-M24) |

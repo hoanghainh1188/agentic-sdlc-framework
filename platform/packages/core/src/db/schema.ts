@@ -1,5 +1,5 @@
-// Kysely types for the `platform` database (design/D-05 sections 6.1–6.4 and 6.7; A06, A07, B02,
-// C02).
+// Kysely types for the `platform` database (design/D-05 sections 6.1–6.5 and 6.7; A06, A07, B02,
+// C02, C03).
 // Written by hand. `TABLE_COLUMNS` mirrors them at runtime; the integration tests compare both
 // with the live schema, so the types cannot drift from the migrations.
 import type {
@@ -14,6 +14,7 @@ import type {
   GateReasonCode,
   IntentStatus,
   ProjectRole,
+  ProviderType,
   RiskTier,
   RunStatus,
 } from '@sdlc/contracts';
@@ -304,6 +305,31 @@ export interface RunEventsTable {
   created_at: CreatedAt;
 }
 
+/**
+ * Append-only cost records (D-05 section 6.5, ADR-M24): one row per model call, synced from the
+ * gateway. Codes, IDs and numbers only.
+ */
+export interface CostRecordsTable {
+  /** bigint identity; `pg` returns int8 as a string. */
+  id: ColumnType<string, never, never>;
+  tenant_id: Immutable<string>;
+  project_id: Immutable<string>;
+  intent_id: ColumnType<string | null, string | null, never>;
+  run_id: ColumnType<string | null, string | null, never>;
+  gate: ColumnType<GateCode | null, GateCode | null, never>;
+  agent: ColumnType<string | null, string | null, never>;
+  model: Immutable<string>;
+  provider_type: Immutable<ProviderType>;
+  /** bigint: `pg` returns int8 as a string. */
+  input_tokens: ColumnType<string, number, never>;
+  output_tokens: ColumnType<string, number, never>;
+  cached_input_tokens: ColumnType<string, number, never>;
+  cost_usd: ColumnType<string, string, never>;
+  source_ref: Immutable<string>;
+  occurred_at: Immutable<Date>;
+  created_at: CreatedAt;
+}
+
 export interface Database {
   tenants: TenantsTable;
   projects: ProjectsTable;
@@ -322,6 +348,7 @@ export interface Database {
   runs: RunsTable;
   run_contracts: RunContractsTable;
   run_events: RunEventsTable;
+  cost_records: CostRecordsTable;
 }
 
 export type TableName = keyof Database;
@@ -543,6 +570,24 @@ export const TABLE_COLUMNS = {
     'payload',
     'created_at',
   ]),
+  cost_records: columns<CostRecordsTable>()([
+    'id',
+    'tenant_id',
+    'project_id',
+    'intent_id',
+    'run_id',
+    'gate',
+    'agent',
+    'model',
+    'provider_type',
+    'input_tokens',
+    'output_tokens',
+    'cached_input_tokens',
+    'cost_usd',
+    'source_ref',
+    'occurred_at',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -567,6 +612,7 @@ export const TENANT_COLUMN = {
   runs: 'tenant_id',
   run_contracts: 'tenant_id',
   run_events: 'tenant_id',
+  cost_records: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -586,6 +632,7 @@ export type GateDecisionRow = Selectable<GateDecisionsTable>;
 export type Run = Selectable<RunsTable>;
 export type RunContractRow = Selectable<RunContractsTable>;
 export type RunEventRow = Selectable<RunEventsTable>;
+export type CostRecordRow = Selectable<CostRecordsTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

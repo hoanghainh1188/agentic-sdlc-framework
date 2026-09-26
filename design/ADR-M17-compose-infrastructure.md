@@ -44,7 +44,7 @@ All licences allow commercial use and redistribution (NFR-04). No MinIO, Redis o
 | PostgreSQL | One server. One database **and one owner role** per component: `platform`, `temporal` + `temporal_visibility`, `litellm`, `langfuse`. Created by an init script on the first start |
 | Temporal | Temporal stopped publishing the `auto-setup` image after 1.29. A one-shot job (`admin-tools`, `temporal-sql-tool`) creates and upgrades the schemas. A second job creates the namespace `default`. The server uses the PostgreSQL plugin and SQL visibility, with no Elasticsearch |
 | Temporal retention | Closed workflows are kept **30 days** (`TEMPORAL_NAMESPACE_RETENTION`). This is unrelated to audit retention, which lives in the platform database (≥ 2 years, A07) |
-| LiteLLM | Uses its own database (mandatory for budgets, D-07 section 3). No models and no provider keys yet. Telemetry is off |
+| LiteLLM | Uses its own database (mandatory for budgets, D-07 section 3). Telemetry is off. **Since C03:** models and keys come from OpenBao through the OpenBao Agent sidecar `litellm-agent` in the new profile `models` (always on on the server); without it, LiteLLM starts with no models and the development master and salt keys from `.env`, which are the only `${VAR:-}` secrets (ADR-M24) |
 | SeaweedFS | Single node (`weed server -s3`). One S3 admin identity from `.env`; anonymous access is denied. A job creates the buckets `evidence` and `langfuse`. The `evidence` bucket has no lifecycle rule: retention is `evidence_retention_days` in project config (A05, E05) |
 | OpenBao | Raft storage, no dev mode. It starts **uninitialised and sealed**; A03 initialises it. Its healthcheck means "API reachable", **not** "unsealed". TLS is off on the internal network and the port is bound to 127.0.0.1; TLS is an open item for A03. **Since A11:** OpenBao publishes no port on the host, and the network gateway is pinned (`SDLC_NETWORK_GATEWAY`) and left out of the AppRole CIDRs (QUESTIONS #27, #37, ADR-M19 §2.5) |
 | Langfuse | Version 4. Open sign-up is disabled (`AUTH_DISABLE_SIGNUP=true`). The only account is created by headless initialisation from `.env`. Telemetry is off. It shares PostgreSQL, Valkey and SeaweedFS |
@@ -88,3 +88,4 @@ All licences allow commercial use and redistribution (NFR-04). No MinIO, Redis o
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A02) | First version |
 | 0.2 | 2026-09-26 | Claude (task A11), approved by Harry | §2.3: "since A11" notes for OpenBao (no host port, gateway pinned and left out of the AppRole CIDRs; QUESTIONS #27, #37) |
+| 0.3 | 2026-09-26 | Claude (task C03), approved by Harry | §2.3: profile `models` with the LiteLLM sidecar; development-only LiteLLM keys in `.env` (ADR-M24) |

@@ -31,6 +31,10 @@ Commands:
                        Revokes the root token at the end unless --keep-token is given.
   root-token           Ask for key shares (hidden) and create a new root token. Prints it
                        ONE time, to the terminal only. Revoke it after use.
+  litellm-credentials  Ask for an admin token (hidden), issue a new secret ID for the AppRole
+                       "litellm" and write it with the role ID into the volume of the LiteLLM
+                       sidecar (Compose profile "models"). Prints no secret. Run it again to
+                       rotate the secret ID, then restart litellm-agent (runbook T11).
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -76,7 +80,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token) ;;
+  status | init | unseal | configure | root-token | litellm-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -230,10 +234,36 @@ cmd_root_token() {
   printf '%s' "$input" | bao_exec sh "$in_container/root-token.sh"
 }
 
+# The role ID and a new secret ID go from the openbao container straight into the sidecar's volume
+# through a pipe: never a host file, a command line or an environment variable. The admin token
+# goes to the openbao container on stdin.
+cmd_litellm_credentials() {
+  require_unsealed
+  token="$(read_secret 'Admin or root token (hidden)')"
+  [ -n "$token" ] || fail "no token given"
+  printf '%s\n' "$token" |
+    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
+      bao read -field=role_id auth/approle/role/litellm/role-id && echo &&
+      bao write -f -field=secret_id auth/approle/role/litellm/secret-id && echo' |
+    compose --profile core --profile models run --rm -T --no-deps --user root --entrypoint sh \
+      litellm-agent -c '
+      umask 077
+      IFS= read -r role_id || role_id=""
+      IFS= read -r secret_id || secret_id=""
+      [ -n "$role_id" ] && [ -n "$secret_id" ] || { echo "no role ID or secret ID received" >&2; exit 1; }
+      printf "%s\n" "$role_id" >/openbao/approle/role_id
+      printf "%s\n" "$secret_id" >/openbao/approle/secret_id
+      chown -R openbao:openbao /openbao/approle
+      chmod 700 /openbao/approle' ||
+    fail "could not deliver the litellm credentials (token valid? OpenBao configured with the litellm AppRole?)"
+  say "litellm AppRole credentials written to the litellm-approle volume; restart litellm-agent to use them"
+}
+
 case "$command" in
   status) cmd_status ;;
   init) cmd_init ;;
   unseal) cmd_unseal ;;
   configure) cmd_configure ;;
   root-token) cmd_root_token ;;
+  litellm-credentials) cmd_litellm_credentials ;;
 esac

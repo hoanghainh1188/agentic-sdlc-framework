@@ -1,0 +1,44 @@
+{{- /*
+  LiteLLM configuration with keys, rendered by the OpenBao Agent sidecar (agent.hcl) into
+  tmpfs (task C03, design/ADR-M24). Compose profile "models"; the server always runs with it.
+
+  - Model provider keys: kv/litellm/providers/<provider>, field api_key. A model appears only
+    when its provider has a key, so a missing key never blocks start-up.
+  - Master key: kv/cost-controller/litellm-master-key, field value (one source, shared with the
+    Cost Controller). Salt key: kv/litellm/salt-key, field value. Both are required.
+  - Values go through toJSON, so no key can break the YAML.
+  - Every model declares model_info.provider_type (api or self_hosted, D-07 section 4). A
+    self-hosted model must declare an internal cost per token above 0: with cost 0, LiteLLM
+    skips budget checks (D-07 section 3).
+  - Adding a model: add an entry below inside "if in $providers ...", then restart LiteLLM.
+*/ -}}
+{{- $providers := secrets "kv/metadata/litellm/providers/" }}
+model_list:
+{{- if in $providers "anthropic" }}
+{{- with secret "kv/data/litellm/providers/anthropic" }}
+  # Small current Claude model (ADR-M10 section 3). Prices from LiteLLM's built-in price list.
+  - model_name: claude-haiku-4-5
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: {{ .Data.data.api_key | toJSON }}
+    model_info:
+      provider_type: api
+{{- end }}
+{{- end }}
+
+general_settings:
+{{- with secret "kv/data/cost-controller/litellm-master-key" }}
+  master_key: {{ .Data.data.value | toJSON }}
+{{- end }}
+  database_url: os.environ/DATABASE_URL
+
+environment_variables:
+{{- with secret "kv/data/litellm/salt-key" }}
+  LITELLM_SALT_KEY: {{ .Data.data.value | toJSON }}
+{{- end }}
+
+# Same as config.yaml: Valkey keys must expire (noeviction, design/ADR-M17 section 2.4).
+router_settings:
+  redis_host: os.environ/REDIS_HOST
+  redis_port: os.environ/REDIS_PORT
+  redis_password: os.environ/REDIS_PASSWORD

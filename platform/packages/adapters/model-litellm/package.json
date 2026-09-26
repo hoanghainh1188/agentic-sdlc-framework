@@ -3,10 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Model gateway adapter: LiteLLM. See design/D-03 section 7.",
+  "description": "Model gateway adapter: LiteLLM Proxy (virtual keys, tenant budgets, spend). See design/D-03 section 7.4, D-08 C03, ADR-M24.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@sdlc/contracts": "workspace:*"
+  }
 }

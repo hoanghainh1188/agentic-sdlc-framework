@@ -3,18 +3,22 @@
 # Profiles:
 #   core           PostgreSQL, Temporal (+ UI), LiteLLM, Valkey, SeaweedFS, OpenBao
 #   observability  Langfuse (web + worker) and ClickHouse; reuses PostgreSQL, Valkey, SeaweedFS
+#   models         OpenBao Agent sidecar that gives LiteLLM its keys from OpenBao (C03,
+#                  design/ADR-M24). Always on on the server: pnpm compose:models
 #
 # Usage (from the repo root; see platform/deploy/README.md):
 #   platform/deploy/scripts/init-env.sh           # once: creates platform/deploy/.env (mode 600)
 #   pnpm compose:core                             # core profile, waits until healthy
 #   pnpm compose:obs                              # core + observability
+#   pnpm compose:models                           # core + models (OpenBao configured first)
 #   pnpm compose:down                             # stop (volumes are kept)
 #
 # Rules:
 #   - Images are pinned to exact versions. Never use "latest" or a bare major tag.
 #   - No MinIO, no Redis, no Elasticsearch (D-01 section 5.8e, D-03 section 10.1).
 #   - Secrets come only from .env (never committed). Secret variables use ${VAR:?}, so a missing
-#     value stops Compose instead of falling back to a default.
+#     value stops Compose instead of falling back to a default. Exception: the LiteLLM master and
+#     salt keys, which come from OpenBao with the profile "models" (litellm/start.sh, ADR-M24).
 #   - Host ports bind to 127.0.0.1 by default (SDLC_BIND_ADDR): the server accepts no inbound
 #     internet connections (D-03 section 9).
 
@@ -41,6 +45,17 @@ volumes:
   seaweedfs-data:
   openbao-data:
   openbao-audit:
+  # AppRole role ID and secret ID of the LiteLLM sidecar (mode 600). Written by
+  # `openbao/bootstrap.sh litellm-credentials` (runbook T11).
+  litellm-approle:
+  # LiteLLM configuration with keys, rendered by the sidecar. In memory only (tmpfs), gone when
+  # the containers stop. Owned by the sidecar's user (openbao, uid 100); LiteLLM runs as root.
+  litellm-config:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=1m,uid=100,gid=1000,mode=0700
   valkey-data:
   clickhouse-data:
   clickhouse-logs:
@@ -183,17 +198,27 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
+      # Profile "models": wait until the sidecar has rendered the configuration with the keys.
+      # Without the profile, LiteLLM starts with config.yaml (development only).
+      litellm-agent:
+        condition: service_healthy
+        required: false
     environment:
       DATABASE_URL: postgresql://litellm:${LITELLM_DB_PASSWORD:?set LITELLM_DB_PASSWORD in .env}@postgres:5432/litellm
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}
-      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?set LITELLM_SALT_KEY in .env}
+      # Development without the profile "models" only. With it, the keys come from OpenBao and
+      # start.sh drops these. On the server both stay empty in .env (runbook T11).
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:-}
       REDIS_HOST: valkey
       REDIS_PORT: '6379'
       REDIS_PASSWORD: ${VALKEY_PASSWORD:?set VALKEY_PASSWORD in .env}
       STORE_MODEL_IN_DB: 'False'
     volumes:
       - ./litellm/config.yaml:/app/config.yaml:ro
-    command: [--config, /app/config.yaml, --port, '4000', --telemetry, 'False']
+      - ./litellm/start.sh:/sdlc/start.sh:ro
+      - litellm-config:/run/litellm:ro
+    entrypoint: [sh, /sdlc/start.sh]
+    command: [--port, '4000', --telemetry, 'False']
     ports:
       - ${SDLC_BIND_ADDR:-127.0.0.1}:${LITELLM_HOST_PORT:-4000}:4000
     healthcheck:
@@ -204,6 +229,31 @@ services:
         - python3
         - -c
         - import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=4)
+
+  # OpenBao Agent: renders LiteLLM's configuration with the provider keys, the master key and the
+  # salt key from OpenBao into tmpfs (C03, QUESTIONS #1 option B, design/ADR-M24). Same image as
+  # OpenBao. Needs OpenBao unsealed and configured, and its AppRole credentials delivered
+  # (`openbao/bootstrap.sh litellm-credentials`, runbook T11).
+  litellm-agent:
+    image: openbao/openbao:2.6.3
+    profiles: [models]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on:
+      openbao:
+        condition: service_healthy
+    command: [agent, -config=/openbao/agent/agent.hcl]
+    environment:
+      BAO_ADDR: http://openbao:8200
+    volumes:
+      - ./litellm/agent.hcl:/openbao/agent/agent.hcl:ro
+      # The template. Live tests point SDLC_LITELLM_TEMPLATE at a test template (stub model).
+      - ${SDLC_LITELLM_TEMPLATE:-./litellm/config.ctmpl}:/openbao/litellm-template/config.ctmpl:ro
+      - litellm-approle:/openbao/approle
+      - litellm-config:/run/litellm
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD-SHELL, 'test -s /run/litellm/config.yaml']
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.47
