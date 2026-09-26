@@ -57,6 +57,7 @@
 - B05: `GitHostError` codes with catalog texts `git_host.error.*` and `gitHostErrorMessage` in `@sdlc/core`. The `worker` AppRole can read the GitHub App key (`design/QUESTIONS.md` #42, option A); D-03 1.4, ADR-M19 0.4, runbook T11 0.5. Tests against an in-process GitHub stub, a DB test for the stored cursor across restarts (`pnpm test:db`), and an optional live test with a test GitHub App (never in CI). `design/QUESTIONS.md` #42–#45. CLAUDE.md: ADR numbers taken up to ADR-M23.
 
 ### Changed
+- CLAUDE.md `Current constraints` after C03 (PR #83) and B05 (PR #82), both merged: C04 now (critical path to C05, C06, C07); second slot B03, C10 or E04. C04 gets ADR-M25 (QUESTIONS #52–#56 were already assigned); C03 used ADR-M24 and no QUESTIONS number.
 - CLAUDE.md `Current constraints` after A11 (PR #78, merged): B05 and C03 now (C03 needs A04 and A06; C05 and C07 wait for it); then C04 after B05. A10 waits for the infrastructure operator; A08 waits for QUESTIONS #4. C03 gets QUESTIONS #47–#51 and ADR-M24.
 - CLAUDE.md `Current constraints` after C02 (PR #79): A11 in review and B05 now (B05 unblocks C04 on the critical path); then C04 and A10. B05 gets QUESTIONS #42–#46 and ADR-M23; C02 used #32–#35.
 - CLAUDE.md `Current constraints` after B02 (PR #69): A04 in review; C02 next once A04 is merged (needs A04 and B02); B02 used QUESTIONS #22 only.
