@@ -11,10 +11,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { OpenBaoClient } from '@sdlc/secrets';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { deployDir, parseEnvFile, root } from '../../deploy/compose';
+import { deployDir, root } from '../../deploy/compose';
+import { containerIp, hostPortBindings, isolateEnv, networkGateways } from '../throwaway-compose';
 
 const enabled = process.env.SDLC_OPENBAO_TEST === '1';
 const PORT_OFFSET = 22000;
@@ -54,7 +54,9 @@ describe.skipIf(!enabled)('OpenBao client (live)', { timeout: TEST_TIMEOUT_MS },
   const envFile = path.join(tmp, 'it.env');
   const project = `sdlcsec${process.pid}`;
   const network = `${project}-net`;
-  const subnet = `172.30.${200 + (process.pid % 50)}.0/24`;
+  const subnet = `172.30.${225 + (process.pid % 25)}.0/24`;
+  // A gateway that is not .1, to check the exclusion with another address (QUESTIONS #37).
+  const gateway = subnet.replace(/0\/24$/, '254');
   const bootstrap = path.join(deployDir, 'openbao/bootstrap.sh');
 
   // Throw-away secrets, kept in memory only.
@@ -113,14 +115,17 @@ describe.skipIf(!enabled)('OpenBao client (live)', { timeout: TEST_TIMEOUT_MS },
       ),
       'admin command',
     ).stdout.trim();
-  const hostPort = (): number =>
-    Number(parseEnvFile(fs.readFileSync(envFile, 'utf8')).get('OPENBAO_HOST_PORT'));
+  const openbaoContainer = (): string => compose('', 'ps', '-q', 'openbao').stdout.trim();
 
-  /** Runs the client in a node container on the Compose network. */
+  /**
+   * Runs the client in a node container on the Compose network, or with `fromHost` in the Docker
+   * host network namespace against the container IP (source address: the gateway).
+   */
   const driver = (
     role: Role | undefined,
     steps: Step[],
     extra: Record<string, string> = {},
+    fromHost = false,
   ): DriverOutput => {
     const input = JSON.stringify({
       roleId: role ? roleIds.get(role) : undefined,
@@ -135,7 +140,7 @@ describe.skipIf(!enabled)('OpenBao client (live)', { timeout: TEST_TIMEOUT_MS },
         '--rm',
         '-i',
         '--network',
-        network,
+        fromHost ? 'host' : network,
         '--user',
         'node',
         '--tmpfs',
@@ -143,7 +148,7 @@ describe.skipIf(!enabled)('OpenBao client (live)', { timeout: TEST_TIMEOUT_MS },
         '-v',
         `${root}:/repo:ro`,
         '-e',
-        'SDLC_OPENBAO_ADDR=http://openbao:8200',
+        `SDLC_OPENBAO_ADDR=http://${fromHost ? containerIp(openbaoContainer(), network) : 'openbao'}:8200`,
         '-e',
         'SECRETS_DIST=/repo/platform/packages/secrets/dist/index.js',
         NODE_IMAGE,
@@ -169,14 +174,12 @@ describe.skipIf(!enabled)('OpenBao client (live)', { timeout: TEST_TIMEOUT_MS },
     // The driver loads the built package (dist): build it and its references.
     ok(run(path.join(root, 'node_modules/.bin/tsc'), ['-b', 'platform/packages/secrets']), 'build');
     ok(run(path.join(deployDir, 'scripts/init-env.sh'), [envFile]), 'init-env');
-    const text = fs
-      .readFileSync(envFile, 'utf8')
-      .replace(/^COMPOSE_PROJECT_NAME=.*$/m, `COMPOSE_PROJECT_NAME=${project}`)
-      .replace(/^SDLC_NETWORK_SUBNET=.*$/m, `SDLC_NETWORK_SUBNET=${subnet}`)
-      .replace(
-        /^(\w+_HOST_PORT)=(\d+)$/gm,
-        (_, key: string, port: string) => `${key}=${Number(port) + PORT_OFFSET}`,
-      );
+    const text = isolateEnv(fs.readFileSync(envFile, 'utf8'), {
+      project,
+      subnet,
+      gateway,
+      portOffset: PORT_OFFSET,
+    });
     fs.writeFileSync(envFile, text, { mode: 0o600 });
     ok(compose('', '--profile', 'core', 'up', '-d', '--wait', 'openbao'), 'compose up openbao');
     ok(run('docker', ['pull', '-q', NODE_IMAGE]), 'pull node image');
@@ -303,28 +306,30 @@ describe.skipIf(!enabled)('OpenBao client (live)', { timeout: TEST_TIMEOUT_MS },
       expect(r.results[0]).toMatchObject({ ok: false, key: 'secrets.login_failed' });
     });
 
-    it('KNOWN GAP (QUESTIONS #27): a login from the host through the published port passes the CIDR check', async () => {
-      // Docker's port proxy connects from the network gateway (x.x.x.1), which is inside the bound
-      // subnet. When the port is no longer published (decision pending), change this test.
-      const dir = fs.mkdtempSync(path.join(tmp, 'host-'));
-      fs.writeFileSync(path.join(dir, 'role-id'), roleIds.get('worker')!, { mode: 0o600 });
-      fs.writeFileSync(path.join(dir, 'secret-id'), secretIds.get('worker')!, { mode: 0o600 });
-      const client = new OpenBaoClient({
-        address: `http://127.0.0.1:${hostPort()}`,
-        allowPlaintext: true,
-        roleIdFile: path.join(dir, 'role-id'),
-        secretIdFile: path.join(dir, 'secret-id'),
-      });
-      try {
-        await expect(client.login()).resolves.toBeUndefined();
-        const audit = admin(
-          'grep "approle/login" /openbao/logs/audit.log | tail -1 | grep -o \'"remote_address":"[^"]*"\'',
-        );
-        expect(audit).toBe(`"remote_address":"${subnet.replace(/0\/24$/, '1')}"`);
-      } finally {
-        await client.close();
-        fs.rmSync(dir, { recursive: true, force: true });
-      }
+    it('A11 (QUESTIONS #27): OpenBao publishes no port on the host', () => {
+      const bindings = hostPortBindings(openbaoContainer());
+      expect(Object.keys(bindings)).toContain('8200/tcp');
+      for (const [port, binding] of Object.entries(bindings)) expect(binding, port).toBeNull();
+    });
+
+    it('A11 (QUESTIONS #37): the network gateway is SDLC_NETWORK_GATEWAY, not .1', () => {
+      expect(networkGateways(network)).toEqual([gateway]);
+    });
+
+    it('A11 (QUESTIONS #37): an AppRole login from the Docker host is refused', () => {
+      // On Linux every host process reaches the container IP from the gateway. The gateway is
+      // left out of the bound CIDRs, so the login is refused (on Docker Desktop: from the VM).
+      const r = driver('worker', [{ name: 'login' }], {}, true);
+      expect(r.results[0]).toMatchObject({ ok: false, key: 'secrets.login_failed' });
+      const audit = admin(
+        'grep "approle/login" /openbao/logs/audit.log | tail -1 | grep -o \'"remote_address":"[^"]*"\'',
+      );
+      expect(audit).toBe(`"remote_address":"${gateway}"`);
+    });
+
+    it('A11: the same credentials still log in from the Compose network', () => {
+      const r = driver('worker', [{ name: 'login' }]);
+      expect(r.results[0]?.ok).toBe(true);
     });
   });
 

@@ -18,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runContractBytes } from '../../../packages/core/src/run-contract/canonical.js';
 import { deployDir, root } from '../../deploy/compose';
 import { SAMPLE_CONTRACT } from '../../run-contract/helpers';
+import { isolateEnv } from '../throwaway-compose';
 
 const enabled = process.env.SDLC_OPENBAO_TEST === '1';
 const PORT_OFFSET = 23000;
@@ -143,14 +144,13 @@ describe.skipIf(!enabled)(
         'build',
       );
       ok(run(path.join(deployDir, 'scripts/init-env.sh'), [envFile]), 'init-env');
-      const text = fs
-        .readFileSync(envFile, 'utf8')
-        .replace(/^COMPOSE_PROJECT_NAME=.*$/m, `COMPOSE_PROJECT_NAME=${project}`)
-        .replace(/^SDLC_NETWORK_SUBNET=.*$/m, `SDLC_NETWORK_SUBNET=${subnet}`)
-        .replace(
-          /^(\w+_HOST_PORT)=(\d+)$/gm,
-          (_, key: string, port: string) => `${key}=${Number(port) + PORT_OFFSET}`,
-        );
+      // Own project, subnet and gateway (A11: the gateway must be inside the subnet).
+      const text = isolateEnv(fs.readFileSync(envFile, 'utf8'), {
+        project,
+        subnet,
+        gateway: subnet.replace(/0\/24$/, '1'),
+        portOffset: PORT_OFFSET,
+      });
       fs.writeFileSync(envFile, text, { mode: 0o600 });
       ok(compose('', '--profile', 'core', 'up', '-d', '--wait', 'openbao'), 'compose up openbao');
       ok(run('docker', ['pull', '-q', NODE_IMAGE]), 'pull node image');

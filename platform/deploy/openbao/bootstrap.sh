@@ -181,15 +181,21 @@ cmd_unseal() {
   say "OpenBao is unsealed"
 }
 
-# Subnet(s) of the Compose network the openbao container is on.
+# Subnet(s) of the Compose network the openbao container is on, WITHOUT the gateway address:
+# on a Linux host every host process reaches containers from the gateway (QUESTIONS #37).
 network_cidrs() {
   container="$(compose ps -q openbao </dev/null)"
   [ -n "$container" ] || fail "the openbao container is not running"
   network="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$container")"
   cidrs=""
   for n in $network; do
-    for subnet in $(docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}} {{end}}' "$n"); do
-      cidrs="${cidrs:+$cidrs,}$subnet"
+    for pair in $(docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}}|{{.Gateway}} {{end}}' "$n"); do
+      subnet="${pair%%|*}"
+      gateway="${pair#*|}"
+      [ -n "$gateway" ] || fail "the Compose network has no fixed gateway (SDLC_NETWORK_GATEWAY in .env)"
+      blocks="$("$deploy_dir/openbao/cidr-exclude.sh" "$subnet" "$gateway")" ||
+        fail "cannot exclude the gateway $gateway from $subnet"
+      cidrs="${cidrs:+$cidrs,}$blocks"
     done
   done
   [ -n "$cidrs" ] || fail "cannot read the subnet of the Compose network"

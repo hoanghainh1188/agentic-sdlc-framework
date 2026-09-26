@@ -11,7 +11,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { deployDir, parseEnvFile } from '../../deploy/compose';
+import { deployDir } from '../../deploy/compose';
+import {
+  containerIp,
+  hostPortBindings,
+  isolateEnv,
+  networkGateways,
+  openbaoImage,
+  sealStatusOnNetwork,
+  type SealStatus,
+} from '../throwaway-compose';
 
 const enabled = process.env.SDLC_OPENBAO_TEST === '1';
 const PORT_OFFSET = 21000;
@@ -19,14 +28,6 @@ const SETUP_TIMEOUT_MS = 5 * 60 * 1000;
 const TEST_TIMEOUT_MS = 2 * 60 * 1000;
 const ROLES = ['api', 'worker', 'runner', 'cost-controller'] as const;
 type Role = (typeof ROLES)[number];
-
-interface SealStatus {
-  initialized: boolean;
-  sealed: boolean;
-  t: number;
-  n: number;
-  progress: number;
-}
 
 interface Result {
   status: number | null;
@@ -39,7 +40,10 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
   const envFile = path.join(tmp, 'it.env');
   const project = `sdlcbao${process.pid}`;
   const network = `${project}-net`;
-  const subnet = `172.30.${100 + (process.pid % 100)}.0/24`;
+  // Subnet ranges per live test file stay disjoint: bootstrap 100–149, run-contract-signing
+  // 150–199, compose-up 200–224, secrets-client 225–249.
+  const subnet = `172.30.${100 + (process.pid % 50)}.0/24`;
+  const gateway = subnet.replace(/0\/24$/, '1');
   const bootstrap = path.join(deployDir, 'openbao/bootstrap.sh');
   let image = '';
 
@@ -116,10 +120,34 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
       `IFS= read -r t; [ -n "$t" ] && export BAO_TOKEN="$t"; ${script}`,
     );
 
-  const login = (role: Role, via: 'network' | 'openbao' = 'network'): Result => {
+  // The same, but from the Docker HOST network namespace to the container IP (the real host on
+  // Linux, the VM on Docker Desktop). Source address: the network gateway (QUESTIONS #37).
+  const onHost = (script: string, input: string): Result => {
+    const container = compose('ps', '-q', 'openbao').stdout.trim();
+    return run(
+      'docker',
+      [
+        'run',
+        '--rm',
+        '-i',
+        '--network',
+        'host',
+        '-e',
+        `BAO_ADDR=http://${containerIp(container, network)}:8200`,
+        '--entrypoint',
+        'sh',
+        image,
+        '-c',
+        `IFS= read -r t; [ -n "$t" ] && export BAO_TOKEN="$t"; ${script}`,
+      ],
+      input,
+    );
+  };
+  const login = (role: Role, via: 'network' | 'openbao' | 'host' = 'network'): Result => {
     const script =
       'IFS= read -r r; IFS= read -r s; printf %s "$s" | bao write -field=token auth/approle/login role_id="$r" secret_id=-';
     const input = `\n${roleIds.get(role)}\n${secretIds.get(role)}\n`;
+    if (via === 'host') return onHost(script, input);
     return via === 'network' ? onNetwork(script, input) : inOpenbao(script, input);
   };
   const loginToken = (role: Role): string => keep(ok(login(role), `login ${role}`).stdout.trim());
@@ -145,19 +173,8 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
   const asAdmin = (script: string): Result =>
     ok(onNetwork(script, `${adminToken}\n`), 'admin command');
 
-  // Retries briefly: right after a restart the published port can reset connections.
-  const sealStatus = async (): Promise<SealStatus> => {
-    const port = Number(parseEnvFile(fs.readFileSync(envFile, 'utf8')).get('OPENBAO_HOST_PORT'));
-    for (let attempt = 1; ; attempt++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${port}/v1/sys/seal-status`);
-        return (await res.json()) as SealStatus;
-      } catch (error) {
-        if (attempt >= 20) throw error;
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-    }
-  };
+  // No host port since A11: read the status from a container on the network.
+  const sealStatus = (): Promise<SealStatus> => sealStatusOnNetwork(network);
   const newRootToken = (): string => {
     const r = ok(
       bootstrapCmd(['root-token', '--stdout-not-tty'], shares.slice(0, 2).join('\n') + '\n'),
@@ -172,17 +189,14 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
 
   beforeAll(() => {
     ok(run(path.join(deployDir, 'scripts/init-env.sh'), [envFile]), 'init-env');
-    const text = fs
-      .readFileSync(envFile, 'utf8')
-      .replace(/^COMPOSE_PROJECT_NAME=.*$/m, `COMPOSE_PROJECT_NAME=${project}`)
-      .replace(/^SDLC_NETWORK_SUBNET=.*$/m, `SDLC_NETWORK_SUBNET=${subnet}`)
-      .replace(
-        /^(\w+_HOST_PORT)=(\d+)$/gm,
-        (_, key: string, port: string) => `${key}=${Number(port) + PORT_OFFSET}`,
-      );
+    const text = isolateEnv(fs.readFileSync(envFile, 'utf8'), {
+      project,
+      subnet,
+      gateway,
+      portOffset: PORT_OFFSET,
+    });
     fs.writeFileSync(envFile, text, { mode: 0o600 });
-    const compose_ = fs.readFileSync(path.join(deployDir, 'docker-compose.yml'), 'utf8');
-    image = /^ {4}image: (openbao\/openbao:\S+)$/m.exec(compose_)![1]!;
+    image = openbaoImage();
     ok(compose('--profile', 'core', 'up', '-d', '--wait', 'openbao'), 'compose up openbao');
   }, SETUP_TIMEOUT_MS);
 
@@ -204,6 +218,14 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
       expect(r.status).not.toBe(0);
       expect(r.stderr).toMatch(/unknown option/);
       expect((await sealStatus()).initialized).toBe(false);
+    });
+
+    it('A11: OpenBao publishes no port; the network gateway is SDLC_NETWORK_GATEWAY', () => {
+      const container = compose('ps', '-q', 'openbao').stdout.trim();
+      const bindings = hostPortBindings(container);
+      expect(Object.keys(bindings)).toContain('8200/tcp');
+      for (const [port, binding] of Object.entries(bindings)) expect(binding, port).toBeNull();
+      expect(networkGateways(network)).toEqual([gateway]);
     });
 
     it('initialises with 3 shares, threshold 2, and prints each share once', async () => {
@@ -344,6 +366,53 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
 
     it('each AppRole logs in from the Compose network', () => {
       for (const role of ROLES) expect(loginToken(role).length).toBeGreaterThan(20);
+    });
+
+    it('A11: the bound CIDRs are the subnet without the gateway (QUESTIONS #37)', () => {
+      const expected = ok(
+        run(path.join(deployDir, 'openbao/cidr-exclude.sh'), [subnet, gateway]),
+        'cidr-exclude',
+      )
+        .stdout.trim()
+        .split(',')
+        .sort();
+      // Reading a role needs a root token (platform-admin cannot): make one, revoke it after.
+      const rootToken = newRootToken();
+      const read = ok(
+        onNetwork(
+          'bao read -format=json auth/approle/role/worker; bao token revoke -self >/dev/null',
+          `${rootToken}\n`,
+        ),
+        'read role',
+      ).stdout;
+      const data = (
+        JSON.parse(read) as {
+          data: Record<string, string[]>;
+        }
+      ).data;
+      for (const field of ['secret_id_bound_cidrs', 'token_bound_cidrs']) {
+        // OpenBao shows a /32 block as a bare address in token_bound_cidrs.
+        const listed = (data[field] ?? []).map((c) => (c.includes('/') ? c : `${c}/32`)).sort();
+        expect(listed, field).toEqual(expected);
+        expect(listed, field).not.toContain(`${gateway}/32`);
+      }
+    });
+
+    it('A11: a secret ID does not work from the Docker host (source: the gateway)', () => {
+      const r = login('runner', 'host');
+      expect(r.status).not.toBe(0);
+      const audit = inOpenbao(
+        'grep "approle/login" /openbao/logs/audit.log | tail -1 | grep -o \'"remote_address":"[^"]*"\'',
+        '',
+      );
+      expect(audit.stdout.trim()).toBe(`"remote_address":"${gateway}"`);
+    });
+
+    it('A11: a login token does not work from the Docker host either', () => {
+      const token = loginToken('runner');
+      const outside = onHost('bao read -field=policies auth/token/lookup-self', `${token}\n`);
+      expect(outside.status).not.toBe(0);
+      expect(outside.stderr).toMatch(/Code: 403/);
     });
 
     it('a secret ID does not work outside the bound subnet', () => {

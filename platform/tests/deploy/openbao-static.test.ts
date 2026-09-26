@@ -10,6 +10,7 @@ import { deployDir, loadCompose, parseEnvFile, readDeployFile, root } from './co
 const BOOTSTRAP = path.join(deployDir, 'openbao/bootstrap.sh');
 const SCRIPTS = [
   'openbao/bootstrap.sh',
+  'openbao/cidr-exclude.sh',
   'openbao/bootstrap/configure.sh',
   'openbao/bootstrap/root-token.sh',
 ];
@@ -214,16 +215,22 @@ describe('OpenBao in Compose', () => {
     expect(main).not.toMatch(/disable_unauthed/);
     expect(keyHolder).toMatch(/address\s*=\s*"127\.0\.0\.1:8210"/);
     expect(keyHolder).toMatch(/disable_unauthed_generate_root_endpoints\s*=\s*false/);
-    expect(openbao.ports?.join(' ')).not.toMatch(/8210/);
+    expect(openbao.ports).toBeUndefined();
   });
 
-  it('pins the Compose network subnet that secret IDs are bound to', () => {
+  it('pins the Compose network subnet and gateway that secret IDs are bound to', () => {
     expect(readDeployFile('docker-compose.yml')).toMatch(
-      /- subnet: \$\{SDLC_NETWORK_SUBNET:-172\.30\.0\.0\/24\}/,
+      /- subnet: \$\{SDLC_NETWORK_SUBNET:-172\.30\.0\.0\/24\}\n\s+gateway: \$\{SDLC_NETWORK_GATEWAY:-172\.30\.0\.1\}/,
     );
-    expect(parseEnvFile(readDeployFile('.env.example')).get('SDLC_NETWORK_SUBNET')).toBe(
-      '172.30.0.0/24',
-    );
+    const env = parseEnvFile(readDeployFile('.env.example'));
+    expect(env.get('SDLC_NETWORK_SUBNET')).toBe('172.30.0.0/24');
+    expect(env.get('SDLC_NETWORK_GATEWAY')).toBe('172.30.0.1');
+  });
+
+  it('configure binds AppRoles to the subnet without the gateway (QUESTIONS #37)', () => {
+    const bootstrap = readDeployFile('openbao/bootstrap.sh');
+    expect(bootstrap).toMatch(/\{\{\.Subnet\}\}\|\{\{\.Gateway\}\}/);
+    expect(bootstrap).toMatch(/"\$deploy_dir\/openbao\/cidr-exclude\.sh" "\$subnet" "\$gateway"/);
   });
 });
 

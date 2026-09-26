@@ -18,7 +18,7 @@ Done by: the repo owner / tech lead (Harry). Time: about half a day for steps 1â
 | GitHub organisation account with rights to create repositories | Step 1 | Harry |
 | GitHub CLI installed and logged in (`gh auth login`) | Step 3 | Harry |
 | Claude Code access through the company plan (not a personal account â€” handbook Ch.2 Rule 1) | Step 4 | Leadership / tool owner |
-| Developer machine: Git, Node.js LTS, pnpm; Docker from A02 | A01, A02 | Developer |
+| Developer machine: Git, Node.js LTS, pnpm; Docker from A02; OpenSSL 3.x first in `PATH` from A04 (on macOS not the built-in LibreSSL, see `platform/deploy/README.md`) | A01, A02, A04 | Developer |
 | **Three people to hold the OpenBao key shares** | **Before A03** | Leadership |
 | Infrastructure operator for the internal server | Before A10 | Leadership |
 | Person B for reviewing platform PRs | Every task | Leadership |

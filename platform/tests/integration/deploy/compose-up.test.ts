@@ -9,6 +9,12 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { deployDir, parseEnvFile } from '../../deploy/compose';
+import {
+  hostPortBindings,
+  isolateEnv,
+  networkGateways,
+  sealStatusOnNetwork,
+} from '../throwaway-compose';
 
 const enabled = process.env.SDLC_COMPOSE_IT === '1';
 const PORT_OFFSET = 20000;
@@ -22,6 +28,7 @@ describe.skipIf(!enabled)(
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-compose-it-'));
     const envFile = path.join(tmp, 'it.env');
     const project = `sdlcit${process.pid}`;
+    const subnet = `172.30.${200 + (process.pid % 25)}.0/24`;
     let vars = new Map<string, string>();
 
     const hostPort = (name: string): number => Number(vars.get(name));
@@ -49,19 +56,14 @@ describe.skipIf(!enabled)(
 
     beforeAll(() => {
       execFileSync(path.join(deployDir, 'scripts/init-env.sh'), [envFile]);
-      // Own project name and ports, so the test never touches a developer's running stack.
-      const text = fs
-        .readFileSync(envFile, 'utf8')
-        .replace(/^COMPOSE_PROJECT_NAME=.*$/m, `COMPOSE_PROJECT_NAME=${project}`)
-        // Own subnet too: two Compose networks cannot share one (A03, SDLC_NETWORK_SUBNET).
-        .replace(
-          /^SDLC_NETWORK_SUBNET=.*$/m,
-          `SDLC_NETWORK_SUBNET=172.30.${200 + (process.pid % 50)}.0/24`,
-        )
-        .replace(
-          /^(\w+_HOST_PORT)=(\d+)$/gm,
-          (_, key: string, port: string) => `${key}=${Number(port) + PORT_OFFSET}`,
-        );
+      // Own project name, ports and subnet, so the test never touches a developer's running
+      // stack (two Compose networks cannot share a subnet: A03, A11).
+      const text = isolateEnv(fs.readFileSync(envFile, 'utf8'), {
+        project,
+        subnet,
+        gateway: subnet.replace(/0\/24$/, '1'),
+        portOffset: PORT_OFFSET,
+      });
       fs.writeFileSync(envFile, text, { mode: 0o600 });
       vars = parseEnvFile(text);
     });
@@ -195,11 +197,17 @@ describe.skipIf(!enabled)(
         expect(res.status).toBe(403);
       });
 
-      it('OpenBao API is reachable but NOT initialised or unsealed (A03 does that)', async () => {
-        const res = await fetch(
-          `http://127.0.0.1:${hostPort('OPENBAO_HOST_PORT')}/v1/sys/seal-status`,
-        );
-        expect(await res.json()).toMatchObject({ initialized: false, sealed: true });
+      it('OpenBao API is reachable on the Compose network but NOT initialised or unsealed (A03 does that)', async () => {
+        expect(await sealStatusOnNetwork(`${project}-net`)).toMatchObject({
+          initialized: false,
+          sealed: true,
+        });
+      });
+
+      it('OpenBao publishes no port on the host; the gateway is pinned (A11)', () => {
+        const bindings = hostPortBindings(compose('ps', '-q', 'openbao').trim());
+        for (const [port, binding] of Object.entries(bindings)) expect(binding, port).toBeNull();
+        expect(networkGateways(`${project}-net`)).toEqual([subnet.replace(/0\/24$/, '1')]);
       });
 
       it('Temporal UI answers', async () => {

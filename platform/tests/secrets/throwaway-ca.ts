@@ -2,6 +2,8 @@
 // Created with the openssl CLI in a temp folder and deleted afterwards. The real internal CA and
 // the TLS listener come in task A10. `openssl ca` is used for server certificates because it
 // sets explicit start and end dates (an expired certificate) on OpenSSL 3.0 (CI) and later.
+// OpenSSL 3.x is required: LibreSSL (the macOS default /usr/bin/openssl) makes different
+// certificates, and the TLS tests then fail with misleading errors (task A11).
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,6 +24,7 @@ export class ThrowawayCa {
   }
 
   static create(name: string): ThrowawayCa {
+    requireOpenssl3();
     const ca = new ThrowawayCa(fs.mkdtempSync(path.join(os.tmpdir(), `sdlc-ca-${name}-`)));
     ca.#openssl(
       'req',
@@ -101,6 +104,37 @@ export class ThrowawayCa {
   #openssl(...args: string[]): void {
     execFileSync('openssl', args, { cwd: this.dir, stdio: ['ignore', 'ignore', 'pipe'] });
   }
+}
+
+/**
+ * Returns an error message when `openssl version` output is not OpenSSL 3.x or later,
+ * otherwise undefined. `found` is the path of the openssl binary, for the message.
+ */
+export function opensslVersionProblem(versionOutput: string, found: string): string | undefined {
+  const major = /^OpenSSL (\d+)\./.exec(versionOutput.trim())?.[1];
+  if (major !== undefined && Number(major) >= 3) return undefined;
+  return (
+    `The TLS tests need OpenSSL 3.x, but "${found}" is "${versionOutput.trim() || 'unknown'}". ` +
+    'Put OpenSSL 3 first in PATH, for example on macOS: brew install openssl@3 && ' +
+    'export PATH="$(brew --prefix openssl@3)/bin:$PATH"'
+  );
+}
+
+let opensslChecked = false;
+
+function requireOpenssl3(): void {
+  if (opensslChecked) return;
+  let version = '';
+  let found = 'openssl';
+  try {
+    found = execFileSync('sh', ['-c', 'command -v openssl'], { encoding: 'utf8' }).trim();
+    version = execFileSync('openssl', ['version'], { encoding: 'utf8' });
+  } catch {
+    // Not installed: reported below.
+  }
+  const problem = opensslVersionProblem(version, found);
+  if (problem) throw new Error(problem);
+  opensslChecked = true;
 }
 
 const EC_KEY = ['-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1'];
