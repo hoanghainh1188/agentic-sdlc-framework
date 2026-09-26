@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.4 |
+| Version | 1.5 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -322,6 +322,13 @@ interface ModelGateway {
 ```
 MVP: `LiteLLMGateway`.
 
+- The exact TypeScript interface is `ModelGateway` in `@sdlc/contracts` (`platform/packages/contracts/src/model-gateway.ts`, task C03, ADR-M24). Same responsibilities; differences from the sketch above:
+  - Money is a decimal string (`maxBudgetUsd: "0.5"`, D-05 D6). `createRunKey` also takes the key lifetime and the tenant's budget group.
+  - `ensureTenantBudget` creates or updates the tenant's monthly budget at the gateway (a LiteLLM team; UTC calendar month; FR-51).
+  - `listModels()` returns the gateway's models with their provider type (`api`, `self_hosted`): the model list the policy engine filters (QUESTIONS #17).
+  - `listSpend(range)` returns the calls of a time range with their labels, for the sync into `cost_records`.
+- The Cost Controller (`@sdlc/core`) caps each key at the smallest of the run budget, what is left of the intent budget and what is left of the tenant's month; it refuses a key when either remainder is zero or less. The gateway's budgets are a backstop (QUESTIONS #14).
+
 ### 7.5. Evidence storage
 
 ```ts
@@ -385,7 +392,7 @@ Licence note [External]:
 |---|---|---|
 | Run Contract signing key | Transit (non-exportable) | worker (signs), runner (reads the public key) |
 | GitHub App private key | KV | api, worker (polls GitHub, posts gate comments, reads specs; QUESTIONS #42), runner |
-| LiteLLM master key | KV | Cost Controller |
+| LiteLLM master key | KV (`kv/cost-controller/litellm-master-key`) | Cost Controller; LiteLLM through its OpenBao Agent sidecar (AppRole `litellm`, this one path only). One source for both (ADR-M24) |
 | Model provider API keys | KV | **LiteLLM only**, through an OpenBao Agent sidecar (AppRole `litellm`) that renders them to a tmpfs file LiteLLM reads at start-up. No LiteLLM Enterprise licence (QUESTIONS #1) |
 | Database and SeaweedFS passwords | KV | The matching process |
 
@@ -598,4 +605,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.2 | 2026-09-25 | Claude, approved by Harry | §8.2: provider keys reach LiteLLM through an OpenBao Agent sidecar (tmpfs), no Enterprise licence; §8.2/§9: TLS on OpenBao 8200 with an internal CA (QUESTIONS #1, #20) |
 | 1.3 | 2026-09-26 | Claude (task C02), approved by Harry | §8: `schema_version`, `plan_id`, `plan_sha256`, `allowed_tools`; signed form; contract validity and clock skew from config; rejection list; key rotation (ADR-M22, QUESTIONS #33, #34) |
 | 1.4 | 2026-09-26 | Claude (task B05), approved by Harry | §7.1: notes on the contracts `GitHostAdapter` (event kinds, new comments only, numeric account IDs and bots, cursor, later additions); §8.2: the worker reads the GitHub App key (ADR-M23, QUESTIONS #42, #43, #45) |
+| 1.5 | 2026-09-26 | Claude (task C03), approved by Harry | §7.4: notes on the contracts `ModelGateway` (decimal money, tenant budget group, `listModels`, `listSpend`) and the Cost Controller caps; §8.2: the LiteLLM master key has one source, read by the Cost Controller and the LiteLLM sidecar (ADR-M24) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |

@@ -91,7 +91,7 @@ The CI `compose` job runs `pnpm test:openbao` when `platform/deploy/`, `platform
 
 ### 2.8. QUESTIONS #1 (LiteLLM provider keys)
 
-A04 is not affected. The sidecar is OpenBao's own Agent, not this client. The `litellm` AppRole and its policy belong to C03.
+A04 is not affected. The sidecar is OpenBao's own Agent, not this client. The `litellm` AppRole and its policy belong to C03 (done: ADR-M24). The Cost Controller reads the LiteLLM master key through this client (`SecretReader`, AppRole `cost-controller`).
 
 ## 3. Open items
 

@@ -20,6 +20,7 @@
     "test:compose": "SDLC_COMPOSE_IT=1 vitest run --config vitest.integration.config.ts platform/tests/integration/deploy",
     "test:db": "platform/deploy/scripts/test-db.sh",
     "test:openbao": "SDLC_OPENBAO_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/openbao",
+    "test:litellm": "SDLC_LITELLM_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/litellm",
     "openbao:bootstrap": "platform/deploy/openbao/bootstrap.sh",
     "db:migrate": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js latest",
     "db:status": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js status",
@@ -27,11 +28,13 @@
     "compose:env": "platform/deploy/scripts/init-env.sh",
     "compose:core": "platform/deploy/scripts/up.sh core",
     "compose:obs": "platform/deploy/scripts/up.sh core observability",
-    "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability down"
+    "compose:models": "platform/deploy/scripts/up.sh core models",
+    "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models down"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@sdlc/adapter-git-github": "workspace:*",
+    "@sdlc/adapter-model-litellm": "workspace:*",
     "@sdlc/adapter-policy-simple": "workspace:*",
     "@sdlc/config": "workspace:*",
     "@sdlc/contracts": "workspace:*",

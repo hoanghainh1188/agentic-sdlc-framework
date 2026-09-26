@@ -8,6 +8,7 @@ This folder runs the infrastructure that the platform reuses, on one server, wit
 |---|---|---|
 | `core` | PostgreSQL, Temporal (+ Temporal UI), LiteLLM, Valkey, SeaweedFS (S3 API), OpenBao | Always. Required by the platform |
 | `observability` | Langfuse (web + worker), ClickHouse. Reuses PostgreSQL, Valkey and SeaweedFS | Optional. The heaviest part; enable it when the server has room (D-03 section 10.1) |
+| `models` | `litellm-agent`: OpenBao Agent that gives LiteLLM its model provider keys, master key and salt key from OpenBao (task C03, [ADR-M24](../../design/ADR-M24-litellm-cost-controller.md)) | **Always on the server** (`pnpm compose:models`). Needs OpenBao unsealed and configured and the sidecar's credentials (runbook T11 §5d). Without it, LiteLLM has no models and uses the development keys from `.env` |
 
 Three one-shot jobs run at every start and then exit: `temporal-schema` (creates or upgrades the Temporal schemas), `temporal-namespace` (creates the namespace) and `seaweedfs-init` (creates the `evidence` and `langfuse` buckets). All three are safe to re-run.
 
@@ -25,6 +26,7 @@ Run from the repo root.
 pnpm compose:env     # once: creates platform/deploy/.env with random secrets (mode 600)
 pnpm compose:core    # starts the core profile and waits until it is healthy
 pnpm compose:obs     # core + observability
+pnpm compose:models  # core + models: LiteLLM with keys from OpenBao (the server; runbook T11 §5d)
 pnpm compose:down    # stops everything; data volumes are kept
 ```
 
@@ -58,7 +60,7 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 | PostgreSQL | 5432 | Databases `platform`, `temporal`, `temporal_visibility`, `litellm`, `langfuse`, one owner role each. The `platform` database also has the application role `platform_app` (see below) |
 | Temporal (gRPC) | 7233 | Namespace `default`; closed workflows kept 30 days |
 | Temporal UI | 8080 | |
-| LiteLLM | 4000 | No models yet (added in M-C) |
+| LiteLLM | 4000 | Models only with the profile `models` (keys from OpenBao). Without it: no models, development keys from `.env` |
 | SeaweedFS S3 | 8333 | Anonymous access denied |
 | Langfuse | 3000 | `observability` profile only |
 

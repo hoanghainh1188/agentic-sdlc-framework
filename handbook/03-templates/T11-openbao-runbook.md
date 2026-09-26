@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, backup, restore)
 
-> Status: **v0.2: tested on a development machine with throw-away keys (task A03, 2026-09-25): sections 3.1, 4, 5, 5b and 8.1.** Sections 6, 7 and 8.2 (rekey) give the commands; the recovery drill in task A10 tests them.
+> Status: **v0.6: tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.2 (rekey) give the commands; the recovery drill in task A10 tests them.
 > Readers: key holders, infrastructure operator, platform admin.
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -8,7 +8,7 @@
 
 ## 1. Purpose and scope
 
-OpenBao is the platform's secret manager. It stores the platform secrets (GitHub App key, LiteLLM master key, database passwords) and signs Run Contracts with a key that never leaves it.
+OpenBao is the platform's secret manager. It stores the platform secrets (GitHub App key, LiteLLM master key, model provider keys, database passwords) and signs Run Contracts with a key that never leaves it.
 
 All OpenBao data is encrypted. After every restart OpenBao is **sealed**: it cannot answer any request until key holders **unseal** it with their key shares. If the key shares are lost, every secret is lost.
 
@@ -17,6 +17,7 @@ This runbook covers:
 - unsealing after a restart;
 - root tokens;
 - daily admin work and AppRole secret IDs;
+- the keys of LiteLLM (model provider keys, master key, salt key);
 - snapshot backup and restore;
 - changing a key holder;
 - troubleshooting;
@@ -83,6 +84,7 @@ What `configure` sets up (details: `design/ADR-M19-openbao-bootstrap.md`):
 - KV version 2 at `kv/`;
 - Transit at `transit/`, with the Ed25519 key `run-contract` (not exportable, not deletable);
 - AppRoles `api`, `worker`, `runner`, `cost-controller`, each reading only `kv/<its name>/…` (plus `kv/shared/github-app` for `api`, `worker` and `runner`);
+- the AppRole `litellm` for the LiteLLM sidecar: it reads the model provider keys, the LiteLLM salt key and the LiteLLM master key, nothing else (section 5d);
 - the token role `platform-admin` (tokens of at most 1 hour);
 - a check that the file audit device is on.
 
@@ -147,9 +149,10 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 | Secret | Path | Read by |
 |---|---|---|
 | GitHub App private key | `kv/shared/github-app` | `api`, `worker`, `runner` |
-| LiteLLM master key | `kv/cost-controller/litellm-master-key` | `cost-controller` |
+| LiteLLM master key (field `value`) | `kv/cost-controller/litellm-master-key` | `cost-controller`, `litellm` (one source for both, section 5d) |
+| LiteLLM salt key (field `value`) | `kv/litellm/salt-key` | `litellm` |
+| Model provider keys (field `api_key`), one entry per provider | `kv/litellm/providers/<provider>`, for example `kv/litellm/providers/anthropic` | `litellm` |
 | Database and SeaweedFS passwords of a process | `kv/<process>/…` | That process |
-| Model provider keys | `kv/litellm/providers/…` | Nobody yet (`design/QUESTIONS.md` #1) |
 
 The GitHub App key is read by `api`, by the `worker` (it polls GitHub, posts gate comments and reads spec files; `design/QUESTIONS.md` #42) and by the runner to create short-lived tokens. It must **never** enter an agent sandbox (task C04; `design/QUESTIONS.md` #44 may remove the runner's access).
 
@@ -202,6 +205,42 @@ Each platform process (api, worker, runner, cost-controller) uses the OpenBao cl
 - The role ID and the secret ID are **files**, never environment variables: anyone allowed to run `docker inspect` can read environment variables.
 - **Rotating a secret ID** (every 90 days, section 8.1): issue a new secret ID, replace the file, then destroy the old secret ID. No restart is needed: the client reads the file again at its next login (at the latest when its token reaches the 4-hour maximum).
 - The client renews its token by itself and logs in again when needed. It never writes a token, secret ID or secret value to its logs.
+
+## 5d. LiteLLM keys (Compose profile `models`)
+
+LiteLLM (the model gateway) gets its keys from OpenBao through a sidecar: an OpenBao Agent (service `litellm-agent`, same image as OpenBao). The sidecar logs in with the AppRole `litellm` and writes LiteLLM's configuration, with the keys, into a file in memory (tmpfs). LiteLLM reads the file when it starts. No model provider key is ever in `.env`, in the repo, in an image or in an environment variable (`design/QUESTIONS.md` #1, `design/ADR-M24-litellm-cost-controller.md`).
+
+**The server always runs with the profile `models`:** `pnpm compose:models` (profiles `core` and `models`). Without the profile, LiteLLM starts with no models and uses the development keys from `.env`; that is for development machines only. On the server, leave `LITELLM_MASTER_KEY` and `LITELLM_SALT_KEY` empty in `.env`.
+
+### First set-up
+
+1. OpenBao is initialised, unsealed and configured (sections 3 and 4). `configure` creates the AppRole `litellm`.
+2. With an admin token, store three kinds of secret (section 5b shows how to pass a value on stdin):
+   - the LiteLLM master key at `kv/cost-controller/litellm-master-key`, field `value` (it must start with `sk-`). The Cost Controller reads the same entry: there is only one master key;
+   - the LiteLLM salt key at `kv/litellm/salt-key`, field `value`. **Never change it after the first start**: LiteLLM encrypts stored credentials with it;
+   - one model provider key per provider at `kv/litellm/providers/<provider>`, field `api_key`:
+     ```bash
+     docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao \
+       sh -c 'read -rs BAO_TOKEN && export BAO_TOKEN && read -rs VALUE && printf %s "$VALUE" | bao kv put -mount=kv litellm/providers/anthropic api_key=-'
+     ```
+3. Deliver the sidecar's AppRole credentials. The command asks for an admin token (hidden), issues a new secret ID and writes it with the role ID into the sidecar's volume. It prints no secret:
+   ```bash
+   pnpm openbao:bootstrap litellm-credentials
+   ```
+   Record it in the operations log (role `litellm`, date, reason; not the secret ID).
+4. Start: `pnpm compose:models`. LiteLLM waits until the sidecar has written the configuration.
+5. Check: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models ps` shows `litellm-agent` and `litellm` as healthy.
+
+A model appears in LiteLLM only when its provider has a key in `kv/litellm/providers/`. The list of models is in `platform/deploy/litellm/config.ctmpl`. To add a model, change that file in a reviewed pull request: every model declares `provider_type` (`api` or `self_hosted`), and a self-hosted model declares a cost per token above 0, because LiteLLM skips budget checks for a model that costs 0 (`design/D-07-model-and-token-management.md` section 3). Then restart LiteLLM.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| A model provider key | Store the new value (step 2). The sidecar writes the new configuration within about 5 minutes. Then restart LiteLLM: `docker compose … --profile core --profile models restart litellm`. Revoke the old key at the provider |
+| The master key | Store the new value. Restart `litellm-agent`, then `litellm`. The Cost Controller reads the new value at its next read. Virtual keys already issued stay valid |
+| The sidecar's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap litellm-credentials`, then restart `litellm-agent`. Then destroy the old secret ID (section 8.1, step 4) |
+| The salt key | Never |
 
 ## 6. Daily snapshot backup
 
@@ -290,6 +329,10 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | A process says `The certificate of OpenBao at … could not be verified` | Wrong or missing CA file, expired server certificate, or the address does not match the certificate | Check `SDLC_OPENBAO_CA_CERT_FILE` and the certificate dates (A10). Never turn the check off |
 | A process says `… does not use TLS` | `http://` address without `SDLC_OPENBAO_ALLOW_PLAINTEXT=1` | On the server: use `https://`. The flag is for development machines and CI only |
 | `no file audit device` | `openbao.hcl` changed | Restore the `audit "file"` block. OpenBao also refuses requests when it cannot write the audit log: check the `openbao-audit` volume (disk full, permissions) |
+| `litellm-agent` stays unhealthy; LiteLLM does not start | OpenBao is sealed, the sidecar's secret ID is missing or expired, or the master key or salt key is not stored | Section 4; `pnpm openbao:bootstrap litellm-credentials`; section 5d step 2. `docker compose … logs litellm-agent` shows the reason (never a key) |
+| LiteLLM exits with `no rendered configuration (Compose profile models) and no LITELLM_MASTER_KEY` | Started without the profile `models` and without a development master key | On the server: `pnpm compose:models`. On a development machine: set `LITELLM_MASTER_KEY` in `.env` |
+| `could not deliver the litellm credentials` | Wrong or expired admin token, or `configure` has not created the AppRole `litellm` yet | Section 5.1; run `configure` again after an upgrade |
+| A model is missing in LiteLLM | Its provider has no key in `kv/litellm/providers/`, or LiteLLM was not restarted after the key was stored | Section 5d |
 | Compose says the network has a different configuration | `SDLC_NETWORK_SUBNET` or `SDLC_NETWORK_GATEWAY` changed | `pnpm compose:down`, then `pnpm compose:core`. Then run `configure` again (secret IDs are bound to the subnet without the gateway) |
 | `the Compose network has no fixed gateway` from `configure` | The network was created before A11 | `pnpm compose:down`, then `pnpm compose:core`, then `configure` again |
 
@@ -313,3 +356,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.3 | 2026-09-25 | Claude Code (task A04) | Section 5c (client settings, credential files, secret ID rotation without restart); tokens bound to the subnet; troubleshooting rows for the client messages; host-port exception (`design/QUESTIONS.md` #27) |
 | 0.4 | 2026-09-26 | Claude Code (task A11) | OpenBao publishes no host port: all admin work through `docker compose exec` (section 1); gateway left out of the bound CIDRs and the trust model (section 5b, `design/QUESTIONS.md` #27, #37); `SDLC_OPENBAO_ADDR` in section 5c; troubleshooting rows |
 | 0.5 | 2026-09-26 | Claude Code (task B05) | The `worker` AppRole also reads the GitHub App key `kv/shared/github-app` (`design/QUESTIONS.md` #42); section 5b: creating the GitHub App, storing and rotating its key (not yet tested with a real App) |
+| 0.6 | 2026-09-26 | Claude Code (task C03) | Section 5d: LiteLLM keys through the OpenBao Agent sidecar (profile `models`), `litellm-credentials`, rotation; AppRole `litellm`; key table; troubleshooting rows (`design/QUESTIONS.md` #1, ADR-M24) |

@@ -12,6 +12,7 @@ export { SystemScope, type NewTenant, type ResolvedApiToken } from './system-sco
 export { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 export { hashApiToken } from './repositories/api-tokens.js';
 export type { AuditEvent } from './repositories/audit-log.js';
+export type { NewCostRecord } from './repositories/cost-records.js';
 export type {
   DecideInput,
   HumanDecisionInput,
@@ -30,6 +31,7 @@ export type { SaveProjectAiRecord } from './repositories/project-ai-records.js';
 export type {
   ApiToken,
   AuditLogRow,
+  CostRecordRow,
   GateDecisionRow,
   GitEventCursor,
   Intent,
