@@ -272,7 +272,9 @@ describe('Dependabot and CODEOWNERS', () => {
     const compose = config.updates.find((u) => u['package-ecosystem'] === 'docker-compose');
     const ignores = compose?.ignore ?? [];
     const ignored = (name: string, type: string): boolean =>
-      ignores.some((i) => i['dependency-name'] === name && (i['update-types'] ?? []).includes(type));
+      ignores.some(
+        (i) => i['dependency-name'] === name && (i['update-types'] ?? []).includes(type),
+      );
     expect(ignored('*', 'version-update:semver-major')).toBe(true);
     expect(ignored('clickhouse/clickhouse-server', 'version-update:semver-minor')).toBe(true);
     const patterns = Object.values(compose?.groups ?? {}).flatMap((g) => g.patterns);
