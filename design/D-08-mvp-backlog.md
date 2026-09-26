@@ -37,12 +37,12 @@
 
 | Milestone | Content | Tasks | Sizes |
 |---|---|---|---|
-| M-A | Foundation: infrastructure, security, audit | 10 | S×5 · M×5 |
+| M-A | Foundation: infrastructure, security, audit | 11 | S×6 · M×5 |
 | M-B | Intent + G1–G3 | 12 | S×4 · M×7 · L×1 |
 | M-0 | Sample pilot repo (separate repo, right before M-C) | 4 | S×1 · M×2 · L×1 |
 | M-C | Run + G4–G6 | 11 | S×3 · M×7 · L×1 |
 | M-D | G7–G8 + evidence + cost | 7 | S×4 · M×3 |
-| **Total** | | **44** | |
+| **Total** | | **45** | |
 
 ### Order and dependencies between milestones
 
@@ -194,7 +194,7 @@ flowchart LR
 
 | Size | Depends on | Requirements | Code area |
 |---|---|---|---|
-| M | A03, A07 | — | platform/deploy/backup/*, platform/deploy/tls/*, handbook/03-templates/T11-openbao-runbook.md |
+| M | A03, A07, A11 | — | platform/deploy/backup/*, platform/deploy/tls/*, handbook/03-templates/T11-openbao-runbook.md |
 
 **Acceptance criteria**
 
@@ -205,6 +205,22 @@ flowchart LR
 - [ ] AC5: Runbook T11 written in full
 
 > Note: Done together with the infrastructure operator
+
+#### A11. Stop publishing the OpenBao port on the host
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | A04 | — | platform/deploy/docker-compose.yml, platform/deploy/.env.example, platform/deploy/README.md, platform/tests/integration/*, design/ADR-M19 |
+
+**Acceptance criteria**
+
+- [ ] AC1: The openbao service publishes no port on the host (QUESTIONS #27, option A); OPENBAO_HOST_PORT removed
+- [ ] AC2: The live tests (compose-up, openbao bootstrap, secrets-client) reach OpenBao through a container on the Compose network
+- [ ] AC3: The "KNOWN GAP" live test becomes: an AppRole login from the host is not possible (no listener on the host)
+- [ ] AC4: A static test fails if any compose file publishes 8200 or 8210 again
+- [ ] AC5: ADR-M19 §2.5 and the deploy README describe the real behaviour; runbook T11 shows `docker compose exec` for admin work
+
+> Note: Small. Must be merged before A10 (TLS on the same listener)
 
 
 ### M-B — Intent + G1–G3
@@ -705,4 +721,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 0.2 | 2026-09-24 | Claude (draft) | After review: SeaweedFS, Valkey, GitHub polling, G7 rule, M-D tasks renamed `E01…E07` |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: B01 oversight/approvers, B07 binding, new B11 escalation, B12 AI record, C10 agent register, C11 kill switch; E01 dual approval; E02/E03 disclosure; E05 retention; tests N7–N9 |
 | 1.1 | 2026-09-25 | Claude, approved by Harry | C03: provider keys via an OpenBao Agent sidecar (QUESTIONS #1). A10: internal CA and TLS on OpenBao 8200, size S → M (QUESTIONS #20) |
+| 1.2 | 2026-09-25 | Claude, approved by Harry | New task A11: stop publishing the OpenBao port on the host (QUESTIONS #27); A10 now depends on A11 |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

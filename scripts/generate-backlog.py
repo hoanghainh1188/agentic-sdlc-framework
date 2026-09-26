@@ -56,7 +56,7 @@ t("A09","M-A","CI for the platform repo","S",["A01"],"NFR-07",".github/workflows
  ["Lint, type check and unit tests on every PR",
   "Integration test job running the Compose core profile",
   "Gitleaks, Semgrep, Trivy run and block critical findings"])
-t("A10","M-A","Resource measurement + backup / restore drill + internal CA / TLS","M",["A03","A07"],"—",
+t("A10","M-A","Resource measurement + backup / restore drill + internal CA / TLS","M",["A03","A07","A11"],"—",
  "platform/deploy/backup/*, platform/deploy/tls/*, handbook/03-templates/T11-openbao-runbook.md",
  ["Internal CA + TLS on OpenBao 8200 (QUESTIONS #20): script creates the CA (5 years) and the server certificate (1 year); the CA key is kept offline; renewal steps and a 30-day reminder in T11; clients verify the CA",
   "Backup script: OpenBao snapshot (Raft), PostgreSQL dump, to storage off the server",
@@ -64,6 +64,14 @@ t("A10","M-A","Resource measurement + backup / restore drill + internal CA / TLS
   "Record RAM/CPU/disk usage for the core and observability profiles",
   "Runbook T11 written in full"],
  "Done together with the infrastructure operator")
+t("A11","M-A","Stop publishing the OpenBao port on the host","S",["A04"],"—",
+ "platform/deploy/docker-compose.yml, platform/deploy/.env.example, platform/deploy/README.md, platform/tests/integration/*, design/ADR-M19",
+ ["The openbao service publishes no port on the host (QUESTIONS #27, option A); OPENBAO_HOST_PORT removed",
+  "The live tests (compose-up, openbao bootstrap, secrets-client) reach OpenBao through a container on the Compose network",
+  "The \"KNOWN GAP\" live test becomes: an AppRole login from the host is not possible (no listener on the host)",
+  "A static test fails if any compose file publishes 8200 or 8210 again",
+  "ADR-M19 §2.5 and the deploy README describe the real behaviour; runbook T11 shows `docker compose exec` for admin work"],
+ "Small. Must be merged before A10 (TLS on the same listener)")
 t("B01","M-B","Policy engine: autonomy, oversight, approvers","M",["A05"],"FR-03, FR-11, FR-14, FR-15, FR-16",
  "platform/packages/contracts (interface), platform/packages/adapters/policy-simple/*",
  ["`maxAutonomy`: critical→L0, high→L1, medium/low→L2 (configurable, never above L2 in the MVP); `client_restricted` only allows self-hosted models",
@@ -377,6 +385,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 0.2 | 2026-09-24 | Claude (draft) | After review: SeaweedFS, Valkey, GitHub polling, G7 rule, M-D tasks renamed `E01…E07` |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: B01 oversight/approvers, B07 binding, new B11 escalation, B12 AI record, C10 agent register, C11 kill switch; E01 dual approval; E02/E03 disclosure; E05 retention; tests N7–N9 |
 | 1.1 | 2026-09-25 | Claude, approved by Harry | C03: provider keys via an OpenBao Agent sidecar (QUESTIONS #1). A10: internal CA and TLS on OpenBao 8200, size S → M (QUESTIONS #20) |
+| 1.2 | 2026-09-25 | Claude, approved by Harry | New task A11: stop publishing the OpenBao port on the host (QUESTIONS #27); A10 now depends on A11 |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))
