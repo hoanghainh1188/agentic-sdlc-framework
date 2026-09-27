@@ -1,5 +1,5 @@
 // The only way to reach tenant data (design/D-05 D1, D-08 A06 AC3).
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 
 import type { Database } from './schema.js';
 import { TenantGuardPlugin } from './tenant-guard-plugin.js';
@@ -9,6 +9,7 @@ import { AuditLogRepository } from './repositories/audit-log.js';
 import { CostRecordRepository } from './repositories/cost-records.js';
 import { GateDecisionRepository } from './repositories/gate-decisions.js';
 import { GitEventCursorRepository } from './repositories/git-event-cursors.js';
+import { GitEventReceiptRepository } from './repositories/git-event-receipts.js';
 import { IntentRepository } from './repositories/intents.js';
 import { PlanRepository } from './repositories/plans.js';
 import { ProjectAiRecordRepository } from './repositories/project-ai-records.js';
@@ -36,6 +37,7 @@ export class TenantScope {
   readonly roleBindings: RoleBindingRepository;
   readonly apiTokens: ApiTokenRepository;
   readonly gitEventCursors: GitEventCursorRepository;
+  readonly gitEventReceipts: GitEventReceiptRepository;
   readonly audit: AuditLogRepository;
   readonly intents: IntentRepository;
   readonly specRefs: SpecRefRepository;
@@ -47,6 +49,7 @@ export class TenantScope {
   readonly costRecords: CostRecordRepository;
 
   private readonly db: Kysely<Database>;
+  #savepoints = 0;
 
   /** @internal Use `PlatformDatabase.forTenant`. */
   constructor(db: Kysely<Database>, tenantId: TenantId) {
@@ -61,6 +64,7 @@ export class TenantScope {
     this.roleBindings = new RoleBindingRepository(this.db, this.tenantId);
     this.apiTokens = new ApiTokenRepository(this.db, this.tenantId);
     this.gitEventCursors = new GitEventCursorRepository(this.db, this.tenantId);
+    this.gitEventReceipts = new GitEventReceiptRepository(this.db, this.tenantId);
     this.audit = new AuditLogRepository(this.db, this.tenantId);
     this.intents = new IntentRepository(this.db, this.tenantId);
     this.specRefs = new SpecRefRepository(this.db, this.tenantId);
@@ -80,5 +84,29 @@ export class TenantScope {
   transaction<T>(work: (scope: TenantScope) => Promise<T>): Promise<T> {
     if (this.db.isTransaction) return work(this);
     return this.db.transaction().execute((trx) => work(new TenantScope(trx, this.tenantId)));
+  }
+
+  /**
+   * Runs `work` inside a savepoint of the current transaction (task B06, ADR-M27): when `work`
+   * throws, only its own writes are rolled back and the transaction stays usable. Only inside
+   * `transaction`. The savepoint statements reference no table, so they bypass the tenant guard,
+   * which refuses raw statements; nothing else may.
+   */
+  async savepoint<T>(work: (scope: TenantScope) => Promise<T>): Promise<T> {
+    if (!this.db.isTransaction) {
+      throw new Error('TenantScope.savepoint must run inside TenantScope.transaction');
+    }
+    this.#savepoints += 1;
+    const name = sql.id(`sdlc_sp_${String(this.#savepoints)}`);
+    const raw = this.db.withoutPlugins();
+    await sql`SAVEPOINT ${name}`.execute(raw);
+    try {
+      const result = await work(this);
+      await sql`RELEASE SAVEPOINT ${name}`.execute(raw);
+      return result;
+    } catch (error) {
+      await sql`ROLLBACK TO SAVEPOINT ${name}`.execute(raw);
+      throw error;
+    }
   }
 }

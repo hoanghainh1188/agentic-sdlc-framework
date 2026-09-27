@@ -486,7 +486,7 @@ describeDb('B03: API app on PostgreSQL', () => {
       const created = await createIntent(tenantA);
       const missing = await decide(tenantA, 'a', created.code, 'G1', { decision: 'reject' });
       expectError(missing, 422, 'decision_not_allowed', 'reason_required');
-      expect(missing.json().error.reason_message).toBe(t('api.reason.reason_required'));
+      expect(missing.json().error.reason_message).toBe(t('gate.reason.reason_required'));
       expectError(
         await decide(tenantA, 'a', created.code, 'G1', {
           decision: 'reject',

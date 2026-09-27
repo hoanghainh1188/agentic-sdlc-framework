@@ -492,7 +492,9 @@ describeDb('B02: registry on PostgreSQL', () => {
       for (const statement of [
         sql`UPDATE gate_decisions SET decision = 'reject' WHERE id = ${row.id}`,
         sql`DELETE FROM gate_decisions WHERE id = ${row.id}`,
-        sql`TRUNCATE gate_decisions`,
+        // CASCADE: since B06, git_event_receipts references gate_decisions, and a plain TRUNCATE
+        // is refused by that foreign key (0A000) before the trigger runs.
+        sql`TRUNCATE gate_decisions CASCADE`,
       ]) {
         await expect(statement.execute(t.appRaw)).rejects.toMatchObject({ code: '42501' });
         await expect(statement.execute(t.owner)).rejects.toMatchObject({ code: 'SDA01' });

@@ -14,3 +14,26 @@ export {
   isCommandGate,
   type CommandGate,
 } from './gate-input.js';
+export {
+  isRefusalReason,
+  REFUSAL_REASON_KEYS,
+  refusalReasonMessage,
+  type RefusalReason,
+} from './refusal-messages.js';
+export {
+  COMMENT_SYNTAX_PROBLEMS,
+  COMMENT_VERBS,
+  parseCommentCommand,
+  type CommentSyntaxProblem,
+  type CommentVerb,
+  type ParsedComment,
+} from './comment-command.js';
+export {
+  COMMENT_REPLY_CODES,
+  handleGitEvent,
+  type CommentReplyCode,
+  type GitEventHandlerDeps,
+  type GitEventOutcome,
+  type GitEventProject,
+  type HandledGitEvent,
+} from './git-event-handler.js';

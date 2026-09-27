@@ -75,6 +75,17 @@ const UPDATABLE: Record<string, readonly string[]> = {
   run_events: [],
   // Append-only (D-05 D3, C03).
   cost_records: [],
+  // B06: a `failing` receipt gets its result once; then only the reply delivery moves (trigger).
+  git_event_receipts: [
+    'outcome',
+    'gate_decision_id',
+    'reply_code',
+    'reply_params',
+    'event_attempts',
+    'reply_attempts',
+    'reply_posted_at',
+    'reply_abandoned_at',
+  ],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -197,7 +208,7 @@ describeDb('AC2: migrations on PostgreSQL', () => {
         c.confdeltype AS on_delete
       FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace AND n.nspname = 'public'
       WHERE c.contype = 'f' AND c.conrelid::regclass::text NOT LIKE 'kysely_%'`);
-    expect(fks).toHaveLength(28); // C03: cost_records → projects, intents, runs
+    expect(fks).toHaveLength(30); // C03: cost_records → projects, intents, runs; B06: receipts → projects, gate_decisions
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

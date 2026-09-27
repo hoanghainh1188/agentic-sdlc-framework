@@ -12,8 +12,9 @@ import { dummyDb, TENANT_A } from './dummy.js';
 const up = MIGRATIONS['0005-cost-records']!.statements.up.join(';\n');
 
 describe('migration 0005: cost_records', () => {
-  it('is the last migration', () => {
-    expect(Object.keys(MIGRATIONS).at(-1)).toBe('0005-cost-records');
+  it('comes right after 0004 (migration order never changes)', () => {
+    const names = Object.keys(MIGRATIONS);
+    expect(names[names.indexOf('0005-cost-records') - 1]).toBe('0004-runs');
   });
 
   it('is append-only: UPDATE/DELETE and TRUNCATE triggers, SELECT and INSERT grants only', () => {
