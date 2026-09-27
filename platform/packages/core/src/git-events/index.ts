@@ -7,3 +7,10 @@ export {
   type PollResult,
 } from './poll-project.js';
 export { COMMENT_REPLY_KEYS, renderCommentReply } from './replies.js';
+export {
+  ESCALATION_NOTICE_KEYS,
+  flushEscalationNotices,
+  renderEscalationNotice,
+  type NoticeDeps,
+  type NoticeLogEvent,
+} from './escalation-notices.js';

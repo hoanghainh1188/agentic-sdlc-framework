@@ -5,8 +5,9 @@
 //   B07 before `gate_advance`; C06 before `run_start`; C07 before `run_resume` or
 //   `budget_increase`; C08 before `push` or `open_pr`; E01 before `merge`; E03 before `release`.
 // Containment (`kill_run`, `revoke_credentials`, C11) is never frozen. No answer never means
-// "go ahead": an escalation keeps freezing until it is closed (the decision's scope, PR 2, may
-// allow the decided action before that).
+// "go ahead": an escalation keeps freezing until it is closed. A decision that has not expired lets
+// the actions of its scope through; the caller still re-checks its bound hash with
+// `revalidateEscalationDecision` just before acting.
 //
 // An escalation freezes when it is not closed and either its response level is `pause`,
 // `contain` or `incident`, or its acknowledgement was missed (observe and notify then freeze too).
@@ -20,6 +21,7 @@ import {
 import type { Escalation } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { loadEffectiveConfig } from '../registry/effective-config.js';
+import { decisionAllows } from './decide.js';
 import { EscalationError } from './errors.js';
 
 export interface FreezeCheck {
@@ -48,13 +50,14 @@ export async function checkFreeze(
   scope: TenantScope,
   intentId: string,
   action: EscalationAction,
+  at: Date = new Date(),
 ): Promise<FreezeCheck> {
   const allowed = { allowed: true, escalationCodes: [] };
   if ((CONTAINMENT_ACTIONS as readonly string[]).includes(action)) return allowed;
   const escalations = await scope.escalations.listForIntent(intentId, {
     statuses: ['open', 'acknowledged', 'resolved'],
   });
-  const freezing = escalations.filter(isFreezing);
+  const freezing = escalations.filter((e) => isFreezing(e) && !decisionAllows(e, action, at));
   if (freezing.length === 0) return allowed;
   // Without the intent there is no safe list to read: the action stays refused (fail closed).
   const intent = await scope.intents.getById(intentId);
@@ -70,8 +73,9 @@ export async function assertActionAllowed(
   scope: TenantScope,
   intentId: string,
   action: EscalationAction,
+  at: Date = new Date(),
 ): Promise<void> {
-  const check = await checkFreeze(scope, intentId, action);
+  const check = await checkFreeze(scope, intentId, action, at);
   if (!check.allowed) {
     throw new EscalationError(
       'frozen',

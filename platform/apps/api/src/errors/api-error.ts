@@ -3,10 +3,12 @@
 import {
   CommandError,
   DbError,
+  EscalationError,
   RegistryError,
   TenantGuardError,
   type CommandErrorCode,
   type DbErrorCode,
+  type EscalationErrorCode,
   type RegistryErrorCode,
 } from '@sdlc/core';
 import type { MessageKey } from '@sdlc/messages';
@@ -26,6 +28,10 @@ export const API_ERROR_CODES = [
   'gate_input_missing',
   'project_not_active',
   'config_invalid',
+  'escalation_not_found',
+  'escalation_not_open',
+  'escalation_already_acknowledged',
+  'escalation_decision_not_allowed',
   'conflict',
   'not_ready',
   'internal',
@@ -46,6 +52,10 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   gate_input_missing: 'api.error.gate_input_missing',
   project_not_active: 'api.error.project_not_active',
   config_invalid: 'api.error.config_invalid',
+  escalation_not_found: 'api.error.escalation_not_found',
+  escalation_not_open: 'api.error.escalation_not_open',
+  escalation_already_acknowledged: 'api.error.escalation_already_acknowledged',
+  escalation_decision_not_allowed: 'api.error.escalation_decision_not_allowed',
   conflict: 'api.error.conflict',
   not_ready: 'api.error.not_ready',
   internal: 'api.error.internal',
@@ -92,6 +102,19 @@ const COMMAND: Readonly<Record<CommandErrorCode, [number, ApiErrorCode]>> = {
   forbidden: [403, 'forbidden'],
 };
 
+/** Escalation refusals (B11). `frozen` and packet errors never come from these endpoints. */
+const ESCALATION: Readonly<Record<EscalationErrorCode, [number, ApiErrorCode]>> = {
+  not_found: [404, 'escalation_not_found'],
+  forbidden: [403, 'forbidden'],
+  not_open: [409, 'escalation_not_open'],
+  already_acknowledged: [409, 'escalation_already_acknowledged'],
+  decision_not_allowed: [422, 'escalation_decision_not_allowed'],
+  intent_not_open: [409, 'escalation_not_open'],
+  invalid_packet: [400, 'invalid_request'],
+  response_level_too_low: [422, 'escalation_decision_not_allowed'],
+  frozen: [409, 'conflict'],
+};
+
 const DB: Partial<Readonly<Record<DbErrorCode, [number, ApiErrorCode]>>> = {
   invalid_value: [400, 'invalid_request'],
   conflict: [409, 'conflict'],
@@ -102,6 +125,7 @@ const DB: Partial<Readonly<Record<DbErrorCode, [number, ApiErrorCode]>>> = {
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
+  if (error instanceof EscalationError) return new ApiError(...ESCALATION[error.code]);
   if (error instanceof RegistryError) {
     const [status, code] = REGISTRY[error.code];
     // A person without the gate's role is refused like any other missing permission.

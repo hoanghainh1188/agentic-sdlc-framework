@@ -16,6 +16,19 @@ export {
   type StepWindow,
 } from './clock.js';
 export { ESCALATION_CODE_PATTERN, formatEscalationCode, parseEscalationCode } from './code.js';
+export {
+  acknowledgeEscalation,
+  actingRoles,
+  closeEscalation,
+  decideEscalation,
+  decisionAllows,
+  DEFAULT_DECISION_ACTIONS,
+  revalidateEscalationDecision,
+  type AcknowledgeInput,
+  type DecideInput as EscalationDecideInput,
+  type RevalidateInput as EscalationRevalidateInput,
+  type RevalidateResult as EscalationRevalidateResult,
+} from './decide.js';
 export { EscalationError, type EscalationErrorCode } from './errors.js';
 export { assertActionAllowed, checkFreeze, isFreezing, type FreezeCheck } from './freeze.js';
 export { clockNotices, raisedNotices, type NoticeToRecord } from './notices.js';

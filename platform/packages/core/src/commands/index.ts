@@ -23,6 +23,8 @@ export {
 export {
   COMMENT_SYNTAX_PROBLEMS,
   COMMENT_VERBS,
+  DECISION_WORDS,
+  ESCALATION_VERBS,
   parseCommentCommand,
   type CommentSyntaxProblem,
   type CommentVerb,
