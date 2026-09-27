@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.8 |
+| Version | 1.9 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -59,6 +59,7 @@ erDiagram
     agents ||--o{ runs : "executes"
     intents ||--o{ escalations : "escalates"
     runs ||--o{ escalations : "escalates"
+    escalations ||--o{ escalation_notices : "notifies"
     intents ||--o{ spec_refs : "links spec"
     intents ||--o{ plans : "has plan"
     intents ||--o{ gate_decisions : "passes gates"
@@ -99,6 +100,8 @@ Use the canonical codes (handbook/00-introduction/05-codes.md).
 | `severity` | `critical`, `high`, `medium`, `low` |
 | `response_level` | `observe`, `notify`, `pause`, `contain`, `incident` |
 | `escalation_status` | `open`, `acknowledged`, `resolved`, `closed` |
+| `escalation_route` | `intent`, `technical`, `security`, `policy`: who receives an escalation first (handbook Ch.6 §6.4; ADR-M28) |
+| `escalation_step` | `owner`, `backup`, `governance`: the chain when nobody acknowledges (handbook Ch.6 §6.5; ADR-M28) |
 | `git_provider` | `github` (MVP), `gitlab` (MVP+1) |
 | `event_source` | `polling`, `webhook` |
 | `gate_reason_code` | `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other` (ADR-M20) |
@@ -249,6 +252,7 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | event_id | text | `GitEvent.id`, for example `github:comment:123`. Unique per (`tenant_id`, `project_id`) |
 | outcome | text | Code: `decided`, `refused`, `syntax_error`, `user_not_linked`, `intent_not_linked`, `intent_ambiguous`, `ignored_bot`, `failed`; `failing` (handling failed, retried) and `failed_internal` (given up) |
 | gate_decision_id | uuid FK null | The decision recorded for the command |
+| escalation_id | uuid FK null | The escalation a `/ack` or `/decide` command acted on (B11). Never together with `gate_decision_id` |
 | issue_number | int null | Issue or pull request to reply on; required with a reply |
 | reply_code | text null | Code of the reply (`comment.reply.<code>` in the message catalog). Null: no reply (for example a successful command) |
 | reply_params | jsonb null | Codes only (gate, refusal reason): a flat object of at most 8 short codes. A CHECK refuses anything else |
@@ -387,27 +391,48 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 
 ### 6.4b. Escalations
 
-**`escalations`**
+**`escalations`** (task B11, ADR-M28). Kept at least 2 years (section 10), so it holds codes, IDs, hashes and references only, never free text or personal or client data.
 
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid PK | `ESC-…` code in `code` |
-| code | text | |
+| id | uuid PK | |
+| code | text | `ESC-YYYY-NNNN`, unique within the tenant (same numbering rules as intent codes) |
 | intent_id | uuid FK | |
 | run_id | uuid FK null | |
 | trigger | escalation_trigger | |
+| route | escalation_route | Who receives it first; the roles per route come from project config `escalation.routing` |
 | severity | severity | |
-| response_level | response_level | |
-| packet | jsonb | Decision packet (handbook template T16) |
-| owner_id, backup_owner_id | uuid FK users | Routed by type (handbook Ch.6 §6.4) |
-| ack_due_at, resolve_due_at | timestamptz | From the SLA table in project config |
-| acknowledged_by, acknowledged_at | uuid, timestamptz null | |
-| current_step | text | `owner`, `backup`, `governance` |
-| status | escalation_status | |
-| decision | jsonb null | Resume / modify / roll back / terminate, bound to version, scope, expiry |
+| response_level | response_level | A G5 breach uses at least `pause` (QUESTIONS #21) |
+| packet | jsonb | Decision packet (handbook template T16), **coded fields only**: `subject_kind`, `subject_sha256` (the version a decision binds to), optional `gate`, `run_id`, `agent_id`, `reason_code`, `recommendation`, and one `https://` `ref`. A CHECK refuses nested values, spaces and `@` |
+| producer_ids | uuid[] | Producers of the change: never owner, backup, acknowledger or decider (FR-18; CHECK) |
+| owner_id, backup_owner_id | uuid FK users null | Routed by type (handbook Ch.6 §6.4). Null when the role has no holder: that step is skipped |
+| current_step | escalation_step | |
+| status | escalation_status | Allowed moves only (trigger, ADR-M28 §2.4); nothing changes once `closed` |
+| ack_due_at | timestamptz | First acknowledge deadline, from the SLA table (kept for metrics) |
+| step_due_at, remind_at, reminded_step | timestamptz, timestamptz null, escalation_step null | Acknowledge window of the current step; each step gets a fresh window |
+| ack_missed_at | timestamptz null | First missed acknowledgement; from then on `observe` and `notify` freeze the intent too |
+| governance_overdue_at | timestamptz null | Governance, the last step, missed its window too |
+| resolve_due_at, resolve_overdue_at | timestamptz null | Resolve clock; null for "next planned work" |
+| next_check_at | timestamptz null | Earliest pending clock, read by the worker loop (ADR-M28 §2.2) |
+| acknowledged_by, acknowledged_at | uuid, timestamptz null | Written once |
+| decision | jsonb null | Resume / modify / roll back / terminate / escalate further, bound to version, scope, expiry; coded fields only |
+| decided_by, decided_at | uuid FK users null, timestamptz null | |
+| closed_at | timestamptz null | |
 | updated_at | timestamptz | |
 
-- Every change is also written to `audit_log`. Updates are allowed only on `status`, `current_step`, acknowledgement and decision fields.
+- Every change is also written to `audit_log` (`escalation.*` actions). `platform_app` may update only the state, clock, acknowledgement and decision columns.
+
+**`escalation_notices`** (task B11, ADR-M28 §2.5): the outbox of the notices the escalation clock records.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint identity PK | |
+| escalation_id | uuid FK | |
+| kind | text | Code: `raised`, `reminder`, `step_changed`, `ack_overdue`, `resolve_overdue`, `incident_due` |
+| step | escalation_step | |
+| audience_role | project_role | A role, never a person; never `viewer`. Unique per (escalation, kind, step, role) |
+| attempts | smallint | |
+| posted_at, abandoned_at | timestamptz null | Final once set (trigger, `SDA08`) |
 
 ### 6.5. Cost
 
@@ -628,3 +653,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.6 | 2026-09-26 | Claude (task C03), approved by Harry | §6.5: `cost_records` as implemented: code formats, `run_id` needs `intent_id`, cached ≤ input tokens, month index, append-only (ADR-M24) |
 | 1.7 | 2026-09-27 | Claude (task B03), approved by Harry | §6.1 `api_tokens`: token format, lifetime, audit events (ADR-M26, QUESTIONS #63) |
 | 1.8 | 2026-09-27 | Claude (task B06), approved by Harry | New §6.1b `git_event_receipts` (with `event_attempts`, outcomes `failing` and `failed_internal` from the review of PR #94); §6.1 notes: users mapped by numeric account ID, cursor compare-and-set (ADR-M27, QUESTIONS #43, #45) |
+| 1.9 | 2026-09-27 | Claude (task B11), approved by Harry | §5: new enums `escalation_route`, `escalation_step`; §6.4b `escalations` as built (route, producers, nullable owners, clock columns, coded packet and decision) and new `escalation_notices`; §6.1b `git_event_receipts.escalation_id` (ADR-M28, QUESTIONS #73–#77) |

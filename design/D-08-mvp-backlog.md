@@ -276,6 +276,9 @@ flowchart LR
 - [ ] AC1: `sdlc login`, `sdlc intent create|show|list`, `sdlc gate approve|reject <G> <INT>`
 - [ ] AC2: Human-readable output from the message catalog; `--json` mode
 - [ ] AC3: Command tests against a mocked API
+- [ ] AC4: `sdlc escalation list|show|ack|decide` against the B11 API endpoints (QUESTIONS #77, ADR-M28 §2.7)
+
+> Note: The escalation commands need the B11 API (B11 PR 2)
 
 #### B05. GitHub adapter (part 1): App, events, comments
 
@@ -348,15 +351,17 @@ flowchart LR
 
 | Size | Depends on | Requirements | Code area |
 |---|---|---|---|
-| M | B02, B05 | FR-18 | platform/packages/core/escalation/*, platform/apps/worker (timers), CLI and comment commands |
+| M | B02, B05 | FR-18 | platform/packages/core/escalation/*, platform/apps/worker (clock loop), platform/apps/api, comment commands |
 
 **Acceptance criteria**
 
 - [ ] AC1: `escalations` table (D-05); create from triggers with severity, response level and decision packet
 - [ ] AC2: Routing: owner by type (intent → Person A; technical/security → Person B; policy → governance) and a backup owner
-- [ ] AC3: Acknowledge and resolve clocks from the SLA table as Temporal timers; no ack → remind → backup → governance
+- [ ] AC3: Acknowledge and resolve clocks from the SLA table, stored in the database and advanced by the worker loop (QUESTIONS #73, ADR-M28); no ack → remind → backup → governance
 - [ ] AC4: While open: only safe-list actions continue; everything else frozen; authority never passes back to the producer
-- [ ] AC5: Acknowledge and decide via CLI or `/ack`, `/decide` comments; decisions bound to version, scope, expiry; every step audited
+- [ ] AC5: Acknowledge and decide via the API or `/ack`, `/decide` comments (CLI in B04); decisions bound to version, scope, expiry; every step audited
+
+> Note: Two PRs: PR 1 = table, config, routing, clocks, freeze; PR 2 = comment commands, API, notices. Supersedes ADR-M14 in part: B07 adds no second timer
 
 #### B12. Project AI record + G1 check
 
@@ -747,4 +752,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.3 | 2026-09-27 | Claude (task C04), approved by Harry | C04 AC1: sandbox egress to LiteLLM and the package proxy only, GitHub through the runner; C08 note: the runner pushes, update the D-03 §4 flow and D11 (QUESTIONS #52, #59, ADR-M25) |
 | 1.4 | 2026-09-27 | Claude, approved by Harry | New task B13 (admin onboarding, B03 decision D1); E07 depends on B13 |
 | 1.5 | 2026-09-27 | Claude (task C04), approved by Harry | C06 AC4: the `sdlc-runner` task queue and heartbeat activity move from C04 to C06; size S → M (QUESTIONS #55, ADR-M25 §2.7) |
+| 1.6 | 2026-09-27 | Claude (task B11), approved by Harry | B11 AC3: clocks in the database, advanced by the worker (QUESTIONS #73, ADR-M28); B11 AC5 and B04 AC4: the escalation CLI moves to B04 (QUESTIONS #77) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

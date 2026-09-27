@@ -69,7 +69,8 @@ describe('default configuration (AC1)', () => {
       .filter((line) =>
         line.includes('[Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8)'),
       );
-    expect(marked).toHaveLength(9);
+    // 9 from QUESTIONS.md #9, #33; 1 from #75 (escalation reminder, task B11).
+    expect(marked).toHaveLength(10);
   });
 
   it('is frozen, so callers cannot change it', () => {

@@ -1,6 +1,7 @@
 // Reads and validates project configuration (YAML). See design/D-03 section 11, D-08 A05, ADR-M18.
 export {
   addWorkingMinutes,
+  durationMinutes,
   deadlineFrom,
   endOfWorkingDay,
   NoWorkingTimeError,
@@ -20,7 +21,9 @@ export {
   checkMandatoryRules,
   DUAL_APPROVAL_G7_FLAGS,
   DUAL_APPROVAL_ROLES,
+  ESCALATION_FINAL_ROLE,
   FORCED_HITL_G3_FLAGS,
+  HANDBOOK_NOTIFY_ON_RAISE,
   HANDBOOK_SLA,
   MANDATORY_RULES,
   MAX_IDENTICAL_TOOL_CALLS,
