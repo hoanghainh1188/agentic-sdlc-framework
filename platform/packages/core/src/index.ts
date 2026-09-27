@@ -8,3 +8,4 @@ export * from './git-host/index.js';
 export * from './cost/index.js';
 export * from './admin/index.js';
 export * from './commands/index.js';
+export * from './git-events/index.js';

@@ -78,6 +78,7 @@ Tenant guard rules:
 - create a tenant
 - read a tenant by ID or slug
 - `resolveApiToken(hash)`: task B03 finds the tenant from the token, so this lookup crosses tenants
+- `listPollableProjects()`: task B06, the GitHub poller runs for every tenant (ADR-M27). It returns only `tenant_id`, `project_id` and the repository name of the active GitHub projects of active tenants; everything after it runs in `forTenant(tenant_id)`
 
 PostgreSQL Row-Level Security stays in MVP+1 (D-05 section 8).
 
@@ -146,7 +147,7 @@ Migration `0002-audit-log` creates `audit_log` (D-05 sections 6.7 and 7).
 - First record of a tenant: `seq = 1`, `prev_hash` = 64 zeros (`CHECK`).
 - Writes: `AuditLogRepository.append` runs in the caller's transaction (or opens one), takes `pg_advisory_xact_lock(<audit class>, hashtext(tenant_id))`, reads the tenant's last row, computes the hash and inserts. The lock is a query fragment without a table, so it passes the tenant guard.
 - **Chain link trigger** (`BEFORE INSERT`): refuses a row whose `seq` is not the tenant's last `seq + 1`, or whose `prev_hash` is not the last `hash`. It cannot recompute the SHA-256, but a writer that skipped the lock cannot create a gap or a fork. Unique `(tenant_id, seq)` stays as well.
-- Trigger errors use our own SQLSTATE codes, mapped to `DbError` codes: `SDA01` append-only → `immutable`; `SDA02` chain link → `conflict`; `SDA03` revoked role binding → `immutable`; `SDA04` void of a non-approval → `invalid_value` (B02, ADR-M20).
+- Trigger errors use our own SQLSTATE codes, mapped to `DbError` codes: `SDA01` append-only → `immutable`; `SDA02` chain link → `conflict`; `SDA03` revoked role binding → `immutable`; `SDA04` void of a non-approval → `invalid_value` (B02, ADR-M20); `SDA06` a delivered or abandoned reply of a Git event receipt → `immutable` (B06, ADR-M27). (`SDA05`: a run in a final status, C02, ADR-M22.)
 
 **What the payload may contain.** The audit log is never deleted and is kept at least 2 years (D-05 section 10, FR-44). Personal data or client data written there could never be erased (handbook Ch.7). Therefore:
 
@@ -207,3 +208,4 @@ Fields marked `?` are optional (ADR-M20 section 2.4): left out when there is no 
 | 0.3 | 2026-09-25 | Claude (issue #55) | §2.5: `@sdlc/contracts` is the source of `data_class` and `project_role`; `vocabulary.ts` keeps DB-only lists; test of `pg_enum` against contracts |
 | 0.4 | 2026-09-25 | Claude (task A07) | §2.8 audit log: triggers, hash chain with `hash_version`, payload rule (IDs, codes, hashes, versions only; declared fields; 2048 bytes), audited config and AI record saves, `sdlc audit verify` (temporary direct DB access, B04 moves it behind the API); §2.7 QUESTIONS #12 done |
 | 0.5 | 2026-09-25 | Claude (task B02) | §2.8: registry audit actions, optional fields, `SDA04`. `gate_decisions` attaches `forbid_mutation()` (ADR-M20) |
+| 0.6 | 2026-09-27 | Claude (task B06) | §2.4: `listPollableProjects()` added to the system scope (IDs only, ADR-M27); `TenantScope.savepoint` issues savepoint statements outside the guard (no table); `SDA06` |

@@ -17,6 +17,24 @@ import { RegistryError } from '../../packages/core/src/registry/errors.js';
 
 const en = catalogFor('en')!;
 
+// The API's refusal texts before B06 moved them from `api.reason.*` to the shared `gate.reason.*`
+// keys (ADR-M27): the API must still return exactly these sentences.
+const TEXTS_BEFORE_B06: Readonly<Record<string, string>> = {
+  actor_not_human: 'Only people approve gates; agents and the platform never do.',
+  producer: 'You produced this change, so you cannot approve it (separation of duties).',
+  no_human_decision:
+    'This gate is checked automatically or sampled afterwards: nobody approves it.',
+  role_missing: 'You do not hold a role that may decide this gate.',
+  already_approved: 'You already approved this: dual approval needs two different people.',
+  role_already_covered: 'Your roles are already covered by another approver.',
+  approvals_complete: 'The gate already has all the approvals it needs.',
+  agent_never_decides: 'Agents never decide or approve gates.',
+  decision_not_for_actor: 'People cannot send this kind of decision.',
+  reason_required: 'A reason code is needed for this decision.',
+  hitl_needs_a_person: "This gate needs a person's decision.",
+  breach_never_passes: 'A scope or budget breach never passes.',
+};
+
 // Every ApprovalRefusal (contracts) and DecisionViolation (core) code.
 const REASONS = [
   'actor_not_human',
@@ -44,10 +62,18 @@ describe('api error catalog', () => {
 
   it('has a message for every refusal reason', () => {
     for (const reason of REASONS) {
-      expect(en[`api.reason.${reason}` as MessageKey], reason).toBeDefined();
-      expect(reasonMessage(reason, 'en')).toBe(t(`api.reason.${reason}` as MessageKey));
+      expect(en[`gate.reason.${reason}` as MessageKey], reason).toBeDefined();
+      expect(reasonMessage(reason, 'en')).toBe(t(`gate.reason.${reason}` as MessageKey));
     }
     expect(reasonMessage('something_new', 'en')).toBe('something_new');
+  });
+
+  it('returns the same refusal texts as before the move to gate.reason.* (B06)', () => {
+    expect(Object.keys(TEXTS_BEFORE_B06).sort()).toEqual([...REASONS].sort());
+    for (const [reason, text] of Object.entries(TEXTS_BEFORE_B06)) {
+      expect(reasonMessage(reason, 'en'), reason).toBe(text);
+    }
+    expect(Object.keys(en).filter((key) => key.startsWith('api.reason.'))).toEqual([]);
   });
 
   it.each([

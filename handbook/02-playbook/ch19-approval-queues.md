@@ -101,6 +101,41 @@ If anything differs → **cancel and ask again**. Three rules always hold:
 
 ---
 
+## 19.8b. Using the platform: gate commands in comments
+
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B06, 2026-09-27, and kept in line with the platform code (`design/ADR-M27-github-poller.md`). The rest of this chapter is Draft 0.1 and is written outside Claude Code.
+
+You can decide a gate by writing a comment on the GitHub issue or pull request of the intent. The platform reads new comments about every 30 seconds (project setting `github.poll_interval_seconds`). The CLI (`sdlc gate …`, task B04) does the same through the API.
+
+**Commands.** Write the command on the **first line of a new comment**:
+
+| Command | Records |
+|---|---|
+| `/approve G3` | An approval of G3. Nothing may follow the gate on that line |
+| `/reject G3 <reason>` | A rejection. The reason is required |
+| `/request-changes G3 <reason>` | A request for changes. The reason is required |
+
+- Gates G1, G2 and G3 can be decided by comment today; G7 and G8 come later.
+- The reason may start with a reason code: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other`. A code other than `other` may stand alone: `/reject G2 spec_unclear` is accepted. `other` alone is not a reason: `/reject G2 other` without text is refused. Without a code, the platform records `other`, and you must write a sentence. Example: `/reject G2 spec_unclear AC2 does not say which warehouse`.
+- The reason text stays in your comment. The platform stores only the reason code and a link to the comment, because its records are kept for years and can never be edited. Write the reason so that it can stay on GitHub, and do not put personal or client data in it.
+- Only new comments count. **Editing a comment never changes a decision.** To change your mind, write a new comment.
+- Text on later lines, quoted text (`> /approve G3`) and commands inside code blocks are not read.
+
+**Who may decide.**
+
+- Your GitHub account must be linked to your platform user. The link uses the numeric account ID, so renaming your GitHub login does not break it. Ask the platform admin to link it.
+- You need the gate's role on the project, for example Person A for G1 and Person B for G3 (codes table §4). The producer of a change never approves it.
+- Bots and automation accounts never decide.
+- The intent must be linked to the issue or pull request.
+
+**Answers.**
+
+- **A successful command gets no reply.** The platform posts the gate status on the issue or pull request when the gate changes (FR-22, task B07).
+- A command that the platform cannot read or refuses gets a reply that says why and shows the syntax. Nothing is recorded in that case: fix the command and write a new comment.
+- If the platform itself fails while handling your command, it tries again on the next polls. After a few failed attempts it gives up and replies that it could not record the command. Nothing is recorded; write the command again later, and tell the platform operator.
+
+---
+
 ## 19.9. Roles and approval points
 
 | What | Who |

@@ -8,7 +8,12 @@ export {
 } from './errors.js';
 export { PlatformDatabase } from './platform-database.js';
 export { TenantScope } from './tenant-scope.js';
-export { SystemScope, type NewTenant, type ResolvedApiToken } from './system-scope.js';
+export {
+  SystemScope,
+  type NewTenant,
+  type PollableProject,
+  type ResolvedApiToken,
+} from './system-scope.js';
 export { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 export { hashApiToken } from './repositories/api-tokens.js';
 export type { AuditEvent } from './repositories/audit-log.js';

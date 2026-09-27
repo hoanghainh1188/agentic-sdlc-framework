@@ -118,7 +118,7 @@ B03 covers only what is needed to use and test the API. Everything else in #58 i
   - Fastify runs with `trustProxy: false`: the client address is the TCP peer. If a reverse proxy is ever put in front of the api, this setting and the per-address limit must be revisited together, or every client shares the proxy's limit.
 - Error envelope: `{ error: { code, message, reason?, reason_message?, details? } }`.
   - Every code has a catalog key `api.error.<code>`.
-  - Every refusal reason of the registry and the policy engine has a key `api.reason.<code>`.
+  - Every refusal reason of the registry and the policy engine has a key `gate.reason.<code>` (`api.reason.<code>` until B06, which shares these texts with the comment replies; ADR-M27 §2.4).
   - The locale comes from `Accept-Language` (English until vi and ja exist).
   - Unknown errors are `internal` (500) and are logged without request data. Stack traces, SQL and library text never reach the client.
 - Another tenant's intent, an intent in a project without a role, and an unknown intent all give the same 404.
@@ -161,3 +161,4 @@ B03 covers only what is needed to use and test the API. Everything else in #58 i
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task B03) | First version |
+| 0.2 | 2026-09-27 | Claude (task B06) | §2.7: refusal reason keys renamed `gate.reason.*`, same texts (ADR-M27) |

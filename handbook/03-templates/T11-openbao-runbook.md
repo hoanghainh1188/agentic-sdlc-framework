@@ -153,6 +153,7 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 | LiteLLM salt key (field `value`) | `kv/litellm/salt-key` | `litellm` |
 | Model provider keys (field `api_key`), one entry per provider | `kv/litellm/providers/<provider>`, for example `kv/litellm/providers/anthropic` | `litellm` |
 | `platform_app` database password of the API (field `password`) | `kv/api/database` | `api` (section 5e) |
+| `platform_app` database password of the worker (field `password`) | `kv/worker/database` | `worker` (section 5f) |
 | Database and SeaweedFS passwords of a process | `kv/<process>/…` | That process |
 
 The GitHub App key is read by `api`, by the `worker` (it polls GitHub, posts gate comments and reads spec files; `design/QUESTIONS.md` #42) and by the runner to create short-lived tokens. It must **never** enter an agent sandbox (task C04; `design/QUESTIONS.md` #44 may remove the runner's access).
@@ -172,6 +173,36 @@ Create one GitHub App per installation of the platform (`design/ADR-M23-github-a
 ```
 
 - Key rotation: generate a new key in GitHub, store it the same way, wait 10 minutes (the platform reads the key again after that), then delete the old key in GitHub.
+
+### 5b.1. Development: the test GitHub App in the development OpenBao (task B06)
+
+On a development machine, the worker (GitHub poller) reads the key of the **test** App `harryforge-sdlc-dev` (Client ID `Iv23liQtMQBwNyVYZuJt`, `platform/GETTING-STARTED.md` Step 11) from the development OpenBao, at `kv/shared/github-app`. Only throw-away OpenBao keys are used there. The production App gets its own key in the real OpenBao later.
+
+- **The repository owner runs these commands in the macOS Terminal**, from the repository root. Never run them through a chat tool, and never paste the key or the token into a chat.
+- The key is read from its file (`~/.config/sdlc-secrets/github-app-dev.pem`, mode 600, outside the repository) and goes to OpenBao on stdin. It is never typed, pasted, passed as an argument, written to the repository or a log, or kept in shell history.
+- The admin token (section 5.1) is typed at a hidden prompt.
+
+Before: OpenBao is running (`pnpm compose:core`), unsealed and configured (sections 3.1 and 4).
+
+1. Store the Client ID and the key:
+   ```bash
+   KEY_FILE="$HOME/.config/sdlc-secrets/github-app-dev.pem"
+   CLIENT_ID=Iv23liQtMQBwNyVYZuJt
+   { printf 'Admin token (hidden): ' >&2; read -rs t && echo >&2 && printf '%s\n%s\n' "$t" "$CLIENT_ID" && cat "$KEY_FILE"; } | \
+     docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T openbao \
+     sh -c 'read -r BAO_TOKEN && read -r CLIENT_ID && export BAO_TOKEN && bao kv put -mount=kv shared/github-app client_id="$CLIENT_ID" private_key=- >/dev/null && echo stored'
+   unset t
+   ```
+   The answer is `stored`.
+2. Check. This prints the Client ID only, never the key:
+   ```bash
+   { printf 'Admin token (hidden): ' >&2; read -rs t && echo >&2 && printf '%s\n' "$t"; } | \
+     docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T openbao \
+     sh -c 'read -r BAO_TOKEN && export BAO_TOKEN && bao kv get -mount=kv -field=client_id shared/github-app'
+   unset t
+   ```
+3. Keep the `.pem` file where it is: the optional live tests read it (`platform/GETTING-STARTED.md` Step 11). If the key ever leaves the machine, delete it in the App settings on GitHub and create a new one.
+4. Deliver the worker's credentials (section 5f) and start it: `pnpm compose:platform`.
 
 ### Issuing a secret ID: sensitive, audited
 
@@ -265,7 +296,30 @@ The API (service `sdlc-api`, task B03) logs in with the AppRole `api` and reads 
 | The API's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap api-credentials`, then restart `sdlc-api`. Then destroy the old secret ID (section 8.1, step 4) |
 | The `platform_app` password | Change it in PostgreSQL and in `.env`, run `pnpm openbao:bootstrap api-credentials`, then restart `sdlc-api` |
 
-## 5f. The runner and sandboxes (Compose profile `sandbox`)
+## 5f. The worker (Compose profile `platform`)
+
+The worker (service `sdlc-worker`, task B06) polls GitHub and handles the comment commands (`design/ADR-M27-github-poller.md`). It logs in with the AppRole `worker`. It reads the password of the database role `platform_app` from `kv/worker/database` once, when it starts, and the GitHub App key from `kv/shared/github-app` every 10 minutes. No password or key is in its environment or image.
+
+### First set-up
+
+1. OpenBao is initialised, unsealed and configured (sections 3 and 4). `configure` creates the AppRole `worker`. The GitHub App key is stored (section 5b; on a development machine section 5b.1).
+2. Store the password and deliver the worker's AppRole credentials. The command asks for an admin token (hidden). It stores `PLATFORM_APP_DB_PASSWORD` from `platform/deploy/.env` at `kv/worker/database`, issues a new secret ID, and writes it with the role ID into the volume `worker-approle`. It prints no secret:
+   ```bash
+   pnpm openbao:bootstrap worker-credentials
+   ```
+   Record it in the operations log (role `worker`, date, reason; not the secret ID).
+3. Start: `pnpm compose:platform` (profiles `core` and `platform`). The worker publishes no port.
+4. Check: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env logs sdlc-worker` shows `worker.started`, then one `poll.completed` per project and interval. The logs hold IDs and codes only.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| The worker's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap worker-credentials`, then restart `sdlc-worker`. Then destroy the old secret ID (section 8.1, step 4) |
+| The `platform_app` password | Change it in PostgreSQL and in `.env`, run `api-credentials`, `worker-credentials` and `runner-credentials`, then restart `sdlc-api`, `sdlc-worker` and `sdlc-runner` |
+| The GitHub App key | Section 5b. No restart: the worker reads the key again after 10 minutes |
+
+## 5g. The runner and sandboxes (Compose profile `sandbox`)
 
 The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per agent run (`design/ADR-M25-runner-sandbox.md`). It logs in with the AppRole `runner` and reads the password of the database role `platform_app` from `kv/runner/database` once, when it starts. It reaches Docker only through the socket proxy (`docker-socket-proxy`); it never mounts the Docker socket itself.
 
@@ -296,8 +350,8 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
 
 | What | Steps |
 |---|---|
+| The `platform_app` password | See section 5f: all three credentials commands, then restart the three services |
 | The runner's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap runner-credentials`, then restart `sdlc-runner`. Then destroy the old secret ID (section 8.1, step 4) |
-| The `platform_app` password | Change it in PostgreSQL and in `.env`, run `pnpm openbao:bootstrap api-credentials` and `pnpm openbao:bootstrap runner-credentials`, then restart `sdlc-api` and `sdlc-runner` |
 
 ### After a crash or restart
 
@@ -394,9 +448,9 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | LiteLLM exits with `no rendered configuration (Compose profile models) and no LITELLM_MASTER_KEY` | Started without the profile `models` and without a development master key | On the server: `pnpm compose:models`. On a development machine: set `LITELLM_MASTER_KEY` in `.env` |
 | `could not deliver the litellm credentials` | Wrong or expired admin token, or `configure` has not created the AppRole `litellm` yet | Section 5.1; run `configure` again after an upgrade |
 | `sdlc-api` restarts with "Cannot read SDLC_OPENBAO_ROLE_ID_FILE" or "no password field" | `api-credentials` was not run, or the volume was removed | Section 5e, step 2 |
-| `sdlc-runner` restarts with `runner.start_failed` ("no password field", "Cannot read SDLC_OPENBAO_ROLE_ID_FILE") | `runner-credentials` was not run, or the volume was removed | Section 5f, step 3 |
-| `docker-socket-proxy` stays unhealthy, or the runner says it cannot reach the Docker socket (`EACCES`) | `SDLC_DOCKER_GID` is not the group of the host's Docker socket | Section 5f, step 2; then `pnpm compose:sandbox` again |
-| A run fails with `image_unavailable` | `sandbox.image` names a digest the local registry does not have, or the registry is down | Section 5f, sandbox images: push the image again and check the digest |
+| `sdlc-runner` restarts with `runner.start_failed` ("no password field", "Cannot read SDLC_OPENBAO_ROLE_ID_FILE") | `runner-credentials` was not run, or the volume was removed | Section 5g, step 3 |
+| `docker-socket-proxy` stays unhealthy, or the runner says it cannot reach the Docker socket (`EACCES`) | `SDLC_DOCKER_GID` is not the group of the host's Docker socket | Section 5g, step 2; then `pnpm compose:sandbox` again |
+| A run fails with `image_unavailable` | `sandbox.image` names a digest the local registry does not have, or the registry is down | Section 5g, sandbox images: push the image again and check the digest |
 | A model is missing in LiteLLM | Its provider has no key in `kv/litellm/providers/`, or LiteLLM was not restarted after the key was stored | Section 5d |
 | Compose says the network has a different configuration | `SDLC_NETWORK_SUBNET` or `SDLC_NETWORK_GATEWAY` changed | `pnpm compose:down`, then `pnpm compose:core`. Then run `configure` again (secret IDs are bound to the subnet without the gateway) |
 | `the Compose network has no fixed gateway` from `configure` | The network was created before A11 | `pnpm compose:down`, then `pnpm compose:core`, then `configure` again |
@@ -424,4 +478,5 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.6 | 2026-09-26 | Claude Code (task C03) | Section 5d: LiteLLM keys through the OpenBao Agent sidecar (profile `models`), `litellm-credentials`, rotation; AppRole `litellm`; key table; troubleshooting rows (`design/QUESTIONS.md` #1, ADR-M24) |
 | 0.7 | 2026-09-27 | Claude Code (task B03) | Section 5e: the API reads the `platform_app` password from `kv/api/database` with the AppRole `api`; `api-credentials`, rotation; key table row; troubleshooting row (`design/QUESTIONS.md` #67, ADR-M26). Tested with throw-away keys (`pnpm test:api`) |
 | 0.8 | 2026-09-27 | Claude Code (task C04) | The `runner` AppRole no longer reads `kv/shared/github-app`; the worker hands it each run's token as a single-use response-wrapped token (`design/QUESTIONS.md` #44). Existing installations: run `configure` again to load the new `runner` and `worker` policies |
-| 0.9 | 2026-09-27 | Claude Code (task C04, session 3) | Section 5f: the runner reads the `platform_app` password from `kv/runner/database` (`runner-credentials`); `SDLC_DOCKER_GID`; the local registry (127.0.0.1 only, no authentication, images by digest, clean-up); clean-up after a restart; troubleshooting rows (ADR-M25). Tested with throw-away keys (`pnpm test:runner-compose`) |
+| 0.9 | 2026-09-27 | Claude Code (task B06) | Section 5b.1: storing the test GitHub App key in the development OpenBao from its file (run by the owner in the macOS Terminal); section 5f: the worker reads `kv/worker/database` and `kv/shared/github-app` with the AppRole `worker`, `worker-credentials`, rotation; key table row |
+| 0.10 | 2026-09-27 | Claude Code (task C04, session 3) | Section 5g: the runner reads the `platform_app` password from `kv/runner/database` (`runner-credentials`); `SDLC_DOCKER_GID`; the local registry (127.0.0.1 only, no authentication, images by digest, clean-up); clean-up after a restart; troubleshooting rows (ADR-M25). Tested with throw-away keys (`pnpm test:runner-compose`) |

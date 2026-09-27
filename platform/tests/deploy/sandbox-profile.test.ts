@@ -222,7 +222,7 @@ describe('sdlc-runner service', () => {
     const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
     expect(bootstrap).toMatch(/^ {2}runner-credentials\) cmd_runner_credentials ;;$/m);
     expect(bootstrap).toMatch(
-      /^cmd_runner_credentials\(\) \{ process_credentials runner sdlc-runner sandbox; \}$/m,
+      /^cmd_runner_credentials\(\) \{ platform_credentials runner sdlc-runner sandbox; \}$/m,
     );
     const dockerfile = read('platform/apps/runner/Dockerfile');
     expect(dockerfile).toMatch(/^USER node$/m);

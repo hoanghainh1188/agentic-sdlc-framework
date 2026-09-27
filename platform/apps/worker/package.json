@@ -8,5 +8,18 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@sdlc/adapter-git-github": "workspace:*",
+    "@sdlc/adapter-policy-simple": "workspace:*",
+    "@sdlc/config": "workspace:*",
+    "@sdlc/contracts": "workspace:*",
+    "@sdlc/core": "workspace:*",
+    "@sdlc/messages": "workspace:*",
+    "@sdlc/secrets": "workspace:*",
+    "zod": "4.6.5"
+  },
+  "bin": {
+    "sdlc-worker": "dist/main.js"
+  }
 }

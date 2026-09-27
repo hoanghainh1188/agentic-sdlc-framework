@@ -139,7 +139,32 @@ importers:
         specifier: workspace:*
         version: link:../../packages/secrets
 
-  platform/apps/worker: {}
+  platform/apps/worker:
+    dependencies:
+      '@sdlc/adapter-git-github':
+        specifier: workspace:*
+        version: link:../../packages/adapters/git-github
+      '@sdlc/adapter-policy-simple':
+        specifier: workspace:*
+        version: link:../../packages/adapters/policy-simple
+      '@sdlc/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@sdlc/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@sdlc/messages':
+        specifier: workspace:*
+        version: link:../../packages/messages
+      '@sdlc/secrets':
+        specifier: workspace:*
+        version: link:../../packages/secrets
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
 
   platform/packages/adapters/agent-openhands: {}
 
