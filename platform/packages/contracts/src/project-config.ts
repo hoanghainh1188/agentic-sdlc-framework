@@ -12,6 +12,7 @@ import type {
   RiskTier,
   Severity,
 } from './codes.js';
+import type { EscalationRoute, SafeAction } from './escalation.js';
 
 /**
  * How a gate is checked for one risk tier. `POLICY` = automatic policy check with no human
@@ -53,6 +54,13 @@ export interface Duration {
 /** A resolution deadline: a duration, the end of the working day, or no clock ("next planned work"). */
 export type Deadline =
   Duration | { readonly kind: 'end_of_working_day' } | { readonly kind: 'next_planned_work' };
+
+/** Who owns an escalation of one route (handbook Ch.6 §6.4 "Who receives it"). */
+export interface EscalationRouting {
+  readonly owner_role: ProjectRole;
+  /** Null: no backup step; a missed acknowledgement goes straight to governance. */
+  readonly backup_role: ProjectRole | null;
+}
 
 export interface SlaEntry {
   readonly acknowledge: Duration;
@@ -99,6 +107,14 @@ export interface ProjectConfig {
   readonly escalation: {
     readonly sla: Readonly<Record<Severity, SlaEntry>>;
     readonly calendar: WorkingCalendar;
+    /** Owner and backup role per route (QUESTIONS #74). The last step is always governance. */
+    readonly routing: Readonly<Record<EscalationRoute, EscalationRouting>>;
+    /** Roles told when an escalation is raised, per severity (handbook Ch.6 §6.4 SLA "Notify"). */
+    readonly notify_on_raise: Readonly<Record<Severity, readonly ProjectRole[]>>;
+    /** Remind the step's holder when this share of the acknowledge window has passed (#75). */
+    readonly reminder_percent: number;
+    /** Actions that continue while the intent is frozen (handbook Ch.6 §6.5, QUESTIONS #76). */
+    readonly safe_actions: readonly SafeAction[];
   };
   readonly run: {
     readonly g6_ci_retries: number;
@@ -141,7 +157,7 @@ export interface ProjectConfig {
 declare const validatedConfig: unique symbol;
 
 /**
- * A configuration that passed the schema and the mandatory rules M1–M16. Only `@sdlc/config`
+ * A configuration that passed the schema and the mandatory rules M1–M17. Only `@sdlc/config`
  * produces it (`loadProjectConfig`, `defaultProjectConfig`). Adapters accept this type, so they
  * never see an unchecked configuration and never repeat the checks (ADR-M16 §2.5, ADR-M18 §2.2).
  */

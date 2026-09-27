@@ -337,6 +337,49 @@ const CASES: Case[] = [
     key: 'config.rule.viewer_never_creates',
     path: 'access.intent_create_roles',
   },
+  // M17: escalation routing and notification (B11, QUESTIONS.md #74, handbook Ch.6 §6.4).
+  {
+    name: 'policy escalations owned by Person A',
+    rule: 'M17',
+    yaml: 'escalation:\n  routing:\n    policy: { owner_role: person_a, backup_role: null }\n',
+    key: 'config.rule.escalation_policy_owner',
+    path: 'escalation.routing.policy.owner_role',
+  },
+  {
+    name: 'viewer as escalation owner',
+    rule: 'M17',
+    yaml: 'escalation:\n  routing:\n    intent: { owner_role: viewer, backup_role: person_b }\n',
+    key: 'config.rule.escalation_viewer',
+    path: 'escalation.routing.intent.owner_role',
+  },
+  {
+    name: 'viewer as escalation backup',
+    rule: 'M17',
+    yaml: 'escalation:\n  routing:\n    technical: { owner_role: person_b, backup_role: viewer }\n',
+    key: 'config.rule.escalation_viewer',
+    path: 'escalation.routing.technical.backup_role',
+  },
+  {
+    name: 'backup role equal to the owner role',
+    rule: 'M17',
+    yaml: 'escalation:\n  routing:\n    security: { owner_role: person_b, backup_role: person_b }\n',
+    key: 'config.rule.escalation_backup_same',
+    path: 'escalation.routing.security.backup_role',
+  },
+  {
+    name: 'critical escalation does not tell governance',
+    rule: 'M17',
+    yaml: 'escalation:\n  notify_on_raise:\n    critical: [person_a, person_b]\n',
+    key: 'config.rule.escalation_notify_missing',
+    path: 'escalation.notify_on_raise.critical',
+  },
+  {
+    name: 'viewer told about a low escalation',
+    rule: 'M17',
+    yaml: 'escalation:\n  notify_on_raise:\n    low: [person_a, viewer]\n',
+    key: 'config.rule.escalation_viewer',
+    path: 'escalation.notify_on_raise.low',
+  },
 ];
 
 describe('mandatory rules refuse loosening (AC2)', () => {

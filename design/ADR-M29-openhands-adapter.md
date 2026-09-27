@@ -73,7 +73,7 @@ The runner loads the task from the database (`loadAgentTask`): the contract's pl
 
 - **Time cap: interrupt, then kill.** At `max_duration_min` the runner interrupts the agent and waits up to `SDLC_RUNNER_AGENT_STOP_GRACE_SECONDS`. If the agent stops, the runner still collects the outputs (`agent_stopped {method: interrupt}`). If not, it does not wait: the sandbox is removed right after (`method: kill`, no outputs).
 - **Iteration cap:** Agent Server 1.48.0 writes a `ConversationErrorEvent` with code `MaxIterationsReached`, then sets the status `error` (found in the live test). The adapter reports that as `max_iterations`. Backstop: a stop without a reason at or above the cap also counts as `max_iterations`.
-- `stopped_budget` for the iteration cap is an interpretation: D-05 has no dedicated status, and D-07 §6 counts the iteration cap as part of a run's budget. QUESTIONS #82 asks Harry to confirm.
+- `stopped_budget` for the iteration cap: D-05 has no dedicated status, and D-07 §6 counts the iteration cap as part of a run's budget. Accepted for the MVP (QUESTIONS #82): C07 tells a cost cap from an iteration cap by `stop_reason`; both need a human decision to resume (QUESTIONS #21).
 - **Kill switch race:** the run leaves `running` only with one conditional update. If the kill switch (C11) or the sweep moved it first, the driver changes nothing, and a run that is not `running` is not started at all.
 - **Found in the live test:** the `kind` filter of `/events/search` and `/events/count` matches nothing in 1.48.0. The adapter therefore reads the whole paged log and filters it locally (steps = `ActionEvent`, one per tool call). This is cheap for MVP run lengths; C11 may move to the WebSocket (ADR-M10 §4.1 item 2).
 - The caps come from the Run Contract; their defaults from configuration (§3).
@@ -87,7 +87,7 @@ The runner loads the task from the database (`loadAgentTask`): the contract's pl
   - if the agent already committed, only what is left is committed; `head_sha` is the final `HEAD`.
 - Every value put into a command is checked against a strict pattern and single-quoted. Answers are read from marker lines (`sdlc:…`) only; a missing marker fails closed.
 - Git runs as `/usr/bin/git` with no system or global configuration (`GIT_CONFIG_NOSYSTEM`, `GIT_CONFIG_GLOBAL=/dev/null`), no replace refs (`--no-replace-objects`), no fsmonitor, and none of the `GIT_*` variables that move the repository.
-- **These answers are what the sandbox reports.** The agent controls everything inside the sandbox (files, `.git`, its shell), so it could make them lie. They are good enough to record the run and to choose what to push; G5 (C07) and the push (C08) must recompute the changed files from the pushed branch outside the sandbox (the runner's clone or the Git host) before any gate relies on them.
+- **These answers are what the sandbox reports.** The agent controls everything inside the sandbox (files, `.git`, its shell), so it could make them lie. They are good enough to record the run and to choose what to push; G5 (C07) and the push (C08) must recompute the changed files and `head_sha` from the pushed branch outside the sandbox (the runner's clone or the Git host) before any gate relies on them (D-08 1.6 notes on C07 and C08).
 - `collectOutputs` lists the files changed between `base_sha` and `HEAD` (`git diff --no-renames --name-status`: a rename is a delete and an add, so G5 sees both paths; Git's C-quoted paths are unquoted), the final `HEAD`, the step count and the whole log.
 - **Only a finished agent's leftovers are committed.** After the iteration or time cap, a stuck agent or an error, the runner does not commit: `changed_files` then counts only what the agent committed itself (between `base_sha` and `HEAD`). Such runs do not reach G6; C07 decides whether uncommitted work of a stopped run is kept as evidence (from the code review).
 - **Where outputs go:** changed paths and the log are client data. They are returned to the caller only; storing them is E02 (evidence) and G5 (C07). The database gets `runs.head_sha`, `runs.iterations` and coded run events.
@@ -149,7 +149,7 @@ These are technical settings, not handbook rules.
 |---|---|
 | Real-model run (local Ollama, `gpt-oss:20b`), numbers recorded; D-02, D-07, ADR-M10 wording | C05 session 2 (QUESTIONS #78) |
 | One API-model run before M-E | QUESTIONS #81 |
-| Status for the iteration cap | QUESTIONS #82 |
+| Status for the iteration cap: accepted (`stopped_budget` / `max_iterations`) | QUESTIONS #82, C07 |
 | Temporal activity around `runAgent`; the virtual key per run; contract caps from config | C06 |
 | G5 checks on the changed files and spend | C07 |
 | Push of `agent/INT-…` by the runner; the commit made here is what it pushes | C08 |
@@ -173,3 +173,4 @@ These are technical settings, not handbook rules.
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task C05, session 1) | First version |
+| 0.2 | 2026-09-27 | Claude (task C05, session 1 review) | §2.4: iteration cap status accepted (QUESTIONS #82); §2.5: recomputation outside the sandbox tracked in D-08 1.6 (C07, C08) |

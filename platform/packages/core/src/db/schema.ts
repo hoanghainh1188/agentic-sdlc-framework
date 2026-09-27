@@ -7,6 +7,10 @@ import type {
   AutonomyLevel,
   ChangeFlag,
   DataClass,
+  EscalationRoute,
+  EscalationStatus,
+  EscalationStep,
+  EscalationTrigger,
   EventSource,
   GateCheckMode,
   GateCode,
@@ -15,8 +19,10 @@ import type {
   IntentStatus,
   ProjectRole,
   ProviderType,
+  ResponseLevel,
   RiskTier,
   RunStatus,
+  Severity,
 } from '@sdlc/contracts';
 import type { ColumnType, Generated, Insertable, Selectable } from 'kysely';
 
@@ -317,6 +323,8 @@ export interface GitEventReceiptsTable {
   event_id: Immutable<string>;
   outcome: ColumnType<string, string, string>;
   gate_decision_id: ColumnType<string | null, string | null | undefined, string | null>;
+  /** The escalation a `/ack` or `/decide` comment acted on (B11, migration 0007). */
+  escalation_id: ColumnType<string | null, string | null | undefined, string | null>;
   issue_number: ColumnType<number | null, number | null | undefined, never>;
   reply_code: ColumnType<string | null, string | null | undefined, string | null>;
   reply_params: ColumnType<Record<string, string> | null, string | null | undefined, string | null>;
@@ -352,6 +360,65 @@ export interface CostRecordsTable {
   created_at: CreatedAt;
 }
 
+type Mutable<T> = ColumnType<T, T | undefined, T>;
+type MutableNullable<T> = ColumnType<T | null, T | null | undefined, T | null>;
+
+/**
+ * Escalations (D-05 section 6.4b, ADR-M28). Kept at least 2 years: codes, IDs, hashes and
+ * references only. `platform_app` updates the state, clock, acknowledgement and decision columns;
+ * a trigger allows only the status moves of ADR-M28 and refuses any change once `closed`.
+ */
+export interface EscalationsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  code: Immutable<string>;
+  intent_id: Immutable<string>;
+  run_id: ColumnType<string | null, string | null | undefined, never>;
+  trigger: Immutable<EscalationTrigger>;
+  route: Immutable<EscalationRoute>;
+  severity: Immutable<Severity>;
+  response_level: Immutable<ResponseLevel>;
+  /** Flat coded object (`EscalationPacket`); stored as JSON text on insert. */
+  packet: ColumnType<Record<string, unknown>, string, never>;
+  producer_ids: ColumnType<string[], string[] | undefined, never>;
+  owner_id: ColumnType<string | null, string | null | undefined, never>;
+  backup_owner_id: MutableNullable<string>;
+  current_step: Mutable<EscalationStep>;
+  status: Mutable<EscalationStatus>;
+  ack_due_at: Immutable<Date>;
+  step_due_at: Mutable<Date>;
+  remind_at: MutableNullable<Date>;
+  reminded_step: MutableNullable<EscalationStep>;
+  ack_missed_at: MutableNullable<Date>;
+  governance_overdue_at: MutableNullable<Date>;
+  resolve_due_at: MutableNullable<Date>;
+  resolve_overdue_at: MutableNullable<Date>;
+  next_check_at: MutableNullable<Date>;
+  acknowledged_by: MutableNullable<string>;
+  acknowledged_at: MutableNullable<Date>;
+  decision: ColumnType<Record<string, unknown> | null, string | null | undefined, string | null>;
+  decided_by: MutableNullable<string>;
+  decided_at: MutableNullable<Date>;
+  closed_at: MutableNullable<Date>;
+  updated_at: ColumnType<Date, never, Date>;
+  created_at: CreatedAt;
+}
+
+/** Outbox of escalation notices (ADR-M28 §2.5): codes only; PR 2 of B11 posts them. */
+export interface EscalationNoticesTable {
+  /** bigint identity; `pg` returns int8 as a string. */
+  id: ColumnType<string, never, never>;
+  tenant_id: Immutable<string>;
+  escalation_id: Immutable<string>;
+  kind: Immutable<string>;
+  step: Immutable<EscalationStep>;
+  audience_role: Immutable<ProjectRole>;
+  attempts: ColumnType<number, number | undefined, number>;
+  posted_at: ColumnType<Date | null, never, Date>;
+  abandoned_at: ColumnType<Date | null, never, Date>;
+  created_at: CreatedAt;
+}
+
 export interface Database {
   tenants: TenantsTable;
   projects: ProjectsTable;
@@ -372,6 +439,8 @@ export interface Database {
   run_events: RunEventsTable;
   cost_records: CostRecordsTable;
   git_event_receipts: GitEventReceiptsTable;
+  escalations: EscalationsTable;
+  escalation_notices: EscalationNoticesTable;
 }
 
 export type TableName = keyof Database;
@@ -626,6 +695,53 @@ export const TABLE_COLUMNS = {
     'reply_posted_at',
     'reply_abandoned_at',
     'created_at',
+    'escalation_id',
+  ]),
+  escalations: columns<EscalationsTable>()([
+    'id',
+    'tenant_id',
+    'code',
+    'intent_id',
+    'run_id',
+    'trigger',
+    'route',
+    'severity',
+    'response_level',
+    'packet',
+    'producer_ids',
+    'owner_id',
+    'backup_owner_id',
+    'current_step',
+    'status',
+    'ack_due_at',
+    'step_due_at',
+    'remind_at',
+    'reminded_step',
+    'ack_missed_at',
+    'governance_overdue_at',
+    'resolve_due_at',
+    'resolve_overdue_at',
+    'next_check_at',
+    'acknowledged_by',
+    'acknowledged_at',
+    'decision',
+    'decided_by',
+    'decided_at',
+    'closed_at',
+    'updated_at',
+    'created_at',
+  ]),
+  escalation_notices: columns<EscalationNoticesTable>()([
+    'id',
+    'tenant_id',
+    'escalation_id',
+    'kind',
+    'step',
+    'audience_role',
+    'attempts',
+    'posted_at',
+    'abandoned_at',
+    'created_at',
   ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
@@ -653,6 +769,8 @@ export const TENANT_COLUMN = {
   run_events: 'tenant_id',
   cost_records: 'tenant_id',
   git_event_receipts: 'tenant_id',
+  escalations: 'tenant_id',
+  escalation_notices: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -674,6 +792,8 @@ export type RunContractRow = Selectable<RunContractsTable>;
 export type RunEventRow = Selectable<RunEventsTable>;
 export type CostRecordRow = Selectable<CostRecordsTable>;
 export type GitEventReceipt = Selectable<GitEventReceiptsTable>;
+export type Escalation = Selectable<EscalationsTable>;
+export type EscalationNotice = Selectable<EscalationNoticesTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

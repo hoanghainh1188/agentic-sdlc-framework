@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M16 and their sources:
+// Rule ids M1–M17 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -21,8 +21,11 @@
 //   M14 permission before dangerous actions (G4 High/Critical HITL) .. codes table §4, Ch.13 §13.8
 //   M15 independent verification (G6 never POLICY) ................... codes table §4 "never skipped"
 //   M16 the viewer role never creates intents ........................ D-05 §5, QUESTIONS.md #66
+//   M17 escalation routing: policy → governance, no viewer, backup ≠ . Ch.6 §6.4, codes table §6.3,
+//       owner; notify lists contain the handbook's roles ............ QUESTIONS.md #74
 import type {
   AutonomyLevel,
+  EscalationRoute,
   ChangeFlag,
   Deadline,
   GateCheckMode,
@@ -34,7 +37,7 @@ import type {
   SlaEntry,
   WorkingCalendar,
 } from '@sdlc/contracts';
-import { RISK_TIERS, SEVERITIES } from '@sdlc/contracts';
+import { ESCALATION_ROUTES, RISK_TIERS, SEVERITIES } from '@sdlc/contracts';
 
 import { durationMinutes, isWorkingUnit, workingDayMinutes } from './calendar.js';
 import { issue, type ConfigIssue } from './issues.js';
@@ -408,6 +411,57 @@ const m16: Rule = (c) =>
     ? [issue('config.rule.viewer_never_creates', 'access.intent_create_roles')]
     : [];
 
+/** The last step of every escalation; also owns the `policy` route (handbook Ch.6 §6.4). */
+export const ESCALATION_FINAL_ROLE: ProjectRole = 'governance';
+
+/** Who must be told when an escalation is raised (handbook Ch.6 §6.4 SLA table "Notify"). */
+export const HANDBOOK_NOTIFY_ON_RAISE: Readonly<Record<Severity, readonly ProjectRole[]>> = {
+  critical: ['governance', 'person_a', 'person_b'],
+  high: ['governance', 'person_a', 'person_b'],
+  medium: ['person_a', 'person_b'],
+  low: ['person_a'],
+};
+
+function routingIssues(route: EscalationRoute, config: ProjectConfig): ConfigIssue[] {
+  const { owner_role: owner, backup_role: backup } = config.escalation.routing[route];
+  const path = `escalation.routing.${route}`;
+  const found: ConfigIssue[] = [];
+  if (owner === 'viewer') found.push(issue('config.rule.escalation_viewer', `${path}.owner_role`));
+  if (backup === 'viewer') {
+    found.push(issue('config.rule.escalation_viewer', `${path}.backup_role`));
+  }
+  if (backup !== null && backup === owner) {
+    found.push(issue('config.rule.escalation_backup_same', `${path}.backup_role`, { route }));
+  }
+  if (route === 'policy' && owner !== ESCALATION_FINAL_ROLE) {
+    found.push(
+      issue('config.rule.escalation_policy_owner', `${path}.owner_role`, {
+        role: ESCALATION_FINAL_ROLE,
+        found: owner,
+      }),
+    );
+  }
+  return found;
+}
+
+const m17: Rule = (c) => [
+  ...ESCALATION_ROUTES.flatMap((route) => routingIssues(route, c)),
+  ...SEVERITIES.flatMap((severity) =>
+    missingItems(HANDBOOK_NOTIFY_ON_RAISE[severity], c.escalation.notify_on_raise[severity]).map(
+      (role) =>
+        issue('config.rule.escalation_notify_missing', `escalation.notify_on_raise.${severity}`, {
+          severity,
+          role,
+        }),
+    ),
+  ),
+  ...SEVERITIES.flatMap((severity) =>
+    c.escalation.notify_on_raise[severity].includes('viewer')
+      ? [issue('config.rule.escalation_viewer', `escalation.notify_on_raise.${severity}`)]
+      : [],
+  ),
+];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -427,6 +481,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M14: m14,
   M15: m15,
   M16: m16,
+  M17: m17,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

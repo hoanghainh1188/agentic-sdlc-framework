@@ -1,17 +1,25 @@
 #!/usr/bin/env node
-// Entry point of the worker process (task B06, design/ADR-M27). Today it runs the GitHub poller;
-// B07 adds the Temporal worker with the G1–G8 workflow. Settings come from the environment, the
-// database password and the GitHub App key from OpenBao (AppRole `worker`).
+// Entry point of the worker process (task B06, design/ADR-M27). Today it runs the GitHub poller
+// and the escalation clock loop (B11, ADR-M28); B07 adds the Temporal worker with the G1–G8
+// workflow. Settings come from the environment, the database password and the GitHub App key
+// from OpenBao (AppRole `worker`).
 import fs from 'node:fs';
 
 import { GitHubAdapter } from '@sdlc/adapter-git-github';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
 import { GitHostError } from '@sdlc/contracts';
-import { gitHostErrorMessage, loadEffectiveConfig, pollProject, Registry } from '@sdlc/core';
+import {
+  advanceEscalation,
+  gitHostErrorMessage,
+  loadEffectiveConfig,
+  pollProject,
+  Registry,
+} from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OpenBaoClient, SecretsError } from '@sdlc/secrets';
 
 import { connectDatabase } from './database.js';
+import { EscalationLoop } from './escalation-loop.js';
 import { jsonLogger } from './logger.js';
 import { PollerLoop } from './poller-loop.js';
 import { loadSettings, SettingsError } from './settings.js';
@@ -58,11 +66,22 @@ async function main(): Promise<void> {
     heartbeat: () => fs.writeFileSync(settings.heartbeatFile, ''),
   });
   loop.start(settings.tickMs);
-  logger.log('info', 'worker.started', { tick_ms: settings.tickMs });
+  // The escalation clocks (B11, ADR-M28): state in PostgreSQL, no Temporal timers.
+  const escalations = new EscalationLoop({
+    listDue: (now, limit) => db.system.listDueEscalations(now, limit),
+    advance: (due, now) => advanceEscalation(db.forTenant(due.tenantId), due.escalationId, now),
+    now: () => new Date(),
+    logger,
+    batchSize: settings.escalationBatch,
+  });
+  escalations.start(settings.escalationTickMs);
+  logger.log('info', 'worker.started', {
+    tick_ms: settings.tickMs,
+    escalation_tick_ms: settings.escalationTickMs,
+  });
 
   const shutdown = (): void => {
-    void loop
-      .stop()
+    void Promise.all([loop.stop(), escalations.stop()])
       .then(() => Promise.all([db.close(), openbao.close()]))
       .then(() => logger.log('info', 'worker.stopped', {}));
   };

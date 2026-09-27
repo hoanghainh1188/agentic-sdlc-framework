@@ -7,6 +7,7 @@ import {
   OVERSIGHT_MODES,
   PROJECT_ROLES,
   PROVIDER_TYPES,
+  SAFE_ACTIONS,
   SEVERITIES,
 } from '@sdlc/contracts';
 import type { MessageKey } from '@sdlc/messages';
@@ -108,6 +109,8 @@ const calendar = z.strictObject({
 
 const sla = z.strictObject({ acknowledge: duration, resolve: deadline });
 
+const escalationRouting = z.strictObject({ owner_role: role, backup_role: role.nullable() });
+
 const providerList = uniqueList(z.enum(PROVIDER_TYPES));
 
 const autonomyLevel = z.enum(AUTONOMY_LEVELS);
@@ -157,6 +160,20 @@ export const projectConfigSchema = z.strictObject({
   escalation: z.strictObject({
     sla: z.strictObject({ critical: sla, high: sla, medium: sla, low: sla }),
     calendar,
+    routing: z.strictObject({
+      intent: escalationRouting,
+      technical: escalationRouting,
+      security: escalationRouting,
+      policy: escalationRouting,
+    }),
+    notify_on_raise: z.strictObject({
+      critical: uniqueList(role),
+      high: uniqueList(role),
+      medium: uniqueList(role),
+      low: uniqueList(role),
+    }),
+    reminder_percent: positiveInt.max(99),
+    safe_actions: uniqueList(z.enum(SAFE_ACTIONS)),
   }),
   run: z.strictObject({
     g6_ci_retries: nonNegativeInt,

@@ -7,6 +7,7 @@ import { parseTenantId, type TenantId } from './tenant-id.js';
 import { ApiTokenRepository } from './repositories/api-tokens.js';
 import { AuditLogRepository } from './repositories/audit-log.js';
 import { CostRecordRepository } from './repositories/cost-records.js';
+import { EscalationNoticeRepository, EscalationRepository } from './repositories/escalations.js';
 import { GateDecisionRepository } from './repositories/gate-decisions.js';
 import { GitEventCursorRepository } from './repositories/git-event-cursors.js';
 import { GitEventReceiptRepository } from './repositories/git-event-receipts.js';
@@ -47,6 +48,8 @@ export class TenantScope {
   readonly runContracts: RunContractRepository;
   readonly runEvents: RunEventRepository;
   readonly costRecords: CostRecordRepository;
+  readonly escalations: EscalationRepository;
+  readonly escalationNotices: EscalationNoticeRepository;
 
   private readonly db: Kysely<Database>;
   #savepoints = 0;
@@ -74,6 +77,8 @@ export class TenantScope {
     this.runContracts = new RunContractRepository(this.db, this.tenantId);
     this.runEvents = new RunEventRepository(this.db, this.tenantId);
     this.costRecords = new CostRecordRepository(this.db, this.tenantId);
+    this.escalations = new EscalationRepository(this.db, this.tenantId);
+    this.escalationNotices = new EscalationNoticeRepository(this.db, this.tenantId);
   }
 
   /**

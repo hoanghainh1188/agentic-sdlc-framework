@@ -122,6 +122,30 @@ escalation:
     working_days: [mon, tue, wed, thu, fri]
     working_hours: { start: '09:00', end: '18:00' }
     holidays: []
+  # Who receives an escalation first, per route (handbook Ch.6 §6.4 "Who receives it";
+  # QUESTIONS.md #74). The raiser picks the route. A missed acknowledgement moves it to the backup,
+  # then to governance, which is always the last step (M17). `backup_role: null` = no backup step.
+  # Producers of the change are never chosen (FR-18).
+  routing:
+    intent: { owner_role: person_a, backup_role: person_b }
+    technical: { owner_role: person_b, backup_role: second_approver }
+    security: { owner_role: person_b, backup_role: second_approver }
+    policy: { owner_role: governance, backup_role: null }
+  # Roles told when an escalation is raised (handbook Ch.6 §6.4 SLA table "Notify"; codes table
+  # §6.3: Critical goes to leadership). The owner of the first step is always told as well. M17:
+  # each list contains at least the handbook's roles.
+  notify_on_raise:
+    critical: [governance, person_a, person_b]
+    high: [governance, person_a, person_b]
+    medium: [person_a, person_b]
+    low: [person_a]
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). QUESTIONS.md #75.
+  # Remind the step's holder when this share of the acknowledge window has passed. Each step
+  # (owner, backup, governance) gets a fresh acknowledge window from the SLA table.
+  reminder_percent: 75
+  # Actions that continue while an escalation freezes the intent (handbook Ch.6 §6.5;
+  # QUESTIONS.md #76). Only these four codes exist; a project can remove some, never add others.
+  safe_actions: [read_only, sandbox_test, unpublished_draft, collect_metrics]
 
 run:
   # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-02 FR-13; QUESTIONS.md #9.
