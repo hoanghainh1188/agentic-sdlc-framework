@@ -12,7 +12,7 @@ import type {
   RiskTier,
   Severity,
 } from './codes.js';
-import type { EscalationRoute, SafeAction } from './escalation.js';
+import type { EscalationRoute, ResponseLevel, SafeAction } from './escalation.js';
 
 /**
  * How a gate is checked for one risk tier. `POLICY` = automatic policy check with no human
@@ -102,6 +102,11 @@ export interface ProjectConfig {
     readonly hitl_gate_deadline: Duration;
     readonly hotl_block_window: Duration;
     readonly approval_expiry: Duration;
+    /** Escalation raised when a gate passes `hitl_gate_deadline` (FR-12, FR-18; QUESTIONS #90). */
+    readonly gate_overdue: {
+      readonly severity: Severity;
+      readonly response_level: ResponseLevel;
+    };
   };
   readonly autonomy: { readonly max_by_risk: Readonly<Record<RiskTier, AutonomyLevel>> };
   readonly escalation: {

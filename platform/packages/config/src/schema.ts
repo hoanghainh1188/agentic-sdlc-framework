@@ -7,6 +7,7 @@ import {
   OVERSIGHT_MODES,
   PROJECT_ROLES,
   PROVIDER_TYPES,
+  RESPONSE_LEVELS,
   SAFE_ACTIONS,
   SEVERITIES,
 } from '@sdlc/contracts';
@@ -148,6 +149,10 @@ export const projectConfigSchema = z.strictObject({
     hitl_gate_deadline: duration,
     hotl_block_window: duration,
     approval_expiry: duration,
+    gate_overdue: z.strictObject({
+      severity: z.enum(SEVERITIES),
+      response_level: z.enum(RESPONSE_LEVELS),
+    }),
   }),
   autonomy: z.strictObject({
     max_by_risk: z.strictObject({

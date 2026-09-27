@@ -7,7 +7,9 @@
 //
 // Deterministic code only: this file is bundled for the Temporal workflow sandbox and may import
 // `@temporalio/workflow`, `@sdlc/contracts` and types (lint rule in eslint.config.mjs).
-// The escalation clocks are not timers here (ADR-M28): the workflow asks the database.
+// The escalation clocks are not timers here (ADR-M28): the workflow asks the database. The only
+// timer is the one a step asks for (`wakeInMs`): the gate deadline or the end of a HOTL block
+// window (session 2). When it fires, the workflow simply steps again; the step decides.
 import { INTENT_WAKE_SIGNAL, type IntentStepResult, type IntentWorkflowRef } from '@sdlc/contracts';
 import {
   condition,
@@ -27,6 +29,9 @@ export const wakeSignal = defineSignal(INTENT_WAKE_SIGNAL);
  * wake-up; the cap stops a loop if a move keeps being reported without progress.
  */
 export const MAX_MOVES_PER_WAKE = 16;
+
+/** Shortest timer the workflow sets for a `wakeInMs`. */
+export const MIN_TIMER_MS = 1000;
 
 const { stepIntent } = proxyActivities<IntentActivities>({
   startToCloseTimeout: '1 minute',
@@ -53,7 +58,13 @@ export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
       continue;
     }
     moves = 0;
-    await condition(() => wakes !== seen);
+    const wakeInMs = result.outcome === 'waiting' ? result.wakeInMs : undefined;
+    if (wakeInMs === undefined) {
+      await condition(() => wakes !== seen);
+    } else {
+      // At least one second: a deadline that just passed is handled by the next step anyway.
+      await condition(() => wakes !== seen, Math.max(MIN_TIMER_MS, wakeInMs));
+    }
     // Long waits with many wake-ups: start a fresh history (the state lives in the database).
     if (workflowInfo().continueAsNewSuggested) {
       await continueAsNew<typeof intentWorkflow>(ref);

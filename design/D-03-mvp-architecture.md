@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.8 |
+| Version | 1.9 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29); 1.9 approved by Harry on 2026-09-27 in the B07 session 2 plan (HOTL block window, C06 waits for it, the gate deadline timer; ADR-M30) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -194,6 +194,8 @@ General rules:
 - Every state change → write `gate_decisions` + `audit_log` + a comment on the issue/PR.
 - Spec hash changed after G2 → back to G2 (FR-02). Plan hash changed after G3 → back to G3.
 - **No gate is ever auto-approved by silence.** HOTL at a human gate passes only when all policy conditions hold, and the notified person can still block within the gate's window.
+  - Version 1.9 (ADR-M30 §2.4b, QUESTIONS #88): the platform records the HOTL pass at once and the intent moves on. Within `oversight.hotl_block_window`, a person with the gate's role may reject the passed gate or request changes; a request for changes takes the intent back to that gate, a rejection ends it. An explicit approval opens no window. **C06 does not start a run before the last open window closes** (`hotlBlockWindowOpenUntil`). No HOTL pass again on an input a person sent back.
+  - A human gate that waits past `oversight.hitl_gate_deadline` raises one escalation (trigger `time`, level from `oversight.gate_overdue`), closed when the gate is decided (ADR-M30 §2.9). This deadline is the only Temporal timer of the intent workflow.
 - Retry counts, thresholds, the oversight matrix and SLAs **come from per-project configuration**.
 
 ### 6.1. Resolving the oversight mode
@@ -235,6 +237,7 @@ trigger (G5 breach, critical finding, disagreement, stopped run, gate overdue…
 ```
 
 - Timers are Temporal timers inside the intent workflow; they survive restarts.
+  - Version 1.9: the only timer of the intent workflow is the gate deadline that raises the escalation (ADR-M30 §2.9); from the raise on, the escalation's clocks are the database's.
   - **Changed in version 1.7 (ADR-M28, QUESTIONS #73):** the escalation clocks are stored in the `escalations` row and advanced by a loop in the worker (`next_check_at`, row lock, idempotent), not by Temporal timers. They survive restarts the same way. The intent workflow (B07) must not add a second timer for the same clock; it raises escalations, asks the freeze check before it acts and waits for the resolution.
 - Actions on the pre-approved **safe list** (read-only, sandbox tests, drafts) may continue while waiting; everything else is frozen.
 - Approval authority never passes back to the producer.
@@ -618,4 +621,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.6 | 2026-09-27 | Claude (task C04), approved by Harry | §4: note, the runner clones and pushes (flow and D11 updated in C08); §8: `egress_allowlist` names services; §8.2: the runner no longer reads the GitHub App key, token handed over response-wrapped; §9: sandbox network is LiteLLM and the package proxy only, per-run internal network; §10: sandbox image by digest, profile `sandbox` (QUESTIONS #44, #52–#54, #59; ADR-M25) |
 | 1.7 | 2026-09-27 | Claude (task B11), approved by Harry | §6.4 and §12 (ADR-M14): escalation clocks stored in the database and advanced by the worker, not Temporal timers; B07 adds no second timer (QUESTIONS #73, ADR-M28) |
 | 1.8 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §7.2: notes on the contracts `AgentAdapter` (endpoint and session key, model from `allowed_models`, agent states, `commitWork`, outputs recomputed outside the sandbox) (ADR-M29, QUESTIONS #79, #80) |
+| 1.9 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | §6 general rules: the HOTL block window, C06 waits for it, overdue human gates; §6.4 the gate deadline is the workflow's only timer (ADR-M30 §2.4b, §2.9; QUESTIONS #88, #90) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |

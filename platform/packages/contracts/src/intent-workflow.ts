@@ -42,8 +42,17 @@ export interface IntentWorkflowSignals {
 export type IntentStepResult =
   /** The intent moved: status or gate changed. The workflow steps again at once. */
   | { readonly outcome: 'moved' }
-  /** Nothing to do until something changes; the workflow waits for a wake signal. */
-  | { readonly outcome: 'waiting'; readonly reason: IntentWaitReason }
+  /**
+   * Nothing to do until something changes; the workflow waits for a wake signal. With `wakeInMs`
+   * it also steps again after that delay without a signal (session 2: the gate deadline, the end
+   * of a HOTL block window). The delay is relative, so the workflow never compares its own clock
+   * with the database's.
+   */
+  | {
+      readonly outcome: 'waiting';
+      readonly reason: IntentWaitReason;
+      readonly wakeInMs?: number;
+    }
   /** The intent is finished (`done`, `rejected`, `cancelled`); the workflow ends. */
   | { readonly outcome: 'finished'; readonly status: string };
 
