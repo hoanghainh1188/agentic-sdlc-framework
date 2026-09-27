@@ -60,11 +60,14 @@ describe('migration 0004: runs', () => {
     expect(new RegExp(pattern).test('stopped_budget')).toBe(true);
   });
 
-  it('runs.stop_reason is a code, not free text; agent_id has no foreign key yet (QUESTIONS #32)', () => {
+  it('runs.stop_reason is a code, not free text; agent_id gets its foreign key in 0008 (QUESTIONS #32)', () => {
     expect(up).toMatch(
       /stop_reason\s+text CHECK \(stop_reason ~ '\^\[a-z\]\[a-z0-9_\]\{0,63\}\$'\)/,
     );
     expect(up).not.toMatch(/REFERENCES agents/);
+    expect(MIGRATIONS['0008-agents']!.statements.up.join('\n')).toMatch(
+      /ALTER TABLE runs ADD CONSTRAINT runs_agent_fkey FOREIGN KEY \(tenant_id, agent_id\)\s+REFERENCES agents \(tenant_id, id\) ON DELETE RESTRICT/,
+    );
   });
 
   it('SDA05 maps to immutable', () => {

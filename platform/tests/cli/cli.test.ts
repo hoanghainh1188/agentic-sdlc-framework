@@ -60,6 +60,62 @@ describe('sdlc', () => {
     expect(err).toEqual([t('cli.admin.usage')]);
   });
 
+  const REG = [
+    'admin',
+    'agent',
+    'register',
+    '--tenant',
+    'x',
+    '--key',
+    'coder',
+    '--version',
+    '1',
+    '--owner',
+    'a@b.c',
+    '--instructions',
+    'AGENTS.md@v1',
+    '--max-autonomy',
+    'L2',
+  ];
+
+  it.each([
+    [['admin', 'agent']],
+    [['admin', 'agent', 'nothing']],
+    [['admin', 'agent', 'activate', '--tenant', 'x']],
+    [['admin', 'agent', 'suspend', '--tenant', 'x', '--key', 'coder']],
+    [['admin', 'agent', 'list', '--tenant', 'x', '--bogus']],
+    // register needs exactly one source of the instructions hash
+    [REG],
+    [[...REG, '--instructions-sha256', 'a'.repeat(64), '--instructions-file', 'AGENTS.md']],
+    [
+      [
+        'admin',
+        'agent',
+        'update',
+        '--tenant',
+        'x',
+        '--key',
+        'coder',
+        '--version',
+        '2',
+        '--instructions-sha256',
+        'a'.repeat(64),
+        '--instructions-file',
+        'AGENTS.md',
+      ],
+    ],
+  ])('admin agent (C10): prints the agent usage and exits 2 for %j', async (argv) => {
+    const { ctx, err } = context({ SDLC_DB_URL: 'postgres://x' });
+    expect(await runCli(argv, ctx)).toBe(EXIT.usage);
+    expect(err).toEqual([t('cli.admin.agent.usage')]);
+  });
+
+  it('admin agent needs SDLC_DB_URL', async () => {
+    const { ctx, err } = context();
+    expect(await runCli(['admin', 'agent', 'list', '--tenant', 'x'], ctx)).toBe(EXIT.usage);
+    expect(err).toEqual([t('cli.admin.missing_url')]);
+  });
+
   it('admin needs SDLC_DB_URL', async () => {
     const { ctx, err } = context();
     expect(await runCli(['admin', 'token', 'list', '--tenant', 'x', '--email', 'a@b.c'], ctx)).toBe(

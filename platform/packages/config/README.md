@@ -53,7 +53,7 @@ Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `wo
 
 ## Mandatory rules
 
-A project may tighten anything. It may **not** loosen these (rules M1–M16, sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
+A project may tighten anything. It may **not** loosen these (rules M1–M18, sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
 
 | Rule | What |
 |---|---|
@@ -72,6 +72,8 @@ A project may tighten anything. It may **not** loosen these (rules M1–M16, sou
 | M14 | G4 High and Critical HITL |
 | M15 | G6 never `POLICY` |
 | M16 | `viewer` never creates intents (`access.intent_create_roles`) |
+| M17 | Escalation routing: `policy` goes to governance, no `viewer`, backup ≠ owner; notify lists keep the handbook's roles |
+| M18 | Agent recertification at least every 3 months (`agents.recertification_months` ≤ 3, handbook Ch.20 §20.8) |
 
 Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 

@@ -3,6 +3,7 @@
 // platform database as `platform_app` (SDLC_DB_URL), like `sdlc audit verify`. Task B13 moves
 // token issuing behind the API once a tenant admin role exists (QUESTIONS.md #65).
 // A token is printed once, to stdout, and never logged. Run these in a terminal, not in a chat.
+// `sdlc admin agent …` (task C10, the agent register) lives in admin-agent.ts.
 import { parseArgs } from 'node:util';
 
 import {
@@ -18,6 +19,7 @@ import {
 import { t } from '@sdlc/messages';
 
 import { EXIT, type CliContext } from '../context.js';
+import { parseAgentCommand, runAgentCommand } from './admin-agent.js';
 
 type Values = Record<string, string | boolean | undefined>;
 
@@ -54,6 +56,7 @@ const REQUIRED: Readonly<Record<keyof typeof SPECS, readonly string[]>> = {
 /** `args` starts after `admin`. Returns the exit code. */
 export async function runAdmin(args: readonly string[], ctx: CliContext): Promise<number> {
   const [first, second, ...rest] = args;
+  if (first === 'agent') return runAgent(args.slice(1), ctx);
   const command = (first === 'token' ? `token ${second ?? ''}` : first) as keyof typeof SPECS;
   if (!Object.hasOwn(SPECS, command)) return usage(ctx);
   const values = parse(command, first === 'token' ? rest : [second, ...rest]);
@@ -93,6 +96,32 @@ export async function runAdmin(args: readonly string[], ctx: CliContext): Promis
       return EXIT.usage;
     }
     throw error;
+  } finally {
+    await db.close();
+  }
+}
+
+/** `sdlc admin agent …`: same connection and tenant lookup as the token commands. */
+async function runAgent(args: readonly string[], ctx: CliContext): Promise<number> {
+  const parsed = parseAgentCommand(args);
+  if (!parsed) {
+    ctx.stderr(t('cli.admin.agent.usage'));
+    return EXIT.usage;
+  }
+  const url = ctx.env.SDLC_DB_URL;
+  if (!url) {
+    ctx.stderr(t('cli.admin.missing_url'));
+    return EXIT.usage;
+  }
+  const db = ctx.connect({
+    connectionString: url,
+    maxConnections: 1,
+    applicationName: 'sdlc-admin',
+  });
+  try {
+    const scope = await tenantScope(db, String(parsed.values.tenant), ctx);
+    if (!scope) return EXIT.usage;
+    return await runAgentCommand(scope, parsed.command, parsed.values, ctx);
   } finally {
     await db.close();
   }

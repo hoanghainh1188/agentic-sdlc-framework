@@ -34,6 +34,7 @@ import { Registry } from '../../../packages/core/src/registry/registry.js';
 import { issueRunContract } from '../../../packages/core/src/run-contract/index.js';
 import { StubGitHost } from '../../runner/stub-git.js';
 import { credentialFiles, StubOpenBao } from '../../secrets/stub-openbao.js';
+import { seedAgent } from '../agent-seed.js';
 import { createTestDatabase, type TestDatabase } from '../db/helpers.js';
 import {
   BUSYBOX,
@@ -164,6 +165,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
         actorType: 'human',
         actorId: personA,
       });
+      const agent = await seedAgent(scope, personA);
       const { envelope } = await issueRunContract(
         scope,
         {
@@ -171,7 +173,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
           planId: plan.id,
           baseSha,
           agent: {
-            id: crypto.randomUUID(),
+            id: agent.id,
             version: '1.0.0',
             instructionsSha256: 'c'.repeat(64),
             tools: ['editor'],

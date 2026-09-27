@@ -144,7 +144,8 @@ t("B13","M-B","Admin onboarding: projects, users, identities, roles, config","M"
   "GitHub identities in user_identities are linked by the numeric GitHub account ID, never by login (QUESTIONS #45)",
   "Project config upload: validated and hashed by @sdlc/config (mandatory rules; warnings recorded in the config.changed audit event)",
   "Token issuing moves behind the API; `sdlc audit verify` moves behind the API once a tenant admin exists (update CLAUDE.md)",
-  "Integration tests: cross-tenant isolation, wrong role refused, audit chain intact"],
+  "Integration tests: cross-tenant isolation, wrong role refused, audit chain intact",
+  "Admin API endpoints for the agent register (C10 has operator commands only, ADR-M31 §2.2), enforcing handbook Ch.20: who approves an agent for use (§20.7) and a change (§20.11), and that Person B or leadership may suspend or quarantine at any time (§20.9)"],
  "Follows B03 (decision D1). Needed before E07: a real tenant must be set up without direct database access")
 t("B10","M-B","Integration tests G1–G3","M",["B08","B09","B11","B12"],"FR-01…03, FR-10…19","platform/tests/integration/*",
  ["Happy path: create intent → G1 → G2 → G3 (Low risk: G2/G3 HOTL pass; Medium: HITL)",
@@ -202,7 +203,7 @@ t("C06","M-C","Automatic gate G4","M",["C05","C10","B07"],"FR-36",
   "Critical → `blocked`, the agent does not run (T10)",
   "High (L1) → the agent only submits a proposal, pushes no code; stored as evidence `proposal`, the run ends `succeeded_proposal_only` (T09); G4 is HITL for High",
   "Worker → runner handoff (QUESTIONS #53, #55; ADR-M25 §2.7): Temporal task queue `sdlc-runner`, one long-running activity per run with heartbeats; the runner worker's activity slots = `SDLC_RUNNER_MAX_SANDBOXES`, so extra runs wait in Temporal; a contract that expires while waiting → run `cancelled` (`contract_expired`) and a new attempt; a lost heartbeat → the workflow ends the run (test with a worker restart)"],
- "Moved from C04 session 3 (QUESTIONS #55): the runner process, slot pool, restart clean-up and sweep exist; C06 adds the Temporal side")
+ "Moved from C04 session 3 (QUESTIONS #55): the runner process, slot pool, restart clean-up and sweep exist; C06 adds the Temporal side. Agent check: call `checkAgentForRun` (C10, ADR-M31 §2.6) with the SHA-256 of the agent's instructions file read at `base_sha` outside the sandbox, and pass its `modelRef` to the adapter (QUESTIONS #79); on the warning `recertification_overdue`, append the audit event `agent.recertification_overdue` and post a notice to the owner on the intent's issue (ADR-M31 §2.7)")
 t("C07","M-C","Gate G5: file scope + budget","M",["C06","C03","B11"],"FR-13, FR-52",
  "platform/apps/worker (G5), platform/packages/core/cost/*",
  ["Files changed outside the plan → stop, back to G3 (N1)",
@@ -260,7 +261,8 @@ t("E06","M-D","Gate waiting-time metrics","S",["B07"],"FR-12","platform/apps/cli
  ["`sdlc metrics gates`: average / maximum waiting time per gate, per project"])
 t("E07","M-D","MVP definition-of-done check","M",["E03","E04","E05","C09","B13"],"D-02 section 10","platform/tests/integration/*, README",
  ["One intent goes through G1 → G8 on the sample repo","All criteria in D-02 section 10 (including 5b–5d) are met",
-  "README explains a fresh deployment with Docker Compose"])
+  "README explains a fresh deployment with Docker Compose",
+  "QUESTIONS #81 is resolved: one real run with an API model has passed before the trial M-E"])
 # ---------- rendering ----------
 IDX={x['id']:x for x in T}; W={'S':1,'M':2,'L':3}
 @functools.lru_cache(None)
@@ -407,6 +409,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.5 | 2026-09-27 | Claude (task C04), approved by Harry | C06 AC4: the `sdlc-runner` task queue and heartbeat activity move from C04 to C06; size S → M (QUESTIONS #55, ADR-M25 §2.7) |
 | 1.6 | 2026-09-27 | Claude (task B11), approved by Harry | B11 AC3: clocks in the database, advanced by the worker (QUESTIONS #73, ADR-M28); B11 AC5 and B04 AC4: the escalation CLI moves to B04 (QUESTIONS #77) |
 | 1.7 | 2026-09-27 | Claude (task C05), approved by Harry | C07 and C08 notes: sandbox outputs are untrusted, changed files and `head_sha` recomputed from the pushed branch outside the sandbox (ADR-M29 §2.5); C07: iteration cap vs cost cap by `stop_reason`, uncommitted edits of a stopped run (QUESTIONS #82) |
+| 1.8 | 2026-09-27 | Claude (task C10), approved by Harry | E07 AC4: QUESTIONS #81 (a real run with an API model before M-E); B13 AC7: admin endpoints for the agent register with the Ch.20 approval rules; C06 note: the agent check and the recertification notice (ADR-M31) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))

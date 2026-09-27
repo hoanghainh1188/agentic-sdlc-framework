@@ -40,6 +40,7 @@ import {
   type IssueRunContract,
 } from '../../../packages/core/src/run-contract/index.js';
 import { StubDocker } from '../../runner/stub-docker.js';
+import { seedAgent } from '../agent-seed.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
 const REPO = 'org/pilot-order-inventory';
@@ -187,12 +188,13 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
       actorType: 'human',
       actorId: personA,
     });
+    const agent = await seedAgent(scope, personA, { tools: ['file_editor', 'terminal'] });
     const input: IssueRunContract = {
       intentId: intent.id,
       planId: plan.id,
       baseSha: BASE,
       agent: {
-        id: '66666666-6666-4666-8666-666666666666',
+        id: agent.id,
         version: '1.0.0',
         instructionsSha256: SHA('c'),
         tools: ['file_editor', 'terminal'],

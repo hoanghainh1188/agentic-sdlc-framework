@@ -158,6 +158,36 @@ export const AUDIT_ACTIONS = {
   },
   /** The escalation was closed; `status` is the status it had before. */
   'escalation.closed': { entityType: 'escalation', fields: { code: 'code', status: 'code' } },
+  /**
+   * An agent was registered (C10, ADR-M31). Never the model name (it may hold `/` and `@`) or the
+   * owner; the instructions hash identifies the instructions version.
+   */
+  'agent.registered': {
+    entityType: 'agent',
+    fields: { agent_key: 'code', version: 'code', instructions_sha256: 'sha256' },
+  },
+  /** An agent got a new version: model, instructions, tools, autonomy or environments (Ch.20 §20.9). */
+  'agent.updated': {
+    entityType: 'agent',
+    fields: { agent_key: 'code', version: 'code', instructions_sha256: 'sha256' },
+  },
+  /** An agent's status changed. `reason_code` is set for suspend, quarantine and retire. */
+  'agent.status_changed': {
+    entityType: 'agent',
+    fields: { agent_key: 'code', from: 'code', to: 'code', reason_code: 'code?' },
+  },
+  /** The agent's owner changed (the owner left, Ch.20 §20.8). Never who the owner is. */
+  'agent.owner_changed': { entityType: 'agent', fields: { agent_key: 'code' } },
+  /** An agent was recertified (Ch.20 §20.8), or certified by its first activation (ADR-M31 §2.6). */
+  'agent.recertified': { entityType: 'agent', fields: { agent_key: 'code' } },
+  /**
+   * A run started with an agent whose recertification is overdue (FR-36: a warning, not a block).
+   * Written by the G4 check of C06 (ADR-M31 §2.6).
+   */
+  'agent.recertification_overdue': {
+    entityType: 'agent',
+    fields: { agent_key: 'code', run_id: 'uuid?' },
+  },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

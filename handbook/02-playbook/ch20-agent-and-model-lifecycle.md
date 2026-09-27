@@ -75,6 +75,34 @@ Every agent gets an entry in the **agent register** and its own identity (never 
 
 Before the platform: a table in the repository (`docs/agents/register.md`), reviewed like code (decision: Harry, 2026-09-24).
 
+### 20.5b. The agent register on the platform
+
+The platform keeps the register in its database. Only an agent that is registered and **active** may run (D-02 FR-36). In the MVP, the server operator changes the register with `sdlc admin agent` commands on the server. The approvals of §20.7 and §20.11 happen outside the platform first; the operator then records the result. The audit log records every change.
+
+| Step (stage) | Command |
+|---|---|
+| Register (stage 2) | `sdlc admin agent register --tenant <slug> --key coder-openhands --version 1.0.0 --owner <email> --model claude-haiku-4-5-20251001 --instructions AGENTS.md@v5 --instructions-file AGENTS.md --tools file_editor,terminal --max-autonomy L2` |
+| Approve and activate (stage 4) | `sdlc admin agent activate --tenant <slug> --key coder-openhands` |
+| Recertify (stage 5) | `sdlc admin agent recertify --tenant <slug> --key coder-openhands [--date YYYY-MM-DD]` |
+| Change (stage 6) | `suspend … --reason quality`, then `update … --version 1.1.0 [--model …] [--instructions … --instructions-file …]`, then `activate` |
+| Suspend or quarantine (stage 6) | `sdlc admin agent suspend\|quarantine --tenant <slug> --key <key> --reason <code>` |
+| Retire (stage 7) | `sdlc admin agent retire --tenant <slug> --key <key> --reason <code>` |
+| New owner | `sdlc admin agent owner --tenant <slug> --key <key> --owner <email>` |
+| Look | `sdlc admin agent show --tenant <slug> --key <key>`; `sdlc admin agent list --tenant <slug> [--overdue] [--json]` |
+
+Reason codes: `incident`, `quality`, `security`, `no_owner`, `replaced`, `unused`, `provider_end_of_support`, `other`.
+
+Rules the platform enforces:
+
+- **Statuses**: proposed → active or retired; active → suspended, quarantined or retired; suspended → active, quarantined or retired; quarantined → suspended or retired. A quarantined agent is suspended (reviewed) before it can run again. A retired agent never changes, and its key is never used again.
+- **A change is a new version** (§20.9). The model, instructions, tools, maximum autonomy and environments change only while the agent is proposed or suspended, and only with a new version label.
+- **Model**: the model is the name of a model in the platform's model gateway, and the name includes the model version (for example `claude-haiku-4-5-20251001`). If the model behind a name changes, register a new agent version.
+- **Instructions**: the platform stores the SHA-256 of the instructions file (for example `AGENTS.md`) and compares it with the file in the repository before each run. **Every edit of `AGENTS.md` stops the agent's runs** (error "instructions differ") until you register a new agent version with the new file. Review the edit, then run `suspend`, `update --version … --instructions-file AGENTS.md` and `activate`.
+- **Autonomy**: at most L2 in the MVP.
+- **Recertification**: every 3 months (the project configuration may choose a shorter time). The first activation counts as the first certification. When the time has passed, the run still starts, and the owner gets a warning. `list --overdue` shows the agents to recertify.
+
+Not yet on the platform (MVP): approvals by agent type (§20.7), change approvals (§20.11), and suspension by Person B from a comment. Until then, Person B or leadership asks the operator, who runs the command at once.
+
 ---
 
 ## 20.6. Stage 3 — Evaluate
@@ -235,3 +263,4 @@ Old context must not quietly come back through caches, indexes or copied instruc
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content |
 | 0.2 | 2026-09-24 | Claude (draft) | Recertification every 3 months; agent register in the repository (Harry) |
+| 0.3 | 2026-09-27 | Claude (task C10) | §20.5b: the agent register on the platform (commands, enforced rules, gaps) |

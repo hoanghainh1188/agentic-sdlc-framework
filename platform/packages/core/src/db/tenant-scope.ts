@@ -4,6 +4,7 @@ import { sql, type Kysely } from 'kysely';
 import type { Database } from './schema.js';
 import { TenantGuardPlugin } from './tenant-guard-plugin.js';
 import { parseTenantId, type TenantId } from './tenant-id.js';
+import { AgentRepository } from './repositories/agents.js';
 import { ApiTokenRepository } from './repositories/api-tokens.js';
 import { AuditLogRepository } from './repositories/audit-log.js';
 import { CostRecordRepository } from './repositories/cost-records.js';
@@ -50,6 +51,7 @@ export class TenantScope {
   readonly costRecords: CostRecordRepository;
   readonly escalations: EscalationRepository;
   readonly escalationNotices: EscalationNoticeRepository;
+  readonly agents: AgentRepository;
 
   private readonly db: Kysely<Database>;
   #savepoints = 0;
@@ -79,6 +81,7 @@ export class TenantScope {
     this.costRecords = new CostRecordRepository(this.db, this.tenantId);
     this.escalations = new EscalationRepository(this.db, this.tenantId);
     this.escalationNotices = new EscalationNoticeRepository(this.db, this.tenantId);
+    this.agents = new AgentRepository(this.db, this.tenantId);
   }
 
   /**
