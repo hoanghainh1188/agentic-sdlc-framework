@@ -9,9 +9,16 @@
 //
 // The Temporal task queue `sdlc-runner` with one heartbeat activity per run (QUESTIONS #53) is
 // wired in C06, where the worker side exists (D-08 C06, ADR-M25 §2.7).
-import type { AgentAdapter } from '@sdlc/contracts';
+import fs from 'node:fs';
 
-import { driveAgent, type AgentRunRequest, type AgentRunResult } from './agent/drive.js';
+import type { AgentAdapter, EvidenceStore } from '@sdlc/contracts';
+
+import {
+  driveAgent,
+  type AgentDriveDeps,
+  type AgentRunRequest,
+  type AgentRunResult,
+} from './agent/drive.js';
 import { RunnerError } from './errors.js';
 import { HeldRuns } from './held.js';
 import { SlotPool, type Slot } from './pool.js';
@@ -24,6 +31,7 @@ import {
 } from './provision.js';
 import { reconcileOnStart, sweepOrphans, type ReconcileResult } from './reconcile.js';
 import type { TeardownReason } from './sandbox/lifecycle.js';
+import { storeProposal } from './workspace/export.js';
 
 export interface RunnerHooks {
   /** Called after each clean-up (start or sweep); `main` writes the heartbeat file here. */
@@ -37,6 +45,11 @@ export interface RunnerAgentOptions {
   readonly adapter?: AgentAdapter;
   /** Tests only: reach the Agent Server another way than on the run's network. */
   readonly agentUrl?: (runId: string) => string;
+  /**
+   * Where L1 proposals go (C06 session 2b, ADR-M33 §2.9): the evidence store with the runner's
+   * write-only credential. Without it an L1 run that finished fails (`proposal_unavailable`).
+   */
+  readonly evidence?: EvidenceStore;
 }
 
 export class Runner {
@@ -46,6 +59,8 @@ export class Runner {
   readonly #hooks: RunnerHooks;
   readonly #agent: RunnerAgentOptions;
   readonly #slots = new Map<string, Slot>();
+  /** The runner's own clones of L1 runs, kept until release (C06 session 2b). */
+  readonly #clones = new Map<string, string>();
   #timer: NodeJS.Timeout | undefined;
   #sweeping: Promise<void> | undefined;
 
@@ -87,8 +102,12 @@ export class Runner {
     try {
       result = await provisionRun(this.#deps, request);
     } finally {
-      if (result?.ok) this.#slots.set(result.contract.run_id, slot);
-      else slot.release();
+      if (result?.ok) {
+        this.#slots.set(result.contract.run_id, slot);
+        if (result.cloneDir) this.#clones.set(result.contract.run_id, result.cloneDir);
+      } else {
+        slot.release();
+      }
     }
     return result;
   }
@@ -112,6 +131,7 @@ export class Runner {
           adapter,
           ...(this.#deps.now ? { now: this.#deps.now } : {}),
           ...(this.#agent.agentUrl ? { agentUrl: this.#agent.agentUrl } : {}),
+          ...this.#proposalFor(contract.run_id),
         },
         request,
       );
@@ -125,6 +145,20 @@ export class Runner {
     }
   }
 
+  /** The proposal step of an L1 run whose clone this process kept (C06 session 2b). */
+  #proposalFor(runId: string): Pick<AgentDriveDeps, 'proposal'> {
+    const cloneDir = this.#clones.get(runId);
+    const evidence = this.#agent.evidence;
+    if (!cloneDir || !evidence) return {};
+    const deps = { db: this.#deps.db, docker: this.#deps.docker, settings: this.#deps.settings };
+    return {
+      proposal: async (contract) => {
+        const stored = await storeProposal({ ...deps, evidence }, contract, cloneDir);
+        return { changedFiles: stored.changedFiles };
+      },
+    };
+  }
+
   /** Removes the sandbox of a run (end of run, kill) and frees its slot. */
   async release(tenantId: string, runId: string, reason: TeardownReason): Promise<void> {
     try {
@@ -134,6 +168,9 @@ export class Runner {
       this.held.release(runId);
       this.#slots.get(runId)?.release();
       this.#slots.delete(runId);
+      const clone = this.#clones.get(runId);
+      if (clone) fs.rmSync(clone, { recursive: true, force: true });
+      this.#clones.delete(runId);
     }
   }
 

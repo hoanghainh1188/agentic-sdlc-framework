@@ -97,9 +97,9 @@ export type IntentWaitReason =
    */
   | 'run_review'
   /**
-   * C06 session 2a: G4 is decided for an L1 (High risk) run, but runs that only propose come with
-   * session 2b (the proposal stored as evidence, QUESTIONS #111). The intent waits at G4.
+   * C06 session 2b: the L1 (High risk) run stored its proposal as evidence (QUESTIONS #111); the
+   * intent is paused at G4 while Person A takes the proposal forward (no new run starts).
    */
-  | 'proposal_runs_unavailable'
+  | 'proposal_review'
   /** A status that the workflow does not move (`paused`, `blocked`, `running`). */
   | 'not_in_gate';

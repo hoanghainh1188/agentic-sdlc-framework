@@ -130,6 +130,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
   intent_notices: ['attempts', 'posted_at', 'abandoned_at'],
   // Append-only (B12, ADR-M32): every version of the project AI record, written by a trigger.
   project_ai_record_versions: [],
+  // C06 session 2b: written once; the purge (E05) will get UPDATE on `purged_at` only.
+  evidence_items: [],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -257,8 +259,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // C10: agents → users; runs → agents.
     // B07: intent_notices → intents, gate_decisions.
     // B12: project_ai_record_versions → project_ai_records, users.
-    // C06: intent_notices → agents.
-    expect(fks).toHaveLength(45);
+    // C06: intent_notices → agents; evidence_items → intents, runs (session 2b).
+    expect(fks).toHaveLength(47);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

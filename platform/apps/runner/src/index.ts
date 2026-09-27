@@ -88,6 +88,20 @@ export {
 } from './workspace/git.js';
 export { packDirectory, packTar, SANDBOX_UID, type TarEntry } from './workspace/tar.js';
 export {
+  exportWorkspace,
+  MAX_WORKSPACE_ENTRIES,
+  storeProposal,
+  type ProposalDeps,
+  type StoredProposal,
+} from './workspace/export.js';
+export {
+  computeProposal,
+  mirrorWorkspace,
+  type Proposal,
+  type ProposalGitOptions,
+} from './workspace/proposal.js';
+export { untarWorkspace, type UntarLimits, type WorkspaceEntry } from './workspace/untar.js';
+export {
   parseEgressServices,
   RUNNER_ENV,
   runnerSettingsFromEnv,

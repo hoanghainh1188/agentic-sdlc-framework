@@ -127,6 +127,7 @@ describe('Docker access (ADR-M25 §2.5)', () => {
     ['POST', `/containers/sdlc-sandbox-${RUN}/wait`],
     ['GET', `/containers/sdlc-sandbox-${RUN}/logs`],
     ['PUT', `/containers/sdlc-sandbox-${RUN}/archive`],
+    ['GET', `/containers/sdlc-sandbox-${RUN}/archive`],
     ['DELETE', `/containers/sdlc-sandbox-${RUN}`],
     ['GET', '/networks'],
     ['POST', '/networks/create'],
@@ -144,7 +145,10 @@ describe('Docker access (ADR-M25 §2.5)', () => {
     ['POST', `/containers/sdlc-sandbox-${RUN}/update`],
     ['POST', `/containers/sdlc-sandbox-${RUN}/kill`],
     ['POST', `/containers/sdlc-sandbox-${RUN}/pause`],
-    ['GET', `/containers/sdlc-sandbox-${RUN}/archive`],
+    // C06 2b: only a run sandbox's files are ever read.
+    ['GET', '/containers/postgres/archive'],
+    ['GET', '/containers/sdlc-sdlc-runner-1/archive'],
+    ['GET', `/containers/sdlc-sandbox-${RUN}x/archive`],
     ['POST', '/build'],
     ['POST', '/commit'],
     ['GET', '/info'],
@@ -224,6 +228,24 @@ describe('sdlc-runner service', () => {
     expect(bootstrap).toMatch(
       /^cmd_runner_credentials\(\) \{ platform_credentials runner sdlc-runner sandbox; \}$/m,
     );
+    // C06 2b: the write-only evidence identity; its keys reach `weed shell` on stdin only and its
+    // output (which prints secrets) is discarded.
+    expect(bootstrap).toMatch(
+      /^ {2}runner-evidence-credentials\) cmd_runner_evidence_credentials ;;$/m,
+    );
+    const evidence =
+      /^cmd_runner_evidence_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
+    expect(evidence).toContain('-actions Write:evidence/proposals/* -apply');
+    expect(evidence).toContain('echo "s3.configure -user runner-evidence -delete -apply" |');
+    expect(evidence).toMatch(/compose exec -T seaweedfs \$weed >\/dev\/null 2>&1/);
+    expect(evidence).toContain('bao kv put -mount=kv runner/evidence - >/dev/null');
+    expect(evidence).not.toContain('s3.config.show');
+    expect(env.SDLC_RUNNER_EVIDENCE_URL).toBe('http://seaweedfs:8333');
+    expect(env.SDLC_RUNNER_EVIDENCE_BUCKET).toBe('evidence');
+    expect(runner.depends_on?.['seaweedfs-init']).toEqual({
+      condition: 'service_completed_successfully',
+    });
+    expect(svc('seaweedfs-init').environment?.SEAWEEDFS_VERSIONED_BUCKETS).toBe('evidence');
     const dockerfile = read('platform/apps/runner/Dockerfile');
     expect(dockerfile).toMatch(/^USER node$/m);
     expect(dockerfile).toMatch(/apt-get install -y --no-install-recommends git ca-certificates/);

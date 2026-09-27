@@ -4,6 +4,8 @@
 // starts the sandbox from the project image (config `sandbox.image`, pinned by digest) and waits
 // for its health check. From inside, the sandbox sees the branch and no Git credential, reaches
 // LiteLLM and nothing else. Then the runner removes everything.
+// C06 session 2b: an L1 run keeps the runner's clone; the proposal is read out of the real sandbox
+// with Docker's archive endpoint and computed with hardened git (ADR-M33 §2.9).
 //
 // `pnpm test:runner` (SDLC_RUNNER_TEST=1, throw-away PostgreSQL from test-db.sh; CI job `compose`).
 // OpenBao is the in-process stub (Transit and response wrapping); `pnpm test:openbao` checks
@@ -18,6 +20,8 @@ import { loadProjectConfig } from '@sdlc/config';
 import { OpenBaoClient, Redacted } from '@sdlc/secrets';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import type { EvidenceStore, StoredEvidence } from '@sdlc/contracts';
+
 import {
   DockerClient,
   HeldRuns,
@@ -27,6 +31,7 @@ import {
   releaseSandbox,
   runLabels,
   runnerSettingsFromEnv,
+  storeProposal,
   type RunnerDeps,
 } from '../../../apps/runner/src/index.js';
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
@@ -122,7 +127,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
     }, 120_000);
 
     /** Worker side: tenant, project with its sandbox image, intent, plan, signed contract. */
-    async function prepareRun(slug: string) {
+    async function prepareRun(slug: string, autonomyLevel: 'L1' | 'L2' = 'L2') {
       const repo = `org/pilot-${slug}`;
       const { first: baseSha } = git.createRepo(repo, {
         'README.md': 'pilot\n',
@@ -179,7 +184,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
             tools: ['editor'],
           },
           planTools: ['editor'],
-          autonomyLevel: 'L2',
+          autonomyLevel,
           maxBudgetUsd: '1',
           maxIterations: 10,
           maxDurationMin: 10,
@@ -240,6 +245,74 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
         'sandbox_ready',
         'sandbox_removed',
       ]);
+    }, 300_000);
+
+    it('C06 2b: an L1 run keeps the clone; the proposal comes from the real sandbox archive', async () => {
+      const { tenant, scope, envelope, wrapped } = await prepareRun('proposal', 'L1');
+      const result = await provisionRun(deps, { envelope, wrappedGitToken: wrapped });
+      if (!result.ok) throw new Error(`provisioning failed: ${result.reason}`);
+      const runId = envelope.contract.run_id;
+      expect(result.cloneDir).not.toBeNull();
+      const cloneDir = result.cloneDir!;
+      try {
+        // What the agent leaves: an edit, a new file, a link out of the workspace, a deletion,
+        // and a change to its own `.git` (never read).
+        docker(
+          'exec',
+          '-u',
+          '10001',
+          result.sandbox.containerId,
+          'sh',
+          '-c',
+          'echo changed >> /workspace/README.md && echo new > /workspace/new.txt && ' +
+            'ln -s /etc/passwd /workspace/link && rm /workspace/probe-targets && ' +
+            'echo evil > /workspace/.git/hooks/post-checkout',
+        );
+        const puts: { tenantId: string; path: string; content: Buffer }[] = [];
+        const evidence: EvidenceStore = {
+          put: (tenantId, p, content): Promise<StoredEvidence> => {
+            puts.push({ tenantId, path: p, content });
+            return Promise.resolve({
+              uri: `s3://evidence/proposals/${tenantId}/${p}`,
+              sha256: crypto.createHash('sha256').update(content).digest('hex'),
+              sizeBytes: content.length,
+            });
+          },
+          get: () => Promise.reject(new Error('not used')),
+        };
+        const stored = await storeProposal({ ...deps, evidence }, envelope.contract, cloneDir);
+        expect(puts).toHaveLength(1);
+        const changed = [...puts[0]!.content.toString().matchAll(/^diff --git a\/(\S+) /gm)].map(
+          (m) => m[1],
+        );
+        // `.write-test` is left by the fixture's own probe that the workspace is writable.
+        expect(changed.sort()).toEqual([
+          '.write-test',
+          'README.md',
+          'link',
+          'new.txt',
+          'probe-targets',
+        ]);
+        expect(stored.changedFiles).toBe(5);
+        expect(puts[0]!.path).toBe(`${envelope.contract.intent_id}/${runId}.patch`);
+        const patch = puts[0]!.content.toString();
+        expect(patch).toContain('+changed');
+        expect(patch).toContain('new file mode 100644');
+        expect(patch).toContain('new file mode 120000'); // the link, as a link
+        expect(patch).toContain('deleted file mode');
+        expect(patch).not.toContain('.git/hooks');
+        expect(patch).not.toContain(TOKEN);
+        const [item] = await scope.evidenceItems.listForIntent(envelope.contract.intent_id);
+        expect(item).toMatchObject({ kind: 'proposal', run_id: runId, sha256: stored.sha256 });
+        const events = await scope.runEvents.list(runId);
+        expect(events.at(-1)).toMatchObject({
+          event_type: 'proposal_stored',
+          payload: { sha256: stored.sha256, size_bytes: stored.sizeBytes, changed_files: 5 },
+        });
+      } finally {
+        await releaseSandbox(deps, tenant.id, runId, 'finished');
+        fs.rmSync(cloneDir, { recursive: true, force: true });
+      }
     }, 300_000);
 
     it('cleans up after a runner restart: sandbox, network, volume gone; run failed (AC5)', async () => {

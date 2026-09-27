@@ -19,6 +19,8 @@ const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 type Method = 'GET' | 'POST' | 'DELETE' | 'PUT' | 'HEAD';
 
 const NAME = '[a-zA-Z0-9][a-zA-Z0-9_.-]*';
+/** A run sandbox's container name (`names.ts`): the only container whose files are read. */
+const SANDBOX = 'sdlc-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 /** Every endpoint the runner may call. Anything else is refused before it reaches the socket. */
 export const ALLOWED_ENDPOINTS: readonly (readonly [Method, RegExp])[] = [
   ['GET', /^\/_ping$/],
@@ -36,6 +38,9 @@ export const ALLOWED_ENDPOINTS: readonly (readonly [Method, RegExp])[] = [
   ['POST', new RegExp(`^/containers/${NAME}/wait$`)],
   ['GET', new RegExp(`^/containers/${NAME}/logs$`)],
   ['PUT', new RegExp(`^/containers/${NAME}/archive$`)],
+  // C06 session 2b (ADR-M33 §2.9): read the workspace out of a run sandbox only;
+  // `exportWorkspace` also checks the container's name and this runner's labels first.
+  ['GET', new RegExp(`^/containers/${SANDBOX}/archive$`)],
   ['DELETE', new RegExp(`^/containers/${NAME}$`)],
   ['GET', /^\/networks$/],
   ['POST', /^\/networks\/create$/],
@@ -185,6 +190,24 @@ export class DockerClient {
     this.#check(res, [200], 'PUT');
   }
 
+  /**
+   * Reads a path of a container as a tar archive (C06 session 2b). The caller checks that the
+   * container is the run's own sandbox (`workspace/export.ts`) and treats the archive as untrusted.
+   */
+  async getArchive(name: string, path: string, maxBytes: number): Promise<Buffer> {
+    const res = await this.request(
+      'GET',
+      `/containers/${name}/archive`,
+      undefined,
+      { path },
+      {
+        maxBytes,
+      },
+    );
+    this.#check(res, [200], 'GET');
+    return res.body;
+  }
+
   async containerStart(id: string): Promise<void> {
     await this.#expect('POST', `/containers/${id}/start`, [204, 304]);
   }
@@ -198,7 +221,7 @@ export class DockerClient {
 
   /** Waits until the container exits; returns its exit code. */
   async containerWait(id: string, timeoutMs: number): Promise<number> {
-    const res = await this.request('POST', `/containers/${id}/wait`, undefined, {}, timeoutMs);
+    const res = await this.request('POST', `/containers/${id}/wait`, undefined, {}, { timeoutMs });
     this.#check(res, [200], 'POST');
     return (JSON.parse(res.body.toString('utf8')) as { StatusCode: number }).StatusCode;
   }
@@ -298,8 +321,10 @@ export class DockerClient {
     path: string,
     body?: unknown,
     query: Readonly<Record<string, string>> = {},
-    timeoutMs = this.#timeoutMs,
+    options: { readonly timeoutMs?: number; readonly maxBytes?: number } = {},
   ): Promise<DockerResponse> {
+    const timeoutMs = options.timeoutMs ?? this.#timeoutMs;
+    const maxBytes = options.maxBytes ?? MAX_RESPONSE_BYTES;
     if (!isAllowedEndpoint(method, path)) {
       return Promise.reject(new RunnerError('runner.docker.endpoint_refused', { method }));
     }
@@ -329,7 +354,7 @@ export class DockerClient {
           let size = 0;
           res.on('data', (chunk: Buffer) => {
             size += chunk.length;
-            if (size > MAX_RESPONSE_BYTES) {
+            if (size > maxBytes) {
               req.destroy();
               reject(new RunnerError('runner.docker.response_too_large'));
               return;

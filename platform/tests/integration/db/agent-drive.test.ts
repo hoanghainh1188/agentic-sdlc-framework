@@ -223,13 +223,18 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     return { scope, envelope, sandbox };
   }
 
-  function deps(agent: FakeAgent, clock?: () => number): AgentDriveDeps {
+  function deps(
+    agent: FakeAgent,
+    clock?: () => number,
+    proposal?: AgentDriveDeps['proposal'],
+  ): AgentDriveDeps {
     return {
       db: t.app as unknown as AgentDriveDeps['db'],
       docker,
       settings,
       adapter: agent,
       ...(clock ? { clock, sleep: () => Promise.resolve() } : {}),
+      ...(proposal ? { proposal } : {}),
     };
   }
 
@@ -300,6 +305,61 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
         },
       ],
     ]);
+    await noClientData(s);
+  });
+
+  it('C06 2b, L1: the runner stores a proposal; succeeded_proposal_only, no commit, no head_sha', async () => {
+    const s = await seed({ extra: { autonomyLevel: 'L1' } });
+    const agent = new FakeAgent();
+    const seen: string[] = [];
+    const result = await driveAgent(
+      deps(agent, undefined, (contract, sandbox) => {
+        seen.push(contract.run_id, sandbox.names.container);
+        return Promise.resolve({ changedFiles: 5 });
+      }),
+      request(s),
+    );
+    expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded_proposal_only' });
+    // What the sandbox reports is never the result of an L1 run.
+    expect(result.outputs).toBeUndefined();
+    expect(seen).toEqual([s.envelope.contract.run_id, s.sandbox.names.container]);
+    expect(agent.commits).toBe(0);
+    expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
+      status: 'succeeded_proposal_only',
+      head_sha: null,
+      stop_reason: null,
+    });
+    expect((await events(s)).at(-1)).toEqual([
+      'agent_finished',
+      { outcome: 'finished', iterations: 3, changed_files: 5 },
+    ]);
+    await noClientData(s);
+  });
+
+  it('C06 2b, L1: without a proposal store the run fails (agent_proposal_unavailable)', async () => {
+    const s = await seed({ extra: { autonomyLevel: 'L1' } });
+    const agent = new FakeAgent();
+    const result = await driveAgent(deps(agent), request(s));
+    expect(result.status).toBe('failed');
+    expect(agent.commits).toBe(0);
+    expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
+      status: 'failed',
+      stop_reason: 'agent_proposal_unavailable',
+    });
+  });
+
+  it('C06 2b, L1: a proposal that cannot be computed or stored fails the run (agent_proposal_failed)', async () => {
+    const s = await seed({ extra: { autonomyLevel: 'L1' } });
+    const agent = new FakeAgent();
+    const result = await driveAgent(
+      deps(agent, undefined, () => Promise.reject(new Error(SECRET_PATH))),
+      request(s),
+    );
+    expect(result.status).toBe('failed');
+    expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
+      status: 'failed',
+      stop_reason: 'agent_proposal_failed',
+    });
     await noClientData(s);
   });
 

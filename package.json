@@ -46,8 +46,10 @@
     "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox down"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "3.1141.0",
     "@eslint/js": "10.0.1",
     "@sdlc/adapter-agent-openhands": "workspace:*",
+    "@sdlc/adapter-evidence-s3": "workspace:*",
     "@sdlc/adapter-git-github": "workspace:*",
     "@sdlc/adapter-model-litellm": "workspace:*",
     "@sdlc/adapter-policy-simple": "workspace:*",

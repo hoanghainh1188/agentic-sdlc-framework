@@ -15,12 +15,20 @@ export const PROCESS_ENV = {
   heartbeatFile: 'SDLC_RUNNER_HEARTBEAT_FILE',
   temporalAddress: 'SDLC_RUNNER_TEMPORAL_ADDRESS',
   temporalNamespace: 'SDLC_RUNNER_TEMPORAL_NAMESPACE',
+  evidenceUrl: 'SDLC_RUNNER_EVIDENCE_URL',
+  evidenceBucket: 'SDLC_RUNNER_EVIDENCE_BUCKET',
+  evidenceSecretPath: 'SDLC_RUNNER_EVIDENCE_SECRET_PATH',
 } as const;
 
 /** The database role of every platform process (ADR-M09 section 2.3). */
 export const DB_USER = 'platform_app';
 /** Field of the KV entry written by `openbao:bootstrap runner-credentials`. */
 export const DB_PASSWORD_FIELD = 'password';
+/** Fields of the KV entry written by `openbao:bootstrap runner-evidence-credentials`. */
+export const EVIDENCE_ACCESS_KEY_FIELD = 'access_key';
+export const EVIDENCE_SECRET_KEY_FIELD = 'secret_key';
+/** Every key the runner writes starts with this prefix (SeaweedFS `Write:evidence/proposals/*`). */
+export const EVIDENCE_KEY_PREFIX = 'proposals/';
 
 export interface ProcessSettings {
   readonly db: {
@@ -37,6 +45,15 @@ export interface ProcessSettings {
    * (`off`): the runner takes no runs (tests of the process without Temporal).
    */
   readonly temporal: { readonly address: string; readonly namespace: string } | null;
+  /**
+   * Where L1 proposals go (C06 session 2b, ADR-M33 §2.9): the S3 API of SeaweedFS and the KV path
+   * of the runner's write-only credential. Null (`SDLC_RUNNER_EVIDENCE_URL=off`): no proposals.
+   */
+  readonly evidence: {
+    readonly url: string;
+    readonly bucket: string;
+    readonly secretPath: string;
+  } | null;
 }
 
 const HOST = /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/;
@@ -44,6 +61,33 @@ const DB_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
 const SECRET_PATH = /^runner\/[A-Za-z0-9_.-]+$/;
 const TEMPORAL_ADDRESS = /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}:[0-9]{1,5}$/;
 const TEMPORAL_NAMESPACE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const BUCKET = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+
+function evidenceSettings(env: NodeJS.ProcessEnv): ProcessSettings['evidence'] {
+  const raw = env[PROCESS_ENV.evidenceUrl] || 'http://seaweedfs:8333';
+  if (raw === 'off') return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw invalid(PROCESS_ENV.evidenceUrl);
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.pathname !== '/' ||
+    url.search !== '' ||
+    url.hash !== ''
+  ) {
+    throw invalid(PROCESS_ENV.evidenceUrl);
+  }
+  const bucket = env[PROCESS_ENV.evidenceBucket] || 'evidence';
+  const secretPath = env[PROCESS_ENV.evidenceSecretPath] || 'runner/evidence';
+  if (!BUCKET.test(bucket)) throw invalid(PROCESS_ENV.evidenceBucket);
+  if (!SECRET_PATH.test(secretPath)) throw invalid(PROCESS_ENV.evidenceSecretPath);
+  return { url: url.origin, bucket, secretPath };
+}
 
 function invalid(name: string): RunnerError {
   return new RunnerError('runner.config.invalid_setting', { name });
@@ -72,5 +116,6 @@ export function processSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Pr
     db: { host, port, name, secretPath },
     heartbeatFile,
     temporal: address === 'off' ? null : { address, namespace },
+    evidence: evidenceSettings(env),
   };
 }

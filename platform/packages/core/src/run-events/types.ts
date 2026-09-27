@@ -76,6 +76,11 @@ export const RUN_EVENT_TYPES = {
   },
   /** An agent call failed (C05); `reason` is an `AgentErrorCode` or `model_unreachable`. */
   agent_failed: { reason: 'code' },
+  /**
+   * The proposal of an L1 run was computed in the runner's clone and stored as evidence (C06
+   * session 2b, ADR-M33 §2.9). The URI and the paths stay in `evidence_items` and the file.
+   */
+  proposal_stored: { sha256: 'sha256', size_bytes: 'count', changed_files: 'count' },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;

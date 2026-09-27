@@ -212,13 +212,13 @@ t("C07","M-C","Gate G5: file scope + budget","M",["C06","C03","B11"],"FR-13, FR-
  ["Files changed outside the plan → stop, back to G3 (N1)",
   "Spend at 80% → warning comment; at 100% → stop and raise an escalation (N3)",
   "Owner decision `resume` with more budget → the run continues (bound, not expired)"],
- "Sandbox outputs are untrusted (ADR-M29 §2.5): recompute the changed files and `head_sha` from the pushed branch outside the sandbox before G5 relies on them. A cost cap and an iteration cap both end as `stopped_budget`; tell them apart by `stop_reason` (`max_iterations`); both need a human decision to resume (QUESTIONS #21, #82). Decide whether uncommitted edits of a stopped run are kept as evidence")
+ "Sandbox outputs are untrusted (ADR-M29 §2.5): recompute the changed files and `head_sha` from the pushed branch outside the sandbox before G5 relies on them; C06 session 2b built the pieces (`exportWorkspace`, `mirrorWorkspace`, `computeProposal` in the runner, ADR-M33 §2.9). A cost cap and an iteration cap both end as `stopped_budget`; tell them apart by `stop_reason` (`max_iterations`); both need a human decision to resume (QUESTIONS #21, #82). Decide whether uncommitted edits of a stopped run are kept as evidence")
 t("C08","M-C","Open PR + gate G6 (CI)","M",["C07","B05"],"—",
  "platform/packages/adapters/git-github (PR, checks), platform/apps/worker (G6)",
  ["Open a PR from the agent branch, filling template T2 (intent_id, run_id, AI-written parts)",
   "Read CI status by polling (checks API); fail → rerun the agent within the retry limit; no retries left → back to G3 (N2)",
   "An agent push to `main` is blocked by branch protection (N6)"],
- "The runner, not the sandbox, pushes `agent/INT-...` (QUESTIONS #52, ADR-M25): update the D-03 §4 flow and diagram D11 (and the D-02 §5 flow) in this task. Sandbox outputs are untrusted (ADR-M29 §2.5): the changed files and `head_sha` are recomputed from the pushed branch outside the sandbox")
+ "The runner, not the sandbox, pushes `agent/INT-...` (QUESTIONS #52, ADR-M25): update the D-03 §4 flow and diagram D11 (and the D-02 §5 flow) in this task. Sandbox outputs are untrusted (ADR-M29 §2.5): the changed files and `head_sha` are recomputed from the pushed branch outside the sandbox (reuse the runner's `exportWorkspace` and hardened git of C06, ADR-M33 §2.9)")
 t("C09","M-C","Integration tests G4–G6 on the sample repo","M",["C08","R04","B10","C11"],"—","platform/tests/integration/*",
  ["T01 runs from G1 to G6 successfully","N1, N2, N3, N6 are blocked correctly","T09 only produces a proposal; T10 is refused",
   "Kill switch and loop detection work on a live run","Unregistered or suspended agent cannot run"])
@@ -245,7 +245,8 @@ t("E02","M-D","Evidence Builder + Markdown export","M",["E01"],"FR-40, FR-42, FR
  ["Collects: spec + hash, plan, diff, CI/test/scan results, the 8 gate decisions with oversight modes, escalations, cost summary",
   "Includes the client AI disclosure note (`disclosure_note`) in the project's disclosure format",
   "Stored in SeaweedFS under a tenant prefix; manifest with a hash per item",
-  "Exports one readable Markdown file (English by default, via the message catalog)"])
+  "Exports one readable Markdown file (English by default, via the message catalog)"],
+ "Builds on C06 session 2b (ADR-M33 §2.9): `EvidenceStore` (`@sdlc/contracts`), `S3EvidenceStore` and the table `evidence_items` exist; L1 proposals are at `s3://evidence/proposals/…`. Re-check the SHA-256 of every item when the pack is built (the runner's identity can delete under `proposals/`; versioning keeps the content). Packs need their own write identity and prefix; decide object lock with E05 (ADR-M33 §2.9 gap 1)")
 t("E03","M-D","Gate G8: release approval, close the intent","S",["E02"],"FR-43",
  "platform/apps/worker (G8)",
  ["Person B approves G8 via CLI or comment (plus business/security owner for Critical); bound to the artifact digest",
@@ -415,6 +416,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.8 | 2026-09-27 | Claude (task C10), approved by Harry | E07 AC4: QUESTIONS #81 (a real run with an API model before M-E); B13 AC7: admin endpoints for the agent register with the Ch.20 approval rules; B13 AC8: stored configurations after a change of platform defaults (QUESTIONS #95); C06 note: the agent check and the recertification notice (ADR-M31) |
 | 1.9 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | C06 note: no run before the last HOTL block window closes (`hotlBlockWindowOpenUntil`; QUESTIONS #88, ADR-M30 §2.4b) |
 | 1.10 | 2026-09-27 | Claude (task B12), approved by Harry | B04 AC5: `sdlc ai-record show|set` over the B12 API; B12 note: codes only, version history, write roles, API + operator command (QUESTIONS #103–#106, ADR-M32) |
+| 1.11 | 2026-09-27 | Claude (task C06, session 2b), approved by Harry | C07, C08 notes: reuse the runner's workspace export and hardened git; E02 note: builds on `EvidenceStore` and `evidence_items`, re-checks hashes, own identity for packs (ADR-M33 §2.9) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))
