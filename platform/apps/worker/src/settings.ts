@@ -2,7 +2,8 @@
 // come from the environment, never from project configuration: the polling interval of each
 // project is project configuration (`github.poll_interval_seconds`). No secret is ever read from an
 // environment variable: the database password and the GitHub App key come from OpenBao, the
-// AppRole credentials from files (ADR-M21).
+// AppRole credentials from files (ADR-M21). The Temporal settings are technical too (B07, ADR-M30).
+import { TEMPORAL_ADDRESS, TEMPORAL_NAMESPACE, type TemporalSettings } from '@sdlc/workflow-client';
 import { z } from 'zod';
 
 export const WORKER_ENV = {
@@ -18,6 +19,11 @@ export const WORKER_ENV = {
   heartbeatFile: 'SDLC_WORKER_HEARTBEAT_FILE',
   escalationTickMs: 'SDLC_WORKER_ESCALATION_TICK_MS',
   escalationBatch: 'SDLC_WORKER_ESCALATION_BATCH',
+  temporalAddress: 'SDLC_WORKER_TEMPORAL_ADDRESS',
+  temporalNamespace: 'SDLC_WORKER_TEMPORAL_NAMESPACE',
+  reconcileMs: 'SDLC_WORKER_RECONCILE_MS',
+  reconcileBatch: 'SDLC_WORKER_RECONCILE_BATCH',
+  workflowBundle: 'SDLC_WORKER_WORKFLOW_BUNDLE',
   devMode: 'SDLC_WORKER_DEV_MODE',
   devDbUrl: 'SDLC_WORKER_DEV_DB_URL',
 } as const;
@@ -51,6 +57,20 @@ const schema = z.object({
   // The shortest SLA clock is minutes long (codes table §6.3), so 15 s is precise enough.
   [WORKER_ENV.escalationTickMs]: z.coerce.number().int().min(1000).max(300_000).default(15_000),
   [WORKER_ENV.escalationBatch]: z.coerce.number().int().min(1).max(1000).default(100),
+  // `off` runs the worker without the intent workflow: development mode only.
+  [WORKER_ENV.temporalAddress]: z
+    .string()
+    .refine((v) => v === 'off' || TEMPORAL_ADDRESS.test(v))
+    .default('temporal:7233'),
+  [WORKER_ENV.temporalNamespace]: z.string().regex(TEMPORAL_NAMESPACE).default('default'),
+  // A lost wake signal is caught up within this time (ADR-M30 §2.3).
+  [WORKER_ENV.reconcileMs]: z.coerce.number().int().min(10_000).max(86_400_000).default(600_000),
+  [WORKER_ENV.reconcileBatch]: z.coerce.number().int().min(1).max(5000).default(500),
+  // Set in the image: the workflow bundle made at build time (ADR-M30 §2.1).
+  [WORKER_ENV.workflowBundle]: z
+    .string()
+    .regex(/^\/[^\s]+\.js$/)
+    .optional(),
   [WORKER_ENV.devMode]: z.enum(['', '0', '1']).default(''),
   [WORKER_ENV.devDbUrl]: z.string().optional(),
   NODE_ENV: z.string().optional(),
@@ -80,12 +100,21 @@ export interface WorkerSettings {
   readonly escalationTickMs: number;
   /** Escalations advanced per tick at most. */
   readonly escalationBatch: number;
+  /** The Temporal frontend of the intent workflow (B07); null: no workflow (development only). */
+  readonly temporal: TemporalSettings | null;
+  /** How often every open intent's workflow is woken, to catch up a lost signal (B07). */
+  readonly reconcileMs: number;
+  /** Intents read per page by the reconcile loop. */
+  readonly reconcileBatch: number;
+  /** Absolute path of the prebuilt workflow bundle; null: bundle at start-up. */
+  readonly workflowBundle: string | null;
 }
 
 export type WorkerSettingsKey =
   | 'worker.settings.invalid'
   | 'worker.settings.dev_mode_in_production'
-  | 'worker.settings.dev_url_missing';
+  | 'worker.settings.dev_url_missing'
+  | 'worker.settings.temporal_off_in_production';
 
 /** A setting is missing or wrong. `key` is a message catalog key; `setting` the variable. */
 export class SettingsError extends Error {
@@ -112,6 +141,13 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
   if (dev && v.NODE_ENV === 'production') {
     throw new SettingsError('worker.settings.dev_mode_in_production', WORKER_ENV.devMode);
   }
+  const temporalOff = v[WORKER_ENV.temporalAddress] === 'off';
+  if (temporalOff && !dev) {
+    throw new SettingsError(
+      'worker.settings.temporal_off_in_production',
+      WORKER_ENV.temporalAddress,
+    );
+  }
   let database: WorkerDatabase;
   if (dev) {
     const url = v[WORKER_ENV.devDbUrl];
@@ -136,5 +172,14 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     heartbeatFile: v[WORKER_ENV.heartbeatFile],
     escalationTickMs: v[WORKER_ENV.escalationTickMs],
     escalationBatch: v[WORKER_ENV.escalationBatch],
+    temporal: temporalOff
+      ? null
+      : {
+          address: v[WORKER_ENV.temporalAddress],
+          namespace: v[WORKER_ENV.temporalNamespace],
+        },
+    reconcileMs: v[WORKER_ENV.reconcileMs],
+    reconcileBatch: v[WORKER_ENV.reconcileBatch],
+    workflowBundle: v[WORKER_ENV.workflowBundle] ?? null,
   };
 }

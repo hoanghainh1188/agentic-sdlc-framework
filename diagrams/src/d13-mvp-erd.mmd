@@ -18,6 +18,7 @@ erDiagram
     intents ||--o{ spec_refs : "links spec"
     intents ||--o{ plans : "has plan"
     intents ||--o{ gate_decisions : "passes gates"
+    intents ||--o{ intent_notices : "announces status"
     intents ||--o{ runs : "runs"
     runs ||--|| run_contracts : "is granted"
     runs ||--o{ run_events : "logs events"

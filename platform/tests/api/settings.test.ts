@@ -17,7 +17,22 @@ describe('api settings', () => {
       },
       rateLimitPerMinute: 120,
       authFailuresPerMinute: 10,
+      temporal: { address: 'temporal:7233', namespace: 'default' },
     });
+  });
+
+  it('B07: the intent workflow signals can be turned off in development mode only', () => {
+    const dev = { SDLC_API_DEV_MODE: '1', SDLC_API_DEV_DB_URL: 'postgres://x/platform' };
+    expect(loadSettings({ ...dev, SDLC_API_TEMPORAL_ADDRESS: 'off' }).temporal).toBeNull();
+    expect(() => loadSettings({ SDLC_API_TEMPORAL_ADDRESS: 'off' })).toThrowError(
+      expect.objectContaining({ key: 'api.settings.temporal_off_in_production' }),
+    );
+    expect(
+      loadSettings({
+        SDLC_API_TEMPORAL_ADDRESS: 'tmp.internal:7300',
+        SDLC_API_TEMPORAL_NAMESPACE: 'sdlc',
+      }).temporal,
+    ).toEqual({ address: 'tmp.internal:7300', namespace: 'sdlc' });
   });
 
   it('dev mode takes a URL, and is refused in production', () => {
@@ -41,6 +56,8 @@ describe('api settings', () => {
     ['SDLC_API_DB_SECRET_PATH', 'worker/database'],
     ['SDLC_API_DB_NAME', 'Platform;drop'],
     ['SDLC_API_DEV_MODE', 'yes'],
+    ['SDLC_API_TEMPORAL_ADDRESS', 'http://temporal:7233'],
+    ['SDLC_API_TEMPORAL_NAMESPACE', 'a b'],
   ])('refuses %s=%s', (name, value) => {
     expect(() => loadSettings({ [name]: value })).toThrowError(
       expect.objectContaining({ key: 'api.settings.invalid', setting: name }),

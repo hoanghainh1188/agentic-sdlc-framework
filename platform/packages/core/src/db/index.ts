@@ -12,6 +12,7 @@ export {
   SystemScope,
   type NewTenant,
   type DueEscalation,
+  type OpenIntent,
   type PollableProject,
   type ResolvedApiToken,
 } from './system-scope.js';
@@ -34,12 +35,14 @@ export type {
 } from './repositories/gate-decisions.js';
 export {
   MAX_INTENT_PAGE,
+  type IntentMove,
   type IntentPageQuery,
   type IntentPosition,
   type IntentQuery,
   type IntentStateChange,
   type NewIntent,
 } from './repositories/intents.js';
+export type { NewIntentNotice } from './repositories/intent-notices.js';
 export type { SubmitPlan } from './repositories/plans.js';
 export type { RegistryActor } from './repositories/registry-actor.js';
 export type { StoreRunContract, StoredRunContract } from './repositories/run-contracts.js';
@@ -56,6 +59,7 @@ export type {
   GateDecisionRow,
   GitEventCursor,
   Intent,
+  IntentNotice,
   Plan,
   Project,
   ProjectAiRecord,

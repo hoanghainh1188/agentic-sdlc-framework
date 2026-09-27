@@ -16,7 +16,12 @@ export type RegistryErrorCode =
   /** The decision breaks a registry rule; `reason` says which. */
   | 'decision_not_allowed'
   /** The policy engine refused the approval (D-02 FR-11, FR-16); `reason` says why. */
-  | 'approval_refused';
+  | 'approval_refused'
+  /**
+   * Another open intent of the project is linked to the same issue or pull request
+   * (design/QUESTIONS.md #68, migration 0008).
+   */
+  | 'issue_already_linked';
 
 export class RegistryError extends Error {
   override readonly name = 'RegistryError';

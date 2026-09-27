@@ -59,6 +59,7 @@ const PG_ERROR_CODES: Record<string, DbErrorCode> = {
   SDA06: 'immutable', // a delivered or abandoned reply of a Git event receipt (migration 0006)
   SDA07: 'immutable', // an escalation status move not allowed, or a closed escalation (0007)
   SDA08: 'immutable', // a posted or abandoned escalation notice (migration 0007)
+  SDA09: 'immutable', // a posted or abandoned intent status notice (migration 0008)
 };
 
 /** Maps a PostgreSQL error to a DbError; anything else is rethrown unchanged. */

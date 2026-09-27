@@ -242,7 +242,7 @@ jobs:
     # script as Compose). Runs on every PR: DB code changes outside platform/deploy/ too.
     name: integration (database)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -255,6 +255,15 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Database tests (fail if no database is available)
         run: pnpm test:db
+      # Task B07: the intent workflow on the Temporal test server (pinned by version and SHA-256 in
+      # the script; the cached archive is checked again on every run, QUESTIONS #92).
+      - name: Cache the Temporal test server archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/sdlc/temporal-test-server
+          key: temporal-test-server-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('platform/deploy/scripts/temporal-test-server.sh') }}
+      - name: Intent workflow tests (Temporal test server + database)
+        run: pnpm test:workflow
 
   gitleaks:
     name: secrets (gitleaks)

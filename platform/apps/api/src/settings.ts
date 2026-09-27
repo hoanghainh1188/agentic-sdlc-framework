@@ -1,6 +1,7 @@
 // Settings of the api process (task B03, ADR-M26 section 2.6). Infrastructure settings come from
 // the environment, never from project configuration. No secret is ever read from an environment
 // variable: the database password comes from OpenBao, the AppRole credentials from files.
+import { TEMPORAL_ADDRESS, TEMPORAL_NAMESPACE, type TemporalSettings } from '@sdlc/workflow-client';
 import { z } from 'zod';
 
 export const API_ENV = {
@@ -14,6 +15,8 @@ export const API_ENV = {
   authFailuresPerMinute: 'SDLC_API_AUTH_FAILURES_PER_MINUTE',
   devMode: 'SDLC_API_DEV_MODE',
   devDbUrl: 'SDLC_API_DEV_DB_URL',
+  temporalAddress: 'SDLC_API_TEMPORAL_ADDRESS',
+  temporalNamespace: 'SDLC_API_TEMPORAL_NAMESPACE',
 } as const;
 
 /** The database role of every platform process (ADR-M09 section 2.3). */
@@ -40,6 +43,12 @@ const schema = z.object({
   [API_ENV.authFailuresPerMinute]: perMinute.default(10),
   [API_ENV.devMode]: z.enum(['', '0', '1']).default(''),
   [API_ENV.devDbUrl]: z.string().optional(),
+  // The intent workflow (B07, ADR-M30); `off`: no wake signals, development mode only.
+  [API_ENV.temporalAddress]: z
+    .string()
+    .refine((v) => v === 'off' || TEMPORAL_ADDRESS.test(v))
+    .default('temporal:7233'),
+  [API_ENV.temporalNamespace]: z.string().regex(TEMPORAL_NAMESPACE).default('default'),
   NODE_ENV: z.string().optional(),
 });
 
@@ -59,6 +68,8 @@ export interface ApiSettings {
   readonly database: Database;
   readonly rateLimitPerMinute: number;
   readonly authFailuresPerMinute: number;
+  /** Where to wake intent workflows (B07); null: no signals (development only). */
+  readonly temporal: TemporalSettings | null;
 }
 
 /** A setting is missing or wrong. `key` is a message catalog key; `name` the variable. */
@@ -69,7 +80,8 @@ export class SettingsError extends Error {
     readonly key:
       | 'api.settings.invalid'
       | 'api.settings.dev_mode_in_production'
-      | 'api.settings.dev_url_missing',
+      | 'api.settings.dev_url_missing'
+      | 'api.settings.temporal_off_in_production',
     readonly setting: string,
   ) {
     super(`${key}: ${setting}`);
@@ -85,6 +97,10 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
   const dev = v[API_ENV.devMode] === '1';
   if (dev && v.NODE_ENV === 'production') {
     throw new SettingsError('api.settings.dev_mode_in_production', API_ENV.devMode);
+  }
+  const temporalOff = v[API_ENV.temporalAddress] === 'off';
+  if (temporalOff && !dev) {
+    throw new SettingsError('api.settings.temporal_off_in_production', API_ENV.temporalAddress);
   }
   let database: Database;
   if (dev) {
@@ -106,5 +122,8 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     database,
     rateLimitPerMinute: v[API_ENV.rateLimitPerMinute],
     authFailuresPerMinute: v[API_ENV.authFailuresPerMinute],
+    temporal: temporalOff
+      ? null
+      : { address: v[API_ENV.temporalAddress], namespace: v[API_ENV.temporalNamespace] },
   };
 }

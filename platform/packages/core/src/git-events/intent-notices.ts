@@ -1,0 +1,201 @@
+// Posting the gate status comments (D-02 FR-22, D-08 B07, design/ADR-M30 §2.5). The intent
+// workflow records one notice per status change (`intent_notices`); the poller posts it after its
+// replies and escalation notices, on the intent's issue.
+//
+// - The comment confirms a successful comment command (ADR-M27 §2.4): it names the decision and the
+//   people who decided. It mentions the holders of the roles that act next (HOTL: the people told).
+//   Logins are read when the comment is posted and never stored.
+// - Delivery follows the reply rules of ADR-M27 §2.4: at least once, after the commit, retried on
+//   the next polls, given up after `maxAttempts`. A notice of an intent with no issue is given up
+//   at once (logged): there is nowhere to post it.
+import type { GateCode, RepoRef } from '@sdlc/contracts';
+import { GitHostError } from '@sdlc/contracts';
+import { t, type MessageKey } from '@sdlc/messages';
+
+import { isCommandGate } from '../commands/gate-input.js';
+import type { GateDecisionRow, Intent, IntentNotice } from '../db/schema.js';
+import type { TenantScope } from '../db/tenant-scope.js';
+import { mentionsFor, type NoticeDeps } from './escalation-notices.js';
+
+export type IntentNoticeLogEvent =
+  | 'status_notice.posted'
+  | 'status_notice.failed'
+  | 'status_notice.abandoned'
+  | 'status_notice.no_issue'
+  | 'status_notice.bookkeeping_failed';
+
+export interface IntentNoticeDeps extends Omit<NoticeDeps, 'log'> {
+  readonly log: (
+    level: 'info' | 'warn' | 'error',
+    event: IntentNoticeLogEvent,
+    fields: Readonly<Record<string, string | number | boolean>>,
+  ) => void;
+}
+
+/** GitHub logins: letters, digits and single hyphens, at most 39 characters. */
+const GITHUB_LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+
+const GATE_NAME_KEYS: Readonly<Record<GateCode, MessageKey>> = {
+  G1: 'gate.name.g1',
+  G2: 'gate.name.g2',
+  G3: 'gate.name.g3',
+  G4: 'gate.name.g4',
+  G5: 'gate.name.g5',
+  G6: 'gate.name.g6',
+  G7: 'gate.name.g7',
+  G8: 'gate.name.g8',
+};
+
+/** Catalog key of a notice (tested: every kind has one). */
+export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): MessageKey {
+  switch (notice.kind) {
+    case 'submitted':
+      return 'intent.status.submitted';
+    case 'rejected':
+      return 'intent.status.rejected';
+    case 'changes_requested':
+      return 'intent.status.changes_requested';
+    default:
+      return notice.gate !== null && isCommandGate(notice.gate)
+        ? 'intent.status.advanced'
+        : 'intent.status.advanced_platform';
+  }
+}
+
+export interface IntentNoticeView {
+  readonly code: string;
+  readonly deciders: readonly string[];
+  readonly mentions: readonly string[];
+  readonly reasonCode: string | null;
+}
+
+/** The Markdown body of one status comment. A hidden marker names the intent and the notice. */
+export function renderIntentNotice(
+  notice: Pick<IntentNotice, 'id' | 'kind' | 'gate' | 'previous_gate'>,
+  view: IntentNoticeView,
+  locale?: string,
+): string {
+  const nobody = t('intent.status.nobody', {}, locale);
+  const gate = notice.gate ?? '—';
+  const body = t(
+    intentNoticeKey(notice),
+    {
+      code: view.code,
+      gate,
+      gate_name: notice.gate === null ? '—' : t(GATE_NAME_KEYS[notice.gate], {}, locale),
+      previous_gate: notice.previous_gate ?? '—',
+      deciders: view.deciders.length > 0 ? view.deciders.join(', ') : nobody,
+      mentions:
+        view.mentions.length > 0
+          ? view.mentions.join(' ')
+          : t('escalation.notice.nobody', {}, locale),
+      reason: view.reasonCode ?? 'other',
+    },
+    locale,
+  );
+  const footer = t('intent.status.footer', {}, locale);
+  return `${body}\n\n${footer}\n\n<!-- sdlc-status ${view.code} ${notice.kind} ${gate} ${notice.id} -->`;
+}
+
+/** `@login` of a user's GitHub identities, when the user is active. */
+async function loginsOf(scope: TenantScope, userId: string | null): Promise<string[]> {
+  if (userId === null) return [];
+  const user = await scope.users.getById(userId);
+  if (user?.status !== 'active') return [];
+  return (await scope.userIdentities.listForUser(userId))
+    .filter((i) => i.provider === 'github' && GITHUB_LOGIN.test(i.external_login))
+    .map((i) => `@${i.external_login}`)
+    .sort();
+}
+
+async function viewOf(
+  scope: TenantScope,
+  intent: Intent,
+  notice: IntentNotice,
+): Promise<IntentNoticeView> {
+  const decision: GateDecisionRow | undefined =
+    notice.decision_id === null ? undefined : await scope.gateDecisions.getById(notice.decision_id);
+  return {
+    code: intent.code,
+    deciders: decision ? await loginsOf(scope, decision.decided_by) : [],
+    mentions: await mentionsFor(scope, intent.project_id, notice.audience_roles, []),
+    reasonCode: decision?.reason_code ?? null,
+  };
+}
+
+/** Posts the pending status comments of a project, oldest first. */
+export async function flushIntentNotices(
+  deps: IntentNoticeDeps,
+  scope: TenantScope,
+  projectId: string,
+  ref: RepoRef,
+): Promise<{ posted: number; failed: number }> {
+  const pending = await scope.intentNotices.pendingForProject(projectId, deps.limit);
+  let posted = 0;
+  let failed = 0;
+  for (const notice of pending) {
+    const intent = await scope.intents.getById(notice.intent_id);
+    const attempts = notice.attempts + 1;
+    const fields = {
+      tenant_id: scope.tenantId,
+      project_id: projectId,
+      intent_id: notice.intent_id,
+      kind: notice.kind,
+    };
+    if (!intent || intent.issue_number === null) {
+      await bookkeeping(deps, scope, notice.id, { attempts, abandonAt: deps.now() }, fields);
+      deps.log('warn', 'status_notice.no_issue', fields);
+      continue;
+    }
+    let error: unknown;
+    try {
+      const body = renderIntentNotice(notice, await viewOf(scope, intent, notice));
+      await deps.gitHost.createIssueComment(ref, intent.issue_number, body);
+    } catch (caught) {
+      error = caught ?? new Error('unknown');
+    }
+    if (error === undefined) {
+      await bookkeeping(deps, scope, notice.id, { attempts, postedAt: deps.now() }, fields);
+      posted += 1;
+      deps.log('info', 'status_notice.posted', fields);
+      continue;
+    }
+    const abandon = attempts >= deps.maxAttempts;
+    await bookkeeping(
+      deps,
+      scope,
+      notice.id,
+      abandon ? { attempts, abandonAt: deps.now() } : { attempts },
+      fields,
+    );
+    const code = error instanceof GitHostError ? error.code : 'unexpected';
+    failed += 1;
+    deps.log(
+      abandon ? 'error' : 'warn',
+      abandon ? 'status_notice.abandoned' : 'status_notice.failed',
+      {
+        ...fields,
+        attempts,
+        error: code,
+      },
+    );
+    // The Git host asks us to wait: the other notices would fail the same way.
+    if (code === 'rate_limited') break;
+  }
+  return { posted, failed };
+}
+
+/** Bookkeeping never stops the other notices: a failure only means a notice may be posted again. */
+async function bookkeeping(
+  deps: IntentNoticeDeps,
+  scope: TenantScope,
+  id: string,
+  result: { readonly attempts: number; readonly postedAt?: Date; readonly abandonAt?: Date },
+  fields: Readonly<Record<string, string>>,
+): Promise<void> {
+  try {
+    await scope.intentNotices.markDelivery(id, result);
+  } catch {
+    deps.log('error', 'status_notice.bookkeeping_failed', fields);
+  }
+}

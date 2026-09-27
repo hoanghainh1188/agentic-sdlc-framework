@@ -26,6 +26,12 @@ export interface DueEscalation {
   readonly escalationId: string;
 }
 
+/** An open intent whose workflow the worker wakes (task B07): IDs only. */
+export interface OpenIntent {
+  readonly tenantId: TenantId;
+  readonly intentId: string;
+}
+
 /** A project the GitHub poller reads (task B06): IDs and the repository name only. */
 export interface PollableProject {
   readonly tenantId: TenantId;
@@ -146,6 +152,39 @@ export class SystemScope {
         .execute(),
     );
     return rows.map((row) => ({ tenantId: parseTenantId(row.tenant_id), escalationId: row.id }));
+  }
+
+  /**
+   * Intent workflow reconcile (task B07, ADR-M30 §2.3): the worker wakes the workflow of every
+   * open intent, so a wake signal lost between a commit and the signal is caught up. Crosses
+   * tenants, so it returns IDs only: open intents (not `done`, `rejected`, `cancelled`) of active
+   * tenants, ordered by (`tenant_id`, `id`), after the keyset position `after`.
+   */
+  async listOpenIntents(
+    limit: number,
+    after?: { readonly tenantId: string; readonly intentId: string },
+  ): Promise<OpenIntent[]> {
+    const rows = await run(
+      this.db
+        .selectFrom('intents as i')
+        .innerJoin('tenants as tn', 'tn.id', 'i.tenant_id')
+        .select(['i.tenant_id', 'i.id'])
+        .where('i.status', 'not in', ['done', 'rejected', 'cancelled'])
+        .where('tn.status', '=', 'active')
+        .$if(after !== undefined, (qb) =>
+          qb.where((eb) =>
+            eb.or([
+              eb('i.tenant_id', '>', after!.tenantId),
+              eb.and([eb('i.tenant_id', '=', after!.tenantId), eb('i.id', '>', after!.intentId)]),
+            ]),
+          ),
+        )
+        .orderBy('i.tenant_id')
+        .orderBy('i.id')
+        .limit(limit)
+        .execute(),
+    );
+    return rows.map((row) => ({ tenantId: parseTenantId(row.tenant_id), intentId: row.id }));
   }
 
   /** Health check (task B03): true when the database answers. Reads no table. */

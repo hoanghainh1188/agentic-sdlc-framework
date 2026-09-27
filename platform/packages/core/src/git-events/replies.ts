@@ -22,6 +22,7 @@ export const COMMENT_REPLY_KEYS: Readonly<Record<CommentReplyCode, MessageKey>> 
   forbidden: 'comment.reply.forbidden',
   gate_not_supported: 'comment.reply.gate_not_supported',
   gate_input_missing: 'comment.reply.gate_input_missing',
+  gate_not_current: 'comment.reply.gate_not_current',
   approval_refused: 'comment.reply.approval_refused',
   decision_not_allowed: 'comment.reply.decision_not_allowed',
   project_not_active: 'comment.reply.project_not_active',

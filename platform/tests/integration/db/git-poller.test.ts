@@ -105,14 +105,24 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       .requestsTo('POST', `/repos/acme/shop/issues/${String(issue)}/comments`)
       .map((r) => (r.body as { body: string }).body);
 
-  async function newIntent(issue: number): Promise<Intent> {
-    return registry.createIntent(seeded.scope, {
+  /**
+   * A new intent waiting at `gate`. B07: a decision counts only at the intent's current gate; the
+   * workflow does not run in these tests, so the intent is moved there directly.
+   */
+  async function newIntent(issue: number, gate: 'G1' | 'G2' | 'G3' = 'G1'): Promise<Intent> {
+    const intent = await registry.createIntent(seeded.scope, {
       projectId: seeded.target.projectId,
       title: `Intent on issue ${String(issue)}`,
       createdBy: seeded.users.a,
       riskTier: 'low',
       dataClass: 'internal',
       issueNumber: issue,
+    });
+    return seeded.scope.intents.updateState(intent.id, {
+      status: 'in_gate',
+      currentGate: gate,
+      actorType: 'system',
+      actorId: null,
     });
   }
 
@@ -362,27 +372,30 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       for (const code of GATE_REASON_CODES) expect(text).toContain(code);
     });
 
-    it('answers unlinked, ambiguous, unsupported gates and missing input; stays silent on other comments', async () => {
+    it('answers unlinked, unsupported, not-current gates and missing input; stays silent on other comments', async () => {
       await newIntent(12);
-      await newIntent(12);
-      await newIntent(13);
+      // QUESTIONS #68 option A (B07): a second open intent on the same issue is refused, so a
+      // comment always names exactly one intent.
+      await expect(newIntent(12)).rejects.toMatchObject({ code: 'issue_already_linked' });
+      await newIntent(13, 'G2');
       const unlinked = post(99, '/approve G1');
       const onPull = post(11, '/approve G1', user(GH.a, 'harry'), { pull: true });
-      const ambiguous = post(12, '/approve G1');
       const unsupported = post(13, '/approve G5');
       const noSpec = post(13, '/approve G2');
+      const notCurrent = post(13, '/approve G3');
       const chat = post(13, 'LGTM, will /approve G1 after lunch');
       await poll();
       expect(await receipt(unlinked)).toMatchObject({ reply_code: 'intent_not_linked' });
       // A pull request comment matches `pr_number`, not `issue_number`.
       expect(await receipt(onPull)).toMatchObject({ reply_code: 'intent_not_linked' });
-      expect(await receipt(ambiguous)).toMatchObject({ reply_code: 'intent_ambiguous' });
       expect(await receipt(unsupported)).toMatchObject({ reply_code: 'gate_not_supported' });
       expect(await receipt(noSpec)).toMatchObject({ reply_code: 'gate_input_missing' });
+      expect(await receipt(notCurrent)).toMatchObject({ reply_code: 'gate_not_current' });
       expect(await receipt(chat)).toBeUndefined();
       expect(replies(13)).toEqual([
         expect.stringContaining(t('comment.reply.gate_not_supported', { gate: 'G5' })),
         expect.stringContaining(t('comment.reply.gate_input_missing', { gate: 'G2' })),
+        expect.stringContaining(t('comment.reply.gate_not_current', { gate: 'G3' })),
       ]);
     });
   });

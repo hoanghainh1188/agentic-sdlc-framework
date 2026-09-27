@@ -12,6 +12,7 @@
     { "path": "../../packages/messages" },
     { "path": "../../packages/core" },
     { "path": "../../packages/secrets" },
+    { "path": "../../packages/workflow-client" },
     { "path": "../../packages/adapters/policy-simple" }
   ]
 }

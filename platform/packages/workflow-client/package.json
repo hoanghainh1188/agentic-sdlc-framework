@@ -1,0 +1,16 @@
+{
+  "name": "@sdlc/workflow-client",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Temporal client for the intent workflow: connection settings and the wake signal (task B07, ADR-M30).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@sdlc/contracts": "workspace:*",
+    "@temporalio/client": "1.24.0"
+  }
+}

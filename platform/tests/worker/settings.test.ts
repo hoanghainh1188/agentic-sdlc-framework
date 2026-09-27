@@ -21,7 +21,22 @@ describe('worker settings', () => {
       heartbeatFile: '/tmp/sdlc-worker.heartbeat',
       escalationTickMs: 15_000,
       escalationBatch: 100,
+      temporal: { address: 'temporal:7233', namespace: 'default' },
+      reconcileMs: 600_000,
+      reconcileBatch: 500,
+      workflowBundle: null,
     });
+  });
+
+  it('B07: the intent workflow can be turned off in development mode only', () => {
+    const dev = { SDLC_WORKER_DEV_MODE: '1', SDLC_WORKER_DEV_DB_URL: 'postgres://x/y' };
+    expect(loadSettings({ ...dev, SDLC_WORKER_TEMPORAL_ADDRESS: 'off' }).temporal).toBeNull();
+    expect(() => loadSettings({ SDLC_WORKER_TEMPORAL_ADDRESS: 'off' })).toThrow(
+      expect.objectContaining({ key: 'worker.settings.temporal_off_in_production' }),
+    );
+    expect(
+      loadSettings({ SDLC_WORKER_WORKFLOW_BUNDLE: '/app/dist/workflow-bundle.js' }).workflowBundle,
+    ).toBe('/app/dist/workflow-bundle.js');
   });
 
   it.each([
@@ -33,6 +48,11 @@ describe('worker settings', () => {
     ['SDLC_WORKER_MAX_EVENT_ATTEMPTS', '0'],
     ['SDLC_WORKER_ESCALATION_TICK_MS', '10'],
     ['SDLC_WORKER_ESCALATION_BATCH', '0'],
+    ['SDLC_WORKER_TEMPORAL_ADDRESS', 'temporal'],
+    ['SDLC_WORKER_TEMPORAL_NAMESPACE', 'a/b'],
+    ['SDLC_WORKER_RECONCILE_MS', '100'],
+    ['SDLC_WORKER_RECONCILE_BATCH', '0'],
+    ['SDLC_WORKER_WORKFLOW_BUNDLE', 'relative.js'],
   ])('refuses %s=%s', (name, value) => {
     expect(() => loadSettings({ [name]: value })).toThrow(
       expect.objectContaining({ key: 'worker.settings.invalid', setting: name }),

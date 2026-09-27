@@ -5,6 +5,11 @@ export type CommandErrorCode =
   | 'gate_not_supported'
   /** The gate has no input to bind the decision to yet (no spec for G2, no plan for G3). */
   | 'gate_input_missing'
+  /**
+   * The intent is not waiting at this gate (task B07): a decision counts only for the gate the
+   * workflow is at, so an early or late decision is refused instead of being ignored.
+   */
+  | 'gate_not_current'
   /** Unknown intent, or an intent of a project the actor cannot read. */
   | 'intent_not_found'
   /** Unknown project, or a project the actor has no role on. */

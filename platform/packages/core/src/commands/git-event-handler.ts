@@ -75,6 +75,7 @@ export const COMMENT_REPLY_CODES = [
   'forbidden',
   'gate_not_supported',
   'gate_input_missing',
+  'gate_not_current',
   'approval_refused',
   'decision_not_allowed',
   'project_not_active',
@@ -105,6 +106,11 @@ export interface HandledGitEvent {
   readonly outcome: GitEventOutcome;
   /** The receipt written for this event; undefined for outcomes that store none. */
   readonly receipt?: GitEventReceipt;
+  /**
+   * The intent whose workflow must look again (B07): set when a gate decision or an escalation
+   * acknowledgement or decision was recorded. The caller wakes it after the commit.
+   */
+  readonly intentId?: string;
 }
 
 const REASON_REF = /^https:\/\/[^\s]{1,504}$/;
@@ -225,7 +231,10 @@ export function handleGitEvent(
           eventSource: event.source,
         }),
       );
-      return await record('decided', { gateDecisionId: decision.id });
+      return {
+        ...(await record('decided', { gateDecisionId: decision.id })),
+        intentId: intents[0]!.id,
+      };
     } catch (error) {
       const refusal = refusalReply(error, gate);
       if (refusal === undefined) throw error;
@@ -271,7 +280,7 @@ async function handleEscalationCommand(
           ),
     );
     const outcome = command.kind === 'escalation_ack' ? 'acknowledged' : 'escalation_decided';
-    return await record(outcome, { escalationId: found.id });
+    return { ...(await record(outcome, { escalationId: found.id })), intentId: intent.id };
   } catch (error) {
     const reply =
       error instanceof EscalationError
@@ -325,7 +334,13 @@ function refusalReply(error: unknown, gate: Readonly<Record<string, string>>): R
     return { code, params: gate };
   }
   if (error instanceof RegistryError) {
-    const code = error.code === 'config_hash_mismatch' ? 'config_invalid' : error.code;
+    // `issue_already_linked` only comes from creating an intent, never from a decision.
+    const code =
+      error.code === 'config_hash_mismatch'
+        ? 'config_invalid'
+        : error.code === 'issue_already_linked'
+          ? 'failed'
+          : error.code;
     return { code, params: error.reason ? { ...gate, reason: error.reason } : gate };
   }
   // The database refused a statement (constraint, privilege, trigger) or the tenant guard refused a

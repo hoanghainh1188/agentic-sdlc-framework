@@ -6,3 +6,4 @@ export const SETTINGS = Symbol('ApiSettings');
 export const CLOCK = Symbol('Clock');
 export const INTENTS = Symbol('IntentsService');
 export const ESCALATIONS = Symbol('EscalationsService');
+export const INTENT_SIGNALS = Symbol('IntentWorkflowSignals');

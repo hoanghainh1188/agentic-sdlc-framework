@@ -82,7 +82,7 @@ export function renderEscalationNotice(
 }
 
 /** `@login` of the active holders of `roles` on the project, producers left out. */
-async function mentionsFor(
+export async function mentionsFor(
   scope: TenantScope,
   projectId: string,
   roles: readonly string[],
