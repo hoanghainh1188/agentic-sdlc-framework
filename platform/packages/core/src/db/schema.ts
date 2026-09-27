@@ -306,6 +306,27 @@ export interface RunEventsTable {
 }
 
 /**
+ * Receipts of Git host events handled by the poller (D-05 section 6.1b, ADR-M27): one row per
+ * command comment, unique per event ID, and the outbox of its reply. Codes and IDs only.
+ */
+export interface GitEventReceiptsTable {
+  /** bigint identity; `pg` returns int8 as a string. */
+  id: ColumnType<string, never, never>;
+  tenant_id: Immutable<string>;
+  project_id: Immutable<string>;
+  event_id: Immutable<string>;
+  outcome: Immutable<string>;
+  gate_decision_id: ColumnType<string | null, string | null | undefined, never>;
+  issue_number: ColumnType<number | null, number | null | undefined, never>;
+  reply_code: ColumnType<string | null, string | null | undefined, never>;
+  reply_params: ColumnType<Record<string, string> | null, string | null | undefined, never>;
+  reply_attempts: ColumnType<number, number | undefined, number>;
+  reply_posted_at: ColumnType<Date | null, never, Date>;
+  reply_abandoned_at: ColumnType<Date | null, never, Date>;
+  created_at: CreatedAt;
+}
+
+/**
  * Append-only cost records (D-05 section 6.5, ADR-M24): one row per model call, synced from the
  * gateway. Codes, IDs and numbers only.
  */
@@ -349,6 +370,7 @@ export interface Database {
   run_contracts: RunContractsTable;
   run_events: RunEventsTable;
   cost_records: CostRecordsTable;
+  git_event_receipts: GitEventReceiptsTable;
 }
 
 export type TableName = keyof Database;
@@ -588,6 +610,21 @@ export const TABLE_COLUMNS = {
     'occurred_at',
     'created_at',
   ]),
+  git_event_receipts: columns<GitEventReceiptsTable>()([
+    'id',
+    'tenant_id',
+    'project_id',
+    'event_id',
+    'outcome',
+    'gate_decision_id',
+    'issue_number',
+    'reply_code',
+    'reply_params',
+    'reply_attempts',
+    'reply_posted_at',
+    'reply_abandoned_at',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -613,6 +650,7 @@ export const TENANT_COLUMN = {
   run_contracts: 'tenant_id',
   run_events: 'tenant_id',
   cost_records: 'tenant_id',
+  git_event_receipts: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -633,6 +671,7 @@ export type Run = Selectable<RunsTable>;
 export type RunContractRow = Selectable<RunContractsTable>;
 export type RunEventRow = Selectable<RunEventsTable>;
 export type CostRecordRow = Selectable<CostRecordsTable>;
+export type GitEventReceipt = Selectable<GitEventReceiptsTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

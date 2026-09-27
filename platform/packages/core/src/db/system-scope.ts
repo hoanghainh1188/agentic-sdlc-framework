@@ -20,6 +20,14 @@ export interface ResolvedApiToken {
   readonly tokenId: string;
 }
 
+/** A project the GitHub poller reads (task B06): IDs and the repository name only. */
+export interface PollableProject {
+  readonly tenantId: TenantId;
+  readonly projectId: string;
+  /** `owner/name` on the Git host. */
+  readonly repoFullName: string;
+}
+
 export class SystemScope {
   /** @internal Use `PlatformDatabase.system`. */
   constructor(private readonly db: Kysely<Database>) {}
@@ -84,6 +92,31 @@ export class SystemScope {
         .where('id', '=', parseTenantId(tenantId))
         .executeTakeFirst(),
     );
+  }
+
+  /**
+   * GitHub poller (task B06, ADR-M27): the poller runs for every tenant, and it only learns a
+   * project's tenant from this list. Returns the IDs and the repository name of the active GitHub
+   * projects of active tenants, nothing else. All further work runs in `forTenant(tenantId)`.
+   */
+  async listPollableProjects(): Promise<PollableProject[]> {
+    const rows = await run(
+      this.db
+        .selectFrom('projects as p')
+        .innerJoin('tenants as tn', 'tn.id', 'p.tenant_id')
+        .select(['p.tenant_id', 'p.id', 'p.repo_full_name'])
+        .where('p.git_provider', '=', 'github')
+        .where('p.status', '=', 'active')
+        .where('tn.status', '=', 'active')
+        .orderBy('p.tenant_id')
+        .orderBy('p.id')
+        .execute(),
+    );
+    return rows.map((row) => ({
+      tenantId: parseTenantId(row.tenant_id),
+      projectId: row.id,
+      repoFullName: row.repo_full_name,
+    }));
   }
 
   /** Health check (task B03): true when the database answers. Reads no table. */

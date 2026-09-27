@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.7 |
+| Version | 1.8 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -52,6 +52,7 @@ erDiagram
     projects ||--o{ role_bindings : "within"
     projects ||--|| project_configs : "configured by"
     projects ||--|| git_event_cursors : "reads events"
+    projects ||--o{ git_event_receipts : "handled events"
     projects ||--o{ intents : "contains"
     projects ||--|| project_ai_records : "has AI record"
     tenants ||--o{ agents : "registers"
@@ -168,6 +169,7 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | external_login | text | Current username, display only |
 
 - Unique: (`tenant_id`, `provider`, `external_id`).
+- Comment commands and reviews are mapped to users by `external_id` only, never by `external_login`; bots never decide (QUESTIONS #45, ADR-M27).
 
 **`role_bindings`**
 
@@ -199,6 +201,8 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | project_id | uuid PK, FK | |
 | cursor | text | Timestamp / ID of the last processed event |
 | last_polled_at | timestamptz | |
+
+- The poller moves the cursor with compare-and-set, in the same transaction as the effects of the events (ADR-M27 §2.2).
 
 **`project_ai_records`** (1–1 with project; handbook Chapter 2 §2.5, template T7)
 
@@ -233,6 +237,26 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | approved_environments | text[] | |
 | last_recertified_at | date null | Warning when older than 3 months |
 | updated_at | timestamptz | |
+
+### 6.1b. Git event receipts
+
+**`git_event_receipts`** (task B06, ADR-M27): one row per command comment that the poller handled. Idempotency by event ID, and the outbox of the reply comment.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint identity PK | Replies are posted in `id` order (event order) |
+| project_id | uuid FK | |
+| event_id | text | `GitEvent.id`, for example `github:comment:123`. Unique per (`tenant_id`, `project_id`) |
+| outcome | text | Code: `decided`, `refused`, `syntax_error`, `user_not_linked`, `intent_not_linked`, `intent_ambiguous`, `ignored_bot`, `failed` |
+| gate_decision_id | uuid FK null | The decision recorded for the command |
+| issue_number | int null | Issue or pull request to reply on; required with a reply |
+| reply_code | text null | Code of the reply (`comment.reply.<code>` in the message catalog). Null: no reply (for example a successful command) |
+| reply_params | jsonb null | Codes only (gate, refusal reason): a flat object of at most 8 short codes. A CHECK refuses anything else |
+| reply_attempts | smallint | Failed and successful posts |
+| reply_posted_at, reply_abandoned_at | timestamptz null | Delivery; final once set (trigger, `SDA06`) |
+
+- No text from the Git host: the comment text stays on GitHub. A decision links to it with `gate_decisions.reason_ref`.
+- `platform_app` may update only `reply_attempts`, `reply_posted_at` and `reply_abandoned_at`. No DELETE.
 
 ### 6.2. Intents, specs, plans
 
@@ -602,3 +626,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.5 | 2026-09-26 | Claude (task C02), approved by Harry | §6.4: `run_events.payload` coded values only; `runs.stop_reason` a code; `runs.agent_id` without a foreign key until C10 (QUESTIONS #32); run state columns and final-status trigger; `run_contracts` written once; index (`tenant_id`, `status`) (ADR-M22) |
 | 1.6 | 2026-09-26 | Claude (task C03), approved by Harry | §6.5: `cost_records` as implemented: code formats, `run_id` needs `intent_id`, cached ≤ input tokens, month index, append-only (ADR-M24) |
 | 1.7 | 2026-09-27 | Claude (task B03), approved by Harry | §6.1 `api_tokens`: token format, lifetime, audit events (ADR-M26, QUESTIONS #63) |
+| 1.8 | 2026-09-27 | Claude (task B06), approved by Harry | New §6.1b `git_event_receipts`; §6.1 notes: users mapped by numeric account ID, cursor compare-and-set (ADR-M27, QUESTIONS #43, #45) |

@@ -151,6 +151,30 @@ export class IntentRepository extends TenantRepository {
     );
   }
 
+  /**
+   * Open intents of a project linked to an issue or a pull request (task B06: a comment command
+   * on GitHub → its intent). An open intent is one not `done`, `rejected` or `cancelled`. Returns
+   * at most two rows: two mean the link is ambiguous (design/QUESTIONS.md #68).
+   */
+  findOpenByGitNumber(
+    projectId: string,
+    link: { readonly kind: 'issue' | 'pull_request'; readonly number: number },
+  ): Promise<Intent[]> {
+    const column = link.kind === 'issue' ? 'issue_number' : 'pr_number';
+    return this.run(
+      this.db
+        .selectFrom('intents')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('project_id', '=', projectId)
+        .where(column, '=', link.number)
+        .where('status', 'not in', ['done', 'rejected', 'cancelled'])
+        .orderBy('created_at')
+        .limit(2)
+        .execute(),
+    );
+  }
+
   listForProject(projectId: string, query: IntentQuery = {}): Promise<Intent[]> {
     return this.run(
       this.db

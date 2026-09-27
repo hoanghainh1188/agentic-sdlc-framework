@@ -5,8 +5,9 @@
 #   observability  Langfuse (web + worker) and ClickHouse; reuses PostgreSQL, Valkey, SeaweedFS
 #   models         OpenBao Agent sidecar that gives LiteLLM its keys from OpenBao (C03,
 #                  design/ADR-M24). Always on on the server: pnpm compose:models
-#   platform       The platform processes built from this repo: sdlc-api (B03, design/ADR-M26).
-#                  Needs core, OpenBao configured and the api credentials delivered first.
+#   platform       The platform processes built from this repo: sdlc-api (B03, design/ADR-M26) and
+#                  sdlc-worker (B06, design/ADR-M27). Needs core, OpenBao configured and the api and
+#                  worker credentials delivered first.
 #
 # Usage (from the repo root; see platform/deploy/README.md):
 #   platform/deploy/scripts/init-env.sh           # once: creates platform/deploy/.env (mode 600)
@@ -64,6 +65,9 @@ volumes:
   # AppRole role ID and secret ID of sdlc-api (mode 600, owner node). Written by
   # `openbao/bootstrap.sh api-credentials` (B03, runbook T11).
   api-approle:
+  # AppRole role ID and secret ID of sdlc-worker (mode 600, owner node). Written by
+  # `openbao/bootstrap.sh worker-credentials` (B06, runbook T11).
+  worker-approle:
 
 services:
   # ---------------------------------------------------------------- core ----
@@ -470,6 +474,39 @@ services:
     security_opt: [no-new-privileges:true]
     ports:
       - ${SDLC_BIND_ADDR:-127.0.0.1}:${SDLC_API_HOST_PORT:-8090}:8080
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, node, /app/dist/healthcheck.js]
+
+  # The worker: GitHub poller (B06); later the Temporal worker with the G1–G8 workflow (B07).
+  # No published port. It reaches GitHub (HTTPS), PostgreSQL and OpenBao.
+  sdlc-worker:
+    image: sdlc-worker:0.0.0
+    build:
+      context: ../..
+      dockerfile: platform/apps/worker/Dockerfile
+    profiles: [platform]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      openbao:
+        condition: service_healthy
+    environment:
+      SDLC_WORKER_DB_HOST: postgres
+      SDLC_WORKER_DB_NAME: platform
+      SDLC_OPENBAO_ADDR: http://openbao:8200
+      # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
+      SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'
+      SDLC_OPENBAO_ROLE_ID_FILE: /run/sdlc/approle/role_id
+      SDLC_OPENBAO_SECRET_ID_FILE: /run/sdlc/approle/secret_id
+    volumes:
+      - worker-approle:/run/sdlc/approle
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     healthcheck:
       <<: *healthcheck-defaults
       test: [CMD, node, /app/dist/healthcheck.js]

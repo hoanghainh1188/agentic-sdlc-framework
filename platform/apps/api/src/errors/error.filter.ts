@@ -8,9 +8,8 @@ import {
   type ExceptionFilter,
   type Logger,
 } from '@nestjs/common';
-import type { ApprovalRefusal } from '@sdlc/contracts';
-import type { DecisionViolation } from '@sdlc/core';
-import { t, type MessageKey } from '@sdlc/messages';
+import { refusalReasonMessage } from '@sdlc/core';
+import { t } from '@sdlc/messages';
 
 import { ApiError, errorMessageKey, toApiError } from './api-error.js';
 import { localeOf } from './locale.js';
@@ -61,28 +60,7 @@ function fromNest(exception: unknown): ApiError | undefined {
   return new ApiError(500, 'internal');
 }
 
-type RefusalReason = ApprovalRefusal | DecisionViolation;
-
-/** Catalog keys of the refusal reasons of the policy engine and the registry. */
-export const REASON_MESSAGE_KEYS: Readonly<Record<RefusalReason, MessageKey>> = {
-  actor_not_human: 'api.reason.actor_not_human',
-  producer: 'api.reason.producer',
-  no_human_decision: 'api.reason.no_human_decision',
-  role_missing: 'api.reason.role_missing',
-  already_approved: 'api.reason.already_approved',
-  role_already_covered: 'api.reason.role_already_covered',
-  approvals_complete: 'api.reason.approvals_complete',
-  agent_never_decides: 'api.reason.agent_never_decides',
-  decision_not_for_actor: 'api.reason.decision_not_for_actor',
-  reason_required: 'api.reason.reason_required',
-  hitl_needs_a_person: 'api.reason.hitl_needs_a_person',
-  breach_never_passes: 'api.reason.breach_never_passes',
-};
-
-/** Catalog text of a refusal reason; the code itself for a reason without a key. */
+/** Catalog text of a refusal reason (shared with the comment replies, `@sdlc/core`). */
 export function reasonMessage(reason: string, locale: string): string {
-  const key = Object.hasOwn(REASON_MESSAGE_KEYS, reason)
-    ? REASON_MESSAGE_KEYS[reason as RefusalReason]
-    : undefined;
-  return key === undefined ? reason : t(key, {}, locale);
+  return refusalReasonMessage(reason, locale);
 }

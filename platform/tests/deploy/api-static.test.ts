@@ -82,17 +82,21 @@ describe('sdlc-api service', () => {
     const at = lines.indexOf(withCaps[0]!);
     const command = lines.slice(at - 1, at + 1).join(' ');
     expect(command).toMatch(/compose .*run --rm -T --no-deps --user root/);
+    // One helper delivers the api and the worker credentials (B06, ADR-M27).
     expect(withCaps[0]).toMatch(
-      /^\s+--cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh sdlc-api -c '$/,
+      /^\s+--cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "\$service" -c '$/,
     );
-    const inFunction = bootstrap.slice(bootstrap.indexOf('cmd_api_credentials() {'));
+    const inFunction = bootstrap.slice(bootstrap.indexOf('platform_credentials() {'));
     expect(inFunction.indexOf('--cap-add')).toBeLessThan(inFunction.indexOf('\n}'));
   });
 
   it('bootstrap.sh delivers the api credentials; the Dockerfile runs as node', () => {
     const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
     expect(bootstrap).toMatch(/^ {2}api-credentials\) cmd_api_credentials ;;$/m);
-    expect(bootstrap).toContain('bao kv put -mount=kv api/database password=-');
+    expect(bootstrap).toMatch(
+      /^cmd_api_credentials\(\) \{ platform_credentials api sdlc-api; \}$/m,
+    );
+    expect(bootstrap).toContain('bao kv put -mount=kv "$1/database" password=-');
     const dockerfile = fs.readFileSync(path.join(root, 'platform/apps/api/Dockerfile'), 'utf8');
     expect(dockerfile).toMatch(/^USER node$/m);
     expect(dockerfile).not.toMatch(/ARG .*(PASSWORD|TOKEN|SECRET)|ENV .*(PASSWORD|TOKEN|SECRET)/);

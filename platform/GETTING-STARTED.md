@@ -277,7 +277,13 @@ SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=~/.config/sdlc-secrets/github-
 ```
 
    It issues a one-repository token, posts a comment on the issue, polls it back and reads a file.
-8. **OpenBao (when the worker polls GitHub, B06):** store `client_id` and `private_key` in `kv/shared/github-app` of the dev OpenBao, reading the key from the file (never typing it). The commands go in runbook T11 with B06.
+8. **OpenBao (the worker polls GitHub, B06):** store `client_id` and `private_key` in `kv/shared/github-app` of the development OpenBao. The key is read from the file, never typed. Follow runbook T11 §5b.1, in the macOS Terminal (not through a chat tool). Then deliver the worker's credentials (T11 §5f: `pnpm openbao:bootstrap worker-credentials`) and start it with `pnpm compose:platform`.
+9. **Live test of the poller** (optional, never in CI; needs Docker for the throw-away database). The App posts `/approve G9` on the test issue; the poller must ignore it, because the App is a bot, and post no reply:
+
+```bash
+SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=~/.config/sdlc-secrets/github-test-app.json \
+  SDLC_TEST_DB_DIR=platform/tests/integration/github pnpm test:db
+```
 
 ## Step 12. Start the API and create the first admin (dev)
 

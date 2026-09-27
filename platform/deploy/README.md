@@ -9,7 +9,7 @@ This folder runs the infrastructure that the platform reuses, on one server, wit
 | `core` | PostgreSQL, Temporal (+ Temporal UI), LiteLLM, Valkey, SeaweedFS (S3 API), OpenBao | Always. Required by the platform |
 | `observability` | Langfuse (web + worker), ClickHouse. Reuses PostgreSQL, Valkey and SeaweedFS | Optional. The heaviest part; enable it when the server has room (D-03 section 10.1) |
 | `models` | `litellm-agent`: OpenBao Agent that gives LiteLLM its model provider keys, master key and salt key from OpenBao (task C03, [ADR-M24](../../design/ADR-M24-litellm-cost-controller.md)) | **Always on the server** (`pnpm compose:models`). Needs OpenBao unsealed and configured and the sidecar's credentials (runbook T11 §5d). Without it, LiteLLM has no models and uses the development keys from `.env` |
-| `platform` | `sdlc-api`: the REST API for the CLI, built from this repo (task B03, [ADR-M26](../../design/ADR-M26-api-app.md)) | With `core` (`pnpm compose:platform`). Needs OpenBao unsealed and configured and `pnpm openbao:bootstrap api-credentials` first (runbook T11 §5e) |
+| `platform` | `sdlc-api`: the REST API for the CLI (task B03, [ADR-M26](../../design/ADR-M26-api-app.md)); `sdlc-worker`: the GitHub poller and comment commands (task B06, [ADR-M27](../../design/ADR-M27-github-poller.md)). Both built from this repo | With `core` (`pnpm compose:platform`). Needs OpenBao unsealed and configured, `pnpm openbao:bootstrap api-credentials` and `worker-credentials` first, and the GitHub App key stored (runbook T11 §5b, §5e, §5f) |
 
 Three one-shot jobs run at every start and then exit: `temporal-schema` (creates or upgrades the Temporal schemas), `temporal-namespace` (creates the namespace) and `seaweedfs-init` (creates the `evidence` and `langfuse` buckets). All three are safe to re-run.
 
@@ -28,7 +28,7 @@ pnpm compose:env     # once: creates platform/deploy/.env with random secrets (m
 pnpm compose:core    # starts the core profile and waits until it is healthy
 pnpm compose:obs     # core + observability
 pnpm compose:models  # core + models: LiteLLM with keys from OpenBao (the server; runbook T11 §5d)
-pnpm compose:platform # core + platform: the API (sdlc-api; runbook T11 §5e)
+pnpm compose:platform # core + platform: the API (sdlc-api) and the worker (sdlc-worker; runbook T11 §5e, §5f)
 pnpm compose:down    # stops everything; data volumes are kept
 ```
 
