@@ -12,7 +12,8 @@
 //   6. The configured agent may run (FR-36, `checkAgentForRun`): registered, active, approved for
 //      the sandbox, autonomy within its maximum, pinned model among the allowed models, and the
 //      instructions file at the base commit equals the registered version.
-//   7. The intent budget is not used up (the Cost Controller caps the run's key when it starts).
+//   7. The intent budget and the tenant's budget of this UTC month are not used up (the Cost
+//      Controller still caps the run's key when it starts).
 // Then it returns the run proposal (g4-proposal.ts), whose hash binds the G4 decision.
 //
 // `stepG4` (the workflow step at G4) acts on it with the oversight mode of the matrix:
@@ -51,7 +52,7 @@ import { loadAiRecordFacts } from '../ai-record/service.js';
 import { checkAgentForRun, type CheckedAgent } from '../agents/check.js';
 import { AgentRegisterError } from '../agents/errors.js';
 import { intentInputSha256 } from '../commands/gate-input.js';
-import { fromMicros, toMicros } from '../cost/money.js';
+import { fromMicros, startOfUtcMonth, toMicros } from '../cost/money.js';
 import type { GateDecisionRow, Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { EscalationError } from '../escalation/errors.js';
@@ -233,6 +234,19 @@ export async function evaluateG4(
       subject: null,
     };
   }
+  if (facts.tenantMonthlyBudgetUsd !== null) {
+    const month = startOfUtcMonth(now);
+    const monthSpent = toMicros(await tx.costRecords.totalSince(month));
+    if (toMicros(facts.tenantMonthlyBudgetUsd) - monthSpent <= 0n) {
+      return {
+        kind: 'fail',
+        reason: 'budget_exceeded',
+        check: 'tenant_budget_exhausted',
+        // One failure per month: a new month is a new budget.
+        subject: month.toISOString().slice(0, 7),
+      };
+    }
+  }
 
   const proposal: RunProposal = {
     intentId: intent.id,
@@ -272,6 +286,8 @@ export type G4StepOutcome =
   | { readonly kind: 'blocked'; readonly decisionId: string }
   /** Person A rejected the run proposal (HITL): the intent ends as `rejected`. */
   | { readonly kind: 'rejected'; readonly decisionId: string }
+  /** G4 is passed or approved for this proposal: the run may start (session 2 moves the intent). */
+  | { readonly kind: 'decided'; readonly proposal: RunProposal }
   | { readonly kind: 'waiting'; readonly result: IntentStepResult };
 
 /**
@@ -321,10 +337,16 @@ export async function stepG4(
     case 'fail':
       await recordG4Failure(tx, registry, intent, evaluation);
       return { kind: 'waiting', result: { outcome: 'waiting', reason: 'g4_check' } };
-    case 'ready':
+    case 'ready': {
+      const result = await decideReady(tx, registry, policy, intent, evaluation);
+      return result === 'decided'
+        ? { kind: 'decided', proposal: evaluation.proposal }
+        : { kind: 'waiting', result };
+    }
+    default:
       return {
         kind: 'waiting',
-        result: await decideReady(tx, registry, policy, intent, evaluation),
+        result: { outcome: 'waiting', reason: 'not_in_gate' },
       };
   }
 }
@@ -438,7 +460,7 @@ async function decideReady(
   policy: G4Policy,
   intent: Intent,
   ready: Extract<G4Evaluation, { kind: 'ready' }>,
-): Promise<IntentStepResult> {
+): Promise<IntentStepResult | 'decided'> {
   const now = registry.now();
   const isNew = await recordRunProposal(tx, ready.proposal, ready.inputSha256, now);
   const { decided, oversight, history } = await g4Decided(
@@ -460,11 +482,11 @@ async function decideReady(
         waitedSeconds: waitedSeconds(intent, now),
       });
     }
-    return { outcome: 'waiting', reason: 'run_pending' };
+    return 'decided';
   }
   if (decided) {
     await closeGateOverdue(tx, registry, intent.id, 'G4');
-    return { outcome: 'waiting', reason: 'run_pending' };
+    return 'decided';
   }
   if (isNew) {
     await tx.intentNotices.record({

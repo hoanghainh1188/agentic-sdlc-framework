@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M19: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M20: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -395,6 +395,14 @@ const CASES: Case[] = [
     yaml: 'access:\n  ai_record_write_roles: [pm_brse, viewer]\n',
     key: 'config.rule.viewer_never_writes_ai_record',
     path: 'access.ai_record_write_roles',
+  },
+  // M20: a failed or lost run freezes the intent (C06 session 2, ADR-M33 §2.7).
+  {
+    name: 'a failed run only notifies',
+    rule: 'M20',
+    yaml: 'run:\n  failed_run_escalation: { severity: high, response_level: notify }\n',
+    key: 'config.rule.failed_run_escalation_freezes',
+    path: 'run.failed_run_escalation.response_level',
   },
 ];
 

@@ -500,6 +500,24 @@ describe.skipIf(!enabled)(
         await controller.endRun({ keyId: issued.key.keyId, syncFrom: now });
         expect(await chat(issued.key.key.reveal())).toBe(401);
       });
+
+      it('C06: endRunKey revokes the key by its run (alias), without the key ID', async () => {
+        const s = await seed();
+        const issued = await issue(s);
+        expect(await chat(issued.key.key.reveal())).toBe(200);
+        await controller.endRunKey({ runId: s.runId, syncFrom: now });
+        expect(await chat(issued.key.key.reveal())).toBe(401);
+      });
+
+      it('C06 (Harry, session 2 plan): the key ID (the hash) is not a key', async () => {
+        const s = await seed();
+        const issued = await issue(s);
+        expect(issued.key.keyId).toMatch(/^[0-9a-f]{64}$/);
+        // LiteLLM treats a key that does not start with sk- as already hashed in some versions;
+        // the pinned version must refuse it, so the ID may appear in logs without being a key.
+        expect(await chat(issued.key.keyId)).toBe(401);
+        expect(await chat(`sk-${issued.key.keyId}`)).toBe(401);
+      });
     });
 
     describe('AC4: spend sync', () => {

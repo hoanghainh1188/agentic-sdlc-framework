@@ -28,6 +28,9 @@
       "path": "../../packages/adapters/policy-simple"
     },
     {
+      "path": "../../packages/adapters/model-litellm"
+    },
+    {
       "path": "../../packages/workflow-client"
     }
   ]

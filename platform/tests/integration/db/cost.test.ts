@@ -58,6 +58,10 @@ class FakeGateway implements ModelGateway {
     this.calls.push('revokeKey');
     return Promise.resolve();
   }
+  revokeRunKey() {
+    this.calls.push('revokeRunKey');
+    return Promise.resolve();
+  }
   getSpend() {
     return Promise.resolve({ spendUsd: '0', maxBudgetUsd: null });
   }

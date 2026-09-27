@@ -15,7 +15,7 @@ import {
 import { GatewayError } from './errors.js';
 
 const USD = /^(0|[1-9][0-9]{0,11})(\.[0-9]{1,6})?$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$/;
 const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 /** Longest key lifetime we ask for: a run never needs more than a day (FR-32 time cap). */

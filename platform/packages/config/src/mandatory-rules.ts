@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M19 and their sources:
+// Rule ids M1–M20 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -25,6 +25,7 @@
 //       owner; notify lists contain the handbook's roles ............ QUESTIONS.md #74
 //   M18 agent recertification at least every 3 months ............... Ch.20 §20.8, ADR-M31
 //   M19 the viewer role never writes the project AI record ........... ADR-M32, QUESTIONS.md #103
+//   M20 a failed or lost run freezes the intent (pause or higher) .... D-03 §6, ADR-M33 §2.7
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -34,6 +35,7 @@ import type {
   OversightCell,
   ProjectConfig,
   ProjectRole,
+  ResponseLevel,
   RiskTier,
   Severity,
   SlaEntry,
@@ -481,6 +483,20 @@ const m19: Rule = (c) =>
     ? [issue('config.rule.viewer_never_writes_ai_record', 'access.ai_record_write_roles')]
     : [];
 
+/** Response levels that freeze the intent from creation (ADR-M28 §2.4). */
+const FREEZING_LEVELS: readonly ResponseLevel[] = ['pause', 'contain', 'incident'];
+
+const m20: Rule = (c) =>
+  FREEZING_LEVELS.includes(c.run.failed_run_escalation.response_level)
+    ? []
+    : [
+        issue(
+          'config.rule.failed_run_escalation_freezes',
+          'run.failed_run_escalation.response_level',
+          { found: c.run.failed_run_escalation.response_level },
+        ),
+      ];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -503,6 +519,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M17: m17,
   M18: m18,
   M19: m19,
+  M20: m20,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

@@ -17,7 +17,7 @@ import {
   GitHostError,
   type DataClass,
   type GitHostAdapter,
-  type ProjectConfig,
+  type ValidatedProjectConfig,
   type RepoRef,
   type RunContractAutonomy,
 } from '@sdlc/contracts';
@@ -36,7 +36,16 @@ export interface G4Deps {
    * The gateway's models that the data class may use under this configuration: the policy
    * engine's `allowedModels` over `ModelGateway.listModels()` (QUESTIONS #17).
    */
-  readonly allowedModels: (config: ProjectConfig, dataClass: DataClass) => Promise<string[]>;
+  readonly allowedModels: (
+    config: ValidatedProjectConfig,
+    dataClass: DataClass,
+  ) => Promise<string[]>;
+  /**
+   * The tenant's monthly budget (decimal string), or null when none is set (code review of C06
+   * session 2a). G4 refuses when this month's spend reached it, so a used-up tenant budget fails
+   * G4 once instead of starting and cancelling runs again and again.
+   */
+  readonly tenantMonthlyBudget?: (tenantId: string) => Promise<string | null>;
 }
 
 export interface G4Facts {
@@ -49,6 +58,8 @@ export interface G4Facts {
     readonly sha256: string | null;
   } | null;
   readonly allowedModels: readonly string[];
+  /** The tenant's monthly budget (USD, decimal string); null: none set or not known. */
+  readonly tenantMonthlyBudgetUsd: string | null;
 }
 
 const REPO_FULL_NAME = /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9._-]{1,100})$/;
@@ -91,7 +102,15 @@ export async function gatherG4Facts(
     instructions = { agentId: agent.id, sha256 };
   }
   const allowedModels = await deps.allowedModels(config, intent.data_class);
-  return { baseSha, instructions, allowedModels: [...new Set(allowedModels)].sort() };
+  const tenantMonthlyBudgetUsd = deps.tenantMonthlyBudget
+    ? await deps.tenantMonthlyBudget(scope.tenantId)
+    : null;
+  return {
+    baseSha,
+    instructions,
+    allowedModels: [...new Set(allowedModels)].sort(),
+    tenantMonthlyBudgetUsd,
+  };
 }
 
 /** The terms of the run that G4 passes or approves (ADR-M33 §2.3). Version 1. */

@@ -61,6 +61,7 @@ import {
 import { gatherG4Facts, type G4Deps, type G4Facts } from './g4-proposal.js';
 import { stepG4 } from './g4.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
+import { moveTo, moveToRunning, stepPaused, stepRunning } from './run-lifecycle.js';
 import { waitedSeconds } from './waited.js';
 
 export { waitedSeconds };
@@ -85,6 +86,12 @@ export interface StepDeps {
    * Without it the step does not evaluate G4 and the intent waits there (`later_gate`).
    */
   readonly g4?: G4Deps;
+  /**
+   * C06 session 2 (ADR-M33 §2.6): the workflow can hand runs to the runner. A decided G4 then
+   * moves the intent to `running`, and the step drives the run's round (`run_prepare`,
+   * `run_ended`). Without it a decided G4 waits (`run_pending`).
+   */
+  readonly startRuns?: boolean;
 }
 
 export class WorkflowError extends Error {
@@ -150,6 +157,22 @@ export async function stepIntent(
       return { outcome: 'finished', status: intent.status };
     }
     if (intent.status === 'draft') return submit(tx, deps, intent);
+    if (deps.startRuns && intent.current_gate === 'G4') {
+      if (intent.status === 'running') {
+        return stepRunning(
+          tx,
+          deps.registry,
+          await deps.registry.policyFor(tx, intent.project_id),
+          intent,
+        );
+      }
+      if (intent.status === 'paused') {
+        const paused = await stepPaused(tx, deps.registry, intent);
+        if (paused !== 'resume') return paused;
+        await moveTo(tx, deps.registry, intent, 'in_gate', 'G4', 'run_resumed');
+        return moved;
+      }
+    }
     if (intent.status !== 'in_gate' || intent.current_gate === null) return waiting('not_in_gate');
     const policy = await deps.registry.policyFor(tx, intent.project_id);
     const block = await earlierBlock(tx, intent, policy.config);
@@ -175,6 +198,13 @@ async function atG4(
 ): Promise<IntentStepResult> {
   const outcome = await stepG4(tx, deps.registry, policy, intent, facts);
   if (outcome.kind === 'waiting') return outcome.result;
+  if (outcome.kind === 'decided') {
+    if (!deps.startRuns) return waiting('run_pending');
+    // Session 2a: runs that only propose (L1) come with session 2b (QUESTIONS #111).
+    if (outcome.proposal.autonomyLevel === 'L1') return waiting('proposal_runs_unavailable');
+    // In the transaction that checked the block window and the freeze (ADR-M30 §2.4b).
+    return (await moveToRunning(tx, deps.registry, intent)) ? moved : waiting('run_pending');
+  }
   return outcome.kind === 'rejected'
     ? move(
         tx,

@@ -140,6 +140,19 @@ export interface ProjectConfig {
      * QUESTIONS #108). Null: no agent; G4 fails with `agent_not_runnable` until one is set.
      */
     readonly agent_key: string | null;
+    /**
+     * Run Contracts issued for one G4 decision when each expires before a runner takes it (task
+     * C06 session 2, ADR-M33 §2.6). Then the platform stops trying and escalates.
+     */
+    readonly contract_attempts_max: number;
+    /**
+     * The escalation raised when a run fails or is lost (ADR-M33 §2.7, D-03 §6 "Stopped →
+     * Escalated"). Mandatory rule M20: the response level freezes the intent (`pause` or higher).
+     */
+    readonly failed_run_escalation: {
+      readonly severity: Severity;
+      readonly response_level: ResponseLevel;
+    };
   };
   readonly budget: {
     readonly warn_percent: number;

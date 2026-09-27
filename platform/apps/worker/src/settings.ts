@@ -24,6 +24,11 @@ export const WORKER_ENV = {
   reconcileMs: 'SDLC_WORKER_RECONCILE_MS',
   reconcileBatch: 'SDLC_WORKER_RECONCILE_BATCH',
   workflowBundle: 'SDLC_WORKER_WORKFLOW_BUNDLE',
+  costRoleIdFile: 'SDLC_WORKER_COST_ROLE_ID_FILE',
+  costSecretIdFile: 'SDLC_WORKER_COST_SECRET_ID_FILE',
+  costMasterKeyPath: 'SDLC_WORKER_COST_MASTER_KEY_PATH',
+  litellmUrl: 'SDLC_WORKER_LITELLM_URL',
+  runEgress: 'SDLC_WORKER_RUN_EGRESS',
   devMode: 'SDLC_WORKER_DEV_MODE',
   devDbUrl: 'SDLC_WORKER_DEV_DB_URL',
 } as const;
@@ -71,6 +76,30 @@ const schema = z.object({
     .string()
     .regex(/^\/[^\s]+\.js$/)
     .optional(),
+  // C06 session 2 (ADR-M33 §2.5, QUESTIONS #112): the second AppRole `cost-controller`, whose
+  // files the bootstrap delivers with the worker's. Both set: the worker runs agent runs.
+  [WORKER_ENV.costRoleIdFile]: z
+    .string()
+    .regex(/^\/[^\s]+$/)
+    .optional(),
+  [WORKER_ENV.costSecretIdFile]: z
+    .string()
+    .regex(/^\/[^\s]+$/)
+    .optional(),
+  // The `cost-controller` AppRole reads `kv/data/cost-controller/*` only (ADR-M24).
+  [WORKER_ENV.costMasterKeyPath]: z
+    .string()
+    .regex(/^cost-controller\/[A-Za-z0-9_.-]+$/)
+    .default('cost-controller/litellm-master-key'),
+  [WORKER_ENV.litellmUrl]: z
+    .string()
+    .regex(/^https?:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?$/)
+    .default('http://litellm:4000'),
+  // Services a sandbox may reach, `alias:port` (ADR-M25 §2.2): the Run Contract's egress list.
+  [WORKER_ENV.runEgress]: z
+    .string()
+    .regex(/^[a-z][a-z0-9-]*:[0-9]{1,5}(,[a-z][a-z0-9-]*:[0-9]{1,5})*$/)
+    .default('litellm:4000,npm-proxy:4873'),
   [WORKER_ENV.devMode]: z.enum(['', '0', '1']).default(''),
   [WORKER_ENV.devDbUrl]: z.string().optional(),
   NODE_ENV: z.string().optional(),
@@ -85,6 +114,15 @@ export type WorkerDatabase =
       readonly secretPath: string;
     }
   | { readonly kind: 'dev_url'; readonly url: string };
+
+/** C06 session 2: what the worker needs to run agents; null when the cost AppRole is not set. */
+export interface WorkerRunSettings {
+  readonly costRoleIdFile: string;
+  readonly costSecretIdFile: string;
+  readonly costMasterKeyPath: string;
+  readonly litellmUrl: string;
+  readonly egressAllowlist: readonly string[];
+}
 
 export interface WorkerSettings {
   readonly database: WorkerDatabase;
@@ -108,13 +146,16 @@ export interface WorkerSettings {
   readonly reconcileBatch: number;
   /** Absolute path of the prebuilt workflow bundle; null: bundle at start-up. */
   readonly workflowBundle: string | null;
+  /** C06 session 2: agent runs (G4, the handoff to the runner); null: G4 waits. */
+  readonly runs: WorkerRunSettings | null;
 }
 
 export type WorkerSettingsKey =
   | 'worker.settings.invalid'
   | 'worker.settings.dev_mode_in_production'
   | 'worker.settings.dev_url_missing'
-  | 'worker.settings.temporal_off_in_production';
+  | 'worker.settings.temporal_off_in_production'
+  | 'worker.settings.cost_role_incomplete';
 
 /** A setting is missing or wrong. `key` is a message catalog key; `setting` the variable. */
 export class SettingsError extends Error {
@@ -146,6 +187,14 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     throw new SettingsError(
       'worker.settings.temporal_off_in_production',
       WORKER_ENV.temporalAddress,
+    );
+  }
+  const roleId = v[WORKER_ENV.costRoleIdFile];
+  const secretId = v[WORKER_ENV.costSecretIdFile];
+  if ((roleId === undefined) !== (secretId === undefined)) {
+    throw new SettingsError(
+      'worker.settings.cost_role_incomplete',
+      roleId === undefined ? WORKER_ENV.costRoleIdFile : WORKER_ENV.costSecretIdFile,
     );
   }
   let database: WorkerDatabase;
@@ -181,5 +230,15 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     reconcileMs: v[WORKER_ENV.reconcileMs],
     reconcileBatch: v[WORKER_ENV.reconcileBatch],
     workflowBundle: v[WORKER_ENV.workflowBundle] ?? null,
+    runs:
+      roleId === undefined || secretId === undefined || temporalOff
+        ? null
+        : {
+            costRoleIdFile: roleId,
+            costSecretIdFile: secretId,
+            costMasterKeyPath: v[WORKER_ENV.costMasterKeyPath],
+            litellmUrl: v[WORKER_ENV.litellmUrl],
+            egressAllowlist: v[WORKER_ENV.runEgress].split(','),
+          },
   };
 }

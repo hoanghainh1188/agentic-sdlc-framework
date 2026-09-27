@@ -25,7 +25,36 @@ describe('worker settings', () => {
       reconcileMs: 600_000,
       reconcileBatch: 500,
       workflowBundle: null,
+      runs: null,
     });
+  });
+
+  it('C06 session 2: agent runs need both files of the cost-controller AppRole', () => {
+    const files = {
+      SDLC_WORKER_COST_ROLE_ID_FILE: '/run/sdlc/cost-approle/role_id',
+      SDLC_WORKER_COST_SECRET_ID_FILE: '/run/sdlc/cost-approle/secret_id',
+    };
+    expect(loadSettings(files).runs).toEqual({
+      costRoleIdFile: '/run/sdlc/cost-approle/role_id',
+      costSecretIdFile: '/run/sdlc/cost-approle/secret_id',
+      costMasterKeyPath: 'cost-controller/litellm-master-key',
+      litellmUrl: 'http://litellm:4000',
+      egressAllowlist: ['litellm:4000', 'npm-proxy:4873'],
+    });
+    expect(() =>
+      loadSettings({ SDLC_WORKER_COST_ROLE_ID_FILE: files.SDLC_WORKER_COST_ROLE_ID_FILE }),
+    ).toThrow(expect.objectContaining({ key: 'worker.settings.cost_role_incomplete' }));
+    // The AppRole reads its own paths only; the egress list names services with ports.
+    for (const bad of [
+      { SDLC_WORKER_COST_MASTER_KEY_PATH: 'worker/litellm-master-key' },
+      { SDLC_WORKER_RUN_EGRESS: 'litellm' },
+      { SDLC_WORKER_RUN_EGRESS: 'api.github.com:443,x' },
+      { SDLC_WORKER_LITELLM_URL: 'http://user:pw@litellm:4000' },
+    ]) {
+      expect(() => loadSettings({ ...files, ...bad })).toThrow(
+        expect.objectContaining({ key: 'worker.settings.invalid' }),
+      );
+    }
   });
 
   it('B07: the intent workflow can be turned off in development mode only', () => {

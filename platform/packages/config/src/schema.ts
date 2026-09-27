@@ -192,6 +192,11 @@ export const projectConfigSchema = z.strictObject({
     default_max_iterations: positiveInt,
     default_max_duration_minutes: positiveInt,
     agent_key: z.string().regex(AGENT_KEY_PATTERN).nullable(),
+    contract_attempts_max: positiveInt.max(10),
+    failed_run_escalation: z.strictObject({
+      severity: z.enum(SEVERITIES),
+      response_level: z.enum(RESPONSE_LEVELS),
+    }),
   }),
   budget: z.strictObject({
     warn_percent: positiveInt,

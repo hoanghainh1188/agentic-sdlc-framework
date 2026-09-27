@@ -153,7 +153,7 @@ Apply the same rules manually:
 
 ## 13.10. Using the platform
 
-> Written by Claude Code together with the platform code. This version covers gate G4 (task C06, session 1). Starting a run, reading G5 decisions, handling G5 escalations, adding budget, stopping a run and reading the run record come with the next tasks.
+> Written by Claude Code together with the platform code. This version covers gate G4 and the start and end of a run (task C06). Reading G5 decisions, handling G5 escalations, adding budget, stopping a run and reading the run record come with the next tasks.
 
 ### 13.10.1. Which agent runs
 
@@ -185,7 +185,21 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 - A rejection at G4 closes the intent.
 - At Low and Medium risk nobody approves G4: the platform passes it when every check holds.
 
-### 13.10.4. Recertification warning
+### 13.10.4. The run
+
+- When G4 is passed or approved, the platform starts the run by itself and posts a comment: **the run starts**. Nobody needs to do anything.
+- Runs wait in a queue when the server already runs as many agents as it allows (usually one). A run that waits so long that its permission expires gets a new permission, a few times. After that, the platform escalates.
+- When the run ends, the platform posts a comment and continues:
+
+| The run… | What happens next |
+|---|---|
+| finished, or stopped at its budget, time or iteration limit | The intent waits at **G5**, where the platform checks the changed files and the budget |
+| failed, or the runner was lost | The intent is **paused**, and a technical escalation goes to Person B (Chapter 18). When a person decides `resume`, the intent goes back to G4 and a new run starts after G4 |
+| could not start (for example the budget is used up, or the run proposal changed) | The intent is back at **G4**, where the platform decides again |
+
+- High-risk runs (L1, a proposal only) do not start yet: the intent waits at G4 until the platform can store proposals.
+
+### 13.10.5. Recertification warning
 
 - When the agent's last recertification is older than the configured age (3 months, Chapter 20 §20.8), the run is **not** blocked. The platform posts a comment that mentions the agent's owner, and the audit log records the warning with the run.
 
@@ -228,3 +242,4 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 | 0.1 | 2026-09-24 | Claude (draft) | First content; platform usage section reserved for Claude Code |
 | 0.2 | 2026-09-24 | Claude (draft) | §13.9 aligned with Ch.2 Rule 9 (supervised assistants only on client projects before the platform) |
 | 0.3 | 2026-09-27 | Claude (task C06, session 1) | §13.10 platform usage for G4: the configured agent, the checks, `/approve G4`, the recertification warning |
+| 0.4 | 2026-09-27 | Claude (task C06, session 2a) | §13.10.4: the start and end of a run, failed and lost runs, the queue |

@@ -4,7 +4,8 @@
 //
 // At start the runner cleans up after the previous process, then sweeps at the configured
 // interval and writes a heartbeat file after each clean-up (the container health check reads it).
-// Runs reach it through the Temporal task queue `sdlc-runner` from C06 (QUESTIONS #53).
+// Runs reach it through the Temporal task queue `sdlc-runner` (C06 session 2, QUESTIONS #53):
+// one activity slot per sandbox (`SDLC_RUNNER_MAX_SANDBOXES`), so extra runs wait in Temporal.
 import fs from 'node:fs';
 
 import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
@@ -12,6 +13,10 @@ import { PlatformDatabase } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OpenBaoClient } from '@sdlc/secrets';
 
+import { RUNNER_TASK_QUEUE } from '@sdlc/contracts';
+import { NativeConnection, Worker } from '@temporalio/worker';
+
+import { createRunnerActivities } from './activities.js';
 import { DockerClient } from './docker/client.js';
 import { RunnerError } from './errors.js';
 import { DB_PASSWORD_FIELD, DB_USER, processSettingsFromEnv } from './process.js';
@@ -81,10 +86,33 @@ async function main(): Promise<void> {
           }),
         ),
     },
-    // Runs reach `runAgent` through the Temporal activity from C06 (QUESTIONS #53, #55).
     { adapter: new OpenHandsAdapter() },
   );
   await runner.start();
+
+  // The task queue `sdlc-runner` (C06 session 2, ADR-M33 §2.6).
+  let temporal:
+    { connection: NativeConnection; worker: Worker; running: Promise<void> } | undefined;
+  if (proc.temporal) {
+    const connection = await NativeConnection.connect({ address: proc.temporal.address });
+    const worker = await Worker.create({
+      connection,
+      namespace: proc.temporal.namespace,
+      taskQueue: RUNNER_TASK_QUEUE,
+      activities: { ...createRunnerActivities({ db, runner, unwrapper: openbao.wrapping() }) },
+      maxConcurrentActivityTaskExecutions: settings.maxSandboxes,
+    });
+    const running = worker.run();
+    // A failed Temporal worker stops the process; Compose restarts it (its clean-up then runs).
+    running.catch(() => {
+      log('error', 'runner.temporal_failed', t('runner.start.temporal_failed'));
+      process.exitCode = 1;
+      process.kill(process.pid, 'SIGTERM');
+    });
+    temporal = { connection, worker, running };
+  } else {
+    log('warn', 'runner.temporal_off', t('runner.start.temporal_off'));
+  }
   log(
     'info',
     'runner.started',
@@ -95,8 +123,10 @@ async function main(): Promise<void> {
   );
 
   const shutdown = () => {
-    void runner
-      .stop()
+    if (temporal?.worker.getState() === 'RUNNING') temporal.worker.shutdown();
+    void (temporal?.running.catch(() => undefined) ?? Promise.resolve())
+      .then(() => temporal?.connection.close())
+      .then(() => runner.stop())
       .then(() => Promise.all([db.close(), openbao.close()]))
       .finally(() => process.exit(0));
   };

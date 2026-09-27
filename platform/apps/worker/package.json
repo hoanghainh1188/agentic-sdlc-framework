@@ -11,6 +11,7 @@
   ],
   "dependencies": {
     "@sdlc/adapter-git-github": "workspace:*",
+    "@sdlc/adapter-model-litellm": "workspace:*",
     "@sdlc/adapter-policy-simple": "workspace:*",
     "@sdlc/config": "workspace:*",
     "@sdlc/contracts": "workspace:*",

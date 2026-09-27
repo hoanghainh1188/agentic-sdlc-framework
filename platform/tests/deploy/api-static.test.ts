@@ -82,11 +82,12 @@ describe('sdlc-api service', () => {
     const at = lines.indexOf(withCaps[0]!);
     const command = lines.slice(at - 1, at + 1).join(' ');
     expect(command).toMatch(/compose .*run --rm -T --no-deps --user root/);
-    // One helper delivers the api and the worker credentials (B06, ADR-M27).
+    // One helper delivers every platform AppRole: api, worker, runner (B06, ADR-M27) and the
+    // worker's cost-controller (C06, ADR-M33 §2.5).
     expect(withCaps[0]).toMatch(
-      /^\s+--cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "\$service" -c '$/,
+      /^\s+--cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "\$2" -c '$/,
     );
-    const inFunction = bootstrap.slice(bootstrap.indexOf('platform_credentials() {'));
+    const inFunction = bootstrap.slice(bootstrap.indexOf('deliver_approle() {'));
     expect(inFunction.indexOf('--cap-add')).toBeLessThan(inFunction.indexOf('\n}'));
   });
 
