@@ -144,6 +144,20 @@ describe('poller loop', () => {
     expect(h.logs.find((l) => l.event === 'worker.poll_failed')?.fields.error).toBe('rate_limited');
   });
 
+  it('logs the catalog key of an OpenBao error (for example a missing GitHub App key)', async () => {
+    const h = harness();
+    h.projects = [P1];
+    h.pollImpl = () =>
+      Promise.reject(
+        Object.assign(new Error('No secret at shared/github-app.'), { key: 'secrets.not_found' }),
+      );
+    await tickAt(h, 0);
+    expect(h.logs.find((l) => l.event === 'worker.poll_failed')?.fields).toMatchObject({
+      project_id: 'p1',
+      error: 'secrets.not_found',
+    });
+  });
+
   it('skips a project whose configuration cannot be read, and tries it again later', async () => {
     const h = harness();
     h.intervals.delete('p2');

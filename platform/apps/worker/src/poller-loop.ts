@@ -29,8 +29,11 @@ export interface PollerLoopDeps {
   heartbeat?(): void;
 }
 
+/** A code for logs, never an error message: Git host codes, catalog keys, error codes. */
 function errorCode(error: unknown): string {
   if (error instanceof GitHostError) return error.code;
+  // `SecretsError` (OpenBao) carries its catalog key, for example `secrets.not_found`.
+  if (error instanceof Error && 'key' in error && typeof error.key === 'string') return error.key;
   if (error instanceof Error && 'code' in error && typeof error.code === 'string') {
     return error.code;
   }
