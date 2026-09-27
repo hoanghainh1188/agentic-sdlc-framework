@@ -10,6 +10,8 @@ export interface SeedAgentOptions {
   readonly tools?: readonly string[];
   readonly instructionsSha256?: string;
   readonly model?: string;
+  /** When the agent is activated (its first certification date). Default: now. */
+  readonly activatedAt?: Date;
 }
 
 export interface SeededAgent {
@@ -41,6 +43,9 @@ export async function seedAgent(
     maxAutonomy: 'L2',
     approvedEnvironments: ['sandbox'],
   });
-  await changeAgentStatus(scope, key, { to: 'active' });
+  await changeAgentStatus(scope, key, {
+    to: 'active',
+    ...(options.activatedAt ? { now: options.activatedAt } : {}),
+  });
   return { id: agent.id, key, version, instructionsSha256, tools };
 }

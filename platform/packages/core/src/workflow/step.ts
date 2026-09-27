@@ -26,13 +26,14 @@
 // Tunable values come from the project configuration through the policy engine: the oversight mode,
 // the roles and the number of approvals per gate and risk tier, the approval expiry, the HOTL block
 // window, the gate deadline and the overdue escalation's severity and level.
-import type {
-  GateCode,
-  IntentStepResult,
-  OversightResolution,
-  PolicyEngine,
-  ProjectRole,
-  ValidatedProjectConfig,
+import {
+  GitHostError,
+  type GateCode,
+  type IntentStepResult,
+  type OversightResolution,
+  type PolicyEngine,
+  type ProjectRole,
+  type ValidatedProjectConfig,
 } from '@sdlc/contracts';
 
 import { checkAiRecordAtSubmit } from '../ai-record/g1-check.js';
@@ -57,10 +58,21 @@ import {
   sentBackForInput,
   type EarlierBlock,
 } from './hotl.js';
+import { gatherG4Facts, type G4Deps, type G4Facts } from './g4-proposal.js';
+import { stepG4 } from './g4.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
+import { waitedSeconds } from './waited.js';
 
-/** Statuses in which the intent is finished: the workflow ends. */
-export const FINISHED_INTENT_STATUSES = ['done', 'rejected', 'cancelled'] as const;
+export { waitedSeconds };
+
+/**
+ * Statuses in which the intent is finished: the workflow ends. `blocked` too (C06: D-03 section 6,
+ * Blocked → end; Critical risk or no autonomy at G4).
+ */
+export const FINISHED_INTENT_STATUSES = ['done', 'rejected', 'cancelled', 'blocked'] as const;
+
+/** Delay before the step tries the Git host again when it could not read the G4 facts. */
+export const GIT_HOST_RETRY_MS = 60_000;
 
 /** The gates the workflow moves on people's decisions (B07); G4 onwards come with C06 and later. */
 const NEXT_GATE: Readonly<Partial<Record<GateCode, GateCode>>> = { G1: 'G2', G2: 'G3', G3: 'G4' };
@@ -68,6 +80,11 @@ const NEXT_GATE: Readonly<Partial<Record<GateCode, GateCode>>> = { G1: 'G2', G2:
 export interface StepDeps {
   /** The registry with the apps' policy factory; its clock is the workflow's clock. */
   readonly registry: Registry;
+  /**
+   * What G4 reads outside the database (C06, ADR-M33): the Git host and the gateway's models.
+   * Without it the step does not evaluate G4 and the intent waits there (`later_gate`).
+   */
+  readonly g4?: G4Deps;
 }
 
 export class WorkflowError extends Error {
@@ -107,6 +124,25 @@ export async function stepIntent(
   deps: StepDeps,
   intentId: string,
 ): Promise<IntentStepResult> {
+  // G4 reads the Git host and the gateway first: no HTTP call while the intent lock is held.
+  let facts: G4Facts | undefined;
+  if (deps.g4) {
+    const peek = await scope.intents.getById(intentId);
+    if (peek?.status === 'in_gate' && peek.current_gate === 'G4') {
+      try {
+        facts = await gatherG4Facts(scope, deps.g4, peek);
+      } catch (error) {
+        if (error instanceof GitHostError) {
+          return {
+            outcome: 'waiting',
+            reason: 'git_host_unavailable',
+            wakeInMs: GIT_HOST_RETRY_MS,
+          };
+        }
+        throw error;
+      }
+    }
+  }
   return scope.transaction(async (tx) => {
     const intent = await tx.intents.lockAndGet(intentId);
     if (!intent) throw new WorkflowError('intent_not_found', `intent ${intentId} not found`);
@@ -119,6 +155,7 @@ export async function stepIntent(
     const block = await earlierBlock(tx, intent, policy.config);
     if (block) return sendBack(tx, deps, policy, intent, block);
     const gate = intent.current_gate;
+    if (gate === 'G4' && facts) return atG4(tx, deps, policy, intent, facts);
     if (!isCommandGate(gate)) {
       // G4 onwards: C06 continues. Wake when the last HOTL block window closes (C06 waits for it).
       const until = await hotlBlockWindowOpenUntil(tx, deps.registry, intent.id);
@@ -126,6 +163,37 @@ export async function stepIntent(
     }
     return stepGate(tx, deps, policy, intent, gate);
   });
+}
+
+/** G4 (C06): block, wait, or wait for the run (`run_pending`). */
+async function atG4(
+  tx: TenantScope,
+  deps: StepDeps,
+  policy: StepPolicy,
+  intent: Intent,
+  facts: G4Facts,
+): Promise<IntentStepResult> {
+  const outcome = await stepG4(tx, deps.registry, policy, intent, facts);
+  if (outcome.kind === 'waiting') return outcome.result;
+  return outcome.kind === 'rejected'
+    ? move(
+        tx,
+        deps,
+        policy,
+        intent,
+        { status: 'rejected', gate: 'G4' },
+        'rejected',
+        outcome.decisionId,
+      )
+    : move(
+        tx,
+        deps,
+        policy,
+        intent,
+        { status: 'blocked', gate: 'G4' },
+        'blocked',
+        outcome.decisionId,
+      );
 }
 
 /** Draft → G1. Creating the intent is the submit (QUESTIONS #89). */
@@ -300,15 +368,6 @@ function approvalsNeeded(oversight: OversightResolution): number {
   return Number.POSITIVE_INFINITY;
 }
 
-/** Seconds the intent has waited at its gate (FR-12): from the entry, wall-clock time. */
-export function waitedSeconds(intent: Pick<Intent, 'gate_entered_at'>, at: Date): number | null {
-  if (intent.gate_entered_at === null) return null;
-  return Math.max(
-    0,
-    Math.floor((at.getTime() - new Date(intent.gate_entered_at).getTime()) / 1000),
-  );
-}
-
 async function resolveOversight(
   tx: TenantScope,
   policy: StepPolicy,
@@ -363,10 +422,11 @@ async function audienceFor(
   tx: TenantScope,
   policy: StepPolicy,
   intent: Intent,
-  to: { readonly status: 'in_gate' | 'rejected'; readonly gate: GateCode },
+  to: { readonly status: 'in_gate' | 'rejected' | 'blocked'; readonly gate: GateCode },
   kind: IntentNoticeKind,
   passedGate: GateCode | null,
 ): Promise<ProjectRole[]> {
+  if (to.status === 'blocked') return ['person_a'];
   if (to.status !== 'in_gate') return [];
   const roles = isCommandGate(to.gate) ? await nextActors(tx, policy, intent, to.gate) : [];
   if (kind === 'hotl_passed' && passedGate !== null) {
@@ -380,7 +440,7 @@ async function move(
   deps: StepDeps,
   policy: StepPolicy,
   intent: Intent,
-  to: { readonly status: 'in_gate' | 'rejected'; readonly gate: GateCode },
+  to: { readonly status: 'in_gate' | 'rejected' | 'blocked'; readonly gate: GateCode },
   kind: IntentNoticeKind,
   decisionId: string | null,
 ): Promise<IntentStepResult> {

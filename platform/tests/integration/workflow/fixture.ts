@@ -34,7 +34,7 @@ export interface WorkflowFixture {
   readonly users: Readonly<Record<Person, string>>;
   readonly h: Harness;
   /** A new intent on its own issue (a draft: the workflow submits it). */
-  newIntent(extra?: { riskTier?: 'low' | 'medium' | 'high' }): Promise<Intent>;
+  newIntent(extra?: { riskTier?: 'low' | 'medium' | 'high' | 'critical' }): Promise<Intent>;
   /** Links a spec (G2 input) and submits a plan (G3 input). */
   addInputs(intent: Intent, plan?: { changeFlags?: readonly 'migration'[] }): Promise<void>;
   /** A comment on the intent's issue, read by the next poll. */

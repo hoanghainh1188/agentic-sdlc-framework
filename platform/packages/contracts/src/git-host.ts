@@ -176,6 +176,8 @@ export interface GitHostAdapter {
   getApprovals(ref: RepoRef, pr: number): Promise<Approval[]>;
   /** The file content as UTF-8 text, exactly as stored (no line-ending changes). */
   getFileAtCommit(ref: RepoRef, path: string, sha: string): Promise<string>;
+  /** The commit a branch points to now (40 hex characters). G4 reads the run's base (C06). */
+  getBranchHead(ref: RepoRef, branch: string): Promise<string>;
   issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken>;
   /** MVP: polling. Pass `INITIAL_EVENT_CURSOR` for a project that has never been polled. */
   listEventsSince(

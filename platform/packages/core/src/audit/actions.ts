@@ -112,6 +112,33 @@ export const AUDIT_ACTIONS = {
       key_version: 'version',
     },
   },
+  /**
+   * G4 computed a new run proposal for the intent (task C06, ADR-M33 §2.3): the terms a G4
+   * approval or pass is bound to. `input_sha256` is the G4 input hash; `base_sha` the commit of the
+   * default branch the run would start from. Hashes, IDs and codes only; never the model name (it
+   * may hold `/` or `@`, ADR-M31 §2.8), which the hash covers.
+   */
+  'run.proposed': {
+    entityType: 'intent',
+    fields: {
+      input_sha256: 'sha256',
+      base_sha: 'code',
+      plan_id: 'uuid',
+      agent_id: 'uuid',
+      agent_version: 'code',
+      instructions_sha256: 'sha256',
+      autonomy_level: 'code',
+    },
+  },
+  /**
+   * A G4 check failed (task C06, ADR-M33 §2.4). The gate decision holds the reason code
+   * (`gate_reason_code`); `check` is the exact cause, for example an agent register refusal
+   * (`agent_not_active`, `model_not_allowed`) or `spec_changed`.
+   */
+  'gate.g4_check_failed': {
+    entityType: 'intent',
+    fields: { decision_id: 'uuid', check: 'code' },
+  },
   /** The runner refused the Run Contract of a known run; `reason` is a reject reason code. */
   'run.contract_rejected': { entityType: 'run', fields: { reason: 'code' } },
   /** An escalation was raised (FR-18, B11). Codes and IDs only, never the words of the package. */

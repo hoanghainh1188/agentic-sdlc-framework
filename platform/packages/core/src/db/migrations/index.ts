@@ -10,6 +10,7 @@ import { migration0007Escalations } from './0007-escalations.js';
 import { migration0008Agents } from './0008-agents.js';
 import { migration0009IntentWorkflow } from './0009-intent-workflow.js';
 import { migration0010AiRecord } from './0010-ai-record.js';
+import { migration0011GateG4 } from './0011-gate-g4.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -23,4 +24,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0008-agents': migration0008Agents,
   '0009-intent-workflow': migration0009IntentWorkflow,
   '0010-ai-record': migration0010AiRecord,
+  '0011-gate-g4': migration0011GateG4,
 };

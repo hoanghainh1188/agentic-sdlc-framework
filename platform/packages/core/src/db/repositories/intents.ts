@@ -173,7 +173,8 @@ export class IntentRepository extends TenantRepository {
 
   /**
    * Open intents of a project linked to an issue or a pull request (task B06: a comment command
-   * on GitHub → its intent). An open intent is one not `done`, `rejected` or `cancelled`. Returns
+   * on GitHub → its intent). An open intent is one not `done`, `rejected`, `cancelled` or
+   * `blocked` (C06: a blocked intent is finished, migration 0011). Returns
    * at most two rows: two mean the link is ambiguous (design/QUESTIONS.md #68).
    */
   findOpenByGitNumber(
@@ -188,7 +189,7 @@ export class IntentRepository extends TenantRepository {
         .where('tenant_id', '=', this.tenantId)
         .where('project_id', '=', projectId)
         .where(column, '=', link.number)
-        .where('status', 'not in', ['done', 'rejected', 'cancelled'])
+        .where('status', 'not in', ['done', 'rejected', 'cancelled', 'blocked'])
         .orderBy('created_at')
         .limit(2)
         .execute(),

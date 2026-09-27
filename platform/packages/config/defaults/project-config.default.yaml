@@ -172,6 +172,10 @@ run:
   # at the time cap, then removes the sandbox. A higher value gives a warning.
   default_max_iterations: 30
   default_max_duration_minutes: 60
+  # Task C06, QUESTIONS.md #108 (Harry, 2026-09-27): the registered agent (its agent_key, see
+  # `sdlc admin agent`) that runs this project's intents. One agent per project in the MVP; B09
+  # may pick the agent per plan task later. None by default: G4 fails until the project sets one.
+  agent_key: null
 
 budget:
   # D-07 §6; D-02 FR-52; handbook Ch.3 §3.6: warning at 80 %, stop at 100 %.

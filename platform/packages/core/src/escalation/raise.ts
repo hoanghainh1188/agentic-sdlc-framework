@@ -22,7 +22,7 @@ import { checkPacket } from './packet.js';
 import { firstStep, isUnrouted, resolveHolders } from './routing.js';
 
 /** Intents in these statuses are finished: nothing to escalate. */
-const CLOSED_INTENT_STATUSES: readonly string[] = ['done', 'rejected', 'cancelled'];
+const CLOSED_INTENT_STATUSES: readonly string[] = ['done', 'rejected', 'cancelled', 'blocked'];
 
 /** People raise escalations as themselves; the workflow, runner and clock as the system. */
 export type EscalationRaiser =

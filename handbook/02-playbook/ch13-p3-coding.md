@@ -153,7 +153,41 @@ Apply the same rules manually:
 
 ## 13.10. Using the platform
 
-> To be written by Claude Code together with the platform code: starting a run, reading G4/G5 decisions, handling G5 escalations, adding budget, stopping a run, reading the run record.
+> Written by Claude Code together with the platform code. This version covers gate G4 (task C06, session 1). Starting a run, reading G5 decisions, handling G5 escalations, adding budget, stopping a run and reading the run record come with the next tasks.
+
+### 13.10.1. Which agent runs
+
+- Each project names **one registered agent** in its configuration: `run.agent_key` (the key of `sdlc admin agent register`). Without it, G4 fails with reason code `agent_not_runnable`.
+- The run uses the agent's pinned model, its registered tools and the caps of the configuration (`budget.default_run_usd`, `run.default_max_iterations`, `run.default_max_duration_minutes`).
+
+### 13.10.2. What the platform checks at G4
+
+The platform checks G4 by itself when the intent reaches it, in this order:
+
+| # | Check | When it fails |
+|---|---|---|
+| 1 | Risk tier and data class allow an agent run (Critical, or autonomy L0: no run) | The intent is **blocked** and closed. The agent never runs |
+| 2 | No HOTL block window is still open (Chapter 19 §19.8b) | The platform waits until the window closes |
+| 3 | No escalation freezes the intent (Chapter 18) | The platform waits until the escalation is decided |
+| 4 | The spec and the plan are the versions G2 and G3 approved | G4 fails: `input_mismatch` |
+| 5 | The project AI record allows the intent's data class (Chapter 2 §2.5) | G4 fails: `ai_record_missing` or `data_class_not_allowed` |
+| 6 | The agent is registered and active, approved for the sandbox, its model is allowed for the data class, and `AGENTS.md` at the start commit equals the registered version (Chapter 20) | G4 fails: `agent_not_runnable`, `instructions_mismatch` or `autonomy_not_allowed` |
+| 7 | The intent budget is not used up | G4 fails: `budget_exceeded` |
+
+- When G4 fails, the platform posts one comment on the intent's issue with the reason code and mentions Person A. **The intent stays at G4.** Fix the cause (for example register a new agent version after an edit of `AGENTS.md`, or update the AI record); the platform checks G4 again on its own.
+- The run starts from the **latest commit of the default branch**.
+
+### 13.10.3. Approving G4 (High risk)
+
+- At High risk, G4 waits for Person A. The platform posts the **run proposal**: the agent and the start commit.
+- Decide with a comment on the intent's issue: `/approve G4`, `/reject G4 <reason>` or `/request-changes G4 <reason>`. The API accepts the same decisions.
+- The approval covers exactly that proposal. A new commit on the default branch, a new agent version or a changed spec or plan makes a **new proposal**: the platform voids the earlier approval and posts the new proposal to approve.
+- A rejection at G4 closes the intent.
+- At Low and Medium risk nobody approves G4: the platform passes it when every check holds.
+
+### 13.10.4. Recertification warning
+
+- When the agent's last recertification is older than the configured age (3 months, Chapter 20 §20.8), the run is **not** blocked. The platform posts a comment that mentions the agent's owner, and the audit log records the warning with the run.
 
 ---
 
@@ -193,3 +227,4 @@ Apply the same rules manually:
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content; platform usage section reserved for Claude Code |
 | 0.2 | 2026-09-24 | Claude (draft) | §13.9 aligned with Ch.2 Rule 9 (supervised assistants only on client projects before the platform) |
+| 0.3 | 2026-09-27 | Claude (task C06, session 1) | §13.10 platform usage for G4: the configured agent, the checks, `/approve G4`, the recertification warning |

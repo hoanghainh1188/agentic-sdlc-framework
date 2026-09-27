@@ -7,14 +7,29 @@ import type { GateCode } from '@sdlc/contracts';
 
 import type { Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
+import { latestRunProposalSha256 } from '../workflow/g4-proposal.js';
 import { CommandError } from './errors.js';
 
-/** Gates that commands can decide in B03. G4–G6 are system gates; E01 and E03 add G7 and G8. */
+/**
+ * The gates of the intent's path before the run (B03, B07): moved on people's decisions or a HOTL
+ * pass. G4 is a policy gate that people decide only when it is HITL (C06, `DECIDABLE_GATES`).
+ */
 export const COMMAND_GATES = ['G1', 'G2', 'G3'] as const satisfies readonly GateCode[];
 export type CommandGate = (typeof COMMAND_GATES)[number];
 
 export function isCommandGate(gate: string): gate is CommandGate {
   return (COMMAND_GATES as readonly string[]).includes(gate);
+}
+
+/**
+ * Gates a person may decide by a command: G1–G3, and G4 (C06: Person A approves the run proposal
+ * at High risk, ADR-M33 §2.4). G5 and G6 are system gates; E01 and E03 add G7 and G8.
+ */
+export const DECIDABLE_GATES = [...COMMAND_GATES, 'G4'] as const satisfies readonly GateCode[];
+export type DecidableGate = (typeof DECIDABLE_GATES)[number];
+
+export function isDecidableGate(gate: string): gate is DecidableGate {
+  return (DECIDABLE_GATES as readonly string[]).includes(gate);
 }
 
 function sha256(text: string): string {
@@ -42,14 +57,22 @@ export function intentInputSha256(intent: Intent): string {
 
 /**
  * The bound input of a gate: G1 the intent, G2 the latest spec content hash, G3 the latest plan
- * hash. Throws `CommandError('gate_input_missing')` when G2 has no spec or G3 no plan.
+ * hash, G4 the last run proposal the workflow recorded (C06, ADR-M33 §2.3). Throws
+ * `CommandError('gate_input_missing')` when G2 has no spec, G3 no plan or G4 no proposal yet.
  */
 export async function gateInputSha256(
   scope: TenantScope,
   intent: Intent,
-  gate: CommandGate,
+  gate: DecidableGate,
 ): Promise<string> {
   switch (gate) {
+    case 'G4': {
+      const proposal = await latestRunProposalSha256(scope, intent.id);
+      if (!proposal) {
+        throw new CommandError('gate_input_missing', `${intent.code}: no run proposal yet`);
+      }
+      return proposal;
+    }
     case 'G1':
       return intentInputSha256(intent);
     case 'G2': {

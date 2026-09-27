@@ -4,12 +4,17 @@
 import { createHash } from 'node:crypto';
 
 import { MVP_MAX_AUTONOMY } from '@sdlc/config';
-import { AUTONOMY_LEVELS, type AgentStatus, type AutonomyLevel } from '@sdlc/contracts';
+import {
+  AGENT_KEY_PATTERN,
+  AUTONOMY_LEVELS,
+  type AgentStatus,
+  type AutonomyLevel,
+} from '@sdlc/contracts';
 
 import { AGENT_ENVIRONMENTS, type AgentEnvironment } from '../db/vocabulary.js';
 import { AgentRegisterError } from './errors.js';
 
-export const AGENT_KEY_PATTERN = /^[a-z][a-z0-9-]{0,62}[a-z0-9]$/;
+export { AGENT_KEY_PATTERN };
 /** Same as the Run Contract's `agent_version`. */
 export const AGENT_VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 /** Same as the Run Contract's `allowed_models` entries. */

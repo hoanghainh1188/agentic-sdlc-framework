@@ -135,6 +135,11 @@ export interface ProjectConfig {
     readonly default_max_iterations: number;
     /** Time cap of a run in minutes when the task sets none (FR-32, template T13; QUESTIONS.md #13). */
     readonly default_max_duration_minutes: number;
+    /**
+     * The registered agent (its `agent_key`) that runs this project's intents (task C06,
+     * QUESTIONS #108). Null: no agent; G4 fails with `agent_not_runnable` until one is set.
+     */
+    readonly agent_key: string | null;
   };
   readonly budget: {
     readonly warn_percent: number;
