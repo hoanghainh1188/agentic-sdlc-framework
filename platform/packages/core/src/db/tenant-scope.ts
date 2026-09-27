@@ -74,7 +74,8 @@ export class TenantScope {
 
   /**
    * Runs `work` in one database transaction, with repositories bound to the same tenant. Inside a
-   * transaction already (a scope from `transaction` or `SystemScope.createTenantWith`), `work` joins it.
+   * transaction already (a scope from `transaction` or `SystemScope.createTenantWith`), `work` joins it:
+   * it commits or rolls back with the outer transaction, never on its own.
    */
   transaction<T>(work: (scope: TenantScope) => Promise<T>): Promise<T> {
     if (this.db.isTransaction) return work(this);

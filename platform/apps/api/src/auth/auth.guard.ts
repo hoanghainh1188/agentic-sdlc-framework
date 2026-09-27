@@ -71,9 +71,14 @@ export class AuthGuard implements CanActivate {
     scope: ReturnType<PlatformDatabase['forTenant']>,
     now: Date,
   ): Promise<void> {
+    const at = now.getTime();
     const last = this.#lastTouch.get(tokenId);
-    if (last !== undefined && now.getTime() - last < TOUCH_INTERVAL_MS) return;
-    this.#lastTouch.set(tokenId, now.getTime());
+    if (last !== undefined && at - last < TOUCH_INTERVAL_MS) return;
+    // Keep only tokens used within the interval, so the map never grows with old tokens.
+    for (const [id, time] of this.#lastTouch) {
+      if (at - time >= TOUCH_INTERVAL_MS) this.#lastTouch.delete(id);
+    }
+    this.#lastTouch.set(tokenId, at);
     await scope.apiTokens.touchLastUsed(tokenId, now);
   }
 }

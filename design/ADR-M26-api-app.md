@@ -115,6 +115,7 @@ B03 covers only what is needed to use and test the API. Everything else in #58 i
   - requests per token per minute;
   - failed authentications per client address per minute (429 once over).
   - A shared limiter (Valkey) comes when there is more than one instance.
+  - Fastify runs with `trustProxy: false`: the client address is the TCP peer. If a reverse proxy is ever put in front of the api, this setting and the per-address limit must be revisited together, or every client shares the proxy's limit.
 - Error envelope: `{ error: { code, message, reason?, reason_message?, details? } }`.
   - Every code has a catalog key `api.error.<code>`.
   - Every refusal reason of the registry and the policy engine has a key `api.reason.<code>`.

@@ -2,6 +2,7 @@
 // instance on the internal server; a shared limiter (Valkey) comes when there is more than one.
 export class RateLimiter {
   readonly #windows = new Map<string, { start: number; count: number }>();
+  #lastSweep = 0;
 
   constructor(
     private readonly limit: number,
@@ -28,7 +29,10 @@ export class RateLimiter {
     return !!window && this.now() - window.start < this.windowMs && window.count >= this.limit;
   }
 
+  /** Drops expired windows, at most once per window, so the map holds only recent keys. */
   #sweep(now: number): void {
+    if (now - this.#lastSweep < this.windowMs) return;
+    this.#lastSweep = now;
     for (const [key, window] of this.#windows) {
       if (now - window.start >= this.windowMs) this.#windows.delete(key);
     }

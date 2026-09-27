@@ -13,4 +13,16 @@ describe('RateLimiter', () => {
     expect(limiter.blocked('a')).toBe(false);
     expect(limiter.hit('a')).toBe(true);
   });
+
+  it('forgets expired keys', () => {
+    let now = 0;
+    const limiter = new RateLimiter(1, 1000, () => now);
+    limiter.hit('a');
+    limiter.hit('a');
+    expect(limiter.blocked('a')).toBe(true);
+    now = 5000;
+    limiter.hit('b');
+    expect(limiter.blocked('a')).toBe(false);
+    expect(limiter.hit('a')).toBe(true);
+  });
 });
