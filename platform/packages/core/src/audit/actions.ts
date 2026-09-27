@@ -138,7 +138,13 @@ export const AUDIT_ACTIONS = {
   /** A person decided (T16 §4), bound to the reviewed hash. Never the reason text (a link only). */
   'escalation.decided': {
     entityType: 'escalation',
-    fields: { code: 'code', decision: 'code', subject_sha256: 'sha256', reason_code: 'code?' },
+    fields: {
+      code: 'code',
+      decision: 'code',
+      subject_sha256: 'sha256',
+      reason_code: 'code?',
+      budget_increase_usd: 'code?',
+    },
   },
   /** A person moved the escalation to governance (`escalate_further`). */
   'escalation.escalated_further': {

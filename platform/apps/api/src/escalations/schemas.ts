@@ -30,4 +30,9 @@ export const escalationDecisionSchema = z.strictObject({
     .optional(),
   /** Protected actions the decision allows; default depends on the decision (ADR-M28 §2.4). */
   actions: z.array(z.enum(PROTECTED_ACTIONS)).max(PROTECTED_ACTIONS.length).optional(),
+  /** Required with `budget_increase` in `actions`, and only then: USD as a decimal string. */
+  budget_increase_usd: z
+    .string()
+    .regex(/^\d{1,12}(\.\d{1,6})?$/)
+    .optional(),
 });

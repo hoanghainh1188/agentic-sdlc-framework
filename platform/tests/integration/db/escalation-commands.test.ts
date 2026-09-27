@@ -370,6 +370,14 @@ describeDb('B11 PR 2: acknowledge, decide, comments, API and notices on PostgreS
         ref: `https://github.com/acme/shop/issues/${String(issue)}#issuecomment-${String(decide)}`,
       });
       expect(JSON.stringify(row)).not.toContain('More budget');
+      // A comment never raises a budget (Harry, PR #98): `/decide resume` leaves it frozen.
+      expect(row.decision).not.toHaveProperty('allow_budget_increase');
+      expect(row.decision).not.toHaveProperty('budget_increase_usd');
+      expect((await checkFreeze(scope, intent.id, 'run_resume', later(1))).allowed).toBe(true);
+      expect(await checkFreeze(scope, intent.id, 'budget_increase', later(1))).toEqual({
+        allowed: false,
+        escalationCodes: [e.code],
+      });
       expect(posted(issue).filter((b) => b.includes('sdlc-reply'))).toEqual([]);
     });
 
@@ -436,6 +444,54 @@ describeDb('B11 PR 2: acknowledge, decide, comments, API and notices on PostgreS
     });
   });
 
+  describe('budget increase: only named, with an amount, bound and audited (PR #98)', () => {
+    it('refuses budget_increase without an amount, an amount without the action, and zero', async () => {
+      const intent = await newIntent();
+      const e = await raise(intent);
+      const decide = (extra: {
+        actions?: ('budget_increase' | 'run_resume')[];
+        budgetIncreaseUsd?: string;
+      }) =>
+        failure(
+          decideEscalation(
+            scope,
+            { escalationId: e.id, actorId: users.b, decision: 'resume', ...extra },
+            clock,
+          ),
+        );
+      expect(await decide({ actions: ['run_resume', 'budget_increase'] })).toBe(
+        'decision_not_allowed',
+      );
+      expect(await decide({ budgetIncreaseUsd: '10' })).toBe('decision_not_allowed');
+      expect(await decide({ actions: ['budget_increase'], budgetIncreaseUsd: '0' })).toBe(
+        'decision_not_allowed',
+      );
+      const decided = await decideEscalation(
+        scope,
+        {
+          escalationId: e.id,
+          actorId: users.b,
+          decision: 'resume',
+          actions: ['run_resume', 'budget_increase'],
+          budgetIncreaseUsd: '25.5',
+        },
+        clock,
+      );
+      expect(decided.decision).toMatchObject({
+        allow_run_resume: true,
+        allow_budget_increase: true,
+        budget_increase_usd: '25.5',
+      });
+      expect((await checkFreeze(scope, intent.id, 'budget_increase', later(1))).allowed).toBe(true);
+      const audit = await sql<{ payload: Record<string, unknown> }>`SELECT payload FROM audit_log
+        WHERE entity_id = ${e.id} AND action = 'escalation.decided'`.execute(db.owner);
+      expect(audit.rows[0]?.payload).toMatchObject({
+        decision: 'resume',
+        budget_increase_usd: '25.5',
+      });
+    });
+  });
+
   describe('API endpoints', () => {
     const inject = (method: 'GET' | 'POST', url: string, who: Person, body?: unknown) =>
       app
@@ -482,6 +538,22 @@ describeDb('B11 PR 2: acknowledge, decide, comments, API and notices on PostgreS
       });
       expect((await inject('GET', '/v1/escalations/ESC-2026-99999', 'b')).statusCode).toBe(404);
       expect((await inject('GET', '/v1/escalations/INT-2026-0001', 'b')).statusCode).toBe(400);
+
+      const other = await raise(await newIntent());
+      const noAmount = await inject('POST', `/v1/escalations/${other.code}/decisions`, 'b', {
+        decision: 'resume',
+        actions: ['run_resume', 'budget_increase'],
+      });
+      expect(noAmount.statusCode).toBe(422);
+      const withAmount = await inject('POST', `/v1/escalations/${other.code}/decisions`, 'b', {
+        decision: 'resume',
+        actions: ['run_resume', 'budget_increase'],
+        budget_increase_usd: '12.75',
+      });
+      expect(withAmount.statusCode).toBe(201);
+      expect(withAmount.json()).toMatchObject({
+        decision: { allow_budget_increase: true, budget_increase_usd: '12.75' },
+      });
     });
   });
 });

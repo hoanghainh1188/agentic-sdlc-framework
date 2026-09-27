@@ -73,6 +73,9 @@ export class EscalationsService {
         reasonCode: body.reason_code ?? null,
         reasonRef: body.reason_ref ?? null,
         ...(body.actions === undefined ? {} : { actions: body.actions }),
+        ...(body.budget_increase_usd === undefined
+          ? {}
+          : { budgetIncreaseUsd: body.budget_increase_usd }),
       },
       { now: this.now },
     );

@@ -39,18 +39,21 @@ import { GOVERNANCE_ROLE } from './routing.js';
  * What a decision allows when the decider names no actions. A mechanism of the platform, not a
  * handbook rule: `roll_back` and `terminate` allow no protected action (the caller cancels or rolls
  * back, which is never frozen), `resume` allows continuing the run, `modify` moving the intent back
- * through its gates.
+ * through its gates. `budget_increase` is never a default (Harry, PR #98): a decision allows it
+ * only when it names it with an amount (`budgetIncreaseUsd`), so a comment never raises a budget.
  */
 export const DEFAULT_DECISION_ACTIONS: Readonly<
   Record<Exclude<EscalationDecision, 'escalate_further'>, readonly ProtectedAction[]>
 > = {
-  resume: ['run_resume', 'run_start', 'budget_increase', 'gate_advance'],
+  resume: ['run_resume', 'run_start', 'gate_advance'],
   modify: ['gate_advance'],
   roll_back: [],
   terminate: [],
 };
 
 const HTTPS_REF = /^https:\/\/[^\s@]{1,504}$/;
+/** USD as a decimal string, above zero (D-05 D6: numeric(18,6), never a float). */
+const BUDGET_USD = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,6})?$/;
 
 export interface AcknowledgeInput {
   readonly escalationId: string;
@@ -66,6 +69,12 @@ export interface DecideInput {
   readonly reasonRef?: string | null;
   /** Protected actions the decision allows. Default: `DEFAULT_DECISION_ACTIONS[decision]`. */
   readonly actions?: readonly ProtectedAction[];
+  /**
+   * The budget increase in USD (decimal string), required exactly when `actions` names
+   * `budget_increase`. Bound in the decision and audited; the caller (C07) may raise the budget
+   * by this amount at most.
+   */
+  readonly budgetIncreaseUsd?: string;
 }
 
 export interface RevalidateInput {
@@ -186,6 +195,7 @@ export async function decideEscalation(
   if (actions?.some((action) => !(PROTECTED_ACTIONS as readonly string[]).includes(action))) {
     throw new EscalationError('decision_not_allowed', 'unknown action in the decision scope');
   }
+  checkBudgetIncrease(actions, input.budgetIncreaseUsd);
   return await scope.transaction(async (tx) => {
     const locked = await lockOpen(tx, input.escalationId);
     assertNotFinished(locked.row);
@@ -258,6 +268,7 @@ async function recordDecision(
     ...(input.reasonCode ? { reason_code: input.reasonCode } : {}),
     ...(input.reasonRef ? { ref: input.reasonRef } : {}),
     ...Object.fromEntries(allowed.map((action) => [`allow_${action}`, true])),
+    ...(input.budgetIncreaseUsd ? { budget_increase_usd: input.budgetIncreaseUsd } : {}),
   };
   const updated = await tx.escalations.updateState(
     row.id,
@@ -283,9 +294,30 @@ async function recordDecision(
       decision,
       subject_sha256: subject,
       ...(input.reasonCode ? { reason_code: input.reasonCode } : {}),
+      ...(input.budgetIncreaseUsd ? { budget_increase_usd: input.budgetIncreaseUsd } : {}),
     },
   });
   return updated;
+}
+
+/**
+ * A budget increase is allowed only when named with an amount, and an amount only with the action
+ * (Harry, PR #98). The amount must be above zero.
+ */
+function checkBudgetIncrease(
+  actions: readonly ProtectedAction[] | undefined,
+  amount: string | undefined,
+): void {
+  const named = actions?.includes('budget_increase') ?? false;
+  if (named !== (amount !== undefined)) {
+    throw new EscalationError(
+      'decision_not_allowed',
+      'budget_increase needs an amount, and an amount needs budget_increase',
+    );
+  }
+  if (amount !== undefined && (!BUDGET_USD.test(amount) || Number(amount) <= 0)) {
+    throw new EscalationError('decision_not_allowed', 'the budget increase must be above zero');
+  }
 }
 
 /** True when the escalation's decision allows `action` now (scope and expiry; not the hash). */

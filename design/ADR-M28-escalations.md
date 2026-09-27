@@ -158,7 +158,7 @@ Escalations are kept at least 2 years (D-05 §10), so they hold codes, IDs, hash
   - The comment URL is the decision's `ref`; the reason text stays on GitHub.
 - **API** (`@sdlc/api`, ADR-M26):
   - `GET /v1/escalations[?intent=&status=&limit=]`, `GET /v1/escalations/:code`.
-  - `POST /v1/escalations/:code/ack` (200) and `POST /v1/escalations/:code/decisions` (201). The decisions body is `{ decision, reason_code?, reason_ref?, actions? }`.
+  - `POST /v1/escalations/:code/ack` (200) and `POST /v1/escalations/:code/decisions` (201). The decisions body is `{ decision, reason_code?, reason_ref?, actions?, budget_increase_usd? }`.
   - Reading follows the intent access rules (no read role → 404).
   - Errors `escalation_not_found` (404), `forbidden` (403), `escalation_not_open` and `escalation_already_acknowledged` (409), `escalation_decision_not_allowed` (422).
   - The CLI commands come with B04 (backlog v1.6).
@@ -166,15 +166,17 @@ Escalations are kept at least 2 years (D-05 §10), so they hold codes, IDs, hash
 - **Decision record** (flat, coded):
   - `decision`, `subject_sha256` (from the packet), `expires_at` (`oversight.approval_expiry` in the working calendar);
   - optional `reason_code` and `ref`;
-  - one `allow_<action>: true` per protected action it allows.
+  - one `allow_<action>: true` per protected action it allows;
+  - `budget_increase_usd` (a decimal string) when it allows `budget_increase`.
 - **Default scope** when the decider names no actions (`DEFAULT_DECISION_ACTIONS`, a platform mechanism, not a handbook rule):
 
   | Decision | Protected actions allowed |
   |---|---|
-  | `resume` | `run_resume`, `run_start`, `budget_increase`, `gate_advance` |
+  | `resume` | `run_resume`, `run_start`, `gate_advance` |
   | `modify` | `gate_advance` |
   | `roll_back`, `terminate` | none (cancelling and rolling back are never frozen) |
 
+- **A budget increase is never a default** (Harry, PR #98). A decision allows `budget_increase` only when it names it explicitly with an amount (`budget_increase_usd`, above zero; API now, CLI in B04). The amount is bound in the decision and written to the `escalation.decided` audit event; the caller (C07) raises the budget by this amount at most. An amount without the action, or the action without an amount, is refused. Comments never name actions, so **a comment never raises a budget**.
 - `decideEscalation` also records the acknowledgement when there was none.
 - `escalate_further` records no decision: it moves the escalation to governance. An open escalation gets a fresh acknowledge window; the step-changed notice is recorded.
 - **Freeze with a decision:** `checkFreeze` lets an action through when a resolved escalation's decision allows it and has not expired.
@@ -207,4 +209,5 @@ Escalations are kept at least 2 years (D-05 §10), so they hold codes, IDs, hash
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task B11, PR 1) | First version |
 | 0.2 | 2026-09-27 | Claude (task B11, PR 1 review) | §2.5: notifying the client stays out of the MVP (Harry) |
+| 0.4 | 2026-09-27 | Claude (task B11, PR 2 review) | §2.7: `resume` no longer allows `budget_increase` by default; a budget increase needs an explicit amount, bound and audited (Harry) |
 | 0.3 | 2026-09-27 | Claude (task B11, PR 2) | §2.7 as built: comments, API, acting roles, decision record and default scope, binding and void, close, notices; §2.2 how B07 learns about a decision; §3 notice delay |

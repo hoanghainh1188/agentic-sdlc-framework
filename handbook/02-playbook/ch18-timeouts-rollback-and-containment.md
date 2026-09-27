@@ -165,7 +165,7 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 | Command | Does |
 |---|---|
 | `/ack ESC-2026-0001` | Acknowledges the escalation: "I have it". The acknowledge clock stops; the resolve clock keeps running. Nothing may follow the code on that line |
-| `/decide ESC-2026-0001 resume` | Decides to continue as before (for example with more budget) |
+| `/decide ESC-2026-0001 resume` | Decides to continue as before. It never raises the budget |
 | `/decide ESC-2026-0001 modify` | Decides that the plan or the work must change first |
 | `/decide ESC-2026-0001 roll-back` | Decides to roll back |
 | `/decide ESC-2026-0001 terminate` | Decides to stop this work |
@@ -186,7 +186,8 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 **What a decision allows** (Chapter 6 §6.6).
 
 - A decision is bound to the version that was reviewed, to the actions it allows, and to an expiry (project setting `oversight.approval_expiry`, 7 days by default).
-  - `resume` allows the run to continue or start again, more budget, and the next gate.
+  - `resume` allows the run to continue or start again, and the next gate.
+  - **More budget** is allowed only when the decision names it with an amount, through the API (`actions: ["budget_increase"]` with `budget_increase_usd`; the CLI comes later). The amount is recorded in the decision and in the audit log. A comment never raises a budget.
   - `modify` allows moving through the gates again.
   - `roll-back` and `terminate` allow no protected action.
 - Just before acting, the platform checks the decision again. If the decision has expired, or the plan or input changed, the decision is voided and the escalation waits for a new decision.
