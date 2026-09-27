@@ -124,6 +124,7 @@ Escalations are kept at least 2 years (D-05 §10), so they hold codes, IDs, hash
   | Resolve overdue | Governance and the step's role; for Critical, also the incident notice to governance |
 
 - A second channel (e-mail, chat) is MVP+1.
+- **Notifying the client** (Critical "client per contract", handbook Ch.6 §6.4 SLA table) is **not in the MVP**: the platform tells project roles only. Leadership or PM/BrSE tells the client outside the platform (Ch.6 §6.7 step 3b).
 
 ### 2.6. Where the rules live
 
@@ -169,3 +170,4 @@ Escalations are kept at least 2 years (D-05 §10), so they hold codes, IDs, hash
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task B11, PR 1) | First version |
+| 0.2 | 2026-09-27 | Claude (task B11, PR 1 review) | §2.5: notifying the client stays out of the MVP (Harry) |
