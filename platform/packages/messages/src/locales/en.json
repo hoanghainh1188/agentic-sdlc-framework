@@ -160,5 +160,6 @@
   "runner.provisioning_failed": "The sandbox could not be created: {reason}.",
   "runner.workspace.clone_failed": "The runner could not prepare the workspace: {reason}.",
   "runner.workspace.too_large": "The repository is larger than the runner uploads into a sandbox (SDLC_RUNNER_WORKSPACE_MAX_MB).",
-  "runner.workspace.special_file": "The repository holds a special file (device, FIFO or socket) that cannot go into a sandbox."
+  "runner.workspace.special_file": "The repository holds a file that cannot go into a sandbox: a hard link, a device, a FIFO or a socket.",
+  "runner.workspace.path_escape": "A path in the repository leaves the workspace. The workspace is refused."
 }

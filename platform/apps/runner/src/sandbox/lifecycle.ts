@@ -22,7 +22,7 @@ export type ProvisioningFailure =
   | 'base_sha_not_found'
   | 'token_leaked' // the token was found in the clone's configuration (never expected)
   | 'workspace_too_large'
-  | 'workspace_invalid' // a special file (device, FIFO, socket) in the repository
+  | 'workspace_invalid' // a hard link, device, FIFO, socket or path escape in the repository
   | 'image_unavailable'
   | 'image_has_no_healthcheck'
   | 'sandbox_unhealthy'

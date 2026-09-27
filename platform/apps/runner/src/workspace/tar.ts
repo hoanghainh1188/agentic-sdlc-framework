@@ -2,8 +2,12 @@
 // user (10001:10001), so the agent can write its workspace; nothing from the runner's host (user
 // names, owners, times, modes other than "executable or not") goes into the archive.
 //
-// - Directories, regular files and symbolic links. Anything else (devices, FIFOs, sockets) makes
-//   packing fail: a repository never needs them.
+// - Directories, regular files and symbolic links. Anything else (hard links, devices, FIFOs,
+//   sockets) makes packing fail: a repository never needs them.
+// - A symbolic link is stored as a link entry (its target path) only. Its target is never read or
+//   followed, wherever it points (`/etc/passwd`, `../..`, the runner's own files): the runner
+//   uses lstat, never descends into a linked directory, and opens files with O_NOFOLLOW.
+// - Every entry path is relative and stays inside the workspace after normalisation.
 // - Names or link targets longer than the ustar fields use a PAX extended header (`x`).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,9 +39,11 @@ function checkPath(p: string): string {
     p.length === 0 ||
     p.startsWith('/') ||
     parts.some((part) => part === '..' || part === '') ||
-    /[\0\n]/.test(p)
+    /[\0\n\\]/.test(p) ||
+    // Normalised, the path must be itself: no `.` segments except the root entry `.`.
+    (p !== '.' && path.posix.normalize(p) !== p)
   ) {
-    throw new TypeError('tar entry paths must be relative, without "..", "//" or line breaks');
+    throw new TypeError('tar entry paths must be relative, normalised, inside the workspace');
   }
   return p;
 }
@@ -122,6 +128,9 @@ export function packTar(entries: readonly TarEntry[]): Buffer {
  * special files, and a total content size above `maxBytes` (`workspace_too_large`).
  */
 export function packDirectory(root: string, maxBytes: number): Buffer {
+  const rootStat = fs.lstatSync(root);
+  if (!rootStat.isDirectory()) throw new RunnerError('runner.workspace.special_file');
+  const realRoot = path.resolve(root);
   const entries: TarEntry[] = [{ type: 'dir', path: '.' }];
   let total = 0;
   const walk = (dir: string, prefix: string): void => {
@@ -129,19 +138,22 @@ export function packDirectory(root: string, maxBytes: number): Buffer {
     for (const name of names) {
       const full = path.join(dir, name);
       const rel = prefix ? `${prefix}/${name}` : name;
+      insideWorkspace(realRoot, full, rel);
       const stat = fs.lstatSync(full);
       if (stat.isSymbolicLink()) {
+        // The link itself, never its target.
         entries.push({ type: 'symlink', path: rel, target: fs.readlinkSync(full) });
       } else if (stat.isDirectory()) {
         entries.push({ type: 'dir', path: rel });
         walk(full, rel);
       } else if (stat.isFile()) {
+        if (stat.nlink > 1) throw new RunnerError('runner.workspace.special_file');
         total += stat.size;
         if (total > maxBytes) throw new RunnerError('runner.workspace.too_large');
         entries.push({
           type: 'file',
           path: rel,
-          content: fs.readFileSync(full),
+          content: readRegularFile(full, stat),
           executable: (stat.mode & 0o111) !== 0,
         });
       } else {
@@ -149,6 +161,44 @@ export function packDirectory(root: string, maxBytes: number): Buffer {
       }
     }
   };
-  walk(root, '');
+  walk(realRoot, '');
   return packTar(entries);
+}
+
+/** Refuses an entry whose path would leave the workspace after normalisation. */
+function insideWorkspace(root: string, full: string, rel: string): void {
+  const resolved = path.resolve(full);
+  if (
+    !resolved.startsWith(root + path.sep) ||
+    path.relative(root, resolved) !== rel.split('/').join(path.sep)
+  ) {
+    throw new RunnerError('runner.workspace.path_escape');
+  }
+  try {
+    checkPath(rel);
+  } catch {
+    throw new RunnerError('runner.workspace.path_escape');
+  }
+}
+
+/**
+ * Reads a regular file without following a symbolic link: O_NOFOLLOW, then the open file must be
+ * the same regular file the walk saw (device and inode), so a swap after `lstat` is refused.
+ */
+function readRegularFile(full: string, seen: fs.Stats): Buffer {
+  let fd: number;
+  try {
+    fd = fs.openSync(full, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  } catch {
+    throw new RunnerError('runner.workspace.special_file');
+  }
+  try {
+    const opened = fs.fstatSync(fd);
+    if (!opened.isFile() || opened.ino !== seen.ino || opened.dev !== seen.dev) {
+      throw new RunnerError('runner.workspace.special_file');
+    }
+    return fs.readFileSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
 }

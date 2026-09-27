@@ -54,6 +54,12 @@ There is no default route.
 
 - Names come from the run ID (a lowercase UUID): container `sdlc-sandbox-<id>`, network `sdlc-run-<id>`, volume `sdlc-ws-<id>`. Labels: `sdlc.managed-by=sdlc-runner`, `sdlc.runner-instance`, `sdlc.run-id`, `sdlc.tenant-id`.
 - The workspace is a **per-run Docker volume** mounted at `/workspace`. A tmpfs (ADR-M10) cannot receive an archive before the start.
+- **What goes into the archive (packing the clone):**
+  - A symbolic link is stored as a link entry, holding only its target path. The target is never read or followed, wherever it points (`/etc/passwd`, `../..`, the runner's own files). The runner uses `lstat`, never descends into a linked directory, and opens each regular file with `O_NOFOLLOW`. The open file must be the same file (device and inode) the walk saw, so a swap after `lstat` is refused.
+  - Hard links, devices, FIFOs and sockets are refused (`workspace_invalid`). A root that is itself a link is refused too.
+  - Every entry path is relative and stays inside the workspace after normalisation: no `..`, no `.` segment, no `//`, no backslash, no absolute path (`workspace_invalid`).
+  - Inside the sandbox a link resolves in the sandbox's own file system, never on the runner's host.
+  - Tests: a repository with an absolute link, a `../` link, a link to `/etc/passwd` and a link to a directory outside the clone packs as link entries with none of the targets' bytes. Hard links, sockets, FIFOs and escaping entry names are refused.
 - The runner uploads the working copy as a tar archive into the created (not yet started) container, through the Docker archive API with `copyUIDGID`. Every entry belongs to the sandbox user 10001. The runner's own tar writer fixes owners, modes and times, so nothing from the runner's host leaks into the archive.
 - **Image contract:** the project image must define a Docker `HEALTHCHECK` that passes when the Agent Server is ready (the runner waits for it and refuses an image without one: `image_has_no_healthcheck`), and it must own `/workspace` as `10001:10001`. Docker copies that owner into the run's empty volume when the sandbox is created; the archive cannot change the owner of the volume root (found in the live test). The session 3 images do this in their Dockerfile.
 - Creation order: volume → network → attach services → container → archive → start. A failure at any step removes everything created so far.
@@ -194,3 +200,4 @@ C04 adds no handbook threshold. Budget, iteration and loop limits belong to C05 
 | 0.1 | 2026-09-27 | Claude (task C04, session 1) | First version |
 | 0.2 | 2026-09-27 | Claude (task C04, session 1 fix) | §2.2: per-run networks set `inhibit_ipv4` (host reachable through the gateway on Linux, found by CI) |
 | 0.3 | 2026-09-27 | Claude (task C04, session 2) | §2.3: health check in the image contract; §2.6: Git, work folder, workspace size and readiness settings; §2.8: provisioning order, failure codes, `releaseSandbox`; §2.11: lookup before unwrap, git process hardening, the OpenBao default policy finding |
+| 0.4 | 2026-09-27 | Claude (task C04, session 2 review) | §2.3: what goes into the archive: links as link entries only (never read or followed, O_NOFOLLOW, same inode), hard links and special files refused, paths inside the workspace after normalisation (Harry's review of PR #91) |

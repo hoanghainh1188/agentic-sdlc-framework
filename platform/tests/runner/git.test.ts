@@ -13,6 +13,7 @@ import {
   authEnv,
   CloneError,
   cloneForRun,
+  packDirectory,
   cloneUrl,
   runnerSettingsFromEnv,
   type GitSettings,
@@ -85,6 +86,29 @@ describe('cloneForRun (stub Git host)', () => {
     expect(config).not.toContain(TOKEN);
     expect(config).toContain(`url = ${host.origin}/${REPO}.git`);
     expect(filesContaining(repoDir, TOKEN)).toEqual([]);
+  });
+
+  it('a cloned repository with links out of the clone packs as link entries only', async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-outside-'));
+    const secret = path.join(outside, 'secret.txt');
+    const canary = 'outside-canary-in-git-test';
+    fs.writeFileSync(secret, canary);
+    try {
+      const repo = 'org/links';
+      const { first } = host.createRepo(
+        repo,
+        { 'README.md': 'links\n' },
+        { symlinks: { 'absolute-link': secret, 'dotdot-link': '../../../../../etc/passwd' } },
+      );
+      const repoDir = await clone({ repo, baseSha: first });
+      expect(fs.readlinkSync(path.join(repoDir, 'absolute-link'))).toBe(secret);
+      const archive = packDirectory(repoDir, 64 * 1024 * 1024);
+      expect(archive.includes(Buffer.from(canary))).toBe(false);
+      expect(archive.includes(Buffer.from(secret))).toBe(true); // the link target path only
+      expect(archive.includes(Buffer.from('../../../../../etc/passwd'))).toBe(true);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
   });
 
   it('fails with clone_failed for a wrong token, without git text', async () => {

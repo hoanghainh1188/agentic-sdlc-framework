@@ -85,6 +85,7 @@ function failureOf(error: unknown): ProvisioningFailure {
   if (error instanceof RunnerError) {
     if (error.key === 'runner.workspace.too_large') return 'workspace_too_large';
     if (error.key === 'runner.workspace.special_file') return 'workspace_invalid';
+    if (error.key === 'runner.workspace.path_escape') return 'workspace_invalid';
   }
   return 'docker_error';
 }
