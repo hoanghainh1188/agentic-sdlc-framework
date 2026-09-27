@@ -20,7 +20,14 @@ export type {
   RevalidateResult,
   SystemDecisionInput,
 } from './repositories/gate-decisions.js';
-export type { IntentQuery, IntentStateChange, NewIntent } from './repositories/intents.js';
+export {
+  MAX_INTENT_PAGE,
+  type IntentPageQuery,
+  type IntentPosition,
+  type IntentQuery,
+  type IntentStateChange,
+  type NewIntent,
+} from './repositories/intents.js';
 export type { SubmitPlan } from './repositories/plans.js';
 export type { RegistryActor } from './repositories/registry-actor.js';
 export type { StoreRunContract, StoredRunContract } from './repositories/run-contracts.js';

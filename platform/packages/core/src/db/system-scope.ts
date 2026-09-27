@@ -1,11 +1,12 @@
 // Operations that cannot be bound to one tenant (design/ADR-M09 section 2.4).
 // Keep this list short and explicit. Each method must say why it needs to cross tenants.
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 
 import { translatePgError } from './errors.js';
 import { assertTokenHash } from './repositories/api-tokens.js';
 import type { Database, Tenant } from './schema.js';
 import { parseTenantId, type TenantId } from './tenant-id.js';
+import { TenantScope } from './tenant-scope.js';
 
 export interface NewTenant {
   readonly slug: string;
@@ -38,6 +39,31 @@ export class SystemScope {
     );
   }
 
+  /**
+   * One-time bootstrap (task B03, ADR-M26): creates a tenant and runs `work` with a scope bound to
+   * it, in the same transaction. The tenant row, its first user, token and audit events commit or
+   * roll back together. Fails with `DbError('conflict')` when the slug is taken.
+   */
+  createTenantWith<T>(
+    input: NewTenant,
+    work: (scope: TenantScope, tenant: Tenant) => Promise<T>,
+  ): Promise<T> {
+    return run(
+      this.db.transaction().execute(async (trx) => {
+        const tenant = await trx
+          .insertInto('tenants')
+          .values({
+            slug: input.slug,
+            name: input.name,
+            monthly_budget_usd: input.monthlyBudgetUsd ?? null,
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        return work(new TenantScope(trx, parseTenantId(tenant.id)), tenant);
+      }),
+    );
+  }
+
   /** Platform admin and CLI: finds a tenant by its slug before a tenant scope exists. */
   getTenantBySlug(slug: string): Promise<Tenant | undefined> {
     return run(
@@ -58,6 +84,12 @@ export class SystemScope {
         .where('id', '=', parseTenantId(tenantId))
         .executeTakeFirst(),
     );
+  }
+
+  /** Health check (task B03): true when the database answers. Reads no table. */
+  async ping(): Promise<true> {
+    await run(sql`SELECT 1`.execute(this.db));
+    return true;
   }
 
   /**

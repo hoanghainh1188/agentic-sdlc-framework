@@ -5,6 +5,8 @@
 #   observability  Langfuse (web + worker) and ClickHouse; reuses PostgreSQL, Valkey, SeaweedFS
 #   models         OpenBao Agent sidecar that gives LiteLLM its keys from OpenBao (C03,
 #                  design/ADR-M24). Always on on the server: pnpm compose:models
+#   platform       The platform processes built from this repo: sdlc-api (B03, design/ADR-M26).
+#                  Needs core, OpenBao configured and the api credentials delivered first.
 #
 # Usage (from the repo root; see platform/deploy/README.md):
 #   platform/deploy/scripts/init-env.sh           # once: creates platform/deploy/.env (mode 600)
@@ -59,6 +61,9 @@ volumes:
   valkey-data:
   clickhouse-data:
   clickhouse-logs:
+  # AppRole role ID and secret ID of sdlc-api (mode 600, owner node). Written by
+  # `openbao/bootstrap.sh api-credentials` (B03, runbook T11).
+  api-approle:
 
 services:
   # ---------------------------------------------------------------- core ----
@@ -428,3 +433,43 @@ services:
           CMD-SHELL,
           'wget -q -O /dev/null "http://$$(hostname -i | cut -d" " -f1):3000/api/public/health" || exit 1',
         ]
+
+  # ------------------------------------------------------------ platform ----
+
+  # REST API for the CLI (B03, design/ADR-M26). Built from platform/apps/api/Dockerfile; the tag
+  # follows the package version. Reads the platform_app database password from OpenBao
+  # (kv/api/database) with the AppRole "api"; no secret in the environment or the image.
+  sdlc-api:
+    image: sdlc-api:0.0.0
+    build:
+      context: ../..
+      dockerfile: platform/apps/api/Dockerfile
+    profiles: [platform]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      openbao:
+        condition: service_healthy
+    environment:
+      SDLC_API_HOST: 0.0.0.0
+      SDLC_API_PORT: '8080'
+      SDLC_API_DB_HOST: postgres
+      SDLC_API_DB_NAME: platform
+      SDLC_OPENBAO_ADDR: http://openbao:8200
+      # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
+      SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'
+      SDLC_OPENBAO_ROLE_ID_FILE: /run/sdlc/approle/role_id
+      SDLC_OPENBAO_SECRET_ID_FILE: /run/sdlc/approle/secret_id
+    volumes:
+      - api-approle:/run/sdlc/approle
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - ${SDLC_BIND_ADDR:-127.0.0.1}:${SDLC_API_HOST_PORT:-8090}:8080
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, node, /app/dist/healthcheck.js]

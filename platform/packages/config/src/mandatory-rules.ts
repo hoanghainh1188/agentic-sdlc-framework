@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M15 and their sources:
+// Rule ids M1–M16 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -20,6 +20,7 @@
 //   M13 human approval of high-risk effects (High/Critical HITL) ..... codes table §4 "never skipped"
 //   M14 permission before dangerous actions (G4 High/Critical HITL) .. codes table §4, Ch.13 §13.8
 //   M15 independent verification (G6 never POLICY) ................... codes table §4 "never skipped"
+//   M16 the viewer role never creates intents ........................ D-05 §5, QUESTIONS.md #66
 import type {
   AutonomyLevel,
   ChangeFlag,
@@ -402,6 +403,11 @@ const m15: Rule = (c) =>
       issue('config.rule.g6_independent_verification', `${ref.path}.mode`, { tier: ref.tier }),
     );
 
+const m16: Rule = (c) =>
+  c.access.intent_create_roles.includes('viewer')
+    ? [issue('config.rule.viewer_never_creates', 'access.intent_create_roles')]
+    : [];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -420,6 +426,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M13: m13,
   M14: m14,
   M15: m15,
+  M16: m16,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

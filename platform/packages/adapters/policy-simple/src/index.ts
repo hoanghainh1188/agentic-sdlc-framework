@@ -1,6 +1,6 @@
 // Policy engine adapter: simple rules read from the validated project configuration.
 // See design/D-03 section 7.3, D-08 B01. The app loads the configuration with `@sdlc/config`
-// (schema and mandatory rules M1–M15) and passes it here; this package imports contracts only.
+// (schema and mandatory rules M1–M16) and passes it here; this package imports contracts only.
 import type { ModelRef, PolicyEngine, ValidatedProjectConfig } from '@sdlc/contracts';
 
 import { canApprove } from './approvers.js';

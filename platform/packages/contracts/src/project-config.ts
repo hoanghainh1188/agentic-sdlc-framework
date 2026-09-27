@@ -122,6 +122,14 @@ export interface ProjectConfig {
   };
   readonly retention: { readonly evidence_retention_days: number };
   readonly github: { readonly poll_interval_seconds: number };
+  /**
+   * Who may create and read intents through the API (task B03, ADR-M26, QUESTIONS.md #66).
+   * Creators may always read. The viewer role never creates (mandatory rule M16).
+   */
+  readonly access: {
+    readonly intent_create_roles: readonly ProjectRole[];
+    readonly intent_read_roles: readonly ProjectRole[];
+  };
   /** Sandbox image of the project, pinned by digest (QUESTIONS #59, ADR-M25). */
   readonly sandbox: { readonly image: string };
 }
@@ -129,7 +137,7 @@ export interface ProjectConfig {
 declare const validatedConfig: unique symbol;
 
 /**
- * A configuration that passed the schema and the mandatory rules M1–M15. Only `@sdlc/config`
+ * A configuration that passed the schema and the mandatory rules M1–M16. Only `@sdlc/config`
  * produces it (`loadProjectConfig`, `defaultProjectConfig`). Adapters accept this type, so they
  * never see an unchecked configuration and never repeat the checks (ADR-M16 §2.5, ADR-M18 §2.2).
  */

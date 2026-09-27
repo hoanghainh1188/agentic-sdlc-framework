@@ -35,6 +35,11 @@ Commands:
                        "litellm" and write it with the role ID into the volume of the LiteLLM
                        sidecar (Compose profile "models"). Prints no secret. Run it again to
                        rotate the secret ID, then restart litellm-agent (runbook T11).
+  api-credentials      Ask for an admin token (hidden). Store the platform_app database password
+                       (PLATFORM_APP_DB_PASSWORD from the env file) at kv/api/database, issue a
+                       new secret ID for the AppRole "api" and write it with the role ID into the
+                       volume of sdlc-api (Compose profile "platform"). Prints no secret. Run it
+                       again to rotate, then restart sdlc-api (runbook T11).
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -80,7 +85,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | api-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -259,6 +264,42 @@ cmd_litellm_credentials() {
   say "litellm AppRole credentials written to the litellm-approle volume; restart litellm-agent to use them"
 }
 
+# The database password goes from the env file to the openbao container on stdin, after the admin
+# token; the role ID and a new secret ID go from the openbao container straight into the volume
+# of sdlc-api through a pipe. Never a host file, a command line or an environment variable.
+# sdlc-api drops every capability; this one-shot root container gets back only what it needs to
+# write the files and give them to the user node.
+cmd_api_credentials() {
+  require_unsealed
+  password="$(sed -n 's/^PLATFORM_APP_DB_PASSWORD=//p' "$env_file" | tail -n 1)"
+  case "$password" in
+    '' | CHANGEME) fail "PLATFORM_APP_DB_PASSWORD is not set in $env_file" ;;
+  esac
+  token="$(read_secret 'Admin or root token (hidden)')"
+  [ -n "$token" ] || fail "no token given"
+  printf '%s\n%s' "$token" "$password" |
+    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
+      bao kv put -mount=kv api/database password=- >/dev/null' ||
+    fail "could not store kv/api/database (token valid? OpenBao configured?)"
+  printf '%s\n' "$token" |
+    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
+      bao read -field=role_id auth/approle/role/api/role-id && echo &&
+      bao write -f -field=secret_id auth/approle/role/api/secret-id && echo' |
+    compose --profile core --profile platform run --rm -T --no-deps --user root \
+      --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh sdlc-api -c '
+      set -e
+      umask 077
+      IFS= read -r role_id || role_id=""
+      IFS= read -r secret_id || secret_id=""
+      [ -n "$role_id" ] && [ -n "$secret_id" ] || { echo "no role ID or secret ID received" >&2; exit 1; }
+      printf "%s\n" "$role_id" >/run/sdlc/approle/role_id
+      printf "%s\n" "$secret_id" >/run/sdlc/approle/secret_id
+      chown -R node:node /run/sdlc/approle
+      chmod 700 /run/sdlc/approle' ||
+    fail "could not deliver the api credentials (token valid? OpenBao configured with the api AppRole?)"
+  say "kv/api/database stored; api AppRole credentials written to the api-approle volume; restart sdlc-api to use them"
+}
+
 case "$command" in
   status) cmd_status ;;
   init) cmd_init ;;
@@ -266,4 +307,5 @@ case "$command" in
   configure) cmd_configure ;;
   root-token) cmd_root_token ;;
   litellm-credentials) cmd_litellm_credentials ;;
+  api-credentials) cmd_api_credentials ;;
 esac

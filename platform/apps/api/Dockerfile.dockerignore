@@ -1,0 +1,13 @@
+# Build context of platform/apps/api/Dockerfile is the repo root. Send only what the build needs.
+**
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!tsconfig.json
+!.npmrc
+!platform/apps/**
+!platform/packages/**
+**/node_modules
+**/dist
+**/*.tsbuildinfo

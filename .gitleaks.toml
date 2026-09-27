@@ -28,3 +28,36 @@ condition = "AND"
 paths = ['''^platform/tests/secrets/[^/]+\.ts$''']
 regexTarget = "match"
 regexes = ['''S3CR3T''']
+
+# Approved by: Harry (Person B), 2026-09-27, PR #90 (task B03).
+# False positive: generic-api-key reads the script line `"test:api": "SDLC_API_TEST=1 …"` in
+# package.json as an "api" key and its value. The line is in the history, which CI scans, so it
+# cannot be renamed away without rewriting history. Only this exact line in package.json is
+# skipped; any other value on it, or in any other file, is still reported.
+[[allowlists]]
+description = "The test:api script line in package.json is not a key (PR #90)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^package\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"test:api": "SDLC_API_TEST=1 vitest run --config vitest\.integration\.config\.ts platform/tests/integration/api",$''']
+
+# Platform API tokens (task B03, ADR-M26 D6; requested by Harry, 2026-09-27). Every personal API
+# token starts with `sdlc_pat_` followed by 32 random bytes in base64url (43 characters), so a
+# leaked token is always found, in any file type.
+[[rules]]
+id = "sdlc-api-token"
+description = "Agentic SDLC platform API token"
+regex = '''sdlc_pat_[A-Za-z0-9_-]{43}'''
+keywords = ["sdlc_pat_"]
+
+# Approved by: Harry (Person B), 2026-09-27, task B03.
+# The rule's own test fixture: a clearly fake token (it contains FAKE) in one folder only. Any
+# other token, or a token without the marker in that folder, is still reported.
+[[allowlists]]
+description = "Fake platform token fixture for the sdlc-api-token rule test (B03)"
+targetRules = ["sdlc-api-token"]
+condition = "AND"
+paths = ['''^platform/tests/gitleaks/fixtures/[^/]+$''']
+regexTarget = "match"
+regexes = ['''FAKE''']

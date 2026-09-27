@@ -32,6 +32,42 @@ describe('sdlc', () => {
     expect(err).toEqual([t('cli.usage')]);
   });
 
+  it.each([
+    [['admin']],
+    [['admin', 'nothing']],
+    [['admin', 'token']],
+    [['admin', 'bootstrap', '--tenant', 'x']],
+    [['admin', 'token', 'issue', '--tenant', 'x', '--email', 'a@b.c']],
+    [['admin', 'token', 'revoke', '--tenant', 'x', '--id', 'y', '--bogus']],
+    [
+      [
+        'admin',
+        'token',
+        'issue',
+        '--tenant',
+        'x',
+        '--email',
+        'a@b.c',
+        '--name',
+        'n',
+        '--days',
+        'ten',
+      ],
+    ],
+  ])('admin: prints the admin usage and exits 2 for %j', async (argv) => {
+    const { ctx, err } = context({ SDLC_DB_URL: 'postgres://x' });
+    expect(await runCli(argv, ctx)).toBe(EXIT.usage);
+    expect(err).toEqual([t('cli.admin.usage')]);
+  });
+
+  it('admin needs SDLC_DB_URL', async () => {
+    const { ctx, err } = context();
+    expect(await runCli(['admin', 'token', 'list', '--tenant', 'x', '--email', 'a@b.c'], ctx)).toBe(
+      EXIT.usage,
+    );
+    expect(err).toEqual([t('cli.admin.missing_url')]);
+  });
+
   it('audit verify needs SDLC_DB_URL', async () => {
     const { ctx, err } = context();
     expect(await runCli(['audit', 'verify'], ctx)).toBe(EXIT.usage);
