@@ -36,6 +36,14 @@ export function planEgress(
   return { ok: true, services: chosen };
 }
 
+/**
+ * The bridge of an internal network gets no IP address. Without this option Docker gives the bridge
+ * the network's gateway address, and the sandbox can reach **every service listening in the host's
+ * network namespace** through it (found by the CI live test on Linux, ADR-M25 §2.2). With it, the
+ * host has no address on the run's network, and the network has no gateway and no route out.
+ */
+export const INHIBIT_IPV4 = 'com.docker.network.bridge.inhibit_ipv4';
+
 /** The run's internal network. */
 export function runNetworkSpec(
   names: RunNames,
@@ -48,6 +56,6 @@ export function runNetworkSpec(
     Attachable: false,
     EnableIPv6: false,
     Labels: labels,
-    Options: {},
+    Options: { [INHIBIT_IPV4]: 'true' },
   };
 }

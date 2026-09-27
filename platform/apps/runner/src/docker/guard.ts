@@ -194,5 +194,13 @@ export function assertSafeNetworkSpec(spec: {
   if (spec.Attachable !== false || spec.EnableIPv6 !== false) refuse('network_options');
   if (spec.Labels[LABELS.managed] !== MANAGED_BY) refuse('labels');
   if (`sdlc-run-${String(spec.Labels[LABELS.runId])}` !== spec.Name) refuse('labels');
-  if (Object.keys(spec.Options).length > 0) refuse('network_options');
+  // Exactly one option: no IP address for the bridge, so the host is not reachable (ADR-M25 §2.2).
+  const options = Object.entries(spec.Options);
+  if (
+    options.length !== 1 ||
+    options[0]?.[0] !== 'com.docker.network.bridge.inhibit_ipv4' ||
+    options[0][1] !== 'true'
+  ) {
+    refuse('network_options');
+  }
 }

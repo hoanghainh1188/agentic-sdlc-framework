@@ -31,14 +31,24 @@ C04 is split into three sessions. Session 1 (this ADR, first version) delivers t
 
 D-03 §9 (version 1.6): the sandbox reaches **LiteLLM and the package proxy only**.
 
-- Each run gets its own network `sdlc-run-<run_id>`: bridge, `internal: true`, no IPv6, not attachable. Docker gives an internal network no route out, and its DNS resolves only containers attached to it.
+- Each run gets its own network `sdlc-run-<run_id>`: bridge, `internal: true`, no IPv6, not attachable, and `com.docker.network.bridge.inhibit_ipv4=true`. Docker gives an internal network no route out, and its DNS resolves only containers attached to it.
+- **The bridge gets no IP address** (`inhibit_ipv4`). Without it, Docker gives the bridge the network's gateway address, and a sandbox can reach every service listening in the host's network namespace through that address. The first CI run found this on Linux; on Docker Desktop the probe had not covered the VM's own namespace. With the option, the host has no address on the run's network. The guard refuses a network without it.
 - The sandbox joins that network only.
 - The runner attaches exactly the services the contract allows, under their aliases (`litellm`, `npm-proxy`), and detaches them at clean-up.
 - Two runs never share a network, so two sandboxes (maybe of two tenants) cannot reach each other.
 - The contract's `egress_allowlist` holds `alias:port` entries. The runner maps each entry to a configured service. An entry it cannot enforce (an internet host such as `github.com`, an unknown alias, a wrong port) refuses the run: `provisioning_failed` with reason `egress_not_enforceable`. The runner never opens more than it was asked, and never silently less.
 - No firewall rules and no domain-filtering proxy are needed. The same layout works on Docker Desktop (development) and Linux (CI, server).
 
-Tested live (`pnpm test:runner`) from inside a sandbox: LiteLLM and the package proxy are reachable; the following are not: an internet IP, `api.github.com`, `host.docker.internal`, the network gateway (a service on the host), a stub OpenBao on the platform network (by name and alias), the LiteLLM container by its own name, and another run's sandbox (by name and by IP). There is no default route.
+Tested live (`pnpm test:runner`) from inside a sandbox. Reachable: LiteLLM and the package proxy (also under the LiteLLM container's own name: the same service and port). Not reachable:
+
+- an internet IP and `api.github.com`;
+- `host.docker.internal`;
+- a service in the host's network namespace, on every host address (loopback, LAN, every Docker bridge), with a positive control that the service is reachable from an ordinary network;
+- a service of the test process on the same addresses;
+- a stub OpenBao on the platform network (by name and alias);
+- another run's sandbox (by name and by IP).
+
+There is no default route.
 
 ### 2.3. Names, labels and the workspace
 

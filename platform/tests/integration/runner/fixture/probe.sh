@@ -1,12 +1,9 @@
 #!/bin/sh
 # Probes of the C04 live egress test (ADR-M25 §2.2). Reads "name host port" lines from
 # /workspace/probe-targets (uploaded by the runner before the start) and prints one line each:
-# probe:<name>:open|blocked. GATEWAY stands for the .1 address of the sandbox's own subnet.
-self=$(ip -4 -o addr show eth0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
-gateway=$(echo "$self" | awk -F. '{print $1"."$2"."$3".1"}')
+# probe:<name>:open|blocked.
 while read -r name host port; do
   [ -z "$name" ] && continue
-  [ "$host" = GATEWAY ] && host=$gateway
   if nc -z -w 3 "$host" "$port" 2>/dev/null; then echo "probe:$name:open"; else echo "probe:$name:blocked"; fi
 done < /workspace/probe-targets
 route=$(ip route 2>/dev/null | awk '/^default/ {print $3}')

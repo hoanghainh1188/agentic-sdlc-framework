@@ -43,7 +43,10 @@ const names = {
   litellm: `sdlc-c04-litellm-${suffix}`,
   npm: `sdlc-c04-npm-${suffix}`,
   openbao: `sdlc-c04-openbao-${suffix}`,
+  hostListener: `sdlc-c04-host-listener-${suffix}`,
 };
+/** Port of a service in the host's network namespace (a container with `--network host`). */
+const HOST_NS_PORT = 40_000 + crypto.randomInt(10_000);
 
 function docker(...args: string[]): string {
   return execFileSync('docker', args, {
@@ -159,6 +162,7 @@ describe.skipIf(!enabled)('C04 live: sandbox egress and hardening on Docker', ()
   let image: string;
   let hostServer: net.Server;
   let hostPort: number;
+  let hostAddresses: string[];
   const runA = crypto.randomUUID();
   const runB = crypto.randomUUID();
 
@@ -175,6 +179,38 @@ describe.skipIf(!enabled)('C04 live: sandbox egress and hardening on Docker', ()
     hostServer = net.createServer((socket) => socket.end());
     await new Promise<void>((resolve) => hostServer.listen(0, '0.0.0.0', resolve));
     hostPort = (hostServer.address() as net.AddressInfo).port;
+    // And a service in the host network namespace of the Docker Engine: on Linux that is the
+    // host itself; on Docker Desktop it is the Linux VM. The sandbox must not reach it on any of
+    // the host's addresses (loopback, LAN, every Docker bridge).
+    docker(
+      'run',
+      '-d',
+      '--name',
+      names.hostListener,
+      '--network',
+      'host',
+      '--read-only',
+      '--tmpfs',
+      '/tmp',
+      '--cap-drop',
+      'ALL',
+      BUSYBOX,
+      'sh',
+      '-c',
+      `mkdir -p /tmp/www && exec httpd -f -p ${String(HOST_NS_PORT)} -h /tmp/www`,
+    );
+    hostAddresses = docker(
+      'run',
+      '--rm',
+      '--network',
+      'host',
+      BUSYBOX,
+      'sh',
+      '-c',
+      "ip -4 -o addr | awk '{print $4}' | cut -d/ -f1",
+    )
+      .split('\n')
+      .filter((ip) => /^[0-9.]+$/.test(ip));
 
     // The canary is in the runner's own environment: it must never reach a sandbox (AC4).
     process.env.ANTHROPIC_API_KEY = CANARY;
@@ -196,7 +232,13 @@ describe.skipIf(!enabled)('C04 live: sandbox egress and hardening on Docker', ()
       }
     }
     hostServer?.close();
-    for (const name of [names.litellm, names.npm, names.openbao, names.registry]) {
+    for (const name of [
+      names.litellm,
+      names.npm,
+      names.openbao,
+      names.registry,
+      names.hostListener,
+    ]) {
       quietly('rm', '-f', '-v', name);
     }
     quietly('network', 'rm', names.platformNet);
@@ -205,6 +247,29 @@ describe.skipIf(!enabled)('C04 live: sandbox egress and hardening on Docker', ()
   }, 120_000);
 
   it('confines each sandbox to LiteLLM and the package proxy (AC1, AC4), then removes it (AC5)', async () => {
+    // Positive control: from an ordinary (non-internal) network, the host listener IS reachable,
+    // so "blocked" below means the sandbox network stops it, not that the listener is missing.
+    expect(hostAddresses).toContain('127.0.0.1');
+    const platformGateway = docker(
+      'network',
+      'inspect',
+      names.platformNet,
+      '--format',
+      '{{(index .IPAM.Config 0).Gateway}}',
+    );
+    expect(
+      docker(
+        'run',
+        '--rm',
+        '--network',
+        names.platformNet,
+        BUSYBOX,
+        'sh',
+        '-c',
+        `nc -z -w 3 ${platformGateway} ${String(HOST_NS_PORT)} && echo open || echo blocked`,
+      ),
+    ).toBe('open');
+
     // Run B first: run A tries to reach it.
     const b = await createSandbox(client, settings, {
       runId: runB,
@@ -234,9 +299,12 @@ describe.skipIf(!enabled)('C04 live: sandbox egress and hardening on Docker', ()
         'internet_ip 1.1.1.1 443',
         'github api.github.com 443',
         `host_docker_internal host.docker.internal ${String(hostPort)}`,
-        `gateway GATEWAY ${String(hostPort)}`,
         `other_sandbox_by_name sdlc-sandbox-${runB} 8000`,
         `other_sandbox_by_ip ${ipB} 8000`,
+        ...hostAddresses.flatMap((ip, i) => [
+          `host_ns_${String(i)} ${ip} ${String(HOST_NS_PORT)}`,
+          `host_process_${String(i)} ${ip} ${String(hostPort)}`,
+        ]),
       ]),
     });
     const probes = await waitForProbes(client, a.containerId);
@@ -251,9 +319,14 @@ describe.skipIf(!enabled)('C04 live: sandbox egress and hardening on Docker', ()
       internet_ip: 'blocked',
       github: 'blocked',
       host_docker_internal: 'blocked',
-      gateway: 'blocked',
       other_sandbox_by_name: 'blocked',
       other_sandbox_by_ip: 'blocked',
+      ...Object.fromEntries(
+        hostAddresses.flatMap((_ip, i) => [
+          [`host_ns_${String(i)}`, 'blocked'],
+          [`host_process_${String(i)}`, 'blocked'],
+        ]),
+      ),
       default_route: 'none',
       rootfs: 'readonly',
       workspace: 'writable',

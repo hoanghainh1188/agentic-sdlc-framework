@@ -101,7 +101,7 @@ export interface NetworkSpec {
   readonly Attachable: false;
   readonly EnableIPv6: false;
   readonly Labels: Readonly<Record<string, string>>;
-  readonly Options: Readonly<Record<string, never>>;
+  readonly Options: { readonly 'com.docker.network.bridge.inhibit_ipv4': 'true' };
 }
 
 export interface VolumeSummary {

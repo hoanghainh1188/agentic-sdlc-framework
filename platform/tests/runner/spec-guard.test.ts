@@ -161,13 +161,26 @@ describe('the guard refuses anything but a hardened sandbox (ADR-M25 §2.5)', ()
 
   it('accepts only the run internal network', () => {
     const net = runNetworkSpec(names, labels);
-    expect(net).toMatchObject({ Internal: true, Driver: 'bridge', Attachable: false });
+    expect(net).toMatchObject({
+      Internal: true,
+      Driver: 'bridge',
+      Attachable: false,
+      Options: { 'com.docker.network.bridge.inhibit_ipv4': 'true' },
+    });
     expect(() => assertSafeNetworkSpec(net)).not.toThrow();
     for (const bad of [
       { ...net, Internal: false },
       { ...net, Attachable: true },
       { ...net, Name: 'sdlc-net' },
-      { ...net, Options: { 'com.docker.network.bridge.enable_ip_masquerade': 'true' } },
+      { ...net, Options: {} }, // the bridge would get the gateway IP: the host becomes reachable
+      { ...net, Options: { 'com.docker.network.bridge.inhibit_ipv4': 'false' } },
+      {
+        ...net,
+        Options: {
+          'com.docker.network.bridge.inhibit_ipv4': 'true',
+          'com.docker.network.bridge.enable_ip_masquerade': 'true',
+        },
+      },
       { ...net, IPAM: { Config: [{ Subnet: '0.0.0.0/0' }] } },
     ]) {
       expect(() => assertSafeNetworkSpec(bad as typeof net)).toThrow(/safety check/);
