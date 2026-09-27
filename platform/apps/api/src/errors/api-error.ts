@@ -27,6 +27,7 @@ export const API_ERROR_CODES = [
   'project_not_active',
   'config_invalid',
   'conflict',
+  'not_ready',
   'internal',
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
@@ -46,6 +47,7 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   project_not_active: 'api.error.project_not_active',
   config_invalid: 'api.error.config_invalid',
   conflict: 'api.error.conflict',
+  not_ready: 'api.error.not_ready',
   internal: 'api.error.internal',
 };
 

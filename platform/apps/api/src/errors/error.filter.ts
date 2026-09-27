@@ -28,7 +28,7 @@ export class ErrorFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const request = http.getRequest<{ headers: Record<string, string | string[] | undefined> }>();
     const error = fromNest(exception) ?? toApiError(exception);
-    if (error.code === 'internal') {
+    if (error.code === 'internal' && !(exception instanceof ApiError)) {
       this.logger.error(
         `unexpected error: ${exception instanceof Error ? exception.name : typeof exception}`,
         exception instanceof Error ? exception.stack : undefined,

@@ -107,6 +107,7 @@
   "api.error.project_not_active": "The project is archived or not active: no new intents.",
   "api.error.config_invalid": "The project configuration stored for this project is not valid. Ask the platform operator to fix it.",
   "api.error.conflict": "This conflicts with existing data. Reload and try again.",
+  "api.error.not_ready": "The API cannot reach its database yet. Try again in a moment.",
   "api.error.internal": "The API had an unexpected error. Try again later; if it continues, tell the platform operator.",
   "api.reason.actor_not_human": "Only people approve gates; agents and the platform never do.",
   "api.reason.producer": "You produced this change, so you cannot approve it (separation of duties).",

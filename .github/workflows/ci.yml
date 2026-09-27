@@ -136,6 +136,9 @@ jobs:
       # C03: LiteLLM with keys from OpenBao (profile "models") and the Cost Controller, on its own
       # throw-away Compose project with a stub model (throw-away test keys, never printed).
       - run: pnpm test:litellm
+      # B03: the sdlc-api image, its database password from OpenBao (api-credentials) and a token
+      # from `sdlc admin bootstrap`, on its own throw-away Compose project (throw-away test keys).
+      - run: pnpm test:api
       - name: Show service state and logs
         if: failure()
         run: |
@@ -182,6 +185,17 @@ jobs:
             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$archive"
           echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
+      - name: Rule self-test (sdlc-api-token, task B03)
+        run: |
+          # A leaked platform token must be found; the fake fixture must stay allow-listed.
+          dir="$RUNNER_TEMP/gitleaks-selftest"
+          mkdir -p "$dir"
+          printf 'sdlc_pat_%s\n' "$(head -c 32 /dev/urandom | basenc --base64url | tr -d '=\n')" > "$dir/leak.txt"
+          if "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner --exit-code 1 "$dir"; then
+            echo "the sdlc-api-token rule did not find a platform token" >&2
+            exit 1
+          fi
+          "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner --exit-code 1 platform/tests/gitleaks
       - name: Scan (any finding blocks)
         run: |
           status=0

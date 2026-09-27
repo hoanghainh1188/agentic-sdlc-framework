@@ -23,7 +23,7 @@ export class HealthController {
     try {
       await this.db.system.ping();
     } catch {
-      throw new ApiError(503, 'internal');
+      throw new ApiError(503, 'not_ready');
     }
     return { status: 'ok' };
   }
