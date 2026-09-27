@@ -4,7 +4,7 @@
 |---|---|
 | Status | **Proposed** (task B07, session 1 for review; session 2 adds HOTL, the gate deadline and overdue escalations) |
 | Date | 2026-09-27 |
-| Decided by | Harry (plan approved 2026-09-27: QUESTIONS #88–#92, #68 option A, with conditions) |
+| Decided by | Harry (plan approved 2026-09-27: QUESTIONS #88–#92, #68 option A, with conditions; review of PR #101: §2.4 current-gate rule accepted, strict re-approval kept for the pilot) |
 | Related | D-02 FR-10, FR-12, FR-14, FR-17, FR-18, FR-22; D-03 sections 5.1, 6, 6.1–6.4, 12 (ADR-M02, ADR-M14); D-05 sections 6.2, 6.2b, 6.3 (version 1.11); D-08 tasks B07, B08, B09, B10, B12, C06, E06; handbook codes table §4, Ch.11, Ch.12, Ch.19 §19.8b; ADR-M16, ADR-M20, ADR-M26, ADR-M27, ADR-M28; QUESTIONS #16, #21, #53, #55, #64, #68, #73, #76, #88–#92 |
 
 ## 1. Context
@@ -80,7 +80,10 @@ loop:
 - **A decision counts only when recorded after the intent last entered the gate, and after the last request for changes at that gate.**
   - The order comes from the **audit chain** (`seq`), not from timestamps. Gate decisions and intent moves both append to the tenant's chain under the audit lock, so `seq` orders them exactly as they committed. A transaction's `now()` is its start time: a poll batch that started before a move could commit a decision after it with an earlier time. A new index `audit_log (tenant_id, entity_id, seq)` keeps this read small.
   - A request for changes keeps the intent at the gate and records a `changes_requested` notice once. An approval of the same input by the same person stays recorded, so the policy engine refuses a second one (`already_approved`): the input must change first (a new spec or plan version voids the old approval, FR-17).
-- **`decideGate` refuses a decision for a gate the intent is not waiting at** (`gate_not_current`, API 409, comment reply). Without this, an early or late decision would be recorded and silently ignored.
+  - **Kept strict for the pilot** (Harry, review of PR #101). It can be loosened later without a data change: the registry would ignore, in its `priorApprovals` check, approvals recorded before the gate's last request for changes (the order from the audit chain, as in `gateHistory`).
+- **`decideGate` refuses a decision for a gate the intent is not waiting at** (`gate_not_current`, API 409, comment reply `comment.reply.gate_not_current`). Accepted by Harry in the review of PR #101: a refusal the person sees is better than a decision that is recorded and then silently ignored by the workflow.
+  - The check reads the intent **under its lock, in the transaction of the decision**, so the workflow cannot move the intent between the check and the record (found by the code review of PR #101).
+  - Callers that decide gates in tests or tools must first bring the intent to the gate (the B03 and B06 tests do).
 - **Approvals needed:** from the policy engine (`oversightMode`, project config `oversight.matrix` and change flags). At least one person decides.
   - HITL: `approvalsNeeded` (dual approval included).
   - HOTL: session 1 waits for an explicit approval; session 2 adds the HOTL pass (QUESTIONS #88).
@@ -139,7 +142,7 @@ Session 2 adds config `oversight.gate_overdue` (severity and response level of a
 - **Temporal down.** Decisions are still recorded (the database is the source of truth); the api and the poller log the failed signal; the reconcile loop catches up after Temporal returns.
 - **Workflow code changes** after intents run: from C06 on, changes to `intentWorkflow` use `patched()` or a new workflow type. No production workflows exist yet.
 - **Status comments wait for the poll** (up to `github.poll_interval_seconds`), like escalation notices.
-- **An approval before a request for changes** blocks the same person from approving the same input again. The fix is a new input version (§2.4). If this is too strict in the pilot, the registry could ignore approvals older than the last request for changes.
+- **An approval before a request for changes** blocks the same person from approving the same input again. The fix is a new input version (§2.4). Kept for the pilot; §2.4 says how to loosen it if the pilot data shows it is too strict.
 - **The test server differs from a real server** in one known way (sticky queues, §2.7). Session 2 runs a smoke test on the Compose Temporal.
 
 ## 4. Consequences
@@ -155,3 +158,4 @@ Session 2 adds config `oversight.gate_overdue` (severity and response level of a
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task B07, session 1) | First version |
+| 0.2 | 2026-09-27 | Claude (task B07, review of PR #101) | §2.4: current-gate rule accepted and checked under the intent lock; strict re-approval after a request for changes kept for the pilot, with the way to loosen it |
