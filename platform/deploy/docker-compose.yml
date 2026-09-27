@@ -72,6 +72,9 @@ volumes:
   # AppRole role ID and secret ID of sdlc-worker (mode 600, owner node). Written by
   # `openbao/bootstrap.sh worker-credentials` (B06, runbook T11).
   worker-approle:
+  # The worker's second AppRole, cost-controller (the LiteLLM master key for agent runs; C06,
+  # design/ADR-M33 §2.5). Written by `openbao/bootstrap.sh worker-credentials`.
+  worker-cost-approle:
   # --- profile sandbox (C04, design/ADR-M25) ---
   # The socket proxy's filtered socket; mounted by the proxy and the runner only. In memory,
   # writable by the proxy's user; the socket gets the Docker socket's group (mode 0660).
@@ -533,8 +536,16 @@ services:
       SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'
       SDLC_OPENBAO_ROLE_ID_FILE: /run/sdlc/approle/role_id
       SDLC_OPENBAO_SECRET_ID_FILE: /run/sdlc/approle/secret_id
+      # C06 session 2 (ADR-M33 §2.5): the second AppRole "cost-controller" (the LiteLLM master key)
+      # for agent runs, delivered by `openbao:bootstrap worker-credentials`. Without the files the
+      # worker starts with runs off (intents wait at G4).
+      SDLC_WORKER_COST_ROLE_ID_FILE: /run/sdlc/cost-approle/role_id
+      SDLC_WORKER_COST_SECRET_ID_FILE: /run/sdlc/cost-approle/secret_id
+      SDLC_WORKER_LITELLM_URL: http://litellm:4000
+      SDLC_WORKER_RUN_EGRESS: litellm:4000,npm-proxy:4873
     volumes:
       - worker-approle:/run/sdlc/approle
+      - worker-cost-approle:/run/sdlc/cost-approle
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -641,6 +652,8 @@ services:
         condition: service_healthy
       npm-proxy:
         condition: service_healthy
+      temporal-namespace:
+        condition: service_completed_successfully
     # Group of the proxy socket (mode 0660, group = the socket proxy's group).
     group_add: ['${SDLC_DOCKER_GID:-0}']
     environment:
@@ -657,6 +670,9 @@ services:
       SDLC_RUNNER_WORK_DIR: /var/lib/sdlc-runner/work
       SDLC_RUNNER_DB_HOST: postgres
       SDLC_RUNNER_DB_NAME: platform
+      # C06 session 2 (ADR-M33 §2.6): the task queue sdlc-runner; one activity slot per sandbox.
+      SDLC_RUNNER_TEMPORAL_ADDRESS: temporal:7233
+      SDLC_RUNNER_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       SDLC_OPENBAO_ADDR: http://openbao:8200
       # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
       SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'

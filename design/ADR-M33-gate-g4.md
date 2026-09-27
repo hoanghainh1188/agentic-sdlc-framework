@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C06; session 1 in review: the G4 decision and `prepareRun`; session 2: the Temporal `sdlc-runner` handoff, the L1 proposal as evidence) |
+| Status | **Proposed** (task C06; session 1 merged in PR #105; session 2a in review: the Temporal `sdlc-runner` handoff and the run's end; session 2b: the L1 proposal as evidence) |
 | Date | 2026-09-27 |
-| Decided by | Harry (plan approved 2026-09-27: QUESTIONS #108–#112, two sessions, with conditions on #111 and #112 and the rule for lost runs, §2.7) |
+| Decided by | Harry (plan approved 2026-09-27: QUESTIONS #108–#112, two sessions, with conditions on #111 and #112 and the rule for lost runs, §2.7; session 2 plan approved 2026-09-27: PRs 2a and 2b, D1–D3 with conditions, §2.6–§2.7, §2.9) |
 | Related | D-02 FR-03, FR-17, FR-19, FR-30…FR-36, FR-50; D-03 sections 6, 6.1, 7.1, 8, 8.2, 9 (version 1.11); D-05 sections 5, 6.2, 6.3 (version 1.15); D-08 tasks C06, C07, C08, C09, C11, E02; handbook codes table §3–§4, Ch.13 §13.5 Step 1 and §13.8, Ch.20; ADR-M22, ADR-M24, ADR-M25, ADR-M28, ADR-M29, ADR-M30, ADR-M31, ADR-M32; QUESTIONS #5, #6, #17, #21, #22, #32, #44, #53, #55, #79, #82, #88, #94, #108–#112 |
 
 ## 1. Context
@@ -55,7 +55,7 @@ When the Git host cannot be read, the step waits (`git_host_unavailable`) and tr
 | 4 | The spec and plan are the versions G2 and G3 passed (Ch.13: approved "for these exact versions") | `fail`, `input_mismatch` (`spec_changed`, `plan_changed`). B08 and B09 add the send-back to G2 or G3 |
 | 5 | The project AI record allows the data class (FR-19 at G4, ADR-M32 §2.6) | `fail`, `ai_record_missing` / `data_class_not_allowed` |
 | 6 | The agent may run: `checkAgentForRun` (FR-36, ADR-M31 §2.6) | `fail`, `agent_not_runnable` (not configured, not found, not active, not approved for the sandbox, model not pinned or not allowed), `instructions_mismatch` (file edited or missing), `autonomy_not_allowed` (the run's autonomy is above the agent's) |
-| 7 | The intent budget is not used up | `fail`, `budget_exceeded` |
+| 7 | The intent budget, and the tenant's budget of this UTC month (session 2a, code review: otherwise a POLICY G4 kept starting runs the Cost Controller refused), are not used up | `fail`, `budget_exceeded` (`intent_budget_exhausted`, `tenant_budget_exhausted`, once per month) |
 
 - A failed check records a system `fail` **once per cause** (as the AI record check at G1, ADR-M32 §2.5): the decision's input hash binds the cause, its subject (the new spec or plan hash, the instructions file hash, the agent version) and the entry into G4. Never the branch head: an unrelated commit on the default branch records nothing new (code review of session 1). The exact cause (for example `agent_not_active`) goes to the audit event `gate.g4_check_failed`; the gate decision holds the reason code. One notice `g4_refused` mentions Person A, who operates runs (Ch.13 §13.3). **The intent stays at G4** (`waiting: g4_check`); the next wake checks again, so a fixed cause lets the intent continue.
 - **POLICY** (Low, Medium; QUESTIONS #6): all checks pass → a system `pass` bound to the proposal, once per proposal since the intent entered G4. Any mode but HITL is handled the same way.
@@ -79,28 +79,43 @@ A failure after the contract revokes the key (`endRun`) and cancels the run (`pr
 
 **The worker holds the Cost Controller capability** (Harry, #112): from session 2 the worker process logs in with two AppRoles, `worker` and `cost-controller`, and can therefore use the LiteLLM master key (`kv/cost-controller/litellm-master-key`). D-03 §8.2 already names the Cost Controller as a reader; the worker is the process that runs it. The two policies stay separate; the credentials of `cost-controller` are delivered by `openbao:bootstrap worker-credentials`.
 
-### 2.6. Session 2: the handoff (planned, for review with session 2)
+### 2.6. The handoff to the runner (session 2a, D-08 C06 AC4, QUESTIONS #53, #55)
 
 ```text
-stepIntent at G4 → G4 decided → move in_gate G4 → running (same transaction: block window, freeze) → 'run'
-workflow: prepareRun(ref)        [sdlc-intents]  → { runId, wrapped git token, wrapped virtual key }
-workflow: executeRun(input)      [sdlc-runner]   provision + runAgent, heartbeats, one attempt
-  expired contract → the run is cancelled (contract_expired) → prepareRun again (new attempt, max run.contract_attempts_max)
-workflow: finishRun(ref, runId)  [sdlc-intents]  endRun (revoke + sync); L1: store the proposal, intent paused;
-                                                 L2: intent running → in_gate G5 (C07)
+step at G4, decided → move in_gate G4 → running (same transaction: block window, freeze) → 'run_prepare'
+prepareRun   [sdlc-intents]  one attempt → { runId, modelRef, wrapped GitHub token, wrapped virtual key }
+executeRun   [sdlc-runner]   one attempt, heartbeat every 30 s (timeout 2 min) → { outcome, status } (codes)
+finishRun    [sdlc-intents]  one attempt: revoke the run's key, sync spend, move the intent (§2.7)
+lost runner  → abandonRun    revoke the key at once, the run fails (runner_lost) → finishRun
 ```
 
-- The runner is a Temporal worker on `sdlc-runner`; its activity slots = `SDLC_RUNNER_MAX_SANDBOXES`, so extra runs wait in Temporal (QUESTIONS #53, #55). The slot pool stays as the backstop.
-- **Required in session 2** (code review of session 1):
-  - `prepareRun` must be idempotent under Temporal retries: a retried or concurrent call for the same decided proposal must not issue a second run, contract, token or key (for example: refuse while the intent has a non-final run, and let the workflow resume that run).
-  - The move to `running` and the run insert must re-check, under the same lock, that the proposal being issued is still the decided one (the G4 input hash), so nothing is issued for a proposal that was superseded, rejected or frozen after the check.
-  - A failure after the GitHub token is issued cannot revoke it yet (no revoke method until C11); the token is short-lived, single-repository and `contents: read`.
-- No escalation timer in the workflow (ADR-M28). C11 (kill switch) cancels the activity through the workflow; the driver's conditional update already handles the race.
-- **L1 proposal (QUESTIONS #111, option A):** the runner computes the proposal diff from the workspace with the hardened git commands of ADR-M29 §2.5, never from what the sandbox reports. It is stored through a new `EvidenceStore` interface (D-03 §7.5) and the adapter `evidence-s3` on SeaweedFS, in the table `evidence_items` as D-05 §6.6 defines it (kind `proposal`, SHA-256, tenant prefix); E02 builds the pack on top. The runner's SeaweedFS credential is **write-only** (no read, list or delete), limited to the tenant prefix if SeaweedFS supports it; otherwise the gap is recorded here.
+- **The database drives the round.** While the intent is `running`, the step looks at the runs started since it became `running` (`roundRuns`: `created_at` ≥ the intent's `updated_at`, one database clock):
+  - no run → `run_prepare`;
+  - the last run is final → `run_ended` (the workflow calls `finishRun`);
+  - the last run is `queued` and its contract expired before a runner took it → the run is cancelled (`contract_expired`) and a new attempt is prepared, at most `run.contract_attempts_max` (default 3, [Proposal]) contracts per round; then the round ends with an escalation (§2.7);
+  - otherwise the run is under way → wait (`run_in_progress`).
+  A workflow that starts again, or a result Temporal lost, finds its way from the database. A runner that refuses a contract for another reason leaves the run `queued` until its contract expires.
+- **No run is issued twice** (code review of session 1): `prepareRun` refuses (`run_exists`) while a run of the round is not final. The run activities are never retried by Temporal (`maximumAttempts: 1`); a failed worker activity only makes the workflow ask the step again after a minute.
+- **The contract is signed outside the lock**, so after the insert `prepareRun` checks again, under the lock and with the same facts, that the proposal is still ready and decided (the G4 input hash). A freeze, a block or a new proposal in between cancels the run (`not_decided`) before any key or token is issued (tested with a freeze raised while the contract is signed).
+- **Any other refusal of `prepareRun`** (the budget is used up, the proposal changed) takes the intent back to `in_gate G4` (notice `run_not_started`), where G4 is decided again; a HITL approval must be given again, because approvals count only after the last entry into G4.
+- **The runner is a Temporal worker** on `sdlc-runner` (`apps/runner/src/activities.ts`, settings `SDLC_RUNNER_TEMPORAL_ADDRESS`, `SDLC_RUNNER_TEMPORAL_NAMESPACE`). Its activity slots are `SDLC_RUNNER_MAX_SANDBOXES`, so extra runs wait in Temporal (tested with one slot and two intents); the slot pool stays as the backstop. `executeRun` reads the signed contract stored for the run (the input holds IDs only), provisions (C04), unwraps the virtual key, drives the agent (C05) and returns the run's final status as codes.
+- **What the Temporal history holds** (Harry, session 2 plan): IDs, codes, the model name, and the two single-use wrapping tokens. Their time to live is `run.contract_validity_minutes` (the contract's validity, never longer): a runner that takes the run later cannot unwrap them, and the contract has expired anyway. **The key ID never enters the history:** the run's key is revoked by its run (`ModelGateway.revokeRunKey`, LiteLLM `key_alias = run-<run_id>`, D-03 §7.4). The key ID is LiteLLM's hash of the key; the pinned LiteLLM refuses it as a key (live test `pnpm test:litellm`), but it stays out of Temporal anyway. The test reads the decoded history and finds neither the key, the key ID nor the GitHub token.
+- **L1 (High risk) runs wait for session 2b** (Harry): a decided L1 G4 does not move to `running`; the intent waits at G4 with the reason `proposal_runs_unavailable`, so no `proposal_ready` notice exists without a stored proposal.
+- **When the activity is cancelled** (the runner stops gracefully; the kill switch comes with C11), the driver stops the agent first, like at the time cap (interrupt, then kill), records `agent_stopped` (`cancelled`), ends the run `failed` (`agent_cancelled`), and only then is the sandbox removed (`release`): never a teardown while the agent is being driven (code review of session 2a). **After a runner restart**, its clean-up at start and its sweep remove what is left and end the run `runner_restarted` or `sandbox_lost` (ADR-M25 §2.8).
+- No escalation timer in the workflow (ADR-M28). The workflow code changed for new step outcomes only; old histories never saw them and replay unchanged (tested), so no `patched()` is needed.
 
-### 2.7. Lost and failed runs (Harry, plan approval)
+### 2.7. How a run ends, and lost runs (Harry, plan approval and session 2 plan)
 
-A run lost to the infrastructure (the runner's heartbeat times out, `runner_lost`, a runner restart, a provisioning failure) does **not** go straight to G5. Following D-03 §6 ("Stopped → Escalated: always reviewed"), the workflow raises a `technical` escalation at response level `pause` or higher. Budget and scope stops stay with C07 at G5 (QUESTIONS #21, #82). Built in session 2.
+| The run ends as | The intent goes to |
+|---|---|
+| `succeeded`, `stopped_budget`, `stopped_scope`, `stopped_timeout`, `stopped_stalled` | `in_gate G5` (notice `run_finished`). C07 decides; a budget or scope stop never resumes by itself (QUESTIONS #21, #82) |
+| `failed` (the agent, provisioning, the infrastructure, `runner_lost`), or the contracts kept expiring | `paused` at G4 and a `technical` escalation (notice `run_failed`) |
+| `stopped_killed` | `paused` at G4, no escalation here: C11 raises its own |
+| `cancelled` before it started (`budget_exceeded`, `not_decided`, `prepare_failed`) | Back to `in_gate G4` (notice `run_not_started`) |
+
+- A failed or lost run does **not** go straight to G5 (D-03 §6: "Stopped → Escalated: always reviewed"). The escalation: trigger `unusual_behaviour`, route `technical`, severity and response level from config `run.failed_run_escalation` (default `high` / `pause`; new mandatory rule **M20**: the level is `pause`, `contain` or `incident`, so the intent stays frozen until a person decides). Packet: `run_contract` with the contract hash, the run and the agent; the person who allowed the run (`triggered_by`) is a producer.
+- **A lost runner:** the heartbeat timeout fails the activity; the workflow calls `abandonRun`, which **revokes the run's key at once** (Harry: not at its expiry), ends the run `failed` / `runner_lost` and records `run_abandoned`. The sandbox is removed by the runner: on the activity's cancel if it is still alive, otherwise by its clean-up at start and its sweep.
+- **Back from `paused`:** the step moves the intent to `in_gate G4` (notice `run_resumed`) once the run's escalation is closed, or a person decided `resume` for this run's contract (re-checked with `revalidateEscalationDecision`, then closed). G4 is then decided again and a new round starts. A killed run waits (`run_review`) until C11 adds its escalation.
 
 ### 2.8. Where the rules live
 
@@ -111,6 +126,9 @@ A run lost to the infrastructure (the runner's heartbeat times out, `runner_lost
 | Models per data class | D-07 §4 | Config `model_routing.allowed_provider_types` |
 | Which agent runs | QUESTIONS #108 | Config `run.agent_key` |
 | Run caps; contract validity | FR-32; T13; QUESTIONS #13, #33 | Config `budget.default_run_usd`, `run.default_max_*`, `run.contract_validity_minutes` |
+| Contracts per round before an escalation | QUESTIONS #53 (session 2a, [Proposal]) | Config `run.contract_attempts_max` |
+| Escalation of a failed or lost run | D-03 §6; Harry (session 2) | Config `run.failed_run_escalation`; mandatory rule M20 (`pause` or higher) |
+| Where a run's end takes the intent; runs never issued twice; key revoked by run, at once when the runner is lost; no key ID or secret in Temporal | D-03 §6; QUESTIONS #21, #82, #112; Harry (session 2 plan) | Code (`workflow/run-lifecycle.ts`, `prepare-run.ts`, the workflow) |
 | Recertification age | Ch.20 §20.8 | Config `agents.recertification_months` (M18) |
 | Approval expiry, block window, gate deadline, overdue escalation | QUESTIONS #9, #88, #90 | Config `oversight.*`, `escalation.calendar` |
 | Safe actions while frozen | Ch.6 §6.5 | Config `escalation.safe_actions` |
@@ -119,6 +137,11 @@ A run lost to the infrastructure (the runner's heartbeat times out, `runner_lost
 | Token permissions (`contents: read`), wrapped secrets | QUESTIONS #44, #112 | Code (`workflow/prepare-run.ts`) |
 
 Adding the default key `run.agent_key` changes the effective `config_hash` of every stored configuration (QUESTIONS #95). No configuration is stored outside tests yet; B13 AC8 handles it.
+
+### 2.9. Session 2b (planned): the L1 proposal as evidence (QUESTIONS #111, option A)
+
+- The runner keeps its own clone until the run ends, pulls the working files out of the sandbox with Docker `GET /containers/{id}/archive` (a new endpoint, allowed only on the run's own sandbox container with this runner's instance label), and computes the diff there with the hardened git commands of ADR-M29 §2.5. The archive is untrusted: regular files and directories only, symlinks kept as symlinks and never followed, hardlinks, devices and path escapes refused, total size and file count capped; deletions are mirrored (files of the clone that are not in the archive are removed, `.git` excepted). C07 and C08 can reuse this to recompute changed files outside the sandbox.
+- The patch is stored through `EvidenceStore` (D-03 §7.5), the adapter `evidence-s3` (`@aws-sdk/client-s3`, exact version) on SeaweedFS, and `evidence_items` (kind `proposal`). The runner's `runner-evidence` credential lives in OpenBao (`kv/runner/…`), never in `.env`; it is write-only (no read, list or delete) and limited to a prefix where SeaweedFS allows it. If Write also allows delete: object keys are never overwritten (one path per run, refused if it exists), E02 re-checks the SHA-256, and bucket versioning is enabled if SeaweedFS supports it. Every remaining gap is recorded here; per-tenant credentials go to B13 / MVP+1.
 
 ## 3. Alternatives considered
 
@@ -136,10 +159,12 @@ Adding the default key `run.agent_key` changes the effective `config_hash` of ev
 - `@sdlc/contracts`: `GitHostAdapter.getBranchHead`, `AGENT_KEY_PATTERN`, wait reasons `g4_check`, `run_pending`, `git_host_unavailable`. `@sdlc/config`: `run.agent_key` (the default `config_hash` changes).
 - Commands: `/approve G4`, `/reject G4`, `/request-changes G4` and the API gate decisions accept G4 (when it waits for a person).
 - Handbook Ch.13 §13.10: G4 usage.
-- Session 1 does not wire G4 into the worker process: without `StepDeps.g4` the step leaves an intent at G4 waiting (`later_gate`), as before. Session 2 wires it together with the handoff.
+- Session 1 did not wire G4 into the worker process. Session 2a does: the worker evaluates G4 and hands runs to the runner when its second AppRole `cost-controller` is delivered (`openbao:bootstrap worker-credentials`); without it, runs are off and intents wait at G4 (`worker.runs_off`).
+- Session 2a: D-03 1.12 (§6 the run's round, §7.4 `revokeRunKey`, §10 the runner's task queue), D-05 1.16 (notice kinds `run_started`, `run_finished`, `run_failed`, `run_not_started`, `run_resumed`; run stop reasons), config `run.contract_attempts_max`, `run.failed_run_escalation`, rule M20 (the default `config_hash` changes), Compose (worker `worker-cost-approle`, runner Temporal settings), runbook T11 §5f, handbook Ch.13 §13.10.
 
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task C06, session 1) | First version: §2.1–§2.5 built; §2.6–§2.7 planned for session 2 |
+| 0.2 | 2026-09-27 | Claude (task C06, session 2a) | §2.4 check 7 includes the tenant's monthly budget; §2.6 the handoff as built (a cancel stops the agent before the sandbox is removed) (the round from the database, no run twice, the re-check after signing, what the history holds, L1 waits); §2.7 how a run ends, lost runs, back from `paused`; §2.9 session 2b plan with Harry's conditions |

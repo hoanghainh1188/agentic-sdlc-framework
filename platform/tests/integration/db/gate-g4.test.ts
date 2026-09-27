@@ -7,192 +7,36 @@
 // - AC3: High risk → HITL: Person A approves the run proposal (`/approve G4`); a new commit on the
 //   default branch voids the approval (FR-17); a rejection ends the intent.
 // - `prepareRun`: contract, capped key, wrapped secrets; the recertification warning (FR-36).
-import crypto from 'node:crypto';
-
-import { loadProjectConfig } from '@sdlc/config';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { GitHostError, type RedactedSecret } from '../../../packages/contracts/src/index.js';
 import { changeAgentStatus } from '../../../packages/core/src/agents/register.js';
-import { decideGate } from '../../../packages/core/src/commands/gate-command.js';
 import { CostError } from '../../../packages/core/src/cost/errors.js';
-import type { Intent } from '../../../packages/core/src/db/schema.js';
 import { raiseEscalation } from '../../../packages/core/src/escalation/raise.js';
-import type { G4Deps } from '../../../packages/core/src/workflow/g4-proposal.js';
 import {
   prepareRun,
   type PrepareRunDeps,
 } from '../../../packages/core/src/workflow/prepare-run.js';
-import { stepIntent } from '../../../packages/core/src/workflow/step.js';
-import { seedAgent, type SeededAgent } from '../agent-seed.js';
+import { seedAgent } from '../agent-seed.js';
+import {
+  AGENTS_MD,
+  atG4,
+  BASE_1,
+  BASE_2,
+  checksFailed,
+  decideAt,
+  flush,
+  harness,
+  HOUR,
+  MODEL,
+  notices,
+  Secret,
+  sha256,
+  T0,
+  type Harness,
+  type World,
+} from '../g4-harness.js';
 import { FakeTransit } from '../../run-contract/helpers.js';
-import { createWorkflowFixture, type Person, type WorkflowFixture } from '../workflow/fixture.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
-
-// Monday 08:00 in Ho Chi Minh City (the default calendar), one hour before the working day.
-const T0 = new Date('2026-09-28T01:00:00.000Z');
-const HOUR = 3_600_000;
-const BASE_1 = '1'.repeat(40);
-const BASE_2 = '2'.repeat(40);
-const AGENTS_MD = '# AGENTS.md\nRun `pnpm test` before you finish.\n';
-const sha256 = (text: string) => crypto.createHash('sha256').update(text).digest('hex');
-const MODEL = 'gpt-oss-20b';
-
-class Secret implements RedactedSecret {
-  constructor(readonly value: string) {}
-  reveal(): string {
-    return this.value;
-  }
-}
-
-/** The facts G4 reads outside the database, changed by the tests. */
-interface World {
-  base: string;
-  instructions: string | null;
-  models: string[];
-  gitDown: boolean;
-}
-
-interface Harness {
-  readonly f: WorkflowFixture;
-  readonly world: World;
-  readonly g4: G4Deps;
-  agent: SeededAgent;
-  setClock(at: Date): void;
-  settle(intent: Intent): ReturnType<typeof stepIntent>;
-  reload(intent: Intent): Promise<Intent>;
-  decide(
-    intent: Intent,
-    decision: 'approve' | 'reject',
-    who: Person,
-  ): ReturnType<typeof decideGate>;
-  setConfig(yaml: string): Promise<void>;
-  g4Decisions(intent: Intent): Promise<[string, string | null, string][]>;
-}
-
-async function harness(db: TestDatabase): Promise<Harness> {
-  let clock = T0;
-  const f = await createWorkflowFixture(db, () => clock);
-  f.h.stub.now = T0;
-  const world: World = { base: BASE_1, instructions: AGENTS_MD, models: [MODEL], gitDown: false };
-  const g4: G4Deps = {
-    gitHost: {
-      getBranchHead: () =>
-        world.gitDown
-          ? Promise.reject(new GitHostError('server_error'))
-          : Promise.resolve(world.base),
-      getFileAtCommit: () =>
-        world.instructions === null
-          ? Promise.reject(new GitHostError('not_found'))
-          : Promise.resolve(world.instructions),
-    },
-    allowedModels: () => Promise.resolve([...world.models]),
-  };
-  let configVersion = 0;
-  const t: Harness = {
-    f,
-    world,
-    g4,
-    agent: await seedAgent(f.scope, f.users.a, {
-      model: MODEL,
-      instructionsSha256: sha256(AGENTS_MD),
-      tools: ['file_editor', 'terminal'],
-    }),
-    setClock(at) {
-      clock = at;
-      f.h.stub.now = at;
-    },
-    async settle(intent) {
-      for (let i = 0; i < 12; i += 1) {
-        const result = await stepIntent(f.scope, { registry: f.registry, g4 }, intent.id);
-        if (result.outcome !== 'moved') return result;
-      }
-      throw new Error('the step never settled');
-    },
-    reload: async (intent) => (await f.scope.intents.getById(intent.id))!,
-    decide: (intent, decision, who) =>
-      decideGate(f.registry, f.scope, {
-        intent,
-        gate: 'G4',
-        decision,
-        actorId: f.users[who],
-        reasonCode: decision === 'approve' ? null : 'policy_denied',
-        source: 'cli',
-      }),
-    async setConfig(yaml) {
-      const loaded = loadProjectConfig(yaml);
-      if (!loaded.ok) throw new Error('test configuration refused');
-      await f.scope.projectConfigs.save(f.target.projectId, {
-        configYaml: yaml,
-        configHash: loaded.configHash,
-        updatedBy: null,
-        expectedVersion: configVersion,
-      });
-      configVersion += 1;
-    },
-    async g4Decisions(intent) {
-      return (await f.scope.gateDecisions.listForIntent(intent.id, 'G4')).map((d) => [
-        d.decision,
-        d.reason_code,
-        d.oversight_mode,
-      ]);
-    },
-  };
-  await t.setConfig(`run:\n  agent_key: ${t.agent.key}\n`);
-  return t;
-}
-
-/**
- * Brings a new intent to an approved G3 through people's approvals (Medium and High: G1–G3 are
- * HITL). The next step moves it to G4 and evaluates G4 with the world as the test set it.
- */
-async function atG4(t: Harness, riskTier: 'medium' | 'high' | 'critical'): Promise<Intent> {
-  const intent = await t.f.newIntent({ riskTier });
-  const approver = riskTier === 'medium' ? 'a' : 'b';
-  await t.settle(intent);
-  await decideAt(t, intent, 'G1', 'a');
-  await t.f.addInputs(intent);
-  await t.settle(intent);
-  await decideAt(t, intent, 'G2', approver);
-  await approve(t, intent, 'G3', 'b');
-  return intent;
-}
-
-async function approve(t: Harness, intent: Intent, gate: 'G1' | 'G2' | 'G3', who: Person) {
-  await decideGate(t.f.registry, t.f.scope, {
-    intent: await t.reload(intent),
-    gate,
-    decision: 'approve',
-    actorId: t.f.users[who],
-    source: 'cli',
-  });
-}
-
-async function decideAt(t: Harness, intent: Intent, gate: 'G1' | 'G2' | 'G3', who: Person) {
-  await approve(t, intent, gate, who);
-  await t.settle(intent);
-}
-
-/** Polls until the platform has posted every pending comment (a poll posts a batch). */
-async function flush(t: Harness): Promise<void> {
-  for (let i = 0; i < 20; i += 1) {
-    const before = t.f.h.stub.requests.length;
-    await t.f.poll();
-    // A poll with nothing to post only reads GitHub (comments, pulls): no POST.
-    const posts = t.f.h.stub.requests.slice(before).filter((r) => r.method === 'POST');
-    if (posts.length === 0) return;
-  }
-}
-
-async function notices(t: Harness, intent: Intent) {
-  return (await t.f.scope.intentNotices.listForIntent(intent.id)).map((n) => n.kind);
-}
-
-async function checksFailed(t: Harness, intent: Intent): Promise<string[]> {
-  return (await t.f.scope.audit.listForEntity(intent.id, ['gate.g4_check_failed'])).map(
-    (e) => (e.payload as { check: string }).check,
-  );
-}
 
 describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
   let db: TestDatabase;
@@ -210,7 +54,12 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
 
   beforeEach(async () => {
     t.setClock(T0);
-    Object.assign(t.world, { base: BASE_1, instructions: AGENTS_MD, models: [MODEL] });
+    Object.assign(t.world, {
+      base: BASE_1,
+      instructions: AGENTS_MD,
+      models: [MODEL],
+      tenantBudget: null,
+    });
     t.world.gitDown = false;
     await t.setConfig(`run:\n  agent_key: ${t.agent.key}\n`);
   });
@@ -380,6 +229,30 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       await t.settle(intent);
       expect(await t.g4Decisions(intent)).toEqual([['fail', 'budget_exceeded', 'POLICY']]);
       expect(await checksFailed(t, intent)).toEqual(['intent_budget_exhausted']);
+    });
+
+    it('the tenant budget of this month is used up → budget_exceeded (tenant_budget_exhausted), once', async () => {
+      const intent = await atG4(t, 'medium');
+      t.world.tenantBudget = '0.5';
+      await t.f.scope.costRecords.insertIfNew({
+        projectId: t.f.target.projectId,
+        intentId: null,
+        runId: null,
+        gate: null,
+        agent: null,
+        model: MODEL,
+        providerType: 'self_hosted',
+        inputTokens: 1,
+        outputTokens: 1,
+        cachedInputTokens: 0,
+        costUsd: '0.5',
+        sourceRef: `tenant-month-${intent.id}`,
+        occurredAt: T0,
+      });
+      await t.settle(intent);
+      await t.settle(intent);
+      expect(await t.g4Decisions(intent)).toEqual([['fail', 'budget_exceeded', 'POLICY']]);
+      expect(await checksFailed(t, intent)).toEqual(['tenant_budget_exhausted']);
     });
 
     it('a frozen intent waits; no decision is recorded', async () => {

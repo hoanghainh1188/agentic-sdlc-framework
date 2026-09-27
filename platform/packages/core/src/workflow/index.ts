@@ -43,3 +43,14 @@ export {
   type PrepareRunResult,
   type PreparedRun,
 } from './prepare-run.js';
+export {
+  abandonRun,
+  CONTRACT_EXPIRED,
+  finishRun,
+  RUNNER_LOST,
+  startRun,
+  stepPaused,
+  stepRunning,
+  type RunDeps,
+} from './run-lifecycle.js';
+export { isFinalRun, roundRuns } from './run-round.js';

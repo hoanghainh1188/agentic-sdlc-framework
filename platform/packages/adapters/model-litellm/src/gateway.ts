@@ -20,11 +20,13 @@ import { GatewayError } from './errors.js';
 import {
   keyGenerateBody,
   modelsFromInfo,
+  runKeyAlias,
   spendLogTime,
   spendRecordFromRow,
   teamBody,
   tenantTeamId,
   usdFromNumber,
+  UUID,
 } from './mapping.js';
 
 export interface LiteLLMGatewayOptions {
@@ -184,6 +186,16 @@ export class LiteLLMGateway implements ModelGateway {
     if (!HASHED_KEY.test(keyId))
       throw new GatewayError('invalid_input', 'keyId is not a key hash', undefined, 'keyId');
     await this.#request('POST', '/key/delete', { body: { keys: [keyId] }, allow404: true });
+  }
+
+  async revokeRunKey(runId: string): Promise<void> {
+    if (!UUID.test(runId))
+      throw new GatewayError('invalid_input', 'runId is not a UUID', undefined, 'runId');
+    // The key alias is `run-<run_id>` (keyGenerateBody); LiteLLM deletes by alias.
+    await this.#request('POST', '/key/delete', {
+      body: { key_aliases: [runKeyAlias(runId)] },
+      allow404: true,
+    });
   }
 
   async getSpend(keyId: string): Promise<SpendInfo> {

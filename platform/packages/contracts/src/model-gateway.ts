@@ -92,6 +92,12 @@ export interface ModelGateway {
   createRunKey(input: CreateRunKey): Promise<VirtualKey>;
   /** Revokes a key. Revoking a key that no longer exists is not an error. */
   revokeKey(keyId: string): Promise<void>;
+  /**
+   * Revokes the key of one run, found by the run (task C06 session 2, ADR-M33 §2.6), so the key's
+   * ID never has to travel with the run (for example through the Temporal history). No key is not
+   * an error.
+   */
+  revokeRunKey(runId: string): Promise<void>;
   /** Spend of one key so far, as the gateway counts it. */
   getSpend(keyId: string): Promise<SpendInfo>;
   /** Models the gateway serves and where each runs (D-07 section 4; input of the policy engine). */

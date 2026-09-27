@@ -176,6 +176,14 @@ run:
   # `sdlc admin agent`) that runs this project's intents. One agent per project in the MVP; B09
   # may pick the agent per plan task later. None by default: G4 fails until the project sets one.
   agent_key: null
+  # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). Task C06 session 2,
+  # ADR-M33 §2.6 (QUESTIONS.md #53): a Run Contract that expires while its run waits for a runner
+  # is cancelled and issued again, at most this many times for one G4 decision; then escalated.
+  contract_attempts_max: 3
+  # Task C06 session 2 (Harry, 2026-09-27; D-03 §6 "Stopped → Escalated: always reviewed"): a run
+  # that fails or is lost raises a technical escalation. [Proposal] pilot severity; mandatory rule
+  # M20: the response level is pause or higher, so the intent stays frozen until a person decides.
+  failed_run_escalation: { severity: high, response_level: pause }
 
 budget:
   # D-07 §6; D-02 FR-52; handbook Ch.3 §3.6: warning at 80 %, stop at 100 %.

@@ -30,6 +30,7 @@ import { EscalationLoop } from './escalation-loop.js';
 import { jsonLogger } from './logger.js';
 import { PollerLoop } from './poller-loop.js';
 import { ReconcileLoop } from './reconcile-loop.js';
+import { createWorkerRuns, type WorkerRuns } from './runs.js';
 import { loadSettings, SettingsError } from './settings.js';
 import { installTemporalLogging, startIntentWorker, type IntentWorkerHandle } from './temporal.js';
 
@@ -50,6 +51,26 @@ async function main(): Promise<void> {
     policyFactory: (config) => createSimplePolicyEngine({ config }),
   });
 
+  // Agent runs (C06 session 2, ADR-M33 §2.5): the cost-controller AppRole, the gateway and the
+  // handoff. Without them a decided G4 waits.
+  let workerRuns: WorkerRuns | undefined;
+  // The Compose file always names the files; until `openbao:bootstrap worker-credentials` wrote
+  // them, the worker starts with runs off instead of failing.
+  if (settings.runs && fs.existsSync(settings.runs.costRoleIdFile)) {
+    workerRuns = await createWorkerRuns({
+      settings: settings.runs,
+      env: process.env,
+      db,
+      registry,
+      gitHost,
+      signer: openbao.transit(),
+      wrapper: openbao.wrapping(),
+      logger,
+    });
+  } else if (settings.temporal) {
+    logger.log('warn', 'worker.runs_off', { message: t('worker.start.runs_off') });
+  }
+
   // The intent workflow (B07, ADR-M30): Temporal worker, wake signals and the reconcile loop.
   let temporal: TemporalClient | undefined;
   let intentWorker: IntentWorkerHandle | undefined;
@@ -60,7 +81,11 @@ async function main(): Promise<void> {
     signals = new TemporalIntentSignals(temporal.client);
     intentWorker = await startIntentWorker({
       settings: settings.temporal,
-      activities: createIntentActivities({ db, registry }),
+      activities: createIntentActivities({
+        db,
+        registry,
+        ...(workerRuns ? { g4: workerRuns.g4, runs: workerRuns.runs } : {}),
+      }),
       workflowBundlePath: settings.workflowBundle,
     });
     // A failed Temporal worker stops the process; Compose restarts it.
@@ -124,7 +149,9 @@ async function main(): Promise<void> {
 
   const shutdown = (): void => {
     void Promise.all([loop.stop(), escalations.stop(), reconcile?.stop(), intentWorker?.shutdown()])
-      .then(() => Promise.all([db.close(), openbao.close(), temporal?.close()]))
+      .then(() =>
+        Promise.all([db.close(), openbao.close(), temporal?.close(), workerRuns?.close()]),
+      )
       .then(() => logger.log('info', 'worker.stopped', {}));
   };
   process.once('SIGTERM', shutdown);

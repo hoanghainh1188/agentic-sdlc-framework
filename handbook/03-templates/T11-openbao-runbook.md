@@ -315,6 +315,7 @@ The worker (service `sdlc-worker`, task B06) polls GitHub and handles the commen
    pnpm openbao:bootstrap worker-credentials
    ```
    Record it in the operations log (role `worker`, date, reason; not the secret ID).
+   The same command also delivers the second AppRole of the worker, `cost-controller`, into the volume `worker-cost-approle` (task C06, `design/ADR-M33-gate-g4.md` §2.5). With it, the worker runs the Cost Controller: it reads the LiteLLM master key (`kv/cost-controller/litellm-master-key`, section 5d) and hands agent runs to the runner. Without it the worker logs `worker.runs_off` and intents wait at G4. Record it in the operations log too (role `cost-controller`).
 3. Start: `pnpm compose:platform` (profiles `core` and `platform`). The worker publishes no port.
 4. Check: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env logs sdlc-worker` shows `worker.started`, then one `poll.completed` per project and interval. The logs hold IDs and codes only.
 
@@ -322,7 +323,7 @@ The worker (service `sdlc-worker`, task B06) polls GitHub and handles the commen
 
 | What | Steps |
 |---|---|
-| The worker's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap worker-credentials`, then restart `sdlc-worker`. Then destroy the old secret ID (section 8.1, step 4) |
+| The worker's secret IDs (`worker` and `cost-controller`, every 90 days, section 8.1) | `pnpm openbao:bootstrap worker-credentials`, then restart `sdlc-worker`. Then destroy the old secret IDs (section 8.1, step 4) |
 | The `platform_app` password | Change it in PostgreSQL and in `.env`, run `api-credentials`, `worker-credentials` and `runner-credentials`, then restart `sdlc-api`, `sdlc-worker` and `sdlc-runner` |
 | The GitHub App key | Section 5b. No restart: the worker reads the key again after 10 minutes |
 
@@ -490,3 +491,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.10 | 2026-09-27 | Claude Code (task C04, session 3) | Section 5g: the runner reads the `platform_app` password from `kv/runner/database` (`runner-credentials`); `SDLC_DOCKER_GID`; the local registry (127.0.0.1 only, no authentication, images by digest, clean-up); clean-up after a restart; troubleshooting rows (ADR-M25). Tested with throw-away keys (`pnpm test:runner-compose`) |
 | 0.11 | 2026-09-27 | Claude Code (task C05) | Troubleshooting row: agent runs that cannot reach the Agent Server or LiteLLM (ADR-M29) |
 | 0.12 | 2026-09-27 | Claude Code (task C05, session 2) | Section 5d: a local Ollama model on developer machines only (`kv/litellm/providers/ollama`, field `api_base`; QUESTIONS #78) |
+| 0.13 | 2026-09-27 | Claude Code (task C06, session 2a) | Section 5f: `worker-credentials` also delivers the AppRole `cost-controller` (volume `worker-cost-approle`); the worker runs agent runs with it; rotation row |

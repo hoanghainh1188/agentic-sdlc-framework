@@ -53,8 +53,15 @@ export type IntentStepResult =
       readonly reason: IntentWaitReason;
       readonly wakeInMs?: number;
     }
-  /** The intent is finished (`done`, `rejected`, `cancelled`); the workflow ends. */
-  | { readonly outcome: 'finished'; readonly status: string };
+  /** The intent is finished (`done`, `rejected`, `cancelled`, `blocked`); the workflow ends. */
+  | { readonly outcome: 'finished'; readonly status: string }
+  /**
+   * C06 session 2 (ADR-M33 §2.6): the intent is `running` and needs a new run. The workflow calls
+   * `prepareRun`, then hands the run to the runner (task queue `sdlc-runner`).
+   */
+  | { readonly outcome: 'run_prepare' }
+  /** C06 session 2: the intent's run ended (a final status); the workflow calls `finishRun`. */
+  | { readonly outcome: 'run_ended'; readonly runId: string };
 
 export type IntentWaitReason =
   /** The gate needs a person's decision. */
@@ -82,5 +89,17 @@ export type IntentWaitReason =
   | 'run_pending'
   /** The Git host could not be read for the G4 facts (base commit, instructions file). */
   | 'git_host_unavailable'
+  /** C06 session 2: the intent's run is under way (the workflow that drives it waits for it). */
+  | 'run_in_progress'
+  /**
+   * C06 session 2: the run failed or was lost and the intent is paused: it waits until the run's
+   * escalation lets a new run start (a person decided; ADR-M33 §2.7).
+   */
+  | 'run_review'
+  /**
+   * C06 session 2a: G4 is decided for an L1 (High risk) run, but runs that only propose come with
+   * session 2b (the proposal stored as evidence, QUESTIONS #111). The intent waits at G4.
+   */
+  | 'proposal_runs_unavailable'
   /** A status that the workflow does not move (`paused`, `blocked`, `running`). */
   | 'not_in_gate';

@@ -49,8 +49,17 @@ describe('sdlc-worker service', () => {
       SDLC_OPENBAO_ROLE_ID_FILE: '/run/sdlc/approle/role_id',
       SDLC_OPENBAO_SECRET_ID_FILE: '/run/sdlc/approle/secret_id',
     });
-    expect(worker.volumes).toEqual(['worker-approle:/run/sdlc/approle']);
+    expect(worker.volumes).toEqual([
+      'worker-approle:/run/sdlc/approle',
+      // C06 session 2a (ADR-M33 §2.5): the second AppRole, cost-controller; files, not values.
+      'worker-cost-approle:/run/sdlc/cost-approle',
+    ]);
+    expect(worker.environment).toMatchObject({
+      SDLC_WORKER_COST_ROLE_ID_FILE: '/run/sdlc/cost-approle/role_id',
+      SDLC_WORKER_COST_SECRET_ID_FILE: '/run/sdlc/cost-approle/secret_id',
+    });
     expect(readDeployFile('docker-compose.yml')).toMatch(/^ {2}worker-approle:$/m);
+    expect(readDeployFile('docker-compose.yml')).toMatch(/^ {2}worker-cost-approle:$/m);
   });
 
   it('runs hardened: read-only root file system, no capabilities, no privilege gain', () => {
@@ -73,7 +82,10 @@ describe('sdlc-worker service', () => {
     const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
     expect(bootstrap).toMatch(/^ {2}worker-credentials\) cmd_worker_credentials ;;$/m);
     expect(bootstrap).toMatch(
-      /^cmd_worker_credentials\(\) \{ platform_credentials worker sdlc-worker; \}$/m,
+      /^cmd_worker_credentials\(\) \{\n {2}platform_credentials worker sdlc-worker\n {2}cost_controller_credentials\n\}$/m,
+    );
+    expect(bootstrap).toContain(
+      'deliver_approle cost-controller sdlc-worker /run/sdlc/cost-approle platform',
     );
   });
 

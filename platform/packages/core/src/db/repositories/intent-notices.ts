@@ -22,6 +22,10 @@ import { TenantRepository } from './base.js';
  * risk or no autonomy: the agent never runs, the intent ends), `run_proposed` (G4 is HITL: the run
  * proposal to approve is new or changed), `agent_recertification_due` (a run starts with an agent
  * whose recertification is overdue; mentions the agent's owner, `agent_id`).
+ * C06 session 2 (ADR-M33 §2.6–§2.7): `run_started` (G4 decided, the run is prepared),
+ * `run_finished` (the run ended; the intent waits at G5), `run_failed` (the run failed or was lost;
+ * the intent is paused and escalated), `run_not_started` (the run could not start; G4 decides again),
+ * `run_resumed` (the run's escalation allows a new run; the intent is back at G4).
  */
 export const INTENT_NOTICE_KINDS = [
   'submitted',
@@ -35,6 +39,11 @@ export const INTENT_NOTICE_KINDS = [
   'blocked',
   'run_proposed',
   'agent_recertification_due',
+  'run_started',
+  'run_finished',
+  'run_failed',
+  'run_not_started',
+  'run_resumed',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

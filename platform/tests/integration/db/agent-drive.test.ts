@@ -361,6 +361,35 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     ]);
   });
 
+  it('C06: a cancel stops the agent (interrupt) before anything is removed; failed, agent_cancelled', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'running', iterations: 1 }];
+    const abort = new AbortController();
+    let polls = 0;
+    const result = await driveAgent(
+      {
+        ...deps(agent),
+        sleep: () => {
+          polls += 1;
+          if (polls === 2) abort.abort();
+          return Promise.resolve();
+        },
+      },
+      { ...request(s), signal: abort.signal },
+    );
+    expect(agent.stopped).toBe(1);
+    expect(result).toMatchObject({
+      outcome: 'failed',
+      status: 'failed',
+      stopReason: 'agent_cancelled',
+    });
+    expect(await events(s)).toContainEqual([
+      'agent_stopped',
+      { reason: 'cancelled', method: 'interrupt' },
+    ]);
+  });
+
   it('stuck: stopped_stalled with agent_stuck', async () => {
     const s = await seed();
     const agent = new FakeAgent();

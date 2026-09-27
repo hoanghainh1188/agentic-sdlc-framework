@@ -61,6 +61,13 @@ export interface AgentRunRequest {
   readonly model: string;
   /** The run's LiteLLM virtual key (Cost Controller `issueRunKey`). */
   readonly virtualKey: RedactedSecret;
+  /**
+   * Aborted when the run is cancelled (C06 session 2: the Temporal activity's cancel; C11: the kill
+   * switch). The driver stops the agent like at the time cap (interrupt, then kill) and ends the
+   * run `failed` (`agent_cancelled`); the caller then removes the sandbox. Never a concurrent
+   * teardown while the agent is being driven.
+   */
+  readonly signal?: AbortSignal;
 }
 
 /** How the agent run ended (run event `agent_finished`). */
@@ -135,18 +142,21 @@ interface Polled {
   readonly state: AgentRunState;
   readonly iterations: number;
   readonly timedOut: boolean;
+  readonly cancelled?: boolean;
 }
 
 async function pollUntilDone(
   deps: AgentDriveDeps,
   handle: AgentRunHandle,
   deadline: number,
+  signal?: AbortSignal,
 ): Promise<Polled> {
   const clock = clockOf(deps);
   const sleep = sleepOf(deps);
   let errors = 0;
   let last = { state: 'running' as AgentRunState, iterations: 0 };
   for (;;) {
+    if (signal?.aborted) return { ...last, timedOut: false, cancelled: true };
     try {
       last = await deps.adapter.getStatus(handle);
       errors = 0;
@@ -287,9 +297,17 @@ export async function driveAgent(
   const deadline = clockOf(deps)() + contract.max_duration_min * 60_000;
   let polled: Polled;
   try {
-    polled = await pollUntilDone(deps, handle, deadline);
+    polled = await pollUntilDone(deps, handle, deadline, request.signal);
   } catch (error) {
     return failRun(deps, scope, contract, failureCode(error));
+  }
+  if (polled.cancelled) {
+    const stopped = await stopAtTimeCap(deps, handle);
+    await scope.runEvents.append(contract.run_id, 'agent_stopped', {
+      reason: 'cancelled',
+      method: stopped.method,
+    });
+    return failRun(deps, scope, contract, 'cancelled');
   }
 
   let outcome: AgentOutcome;

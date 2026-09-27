@@ -180,6 +180,17 @@ export class CostController {
     return this.syncSpend({ from: input.syncFrom, to: this.now() });
   }
 
+  /**
+   * Revokes a run's key found by the run (C06 session 2, ADR-M33 §2.6), then syncs its spend once.
+   * Used when the run ends through the workflow, which never holds the key's ID. Revoking a key
+   * that is already gone is not an error.
+   */
+  async endRunKey(input: { readonly runId: string; readonly syncFrom: Date }): Promise<SyncResult> {
+    await this.gateway.revokeRunKey(input.runId);
+    this.logger.log('info', 'cost.run_key_revoked', {});
+    return this.syncSpend({ from: input.syncFrom, to: this.now() });
+  }
+
   /** Gateway spend → `cost_records` (D-08 C03 AC4). Safe to run again on the same range. */
   syncSpend(range: SyncRange): Promise<SyncResult> {
     return syncSpend({ gateway: this.gateway, db: this.db, logger: this.logger }, range);

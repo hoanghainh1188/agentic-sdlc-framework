@@ -35,6 +35,9 @@ importers:
       '@sdlc/secrets':
         specifier: workspace:*
         version: link:platform/packages/secrets
+      '@temporalio/activity':
+        specifier: 1.24.0
+        version: 1.24.0
       '@temporalio/client':
         specifier: 1.24.0
         version: 1.24.0
@@ -156,12 +159,21 @@ importers:
       '@sdlc/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets
+      '@temporalio/activity':
+        specifier: 1.24.0
+        version: 1.24.0
+      '@temporalio/worker':
+        specifier: 1.24.0
+        version: 1.24.0
 
   platform/apps/worker:
     dependencies:
       '@sdlc/adapter-git-github':
         specifier: workspace:*
         version: link:../../packages/adapters/git-github
+      '@sdlc/adapter-model-litellm':
+        specifier: workspace:*
+        version: link:../../packages/adapters/model-litellm
       '@sdlc/adapter-policy-simple':
         specifier: workspace:*
         version: link:../../packages/adapters/policy-simple

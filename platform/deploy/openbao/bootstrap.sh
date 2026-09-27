@@ -41,7 +41,9 @@ Commands:
                        volume of sdlc-api (Compose profile "platform"). Prints no secret. Run it
                        again to rotate, then restart sdlc-api (runbook T11).
   worker-credentials   The same for the worker: kv/worker/database, AppRole "worker", volume of
-                       sdlc-worker. Run it again to rotate, then restart sdlc-worker (runbook T11).
+                       sdlc-worker. Also the AppRole "cost-controller" into the volume
+                       worker-cost-approle: the worker runs the Cost Controller (C06, ADR-M33).
+                       Run it again to rotate, then restart sdlc-worker (runbook T11).
   runner-credentials   The same for the runner: kv/runner/database, AppRole "runner", volume of
                        sdlc-runner (Compose profile "sandbox"). Run it again to rotate, then
                        restart sdlc-runner (runbook T11 §5g).
@@ -269,11 +271,32 @@ cmd_litellm_credentials() {
   say "litellm AppRole credentials written to the litellm-approle volume; restart litellm-agent to use them"
 }
 
+# Writes the role ID and a new secret ID of an AppRole straight into a volume of a platform
+# service: from the openbao container through a pipe, never a host file, a command line or an
+# environment variable. The platform services drop every capability; this one-shot root container
+# gets back only what it needs to write the files and give them to the user node. Needs $token.
+# deliver_approle <AppRole> <Compose service> <directory in the service> <profile>
+deliver_approle() {
+  printf '%s\n' "$token" |
+    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
+      bao read -field=role_id "auth/approle/role/$1/role-id" && echo &&
+      bao write -f -field=secret_id "auth/approle/role/$1/secret-id" && echo' sh "$1" |
+    compose --profile core --profile "$4" run --rm -T --no-deps --user root \
+      --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "$2" -c '
+      set -e
+      umask 077
+      IFS= read -r role_id || role_id=""
+      IFS= read -r secret_id || secret_id=""
+      [ -n "$role_id" ] && [ -n "$secret_id" ] || { echo "no role ID or secret ID received" >&2; exit 1; }
+      printf "%s\n" "$role_id" >"$0/role_id"
+      printf "%s\n" "$secret_id" >"$0/secret_id"
+      chown -R node:node "$0"
+      chmod 700 "$0"' "$3" ||
+    fail "could not deliver the $1 credentials (token valid? OpenBao configured with the $1 AppRole?)"
+}
+
 # The database password goes from the env file to the openbao container on stdin, after the admin
-# token; the role ID and a new secret ID go from the openbao container straight into the volume
-# of the platform service through a pipe. Never a host file, a command line or an environment
-# variable. The platform services drop every capability; this one-shot root container gets back
-# only what it needs to write the files and give them to the user node.
+# token; the AppRole credentials go into the service's volume (deliver_approle).
 # platform_credentials <AppRole and KV prefix: api | worker | runner> <Compose service> [profile]
 # The profile is "platform" by default; the runner lives in the profile "sandbox" (C04).
 platform_credentials() {
@@ -290,27 +313,23 @@ platform_credentials() {
     bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
       bao kv put -mount=kv "$1/database" password=- >/dev/null' sh "$role" ||
     fail "could not store kv/$role/database (token valid? OpenBao configured?)"
-  printf '%s\n' "$token" |
-    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
-      bao read -field=role_id "auth/approle/role/$1/role-id" && echo &&
-      bao write -f -field=secret_id "auth/approle/role/$1/secret-id" && echo' sh "$role" |
-    compose --profile core --profile "${3:-platform}" run --rm -T --no-deps --user root \
-      --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "$service" -c '
-      set -e
-      umask 077
-      IFS= read -r role_id || role_id=""
-      IFS= read -r secret_id || secret_id=""
-      [ -n "$role_id" ] && [ -n "$secret_id" ] || { echo "no role ID or secret ID received" >&2; exit 1; }
-      printf "%s\n" "$role_id" >/run/sdlc/approle/role_id
-      printf "%s\n" "$secret_id" >/run/sdlc/approle/secret_id
-      chown -R node:node /run/sdlc/approle
-      chmod 700 /run/sdlc/approle' ||
-    fail "could not deliver the $role credentials (token valid? OpenBao configured with the $role AppRole?)"
+  deliver_approle "$role" "$service" /run/sdlc/approle "${3:-platform}"
   say "kv/$role/database stored; $role AppRole credentials written to the $role-approle volume; restart $service to use them"
 }
 
+# The worker also holds the Cost Controller capability (C06, ADR-M33 §2.5, QUESTIONS #112): the
+# AppRole "cost-controller" goes into the volume worker-cost-approle. Uses the admin token read
+# by platform_credentials.
+cost_controller_credentials() {
+  deliver_approle cost-controller sdlc-worker /run/sdlc/cost-approle platform
+  say "cost-controller AppRole credentials written to the worker-cost-approle volume; restart sdlc-worker to use them"
+}
+
 cmd_api_credentials() { platform_credentials api sdlc-api; }
-cmd_worker_credentials() { platform_credentials worker sdlc-worker; }
+cmd_worker_credentials() {
+  platform_credentials worker sdlc-worker
+  cost_controller_credentials
+}
 cmd_runner_credentials() { platform_credentials runner sdlc-runner sandbox; }
 
 case "$command" in

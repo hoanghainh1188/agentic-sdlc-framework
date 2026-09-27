@@ -33,6 +33,7 @@ import type { Registry } from '../registry/registry.js';
 import { issueRunContract } from '../run-contract/issue.js';
 import { gatherG4Facts, projectRepoRef, type G4Deps, type RunProposal } from './g4-proposal.js';
 import { evaluateG4, g4Decided } from './g4.js';
+import { isFinalRun, roundRuns } from './run-round.js';
 
 export interface PrepareRunDeps {
   readonly registry: Registry;
@@ -53,7 +54,12 @@ export type PrepareRunRefusal =
   /** The proposal changed since G4 passed or was approved: G4 decides again. */
   | 'not_decided'
   /** The Cost Controller refused the run's key: the intent or tenant budget is used up. */
-  | 'budget_exceeded';
+  | 'budget_exceeded'
+  /**
+   * A run of this round is already under way (session 2, ADR-M33 §2.6): a retried or concurrent
+   * call never issues a second run, contract, token or key.
+   */
+  | 'run_exists';
 
 export interface PreparedRun {
   readonly runId: string;
@@ -79,6 +85,7 @@ export type PrepareRunResult =
 const SECONDS_PER_MINUTE = 60;
 
 interface Checked {
+  readonly inputSha256: string;
   readonly proposal: RunProposal;
   readonly triggeredBy: string | null;
   readonly agent: { readonly id: string; readonly key: string; readonly tools: readonly string[] };
@@ -98,12 +105,14 @@ export async function prepareRun(
   const checked = await scope.transaction(async (tx): Promise<Checked | PrepareRunRefusal> => {
     const intent = await tx.intents.lockAndGet(intentId);
     if (!intent || !isAtG4(intent)) return 'not_at_g4';
+    if ((await roundRuns(tx, intent)).some((r) => !isFinalRun(r.status))) return 'run_exists';
     const policy = await deps.registry.policyFor(tx, intent.project_id);
     const ready = await evaluateG4(tx, deps.registry, policy, intent, facts);
     if (ready.kind !== 'ready') return 'not_ready';
     const decided = await g4Decided(tx, deps.registry, policy, intent, ready.inputSha256);
     if (!decided.decided) return 'not_decided';
     return {
+      inputSha256: ready.inputSha256,
       proposal: ready.proposal,
       triggeredBy: decided.approverId,
       agent: ready.agent.agent,
@@ -139,6 +148,21 @@ export async function prepareRun(
     { signer: deps.signer, now: () => deps.registry.now() },
   );
   const runId = issued.run.id;
+  // The contract was signed outside the lock. Before any secret is issued, check again under the
+  // lock that this proposal is still the decided one (code review of session 1): a block, a freeze
+  // or a new proposal in between cancels the run.
+  const still = await scope.transaction(async (tx) => {
+    const intent = await tx.intents.lockAndGet(intentId);
+    if (!intent || !isAtG4(intent)) return false;
+    const policy = await deps.registry.policyFor(tx, intent.project_id);
+    const again = await evaluateG4(tx, deps.registry, policy, intent, facts);
+    if (again.kind !== 'ready' || again.inputSha256 !== checked.inputSha256) return false;
+    return (await g4Decided(tx, deps.registry, policy, intent, again.inputSha256)).decided;
+  });
+  if (!still) {
+    await cancel(scope, deps.registry, runId, 'not_decided');
+    return { ok: false, reason: 'not_decided' };
+  }
   if (checked.ownerWarning) await warnOwner(scope, deps.registry, intentId, checked.agent, runId);
 
   let key;

@@ -1,22 +1,36 @@
-// The intent workflow on Temporal (D-08 B07 AC1 and AC5, design/D-03 section 6, ADR-M30).
+// The intent workflow on Temporal (D-08 B07 AC1 and AC5, design/D-03 section 6, ADR-M30; the run
+// after G4: D-08 C06 AC4, ADR-M33 §2.6).
 //
 // A thin durable loop. The database is the source of truth: the `stepIntent` activity reads the
 // intent under its lock and makes at most one move (core `stepIntent`). The workflow steps again
 // after a move, waits for a wake signal when there is nothing to do, and ends when the intent is
 // finished. It holds no client data: its input, signal and activity results are IDs and codes.
 //
+// C06 session 2: when G4 is decided the step asks for a run (`run_prepare`). The workflow prepares
+// it (`prepareRun`, worker), hands it to the runner (`executeRun` on the task queue `sdlc-runner`:
+// one long-running activity with heartbeats, one attempt), and asks the step again. When the run
+// ended the step says `run_ended` and the workflow calls `finishRun`. A lost runner (heartbeat
+// timeout, activity failure) → `abandonRun`: the run's key is revoked at once and the run fails.
+// Old histories never saw the run outcomes, so the new branches replay them unchanged (no patch).
+//
 // Deterministic code only: this file is bundled for the Temporal workflow sandbox and may import
 // `@temporalio/workflow`, `@sdlc/contracts` and types (lint rule in eslint.config.mjs).
 // The escalation clocks are not timers here (ADR-M28): the workflow asks the database. The only
-// timer is the one a step asks for (`wakeInMs`): the gate deadline or the end of a HOTL block
-// window (session 2). When it fires, the workflow simply steps again; the step decides.
-import { INTENT_WAKE_SIGNAL, type IntentStepResult, type IntentWorkflowRef } from '@sdlc/contracts';
+// timers are the one a step asks for (`wakeInMs`) and the pause after a failed activity.
+import {
+  INTENT_WAKE_SIGNAL,
+  RUNNER_TASK_QUEUE,
+  type IntentStepResult,
+  type IntentWorkflowRef,
+  type RunnerActivities,
+} from '@sdlc/contracts';
 import {
   condition,
   continueAsNew,
   defineSignal,
   proxyActivities,
   setHandler,
+  sleep,
   workflowInfo,
 } from '@temporalio/workflow';
 
@@ -33,6 +47,9 @@ export const MAX_MOVES_PER_WAKE = 16;
 /** Shortest timer the workflow sets for a `wakeInMs`. */
 export const MIN_TIMER_MS = 1000;
 
+/** Pause before the workflow asks again after a run activity failed (the worker, not the run). */
+export const RUN_ACTIVITY_RETRY_MS = 60_000;
+
 const { stepIntent } = proxyActivities<IntentActivities>({
   startToCloseTimeout: '1 minute',
   retry: {
@@ -41,6 +58,23 @@ const { stepIntent } = proxyActivities<IntentActivities>({
     // A missing intent never appears later: fail the workflow instead of retrying for ever.
     nonRetryableErrorTypes: ['WorkflowError'],
   },
+});
+
+// The run activities are not retried by Temporal: a retry could issue a second contract or finish
+// twice. The database says what to do next, so the workflow simply asks the step again.
+const { prepareRun, finishRun, abandonRun } = proxyActivities<IntentActivities>({
+  startToCloseTimeout: '5 minutes',
+  retry: { maximumAttempts: 1 },
+});
+
+// One run = one attempt. The runner sends a heartbeat at least every 30 seconds; a lost heartbeat
+// means the runner is gone (ADR-M33 §2.7). The run itself is capped by its contract
+// (`max_duration_min`, at most a few hours in the MVP).
+const { executeRun } = proxyActivities<RunnerActivities>({
+  taskQueue: RUNNER_TASK_QUEUE,
+  startToCloseTimeout: '12 hours',
+  heartbeatTimeout: '2 minutes',
+  retry: { maximumAttempts: 1 },
 });
 
 export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
@@ -53,9 +87,16 @@ export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
     const seen = wakes;
     const result: IntentStepResult = await stepIntent(ref);
     if (result.outcome === 'finished') return result.status;
-    if (result.outcome === 'moved' && moves < MAX_MOVES_PER_WAKE) {
-      moves += 1;
-      continue;
+    if (moves < MAX_MOVES_PER_WAKE) {
+      if (result.outcome === 'moved') {
+        moves += 1;
+        continue;
+      }
+      if (result.outcome === 'run_prepare' || result.outcome === 'run_ended') {
+        moves += 1;
+        if (!(await driveRun(ref, result))) await sleep(RUN_ACTIVITY_RETRY_MS);
+        continue;
+      }
     }
     moves = 0;
     const wakeInMs = result.outcome === 'waiting' ? result.wakeInMs : undefined;
@@ -69,5 +110,38 @@ export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
     if (workflowInfo().continueAsNewSuggested) {
       await continueAsNew<typeof intentWorkflow>(ref);
     }
+  }
+}
+
+/**
+ * One piece of a run's round. Returns false when a worker activity failed (the workflow waits a
+ * little and asks the step again); the runner's failure is not one: the run is abandoned.
+ */
+async function driveRun(
+  ref: IntentWorkflowRef,
+  result: Extract<IntentStepResult, { outcome: 'run_prepare' | 'run_ended' }>,
+): Promise<boolean> {
+  try {
+    if (result.outcome === 'run_ended') {
+      await finishRun(ref, result.runId);
+      return true;
+    }
+    const prepared = await prepareRun(ref);
+    if (!prepared.ok) return true;
+    try {
+      await executeRun({
+        tenantId: ref.tenantId,
+        runId: prepared.runId,
+        modelRef: prepared.modelRef,
+        wrappedGitToken: prepared.wrappedGitToken,
+        wrappedVirtualKey: prepared.wrappedVirtualKey,
+      });
+    } catch {
+      // Heartbeat timeout, the runner stopped, or the activity failed: the run is lost.
+      await abandonRun(ref, prepared.runId);
+    }
+    return true;
+  } catch {
+    return false;
   }
 }

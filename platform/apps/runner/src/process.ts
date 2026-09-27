@@ -13,6 +13,8 @@ export const PROCESS_ENV = {
   dbName: 'SDLC_RUNNER_DB_NAME',
   dbSecretPath: 'SDLC_RUNNER_DB_SECRET_PATH',
   heartbeatFile: 'SDLC_RUNNER_HEARTBEAT_FILE',
+  temporalAddress: 'SDLC_RUNNER_TEMPORAL_ADDRESS',
+  temporalNamespace: 'SDLC_RUNNER_TEMPORAL_NAMESPACE',
 } as const;
 
 /** The database role of every platform process (ADR-M09 section 2.3). */
@@ -30,11 +32,18 @@ export interface ProcessSettings {
   };
   /** Written after each clean-up; the container health check reads its age (healthcheck.ts). */
   readonly heartbeatFile: string;
+  /**
+   * The Temporal frontend of the task queue `sdlc-runner` (C06 session 2, ADR-M33 §2.6); null
+   * (`off`): the runner takes no runs (tests of the process without Temporal).
+   */
+  readonly temporal: { readonly address: string; readonly namespace: string } | null;
 }
 
 const HOST = /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/;
 const DB_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
 const SECRET_PATH = /^runner\/[A-Za-z0-9_.-]+$/;
+const TEMPORAL_ADDRESS = /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}:[0-9]{1,5}$/;
+const TEMPORAL_NAMESPACE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 function invalid(name: string): RunnerError {
   return new RunnerError('runner.config.invalid_setting', { name });
@@ -53,5 +62,15 @@ export function processSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Pr
   if (!DB_NAME.test(name)) throw invalid(PROCESS_ENV.dbName);
   if (!SECRET_PATH.test(secretPath)) throw invalid(PROCESS_ENV.dbSecretPath);
   if (!path.isAbsolute(heartbeatFile)) throw invalid(PROCESS_ENV.heartbeatFile);
-  return { db: { host, port, name, secretPath }, heartbeatFile };
+  const address = env[PROCESS_ENV.temporalAddress] || 'temporal:7233';
+  const namespace = env[PROCESS_ENV.temporalNamespace] || 'default';
+  if (address !== 'off' && !TEMPORAL_ADDRESS.test(address)) {
+    throw invalid(PROCESS_ENV.temporalAddress);
+  }
+  if (!TEMPORAL_NAMESPACE.test(namespace)) throw invalid(PROCESS_ENV.temporalNamespace);
+  return {
+    db: { host, port, name, secretPath },
+    heartbeatFile,
+    temporal: address === 'off' ? null : { address, namespace },
+  };
 }

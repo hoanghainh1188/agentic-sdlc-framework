@@ -156,6 +156,29 @@ describe('AC3: revokeKey', () => {
   });
 });
 
+describe('C06 session 2: revokeRunKey (the key ID never travels)', () => {
+  const RUN = '00000000-0000-4000-8000-000000000007';
+
+  it('deletes the run key by its alias run-<run_id>', async () => {
+    stub.on('POST', '/key/delete', () => ({ body: { deleted_keys: ['x'] } }));
+    await gateway.revokeRunKey(RUN);
+    expect(stub.requests[0]!.body).toEqual({ key_aliases: [`run-${RUN}`] });
+  });
+
+  it('no key for the run is not an error', async () => {
+    stub.on('POST', '/key/delete', () => ({
+      status: 500,
+      body: { error: { message: "{'error': 'No keys found'}", code: '404' } },
+    }));
+    await expect(gateway.revokeRunKey(RUN)).resolves.toBeUndefined();
+  });
+
+  it('refuses a run ID that is not a UUID', async () => {
+    expect((await failure(() => gateway.revokeRunKey('run-1'))).code).toBe('invalid_input');
+    expect(stub.requests).toEqual([]);
+  });
+});
+
 describe('FR-51: ensureTenantBudget (tenant team, UTC calendar month)', () => {
   it('updates the team with a fixed ID and a monthly budget', async () => {
     stub.on('POST', '/team/update', () => ({ body: { team_id: 'sdlc-tenant-acme' } }));
