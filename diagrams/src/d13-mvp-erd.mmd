@@ -14,6 +14,7 @@ erDiagram
     agents ||--o{ runs : "executes"
     intents ||--o{ escalations : "escalates"
     runs ||--o{ escalations : "escalates"
+    escalations ||--o{ escalation_notices : "notifies"
     intents ||--o{ spec_refs : "links spec"
     intents ||--o{ plans : "has plan"
     intents ||--o{ gate_decisions : "passes gates"

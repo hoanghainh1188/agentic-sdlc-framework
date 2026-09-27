@@ -20,6 +20,12 @@ export interface ResolvedApiToken {
   readonly tokenId: string;
 }
 
+/** An escalation whose clock is due (task B11): IDs only. */
+export interface DueEscalation {
+  readonly tenantId: TenantId;
+  readonly escalationId: string;
+}
+
 /** A project the GitHub poller reads (task B06): IDs and the repository name only. */
 export interface PollableProject {
   readonly tenantId: TenantId;
@@ -117,6 +123,29 @@ export class SystemScope {
       projectId: row.id,
       repoFullName: row.repo_full_name,
     }));
+  }
+
+  /**
+   * Escalation clock (task B11, ADR-M28 §2.2): the worker loop advances the clocks of every
+   * tenant and only learns an escalation's tenant from this list. Returns the IDs of escalations
+   * with a clock due at `now`, earliest first, of active tenants. All further work runs in
+   * `forTenant(tenantId)`, which locks the row.
+   */
+  async listDueEscalations(now: Date, limit: number): Promise<DueEscalation[]> {
+    const rows = await run(
+      this.db
+        .selectFrom('escalations as e')
+        .innerJoin('tenants as tn', 'tn.id', 'e.tenant_id')
+        .select(['e.tenant_id', 'e.id'])
+        .where('e.next_check_at', 'is not', null)
+        .where('e.next_check_at', '<=', now)
+        .where('tn.status', '=', 'active')
+        .orderBy('e.next_check_at')
+        .orderBy('e.id')
+        .limit(limit)
+        .execute(),
+    );
+    return rows.map((row) => ({ tenantId: parseTenantId(row.tenant_id), escalationId: row.id }));
   }
 
   /** Health check (task B03): true when the database answers. Reads no table. */

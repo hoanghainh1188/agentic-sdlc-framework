@@ -85,7 +85,32 @@ const UPDATABLE: Record<string, readonly string[]> = {
     'reply_attempts',
     'reply_posted_at',
     'reply_abandoned_at',
+    // B11: the escalation a `/ack` or `/decide` comment acted on (fixed with the result, trigger).
+    'escalation_id',
   ],
+  // B11: state, clocks, acknowledgement and decision; identity, trigger, packet, producers never.
+  escalations: [
+    'backup_owner_id',
+    'current_step',
+    'status',
+    'step_due_at',
+    'remind_at',
+    'reminded_step',
+    'ack_missed_at',
+    'governance_overdue_at',
+    'resolve_due_at',
+    'resolve_overdue_at',
+    'next_check_at',
+    'acknowledged_by',
+    'acknowledged_at',
+    'decision',
+    'decided_by',
+    'decided_at',
+    'closed_at',
+    'updated_at',
+  ],
+  // B11: only the delivery moves (trigger: final once posted or abandoned).
+  escalation_notices: ['attempts', 'posted_at', 'abandoned_at'],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -208,7 +233,9 @@ describeDb('AC2: migrations on PostgreSQL', () => {
         c.confdeltype AS on_delete
       FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace AND n.nspname = 'public'
       WHERE c.contype = 'f' AND c.conrelid::regclass::text NOT LIKE 'kysely_%'`);
-    expect(fks).toHaveLength(30); // C03: cost_records → projects, intents, runs; B06: receipts → projects, gate_decisions
+    // C03: cost_records → projects, intents, runs; B06: receipts → projects, gate_decisions;
+    // B11: escalations → intents, runs, users ×4; notices → escalations; receipts → escalations.
+    expect(fks).toHaveLength(38);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.6 |
+| Version | 1.7 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -235,6 +235,7 @@ trigger (G5 breach, critical finding, disagreement, stopped run, gate overdue…
 ```
 
 - Timers are Temporal timers inside the intent workflow; they survive restarts.
+  - **Changed in version 1.7 (ADR-M28, QUESTIONS #73):** the escalation clocks are stored in the `escalations` row and advanced by a loop in the worker (`next_check_at`, row lock, idempotent), not by Temporal timers. They survive restarts the same way. The intent workflow (B07) must not add a second timer for the same clock; it raises escalations, asks the freeze check before it acts and waits for the resolution.
 - Actions on the pre-approved **safe list** (read-only, sandbox tests, drafts) may continue while waiting; everything else is frozen.
 - Approval authority never passes back to the producer.
 - SLA defaults: Critical 15 min / 1 h; High 1 h / same working day; Medium 1 working day / 3 working days; Low 3 working days / next planned work.
@@ -552,7 +553,7 @@ platform/
 | ADR-M08 | One internal server, limited concurrent runs, Compose profiles | Matches the infrastructure decision; saves cost | No failover if the server breaks → regular backups |
 | ADR-M11 | GitHub events by polling in the MVP, webhooks later | The internal server does not accept inbound internet connections | Delay of tens of seconds; uses API quota → configurable interval |
 | ADR-M13 | Oversight as a data-driven matrix (gate × risk + change flags) in project config | The handbook defines oversight by risk; tuning must not need code changes | Matrix must be validated; wrong config can loosen control → config changes audited and reviewed |
-| ADR-M14 | Escalations as part of the Temporal intent workflow (timers, signals) | Durable clocks, no extra scheduler | Workflow grows more complex → escalation logic kept in its own module with tests |
+| ADR-M14 | Escalations as part of the Temporal intent workflow (timers, signals). **Partly superseded by ADR-M28:** the clocks live in the database, advanced by the worker | Durable clocks, no extra scheduler | Workflow grows more complex → escalation logic kept in its own module with tests |
 | ADR-M15 | Minimal agent register in the platform database | Handbook requires owned, pinned, recertified agents | Recertification workflow deferred to MVP+1 |
 | ADR-M12 | SeaweedFS instead of MinIO, Valkey instead of Redis | MinIO is no longer maintained; Redis licence does not fit a product we sell | Team learns new tools; S3 API / Redis protocol unchanged, so code is unaffected |
 
@@ -610,4 +611,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.4 | 2026-09-26 | Claude (task B05), approved by Harry | §7.1: notes on the contracts `GitHostAdapter` (event kinds, new comments only, numeric account IDs and bots, cursor, later additions); §8.2: the worker reads the GitHub App key (ADR-M23, QUESTIONS #42, #43, #45) |
 | 1.5 | 2026-09-26 | Claude (task C03), approved by Harry | §7.4: notes on the contracts `ModelGateway` (decimal money, tenant budget group, `listModels`, `listSpend`) and the Cost Controller caps; §8.2: the LiteLLM master key has one source, read by the Cost Controller and the LiteLLM sidecar (ADR-M24) |
 | 1.6 | 2026-09-27 | Claude (task C04), approved by Harry | §4: note, the runner clones and pushes (flow and D11 updated in C08); §8: `egress_allowlist` names services; §8.2: the runner no longer reads the GitHub App key, token handed over response-wrapped; §9: sandbox network is LiteLLM and the package proxy only, per-run internal network; §10: sandbox image by digest, profile `sandbox` (QUESTIONS #44, #52–#54, #59; ADR-M25) |
+| 1.7 | 2026-09-27 | Claude (task B11), approved by Harry | §6.4 and §12 (ADR-M14): escalation clocks stored in the database and advanced by the worker, not Temporal timers; B07 adds no second timer (QUESTIONS #73, ADR-M28) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |

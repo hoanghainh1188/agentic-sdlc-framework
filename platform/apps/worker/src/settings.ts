@@ -16,6 +16,8 @@ export const WORKER_ENV = {
   maxReplyAttempts: 'SDLC_WORKER_MAX_REPLY_ATTEMPTS',
   maxEventAttempts: 'SDLC_WORKER_MAX_EVENT_ATTEMPTS',
   heartbeatFile: 'SDLC_WORKER_HEARTBEAT_FILE',
+  escalationTickMs: 'SDLC_WORKER_ESCALATION_TICK_MS',
+  escalationBatch: 'SDLC_WORKER_ESCALATION_BATCH',
   devMode: 'SDLC_WORKER_DEV_MODE',
   devDbUrl: 'SDLC_WORKER_DEV_DB_URL',
 } as const;
@@ -46,6 +48,9 @@ const schema = z.object({
   [WORKER_ENV.maxReplyAttempts]: z.coerce.number().int().min(1).max(100).default(5),
   [WORKER_ENV.maxEventAttempts]: z.coerce.number().int().min(1).max(20).default(3),
   [WORKER_ENV.heartbeatFile]: z.string().min(1).default('/tmp/sdlc-worker.heartbeat'),
+  // The shortest SLA clock is minutes long (codes table §6.3), so 15 s is precise enough.
+  [WORKER_ENV.escalationTickMs]: z.coerce.number().int().min(1000).max(300_000).default(15_000),
+  [WORKER_ENV.escalationBatch]: z.coerce.number().int().min(1).max(1000).default(100),
   [WORKER_ENV.devMode]: z.enum(['', '0', '1']).default(''),
   [WORKER_ENV.devDbUrl]: z.string().optional(),
   NODE_ENV: z.string().optional(),
@@ -71,6 +76,10 @@ export interface WorkerSettings {
   /** Failed attempts before an event is given up (`failed_internal`, ADR-M27 §2.2). */
   readonly maxEventAttempts: number;
   readonly heartbeatFile: string;
+  /** How often the escalation clock loop runs (B11, ADR-M28 §2.2). Technical, not a handbook rule. */
+  readonly escalationTickMs: number;
+  /** Escalations advanced per tick at most. */
+  readonly escalationBatch: number;
 }
 
 export type WorkerSettingsKey =
@@ -125,5 +134,7 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     maxReplyAttempts: v[WORKER_ENV.maxReplyAttempts],
     maxEventAttempts: v[WORKER_ENV.maxEventAttempts],
     heartbeatFile: v[WORKER_ENV.heartbeatFile],
+    escalationTickMs: v[WORKER_ENV.escalationTickMs],
+    escalationBatch: v[WORKER_ENV.escalationBatch],
   };
 }

@@ -99,6 +99,40 @@ export const AUDIT_ACTIONS = {
   },
   /** The runner refused the Run Contract of a known run; `reason` is a reject reason code. */
   'run.contract_rejected': { entityType: 'run', fields: { reason: 'code' } },
+  /** An escalation was raised (FR-18, B11). Codes and IDs only, never the words of the package. */
+  'escalation.created': {
+    entityType: 'escalation',
+    fields: {
+      code: 'code',
+      intent_id: 'uuid',
+      trigger: 'code',
+      route: 'code',
+      severity: 'code',
+      response_level: 'code',
+      step: 'code',
+      subject_sha256: 'sha256',
+      run_id: 'uuid?',
+      gate: 'code?',
+    },
+  },
+  /** Nobody but producers holds any role of the route or governance (QUESTIONS #74). */
+  'escalation.unrouted': { entityType: 'escalation', fields: { code: 'code' } },
+  /** The holder of the current step was reminded (Ch.6 §6.5, QUESTIONS #75). */
+  'escalation.reminded': { entityType: 'escalation', fields: { code: 'code', step: 'code' } },
+  /** Nobody acknowledged in time: the escalation moved to the next step (Ch.6 §6.5). */
+  'escalation.step_changed': {
+    entityType: 'escalation',
+    fields: { code: 'code', from_step: 'code', to_step: 'code' },
+  },
+  /** Governance, the last step, did not acknowledge in time either. Recorded once. */
+  'escalation.ack_overdue': { entityType: 'escalation', fields: { code: 'code' } },
+  /** The resolve deadline passed without a decision; governance takes over. Recorded once. */
+  'escalation.resolve_overdue': {
+    entityType: 'escalation',
+    fields: { code: 'code', from_step: 'code' },
+  },
+  /** A Critical escalation passed its resolve deadline: the incident process is due (Ch.6 §6.7). */
+  'escalation.incident_due': { entityType: 'escalation', fields: { code: 'code' } },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;
