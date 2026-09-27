@@ -64,6 +64,14 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.returned';
     case 'ai_record_refused':
       return 'intent.status.ai_record_refused';
+    case 'g4_refused':
+      return 'intent.status.g4_refused';
+    case 'blocked':
+      return 'intent.status.blocked';
+    case 'run_proposed':
+      return 'intent.status.run_proposed';
+    case 'agent_recertification_due':
+      return 'intent.status.agent_recertification_due';
     default:
       return notice.gate !== null && isCommandGate(notice.gate)
         ? 'intent.status.advanced'
@@ -78,6 +86,10 @@ export interface IntentNoticeView {
   readonly reasonCode: string | null;
   /** HOTL pass: when its block window closes (UTC). */
   readonly windowEnd?: Date | null;
+  /** C06: the agent key (run proposal, recertification warning). */
+  readonly agentKey?: string | null;
+  /** C06: the base commit of the run proposal, short form. */
+  readonly baseSha?: string | null;
 }
 
 /** `YYYY-MM-DD HH:MM UTC`: the same text whatever the reader's locale. */
@@ -107,6 +119,8 @@ export function renderIntentNotice(
           : t('escalation.notice.nobody', {}, locale),
       reason: view.reasonCode ?? 'other',
       window_end: view.windowEnd ? formatUtcMinute(view.windowEnd) : '—',
+      agent: view.agentKey ?? '—',
+      base_sha: view.baseSha ?? '—',
     },
     locale,
   );
@@ -138,13 +152,36 @@ async function viewOf(
     const passAt = await decisionRecordedAt(scope, intent.id, decision.id);
     windowEnd = passAt === null ? null : blockWindowEnd(passAt, config);
   }
+  const agent = notice.agent_id === null ? undefined : await scope.agents.getById(notice.agent_id);
+  const proposal = notice.kind === 'run_proposed' ? await lastProposal(scope, intent.id) : null;
+  const mentions = await mentionsFor(scope, intent.project_id, notice.audience_roles, []);
+  // The recertification warning goes to the agent's owner (ADR-M31 §2.7), read now.
+  if (agent) mentions.push(...(await loginsOf(scope, agent.owner_id)));
   return {
     code: intent.code,
     deciders: decision ? await loginsOf(scope, decision.decided_by) : [],
-    mentions: await mentionsFor(scope, intent.project_id, notice.audience_roles, []),
+    mentions: [...new Set(mentions)].sort(),
     reasonCode: decision?.reason_code ?? null,
     windowEnd,
+    agentKey: agent?.agent_key ?? (proposal ? await agentKeyOf(scope, proposal.agentId) : null),
+    baseSha: proposal ? proposal.baseSha.slice(0, 12) : null,
   };
+}
+
+/** The last run proposal of the intent (`run.proposed`): IDs and hashes only. */
+async function lastProposal(
+  scope: TenantScope,
+  intentId: string,
+): Promise<{ readonly baseSha: string; readonly agentId: string } | null> {
+  const payload = (await scope.audit.listForEntity(intentId, ['run.proposed'])).at(-1)?.payload as
+    { base_sha?: unknown; agent_id?: unknown } | undefined;
+  return typeof payload?.base_sha === 'string' && typeof payload.agent_id === 'string'
+    ? { baseSha: payload.base_sha, agentId: payload.agent_id }
+    : null;
+}
+
+async function agentKeyOf(scope: TenantScope, agentId: string): Promise<string | null> {
+  return (await scope.agents.getById(agentId))?.agent_key ?? null;
 }
 
 /** Posts the pending status comments of a project, oldest first. */

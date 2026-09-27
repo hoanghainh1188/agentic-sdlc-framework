@@ -48,6 +48,36 @@ describe('B07: gate status comments', () => {
     expect(body).toContain('`/request-changes G2 <reason>`');
   });
 
+  it('C06: a run proposal names the agent and the base commit, and how to decide G4', () => {
+    const body = renderIntentNotice(
+      { id: '21', kind: 'run_proposed', gate: 'G4', previous_gate: null },
+      { ...view, deciders: [], agentKey: 'coder-openhands', baseSha: '1111111111ab' },
+    );
+    expect(body).toContain('waits at **G4**');
+    expect(body).toContain('agent `coder-openhands`, base commit `1111111111ab`');
+    expect(body).toContain('@bob: decide with `/approve G4`');
+  });
+
+  it('C06: a G4 refusal, a block and the recertification warning name their reason', () => {
+    const refused = renderIntentNotice(
+      { id: '22', kind: 'g4_refused', gate: 'G4', previous_gate: null },
+      { ...view, reasonCode: 'instructions_mismatch' },
+    );
+    expect(refused).toContain('a G4 check failed (reason code `instructions_mismatch`)');
+    const blocked = renderIntentNotice(
+      { id: '23', kind: 'blocked', gate: 'G4', previous_gate: 'G4' },
+      { ...view, reasonCode: 'policy_denied' },
+    );
+    expect(blocked).toContain('was blocked at **G4**');
+    expect(blocked).toContain('The agent never runs');
+    const due = renderIntentNotice(
+      { id: '24', kind: 'agent_recertification_due', gate: 'G4', previous_gate: null },
+      { ...view, agentKey: 'coder-openhands' },
+    );
+    expect(due).toContain('agent `coder-openhands`, whose recertification is overdue');
+    expect(due).toContain('The run is not blocked');
+  });
+
   it('a return names who sent the gate back and the gate the intent left', () => {
     const body = renderIntentNotice(
       { id: '17', kind: 'returned', gate: 'G3', previous_gate: 'G4' },

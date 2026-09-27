@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.10 |
+| Version | 1.11 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29); 1.9 approved by Harry on 2026-09-27 in the B07 session 2 plan (HOTL block window, C06 waits for it, the gate deadline timer; ADR-M30); 1.10 approved by Harry on 2026-09-27 in the B12 plan (project AI record module: codes only, write roles, G1 check at the submit; ADR-M32) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29); 1.9 approved by Harry on 2026-09-27 in the B07 session 2 plan (HOTL block window, C06 waits for it, the gate deadline timer; ADR-M30); 1.10 approved by Harry on 2026-09-27 in the B12 plan (project AI record module: codes only, write roles, G1 check at the submit; ADR-M32); 1.11 approved by Harry on 2026-09-27 in the C06 plan (G4 checks and decisions, `getBranchHead`, the worker holds the Cost Controller AppRole; QUESTIONS #108–#112; ADR-M33) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -196,6 +196,7 @@ General rules:
 - **No gate is ever auto-approved by silence.** HOTL at a human gate passes only when all policy conditions hold, and the notified person can still block within the gate's window.
   - Version 1.9 (ADR-M30 §2.4b, QUESTIONS #88): the platform records the HOTL pass at once and the intent moves on. Within `oversight.hotl_block_window`, a person with the gate's role may reject the passed gate or request changes; a request for changes takes the intent back to that gate, a rejection ends it. An explicit approval opens no window. **C06 does not start a run before the last open window closes** (`hotlBlockWindowOpenUntil`). No HOTL pass again on an input a person sent back.
   - A human gate that waits past `oversight.hitl_gate_deadline` raises one escalation (trigger `time`, level from `oversight.gate_overdue`), closed when the gate is decided (ADR-M30 §2.9). This deadline is the only Temporal timer of the intent workflow.
+- **G4** (version 1.11, ADR-M33 §2.4, QUESTIONS #110): the checks run in a fixed order (Critical or L0, block window, freeze, approved spec and plan, AI record, agent register, intent budget). Critical risk or an effective autonomy of L0 → `blocked`, which is final. Any other failed check records a system `fail` once per cause and the intent **waits at G4**; the next wake checks again. A G4 pass or approval is bound to the run proposal (plan, spec, agent and version, instructions, model, autonomy, tools, caps, base commit); a changed proposal voids a G4 approval (FR-17).
 - Retry counts, thresholds, the oversight matrix and SLAs **come from per-project configuration**.
 
 ### 6.1. Resolving the oversight mode
@@ -263,6 +264,7 @@ interface GitHostAdapter {
   getCheckStatus(ref: RepoRef, sha: string): Promise<CheckSummary>;
   getApprovals(ref: RepoRef, pr: number): Promise<Approval[]>;
   getFileAtCommit(ref: RepoRef, path: string, sha: string): Promise<string>;
+  getBranchHead(ref: RepoRef, branch: string): Promise<string>;
   issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken>;
   listEventsSince(ref: RepoRef, cursor: EventCursor): Promise<{ events: GitEvent[]; next: EventCursor }>; // MVP: polling
   verifyWebhook(headers: Record<string, string>, rawBody: Buffer): GitEvent; // enabled later
@@ -272,12 +274,13 @@ MVP: `GitHubAdapter` through a **GitHub App** (short-lived per-repo tokens), rea
 
 - Polling and webhooks return the same `GitEvent` type → one handler for `/approve` commands, reviews and CI.
 - The `EventCursor` is stored per project in the database, so events are not processed twice after a restart.
-- The exact TypeScript interface is `GitHostAdapter` in `@sdlc/contracts` (`platform/packages/contracts/src/git-host.ts`, task B05, ADR-M23). Same nine methods and parameters as above. Notes:
+- The exact TypeScript interface is `GitHostAdapter` in `@sdlc/contracts` (`platform/packages/contracts/src/git-host.ts`, task B05, ADR-M23). Same ten methods and parameters as above. Notes:
   - `GitEvent` has three kinds: `comment_created`, `review_submitted`, `check_completed`. Each has a stable `id` (the same for polling and webhooks) and a `url` to store as a reference. Only a comment's `body` is free text; it is never stored in an append-only table.
   - Only **new** comments are events; an edited comment never is (QUESTIONS #43).
   - Actors carry the numeric account ID and `type: user | bot`. Users are mapped by the numeric ID only; bots never count as approvers (QUESTIONS #45).
   - `EventCursor` is opaque; the adapter returns `next` and the caller (B06) stores it. A new project starts from `INITIAL_EVENT_CURSOR` (no history).
   - `getChangedFiles` returns both paths of a renamed file and fails instead of returning a partial list. `getApprovals` returns each reviewer's latest decision, bound to the reviewed commit.
+  - `getBranchHead` (version 1.11, task C06, QUESTIONS #109): the commit a branch points to now. G4 reads the head of the default branch as the run's `base_sha`.
   - Later tasks add what they need, with a D-03 update: opening a pull request (C08), revoking a short-lived token (C11), the merge event (E01).
 
 ### 7.2. Agent
@@ -403,7 +406,7 @@ Licence note [External]:
 |---|---|---|
 | Run Contract signing key | Transit (non-exportable) | worker (signs), runner (reads the public key) |
 | GitHub App private key | KV | api, worker (polls GitHub, posts gate comments, reads specs, issues the run's single-repository token; QUESTIONS #42, #44). **Not the runner**: it receives the run's token from the worker as an OpenBao response-wrapped token (single use), unwraps it once and keeps it in memory only (ADR-M25) |
-| LiteLLM master key | KV (`kv/cost-controller/litellm-master-key`) | Cost Controller; LiteLLM through its OpenBao Agent sidecar (AppRole `litellm`, this one path only). One source for both (ADR-M24) |
+| LiteLLM master key | KV (`kv/cost-controller/litellm-master-key`) | Cost Controller; LiteLLM through its OpenBao Agent sidecar (AppRole `litellm`, this one path only). One source for both (ADR-M24). Version 1.11 (ADR-M33 §2.5, QUESTIONS #112): the Cost Controller runs in the **worker** process, which logs in with two AppRoles (`worker` and `cost-controller`) and so can use this key. The worker hands the run's virtual key to the runner as a single-use wrapping token, like the GitHub token |
 | Model provider API keys | KV | **LiteLLM only**, through an OpenBao Agent sidecar (AppRole `litellm`) that renders them to a tmpfs file LiteLLM reads at start-up. No LiteLLM Enterprise licence (QUESTIONS #1) |
 | Database and SeaweedFS passwords | KV | The matching process |
 
@@ -623,4 +626,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.8 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §7.2: notes on the contracts `AgentAdapter` (endpoint and session key, model from `allowed_models`, agent states, `commitWork`, outputs recomputed outside the sandbox) (ADR-M29, QUESTIONS #79, #80) |
 | 1.9 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | §6 general rules: the HOTL block window, C06 waits for it, overdue human gates; §6.4 the gate deadline is the workflow's only timer (ADR-M30 §2.4b, §2.9; QUESTIONS #88, #90) |
 | 1.10 | 2026-09-27 | Claude (task B12), approved by Harry | §5.2 Project AI Record: codes only, version history, write roles, the G1 check at the submit (ADR-M32, QUESTIONS #103–#106) |
+| 1.11 | 2026-09-27 | Claude (task C06, session 1), approved by Harry | §6: G4 check order, blocked is final, failed checks wait at G4, G4 bound to the run proposal; §7.1: `getBranchHead` (ten methods); §8.2: the worker holds the Cost Controller AppRole, the virtual key is handed over wrapped (ADR-M33, QUESTIONS #108–#112) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |

@@ -116,6 +116,42 @@ describe('getFileAtCommit (AC3)', () => {
   });
 });
 
+describe('getBranchHead (C06, QUESTIONS #109)', () => {
+  const REF = '/repos/acme/shop/git/ref/heads/release/v1';
+
+  it('returns the commit the branch points to', async () => {
+    h.stub.on('GET', REF, {
+      body: { ref: 'refs/heads/release/v1', object: { type: 'commit', sha: SHA_A } },
+    });
+    await expect(h.adapter().getBranchHead(REPO, 'release/v1')).resolves.toBe(SHA_A);
+    expect(h.stub.requestsTo('GET', REF)).toHaveLength(1);
+  });
+
+  it('refuses a reference that is not a commit', async () => {
+    h.stub.on('GET', REF, { body: { object: { type: 'tag', sha: SHA_A } } });
+    await expect(h.adapter().getBranchHead(REPO, 'release/v1')).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
+
+  it('maps a missing branch to not_found', async () => {
+    await expect(h.adapter().getBranchHead(REPO, 'gone')).rejects.toMatchObject({
+      code: 'not_found',
+    });
+  });
+
+  it.each(['', '../main', 'a..b', '-x', 'a//b', '.hidden', 'x.lock', 'a b', 'a?b', 'a/'])(
+    'refuses the branch name %j without calling GitHub',
+    async (branch) => {
+      await expect(h.adapter().getBranchHead(REPO, branch)).rejects.toMatchObject({
+        code: 'invalid_input',
+        params: { field: 'branch' },
+      });
+      expect(h.stub.requests).toHaveLength(0);
+    },
+  );
+});
+
 describe('getPullRequest and getChangedFiles', () => {
   it('returns the pull request without its free-text title or body', async () => {
     h.stub.on('GET', '/repos/acme/shop/pulls/7', { body: pull(7, '2026-09-26T07:00:00Z') });

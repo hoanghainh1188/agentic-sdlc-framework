@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { MIGRATIONS } from '../../packages/core/src/db/migrations/index.js';
 import { TABLE_COLUMNS, TENANT_COLUMN } from '../../packages/core/src/db/schema.js';
 import { DB_ENUMS } from '../../packages/core/src/db/vocabulary.js';
+import { enumValuesAfterMigrations } from './enum-values.js';
 
 const repoRoot = path.resolve(__dirname, '../../..');
 const upSql = Object.values(MIGRATIONS)
@@ -60,10 +61,7 @@ describe('AC2: tenancy tables (static checks of the migration SQL)', () => {
 
   it('creates the enums with the canonical values (D-05 section 5)', () => {
     for (const [name, values] of Object.entries(DB_ENUMS)) {
-      const match = new RegExp(`CREATE TYPE ${name} AS ENUM\\s*\\(([^)]*)\\)`).exec(upSql);
-      expect(match, name).not.toBeNull();
-      const created = [...match![1]!.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-      expect(created, name).toEqual([...values]);
+      expect(enumValuesAfterMigrations(name), name).toEqual([...values]);
     }
   });
 

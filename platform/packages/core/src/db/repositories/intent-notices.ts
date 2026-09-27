@@ -18,6 +18,10 @@ import { TenantRepository } from './base.js';
  * within the block window took the intent back to the passed gate (`returned`).
  * `ai_record_refused` (B12): the project AI record check stopped the submit; the intent stays
  * `draft` until the record allows it.
+ * C06 (G4, ADR-M33): `g4_refused` (a G4 check failed; the intent waits at G4), `blocked` (Critical
+ * risk or no autonomy: the agent never runs, the intent ends), `run_proposed` (G4 is HITL: the run
+ * proposal to approve is new or changed), `agent_recertification_due` (a run starts with an agent
+ * whose recertification is overdue; mentions the agent's owner, `agent_id`).
  */
 export const INTENT_NOTICE_KINDS = [
   'submitted',
@@ -27,6 +31,10 @@ export const INTENT_NOTICE_KINDS = [
   'hotl_passed',
   'returned',
   'ai_record_refused',
+  'g4_refused',
+  'blocked',
+  'run_proposed',
+  'agent_recertification_due',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 
@@ -39,6 +47,7 @@ const SCALAR_COLUMNS = [
   'gate',
   'previous_gate',
   'decision_id',
+  'agent_id',
   'attempts',
   'posted_at',
   'abandoned_at',
@@ -57,6 +66,8 @@ export interface NewIntentNotice {
   readonly decisionId: string | null;
   /** Roles to mention: the people who act next. Never `viewer`. */
   readonly audienceRoles: readonly ProjectRole[];
+  /** The agent the notice is about; its owner is mentioned too (C06). */
+  readonly agentId?: string | null;
 }
 
 export class IntentNoticeRepository extends TenantRepository {
@@ -75,6 +86,7 @@ export class IntentNoticeRepository extends TenantRepository {
           previous_gate: notice.previousGate,
           decision_id: notice.decisionId,
           audience_roles: roles,
+          agent_id: notice.agentId ?? null,
         })
         .returning([...SCALAR_COLUMNS, audienceRoles])
         .executeTakeFirstOrThrow(),

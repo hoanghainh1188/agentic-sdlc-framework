@@ -9,10 +9,13 @@ export {
 } from './gate-command.js';
 export {
   COMMAND_GATES,
+  DECIDABLE_GATES,
   gateInputSha256,
   intentInputSha256,
   isCommandGate,
+  isDecidableGate,
   type CommandGate,
+  type DecidableGate,
 } from './gate-input.js';
 export {
   isRefusalReason,

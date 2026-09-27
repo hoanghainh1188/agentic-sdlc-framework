@@ -169,7 +169,7 @@ export class SystemScope {
         .selectFrom('intents as i')
         .innerJoin('tenants as tn', 'tn.id', 'i.tenant_id')
         .select(['i.tenant_id', 'i.id'])
-        .where('i.status', 'not in', ['done', 'rejected', 'cancelled'])
+        .where('i.status', 'not in', ['done', 'rejected', 'cancelled', 'blocked'])
         .where('tn.status', '=', 'active')
         .$if(after !== undefined, (qb) =>
           qb.where((eb) =>

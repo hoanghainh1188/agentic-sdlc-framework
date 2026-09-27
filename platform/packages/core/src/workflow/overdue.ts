@@ -10,14 +10,21 @@
 // (ADR-M28): the workflow adds no timer for them. The workflow closes its escalation itself once
 // the gate is decided, so its freeze never blocks the move it was raised for.
 import { deadlineFrom } from '@sdlc/config';
-import type { EscalationRoute, OversightResolution, ProjectConfig } from '@sdlc/contracts';
+import type {
+  EscalationRoute,
+  GateCode,
+  OversightResolution,
+  ProjectConfig,
+} from '@sdlc/contracts';
 
-import type { CommandGate } from '../commands/gate-input.js';
 import type { Escalation, Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { closeEscalation } from '../escalation/decide.js';
 import { raiseEscalation } from '../escalation/raise.js';
 import type { Registry } from '../registry/registry.js';
+
+/** Gates that wait for a person with a deadline: G1–G3 (B07) and G4 when HITL (C06). */
+export type HumanGate = Extract<GateCode, 'G1' | 'G2' | 'G3' | 'G4'>;
 
 /** Statuses of an escalation that is not closed. */
 const NOT_CLOSED = ['open', 'acknowledged', 'resolved'] as const;
@@ -45,18 +52,21 @@ export function overdueRoute(oversight: Pick<OversightResolution, 'roles'>): Esc
   return oversight.roles.includes('person_a') ? 'intent' : 'technical';
 }
 
-function isGateOverdue(escalation: Escalation, gate: CommandGate): boolean {
+function isGateOverdue(escalation: Escalation, gate: HumanGate): boolean {
   return escalation.trigger === 'time' && escalation.packet.gate === gate;
 }
 
 export interface OverdueInput {
   readonly intent: Intent;
-  readonly gate: CommandGate;
+  readonly gate: HumanGate;
   readonly config: ProjectConfig;
   readonly oversight: OversightResolution;
   readonly clockStart: Date;
   /** The version a decision on the escalation is bound to (the gate's input, or the intent). */
-  readonly subject: { readonly kind: 'intent' | 'spec' | 'plan'; readonly sha256: string };
+  readonly subject: {
+    readonly kind: 'intent' | 'spec' | 'plan' | 'run_contract';
+    readonly sha256: string;
+  };
 }
 
 /**
@@ -91,7 +101,7 @@ export async function checkGateOverdue(
         subject_sha256: input.subject.sha256,
         gate: input.gate,
       },
-      // At G1–G3 no change has been produced yet (QUESTIONS #64).
+      // At G1–G4 no change has been produced yet (QUESTIONS #64).
       producers: [],
       raisedBy: { type: 'system' },
     },
@@ -108,7 +118,7 @@ export async function closeGateOverdue(
   scope: TenantScope,
   registry: Registry,
   intentId: string,
-  gate: CommandGate,
+  gate: HumanGate,
 ): Promise<number> {
   const open = (await scope.escalations.listForIntent(intentId, { statuses: NOT_CLOSED })).filter(
     (e) => isGateOverdue(e, gate),

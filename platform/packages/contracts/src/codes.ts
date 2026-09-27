@@ -101,6 +101,9 @@ export const RUN_STATUSES = [
 ] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
+/** An agent's key in the register (ADR-M31), also the project config `run.agent_key` (C06). */
+export const AGENT_KEY_PATTERN = /^[a-z][a-z0-9-]{0,62}[a-z0-9]$/;
+
 /**
  * Status of a registered agent (design/D-05 section 5 `agent_status`, handbook Ch.20). Only
  * `active` agents may run (D-02 FR-36); `retired` is final and keeps the identity reserved.
@@ -168,6 +171,12 @@ export const GATE_REASON_CODES = [
   'expired',
   'input_mismatch',
   'scope_mismatch',
+  // G4 (task C06, ADR-M33, QUESTIONS #110): the agent check failed (not registered, not active,
+  // model not pinned or not allowed, not approved for the sandbox, none configured), the
+  // instructions file differs from the registered version, or the run's autonomy is not allowed.
+  'agent_not_runnable',
+  'instructions_mismatch',
+  'autonomy_not_allowed',
   'other',
 ] as const;
 export type GateReasonCode = (typeof GATE_REASON_CODES)[number];

@@ -487,6 +487,8 @@ export interface IntentNoticesTable {
   decision_id: Immutable<string | null>;
   /** Roles mentioned in the comment: the people who act next. Never `viewer`. */
   audience_roles: ColumnType<ProjectRole[], ProjectRole[] | undefined, never>;
+  /** The agent a notice is about (C06: the recertification warning mentions its owner). */
+  agent_id: ColumnType<string | null, string | null | undefined, never>;
   attempts: ColumnType<number, number | undefined, number>;
   posted_at: ColumnType<Date | null, never, Date>;
   abandoned_at: ColumnType<Date | null, never, Date>;
@@ -852,6 +854,7 @@ export const TABLE_COLUMNS = {
     'posted_at',
     'abandoned_at',
     'created_at',
+    'agent_id',
   ]),
   project_ai_record_versions: columns<ProjectAiRecordVersionsTable>()([
     'tenant_id',

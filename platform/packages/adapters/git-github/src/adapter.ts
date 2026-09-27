@@ -208,6 +208,23 @@ export class GitHubAdapter implements GitHostAdapter {
     }
   }
 
+  /**
+   * The commit a branch points to now (task C06, G4 base commit; QUESTIONS #109). Reads the Git
+   * reference `heads/<branch>`; an annotated or other non-commit object is refused.
+   */
+  async getBranchHead(ref: RepoRef, branch: string): Promise<string> {
+    const base = repoPath(ref);
+    const encoded = encodeBranch(branch);
+    const res = await this.#auth.withRepoAuth(ref, (auth) =>
+      this.#http.json('GET', `${base}/git/ref/heads/${encoded}`, { auth }),
+    );
+    const object = obj(obj(res.body, 'ref').object, 'ref.object');
+    if (str(object.type, 'ref.object.type') !== 'commit') {
+      throw new GitHostError('invalid_response', { field: 'ref.object.type' });
+    }
+    return sha(object.sha, 'ref.object.sha');
+  }
+
   async issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken> {
     const repo = checkRepo(ref);
     const minted = await this.#auth.mint(repo, checkScope(scope));
@@ -245,6 +262,25 @@ function summaryState(checks: readonly CheckItem[]): CheckSummary['state'] {
 }
 
 /** A repository file path for the contents API: relative, no `.` or `..` segments. */
+/**
+ * A branch name, checked before it reaches a URL: Git's reference rules for the characters the
+ * platform needs (letters, digits, `.`, `_`, `-`, `/` between parts), at most 255 characters.
+ */
+function encodeBranch(branch: string): string {
+  if (
+    typeof branch !== 'string' ||
+    branch.length === 0 ||
+    branch.length > 255 ||
+    !/^[A-Za-z0-9._/-]+$/.test(branch) ||
+    branch.endsWith('.lock') ||
+    branch.startsWith('-') ||
+    branch.split('/').some((s) => s === '' || s.startsWith('.') || s.includes('..'))
+  ) {
+    throw new GitHostError('invalid_input', { field: 'branch' });
+  }
+  return branch.split('/').map(encodeURIComponent).join('/');
+}
+
 function encodeFilePath(path: string): string {
   if (typeof path !== 'string' || path.length === 0 || path.length > 4096) {
     throw new GitHostError('invalid_input', { field: 'path' });

@@ -44,7 +44,7 @@ const contract = methods(
 );
 
 describe('GitHostAdapter matches D-03 section 7.1 (AC4)', () => {
-  it('the design doc lists the nine methods', () => {
+  it('the design doc lists the ten methods', () => {
     expect([...design.keys()]).toEqual([
       'createIssueComment',
       'getPullRequest',
@@ -52,6 +52,7 @@ describe('GitHostAdapter matches D-03 section 7.1 (AC4)', () => {
       'getCheckStatus',
       'getApprovals',
       'getFileAtCommit',
+      'getBranchHead',
       'issueShortLivedToken',
       'listEventsSince',
       'verifyWebhook',

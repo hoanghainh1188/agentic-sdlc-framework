@@ -68,7 +68,19 @@ export type IntentWaitReason =
   | 'ai_record'
   /** An escalation freezes the intent (ADR-M28 §2.4). */
   | 'frozen'
-  /** The intent waits at a gate that later tasks handle (G4: C06). */
+  /**
+   * The intent waits at a gate that later tasks handle, or for the end of the last HOTL block
+   * window before a run may start (G4, ADR-M30 §2.4b).
+   */
   | 'later_gate'
+  /**
+   * A G4 check failed (task C06, ADR-M33): the agent, its instructions, the AI record, the
+   * approved inputs or the budget. A system `fail` records the cause; the next wake checks again.
+   */
+  | 'g4_check'
+  /** G4 passed or was approved; the run starts (C06 session 2 hands it to the runner). */
+  | 'run_pending'
+  /** The Git host could not be read for the G4 facts (base commit, instructions file). */
+  | 'git_host_unavailable'
   /** A status that the workflow does not move (`paused`, `blocked`, `running`). */
   | 'not_in_gate';

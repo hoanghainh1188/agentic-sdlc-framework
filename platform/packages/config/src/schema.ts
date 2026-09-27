@@ -2,6 +2,7 @@
 // Mandatory handbook rules are checked separately, in mandatory-rules.ts.
 // Error text never comes from zod: issues are mapped to message keys in `toConfigIssues`.
 import {
+  AGENT_KEY_PATTERN,
   AUTONOMY_LEVELS,
   CHANGE_FLAGS,
   OVERSIGHT_MODES,
@@ -190,6 +191,7 @@ export const projectConfigSchema = z.strictObject({
     contract_clock_skew_seconds: nonNegativeInt,
     default_max_iterations: positiveInt,
     default_max_duration_minutes: positiveInt,
+    agent_key: z.string().regex(AGENT_KEY_PATTERN).nullable(),
   }),
   budget: z.strictObject({
     warn_percent: positiveInt,

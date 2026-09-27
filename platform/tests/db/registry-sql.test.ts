@@ -9,15 +9,10 @@ import { MIGRATIONS } from '../../packages/core/src/db/migrations/index.js';
 import { TenantGuardPlugin } from '../../packages/core/src/db/tenant-guard-plugin.js';
 import { parseTenantId } from '../../packages/core/src/db/tenant-id.js';
 import { DB_ENUMS } from '../../packages/core/src/db/vocabulary.js';
+import { enumValuesAfterMigrations } from './enum-values.js';
 import { dummyDb, SOME_ID, TENANT_A } from './dummy.js';
 
 const up = MIGRATIONS['0003-registry']!.statements.up.join(';\n');
-
-function enumValues(name: string): string[] {
-  const match = new RegExp(`CREATE TYPE ${name} AS ENUM\\s*\\(([^)]*)\\)`).exec(up);
-  if (!match) throw new Error(`enum ${name} not found`);
-  return [...match[1]!.matchAll(/'([^']+)'/g)].map((m) => m[1]!);
-}
 
 describe('migration 0003: registry', () => {
   it('lists the same enum values as @sdlc/contracts (via DB_ENUMS)', () => {
@@ -32,7 +27,7 @@ describe('migration 0003: registry', () => {
       'gate_reason_code',
       'event_source',
     ] as const) {
-      expect(enumValues(name), name).toEqual([...DB_ENUMS[name]]);
+      expect(enumValuesAfterMigrations(name), name).toEqual([...DB_ENUMS[name]]);
     }
   });
 

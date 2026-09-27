@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.14 |
+| Version | 1.15 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the C10 plan (agent register; ADR-M31); 1.12 approved by Harry on 2026-09-27 in the B07 plan (intent workflow: `gate_entered_at`, one open intent per issue, status notices; ADR-M30, QUESTIONS #68, #91); 1.13 approved by Harry on 2026-09-27 in the B07 session 2 plan (notice kinds `hotl_passed` and `returned`, `waited_seconds`, clocks of `escalations.created_at` and gate decision events; ADR-M30 §2.4b, §2.9); 1.14 approved by Harry on 2026-09-27 in the B12 plan (project AI record: codes only, version history; ADR-M32, QUESTIONS #103–#106) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the C10 plan (agent register; ADR-M31); 1.12 approved by Harry on 2026-09-27 in the B07 plan (intent workflow: `gate_entered_at`, one open intent per issue, status notices; ADR-M30, QUESTIONS #68, #91); 1.13 approved by Harry on 2026-09-27 in the B07 session 2 plan (notice kinds `hotl_passed` and `returned`, `waited_seconds`, clocks of `escalations.created_at` and gate decision events; ADR-M30 §2.4b, §2.9); 1.14 approved by Harry on 2026-09-27 in the B12 plan (project AI record: codes only, version history; ADR-M32, QUESTIONS #103–#106); 1.15 approved by Harry on 2026-09-27 in the C06 plan (G4 reason codes, notice kinds and `intent_notices.agent_id`, a blocked intent is finished; ADR-M33, QUESTIONS #110) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -106,7 +106,7 @@ Use the canonical codes (handbook/00-introduction/05-codes.md).
 | `escalation_step` | `owner`, `backup`, `governance`: the chain when nobody acknowledges (handbook Ch.6 §6.5; ADR-M28) |
 | `git_provider` | `github` (MVP), `gitlab` (MVP+1) |
 | `event_source` | `polling`, `webhook` |
-| `gate_reason_code` | `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other` (ADR-M20) |
+| `gate_reason_code` | `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `agent_not_runnable`, `instructions_mismatch`, `autonomy_not_allowed` (G4, ADR-M33), `other` (ADR-M20) |
 
 - [Proposal] `gate_decision`: `pass` / `fail` are used by automatic gates (G4, G5, G6). The other values are used by human gates.
 - The `data_class` of an intent is set at G1 and **can never be lowered** afterwards (it can only be raised).
@@ -305,7 +305,7 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 
 - This is the **only** table in the intent group that is UPDATEd (current state). History lives in `gate_decisions` and `audit_log`.
 - Only the intent workflow moves `status`, `current_gate` and `gate_entered_at`, with a compare-and-set on status and gate (ADR-M30 §2.2).
-- One open intent per issue and per pull request of a project: partial unique indexes on (`tenant_id`, `project_id`, `issue_number`) and (`tenant_id`, `project_id`, `pr_number`) for intents not `done`, `rejected` or `cancelled`. A comment command always names exactly one intent (QUESTIONS #68, ADR-M30 §2.6).
+- One open intent per issue and per pull request of a project: partial unique indexes on (`tenant_id`, `project_id`, `issue_number`) and (`tenant_id`, `project_id`, `pr_number`) for intents not `done`, `rejected`, `cancelled` or `blocked` (`blocked` since 1.15: a blocked intent is finished, ADR-M33 §2.4). A comment command always names exactly one intent (QUESTIONS #68, ADR-M30 §2.6).
 - A gate decision counts only when recorded after the intent last entered the gate, and after the last request for changes at that gate. The order comes from the audit chain (`audit_log.seq`), indexed by (`tenant_id`, `entity_id`, `seq`) (ADR-M30 §2.4).
 
 **`spec_refs`**
@@ -339,11 +339,12 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 |---|---|---|
 | id | bigint identity PK | Posted in `id` order |
 | intent_id | uuid FK | |
-| kind | text | Code: `submitted`, `advanced`, `rejected`, `changes_requested`; session 2: `hotl_passed` (the platform passed a HOTL gate), `returned` (a block within the block window took the intent back); B12: `ai_record_refused` (the project AI record check stopped the submit; the intent stays `draft`, ADR-M32 §2.5) |
+| kind | text | Code: `submitted`, `advanced`, `rejected`, `changes_requested`; session 2: `hotl_passed` (the platform passed a HOTL gate), `returned` (a block within the block window took the intent back); B12: `ai_record_refused` (the project AI record check stopped the submit; the intent stays `draft`, ADR-M32 §2.5); C06: `g4_refused` (a G4 check failed; the intent waits at G4), `blocked` (Critical or L0: the agent never runs), `run_proposed` (HITL: a new run proposal to approve), `agent_recertification_due` (a run uses an agent whose recertification is overdue; mentions the owner through `agent_id`) (ADR-M33) |
 | status | intent_status | The intent's status after the change |
 | gate, previous_gate | gate_code null | The gate after and before the change |
 | decision_id | uuid FK gate_decisions null | The decision that caused the change; null for the submit |
 | audience_roles | project_role[] | Roles mentioned in the comment: the people who act next. Never `viewer`, at most 8 |
+| agent_id | uuid FK agents null | C06: the agent the notice is about; its current owner is mentioned (login read when posted, never stored) |
 | attempts | smallint | |
 | posted_at, abandoned_at | timestamptz null | Delivery; final once set (trigger, `SDA10`) |
 
@@ -700,3 +701,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.12 | 2026-09-27 | Claude (task B07, session 1), approved by Harry | §4 ERD and §6.2: `intents.gate_entered_at`, one open intent per issue and pull request, decisions ordered by the audit chain, new table `intent_notices` (ADR-M30, QUESTIONS #68, #91) |
 | 1.13 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | §6.2 `intent_notices.kind`: `hotl_passed`, `returned`; §6.3 `waited_seconds` and the time of decision events; §6.4b `escalations.created_at` from the escalation clock (ADR-M30 §2.4b, §2.9). No migration |
 | 1.14 | 2026-09-27 | Claude (task B12), approved by Harry | §4 ERD and §6.1: `project_ai_records` codes only (`confirmed_by`, `allowed_tools_locations` dropped; `record_ref`, `record_sha256` added; fixed rules as CHECKs), new append-only `project_ai_record_versions` (ADR-M32, QUESTIONS #103–#106) |
+| 1.15 | 2026-09-27 | Claude (task C06, session 1), approved by Harry | §5 `gate_reason_code`: `agent_not_runnable`, `instructions_mismatch`, `autonomy_not_allowed`; §6.2 `intent_notices`: kinds `g4_refused`, `blocked`, `run_proposed`, `agent_recertification_due`, column `agent_id`; one open intent per issue excludes `blocked` (migration `0011-gate-g4`, ADR-M33, QUESTIONS #110) |

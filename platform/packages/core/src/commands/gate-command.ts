@@ -10,10 +10,10 @@ import { normalizeScope, type ApprovalScope } from '../registry/approval-binding
 import type { HumanDecision } from '../registry/decision-rules.js';
 import type { Registry } from '../registry/registry.js';
 import { openBlockWindow } from '../workflow/hotl.js';
-import { waitedSeconds } from '../workflow/step.js';
+import { waitedSeconds } from '../workflow/waited.js';
 import { projectAccess } from './access.js';
 import { CommandError } from './errors.js';
-import { gateInputSha256, isCommandGate, type CommandGate } from './gate-input.js';
+import { gateInputSha256, isCommandGate, isDecidableGate } from './gate-input.js';
 
 /** Decisions a person may send as a command (D-08 B03 AC3, B06 AC2). */
 export const COMMAND_DECISIONS = [
@@ -51,11 +51,11 @@ export async function decideGate(
   if (access.roles.length === 0) {
     throw new CommandError('intent_not_found', `intent ${intent.code} not found`);
   }
-  if (!isCommandGate(command.gate)) {
+  if (!isDecidableGate(command.gate)) {
     throw new CommandError('gate_not_supported', `${command.gate} cannot be decided by a command`);
   }
   const gate = command.gate;
-  // D3 (B07 session 2): the gate advance at G1–G3 has no scope, so an approval with one is refused
+  // D3 (B07 session 2): the gate advance at G1–G3 has no scope, nor the run start at G4 (C06), so an approval with one is refused
   // here instead of being recorded and then voided (`scope_mismatch`, which stays as a safeguard).
   if (command.decision === 'approve' && normalizeScope(command.scope) !== null) {
     throw new CommandError('scope_not_allowed', `${gate} approvals take no scope`);
@@ -100,11 +100,12 @@ async function mayBlockPassedGate(
   registry: Registry,
   tx: TenantScope,
   intent: Intent,
-  gate: CommandGate,
+  gate: string,
   command: GateCommand,
   now: Date,
 ): Promise<boolean> {
   if (command.decision === 'approve' || intent.status !== 'in_gate') return false;
+  if (!isCommandGate(gate)) return false;
   const { config } = await registry.policyFor(tx, intent.project_id);
   return (await openBlockWindow(tx, intent, gate, config, now)) !== null;
 }
