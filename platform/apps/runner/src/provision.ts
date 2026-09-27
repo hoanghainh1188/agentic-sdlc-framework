@@ -1,15 +1,17 @@
 // The runner's provisioning flow for one run (D-08 C04, ADR-M25 §2.8). Order:
 //
 // 1. verify the Run Contract (ADR-M22): refused contracts are recorded by `verifyRunContract`;
-// 2. claim the run `queued → provisioning` with one conditional update (QUESTIONS #35);
-// 3. unwrap the GitHub token the worker handed over (QUESTIONS #44);
-// 4. check that the contract's egress list can be enforced;
-// 5. clone at `base_sha`, create `agent/INT-…`, pack the workspace          → `workspace_prepared`;
-// 6. create the sandbox (volume, network, services, container, archive)     → `sandbox_created`;
-// 7. wait for the sandbox health check, then `provisioning → running`       → `sandbox_ready`.
+// 2. hold the run in this process and reserve its labelled workspace volume, so a crash after the
+//    claim always leaves an object the clean-up can find (ADR-M25 §2.8);
+// 3. claim the run `queued → provisioning` with one conditional update (QUESTIONS #35);
+// 4. unwrap the GitHub token the worker handed over (QUESTIONS #44);
+// 5. check that the contract's egress list can be enforced;
+// 6. clone at `base_sha`, create `agent/INT-…`, pack the workspace          → `workspace_prepared`;
+// 7. create the sandbox (network, services, container, archive)             → `sandbox_created`;
+// 8. wait for the sandbox health check, then `provisioning → running`       → `sandbox_ready`.
 //
-// A failure after the claim removes everything created, records `provisioning_failed` and
-// `sandbox_removed`, and ends the run as `failed` with the reason as `stop_reason`. The clone on
+// A failure after the claim removes everything created (the reserved volume included), records
+// `provisioning_failed` (and `sandbox_removed` when a sandbox was created), and ends the run as `failed` with the reason as `stop_reason`. The clone on
 // the runner's disk is always removed; the token lives only in memory for the clone.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,9 +33,12 @@ import {
 
 import type { DockerClient } from './docker/client.js';
 import { RunnerError } from './errors.js';
+import type { HeldRuns } from './held.js';
 import {
   createSandbox,
   ProvisioningError,
+  releaseWorkspace,
+  reserveWorkspace,
   teardownSandbox,
   type ProvisioningFailure,
   type Sandbox,
@@ -50,6 +55,12 @@ export interface RunnerDeps {
   readonly settings: RunnerSettings;
   readonly verifier: RunContractVerifier;
   readonly unwrapper: SecretUnwrapper;
+  /**
+   * Runs this process holds (ADR-M25 §2.8): a second provisioning of a held run is refused before
+   * Docker, and the sweep skips held runs. One runner process per instance label: the clean-up at
+   * start removes every object of the instance.
+   */
+  readonly held: HeldRuns;
   /** Default: `new Date()`. */
   readonly now?: () => Date;
 }
@@ -106,9 +117,23 @@ export async function provisionRun(
     };
   }
   const { contract } = verified;
+  const runId = contract.run_id;
   const scope = deps.db.forTenant(parseTenantId(contract.tenant_id));
-  if (!(await scope.runs.claimForProvisioning(contract.run_id, clock(deps)))) {
-    return { ok: false, reason: 'run_not_startable', runId: contract.run_id };
+  if (!deps.held.hold(runId)) {
+    return { ok: false, reason: 'run_not_startable', runId };
+  }
+  let reserved: 'created' | 'existed';
+  try {
+    reserved = await reserveWorkspace(deps.docker, deps.settings, runId, contract.tenant_id);
+  } catch {
+    // Nothing is claimed yet: the run stays `queued` for another attempt.
+    deps.held.release(runId);
+    return { ok: false, reason: 'docker_error', runId };
+  }
+  if (!(await scope.runs.claimForProvisioning(runId, clock(deps)))) {
+    if (reserved === 'created') await releaseWorkspace(deps.docker, runId).catch(() => undefined);
+    deps.held.release(runId);
+    return { ok: false, reason: 'run_not_startable', runId };
   }
 
   const workDir = fs.mkdtempSync(path.join(ensureDir(deps.settings.workDir), 'run-'));
@@ -129,7 +154,7 @@ export async function provisionRun(
       dir: workDir,
     });
     const workspaceTar = packDirectory(repoDir, deps.settings.workspaceMaxBytes);
-    await scope.runEvents.append(contract.run_id, 'workspace_prepared', {
+    await scope.runEvents.append(runId, 'workspace_prepared', {
       base_sha: contract.base_sha,
       duration_ms: Date.now() - cloneStarted,
     });
@@ -138,19 +163,20 @@ export async function provisionRun(
     const startStarted = Date.now();
     sandboxCreated = true;
     const sandbox = await createSandbox(deps.docker, deps.settings, {
-      runId: contract.run_id,
+      runId: runId,
       tenantId: contract.tenant_id,
       image,
       egressAllowlist: contract.egress_allowlist,
       workspaceTar,
+      workspaceReserved: true,
     });
-    await scope.runEvents.append(contract.run_id, 'sandbox_created', {
+    await scope.runEvents.append(runId, 'sandbox_created', {
       image_sha256: sandbox.imageSha256,
     });
     await waitUntilHealthy(deps, sandbox.containerId);
     const now = clock(deps);
     if (
-      !(await scope.runs.transition(contract.run_id, {
+      !(await scope.runs.transition(runId, {
         from: ['provisioning'],
         to: 'running',
         now,
@@ -160,14 +186,18 @@ export async function provisionRun(
       // Stopped meanwhile (kill switch, C11): do not keep the sandbox.
       throw new ProvisioningError('run_stopped');
     }
-    await scope.runEvents.append(contract.run_id, 'sandbox_ready', {
+    await scope.runEvents.append(runId, 'sandbox_ready', {
       duration_ms: Date.now() - startStarted,
     });
     return { ok: true, contract, sandbox };
   } catch (error) {
     const reason = failureOf(error);
-    await failRun(deps, scope, contract.run_id, reason, sandboxCreated);
-    return { ok: false, reason, runId: contract.run_id };
+    try {
+      await failRun(deps, scope, runId, reason, sandboxCreated);
+    } finally {
+      deps.held.release(runId);
+    }
+    return { ok: false, reason, runId };
   } finally {
     fs.rmSync(workDir, { recursive: true, force: true });
   }
@@ -189,6 +219,7 @@ export async function releaseSandbox(
     reason,
     duration_ms: result.durationMs,
   });
+  deps.held.release(runId);
 }
 
 async function failRun(
@@ -199,7 +230,13 @@ async function failRun(
   sandboxCreated: boolean,
 ): Promise<void> {
   await scope.runEvents.append(runId, 'provisioning_failed', { reason });
-  if (sandboxCreated) await releaseSandbox(deps, scope.tenantId, runId, 'provisioning_failed');
+  // The reserved workspace volume exists from before the claim, so there is always something to
+  // remove. A clean-up error must not keep the run out of `failed`: the sweep retries the objects.
+  await (
+    sandboxCreated
+      ? releaseSandbox(deps, scope.tenantId, runId, 'provisioning_failed')
+      : teardownSandbox(deps.docker, deps.settings.egressServices, runId)
+  ).catch(() => undefined);
   const now = clock(deps);
   await scope.runs.transition(runId, {
     from: ['provisioning'],

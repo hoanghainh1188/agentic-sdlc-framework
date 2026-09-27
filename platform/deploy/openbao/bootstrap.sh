@@ -40,6 +40,9 @@ Commands:
                        new secret ID for the AppRole "api" and write it with the role ID into the
                        volume of sdlc-api (Compose profile "platform"). Prints no secret. Run it
                        again to rotate, then restart sdlc-api (runbook T11).
+  runner-credentials   The same for the runner: kv/runner/database and the AppRole "runner"
+                       into the volume of sdlc-runner (Compose profile "sandbox"). Restart
+                       sdlc-runner afterwards (runbook T11).
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -85,7 +88,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | api-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | runner-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -266,10 +269,13 @@ cmd_litellm_credentials() {
 
 # The database password goes from the env file to the openbao container on stdin, after the admin
 # token; the role ID and a new secret ID go from the openbao container straight into the volume
-# of sdlc-api through a pipe. Never a host file, a command line or an environment variable.
-# sdlc-api drops every capability; this one-shot root container gets back only what it needs to
-# write the files and give them to the user node.
-cmd_api_credentials() {
+# of the process through a pipe. Never a host file, a command line or an environment variable.
+# The processes drop every capability; this one-shot root container gets back only what it needs
+# to write the files and give them to the user node.
+#   process_credentials <AppRole> <service> <profile>
+# stores kv/<AppRole>/database and writes the AppRole files of <service> (sdlc-api, sdlc-runner).
+process_credentials() {
+  role="$1" service="$2" profile="$3"
   require_unsealed
   password="$(sed -n 's/^PLATFORM_APP_DB_PASSWORD=//p' "$env_file" | tail -n 1)"
   case "$password" in
@@ -279,14 +285,14 @@ cmd_api_credentials() {
   [ -n "$token" ] || fail "no token given"
   printf '%s\n%s' "$token" "$password" |
     bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
-      bao kv put -mount=kv api/database password=- >/dev/null' ||
-    fail "could not store kv/api/database (token valid? OpenBao configured?)"
+      bao kv put -mount=kv "$0/database" password=- >/dev/null' "$role" ||
+    fail "could not store kv/$role/database (token valid? OpenBao configured?)"
   printf '%s\n' "$token" |
     bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
-      bao read -field=role_id auth/approle/role/api/role-id && echo &&
-      bao write -f -field=secret_id auth/approle/role/api/secret-id && echo' |
-    compose --profile core --profile platform run --rm -T --no-deps --user root \
-      --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh sdlc-api -c '
+      bao read -field=role_id "auth/approle/role/$0/role-id" && echo &&
+      bao write -f -field=secret_id "auth/approle/role/$0/secret-id" && echo' "$role" |
+    compose --profile core --profile "$profile" run --rm -T --no-deps --user root \
+      --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "$service" -c '
       set -e
       umask 077
       IFS= read -r role_id || role_id=""
@@ -296,9 +302,12 @@ cmd_api_credentials() {
       printf "%s\n" "$secret_id" >/run/sdlc/approle/secret_id
       chown -R node:node /run/sdlc/approle
       chmod 700 /run/sdlc/approle' ||
-    fail "could not deliver the api credentials (token valid? OpenBao configured with the api AppRole?)"
-  say "kv/api/database stored; api AppRole credentials written to the api-approle volume; restart sdlc-api to use them"
+    fail "could not deliver the $role credentials (token valid? OpenBao configured with the $role AppRole?)"
+  say "kv/$role/database stored; $role AppRole credentials written to the $role-approle volume; restart $service to use them"
 }
+
+cmd_api_credentials() { process_credentials api sdlc-api platform; }
+cmd_runner_credentials() { process_credentials runner sdlc-runner sandbox; }
 
 case "$command" in
   status) cmd_status ;;
@@ -308,4 +317,5 @@ case "$command" in
   root-token) cmd_root_token ;;
   litellm-credentials) cmd_litellm_credentials ;;
   api-credentials) cmd_api_credentials ;;
+  runner-credentials) cmd_runner_credentials ;;
 esac

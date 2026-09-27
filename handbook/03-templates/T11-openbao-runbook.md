@@ -265,6 +265,44 @@ The API (service `sdlc-api`, task B03) logs in with the AppRole `api` and reads 
 | The API's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap api-credentials`, then restart `sdlc-api`. Then destroy the old secret ID (section 8.1, step 4) |
 | The `platform_app` password | Change it in PostgreSQL and in `.env`, run `pnpm openbao:bootstrap api-credentials`, then restart `sdlc-api` |
 
+## 5f. The runner and sandboxes (Compose profile `sandbox`)
+
+The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per agent run (`design/ADR-M25-runner-sandbox.md`). It logs in with the AppRole `runner` and reads the password of the database role `platform_app` from `kv/runner/database` once, when it starts. It reaches Docker only through the socket proxy (`docker-socket-proxy`); it never mounts the Docker socket itself.
+
+### First set-up
+
+1. OpenBao is initialised, unsealed and configured (sections 3 and 4). `configure` creates the AppRole `runner`.
+2. Check `SDLC_DOCKER_GID` in `platform/deploy/.env`: the group of `/var/run/docker.sock` on the host (`init-env.sh` fills it in; `stat -c %g /var/run/docker.sock` on Linux, `0` on Docker Desktop). With a wrong value the socket proxy cannot read the socket and stays unhealthy.
+3. Store the password and deliver the runner's AppRole credentials. The command asks for an admin token (hidden). It stores `PLATFORM_APP_DB_PASSWORD` from `platform/deploy/.env` at `kv/runner/database`, issues a new secret ID, and writes the secret ID with the role ID into the volume `runner-approle`. It prints no secret:
+   ```bash
+   pnpm openbao:bootstrap runner-credentials
+   ```
+   Record it in the operations log (role `runner`, date, reason; not the secret ID).
+4. Start: `pnpm compose:sandbox` (profiles `core` and `sandbox`). It also starts the npm package proxy (`npm-proxy`, Verdaccio) and the local image registry (`registry`).
+5. Check: `docker compose … ps sdlc-runner` shows `healthy`. The runner's log has one line with `"event":"runner.started"`.
+
+### Sandbox images and the local registry
+
+- The registry listens on **127.0.0.1 only** (`SDLC_REGISTRY_HOST_PORT`, default 5050) and has **no authentication**. Only operators logged in on the server can push. Never publish it on another address.
+- Images are **always used by digest**, never by tag. Build and push, then copy the printed reference into the project configuration as `sandbox.image`:
+  ```bash
+  pnpm sandbox-image:build node24
+  # prints localhost:5050/sdlc/sandbox-node24@sha256:<digest>
+  ```
+- On Docker Desktop (development) the Engine cannot push to a port published on the Mac. Use `platform/sandbox-images/build.sh node24 --no-push`: it prints the local reference by digest.
+- Old images: delete the manifest by digest (`curl -X DELETE http://127.0.0.1:5050/v2/sdlc/sandbox-node24/manifests/sha256:<digest>`), then run garbage collection: `docker compose … exec registry registry garbage-collect /etc/docker/registry/config.yml`. Keep every digest a project configuration still names.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| The runner's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap runner-credentials`, then restart `sdlc-runner`. Then destroy the old secret ID (section 8.1, step 4) |
+| The `platform_app` password | Change it in PostgreSQL and in `.env`, run `pnpm openbao:bootstrap api-credentials` and `pnpm openbao:bootstrap runner-credentials`, then restart `sdlc-api` and `sdlc-runner` |
+
+### After a crash or restart
+
+The runner cleans up by itself when it starts: it removes every sandbox, network and workspace volume that carries its instance label (`COMPOSE_PROJECT_NAME`). Runs that were still provisioning or running end as `failed` with `runner_restarted`. Nothing to do by hand. Run **one** `sdlc-runner` per Compose project: two runners with the same instance label would remove each other's sandboxes.
+
 ## 6. Daily snapshot backup
 
 > Commands only. The procedure is tested in the recovery drill of task A10, which also adds the backup script.
@@ -356,6 +394,9 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | LiteLLM exits with `no rendered configuration (Compose profile models) and no LITELLM_MASTER_KEY` | Started without the profile `models` and without a development master key | On the server: `pnpm compose:models`. On a development machine: set `LITELLM_MASTER_KEY` in `.env` |
 | `could not deliver the litellm credentials` | Wrong or expired admin token, or `configure` has not created the AppRole `litellm` yet | Section 5.1; run `configure` again after an upgrade |
 | `sdlc-api` restarts with "Cannot read SDLC_OPENBAO_ROLE_ID_FILE" or "no password field" | `api-credentials` was not run, or the volume was removed | Section 5e, step 2 |
+| `sdlc-runner` restarts with `runner.start_failed` ("no password field", "Cannot read SDLC_OPENBAO_ROLE_ID_FILE") | `runner-credentials` was not run, or the volume was removed | Section 5f, step 3 |
+| `docker-socket-proxy` stays unhealthy, or the runner says it cannot reach the Docker socket (`EACCES`) | `SDLC_DOCKER_GID` is not the group of the host's Docker socket | Section 5f, step 2; then `pnpm compose:sandbox` again |
+| A run fails with `image_unavailable` | `sandbox.image` names a digest the local registry does not have, or the registry is down | Section 5f, sandbox images: push the image again and check the digest |
 | A model is missing in LiteLLM | Its provider has no key in `kv/litellm/providers/`, or LiteLLM was not restarted after the key was stored | Section 5d |
 | Compose says the network has a different configuration | `SDLC_NETWORK_SUBNET` or `SDLC_NETWORK_GATEWAY` changed | `pnpm compose:down`, then `pnpm compose:core`. Then run `configure` again (secret IDs are bound to the subnet without the gateway) |
 | `the Compose network has no fixed gateway` from `configure` | The network was created before A11 | `pnpm compose:down`, then `pnpm compose:core`, then `configure` again |
@@ -383,3 +424,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.6 | 2026-09-26 | Claude Code (task C03) | Section 5d: LiteLLM keys through the OpenBao Agent sidecar (profile `models`), `litellm-credentials`, rotation; AppRole `litellm`; key table; troubleshooting rows (`design/QUESTIONS.md` #1, ADR-M24) |
 | 0.7 | 2026-09-27 | Claude Code (task B03) | Section 5e: the API reads the `platform_app` password from `kv/api/database` with the AppRole `api`; `api-credentials`, rotation; key table row; troubleshooting row (`design/QUESTIONS.md` #67, ADR-M26). Tested with throw-away keys (`pnpm test:api`) |
 | 0.8 | 2026-09-27 | Claude Code (task C04) | The `runner` AppRole no longer reads `kv/shared/github-app`; the worker hands it each run's token as a single-use response-wrapped token (`design/QUESTIONS.md` #44). Existing installations: run `configure` again to load the new `runner` and `worker` policies |
+| 0.9 | 2026-09-27 | Claude Code (task C04, session 3) | Section 5f: the runner reads the `platform_app` password from `kv/runner/database` (`runner-credentials`); `SDLC_DOCKER_GID`; the local registry (127.0.0.1 only, no authentication, images by digest, clean-up); clean-up after a restart; troubleshooting rows (ADR-M25). Tested with throw-away keys (`pnpm test:runner-compose`) |

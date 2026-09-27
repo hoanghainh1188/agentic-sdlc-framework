@@ -12,6 +12,10 @@
   "dependencies": {
     "@sdlc/contracts": "workspace:*",
     "@sdlc/core": "workspace:*",
-    "@sdlc/messages": "workspace:*"
+    "@sdlc/messages": "workspace:*",
+    "@sdlc/secrets": "workspace:*"
+  },
+  "bin": {
+    "sdlc-runner": "dist/main.js"
   }
 }

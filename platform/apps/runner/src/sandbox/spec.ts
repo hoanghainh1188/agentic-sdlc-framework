@@ -48,7 +48,13 @@ export function buildSandboxSpec(input: SandboxSpecInput, settings: RunnerSettin
       `SESSION_API_KEY=${input.sessionApiKey}`,
       `OH_SECRET_KEY=${input.agentSecretKey}`,
       ...FIXED_ENV,
-      ...(settings.npmRegistry ? [`NPM_CONFIG_REGISTRY=${settings.npmRegistry}`] : []),
+      ...(settings.npmRegistry
+        ? [
+            `NPM_CONFIG_REGISTRY=${settings.npmRegistry}`,
+            // Corepack fetches the pnpm (or yarn) version a project pins in `packageManager`.
+            `COREPACK_NPM_REGISTRY=${settings.npmRegistry.replace(/\/$/, '')}`,
+          ]
+        : []),
     ],
     Labels: input.labels,
     WorkingDir: WORKSPACE_PATH,

@@ -20,6 +20,7 @@ describe('run event payloads', () => {
       'sandbox_ready',
       'provisioning_failed',
       'sandbox_removed',
+      'run_abandoned',
     ]);
   });
 
@@ -36,6 +37,9 @@ describe('run event payloads', () => {
       reason: 'orphan',
       duration_ms: 0,
     });
+    expect(checkRunEvent('run_abandoned', { previous_status: 'running' })).toEqual({
+      previous_status: 'running',
+    });
   });
 
   it.each([
@@ -45,6 +49,9 @@ describe('run event payloads', () => {
     ['sandbox_created', { image_sha256: SHA, image: 'registry/name' }],
     ['provisioning_failed', { reason: 'git clone failed: auth' }],
     ['sandbox_removed', { reason: 'finished' }],
+    ['run_abandoned', {}],
+    ['run_abandoned', { previous_status: 'the runner crashed' }],
+    ['run_abandoned', { previous_status: 'running', host: 'server-1' }],
   ])('refuses a bad %s payload', (type, payload) => {
     expect(refused(type, payload)).toThrow(DbError);
   });

@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C04; session 1 merged in PR #89, approved by Harry 2026-09-27; session 2 in review) |
+| Status | **Proposed** (task C04; sessions 1 and 2 merged in PR #89 and PR #91, approved by Harry 2026-09-27; session 3 in review) |
 | Date | 2026-09-27 |
-| Decided by | Harry (C04 plan approved 2026-09-27; QUESTIONS #44, #52, #53, #54, #59) |
+| Decided by | Harry (C04 plan approved 2026-09-27; session 3 plan approved 2026-09-27; QUESTIONS #44, #52, #53, #54, #55, #59) |
 | Related | D-02 FR-30, FR-33, FR-34, FR-50; D-03 sections 4, 5.1, 6.5, 7.2, 8, 8.2, 9, 10, 10.1, 13 (version 1.6); D-05 section 6.4; D-08 tasks C04, C05, C06, C08, C09, C11, R01; ADR-M10, ADR-M17, ADR-M19, ADR-M21, ADR-M22, ADR-M23, ADR-M24 |
 
 ## 1. Context
@@ -17,7 +17,7 @@ Task C04 builds the runner: it receives a Run Contract, creates one sandbox per 
 - Who holds the GitHub App key, and how the single-repository token reaches the runner (QUESTIONS #44).
 - How the worker talks to the runner, and where extra runs wait (D-03 §10.1).
 
-C04 is split into three sessions. Session 1 (this ADR, first version) delivers the Docker layer, the hardening, the egress layout, the slot pool, the run claim and the run event types. Session 2 adds the token handoff, the clone and the full provisioning flow. Session 3 adds the runner image, the Compose profile `sandbox`, restart clean-up and the per-project sandbox image.
+C04 is split into three sessions. Session 1 (this ADR, first version) delivers the Docker layer, the hardening, the egress layout, the slot pool, the run claim and the run event types. Session 2 adds the token handoff, the clone and the full provisioning flow. Session 3 adds the runner process and image, the Compose profile `sandbox` (socket proxy, package proxy, local registry), the clean-up after a restart, the periodic sweep and the first sandbox image `node24`. The Temporal side of the handoff moves to C06 (§2.7).
 
 ## 2. Decision
 
@@ -89,8 +89,18 @@ The sandbox never receives a provider key, the LiteLLM master key, an OpenBao ad
 - **Endpoint allowlist:** ping, image inspect/pull, containers (list, create, inspect, start, wait, logs, archive upload, remove), networks (list, create, inspect, connect, disconnect, remove), volumes (list, create, remove). No exec, build, commit, swarm, plugins or system calls. Anything else is refused before it reaches the socket.
 - **Guard:** every container and network definition is checked again just before the socket, as an allowlist of keys. Refused: any unknown option (so `Privileged`, `Binds`, `PidMode`, `CapAdd`, `Devices`, `PortBindings`… can never slip through), a bind mount, a second mount, a writable root, kept capabilities, extra swap, a missing limit, a restart policy, an image without digest, a user other than 10001, an environment variable outside the allowlist, a command override, and a network that is not the run's own internal network.
 - Errors never contain Docker's own text (it can echo request data); only the method, the status code or a Node error code.
-- **Session 3:** in Compose the runner reaches Docker through **docker-socket-proxy** (Tecnativa, Apache-2.0, pinned), which allows only the container, network, volume and image endpoint groups.
-- **Residual risk:** whoever controls the runner process can still ask Docker for a privileged container; the guard and the proxy limit mistakes, not a compromised runner. On the internal server the runner should run in a separate VM or with rootless Docker (D-03 §10.1). This belongs to A10 (infrastructure operator).
+- **Socket proxy (session 3):** in Compose the runner never gets the Docker socket. It reaches Docker through **wollomatic/socket-proxy** 1.13.1 (MIT, a few files Apache-2.0; Go, built from scratch with no OS; pinned by digest), service `docker-socket-proxy`:
+  - It is the only service that mounts `/var/run/docker.sock`, read-only. It joins no network (`network_mode: none`), runs as uid 65534 with the socket's group (`SDLC_DOCKER_GID`, filled in by `init-env.sh`), with a read-only root and no capabilities.
+  - It listens on a Unix socket (mode 0660) in the in-memory volume `docker-proxy`, which only the proxy and the runner mount. The runner joins the socket's group.
+  - Its allowlist is one regular expression per method, the same list as the client's `ALLOWED_ENDPOINTS` with the API version `/v1.44`: GET ping, image inspect, container list/inspect/logs, network list/inspect, volume list; POST image pull, container create/start/wait, network create/connect/disconnect, volume create; PUT container archive; DELETE container, network, volume. Nothing else: no exec, attach, build, commit, push, image delete, prune, events, info, swarm, plugins or secrets. A static test sends the same list of requests through both allowlists and fails when they differ (`platform/tests/deploy/sandbox-profile.test.ts`).
+  - `-allowbindmountfrom` names a folder that does not exist, so the proxy refuses every bind mount in a container definition (checked live: HTTP 403).
+- **Honest limit of the proxy:** a method-and-path proxy cannot read the body of `POST /containers/create`. Apart from bind mounts, it lets through what the body asks for: `Privileged`, host namespaces, devices, capabilities, a host network (checked live: a privileged container definition is accepted by the proxy). Only `docker/guard.ts` inside the runner checks the container definition. The proxy therefore limits the *endpoints* a compromised runner can reach (no exec into other containers, no image push, no reading the host's system information), not what it can create.
+- **Residual risk and mitigations:** whoever controls the runner process can still create a privileged container through `containers/create`. Mitigations, in order of effect:
+  1. Run the runner (and its Docker Engine) in a **separate VM** from the platform (D-03 §10.1), so root on that host reaches only sandboxes and the runner itself.
+  2. **Rootless Docker** or `userns-remap` for that Engine, so a privileged container is not root on the host.
+  3. Later, a Docker **authorization plugin** that inspects request bodies (for example OPA's Docker authz plugin) with the same rules as the guard.
+
+  Items 1 and 2 belong to A10 (infrastructure operator); item 3 is MVP+1.
 
 ### 2.6. Settings
 
@@ -110,42 +120,65 @@ Deployment settings come from the environment (`SDLC_RUNNER_*`), not from the pr
 | `SDLC_RUNNER_WORK_DIR` | `<tmp>/sdlc-runner` | Absolute path; each run clones into its own subfolder, removed right after the upload |
 | `SDLC_RUNNER_WORKSPACE_MAX_MB` | 1024 | Largest workspace (file content, `.git` included) the runner uploads |
 | `SDLC_RUNNER_READY_TIMEOUT_SECONDS` | 120 | How long the runner waits for the sandbox health check |
+| `SDLC_RUNNER_SWEEP_INTERVAL_SECONDS` | 300 | 30–3600. How often the runner removes the objects of runs it does not hold (§2.8) |
+| `SDLC_RUNNER_DB_HOST`, `_DB_PORT`, `_DB_NAME`, `_DB_SECRET_PATH` | `postgres`, 5432, `platform`, `runner/database` | The runner connects as `platform_app`; the password is read from OpenBao (`kv/runner/database`, written by `openbao:bootstrap runner-credentials`), never from the environment |
+| `SDLC_RUNNER_HEARTBEAT_FILE` | `<tmp>/sdlc-runner-heartbeat` | Written after each clean-up; the container health check fails when it is older than two sweep intervals plus 30 seconds. In Compose `/tmp` is a tmpfs (read-only root) |
+
+- **One runner process per instance label.** The clean-up at start removes every object with the instance's label, so two processes with the same `SDLC_RUNNER_INSTANCE` on one Docker host would remove each other's sandboxes. Compose runs one `sdlc-runner` per project; the label is `COMPOSE_PROJECT_NAME`.
 
 ### 2.7. Worker ↔ runner, and where extra runs wait (QUESTIONS #53)
 
-- The runner is a Temporal worker on the task queue `sdlc-runner`. One long-running activity per run sends heartbeats while the sandbox lives (session 3 wiring, with B07/C06).
+- The runner is a Temporal worker on the task queue `sdlc-runner`. One long-running activity per run sends heartbeats while the sandbox lives. **Built in C06** (QUESTIONS #55, D-08 1.5 C06 AC4): no workflow calls the runner before C06, so C04 has nothing to test the activity against. C04 delivers the process the activity will run in (`Runner`: slot pool, held runs, clean-up, sweep).
 - The limit is the activity slot count of that worker (`maxConcurrentActivityTaskExecutions` = `SDLC_RUNNER_MAX_SANDBOXES`), so extra runs wait in Temporal, as D-03 §10.1 says.
-- Inside the process, a **slot pool** (FIFO) is the backstop: at most `SDLC_RUNNER_MAX_SANDBOXES` sandboxes exist at once, and a failing run always frees its slot.
+- Inside the process, a **slot pool** (FIFO) is the backstop: at most `SDLC_RUNNER_MAX_SANDBOXES` sandboxes exist at once. `Runner.provision` takes a slot before provisioning and keeps it while the sandbox lives; `Runner.release` frees it, and a failed provisioning frees it at once (tested on PostgreSQL: with one slot, the second run waits until the first is released).
 - A contract can expire while its run waits (15 minutes by default). The runner refuses it (`expired`, ADR-M22); the workflow then sets that run to `cancelled` with `contract_expired` and issues a new attempt (C06).
 
 ### 2.8. Claim, clean-up, run events
 
 - **Provisioning order (`provisionRun`, session 2):**
   1. verify the Run Contract (ADR-M22; a refused contract is recorded there, and nothing else happens: no claim, no unwrap);
-  2. claim the run;
-  3. unwrap the GitHub token (§2.11);
-  4. check that the egress list can be enforced;
-  5. load `sandbox.image` from the project configuration;
-  6. clone and pack the workspace → `workspace_prepared`;
-  7. create the sandbox → `sandbox_created`;
-  8. wait for its health check, then `provisioning → running` → `sandbox_ready`.
+  2. hold the run in this process (a second provisioning of a held run is refused before Docker) and **reserve its labelled workspace volume** (session 3);
+  3. claim the run;
+  4. unwrap the GitHub token (§2.11);
+  5. check that the egress list can be enforced;
+  6. load `sandbox.image` from the project configuration;
+  7. clone and pack the workspace → `workspace_prepared`;
+  8. create the sandbox (network, services, container, archive) → `sandbox_created`;
+  9. wait for its health check, then `provisioning → running` → `sandbox_ready`.
 
-  Any failure after the claim removes what was created, records `provisioning_failed` (and `sandbox_removed` when a sandbox was started), and ends the run as `failed` with the reason as `stop_reason`. The clone on the runner's disk is removed in every case. `releaseSandbox` removes the sandbox at the end of a run (C05) or on a kill (C11) and records `sandbox_removed`; the run status stays the caller's.
+  Any failure after the claim removes what was created (the reserved volume included), records `provisioning_failed` (and `sandbox_removed` when a sandbox was started), and ends the run as `failed` with the reason as `stop_reason`.
+- **Workspace reserved before the claim (session 3):** every claimed run has at least one labelled Docker object from the start, so a crash at any later step leaves something the clean-up can find. Docker's volume create is idempotent, so the runner lists first. A volume that it created is removed again when the claim fails; a volume that already existed is left alone (another provisioning of the run). No crash window is left: a crash between the reservation and the claim leaves a volume and a `queued` run, which the clean-up removes without changing the run. The clone on the runner's disk is removed in every case. `releaseSandbox` removes the sandbox at the end of a run (C05) or on a kill (C11) and records `sandbox_removed`; the run status stays the caller's.
 - **Claim (QUESTIONS #35):** after the contract is verified, the runner moves the run `queued → provisioning` with one conditional update (`RunRepository.claimForProvisioning`) and checks the row count. Zero rows → no sandbox. Tested with concurrent claims on PostgreSQL: exactly one wins.
 - **Clean-up (`teardownSandbox`):** remove the container, detach the shared services, remove the network, remove the workspace volume. Idempotent (objects already gone are skipped), every step runs even when one fails, and the first error is reported at the end. Used after success and failure (session 2), and for orphans (session 3).
-- **Restart (session 3):** at start, the runner removes every object with its instance label. Runs still in `provisioning` or `running` become `failed` with `runner_restarted`; their outputs are lost. A periodic sweep removes objects of runs already in a final state.
-- **Run events** (coded payloads only, ADR-M22 §2.5): `workspace_prepared {base_sha, duration_ms}`, `sandbox_created {image_sha256}`, `sandbox_ready {duration_ms}`, `provisioning_failed {reason}`, `sandbox_removed {reason, duration_ms}`. Reasons are codes. `provisioning_failed`: `token_unavailable`, `config_unavailable`, `egress_not_enforceable`, `clone_failed`, `base_sha_not_found`, `token_leaked`, `workspace_too_large`, `workspace_invalid`, `image_unavailable`, `image_has_no_healthcheck`, `sandbox_unhealthy`, `sandbox_not_ready`, `run_stopped`, `docker_error`. `sandbox_removed`: `finished`, `failed`, `provisioning_failed`, `killed`, `orphan`.
+- **Restart (session 3, `reconcileOnStart`):** at start, the runner lists the containers, networks and volumes with its `sdlc.managed-by` and instance labels, and groups them by run. The `sdlc.run-id` and `sdlc.tenant-id` labels are trusted only on objects that carry this runner's instance label and have well-formed UUIDs (`runOfLabels`); anything else is left alone. For each run: `teardownSandbox`, then, in the run's tenant scope:
+  - `provisioning`, `running` or `stopping` → `failed` with `stop_reason` `runner_restarted`; events `run_abandoned {previous_status}` and `sandbox_removed {reason: runner_restarted}`. Their outputs are lost.
+  - a final status → `sandbox_removed {reason: orphan}`.
+  - `queued` (workspace reserved, never claimed) or no row → objects removed, nothing recorded.
+
+  Old clone folders (`run-*`) in the work folder are removed too. An error on one run is counted and the next run is still handled.
+- **Sweep (session 3, `sweepOrphans`):** every `SDLC_RUNNER_SWEEP_INTERVAL_SECONDS`, the same for runs this process does **not** hold; a run that has not reached a final status becomes `failed` with `sandbox_lost` (`run_abandoned` + `sandbox_removed {reason: orphan}`). Held runs are never touched. A sweep that fails as a whole (Docker unreachable) is logged and retried at the next interval.
+- Tests: unit tests (labels, instance filter), PostgreSQL tests with stub Docker (every branch, one broken run does not block the others, held runs untouched) and a live test on Docker (`pnpm test:runner`: a real sandbox, then a new process cleans up; objects of another instance survive).
+- **Run events** (coded payloads only, ADR-M22 §2.5): `workspace_prepared {base_sha, duration_ms}`, `sandbox_created {image_sha256}`, `sandbox_ready {duration_ms}`, `provisioning_failed {reason}`, `sandbox_removed {reason, duration_ms}`, `run_abandoned {previous_status}` (session 3). Reasons are codes. `provisioning_failed`: `token_unavailable`, `config_unavailable`, `egress_not_enforceable`, `clone_failed`, `base_sha_not_found`, `token_leaked`, `workspace_too_large`, `workspace_invalid`, `image_unavailable`, `image_has_no_healthcheck`, `sandbox_unhealthy`, `sandbox_not_ready`, `run_stopped`, `docker_error`. `sandbox_removed`: `finished`, `failed`, `provisioning_failed`, `killed`, `orphan`, `runner_restarted`. Stop reasons added in session 3: `runner_restarted`, `sandbox_lost`.
 
 ### 2.9. Sandbox image per project (QUESTIONS #59 option A, #54)
 
 - Project configuration `sandbox.image`: a reference **pinned by digest** (`[registry/]name[:tag]@sha256:<64 hex>`); a tag alone is refused. Default: the pinned Agent Server base of ADR-M10 §2.1 (no project toolchain). The default `config_hash` changes.
-- Images are built on the pinned Agent Server base plus the project toolchain. Dockerfiles live in `platform/sandbox-images/<toolchain>/` (session 3, first: Node 24 and pnpm for the sample repo). CI builds them and scans them with Trivy for vulnerabilities and licences, with the same rules as ADR-M10 §2.1.
+- Images are built on the pinned Agent Server base plus the project toolchain. Dockerfiles live in `platform/sandbox-images/<toolchain>/`. CI builds them and scans them with Trivy for vulnerabilities and licences, with the same rules as ADR-M10 §2.1.
+- **First image, `node24` (session 3):** for Node.js projects such as the sample repo (Vue + NestJS).
+  - The pinned base already ships Node.js 24 (24.21.0) and corepack 0.36.0, so the image reuses them instead of copying another Node in; the build fails when a new base ships another Node major.
+  - `corepack enable pnpm`: corepack fetches the pnpm version a project pins in `packageManager` through `COREPACK_NPM_REGISTRY`, which the runner sets to the package proxy (Harry's review). `COREPACK_HOME` and the npm cache live on the sandbox's tmpfs.
+  - The Agent Server keeps its state under `workspace/…` of its working directory by default. The sandbox starts in `/workspace`, which is the repository, so that state would show as changed files; `OH_CONVERSATIONS_PATH` and `OH_BASH_EVENTS_DIR` move it to the home tmpfs (found in the live test).
+  - Image contract: `/workspace` owned by 10001 (the base's empty `/workspace/project` removed), `HEALTHCHECK` on the Agent Server's `/ready`, user 10001. No secret and no proxy address are baked in.
+- **Build and store:** `platform/sandbox-images/build.sh <toolchain>` builds, pushes to the local registry and prints the reference by digest for `sandbox.image`. The registry is the Compose service `registry` (profile `sandbox`): `registry:2.8.3` pinned by digest, published on **127.0.0.1 only** (`SDLC_REGISTRY_HOST_PORT`, default 5050 because macOS uses 5000), with **no authentication**. Only operators on the server push; the Docker Engine pulls by digest (runbook T11). Deleting old images is allowed (`REGISTRY_STORAGE_DELETE_ENABLED`); garbage collection is a runbook step.
+- **CI (job `sandbox-image`):** builds the image, scans it with Trivy (vulnerabilities: CRITICAL blocks, HIGH is listed; licences: the CRITICAL licence category blocks), pushes it only to a throw-away `registry:2` on 127.0.0.1 inside the job, and runs `pnpm test:sandbox-image` against that digest. Nothing is pushed to GHCR or any other registry. The job runs on changes to the images or the runner, on the weekly schedule and on manual dispatch.
 - **Registry for the MVP (QUESTIONS #54):** a local registry on the server, `registry:2` (distribution, Apache-2.0, pinned by digest), or a build on the server. Images are always referenced by digest. GHCR is not used for now: private packages on GitHub Free have a small free storage quota, and the ~860 MB Agent Server image would likely exceed it. **GHCR is the option after the GitHub Team upgrade.**
 - The runner pulls a missing image by digest and refuses to start when the pull fails (`image_unavailable`).
 
 ### 2.10. Package proxy (QUESTIONS #59 option C)
 
-- **Verdaccio** (MIT), pinned by digest, as the Compose service `npm-proxy` in a new profile `sandbox` (session 3). Its only uplink is registry.npmjs.org; publishing is disabled; packages are cached in a volume. It sits on the platform network (for its uplink) and is attached to each run's network by the runner.
+- **Verdaccio** 6.9.3 (MIT), pinned by digest, as the Compose service `npm-proxy` in the profile `sandbox` (session 3). Its only uplink is registry.npmjs.org; publishing and unpublishing are refused; no web UI; no host port; packages are cached in a volume. It sits on the platform network (for its uplink) and is attached to each run's network by the runner. 6.10.x was days old with five patches in a month, so the previous minor's last patch is pinned (ADR-M17 rule).
+- **Accepted risk of option C (Harry's review):** the uplink makes the proxy a channel out of the sandbox. An agent can put data into the names or versions of packages it asks for (for example `GET /<encoded-data>`), and Verdaccio forwards the request to registry.npmjs.org. The data leaves as request paths only (no request body is forwarded) and only to the npm registry. This is accepted for the MVP, because the sandbox holds only the workspace of an intent whose data class allows the model provider anyway (D-07 §4), and the sandbox has no credential. Mitigations: installs from the lockfile (`--frozen-lockfile`); the request log (below); later, an allowlist of packages or an offline mirror for `client_restricted` projects.
+- **Request log:** Verdaccio logs each request as JSON on stdout with the package and the client address. A sandbox's address belongs to its own run network `sdlc-run-<run_id>`, so an operator can tell which run asked for which package while the run exists. The log is not copied into the platform database (it would be free text in an append-only table); correlating it per run automatically is left for later.
 - The sandbox gets `NPM_CONFIG_REGISTRY` from the runner settings; pnpm reads it. Installs should use the lockfile (`pnpm install --frozen-lockfile`) so the proxy serves only reviewed versions.
 - Later, only when a project needs them: PyPI through **devpi-server** (MIT), Maven through **Reposilite** (Apache-2.0). Each is one more egress service.
 
@@ -169,6 +202,10 @@ Deployment settings come from the environment (`SDLC_RUNNER_*`), not from the pr
 | Sandbox image | QUESTIONS #59 | Project configuration `sandbox.image`, digest required |
 | Resource limits, package proxy address | Deployment | Runner settings |
 | Contract validity and clock skew | QUESTIONS #33 | Project configuration `run.*` (ADR-M22) |
+| Sandbox image registry address | QUESTIONS #54 | Part of `sandbox.image` (project configuration); registry port `SDLC_REGISTRY_HOST_PORT` |
+| Package proxy address | QUESTIONS #59 | Runner settings `SDLC_RUNNER_NPM_REGISTRY`, `SDLC_RUNNER_EGRESS_SERVICES` (Compose) |
+| Sweep interval | Deployment | Runner setting `SDLC_RUNNER_SWEEP_INTERVAL_SECONDS` |
+| Docker endpoints the runner may call | D-03 §13 | Code (`ALLOWED_ENDPOINTS`) and the socket proxy allowlist (Compose), kept equal by a test. Not configurable |
 
 C04 adds no handbook threshold. Budget, iteration and loop limits belong to C05 and C11 and are already configuration.
 
@@ -184,6 +221,8 @@ C04 adds no handbook threshold. Budget, iteration and loop limits belong to C05 
 | `dockerode` (Apache-2.0) | A dependency for about fifteen endpoints; less control over errors and the endpoint allowlist |
 | GHCR for sandbox images now | Storage quota on GitHub Free (QUESTIONS #54). The option after the GitHub Team upgrade |
 | One platform image with every toolchain (QUESTIONS #59 option B) | Larger, not fitted to each project |
+| Tecnativa docker-socket-proxy (named in version 0.1 of this ADR) | Opens whole endpoint groups: with containers and POST allowed it also lets `POST /containers/{id}/exec` through, and it cannot refuse bind mounts. wollomatic/socket-proxy allows exact paths per method |
+| Copy Node.js from the `node:24` image into the sandbox image | The pinned base already ships Node 24 and corepack; a second copy adds size and a second version to track |
 
 ## 5. Consequences
 
@@ -191,7 +230,9 @@ C04 adds no handbook threshold. Budget, iteration and loop limits belong to C05 
 - The Run Contract's `egress_allowlist` now names services as `alias:port` (for example `litellm:4000`, `npm-proxy:4873`). C06 fills it from the deployment settings.
 - C05 attaches the runner to the run's network to call the Agent Server (the runner runs in Compose from session 3), and passes the virtual key through the Agent Server API.
 - C11 kills a run with `teardownSandbox` plus the key and token revocation.
-- A10: separate VM or rootless Docker for the runner on the server.
+- A10: separate VM or rootless Docker (or `userns-remap`) for the runner's Docker Engine on the server (§2.5).
+- C06: the Temporal task queue `sdlc-runner` and the heartbeat activity (QUESTIONS #55).
+- R01 / C09: projects on the sample repo use `sandbox.image` = the `node24` image by digest from the local registry.
 
 ## Version history
 
@@ -201,3 +242,4 @@ C04 adds no handbook threshold. Budget, iteration and loop limits belong to C05 
 | 0.2 | 2026-09-27 | Claude (task C04, session 1 fix) | §2.2: per-run networks set `inhibit_ipv4` (host reachable through the gateway on Linux, found by CI) |
 | 0.3 | 2026-09-27 | Claude (task C04, session 2) | §2.3: health check in the image contract; §2.6: Git, work folder, workspace size and readiness settings; §2.8: provisioning order, failure codes, `releaseSandbox`; §2.11: lookup before unwrap, git process hardening, the OpenBao default policy finding |
 | 0.4 | 2026-09-27 | Claude (task C04, session 2 review) | §2.3: what goes into the archive: links as link entries only (never read or followed, O_NOFOLLOW, same inode), hard links and special files refused, paths inside the workspace after normalisation (Harry's review of PR #91) |
+| 0.5 | 2026-09-27 | Claude (task C04, session 3) | §2.5: wollomatic/socket-proxy with the endpoint allowlist, bind mounts refused, the honest limit (no body inspection) and mitigations; §2.6: sweep, database and heartbeat settings, one process per instance; §2.7: the Temporal handoff moves to C06 (QUESTIONS #55), the slot pool around provisioning; §2.8: workspace reserved before the claim, clean-up at start, sweep, `run_abandoned`; §2.9: image `node24`, build script, local registry on 127.0.0.1, CI job; §2.10: Verdaccio 6.9.3, accepted exfiltration risk, request log |

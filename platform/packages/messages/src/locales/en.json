@@ -209,5 +209,10 @@
   "runner.workspace.clone_failed": "The runner could not prepare the workspace: {reason}.",
   "runner.workspace.too_large": "The repository is larger than the runner uploads into a sandbox (SDLC_RUNNER_WORKSPACE_MAX_MB).",
   "runner.workspace.special_file": "The repository holds a file that cannot go into a sandbox: a hard link, a device, a FIFO or a socket.",
-  "runner.workspace.path_escape": "A path in the repository leaves the workspace. The workspace is refused."
+  "runner.workspace.path_escape": "A path in the repository leaves the workspace. The workspace is refused.",
+  "runner.start.no_db_password": "The runner's database secret in OpenBao has no password field. Run: pnpm openbao:bootstrap runner-credentials.",
+  "runner.start.ready": "The runner is ready (instance {instance}, at most {max} sandboxes).",
+  "runner.start.cleaned_up": "The runner removed the objects of {runs} runs ({failed} runs ended as failed, {errors} clean-up errors).",
+  "runner.start.sweep_failed": "The runner's sweep failed ({reason}); the next sweep tries again.",
+  "runner.start.failed": "The runner could not start: {reason}"
 }

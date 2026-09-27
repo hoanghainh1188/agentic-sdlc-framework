@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 
 import type { DockerClient } from '../docker/client.js';
 import { RunnerError } from '../errors.js';
-import { runLabels, runNames, type RunNames } from '../names.js';
+import { LABELS, runLabels, runNames, type RunNames } from '../names.js';
 import type { EgressService, RunnerSettings } from '../settings.js';
 import { planEgress, runNetworkSpec } from './network.js';
 import { buildSandboxSpec } from './spec.js';
@@ -30,8 +30,12 @@ export type ProvisioningFailure =
   | 'run_stopped' // the run left `provisioning` meanwhile (kill switch)
   | 'docker_error';
 
-/** Why the runner removed a sandbox (run event `sandbox_removed`). */
-export type TeardownReason = 'finished' | 'failed' | 'provisioning_failed' | 'killed' | 'orphan';
+/**
+ * Why the runner removed a sandbox (run event `sandbox_removed`). `orphan`: the sweep found objects
+ * of a run this process does not hold; `runner_restarted`: the clean-up when the runner starts.
+ */
+export type TeardownReason =
+  'finished' | 'failed' | 'provisioning_failed' | 'killed' | 'orphan' | 'runner_restarted';
 
 export interface CreateSandboxInput {
   readonly runId: string;
@@ -42,6 +46,8 @@ export interface CreateSandboxInput {
   readonly egressAllowlist: readonly string[];
   /** Tar archive extracted into `/workspace` before the sandbox starts (the cloned repository). */
   readonly workspaceTar?: Buffer;
+  /** The workspace volume already exists: `reserveWorkspace` created it before the claim. */
+  readonly workspaceReserved?: boolean;
 }
 
 export interface Sandbox {
@@ -94,7 +100,7 @@ export async function createSandbox(
 
   const sessionApiKey = randomKey();
   try {
-    await docker.volumeCreate(names.volume, labels);
+    if (!input.workspaceReserved) await docker.volumeCreate(names.volume, labels);
     await docker.networkCreate(runNetworkSpec(names, labels));
     for (const service of egress.services) {
       await docker.networkConnect(names.network, service.container, [service.alias]);
@@ -112,6 +118,32 @@ export async function createSandbox(
     if (error instanceof RunnerError) throw error;
     throw new ProvisioningError('docker_error');
   }
+}
+
+/**
+ * Creates the run's labelled workspace volume **before** the run is claimed (ADR-M25 §2.8). So
+ * every claimed run has at least one labelled Docker object, and the clean-up after a crash finds
+ * it. Docker's volume create is idempotent, so the runner looks first: `existed` means the volume
+ * was already there (objects of an earlier provisioning of this run), and it must not be removed
+ * when the claim fails; the sweep deals with it.
+ */
+export async function reserveWorkspace(
+  docker: DockerClient,
+  settings: RunnerSettings,
+  runId: string,
+  tenantId: string,
+): Promise<'created' | 'existed'> {
+  const names = runNames(runId);
+  const labels = runLabels(settings.instance, runId, tenantId);
+  const found = await docker.volumeList({ [LABELS.runId]: runId });
+  if (found.some((v) => v.Name === names.volume)) return 'existed';
+  await docker.volumeCreate(names.volume, labels);
+  return 'created';
+}
+
+/** Removes a workspace volume that `reserveWorkspace` created when the claim failed. */
+export async function releaseWorkspace(docker: DockerClient, runId: string): Promise<void> {
+  await docker.volumeRemove(runNames(runId).volume);
 }
 
 export interface TeardownResult {

@@ -20,9 +20,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   DockerClient,
+  HeldRuns,
   LABELS,
   provisionRun,
+  reconcileOnStart,
   releaseSandbox,
+  runLabels,
   runnerSettingsFromEnv,
   type RunnerDeps,
 } from '../../../apps/runner/src/index.js';
@@ -45,7 +48,6 @@ import {
 } from './live-helpers';
 
 const TOKEN = `ghs_c04Live${crypto.randomBytes(12).toString('hex')}`;
-const REPO = 'org/pilot-order-inventory';
 const suffix = crypto.randomBytes(4).toString('hex');
 const instance = `c04-flow-${suffix}`;
 const platformNet = `sdlc-c04-flow-platform-${suffix}`;
@@ -101,6 +103,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
           publicKey: (version) => runnerKey.publicKey(version),
         },
         unwrapper: runner.wrapping(),
+        held: new HeldRuns(),
       };
     }, 300_000);
 
@@ -117,20 +120,22 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
       await t?.drop();
     }, 120_000);
 
-    it('verifies, clones, starts a healthy sandbox with the branch and no credential, then cleans up', async () => {
-      const { first: baseSha } = git.createRepo(REPO, {
+    /** Worker side: tenant, project with its sandbox image, intent, plan, signed contract. */
+    async function prepareRun(slug: string) {
+      const repo = `org/pilot-${slug}`;
+      const { first: baseSha } = git.createRepo(repo, {
         'README.md': 'pilot\n',
         'probe-targets': 'litellm litellm 4000\ngithub api.github.com 443\n',
       });
 
       // Worker side: tenant, project with its sandbox image, intent, plan, signed contract.
-      const tenant = await t.app.system.createTenant({ slug: 'live', name: 'live' });
+      const tenant = await t.app.system.createTenant({ slug, name: slug });
       const scope = t.app.forTenant(parseTenantId(tenant.id));
       const project = await scope.projects.create({
         slug: 'shop',
         name: 'Shop',
         git_provider: 'github',
-        repo_full_name: REPO,
+        repo_full_name: repo,
       });
       const configYaml = `sandbox:\n  image: ${fixture!.image}\n`;
       const loaded = loadProjectConfig(configYaml);
@@ -186,6 +191,12 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
         .wrapping()
         .wrap({ token: new Redacted(TOKEN) }, { ttlSeconds: 900 });
 
+      return { tenant, scope, envelope, wrapped };
+    }
+
+    it('verifies, clones, starts a healthy sandbox with the branch and no credential, then cleans up', async () => {
+      const { tenant, scope, envelope, wrapped } = await prepareRun('live');
+
       // Runner side.
       const result = await provisionRun(deps, { envelope, wrappedGitToken: wrapped });
       if (!result.ok) throw new Error(`provisioning failed: ${result.reason}`);
@@ -227,6 +238,47 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
         'sandbox_ready',
         'sandbox_removed',
       ]);
+    }, 300_000);
+
+    it('cleans up after a runner restart: sandbox, network, volume gone; run failed (AC5)', async () => {
+      const { tenant, scope, envelope, wrapped } = await prepareRun('restart');
+      const result = await provisionRun(deps, { envelope, wrappedGitToken: wrapped });
+      if (!result.ok) throw new Error(`provisioning failed: ${result.reason}`);
+      const runId = envelope.contract.run_id;
+      // Another runner deployment on the same host: its objects must survive.
+      const foreign = `sdlc-ws-${crypto.randomUUID()}`;
+      const foreignLabels = runLabels(`${instance}-other`, crypto.randomUUID(), tenant.id);
+      docker(
+        'volume',
+        'create',
+        ...Object.entries(foreignLabels).flatMap(([k, v]) => ['--label', `${k}=${v}`]),
+        foreign,
+      );
+      try {
+        // The old process is gone: a new one starts with nothing in memory.
+        const restarted = await reconcileOnStart({
+          db: deps.db,
+          docker: deps.docker,
+          settings: deps.settings,
+        });
+        expect(restarted).toEqual({ runs: 1, failedRuns: 1, errors: 0 });
+        const labels = { [LABELS.instance]: instance };
+        expect(await deps.docker.containerList(labels)).toEqual([]);
+        expect(await deps.docker.networkList(labels)).toEqual([]);
+        expect(await deps.docker.volumeList(labels)).toEqual([]);
+        expect(await scope.runs.getById(runId)).toMatchObject({
+          status: 'failed',
+          stop_reason: 'runner_restarted',
+        });
+        expect((await scope.runEvents.list(runId)).map((e) => e.event_type).slice(-2)).toEqual([
+          'run_abandoned',
+          'sandbox_removed',
+        ]);
+        expect(docker('volume', 'ls', '-q', '--filter', `name=${foreign}`)).toBe(foreign);
+      } finally {
+        quietly('volume', 'rm', foreign);
+        deps.held.release(runId);
+      }
     }, 300_000);
   },
 );

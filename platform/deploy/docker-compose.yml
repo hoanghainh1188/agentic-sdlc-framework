@@ -7,6 +7,10 @@
 #                  design/ADR-M24). Always on on the server: pnpm compose:models
 #   platform       The platform processes built from this repo: sdlc-api (B03, design/ADR-M26).
 #                  Needs core, OpenBao configured and the api credentials delivered first.
+#   sandbox        The runner and what its sandboxes need (C04, design/ADR-M25): sdlc-runner,
+#                  the Docker socket proxy, the npm package proxy (Verdaccio) and the local
+#                  registry for sandbox images. Needs core, OpenBao configured and the runner
+#                  credentials delivered first: pnpm compose:sandbox
 #
 # Usage (from the repo root; see platform/deploy/README.md):
 #   platform/deploy/scripts/init-env.sh           # once: creates platform/deploy/.env (mode 600)
@@ -64,6 +68,24 @@ volumes:
   # AppRole role ID and secret ID of sdlc-api (mode 600, owner node). Written by
   # `openbao/bootstrap.sh api-credentials` (B03, runbook T11).
   api-approle:
+  # --- profile sandbox (C04, design/ADR-M25) ---
+  # The socket proxy's filtered socket; mounted by the proxy and the runner only. In memory,
+  # writable by the proxy's user; the socket gets the Docker socket's group (mode 0660).
+  docker-proxy:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=64k,uid=65534,gid=${SDLC_DOCKER_GID:-0},mode=0770
+  # AppRole role ID and secret ID of sdlc-runner (mode 600, owner node). Written by
+  # `openbao/bootstrap.sh runner-credentials` (runbook T11).
+  runner-approle:
+  # The runner's clones before they go into a sandbox (removed right after the upload).
+  runner-work:
+  # npm packages cached by the package proxy.
+  npm-proxy-storage:
+  # Sandbox images of the local registry.
+  registry-data:
 
 services:
   # ---------------------------------------------------------------- core ----
@@ -470,6 +492,134 @@ services:
     security_opt: [no-new-privileges:true]
     ports:
       - ${SDLC_BIND_ADDR:-127.0.0.1}:${SDLC_API_HOST_PORT:-8090}:8080
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, node, /app/dist/healthcheck.js]
+
+  # ------------------------------------------------------------- sandbox ----
+
+  # Filtered Docker socket for the runner (design/ADR-M25 §2.5). wollomatic/socket-proxy (MIT,
+  # Go, from scratch, no shell). The only service that mounts the Docker socket, read-only; it
+  # joins no network and listens on a Unix socket in the volume docker-proxy only.
+  # The allowlist is the runner's ALLOWED_ENDPOINTS (docker/client.ts) with the API version; a
+  # test keeps both equal (platform/tests/deploy/sandbox-profile.test.ts). The proxy checks the
+  # method and path only, not the request body: docker/guard.ts inside the runner checks the
+  # container definition (ADR-M25 §2.5, residual risk). Bind mounts are refused by the proxy too.
+  docker-socket-proxy:
+    image: wollomatic/socket-proxy:1.13.1@sha256:3935b709275e4ec35d6ed5a5c4a1f0d01ed31eec5e7234efc3357ecd47689002
+    profiles: [sandbox]
+    restart: unless-stopped
+    network_mode: none
+    user: 65534:${SDLC_DOCKER_GID:-0}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - docker-proxy:/run/docker-proxy
+    command:
+      - -socketpath=/var/run/docker.sock
+      - -proxysocketendpoint=/run/docker-proxy/docker.sock
+      - -proxysocketendpointfilemode=0660
+      - -allowbindmountfrom=/nonexistent-sdlc-no-bind-mounts
+      - -allowhealthcheck
+      - -logjson
+      - -loglevel=WARN
+      - -shutdowngracetime=5
+      - '-allowGET=/v1\.44/(_ping|images/[a-zA-Z0-9][a-zA-Z0-9_.-]*(:[0-9]{1,5})?(/[a-zA-Z0-9][a-zA-Z0-9_.-]*)*(:[\w.-]+)?(@sha256:[0-9a-f]{64})?/json|containers/json|containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(json|logs)|networks|networks/[a-zA-Z0-9][a-zA-Z0-9_.-]*|volumes)'
+      - '-allowPOST=/v1\.44/(images/create|containers/create|containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(start|wait)|networks/create|networks/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(connect|disconnect)|volumes/create)'
+      - '-allowPUT=/v1\.44/containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/archive'
+      - '-allowDELETE=/v1\.44/(containers|networks|volumes)/[a-zA-Z0-9][a-zA-Z0-9_.-]*'
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, /healthcheck]
+
+  # npm package proxy of the sandboxes (QUESTIONS #59 option C, ADR-M25 §2.10). Verdaccio (MIT).
+  # Its only uplink is registry.npmjs.org; publishing is refused; no web UI; no host port. The
+  # runner attaches it to each run's internal network under the alias npm-proxy.
+  npm-proxy:
+    image: verdaccio/verdaccio:6.9.3@sha256:3b0591ab7612f3ed232fe5bb5888b9418ac9f34d712db781a03bd8dad43b4aa8
+    profiles: [sandbox]
+    restart: unless-stopped
+    networks: [sdlc]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ./verdaccio/config.yaml:/verdaccio/conf/config.yaml:ro
+      - npm-proxy-storage:/verdaccio/storage
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:4873/-/ping]
+
+  # Local registry for sandbox images (QUESTIONS #54: no GHCR for now). distribution registry:2
+  # (Apache-2.0). Published on 127.0.0.1 only, with no authentication: only operators on the
+  # server push (platform/sandbox-images/build.sh); the Docker Engine pulls by digest.
+  registry:
+    image: registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+    profiles: [sandbox]
+    restart: unless-stopped
+    networks: [sdlc]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: 'true'
+    volumes:
+      - registry-data:/var/lib/registry
+    ports:
+      - 127.0.0.1:${SDLC_REGISTRY_HOST_PORT:-5050}:5000
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:5000/v2/]
+
+  # Runner (C04, design/ADR-M25): provisions one hardened sandbox per run. Built from
+  # platform/apps/runner/Dockerfile. Reads the platform_app password from OpenBao
+  # (kv/runner/database) with the AppRole "runner"; reaches Docker only through the socket proxy.
+  sdlc-runner:
+    image: sdlc-runner:0.0.0
+    build:
+      context: ../..
+      dockerfile: platform/apps/runner/Dockerfile
+    profiles: [sandbox]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      openbao:
+        condition: service_healthy
+      docker-socket-proxy:
+        condition: service_healthy
+      npm-proxy:
+        condition: service_healthy
+    # Group of the proxy socket (mode 0660, group = the socket proxy's group).
+    group_add: ['${SDLC_DOCKER_GID:-0}']
+    environment:
+      SDLC_RUNNER_DOCKER_SOCKET: /run/docker-proxy/docker.sock
+      SDLC_RUNNER_INSTANCE: ${COMPOSE_PROJECT_NAME:-sdlc}
+      SDLC_RUNNER_MAX_SANDBOXES: ${SDLC_RUNNER_MAX_SANDBOXES:-1}
+      SDLC_RUNNER_SWEEP_INTERVAL_SECONDS: ${SDLC_RUNNER_SWEEP_INTERVAL_SECONDS:-300}
+      SDLC_RUNNER_EGRESS_SERVICES: litellm=${COMPOSE_PROJECT_NAME:-sdlc}-litellm-1:4000,npm-proxy=${COMPOSE_PROJECT_NAME:-sdlc}-npm-proxy-1:4873
+      SDLC_RUNNER_NPM_REGISTRY: http://npm-proxy:4873/
+      SDLC_RUNNER_WORK_DIR: /var/lib/sdlc-runner/work
+      SDLC_RUNNER_DB_HOST: postgres
+      SDLC_RUNNER_DB_NAME: platform
+      SDLC_OPENBAO_ADDR: http://openbao:8200
+      # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
+      SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'
+      SDLC_OPENBAO_ROLE_ID_FILE: /run/sdlc/approle/role_id
+      SDLC_OPENBAO_SECRET_ID_FILE: /run/sdlc/approle/secret_id
+    volumes:
+      - docker-proxy:/run/docker-proxy
+      - runner-approle:/run/sdlc/approle
+      - runner-work:/var/lib/sdlc-runner/work
+    read_only: true
+    # /tmp holds the heartbeat file the health check reads.
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     healthcheck:
       <<: *healthcheck-defaults
       test: [CMD, node, /app/dist/healthcheck.js]

@@ -13,11 +13,38 @@ export {
   type ContainerSpec,
 } from './docker/guard.js';
 export { RunnerError, type RunnerErrorKey } from './errors.js';
-export { isRunId, LABELS, MANAGED_BY, runLabels, runNames, type RunNames } from './names.js';
+export { HeldRuns } from './held.js';
+export {
+  isRunId,
+  LABELS,
+  MANAGED_BY,
+  runLabels,
+  runNames,
+  runOfLabels,
+  type LabelledRun,
+  type RunNames,
+} from './names.js';
 export { SlotPool, type Slot } from './pool.js';
+export {
+  DB_PASSWORD_FIELD,
+  DB_USER,
+  PROCESS_ENV,
+  processSettingsFromEnv,
+  type ProcessSettings,
+} from './process.js';
+export {
+  findRunObjects,
+  reconcileOnStart,
+  sweepOrphans,
+  type ReconcileDeps,
+  type ReconcileResult,
+} from './reconcile.js';
+export { Runner, type RunnerHooks } from './runner.js';
 export {
   createSandbox,
   ProvisioningError,
+  releaseWorkspace,
+  reserveWorkspace,
   teardownSandbox,
   type CreateSandboxInput,
   type ProvisioningFailure,

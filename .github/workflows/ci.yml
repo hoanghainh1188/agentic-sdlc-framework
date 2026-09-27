@@ -74,6 +74,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       run_compose: ${{ steps.decide.outputs.run_compose }}
+      run_sandbox_image: ${{ steps.decide.outputs.run_sandbox_image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -101,6 +102,20 @@ jobs:
           fi
           echo "run_compose=$run" >> "$GITHUB_OUTPUT"
           echo "Compose integration job: run=$run ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
+          image=false
+          if [ "$EVENT_NAME" = schedule ] || [ "$EVENT_NAME" = workflow_dispatch ]; then
+            image=true; reason="$EVENT_NAME run"
+          elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            image=true; reason="base commit unknown, running to be safe"
+          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/)" ]; then
+            image=true; reason="a sandbox image, the runner, the package proxy or their live test changed"
+          else
+            reason="sandbox images, runner, package proxy and their live test unchanged"
+          fi
+          echo "run_sandbox_image=$image" >> "$GITHUB_OUTPUT"
+          echo "Sandbox image job: run=$image ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
 
   compose:
     name: integration (compose core)
@@ -139,6 +154,9 @@ jobs:
       # C04: sandbox egress and hardening on the runner's Docker Engine (per-run internal networks,
       # fixture image in a throw-away registry:2, stub services; everything removed afterwards).
       - run: pnpm test:runner
+      # C04 session 3: the sdlc-runner container in the profile "sandbox" (socket proxy, Verdaccio,
+      # runner-credentials, clean-up at start), on its own throw-away Compose project.
+      - run: pnpm test:runner-compose
       # B03: the sdlc-api image, its database password from OpenBao (api-credentials) and a token
       # from `sdlc admin bootstrap`, on its own throw-away Compose project (throw-away test keys).
       - run: pnpm test:api
@@ -152,6 +170,69 @@ jobs:
         run: |
           [ -f platform/deploy/.env ] || exit 0
           docker compose -f "$COMPOSE_FILE_PATH" --env-file platform/deploy/.env --profile core down --volumes --remove-orphans
+
+  sandbox-image:
+    # C04 (design/ADR-M25 §2.9, QUESTIONS #54): build the sandbox image node24, scan it with Trivy
+    # (vulnerabilities and licences, ADR-M10 §2.1) and run it hardened with the real package
+    # proxy. Nothing is pushed anywhere except a throw-away registry:2 on 127.0.0.1 inside the job:
+    # no GHCR, no GitHub secrets, no keys.
+    name: sandbox image (node24)
+    needs: detect
+    if: needs.detect.outputs.run_sandbox_image == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (reads packageManager)
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build (no push)
+        run: |
+          ref="$(sh platform/sandbox-images/build.sh node24 --no-push)"
+          docker save "$ref" -o "$RUNNER_TEMP/node24.tar"
+          echo "Built $ref" >> "$GITHUB_STEP_SUMMARY"
+      - name: Install trivy
+        run: |
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$archive" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$archive"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" trivy
+      - name: Report (does not block)
+        run: |
+          "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/node24.tar" --scanners vuln \
+            --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" \
+            --ignorefile platform/sandbox-images/.trivyignore \
+            --disable-telemetry --skip-version-check --exit-code 0 \
+            --format table --output "$RUNNER_TEMP/trivy-image.txt"
+          {
+            echo "### trivy image node24: $TRIVY_REPORT_SEVERITY and $TRIVY_BLOCK_SEVERITY findings (only $TRIVY_BLOCK_SEVERITY blocks)"
+            echo '```text'
+            cat "$RUNNER_TEMP/trivy-image.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Scan vulnerabilities (severity CRITICAL blocks)
+        run: |
+          "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/node24.tar" --scanners vuln \
+            --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile platform/sandbox-images/.trivyignore \
+            --disable-telemetry --skip-version-check --exit-code 1
+      # ADR-M10 §2.1: the CRITICAL licence category (AGPL, SSPL, commercial) blocks.
+      - name: Scan licences (CRITICAL category blocks)
+        run: |
+          "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/node24.tar" --scanners license \
+            --severity "$TRIVY_BLOCK_SEVERITY" \
+            --disable-telemetry --skip-version-check --exit-code 1
+      # Hardened sandbox from the image by digest (throw-away registry:2), with Verdaccio: Node 24,
+      # pnpm through corepack and the proxy, no other way out.
+      - run: pnpm test:sandbox-image
+      - name: Remove the image archive
+        if: always()
+        run: rm -f "$RUNNER_TEMP/node24.tar"
 
   db:
     # Task A06: migrations and tenant isolation on a throw-away PostgreSQL (same image and init
@@ -266,7 +347,7 @@ jobs:
 
   ci-ok:
     name: ci-ok
-    needs: [checks, detect, compose, db, gitleaks, semgrep, trivy]
+    needs: [checks, detect, compose, sandbox-image, db, gitleaks, semgrep, trivy]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
