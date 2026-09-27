@@ -1,26 +1,32 @@
 import type { DataClass } from '@sdlc/contracts';
 import { sql, type Kysely } from 'kysely';
 
+import { AiRecordError } from '../../ai-record/errors.js';
+import {
+  aiRecordSha256,
+  aiRecordViolation,
+  consentOf,
+  sortDataClasses,
+  type AiRecordContent,
+} from '../../ai-record/rules.js';
 import { DbError } from '../errors.js';
-import type { Database, ProjectAiRecord } from '../schema.js';
-import type { AiAllowed, DisclosureFormat, ProdLogsAllowed } from '../vocabulary.js';
+import type { Database, ProjectAiRecord, ProjectAiRecordVersion } from '../schema.js';
 import { AuditLogRepository } from './audit-log.js';
 import { TenantRepository } from './base.js';
 import { assertExpectedVersion, versionConflict } from './versioned.js';
 
-export interface SaveProjectAiRecord {
-  readonly aiAllowed: AiAllowed;
-  readonly allowedDataClasses: readonly DataClass[];
-  readonly allowedToolsLocations: string | null;
-  readonly prodLogsAllowed: ProdLogsAllowed;
-  readonly disclosureFormat: DisclosureFormat;
-  /** Client contact who confirmed the record; null while consent is unknown. */
-  readonly confirmedBy: string | null;
-  /** `YYYY-MM-DD`. */
-  readonly confirmedAt: string | null;
+export interface SaveProjectAiRecord extends AiRecordContent {
+  /** The person accountable for this version: a user of the tenant. */
   readonly updatedBy: string;
   /** Version the caller read; 0 when the project has no AI record yet. */
   readonly expectedVersion: number;
+  /**
+   * Who records the change in the audit log: `human` (the API: `updatedBy` is the logged-in
+   * user) or `system` (the operator's `sdlc admin ai-record` command, on behalf of `updatedBy`).
+   */
+  readonly actorType: 'human' | 'system';
+  /** Today (`YYYY-MM-DD`, UTC) for the confirmation-date check. Default: the current date. */
+  readonly today?: string;
 }
 
 const SCALAR_COLUMNS = [
@@ -28,11 +34,11 @@ const SCALAR_COLUMNS = [
   'tenant_id',
   'version',
   'ai_allowed',
-  'allowed_tools_locations',
   'prod_logs_allowed',
   'disclosure_format',
-  'confirmed_by',
   'confirmed_at',
+  'record_ref',
+  'record_sha256',
   'updated_by',
   'created_at',
 ] as const;
@@ -53,21 +59,72 @@ export class ProjectAiRecordRepository extends TenantRepository {
     );
   }
 
+  /** Every version of the record, oldest first (ADR-M32 §2.3). */
+  versions(projectId: string): Promise<ProjectAiRecordVersion[]> {
+    return this.run(
+      this.db
+        .selectFrom('project_ai_record_versions')
+        .select([
+          'tenant_id',
+          'project_id',
+          'version',
+          'ai_allowed',
+          'prod_logs_allowed',
+          'disclosure_format',
+          'confirmed_at',
+          'record_ref',
+          'record_sha256',
+          'updated_by',
+          'created_at',
+          allowedDataClasses,
+        ])
+        .where('tenant_id', '=', this.tenantId)
+        .where('project_id', '=', projectId)
+        .orderBy('version')
+        .execute(),
+    );
+  }
+
   /**
-   * Creates version 1, or replaces version N with N + 1. Checks at G1 belong to B12. In the same
-   * transaction, appends an `ai_record.changed` audit event with the new version only (never the
-   * record contents: client names and consent details stay out of the audit log).
+   * Creates version 1, or replaces version N with N + 1 (compare-and-set). Checks the fixed rules
+   * of handbook Chapter 2 first (`AiRecordError`, ADR-M32 §3). A database trigger appends the
+   * version to `project_ai_record_versions`. In the same transaction, appends `ai_record.changed`
+   * with codes, the version and the record hash only (never the link).
    */
   async save(projectId: string, input: SaveProjectAiRecord): Promise<ProjectAiRecord> {
     assertExpectedVersion(input.expectedVersion);
+    const content: AiRecordContent = {
+      aiAllowed: input.aiAllowed,
+      allowedDataClasses: input.allowedDataClasses,
+      prodLogsAllowed: input.prodLogsAllowed,
+      disclosureFormat: input.disclosureFormat,
+      confirmedAt: input.confirmedAt,
+      recordRef: input.recordRef,
+    };
+    const found = aiRecordViolation(content, input.today ?? new Date().toISOString().slice(0, 10));
+    if (found) {
+      throw new AiRecordError(
+        found.violation,
+        `project AI record: ${found.violation}`,
+        found.field,
+      );
+    }
     return this.transactional(async (db) => {
-      const saved = await this.write(db, projectId, input);
+      const saved = await this.write(db, projectId, input, content);
       await new AuditLogRepository(db, this.tenantId).append({
         action: 'ai_record.changed',
-        actorType: 'human',
-        actorId: saved.updated_by,
+        actorType: input.actorType,
+        actorId: input.actorType === 'human' ? saved.updated_by : null,
         entityId: saved.project_id,
-        payload: { version: saved.version },
+        payload: {
+          version: saved.version,
+          record_sha256: saved.record_sha256,
+          ai_allowed: saved.ai_allowed,
+          prod_logs_allowed: saved.prod_logs_allowed,
+          disclosure_format: saved.disclosure_format,
+          consent: consentOf(saved.confirmed_at),
+          updated_by: saved.updated_by,
+        },
       });
       return saved;
     });
@@ -77,16 +134,17 @@ export class ProjectAiRecordRepository extends TenantRepository {
     db: Kysely<Database>,
     projectId: string,
     input: SaveProjectAiRecord,
+    content: AiRecordContent,
   ): Promise<ProjectAiRecord> {
     const values = {
       version: input.expectedVersion + 1,
-      ai_allowed: input.aiAllowed,
-      allowed_data_classes: [...input.allowedDataClasses],
-      allowed_tools_locations: input.allowedToolsLocations,
-      prod_logs_allowed: input.prodLogsAllowed,
-      disclosure_format: input.disclosureFormat,
-      confirmed_by: input.confirmedBy,
-      confirmed_at: input.confirmedAt,
+      ai_allowed: content.aiAllowed,
+      allowed_data_classes: sortDataClasses(content.allowedDataClasses),
+      prod_logs_allowed: content.prodLogsAllowed,
+      disclosure_format: content.disclosureFormat,
+      confirmed_at: content.confirmedAt,
+      record_ref: content.recordRef,
+      record_sha256: aiRecordSha256(content),
       updated_by: input.updatedBy,
     };
     if (input.expectedVersion === 0) {

@@ -22,15 +22,26 @@ function rejection(run: () => unknown): string | undefined {
   }
 }
 
+// Codes, the version and the record hash only (B12, ADR-M32 §2.2).
+const AI_RECORD_PAYLOAD = {
+  version: 1,
+  record_sha256: HASH,
+  ai_allowed: 'yes',
+  prod_logs_allowed: 'no',
+  disclosure_format: 'standard_note',
+  consent: 'unknown',
+  updated_by: SOME_ID,
+};
+
 describe('checkAuditEvent', () => {
   it('accepts the declared fields and returns exactly them', () => {
     expect(checkAuditEvent('config.changed', SOME_ID, { config_hash: HASH, version: 3 })).toEqual({
       entityType: 'project',
       payload: { version: 3, config_hash: HASH },
     });
-    expect(checkAuditEvent('ai_record.changed', SOME_ID, { version: 1 })).toEqual({
+    expect(checkAuditEvent('ai_record.changed', SOME_ID, AI_RECORD_PAYLOAD)).toEqual({
       entityType: 'project',
-      payload: { version: 1 },
+      payload: AI_RECORD_PAYLOAD,
     });
   });
 
@@ -43,10 +54,13 @@ describe('checkAuditEvent', () => {
       { email: 'someone@example.com' },
       { config_yaml: 'gates: {}' },
       { confirmed_by: 'Client contact' },
+      { record_ref: 'https://docs.example.test/ai-record' },
       { note: 'free text' },
     ]) {
       expect(
-        rejection(() => checkAuditEvent('ai_record.changed', SOME_ID, { version: 1, ...extra })),
+        rejection(() =>
+          checkAuditEvent('ai_record.changed', SOME_ID, { ...AI_RECORD_PAYLOAD, ...extra }),
+        ),
         JSON.stringify(extra),
       ).toBe('invalid_value');
     }

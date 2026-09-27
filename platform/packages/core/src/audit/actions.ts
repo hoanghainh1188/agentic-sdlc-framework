@@ -44,8 +44,23 @@ export const AUDIT_ACTIONS = {
     entityType: 'project',
     fields: { version: 'version', config_hash: 'sha256' },
   },
-  /** A project AI record was created or replaced (FR-19). Never the record contents. */
-  'ai_record.changed': { entityType: 'project', fields: { version: 'version' } },
+  /**
+   * A project AI record was created or replaced (FR-19, B12, ADR-M32 §2.2). Codes, the version and
+   * the hash of the coded record only; the allowed classes are in the hash and in
+   * `project_ai_record_versions`. Never the link or anything from the human record.
+   */
+  'ai_record.changed': {
+    entityType: 'project',
+    fields: {
+      version: 'version',
+      record_sha256: 'sha256',
+      ai_allowed: 'code',
+      prod_logs_allowed: 'code',
+      disclosure_format: 'code',
+      consent: 'code',
+      updated_by: 'uuid',
+    },
+  },
   /** An intent was created (FR-01, FR-03). Never the title or description. */
   'intent.created': {
     entityType: 'intent',

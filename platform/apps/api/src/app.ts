@@ -8,6 +8,8 @@ import type { IntentWorkflowSignals } from '@sdlc/contracts';
 import { Registry, type PlatformDatabase } from '@sdlc/core';
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
+import { AiRecordsController } from './ai-records/ai-records.controller.js';
+import { AiRecordsService } from './ai-records/ai-records.service.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { RateLimiter } from './auth/rate-limiter.js';
 import { ErrorFilter } from './errors/error.filter.js';
@@ -18,7 +20,7 @@ import { IntentsController } from './intents/intents.controller.js';
 import { IntentsService } from './intents/intents.service.js';
 import { MeController } from './me/me.controller.js';
 import type { ApiSettings } from './settings.js';
-import { CLOCK, DATABASE, ESCALATIONS, INTENTS, REGISTRY, SETTINGS } from './tokens.js';
+import { AI_RECORDS, CLOCK, DATABASE, ESCALATIONS, INTENTS, REGISTRY, SETTINGS } from './tokens.js';
 
 /** Largest accepted request body. Intents carry at most ~10 kB of text. */
 const BODY_LIMIT_BYTES = 64 * 1024;
@@ -45,7 +47,13 @@ class ApiModule {
     const wakeLogger = new Logger('sdlc-api');
     return {
       module: ApiModule,
-      controllers: [HealthController, MeController, IntentsController, EscalationsController],
+      controllers: [
+        HealthController,
+        MeController,
+        IntentsController,
+        EscalationsController,
+        AiRecordsController,
+      ],
       providers: [
         { provide: DATABASE, useValue: deps.db },
         { provide: SETTINGS, useValue: deps.settings },
@@ -63,6 +71,7 @@ class ApiModule {
           inject: [REGISTRY],
         },
         { provide: ESCALATIONS, useValue: new EscalationsService(now, signals, wakeLogger) },
+        { provide: AI_RECORDS, useValue: new AiRecordsService(signals, wakeLogger, now) },
         {
           provide: APP_GUARD,
           useFactory: (reflector: Reflector) =>

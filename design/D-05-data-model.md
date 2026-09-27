@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.12 |
+| Version | 1.13 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the C10 plan (agent register; ADR-M31); 1.12 approved by Harry on 2026-09-27 in the B07 plan (intent workflow: `gate_entered_at`, one open intent per issue, status notices; ADR-M30, QUESTIONS #68, #91) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the C10 plan (agent register; ADR-M31); 1.12 approved by Harry on 2026-09-27 in the B07 plan (intent workflow: `gate_entered_at`, one open intent per issue, status notices; ADR-M30, QUESTIONS #68, #91); 1.13 approved by Harry on 2026-09-27 in the B12 plan (project AI record: codes only, version history; ADR-M32, QUESTIONS #103–#106) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -55,6 +55,7 @@ erDiagram
     projects ||--o{ git_event_receipts : "handled events"
     projects ||--o{ intents : "contains"
     projects ||--|| project_ai_records : "has AI record"
+    project_ai_records ||--o{ project_ai_record_versions : "keeps versions"
     tenants ||--o{ agents : "registers"
     agents ||--o{ runs : "executes"
     intents ||--o{ escalations : "escalates"
@@ -215,14 +216,26 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | project_id | uuid PK, FK | |
 | version | int | Incremented on every change |
 | ai_allowed | text | `no`, `yes`, `yes_with_conditions` |
-| allowed_data_classes | data_class[] | Unknown consent → only `client_restricted` handling |
-| allowed_tools_locations | text | e.g. "business plan, data in Japan" |
+| allowed_data_classes | data_class[] | Never `prohibited`; no `client_*` class when `ai_allowed = no`; no `client_confidential` while consent is unknown (handbook Ch.2 Rule 3). CHECK constraints |
 | prod_logs_allowed | text | `no`, `yes_masked` (asked separately) |
-| disclosure_format | text | `client_format`, `standard_note` |
-| confirmed_by, confirmed_at | text, date | Client contact and date |
-| updated_by | uuid FK users | |
+| disclosure_format | text | `client_format`, `standard_note`. Read by E02 / E03 (FR-43) |
+| confirmed_at | date null | When the client confirmed in writing. Null = consent unknown. Never in the future |
+| record_ref | text null | `https://` link (≤ 512) to the human AI record (template T7, e.g. `docs/project/ai-record.md`), which holds the client contact, allowed tools and locations, and special conditions. Required when `confirmed_at` is set |
+| record_sha256 | char(64) | SHA-256 of the RFC 8785 canonical JSON of the coded record (ADR-M32 §2.2) |
+| updated_by | uuid FK users | The accountable person; holds a write role (config `access.ai_record_write_roles`) |
 
-- G1 fails when the record is missing, or when the intent's `data_class` is not in `allowed_data_classes`.
+- Codes only (QUESTIONS #104): the free-text columns `confirmed_by` (a client contact) and `allowed_tools_locations` were dropped in B12; that text stays in the linked human record, where it can be edited or deleted.
+- G1 fails when the record is missing, or when it does not allow the intent's `data_class` (FR-19, ADR-M32 §2.5). The platform never raises the intent's data class.
+- `platform_app` may update every column except `project_id`, `tenant_id` and `created_at`; a trigger allows only the next version and appends it to `project_ai_record_versions`.
+
+**`project_ai_record_versions`** (AO; task B12, ADR-M32 §2.3): every version of a project AI record.
+
+| Column | Type | Notes |
+|---|---|---|
+| project_id, version | uuid FK, int | PK with `tenant_id`. FK (`tenant_id`, `project_id`) → `project_ai_records` |
+| ai_allowed, allowed_data_classes, prod_logs_allowed, disclosure_format, confirmed_at, record_ref, record_sha256, updated_by | as above | Same CHECK constraints as the record |
+
+- Written by a trigger on `project_ai_records`, so no save can skip it. Codes, dates, one link and IDs only. Append-only (triggers, `SELECT, INSERT` only for `platform_app`).
 
 **`agents`** (agent register; handbook Chapter 20; task C10, ADR-M31)
 
@@ -611,6 +624,7 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | Evidence Pack (files in SeaweedFS) | **6 months by default** from `sealed_at` (decided by Harry, 2026-09-24). Configurable per tenant / project | When selling: the client chooses per contract |
 | run_events | 1 year, then summarised | |
 | cost_records | Never deleted in the MVP | Used for cost calculation |
+| project_ai_record_versions | Never deleted in the MVP | Evidence of the client's consent over time (codes only); purged only by the separate client data-deletion design (MVP+2) |
 
 ### 10.1. Deleting Evidence Packs after 6 months [Proposal]
 
@@ -682,3 +696,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.10 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §6.4: `run_events` types of C04 and C05, `runs.stop_reason` codes of C05; the iteration cap ends as `stopped_budget` with `max_iterations` (ADR-M29, QUESTIONS #82) |
 | 1.11 | 2026-09-27 | Claude (task C10), approved by Harry | §6.1 `agents` as built: `model_ref` is the gateway model name with its version, `instructions_ref` format, status moves, config changes only with a new version, tombstones; §6.4 `runs.agent_id` foreign key (ADR-M31, QUESTIONS #32, #93, #94) |
 | 1.12 | 2026-09-27 | Claude (task B07, session 1), approved by Harry | §4 ERD and §6.2: `intents.gate_entered_at`, one open intent per issue and pull request, decisions ordered by the audit chain, new table `intent_notices` (ADR-M30, QUESTIONS #68, #91) |
+| 1.13 | 2026-09-27 | Claude (task B12), approved by Harry | §4 ERD and §6.1: `project_ai_records` codes only (`confirmed_by`, `allowed_tools_locations` dropped; `record_ref`, `record_sha256` added; fixed rules as CHECKs), new append-only `project_ai_record_versions` (ADR-M32, QUESTIONS #103–#106) |

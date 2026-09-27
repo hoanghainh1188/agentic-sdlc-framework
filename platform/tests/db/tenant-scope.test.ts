@@ -102,10 +102,10 @@ describe('TenantScope', () => {
           scope.projectAiRecords.save(SOME_ID, {
             aiAllowed: 'yes',
             allowedDataClasses: ['internal'],
-            allowedToolsLocations: null,
             prodLogsAllowed: 'no',
             disclosureFormat: 'standard_note',
-            confirmedBy: null,
+            recordRef: null,
+            actorType: 'human',
             confirmedAt: null,
             updatedBy: SOME_ID,
             expectedVersion,

@@ -1,5 +1,6 @@
 // Shared types, adapter interfaces and the Run Contract schema. See design/D-03 sections 7 and 8.
 export * from './codes.js';
+export * from './ai-record.js';
 export * from './escalation.js';
 export * from './forbidden-actions.js';
 export * from './git-host.js';

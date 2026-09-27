@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M16: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M19: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -387,6 +387,14 @@ const CASES: Case[] = [
     yaml: 'agents:\n  recertification_months: 4\n',
     key: 'config.rule.recertification_max',
     path: 'agents.recertification_months',
+  },
+  // M19: the viewer role never writes the project AI record (B12, ADR-M32, QUESTIONS.md #103).
+  {
+    name: 'viewer may write the AI record',
+    rule: 'M19',
+    yaml: 'access:\n  ai_record_write_roles: [pm_brse, viewer]\n',
+    key: 'config.rule.viewer_never_writes_ai_record',
+    path: 'access.ai_record_write_roles',
   },
 ];
 

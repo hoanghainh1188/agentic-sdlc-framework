@@ -52,6 +52,11 @@ export type IntentWaitReason =
   | 'decision'
   /** The gate's input (spec at G2, plan at G3) does not exist yet. */
   | 'input_missing'
+  /**
+   * The project AI record is missing or does not allow the intent's data class: the submit waits
+   * until the record is fixed (D-02 FR-19, ADR-M32 §2.5).
+   */
+  | 'ai_record'
   /** An escalation freezes the intent (ADR-M28 §2.4). */
   | 'frozen'
   /** The intent waits at a gate that later tasks handle (G4: C06). */

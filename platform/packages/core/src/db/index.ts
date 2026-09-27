@@ -65,6 +65,7 @@ export type {
   Plan,
   Project,
   ProjectAiRecord,
+  ProjectAiRecordVersion,
   ProjectConfig,
   RoleBinding,
   Run,

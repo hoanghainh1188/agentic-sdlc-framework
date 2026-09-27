@@ -6,7 +6,7 @@
 // nothing, because the move is a compare-and-set on the intent's status and gate.
 //
 // Session 1 of B07 covers the moves of the D-03 state machine on people's decisions:
-//   draft → G1 (the submit; B12 adds the AI-record check here) → G2 → G3 → G4 (C06 continues);
+//   draft → G1 (the submit, after the project AI record check of B12) → G2 → G3 → G4 (C06 continues);
 //   a rejection at G1–G3 ends the intent as `rejected`; a request for changes keeps it at the gate.
 // Session 2 adds the HOTL pass, the gate deadline and the escalation of an overdue gate.
 //
@@ -22,6 +22,7 @@
 // the roles and the number of approvals per gate and risk tier, the approval expiry.
 import type { GateCode, IntentStepResult, ProjectRole } from '@sdlc/contracts';
 
+import { checkAiRecordAtSubmit } from '../ai-record/g1-check.js';
 import { gateInputSha256, isCommandGate } from '../commands/gate-input.js';
 import { CommandError } from '../commands/errors.js';
 import type { IntentNoticeKind } from '../db/repositories/intent-notices.js';
@@ -83,7 +84,8 @@ export async function stepIntent(
 
 /** Draft → G1. Creating the intent is the submit (QUESTIONS #89). */
 async function submit(tx: TenantScope, deps: StepDeps, intent: Intent): Promise<IntentStepResult> {
-  // B12 adds the project AI record check here (FR-19): G1 fails without it.
+  // FR-19 (B12, ADR-M32 §2.5): no G1 without a project AI record that allows the data class.
+  if (await checkAiRecordAtSubmit(tx, deps.registry, intent)) return waiting('ai_record');
   if (!(await gateAdvanceAllowed(tx, intent, deps.registry.now()))) return waiting('frozen');
   return move(tx, deps, intent, { status: 'in_gate', gate: 'G1' }, 'submitted', null);
 }

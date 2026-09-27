@@ -85,13 +85,31 @@ export interface ProjectAiRecordsTable {
   version: number;
   ai_allowed: AiAllowed;
   allowed_data_classes: DataClass[];
-  allowed_tools_locations: string | null;
   prod_logs_allowed: ProdLogsAllowed;
   disclosure_format: DisclosureFormat;
-  confirmed_by: string | null;
-  /** SQL `date`, returned as `YYYY-MM-DD` (see connection.ts). */
+  /** When the client confirmed in writing; null while consent is unknown. SQL `date`, `YYYY-MM-DD`. */
   confirmed_at: string | null;
   updated_by: string;
+  created_at: CreatedAt;
+  /** `https://` link to the human AI record (template T7), which holds the free text (B12). */
+  record_ref: string | null;
+  /** SHA-256 of the canonical coded record (ADR-M32 §2.2). */
+  record_sha256: string;
+}
+
+/** Every version of a project AI record, append-only, written by a trigger (B12, ADR-M32). */
+export interface ProjectAiRecordVersionsTable {
+  tenant_id: Immutable<string>;
+  project_id: Immutable<string>;
+  version: Immutable<number>;
+  ai_allowed: Immutable<AiAllowed>;
+  allowed_data_classes: Immutable<DataClass[]>;
+  prod_logs_allowed: Immutable<ProdLogsAllowed>;
+  disclosure_format: Immutable<DisclosureFormat>;
+  confirmed_at: Immutable<string | null>;
+  record_ref: Immutable<string | null>;
+  record_sha256: Immutable<string>;
+  updated_by: Immutable<string>;
   created_at: CreatedAt;
 }
 
@@ -494,6 +512,7 @@ export interface Database {
   escalation_notices: EscalationNoticesTable;
   agents: AgentsTable;
   intent_notices: IntentNoticesTable;
+  project_ai_record_versions: ProjectAiRecordVersionsTable;
 }
 
 export type TableName = keyof Database;
@@ -542,13 +561,13 @@ export const TABLE_COLUMNS = {
     'version',
     'ai_allowed',
     'allowed_data_classes',
-    'allowed_tools_locations',
     'prod_logs_allowed',
     'disclosure_format',
-    'confirmed_by',
     'confirmed_at',
     'updated_by',
     'created_at',
+    'record_ref',
+    'record_sha256',
   ]),
   users: columns<UsersTable>()([
     'id',
@@ -829,6 +848,20 @@ export const TABLE_COLUMNS = {
     'abandoned_at',
     'created_at',
   ]),
+  project_ai_record_versions: columns<ProjectAiRecordVersionsTable>()([
+    'tenant_id',
+    'project_id',
+    'version',
+    'ai_allowed',
+    'allowed_data_classes',
+    'prod_logs_allowed',
+    'disclosure_format',
+    'confirmed_at',
+    'record_ref',
+    'record_sha256',
+    'updated_by',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -859,6 +892,7 @@ export const TENANT_COLUMN = {
   escalation_notices: 'tenant_id',
   agents: 'tenant_id',
   intent_notices: 'tenant_id',
+  project_ai_record_versions: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -884,6 +918,7 @@ export type Escalation = Selectable<EscalationsTable>;
 export type EscalationNotice = Selectable<EscalationNoticesTable>;
 export type Agent = Selectable<AgentsTable>;
 export type IntentNotice = Selectable<IntentNoticesTable>;
+export type ProjectAiRecordVersion = Selectable<ProjectAiRecordVersionsTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

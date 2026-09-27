@@ -200,6 +200,11 @@ access:
   # The viewer role never creates intents (mandatory rule M16).
   intent_create_roles: [person_a]
   intent_read_roles: [person_a, person_b, second_approver, pm_brse, governance, admin, viewer]
+  # Task B12, ADR-M32, QUESTIONS.md #103. The project AI record (handbook Ch.2 §2.5, T7): D-02 §3
+  # says PM / BrSE maintains it, Ch.2 §2.5 says Person A owns it, T7 says both fill it in.
+  # Writers may always read. The viewer role never writes it (mandatory rule M19).
+  ai_record_write_roles: [person_a, pm_brse]
+  ai_record_read_roles: [person_a, person_b, second_approver, pm_brse, governance, admin, viewer]
 
 agents:
   # Handbook Ch.20 §20.8 (decision: Harry, 2026-09-24): recertify every agent every 3 months. The

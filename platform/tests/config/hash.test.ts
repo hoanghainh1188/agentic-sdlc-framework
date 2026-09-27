@@ -9,9 +9,9 @@ import { loadValid } from './helpers';
 
 /**
  * Pinned hash of the shipped default configuration. It changes only when a default value changes.
- * Update it in the same PR as the default change, after review.
+ * Update it in the same PR as the default change, after review (B12: `access.ai_record_*`).
  */
-const DEFAULT_CONFIG_HASH = '6b36c7e37ba7be5e942a1e2e8e4ea4198110f677b20937002deb8a170675ed23';
+const DEFAULT_CONFIG_HASH = '5485acca9240bd35baf16d4d7c421017f678ea32795e46d6aa2b96130de191a3';
 
 describe('config_hash (AC3)', () => {
   it('is the pinned value for the default configuration', () => {

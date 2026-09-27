@@ -173,10 +173,19 @@ describeDb('A07: audit log on PostgreSQL', () => {
         actorType: 'human',
         actorId: s.userId,
         entityId: s.projectId,
-        payload: { version: 1 },
+        payload: {
+          version: 1,
+          record_sha256: HASH('r'),
+          ai_allowed: 'yes',
+          prod_logs_allowed: 'no',
+          disclosure_format: 'standard_note',
+          consent: 'confirmed',
+          updated_by: s.userId,
+        },
       };
       for (const event of [
-        { ...base, payload: { version: 1, confirmed_by: 'Client contact' } },
+        { ...base, payload: { ...base.payload, confirmed_by: 'Client contact' } },
+        { ...base, payload: { version: 1 } },
         { ...base, action: 'user.renamed' },
         { ...base, actorType: 'system' },
         { ...base, actorType: 'human', actorId: null },
@@ -351,24 +360,37 @@ describeDb('A07: audit log on PostgreSQL', () => {
       expect(await s.scope.audit.verify()).toMatchObject({ checked: 2 });
     });
 
-    it('AI record save appends ai_record.changed with the version only', async () => {
+    it('AI record save appends ai_record.changed with codes, version and hash only', async () => {
       const s = await seed();
       await s.scope.projectAiRecords.save(s.projectId, {
         aiAllowed: 'yes_with_conditions',
         allowedDataClasses: ['internal'],
-        allowedToolsLocations: 'Data stays in Japan',
         prodLogsAllowed: 'no',
         disclosureFormat: 'standard_note',
-        confirmedBy: 'Client contact name',
+        recordRef: 'https://docs.example.test/project/ai-record',
+        actorType: 'human',
         confirmedAt: '2026-09-25',
         updatedBy: s.userId,
         expectedVersion: 0,
       });
       const rows = await rowsOf(s);
+      const saved = await s.scope.projectAiRecords.get(s.projectId);
       expect(rows.map((r) => [r.action, r.payload])).toEqual([
-        ['ai_record.changed', { version: 1 }],
+        [
+          'ai_record.changed',
+          {
+            version: 1,
+            record_sha256: saved!.record_sha256,
+            ai_allowed: 'yes_with_conditions',
+            prod_logs_allowed: 'no',
+            disclosure_format: 'standard_note',
+            consent: 'confirmed',
+            updated_by: s.userId,
+          },
+        ],
       ]);
-      expect(JSON.stringify(rows)).not.toMatch(/Client contact|Japan/);
+      // Never the link to the human record.
+      expect(JSON.stringify(rows)).not.toMatch(/https:|example\.test/);
     });
 
     it('a save and its audit event commit or roll back together', async () => {

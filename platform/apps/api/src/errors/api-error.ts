@@ -1,6 +1,7 @@
 // Every error the API returns has a stable code, an HTTP status and a message from the catalog
 // (D-08 B03 AC4, NFR-08). Nothing else reaches the client: no stack trace, no SQL, no library text.
 import {
+  AiRecordError,
   CommandError,
   DbError,
   EscalationError,
@@ -34,6 +35,9 @@ export const API_ERROR_CODES = [
   'escalation_not_open',
   'escalation_already_acknowledged',
   'escalation_decision_not_allowed',
+  'ai_record_not_found',
+  'ai_record_invalid',
+  'ai_record_version_conflict',
   'conflict',
   'not_ready',
   'internal',
@@ -60,6 +64,9 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   escalation_not_open: 'api.error.escalation_not_open',
   escalation_already_acknowledged: 'api.error.escalation_already_acknowledged',
   escalation_decision_not_allowed: 'api.error.escalation_decision_not_allowed',
+  ai_record_not_found: 'api.error.ai_record_not_found',
+  ai_record_invalid: 'api.error.ai_record_invalid',
+  ai_record_version_conflict: 'api.error.ai_record_version_conflict',
   conflict: 'api.error.conflict',
   not_ready: 'api.error.not_ready',
   internal: 'api.error.internal',
@@ -132,6 +139,13 @@ export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
   if (error instanceof EscalationError) return new ApiError(...ESCALATION[error.code]);
+  if (error instanceof AiRecordError) {
+    if (error.code === 'version_conflict') return new ApiError(409, 'ai_record_version_conflict');
+    if (error.code === 'not_a_writer') return new ApiError(403, 'forbidden');
+    const details =
+      error.field === undefined ? undefined : [{ path: `body.${error.field}`, issue: 'invalid' }];
+    return new ApiError(422, 'ai_record_invalid', error.code, details);
+  }
   if (error instanceof RegistryError) {
     const [status, code] = REGISTRY[error.code];
     // A person without the gate's role is refused like any other missing permission.
