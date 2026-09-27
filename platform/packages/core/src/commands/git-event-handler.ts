@@ -11,7 +11,7 @@
 //   comment URL (`reason_ref`) only.
 import type { CommentCreatedEvent, GitEvent } from '@sdlc/contracts';
 
-import { DbError } from '../db/errors.js';
+import { DbError, TenantGuardError } from '../db/errors.js';
 import type { GitEventReceipt } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import type { GitProvider } from '../db/vocabulary.js';
@@ -193,12 +193,11 @@ function refusalReply(error: unknown, gate: Readonly<{ gate: string }>): Reply |
     const code = error.code === 'config_hash_mismatch' ? 'config_invalid' : error.code;
     return { code, params: error.reason ? { ...gate, reason: error.reason } : gate };
   }
-  // A value the database refused (for example a constraint): retrying the poll would fail the
-  // same way and block every later event of the project, so it is answered, not retried.
-  if (
-    error instanceof DbError &&
-    (error.code === 'invalid_value' || error.code === 'reference_not_found')
-  ) {
+  // The database refused a statement (constraint, privilege, trigger) or the tenant guard refused a
+  // query. Both are deterministic: retrying the poll would fail the same way and block every later
+  // event of the project, so the command is answered `failed` instead. Only other errors (for
+  // example a lost connection, which `DbError` never wraps) stop the poll and are retried.
+  if (error instanceof DbError || error instanceof TenantGuardError) {
     return { code: 'failed', params: gate };
   }
   return undefined;

@@ -33,7 +33,8 @@ export type PollLogEvent =
   | 'poll.event_handled'
   | 'reply.posted'
   | 'reply.failed'
-  | 'reply.abandoned';
+  | 'reply.abandoned'
+  | 'reply.bookkeeping_failed';
 
 /** Structured log hook. Fields hold IDs and codes only: never comment text or tokens. */
 export interface PollLogger {
@@ -124,7 +125,11 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
     log.log('warn', 'poll.cursor_moved', ids);
   }
 
-  const replies = await flushReplies(deps, scope, project.id, ref, now);
+  // The poller that lost the cursor race leaves the replies to the winner, which is flushing them.
+  const replies =
+    status === 'polled'
+      ? await flushReplies(deps, scope, project.id, ref, now)
+      : { posted: 0, failed: 0 };
   log.log('info', 'poll.completed', {
     ...ids,
     status,
@@ -162,28 +167,42 @@ async function flushReplies(
       reply: receipt.reply_code ?? '',
     };
     const attempts = receipt.reply_attempts + 1;
+    let error: unknown;
     try {
       await deps.gitHost.createIssueComment(
         ref,
         receipt.issue_number!,
         renderCommentReply(receipt.reply_code!, receipt.reply_params ?? {}, receipt.event_id),
       );
-      await scope.gitEventReceipts.markReplyPosted(receipt.id, attempts, now());
+    } catch (caught) {
+      error = caught ?? new Error('unknown');
+    }
+    const abandon = error !== undefined && attempts >= maxAttempts;
+    try {
+      // Bookkeeping never stops the other replies: a failure here only means this reply may be
+      // posted again later (at least once).
+      if (error === undefined) {
+        await scope.gitEventReceipts.markReplyPosted(receipt.id, attempts, now());
+      } else {
+        await scope.gitEventReceipts.markReplyFailed(receipt.id, attempts, abandon ? now() : null);
+      }
+    } catch {
+      log.log('error', 'reply.bookkeeping_failed', { ...fields, attempts });
+    }
+    if (error === undefined) {
       posted += 1;
       log.log('info', 'reply.posted', fields);
-    } catch (error) {
-      const code = error instanceof GitHostError ? error.code : 'unexpected';
-      const abandon = attempts >= maxAttempts;
-      await scope.gitEventReceipts.markReplyFailed(receipt.id, attempts, abandon ? now() : null);
-      failed += 1;
-      log.log(abandon ? 'error' : 'warn', abandon ? 'reply.abandoned' : 'reply.failed', {
-        ...fields,
-        attempts,
-        error: code,
-      });
-      // The Git host asks us to wait: the other replies would fail the same way.
-      if (code === 'rate_limited') break;
+      continue;
     }
+    const code = error instanceof GitHostError ? error.code : 'unexpected';
+    failed += 1;
+    log.log(abandon ? 'error' : 'warn', abandon ? 'reply.abandoned' : 'reply.failed', {
+      ...fields,
+      attempts,
+      error: code,
+    });
+    // The Git host asks us to wait: the other replies would fail the same way.
+    if (code === 'rate_limited') break;
   }
   return { posted, failed };
 }

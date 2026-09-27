@@ -56,11 +56,15 @@ export class PollerLoop {
     for (const known of [...this.#nextDue.keys()]) {
       if (!listed.has(known)) this.#nextDue.delete(known);
     }
-    for (const project of projects) {
+    // Longest-waiting first, so a project late in the list is never starved when more projects
+    // are due than `maxConcurrentPolls`.
+    const now = this.#deps.now();
+    const due = projects
+      .filter((p) => !this.#running.has(key(p)) && now >= (this.#nextDue.get(key(p)) ?? 0))
+      .sort((a, b) => (this.#nextDue.get(key(a)) ?? 0) - (this.#nextDue.get(key(b)) ?? 0));
+    for (const project of due) {
       if (this.#stopped || this.#running.size >= this.#deps.maxConcurrentPolls) break;
       const id = key(project);
-      if (this.#running.has(id)) continue;
-      if (this.#deps.now() < (this.#nextDue.get(id) ?? 0)) continue;
       const run = this.#run(project).finally(() => this.#running.delete(id));
       this.#running.set(id, run);
     }

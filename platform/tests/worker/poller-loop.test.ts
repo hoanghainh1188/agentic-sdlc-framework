@@ -116,6 +116,16 @@ describe('poller loop', () => {
     await h.loop.idle();
   });
 
+  it('polls the longest-waiting projects first, so none is starved', async () => {
+    const h = harness(1);
+    const P3 = { ...P1, projectId: 'p3', repoFullName: 'acme/three' };
+    h.projects = [P1, P2, P3];
+    h.intervals.set('p3', 30);
+    h.intervals.set('p2', 30);
+    for (const ms of [0, 1, 2, 30_000, 30_001, 30_002]) await tickAt(h, ms);
+    expect(h.polls).toEqual(['p1', 'p2', 'p3', 'p1', 'p2', 'p3']);
+  });
+
   it('waits for the rate-limit reset of the Git host', async () => {
     const h = harness();
     h.projects = [P1];

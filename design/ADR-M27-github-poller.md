@@ -27,7 +27,7 @@ These points were open:
 - The worker runs a loop (`PollerLoop`, `platform/apps/worker/src/poller-loop.ts`).
   - Every tick (`SDLC_WORKER_TICK_MS`, default 1 s), it reads the pollable projects (`SystemScope.listPollableProjects()`) and starts the polls that are due.
   - Before every poll it reads the project's `github.poll_interval_seconds` (default 30) from the project configuration. A configuration change applies without a restart.
-  - A project never has two polls running at once in one process. At most `SDLC_WORKER_MAX_CONCURRENT_POLLS` polls run at once (default 4).
+  - A project never has two polls running at once in one process. At most `SDLC_WORKER_MAX_CONCURRENT_POLLS` polls run at once (default 4); the projects that have waited longest go first, so none is starved.
   - After a `rate_limited` error, the project waits until GitHub's reset time (`retry_at`).
   - A project whose configuration cannot be read is skipped and tried again after 60 s. This is a technical retry delay, not a handbook rule.
 - All state is in PostgreSQL: the cursor (`git_event_cursors`) and the receipts (`git_event_receipts`). After a restart, every project is polled once right away and continues from its stored cursor.
@@ -49,9 +49,9 @@ These points were open:
 - Each command runs inside a savepoint (`TenantScope.savepoint`). An expected refusal rolls back only that command:
   - `CommandError`;
   - `RegistryError`;
-  - a stored value that the database refuses.
+  - any `DbError` (a constraint, privilege or trigger refused a statement) or `TenantGuardError`. These are deterministic: a retry would fail the same way and block every later event of the project, so the command is answered `failed` instead.
   The refusal is then recorded as a receipt with a reply.
-- Any other error (for example a lost connection) rolls back the whole batch, and the next tick retries.
+- Any other error (for example a lost connection, which `DbError` never wraps) rolls back the whole batch, and the next tick retries.
 - Only command comments get a receipt. Other comments, reviews and checks only move the cursor: reviews and checks are read by later gates (E01, C08).
 
 ### 2.3. Command grammar and reason codes (D3)
@@ -68,7 +68,8 @@ These points were open:
   - Gates other than G1–G3 are refused by `decideGate` (`gate_not_supported`); E01 and E03 add G7 and G8.
 - `/reject` and `/request-changes` need a reason. The reason is the rest of the first line and the lines below.
   - An optional first word may be a code from `GATE_REASON_CODES` (`spec_unclear`, `spec-unclear`, any case).
-  - Without a code, the platform records `other`.
+  - A code other than `other` is a reason by itself (`/reject G3 spec_unclear`).
+  - Without a code, the platform records `other`, and a sentence is required.
 - **The reason text stays in the comment on GitHub.** The decision stores `reason_code` and `reason_ref` = the comment's `https://` URL (ADR-M20). The parser returns codes only. Receipts and logs never hold text from GitHub.
 - Other slash words (`/label`, later `/ack`, `/decide`, `/kill`) are not ours and are ignored. B11 and C11 add their verbs to the same parser.
 
@@ -90,8 +91,9 @@ These points were open:
   - The receipt stores a reply code and code parameters (gate, refusal reason). The text is rendered from the message catalog when the reply is posted (`comment.reply.*`, NFR-08).
   - Syntax replies show the syntax and the list of valid reason codes.
   - Refusal texts come from `gate.reason.*`. These keys were `api.reason.*` before B06. The API uses the same keys, so both give the same sentence; a test checks that the API texts are unchanged.
-- **Delivery.** Replies are posted after the commit, in event order, at least once.
+- **Delivery.** Replies are posted after the commit, in event order, at least once, by the poller that won the cursor race (the other one posts nothing).
   - A crash after the POST and before the update posts that reply again: a harmless duplicate.
+  - The delivery update is conditional: a reply that is already delivered or abandoned stays so. A failed update is logged (`reply.bookkeeping_failed`) and never stops the other replies.
   - A failed post is retried on the next polls. After `SDLC_WORKER_MAX_REPLY_ATTEMPTS` failures (default 5), the reply is given up and logged.
   - After a `rate_limited` answer, the other replies wait.
 
@@ -164,7 +166,8 @@ These points were open:
   - Before more projects share one installation: measure, then raise the interval or move to webhooks (ADR-M11) once public infrastructure exists.
 - `intents.issue_number` is not unique per project. Two open intents on one issue give `intent_ambiguous`, and nothing is decided (QUESTIONS #68).
 - Replies are at least once, so a rare duplicate reply is possible. A successful command gets no reply until B07.
-- One worker instance is the MVP. The compare-and-set makes a second instance safe, but not efficient: its polls roll back.
+- One worker instance is the MVP. The compare-and-set makes a second instance safe, but not efficient: its polls roll back. Two instances flushing the same project at the same moment can post a reply twice (at least once).
+- An unexpected error that is not a database refusal (for example a bug in the handler) rolls the batch back on every poll, so that project's commands wait until it is fixed. `worker.poll_failed` is logged on every attempt; watch it.
 
 ## 4. Consequences
 

@@ -16,6 +16,7 @@ import { sql } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { handleGitEvent } from '../../../packages/core/src/commands/git-event-handler.js';
+import { DbError } from '../../../packages/core/src/db/errors.js';
 import type { Intent } from '../../../packages/core/src/db/schema.js';
 import type { PollableProject } from '../../../packages/core/src/db/system-scope.js';
 import { parseTenantId, type TenantId } from '../../../packages/core/src/db/tenant-id.js';
@@ -180,7 +181,7 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       body: comments.filter((c) => Date.parse(c.updated_at) >= Date.parse(req.query.get('since')!)),
     }));
     h.stub.on('GET', '/repos/acme/shop/pulls', { body: [] });
-    for (const issue of [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 99]) {
+    for (const issue of [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 99]) {
       h.stub.on('POST', `/repos/acme/shop/issues/${String(issue)}/comments`, {
         status: 201,
         body: { id: 1 },
@@ -418,6 +419,28 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       expect(await receipt(id)).toMatchObject({ outcome: 'decided' });
     });
 
+    it('a value the database refuses is answered "failed"; it never blocks the later events', async () => {
+      class RefusingRegistry extends Registry {
+        override async decide(
+          ...args: Parameters<Registry['decide']>
+        ): ReturnType<Registry['decide']> {
+          if (args[1].decision === 'reject') throw new DbError('conflict', 'duplicate');
+          return super.decide(...args);
+        }
+      }
+      const intent = await newIntent(16);
+      const refused = post(16, '/reject G1 spec_unclear');
+      const approved = post(16, '/approve G1');
+      const result = await poll({ registry: new RefusingRegistry({ policyFactory }) });
+      expect(result).toMatchObject({ status: 'polled', outcomes: { failed: 1, decided: 1 } });
+      expect(await receipt(refused)).toMatchObject({ outcome: 'failed', reply_code: 'failed' });
+      expect(await receipt(approved)).toMatchObject({ outcome: 'decided' });
+      expect((await decisions()).filter((d) => d.intent_id === intent.id)).toHaveLength(1);
+      expect(replies(16)).toEqual([
+        expect.stringContaining(t('comment.reply.failed', { gate: 'G1' })),
+      ]);
+    });
+
     it('an event handled twice (overlap window, webhook later) is skipped by its receipt', async () => {
       const id = post(14, '/reject G1');
       await poll();
@@ -505,6 +528,19 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       expect((await receipt(abandoned))?.reply_abandoned_at).toBeInstanceOf(Date);
       await poll();
       expect(replies(14)).toHaveLength(posted + 1);
+    });
+  });
+
+  describe('reply bookkeeping', () => {
+    it('never reopens a reply another poller already delivered', async () => {
+      const [row] = (
+        await sql<{ id: string; reply_attempts: number }>`SELECT id, reply_attempts
+          FROM git_event_receipts WHERE reply_posted_at IS NOT NULL LIMIT 1`.execute(db.owner)
+      ).rows;
+      const at = new Date('2026-09-26T09:00:00Z');
+      const receipts = seeded.scope.gitEventReceipts;
+      expect(await receipts.markReplyPosted(row!.id, row!.reply_attempts + 1, at)).toBe(false);
+      expect(await receipts.markReplyFailed(row!.id, row!.reply_attempts + 1, at)).toBe(false);
     });
   });
 

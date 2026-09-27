@@ -5,7 +5,7 @@ import { GATE_REASON_CODES } from '@sdlc/contracts';
 import { t, type MessageKey } from '@sdlc/messages';
 
 import { COMMENT_REPLY_CODES, type CommentReplyCode } from '../commands/git-event-handler.js';
-import { refusalReasonMessage } from '../commands/refusal-messages.js';
+import { isRefusalReason, refusalReasonMessage } from '../commands/refusal-messages.js';
 
 /** Catalog key of each reply code (tested: every code has one). */
 export const COMMENT_REPLY_KEYS: Readonly<Record<CommentReplyCode, MessageKey>> = {
@@ -44,7 +44,8 @@ export function renderCommentReply(
   // A code from a newer version of the platform (rolled back since): answer generically.
   const key = isReplyCode(code) ? COMMENT_REPLY_KEYS[code] : COMMENT_REPLY_KEYS.failed;
   const parts = [t(key, { gate: params.gate ?? '' }, locale)];
-  if (params.reason !== undefined) {
+  // Known reason codes only: the text of an unknown code is never echoed into a comment.
+  if (params.reason !== undefined && isRefusalReason(params.reason)) {
     parts.push(
       t('comment.reply.reason', { reason: refusalReasonMessage(params.reason, locale) }, locale),
     );

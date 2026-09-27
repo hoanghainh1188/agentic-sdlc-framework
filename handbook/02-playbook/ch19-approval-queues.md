@@ -116,7 +116,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 | `/request-changes G3 <reason>` | A request for changes. The reason is required |
 
 - Gates G1, G2 and G3 can be decided by comment today; G7 and G8 come later.
-- The reason may start with a reason code: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other`. Without a code, the platform records `other`. Example: `/reject G2 spec_unclear AC2 does not say which warehouse`.
+- The reason may start with a reason code: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other`. A code other than `other` may stand alone (`/reject G2 spec_unclear`). Without a code, the platform records `other` and you must write a sentence. Example: `/reject G2 spec_unclear AC2 does not say which warehouse`.
 - The reason text stays in your comment. The platform stores only the reason code and a link to the comment, because its records are kept for years and can never be edited. Write the reason so that it can stay on GitHub, and do not put personal or client data in it.
 - Only new comments count. **Editing a comment never changes a decision.** To change your mind, write a new comment.
 - Text on later lines, quoted text (`> /approve G3`) and commands inside code blocks are not read.

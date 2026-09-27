@@ -31,6 +31,9 @@ describe('comment command grammar', () => {
     ['/request-changes G1\nThe scope is too wide.', 'request_changes', 'G1', 'other'],
     ['/reject G3\tout_of_scope\tsee below', 'reject', 'G3', 'out_of_scope'],
     ['/approve G7', 'approve', 'G7', null],
+    // A named reason code is a reason by itself.
+    ['/reject G3 spec_unclear', 'reject', 'G3', 'spec_unclear'],
+    ['/request-changes G2 tests-insufficient', 'request_changes', 'G2', 'tests_insufficient'],
   ])('%j → %s %s (%s)', (body, decision, gate, reasonCode) => {
     expect(parseCommentCommand(body)).toMatchObject({
       kind: 'gate_decision',
@@ -49,7 +52,7 @@ describe('comment command grammar', () => {
     ['/approve G3 if the tests pass', 'unexpected_text'],
     ['/approve G3 G4', 'unexpected_text'],
     ['/reject G3', 'reason_missing'],
-    ['/reject G3 spec_unclear', 'reason_missing'],
+    ['/reject G3 other', 'reason_missing'],
     ['/request-changes G3   \n   \n', 'reason_missing'],
   ])('%j is refused with %s', (body, problem) => {
     expect(parseCommentCommand(body)).toMatchObject({ kind: 'invalid', problem });
@@ -113,6 +116,16 @@ describe('reply comments (AC4)', () => {
       t('comment.reply.footer'),
     );
     expect(t('comment.reply.footer')).toMatch(/Successful commands get no reply/);
+  });
+
+  it('never echoes an unknown reason code into a reply', () => {
+    const body = renderCommentReply(
+      'approval_refused',
+      { gate: 'G3', reason: 'something_new' },
+      'github:comment:9',
+    );
+    expect(body).not.toContain('something_new');
+    expect(body).not.toContain(t('comment.reply.reason', { reason: '' }).trim());
   });
 
   it('answers an unknown reply code generically', () => {

@@ -4,6 +4,8 @@
 //   /reject G<n> [<reason_code>] <reason>
 //   /request-changes G<n> [<reason_code>] <reason>
 //
+// The reason text may be left out when a reason code other than `other` is given.
+//
 // Only the first non-empty line of a comment is read; text quoted or written further down is
 // never taken as a command. The reason text stays in the comment on the Git host: the parser
 // returns codes only, and the decision stores the comment URL as `reason_ref` (ADR-M20).
@@ -90,7 +92,9 @@ export function parseCommentCommand(body: string): ParsedComment {
   const code = reasonCodeOf(rest[0]);
   const reasonWords = code === undefined ? rest : rest.slice(1);
   const moreLines = lines.slice(first + 1).some((line) => line.trim() !== '');
-  if (reasonWords.length === 0 && !moreLines) {
+  // A named reason code is a reason by itself (`/reject G3 spec_unclear`); `other` is not.
+  const namedCode = code !== undefined && code !== 'other';
+  if (reasonWords.length === 0 && !moreLines && !namedCode) {
     return { kind: 'invalid', verb, problem: 'reason_missing' };
   }
   return {

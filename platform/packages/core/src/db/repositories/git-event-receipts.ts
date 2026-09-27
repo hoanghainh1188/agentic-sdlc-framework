@@ -63,20 +63,28 @@ export class GitEventReceiptRepository extends TenantRepository {
     );
   }
 
-  async markReplyPosted(id: string, attempts: number, at: Date): Promise<void> {
-    await this.run(
+  /**
+   * Records the delivery. Conditional: a reply another poller already finished stays as it is
+   * (returns false) instead of hitting the final-delivery trigger.
+   */
+  async markReplyPosted(id: string, attempts: number, at: Date): Promise<boolean> {
+    const updated = await this.run(
       this.db
         .updateTable('git_event_receipts')
         .set({ reply_attempts: attempts, reply_posted_at: at })
         .where('tenant_id', '=', this.tenantId)
         .where('id', '=', id)
-        .execute(),
+        .where('reply_posted_at', 'is', null)
+        .where('reply_abandoned_at', 'is', null)
+        .where('reply_attempts', '<=', attempts)
+        .executeTakeFirst(),
     );
+    return updated.numUpdatedRows > 0n;
   }
 
-  /** Counts a failed attempt; gives the reply up at `abandon` (the attempt count is final). */
-  async markReplyFailed(id: string, attempts: number, abandonAt: Date | null): Promise<void> {
-    await this.run(
+  /** Counts a failed attempt; gives the reply up when `abandonAt` is set. Conditional, like above. */
+  async markReplyFailed(id: string, attempts: number, abandonAt: Date | null): Promise<boolean> {
+    const updated = await this.run(
       this.db
         .updateTable('git_event_receipts')
         .set(
@@ -86,7 +94,11 @@ export class GitEventReceiptRepository extends TenantRepository {
         )
         .where('tenant_id', '=', this.tenantId)
         .where('id', '=', id)
-        .execute(),
+        .where('reply_posted_at', 'is', null)
+        .where('reply_abandoned_at', 'is', null)
+        .where('reply_attempts', '<=', attempts)
+        .executeTakeFirst(),
     );
+    return updated.numUpdatedRows > 0n;
   }
 }
