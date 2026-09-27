@@ -152,6 +152,7 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 | LiteLLM master key (field `value`) | `kv/cost-controller/litellm-master-key` | `cost-controller`, `litellm` (one source for both, section 5d) |
 | LiteLLM salt key (field `value`) | `kv/litellm/salt-key` | `litellm` |
 | Model provider keys (field `api_key`), one entry per provider | `kv/litellm/providers/<provider>`, for example `kv/litellm/providers/anthropic` | `litellm` |
+| `platform_app` database password of the API (field `password`) | `kv/api/database` | `api` (section 5e) |
 | Database and SeaweedFS passwords of a process | `kv/<process>/…` | That process |
 
 The GitHub App key is read by `api`, by the `worker` (it polls GitHub, posts gate comments and reads spec files; `design/QUESTIONS.md` #42) and by the runner to create short-lived tokens. It must **never** enter an agent sandbox (task C04; `design/QUESTIONS.md` #44 may remove the runner's access).
@@ -241,6 +242,28 @@ A model appears in LiteLLM only when its provider has a key in `kv/litellm/provi
 | The master key | Store the new value. Restart `litellm-agent`, then `litellm`. The Cost Controller reads the new value at its next read. Virtual keys already issued stay valid |
 | The sidecar's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap litellm-credentials`, then restart `litellm-agent`. Then destroy the old secret ID (section 8.1, step 4) |
 | The salt key | Never |
+
+## 5e. The API (Compose profile `platform`)
+
+The API (service `sdlc-api`, task B03) logs in with the AppRole `api` and reads the password of the database role `platform_app` from `kv/api/database` once, when it starts. The password is never in its environment or image (`design/ADR-M26-api-app.md` §2.6, `design/QUESTIONS.md` #67).
+
+### First set-up
+
+1. OpenBao is initialised, unsealed and configured (sections 3 and 4). `configure` creates the AppRole `api`.
+2. Store the password and deliver the API's AppRole credentials. The command asks for an admin token (hidden). It stores `PLATFORM_APP_DB_PASSWORD` from `platform/deploy/.env` at `kv/api/database`, issues a new secret ID, and writes the secret ID with the role ID into the volume `api-approle`. It prints no secret:
+   ```bash
+   pnpm openbao:bootstrap api-credentials
+   ```
+   Record it in the operations log (role `api`, date, reason; not the secret ID).
+3. Start: `pnpm compose:platform` (profiles `core` and `platform`). The API listens on `127.0.0.1:8090`.
+4. Check: `curl -s http://127.0.0.1:8090/health/ready` answers `{"status":"ok"}`.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| The API's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap api-credentials`, then restart `sdlc-api`. Then destroy the old secret ID (section 8.1, step 4) |
+| The `platform_app` password | Change it in PostgreSQL and in `.env`, run `pnpm openbao:bootstrap api-credentials`, then restart `sdlc-api` |
 
 ## 6. Daily snapshot backup
 
@@ -332,6 +355,7 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | `litellm-agent` stays unhealthy; LiteLLM does not start | OpenBao is sealed, the sidecar's secret ID is missing or expired, or the master key or salt key is not stored | Section 4; `pnpm openbao:bootstrap litellm-credentials`; section 5d step 2. `docker compose … logs litellm-agent` shows the reason (never a key) |
 | LiteLLM exits with `no rendered configuration (Compose profile models) and no LITELLM_MASTER_KEY` | Started without the profile `models` and without a development master key | On the server: `pnpm compose:models`. On a development machine: set `LITELLM_MASTER_KEY` in `.env` |
 | `could not deliver the litellm credentials` | Wrong or expired admin token, or `configure` has not created the AppRole `litellm` yet | Section 5.1; run `configure` again after an upgrade |
+| `sdlc-api` restarts with "Cannot read SDLC_OPENBAO_ROLE_ID_FILE" or "no password field" | `api-credentials` was not run, or the volume was removed | Section 5e, step 2 |
 | A model is missing in LiteLLM | Its provider has no key in `kv/litellm/providers/`, or LiteLLM was not restarted after the key was stored | Section 5d |
 | Compose says the network has a different configuration | `SDLC_NETWORK_SUBNET` or `SDLC_NETWORK_GATEWAY` changed | `pnpm compose:down`, then `pnpm compose:core`. Then run `configure` again (secret IDs are bound to the subnet without the gateway) |
 | `the Compose network has no fixed gateway` from `configure` | The network was created before A11 | `pnpm compose:down`, then `pnpm compose:core`, then `configure` again |
@@ -357,3 +381,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.4 | 2026-09-26 | Claude Code (task A11) | OpenBao publishes no host port: all admin work through `docker compose exec` (section 1); gateway left out of the bound CIDRs and the trust model (section 5b, `design/QUESTIONS.md` #27, #37); `SDLC_OPENBAO_ADDR` in section 5c; troubleshooting rows |
 | 0.5 | 2026-09-26 | Claude Code (task B05) | The `worker` AppRole also reads the GitHub App key `kv/shared/github-app` (`design/QUESTIONS.md` #42); section 5b: creating the GitHub App, storing and rotating its key (not yet tested with a real App) |
 | 0.6 | 2026-09-26 | Claude Code (task C03) | Section 5d: LiteLLM keys through the OpenBao Agent sidecar (profile `models`), `litellm-credentials`, rotation; AppRole `litellm`; key table; troubleshooting rows (`design/QUESTIONS.md` #1, ADR-M24) |
+| 0.7 | 2026-09-27 | Claude Code (task B03) | Section 5e: the API reads the `platform_app` password from `kv/api/database` with the AppRole `api`; `api-credentials`, rotation; key table row; troubleshooting row (`design/QUESTIONS.md` #67, ADR-M26). Tested with throw-away keys (`pnpm test:api`) |

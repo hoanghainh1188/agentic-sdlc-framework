@@ -2,7 +2,16 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "experimentalDecorators": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/config" },
+    { "path": "../../packages/messages" },
+    { "path": "../../packages/core" },
+    { "path": "../../packages/secrets" },
+    { "path": "../../packages/adapters/policy-simple" }
+  ]
 }

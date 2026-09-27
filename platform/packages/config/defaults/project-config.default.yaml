@@ -165,6 +165,12 @@ github:
   # D-02 §6.3; ADR-M11.
   poll_interval_seconds: 30
 
+access:
+  # Task B03, ADR-M26, QUESTIONS.md #66. D-02 §3: Person A creates intents. Creators may always read.
+  # The viewer role never creates intents (mandatory rule M16).
+  intent_create_roles: [person_a]
+  intent_read_roles: [person_a, person_b, second_approver, pm_brse, governance, admin, viewer]
+
 sandbox:
   # QUESTIONS #59 (A), ADR-M25: one sandbox image per project, built on the pinned OpenHands
   # agent-server base plus the project toolchain, referenced by digest (a tag alone is refused).

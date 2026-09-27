@@ -47,12 +47,13 @@ escalation:
 | `model_routing.allowed_provider_types` | `api` / `self_hosted` per data class |
 | `retention.evidence_retention_days` | Default 180 |
 | `github.poll_interval_seconds` | Default 30 |
+| `access.intent_create_roles`, `access.intent_read_roles` | Who may create and read intents through the API (B03, ADR-M26). Default: `person_a` creates; every role reads; creators always read |
 
 Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `working_hours`, `working_days` (working calendar; one working day = the working hours). Deadlines may also be `{ kind: end_of_working_day }` or `{ kind: next_planned_work }` (no clock).
 
 ## Mandatory rules
 
-A project may tighten anything. It may **not** loosen these (rules M1–M15, sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
+A project may tighten anything. It may **not** loosen these (rules M1–M16, sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
 
 | Rule | What |
 |---|---|
@@ -70,6 +71,7 @@ A project may tighten anything. It may **not** loosen these (rules M1–M15, sou
 | M13 | High and Critical: G2, G3, G6, G7, production G8 HITL; Critical non-production G8 HITL |
 | M14 | G4 High and Critical HITL |
 | M15 | G6 never `POLICY` |
+| M16 | `viewer` never creates intents (`access.intent_create_roles`) |
 
 Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 

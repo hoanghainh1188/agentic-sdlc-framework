@@ -9,6 +9,7 @@ This folder runs the infrastructure that the platform reuses, on one server, wit
 | `core` | PostgreSQL, Temporal (+ Temporal UI), LiteLLM, Valkey, SeaweedFS (S3 API), OpenBao | Always. Required by the platform |
 | `observability` | Langfuse (web + worker), ClickHouse. Reuses PostgreSQL, Valkey and SeaweedFS | Optional. The heaviest part; enable it when the server has room (D-03 section 10.1) |
 | `models` | `litellm-agent`: OpenBao Agent that gives LiteLLM its model provider keys, master key and salt key from OpenBao (task C03, [ADR-M24](../../design/ADR-M24-litellm-cost-controller.md)) | **Always on the server** (`pnpm compose:models`). Needs OpenBao unsealed and configured and the sidecar's credentials (runbook T11 §5d). Without it, LiteLLM has no models and uses the development keys from `.env` |
+| `platform` | `sdlc-api`: the REST API for the CLI, built from this repo (task B03, [ADR-M26](../../design/ADR-M26-api-app.md)) | With `core` (`pnpm compose:platform`). Needs OpenBao unsealed and configured and `pnpm openbao:bootstrap api-credentials` first (runbook T11 §5e) |
 
 Three one-shot jobs run at every start and then exit: `temporal-schema` (creates or upgrades the Temporal schemas), `temporal-namespace` (creates the namespace) and `seaweedfs-init` (creates the `evidence` and `langfuse` buckets). All three are safe to re-run.
 
@@ -27,6 +28,7 @@ pnpm compose:env     # once: creates platform/deploy/.env with random secrets (m
 pnpm compose:core    # starts the core profile and waits until it is healthy
 pnpm compose:obs     # core + observability
 pnpm compose:models  # core + models: LiteLLM with keys from OpenBao (the server; runbook T11 §5d)
+pnpm compose:platform # core + platform: the API (sdlc-api; runbook T11 §5e)
 pnpm compose:down    # stops everything; data volumes are kept
 ```
 
@@ -63,6 +65,7 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 | LiteLLM | 4000 | Models only with the profile `models` (keys from OpenBao). Without it: no models, development keys from `.env` |
 | SeaweedFS S3 | 8333 | Anonymous access denied |
 | Langfuse | 3000 | `observability` profile only |
+| API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI |
 
 Valkey, ClickHouse, the Langfuse worker and **OpenBao** publish no port.
 
@@ -91,7 +94,23 @@ The audit log is append-only and hash-chained per tenant (ADR-M09 section 2.8). 
 SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm sdlc audit verify
 ```
 
-Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. Until task B04 the command connects straight to the database; B04 moves it behind the API.
+Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. The command connects straight to the database until task B13 adds a tenant admin role (`design/QUESTIONS.md` #65).
+
+### First admin and API tokens (task B03)
+
+The API authenticates people with personal API tokens (`sdlc_pat_…`). The first user of a tenant and its token come from a one-time bootstrap, run by the operator on the server ([ADR-M26](../../design/ADR-M26-api-app.md) §2.2). Run it in a terminal: the token is printed **once**. Store it in a password manager; never paste it into a chat, a ticket or a file in a repository.
+
+```bash
+export SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform"
+pnpm sdlc admin bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
+pnpm sdlc admin token issue --tenant internal --email you@example.com --name laptop-you --days 90
+pnpm sdlc admin token list --tenant internal --email you@example.com
+pnpm sdlc admin token revoke --tenant internal --id <token-id>
+```
+
+- The bootstrap runs once per tenant; a second run with the same slug is refused.
+- Tokens last 90 days by default, at most 365. Only the SHA-256 hash is stored. Every issue and revocation is written to the audit log (IDs only).
+- Projects, users, GitHub identities, roles and project configuration have no command yet (task B13, `design/QUESTIONS.md` #58).
 
 ### Reset after a change to migration 0001 (development only)
 

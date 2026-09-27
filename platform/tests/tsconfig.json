@@ -5,6 +5,7 @@
     "declaration": false,
     "declarationMap": false,
     "noEmit": true,
+    "experimentalDecorators": true,
     "rootDir": ".."
   },
   "include": ["**/*.ts"]
