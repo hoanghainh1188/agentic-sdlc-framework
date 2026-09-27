@@ -101,6 +101,19 @@ export const RUN_STATUSES = [
 ] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
+/**
+ * Status of a registered agent (design/D-05 section 5 `agent_status`, handbook Ch.20). Only
+ * `active` agents may run (D-02 FR-36); `retired` is final and keeps the identity reserved.
+ */
+export const AGENT_STATUSES = [
+  'proposed',
+  'active',
+  'suspended',
+  'quarantined',
+  'retired',
+] as const;
+export type AgentStatus = (typeof AGENT_STATUSES)[number];
+
 /** Final run statuses: once a run has one, the database refuses any change to it (ADR-M22). */
 export const FINAL_RUN_STATUSES = [
   'succeeded',

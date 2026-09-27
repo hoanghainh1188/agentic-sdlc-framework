@@ -22,6 +22,7 @@ import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
 import type { TenantScope } from '../../../packages/core/src/db/tenant-scope.js';
 import { Registry } from '../../../packages/core/src/registry/registry.js';
 import { issueRunContract } from '../../../packages/core/src/run-contract/index.js';
+import { seedAgent } from '../agent-seed.js';
 import type { TestDatabase } from '../db/helpers.js';
 import { docker, dockerSocket } from '../runner/live-helpers';
 import { repoRoot } from '../../workspace/helpers';
@@ -119,6 +120,7 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
     actorType: 'human',
     actorId: person,
   });
+  const agent = await seedAgent(scope, person, { tools: ['file_editor', 'terminal'] });
   const { envelope } = await issueRunContract(
     scope,
     {
@@ -126,7 +128,7 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
       planId: plan.id,
       baseSha,
       agent: {
-        id: '66666666-6666-4666-8666-666666666666',
+        id: agent.id,
         version: '1.0.0',
         instructionsSha256: 'c'.repeat(64),
         tools: ['file_editor', 'terminal'],

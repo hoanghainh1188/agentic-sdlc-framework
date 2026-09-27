@@ -17,6 +17,7 @@ export {
 } from './system-scope.js';
 export { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 export { hashApiToken } from './repositories/api-tokens.js';
+export type { AgentQuery, AgentUpdate, NewAgent } from './repositories/agents.js';
 export type { AuditEvent } from './repositories/audit-log.js';
 export type { NewCostRecord } from './repositories/cost-records.js';
 export type {
@@ -48,6 +49,7 @@ export type { SaveProjectConfig } from './repositories/project-configs.js';
 export type { RoleBindingQuery } from './repositories/role-bindings.js';
 export type { SaveProjectAiRecord } from './repositories/project-ai-records.js';
 export type {
+  Agent,
   ApiToken,
   AuditLogRow,
   CostRecordRow,

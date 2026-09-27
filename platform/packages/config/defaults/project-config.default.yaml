@@ -201,6 +201,12 @@ access:
   intent_create_roles: [person_a]
   intent_read_roles: [person_a, person_b, second_approver, pm_brse, governance, admin, viewer]
 
+agents:
+  # Handbook Ch.20 §20.8 (decision: Harry, 2026-09-24): recertify every agent every 3 months. The
+  # owner is warned when the last recertification is older; the run is not blocked (D-02 FR-36).
+  # Mandatory rule M18: never more than 3. Task C10, ADR-M31.
+  recertification_months: 3
+
 sandbox:
   # QUESTIONS #59 (A), ADR-M25: one sandbox image per project, built on the pinned OpenHands
   # agent-server base plus the project toolchain, referenced by digest (a tag alone is refused).

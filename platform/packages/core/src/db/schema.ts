@@ -4,6 +4,7 @@
 // with the live schema, so the types cannot drift from the migrations.
 import type {
   ActorType,
+  AgentStatus,
   AutonomyLevel,
   ChangeFlag,
   DataClass,
@@ -27,6 +28,7 @@ import type {
 import type { ColumnType, Generated, Insertable, Selectable } from 'kysely';
 
 import type {
+  AgentEnvironment,
   AiAllowed,
   DisclosureFormat,
   GateDecisionSource,
@@ -419,6 +421,30 @@ export interface EscalationNoticesTable {
   created_at: CreatedAt;
 }
 
+/**
+ * The agent register (D-05 section 6.1, task C10, ADR-M31). Codes only; rows are never deleted. A
+ * trigger allows only the status moves of handbook Ch.20 and configuration changes with a new
+ * version while `proposed` or `suspended`.
+ */
+export interface AgentsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  agent_key: Immutable<string>;
+  version: string;
+  status: Mutable<AgentStatus>;
+  owner_id: string;
+  model_ref: MutableNullable<string>;
+  instructions_ref: string;
+  instructions_sha256: string;
+  allowed_tools: Mutable<string[]>;
+  max_autonomy: AutonomyLevel;
+  approved_environments: Mutable<AgentEnvironment[]>;
+  /** SQL `date`, kept as a `YYYY-MM-DD` string (connection.ts). */
+  last_recertified_at: MutableNullable<string>;
+  updated_at: ColumnType<Date, never, Date>;
+  created_at: CreatedAt;
+}
+
 export interface Database {
   tenants: TenantsTable;
   projects: ProjectsTable;
@@ -441,6 +467,7 @@ export interface Database {
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
+  agents: AgentsTable;
 }
 
 export type TableName = keyof Database;
@@ -743,6 +770,23 @@ export const TABLE_COLUMNS = {
     'abandoned_at',
     'created_at',
   ]),
+  agents: columns<AgentsTable>()([
+    'id',
+    'tenant_id',
+    'agent_key',
+    'version',
+    'status',
+    'owner_id',
+    'model_ref',
+    'instructions_ref',
+    'instructions_sha256',
+    'allowed_tools',
+    'max_autonomy',
+    'approved_environments',
+    'last_recertified_at',
+    'updated_at',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -771,6 +815,7 @@ export const TENANT_COLUMN = {
   git_event_receipts: 'tenant_id',
   escalations: 'tenant_id',
   escalation_notices: 'tenant_id',
+  agents: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -794,6 +839,7 @@ export type CostRecordRow = Selectable<CostRecordsTable>;
 export type GitEventReceipt = Selectable<GitEventReceiptsTable>;
 export type Escalation = Selectable<EscalationsTable>;
 export type EscalationNotice = Selectable<EscalationNoticesTable>;
+export type Agent = Selectable<AgentsTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

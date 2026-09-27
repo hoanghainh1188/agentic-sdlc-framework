@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M17 and their sources:
+// Rule ids M1–M18 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -23,6 +23,7 @@
 //   M16 the viewer role never creates intents ........................ D-05 §5, QUESTIONS.md #66
 //   M17 escalation routing: policy → governance, no viewer, backup ≠ . Ch.6 §6.4, codes table §6.3,
 //       owner; notify lists contain the handbook's roles ............ QUESTIONS.md #74
+//   M18 agent recertification at least every 3 months ............... Ch.20 §20.8, ADR-M31
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -43,6 +44,9 @@ import { durationMinutes, isWorkingUnit, workingDayMinutes } from './calendar.js
 import { issue, type ConfigIssue } from './issues.js';
 
 export const MVP_MAX_AUTONOMY: AutonomyLevel = 'L2';
+
+/** Handbook Ch.20 §20.8: every agent is recertified at least every 3 months (rule M18). */
+export const MAX_RECERTIFICATION_MONTHS = 3;
 
 export const FORCED_HITL_G3_FLAGS: readonly ChangeFlag[] = [
   'migration',
@@ -462,6 +466,15 @@ const m17: Rule = (c) => [
   ),
 ];
 
+const m18: Rule = (c) =>
+  c.agents.recertification_months > MAX_RECERTIFICATION_MONTHS
+    ? [
+        issue('config.rule.recertification_max', 'agents.recertification_months', {
+          maximum: MAX_RECERTIFICATION_MONTHS,
+        }),
+      ]
+    : [];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -482,6 +495,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M15: m15,
   M16: m16,
   M17: m17,
+  M18: m18,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

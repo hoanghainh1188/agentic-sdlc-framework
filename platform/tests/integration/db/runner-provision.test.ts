@@ -39,6 +39,7 @@ import {
 import { StubDocker } from '../../runner/stub-docker.js';
 import { StubGitHost } from '../../runner/stub-git.js';
 import { credentialFiles, StubOpenBao } from '../../secrets/stub-openbao.js';
+import { seedAgent } from '../agent-seed.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
 const TOKEN = 'ghs_c04ProvisionTokenCanary0000000000';
@@ -54,6 +55,7 @@ interface Seeded {
   readonly intentId: string;
   readonly planId: string;
   readonly personB: string;
+  readonly agentId: string;
 }
 
 describeDb('C04: runner provisioning flow on PostgreSQL', () => {
@@ -156,7 +158,8 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
       actorType: 'human',
       actorId: personA,
     });
-    return { scope, intentId: intent.id, planId: plan.id, personB };
+    const agent = await seedAgent(scope, personA, { version: '1.4.0', tools: ['editor', 'git'] });
+    return { scope, intentId: intent.id, planId: plan.id, personB, agentId: agent.id };
   }
 
   const issue = async (s: Seeded, extra: Partial<IssueRunContract> = {}) =>
@@ -168,7 +171,7 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
           planId: s.planId,
           baseSha,
           agent: {
-            id: '66666666-6666-4666-8666-666666666666',
+            id: s.agentId,
             version: '1.4.0',
             instructionsSha256: SHA('c'),
             tools: ['editor', 'git'],

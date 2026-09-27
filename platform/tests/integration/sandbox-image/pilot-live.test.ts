@@ -40,6 +40,7 @@ import { Registry } from '../../../packages/core/src/registry/registry.js';
 import { issueRunContract } from '../../../packages/core/src/run-contract/index.js';
 import { repoRoot } from '../../workspace/helpers';
 import { credentialFiles, StubOpenBao } from '../../secrets/stub-openbao.js';
+import { seedAgent } from '../agent-seed.js';
 import { createTestDatabase, type TestDatabase } from '../db/helpers.js';
 import { BUSYBOX, docker, dockerSocket } from '../runner/live-helpers';
 import { IMAGE_ENV, sh, startInfrastructure, type Infrastructure } from './helpers';
@@ -182,6 +183,7 @@ describe.skipIf(!enabled)('C04 live: the pilot repository in a node24 sandbox', 
       actorType: 'human',
       actorId: personA,
     });
+    const agent = await seedAgent(scope, personA);
     const { envelope } = await issueRunContract(
       scope,
       {
@@ -189,7 +191,7 @@ describe.skipIf(!enabled)('C04 live: the pilot repository in a node24 sandbox', 
         planId: plan.id,
         baseSha: s.commit_sha,
         agent: {
-          id: crypto.randomUUID(),
+          id: agent.id,
           version: '1.0.0',
           instructionsSha256: 'c'.repeat(64),
           tools: ['editor'],

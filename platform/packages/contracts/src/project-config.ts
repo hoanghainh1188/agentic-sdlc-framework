@@ -150,6 +150,14 @@ export interface ProjectConfig {
     readonly intent_create_roles: readonly ProjectRole[];
     readonly intent_read_roles: readonly ProjectRole[];
   };
+  /** Agent register (task C10, ADR-M31). */
+  readonly agents: {
+    /**
+     * Maximum age of an agent's last recertification before the owner is warned (handbook Ch.20
+     * §20.8: every 3 months; mandatory rule M18: never more than 3).
+     */
+    readonly recertification_months: number;
+  };
   /** Sandbox image of the project, pinned by digest (QUESTIONS #59, ADR-M25). */
   readonly sandbox: { readonly image: string };
 }
@@ -157,7 +165,7 @@ export interface ProjectConfig {
 declare const validatedConfig: unique symbol;
 
 /**
- * A configuration that passed the schema and the mandatory rules M1–M17. Only `@sdlc/config`
+ * A configuration that passed the schema and the mandatory rules M1–M18. Only `@sdlc/config`
  * produces it (`loadProjectConfig`, `defaultProjectConfig`). Adapters accept this type, so they
  * never see an unchecked configuration and never repeat the checks (ADR-M16 §2.5, ADR-M18 §2.2).
  */
