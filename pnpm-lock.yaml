@@ -83,7 +83,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/messages
 
-  platform/apps/runner: {}
+  platform/apps/runner:
+    dependencies:
+      '@sdlc/messages':
+        specifier: workspace:*
+        version: link:../../packages/messages
 
   platform/apps/worker: {}
 

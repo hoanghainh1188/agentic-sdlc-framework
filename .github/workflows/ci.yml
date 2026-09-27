@@ -93,11 +93,11 @@ jobs:
           elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             run=true; reason="base commit unknown, running to be safe"
           # Infrastructure (A02, A03), the OpenBao client (A04), the LiteLLM adapter and Cost
-          # Controller (C03): their live tests need Compose.
-          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/)" ]; then
-            run=true; reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller or a live test changed"
+          # Controller (C03), the runner (C04): their live tests need Docker.
+          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/)" ]; then
+            run=true; reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner or a live test changed"
           else
-            reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller and their live tests unchanged"
+            reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner and their live tests unchanged"
           fi
           echo "run_compose=$run" >> "$GITHUB_OUTPUT"
           echo "Compose integration job: run=$run ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -136,6 +136,9 @@ jobs:
       # C03: LiteLLM with keys from OpenBao (profile "models") and the Cost Controller, on its own
       # throw-away Compose project with a stub model (throw-away test keys, never printed).
       - run: pnpm test:litellm
+      # C04: sandbox egress and hardening on the runner's Docker Engine (per-run internal networks,
+      # fixture image in a throw-away registry:2, stub services; everything removed afterwards).
+      - run: pnpm test:runner
       - name: Show service state and logs
         if: failure()
         run: |

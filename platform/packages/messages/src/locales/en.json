@@ -1,13 +1,12 @@
 {
   "config.path.root": "(whole file)",
   "config.calendar.no_working_time": "The working calendar has no working time left: check the working days and holidays.",
-
   "config.yaml.syntax": "The YAML is not valid at line {line}, column {column} (error {code}).",
   "config.yaml.duplicate_key": "The YAML has a duplicate key at line {line}, column {column}.",
   "config.yaml.too_many_aliases": "The YAML uses too many aliases (maximum {maximum}).",
   "config.yaml.not_a_mapping": "The configuration must be a YAML mapping (key: value pairs).",
-
   "config.schema.missing": "{path}: this setting is missing.",
+  "config.schema.image_not_pinned": "{path}: the image \"{value}\" must be pinned by digest, for example registry/name:tag@sha256:<64 hex characters>.",
   "config.schema.invalid_type": "{path}: wrong type, expected {expected}.",
   "config.schema.unknown_key": "{path}: unknown setting \"{key}\".",
   "config.schema.invalid_value": "{path}: this value is not allowed. Allowed values: {allowed}.",
@@ -21,7 +20,6 @@
   "config.schema.invalid_date": "{path}: \"{value}\" is not a date in YYYY-MM-DD format.",
   "config.schema.working_hours_order": "{path}: the start time {start} must be before the end time {end}.",
   "config.schema.invalid": "{path}: the value is not valid.",
-
   "config.rule.g1_hitl": "{path}: G1 must be HITL at every risk tier; found {found} for {tier} (rule {rule}, codes table §4).",
   "config.rule.g7_hitl": "{path}: G7 must be HITL at every risk tier; found {found} for {tier} (rule {rule}, codes table §4).",
   "config.rule.g8_production_hitl": "{path}: G8 in production must be HITL at every risk tier; found {found} for {tier} (rule {rule}, codes table §4).",
@@ -54,7 +52,6 @@
   "config.rule.high_risk_hitl": "{path}: {gate} must be HITL at {tier} risk, because high-risk effects always need human approval; found {found} (rule {rule}, codes table §4).",
   "config.rule.g4_high_risk_hitl": "{path}: G4 must be HITL at {tier} risk: permission before dangerous actions is never skipped; found {found} (rule {rule}, codes table §4).",
   "config.rule.g6_independent_verification": "{path}: G6 may not be a POLICY check at {tier} risk: independent verification is never skipped (rule {rule}, codes table §4).",
-
   "config.warning.mode_loosened": "{path}: oversight loosened from {from} (codes table default) to {to}. This change must be reviewed.",
   "config.warning.g6_security_threshold_raised": "{path}: G6 security threshold raised from {from} (default) to {to}, so fewer findings need a person. This change must be reviewed.",
   "config.warning.approvals_reduced": "{path}: approvals reduced from {from} (default) to {to}. This change must be reviewed.",
@@ -62,7 +59,6 @@
   "config.warning.many_holidays": "{path}: {count} holidays in {year} (more than {maximum}), so working-time clocks run longer. This change must be reviewed.",
   "config.warning.contract_validity_long": "{path}: Run Contracts stay valid for {minutes} minutes (more than {maximum}) between G4 and the sandbox start. This change must be reviewed.",
   "config.warning.working_hours_shortened": "{path}: a working day is now {to} minutes instead of {from}, so working-time clocks run longer. This change must be reviewed.",
-
   "run_contract.reject.malformed": "The Run Contract is malformed: a field is missing, extra or badly formatted.",
   "run_contract.reject.bad_signature": "The Run Contract signature is not valid for its content.",
   "run_contract.reject.unknown_contract": "The Run Contract is not known to the platform.",
@@ -85,10 +81,8 @@
   "db.migrate.failed": "Migration failed: {reason}",
   "db.status.applied": "applied  {name}  {executed_at}",
   "db.status.pending": "pending  {name}",
-
   "cli.usage": "Usage: sdlc audit verify [--tenant <slug>] [--json]. Needs SDLC_DB_URL (application role platform_app).",
   "cli.failed": "The command failed: {reason}",
-
   "audit.verify.missing_url": "SDLC_DB_URL is not set.",
   "audit.verify.tenant_not_found": "No tenant with the slug {slug}.",
   "audit.verify.no_tenants": "There are no tenants to check.",
@@ -98,7 +92,6 @@
   "audit.verify.reason.prev_hash_mismatch": "prev_hash does not match the hash of the previous record",
   "audit.verify.reason.hash_mismatch": "the record was changed after it was written (hash mismatch)",
   "audit.verify.reason.unknown_hash_version": "the record uses an unknown hash version",
-
   "secrets.config.missing_setting": "{name} is not set. The OpenBao client needs it.",
   "secrets.config.invalid_flag": "{name} must be 1 (on) or 0 or empty (off).",
   "secrets.config.invalid_timeout": "{name} must be a whole number of milliseconds, greater than 0.",
@@ -147,5 +140,19 @@
   "git_host.error.too_many_files": "The pull request changes more than {max_files} files. The Git host cannot list them all, so the scope check cannot run. Split the change.",
   "git_host.error.webhook_disabled": "Webhooks are not enabled.",
   "git_host.error.webhook_bad_signature": "The webhook signature is missing or wrong.",
-  "git_host.error.unsupported_event": "The webhook event is not one the platform handles."
+  "git_host.error.unsupported_event": "The webhook event is not one the platform handles.",
+  "runner.invalid_run_id": "The run ID is not a platform run ID (a lowercase UUID).",
+  "runner.config.invalid_setting": "The runner setting {name} is not valid. See the deploy README (runner settings).",
+  "runner.docker.endpoint_refused": "The runner refused a Docker API call ({method}) that is not on its allowlist.",
+  "runner.docker.spec_refused": "The runner refused to create a sandbox that fails the safety check \"{check}\".",
+  "runner.docker.image_not_pinned": "The sandbox image must be pinned by digest (name@sha256:…).",
+  "runner.docker.pull_failed": "Docker could not pull the sandbox image.",
+  "runner.docker.not_found": "Docker did not find the object of a {method} request.",
+  "runner.docker.conflict": "Docker refused a {method} request because the object already exists or is in use.",
+  "runner.docker.api_error": "Docker answered a {method} request with HTTP {status}.",
+  "runner.docker.timeout": "Docker did not answer a {method} request in time.",
+  "runner.docker.unreachable": "The runner cannot reach the Docker socket ({code}).",
+  "runner.docker.response_too_large": "Docker sent an answer larger than the runner accepts.",
+  "runner.slot_wait_aborted": "The run stopped waiting for a free sandbox slot.",
+  "runner.provisioning_failed": "The sandbox could not be created: {reason}."
 }

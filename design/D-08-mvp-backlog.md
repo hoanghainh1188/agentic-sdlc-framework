@@ -489,7 +489,7 @@ flowchart LR
 
 **Acceptance criteria**
 
-- [ ] AC1: One container per run; network egress to GitHub and LiteLLM only
+- [ ] AC1: One container per run on its own internal network; sandbox egress to LiteLLM and the package proxy only; GitHub is reached by the runner, never by the sandbox (QUESTIONS #52, ADR-M25)
 - [ ] AC2: Clone with a short-lived GitHub token; create branch `agent/INT-...`
 - [ ] AC3: Limit concurrent runs (default 1–2, configurable); extra runs wait in a queue
 - [ ] AC4: The sandbox has no real model-provider key and no OpenBao access (test)
@@ -543,6 +543,8 @@ flowchart LR
 - [ ] AC1: Open a PR from the agent branch, filling template T2 (intent_id, run_id, AI-written parts)
 - [ ] AC2: Read CI status by polling (checks API); fail → rerun the agent within the retry limit; no retries left → back to G3 (N2)
 - [ ] AC3: An agent push to `main` is blocked by branch protection (N6)
+
+> Note: The runner, not the sandbox, pushes `agent/INT-...` (QUESTIONS #52, ADR-M25): update the D-03 §4 flow and diagram D11 (and the D-02 §5 flow) in this task
 
 #### C09. Integration tests G4–G6 on the sample repo
 
@@ -722,4 +724,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Handbook alignment: B01 oversight/approvers, B07 binding, new B11 escalation, B12 AI record, C10 agent register, C11 kill switch; E01 dual approval; E02/E03 disclosure; E05 retention; tests N7–N9 |
 | 1.1 | 2026-09-25 | Claude, approved by Harry | C03: provider keys via an OpenBao Agent sidecar (QUESTIONS #1). A10: internal CA and TLS on OpenBao 8200, size S → M (QUESTIONS #20) |
 | 1.2 | 2026-09-25 | Claude, approved by Harry | New task A11: stop publishing the OpenBao port on the host (QUESTIONS #27); A10 now depends on A11 |
+| 1.3 | 2026-09-27 | Claude (task C04), approved by Harry | C04 AC1: sandbox egress to LiteLLM and the package proxy only, GitHub through the runner; C08 note: the runner pushes, update the D-03 §4 flow and D11 (QUESTIONS #52, #59, ADR-M25) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

@@ -122,6 +122,8 @@ export interface ProjectConfig {
   };
   readonly retention: { readonly evidence_retention_days: number };
   readonly github: { readonly poll_interval_seconds: number };
+  /** Sandbox image of the project, pinned by digest (QUESTIONS #59, ADR-M25). */
+  readonly sandbox: { readonly image: string };
 }
 
 declare const validatedConfig: unique symbol;

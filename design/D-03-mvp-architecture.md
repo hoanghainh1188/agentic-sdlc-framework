@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.5 |
+| Version | 1.6 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -103,6 +103,8 @@ flowchart TB
 ```
 
 SVG version: [d11-mvp-architecture.svg](../diagrams/svg/d11-mvp-architecture.svg)
+
+- Note (version 1.6, QUESTIONS #52): the **runner**, not the agent in the sandbox, clones the repository and pushes `agent/*`; the sandbox reaches only LiteLLM and the package proxy (section 9). The arrow "OH → push branch agent/*" above, diagram D11 and the D-02 §5 flow are updated in task C08.
 
 ---
 
@@ -359,7 +361,7 @@ The MVP builds a light version that **keeps the main idea**:
 | `autonomy_level` | L2 |
 | `max_tokens_usd`, `max_iterations`, `max_duration_min`, `loop_threshold` | Caps |
 | `allowed_models` | From policy |
-| `egress_allowlist` | GitHub, LiteLLM |
+| `egress_allowlist` | Services as `alias:port`: `litellm:4000`, `npm-proxy:4873` (section 9, ADR-M25) |
 | `issued_at`, `expires_at` | Short validity |
 | `signature` | **Ed25519** signature with the platform key |
 
@@ -391,7 +393,7 @@ Licence note [External]:
 | Secret | Engine | Who may read it |
 |---|---|---|
 | Run Contract signing key | Transit (non-exportable) | worker (signs), runner (reads the public key) |
-| GitHub App private key | KV | api, worker (polls GitHub, posts gate comments, reads specs; QUESTIONS #42), runner |
+| GitHub App private key | KV | api, worker (polls GitHub, posts gate comments, reads specs, issues the run's single-repository token; QUESTIONS #42, #44). **Not the runner**: it receives the run's token from the worker as an OpenBao response-wrapped token (single use), unwraps it once and keeps it in memory only (ADR-M25) |
 | LiteLLM master key | KV (`kv/cost-controller/litellm-master-key`) | Cost Controller; LiteLLM through its OpenBao Agent sidecar (AppRole `litellm`, this one path only). One source for both (ADR-M24) |
 | Model provider API keys | KV | **LiteLLM only**, through an OpenBao Agent sidecar (AppRole `litellm`) that renders them to a tmpfs file LiteLLM reads at start-up. No LiteLLM Enterprise licence (QUESTIONS #1) |
 | Database and SeaweedFS passwords | KV | The matching process |
@@ -406,10 +408,10 @@ Licence note [External]:
 
 | Topic | What the MVP does |
 |---|---|
-| GitHub permissions | GitHub App with minimal permissions. Short-lived tokens, issued per run, for the run's repo only |
+| GitHub permissions | GitHub App with minimal permissions. Short-lived tokens, issued per run by the worker, for the run's repo only. Used by the runner to clone and push; never given to the sandbox |
 | Branches | The agent only pushes `agent/*`. `main` has branch protection (D-09 section 6) |
 | Model keys | The agent only has a LiteLLM **virtual key**, with a cap, revoked when the run ends |
-| Sandbox network | Outbound to GitHub and LiteLLM only. Everything else blocked |
+| Sandbox network | Outbound only to LiteLLM and the package proxy (npm first), on an internal Docker network per run; no route to the internet. GitHub is reached by the runner, never by the sandbox: the runner clones and pushes `agent/*` with the run's short-lived single-repository token. Everything else is blocked (ADR-M25) |
 | TLS for internal services | OpenBao 8200: internal CA, server certificate 1 year, CA 5 years, CA key offline; clients always verify (no skip-verify). Other internal services may reuse the CA later (QUESTIONS #20) |
 | Secrets | Not in the repo, not in images. Fetched from OpenBao at runtime with short-lived tokens |
 | GitHub events | MVP: polling through the GitHub App (no inbound port). When webhooks are enabled: verify signatures, expose only `/webhooks/github` |
@@ -434,7 +436,8 @@ Licence note [External]:
 | `seaweedfs` | S3 API for Evidence Packs and Langfuse. Single node |
 | `openbao` | Raft storage. Needs an unseal procedure and key backup (see 10.2) |
 | `sdlc-api`, `sdlc-worker`, `sdlc-runner` | Built by us |
-| OpenHands sandbox | **Not declared up front**. The runner creates it per run and removes it afterwards |
+| OpenHands sandbox | **Not declared up front**. The runner creates it per run, from the project's sandbox image pinned by digest (config `sandbox.image`), with its own internal network and workspace volume, and removes all three afterwards (ADR-M25) |
+| `npm-proxy`, `docker-socket-proxy`, `registry` (profile `sandbox`) | Package proxy for sandboxes (Verdaccio); the runner's limited access to Docker; a local registry for sandbox images (`registry:2`; GHCR after the GitHub Team upgrade). Added in C04 session 3 (ADR-M25, QUESTIONS #54, #59) |
 
 - The runner needs control of Docker to create sandboxes.
 
@@ -606,4 +609,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.3 | 2026-09-26 | Claude (task C02), approved by Harry | §8: `schema_version`, `plan_id`, `plan_sha256`, `allowed_tools`; signed form; contract validity and clock skew from config; rejection list; key rotation (ADR-M22, QUESTIONS #33, #34) |
 | 1.4 | 2026-09-26 | Claude (task B05), approved by Harry | §7.1: notes on the contracts `GitHostAdapter` (event kinds, new comments only, numeric account IDs and bots, cursor, later additions); §8.2: the worker reads the GitHub App key (ADR-M23, QUESTIONS #42, #43, #45) |
 | 1.5 | 2026-09-26 | Claude (task C03), approved by Harry | §7.4: notes on the contracts `ModelGateway` (decimal money, tenant budget group, `listModels`, `listSpend`) and the Cost Controller caps; §8.2: the LiteLLM master key has one source, read by the Cost Controller and the LiteLLM sidecar (ADR-M24) |
+| 1.6 | 2026-09-27 | Claude (task C04), approved by Harry | §4: note, the runner clones and pushes (flow and D11 updated in C08); §8: `egress_allowlist` names services; §8.2: the runner no longer reads the GitHub App key, token handed over response-wrapped; §9: sandbox network is LiteLLM and the package proxy only, per-run internal network; §10: sandbox image by digest, profile `sandbox` (QUESTIONS #44, #52–#54, #59; ADR-M25) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |

@@ -112,6 +112,14 @@ const providerList = uniqueList(z.enum(PROVIDER_TYPES));
 
 const autonomyLevel = z.enum(AUTONOMY_LEVELS);
 
+// A container image pinned by digest (QUESTIONS #59, ADR-M25): `[registry/]name[:tag]@sha256:<hex>`.
+// A tag alone can move, so it is refused.
+const PINNED_IMAGE =
+  /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]{1,5})?(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)+(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?@sha256:[0-9a-f]{64}$/;
+const pinnedImage = z.string().superRefine((value, ctx) => {
+  if (!PINNED_IMAGE.test(value)) addIssue(ctx, 'config.schema.image_not_pinned', { value });
+});
+
 export const projectConfigSchema = z.strictObject({
   schema_version: z.literal(1),
   oversight: z.strictObject({
@@ -176,6 +184,7 @@ export const projectConfigSchema = z.strictObject({
   }),
   retention: z.strictObject({ evidence_retention_days: positiveInt }),
   github: z.strictObject({ poll_interval_seconds: positiveInt }),
+  sandbox: z.strictObject({ image: pinnedImage }),
 });
 
 /** Maps zod issues to catalog-keyed configuration issues. Zod's own English text is never used. */

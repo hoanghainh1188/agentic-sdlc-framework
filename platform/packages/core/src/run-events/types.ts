@@ -29,6 +29,22 @@ export const RUN_EVENT_TYPES = {
   contract_accepted: { contract_sha256: 'sha256', key_version: 'version' },
   /** The runner refused the contract; `reason` is a `RunContractRejectReason` (C02). */
   contract_rejected: { reason: 'code' },
+  /**
+   * The runner cloned the repository at `base_sha` and created the `agent/INT-…` branch in the
+   * run's workspace (C04, ADR-M25). The branch name is in the contract, not repeated here.
+   */
+  workspace_prepared: { base_sha: 'code', duration_ms: 'count' },
+  /** The runner created the sandbox container from the project image, pinned by digest (C04). */
+  sandbox_created: { image_sha256: 'sha256' },
+  /** The sandbox passed its health check (C04). */
+  sandbox_ready: { duration_ms: 'count' },
+  /** Provisioning stopped before the sandbox was ready; `reason` is a `ProvisioningFailure` (C04). */
+  provisioning_failed: { reason: 'code' },
+  /**
+   * The runner removed the sandbox, its network and its workspace (C04). `reason` is a
+   * `TeardownReason` code (`finished`, `failed`, `orphan`, …).
+   */
+  sandbox_removed: { reason: 'code', duration_ms: 'count' },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;
