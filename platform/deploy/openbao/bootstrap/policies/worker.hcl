@@ -10,6 +10,13 @@ path "kv/data/shared/github-app" {
   capabilities = ["read"]
 }
 
+# Hands the run's GitHub token to the runner as a single-use wrapping token (QUESTIONS #44,
+# design/ADR-M25 §2.11). OpenBao's built-in `default` policy allows this for every token too;
+# stated here so the handoff keeps working if the default policy is ever tightened.
+path "sys/wrapping/wrap" {
+  capabilities = ["update"]
+}
+
 path "transit/sign/run-contract" {
   capabilities = ["update"]
 }

@@ -1,12 +1,9 @@
-# AppRole "runner" (D-03 sections 8 and 8.2). Its own secrets and the GitHub App key; verifies
-# Run Contracts. It can NOT read the LiteLLM master key or model provider keys, and it can NOT
-# sign. The GitHub App key never enters a sandbox: the sandbox gets only a short-lived,
-# single-repo token (task C04, design/ADR-M19).
+# AppRole "runner" (D-03 sections 8 and 8.2). Its own secrets; verifies Run Contracts. It can NOT
+# read the LiteLLM master key, model provider keys or the GitHub App key, and it can NOT sign.
+# The run's short-lived single-repository GitHub token comes from the worker as a response-wrapped
+# token; unwrapping is authenticated by that token itself, so no policy line is needed
+# (QUESTIONS #44, design/ADR-M25 §2.11). The token never enters a sandbox.
 path "kv/data/runner/*" {
-  capabilities = ["read"]
-}
-
-path "kv/data/shared/github-app" {
   capabilities = ["read"]
 }
 

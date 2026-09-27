@@ -1,6 +1,8 @@
 // Agent runs (design/D-05 section 6.4). Runs are created with their Run Contract
 // (`RunContractRepository.store`); state changes belong to the runner and the worker (C04, C07,
 // C11). The database refuses any change once the status is final (ADR-M22).
+import type { RunStatus } from '@sdlc/contracts';
+
 import type { Run } from '../schema.js';
 import { isUuid } from '../tenant-id.js';
 import { TenantRepository } from './base.js';
@@ -33,6 +35,41 @@ export class RunRepository extends TenantRepository {
         .where('tenant_id', '=', this.tenantId)
         .where('id', '=', id)
         .where('status', '=', 'queued')
+        .executeTakeFirst(),
+    );
+    return result.numUpdatedRows === 1n;
+  }
+
+  /**
+   * Moves a run from one of `from` to `to` with one conditional update (C04, ADR-M25 §2.8), and
+   * sets the given state columns. Returns false when the run is not in `from` any more (another
+   * process moved it first). `stopReason` is a code; the database refuses free text.
+   */
+  async transition(
+    id: string,
+    change: {
+      readonly from: readonly RunStatus[];
+      readonly to: RunStatus;
+      readonly now: Date;
+      readonly stopReason?: string;
+      readonly startedAt?: Date;
+      readonly finishedAt?: Date;
+    },
+  ): Promise<boolean> {
+    if (!isUuid(id) || change.from.length === 0) return false;
+    const result = await this.run(
+      this.db
+        .updateTable('runs')
+        .set({
+          status: change.to,
+          updated_at: change.now,
+          ...(change.stopReason === undefined ? {} : { stop_reason: change.stopReason }),
+          ...(change.startedAt === undefined ? {} : { started_at: change.startedAt }),
+          ...(change.finishedAt === undefined ? {} : { finished_at: change.finishedAt }),
+        })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .where('status', 'in', change.from)
         .executeTakeFirst(),
     );
     return result.numUpdatedRows === 1n;

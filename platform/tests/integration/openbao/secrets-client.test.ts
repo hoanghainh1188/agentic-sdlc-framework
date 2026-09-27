@@ -265,11 +265,27 @@ describe.skipIf(!enabled)('OpenBao client (live)', { timeout: TEST_TIMEOUT_MS },
         { name: 'sign', payload: PAYLOAD },
         { name: 'read', path: 'cost-controller/litellm-master-key' },
         { name: 'read', path: 'shared/github-app', expect: values.githubApp },
+        { name: 'wrap', value: values.githubApp, ttlSeconds: 60 },
       ]);
       expect([...r.values()].slice(0, 4).map((s) => s.value)).toEqual([true, true, false, false]);
       expect(r.get('4:sign')?.key).toBe('secrets.permission_denied');
       expect(r.get('5:read')?.key).toBe('secrets.permission_denied');
-      expect(r.get('6:read')?.value).toEqual({ version: 1, matches: true });
+      // QUESTIONS #44: the runner no longer reads the GitHub App key.
+      expect(r.get('6:read')?.key).toBe('secrets.permission_denied');
+      // OpenBao's built-in `default` policy lets every token wrap data it already holds. Harmless:
+      // wrapping grants no access; it only packages the caller's own data (ADR-M25 §2.11).
+      expect(r.get('7:wrap')?.value).toBe('wrapped');
+    });
+
+    it('worker wraps a token; the wrapping token opens exactly once (QUESTIONS #44)', () => {
+      const r = results('worker', [
+        { name: 'wrap', value: values.githubApp, ttlSeconds: 60 },
+        { name: 'unwrap', expect: values.githubApp },
+        { name: 'unwrap', expect: values.githubApp },
+      ]);
+      expect(r.get('0:wrap')?.value).toBe('wrapped');
+      expect(r.get('1:unwrap')?.value).toEqual({ matches: true });
+      expect(r.get('2:unwrap')?.key).toBe('secrets.wrapping.invalid_token');
     });
 
     it('api: cannot sign Run Contracts', () => {

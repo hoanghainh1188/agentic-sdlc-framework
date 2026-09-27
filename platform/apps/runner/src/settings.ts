@@ -4,7 +4,11 @@
 //
 // Nothing here can loosen the sandbox hardening (ADR-M25 §2.4): the settings choose sizes and the
 // services a sandbox may reach, never capabilities, mounts or the network type.
+import os from 'node:os';
+import path from 'node:path';
+
 import { RunnerError } from './errors.js';
+import type { GitSettings } from './workspace/git.js';
 
 export const RUNNER_ENV = {
   dockerSocket: 'SDLC_RUNNER_DOCKER_SOCKET',
@@ -16,6 +20,12 @@ export const RUNNER_ENV = {
   tmpMb: 'SDLC_RUNNER_SANDBOX_TMP_MB',
   egressServices: 'SDLC_RUNNER_EGRESS_SERVICES',
   npmRegistry: 'SDLC_RUNNER_NPM_REGISTRY',
+  gitBaseUrl: 'SDLC_RUNNER_GIT_BASE_URL',
+  gitAllowPlaintext: 'SDLC_RUNNER_GIT_ALLOW_PLAINTEXT',
+  gitTimeoutSeconds: 'SDLC_RUNNER_GIT_TIMEOUT_SECONDS',
+  workDir: 'SDLC_RUNNER_WORK_DIR',
+  workspaceMaxMb: 'SDLC_RUNNER_WORKSPACE_MAX_MB',
+  readyTimeoutSeconds: 'SDLC_RUNNER_READY_TIMEOUT_SECONDS',
 } as const;
 
 /**
@@ -47,6 +57,14 @@ export interface RunnerSettings {
   readonly egressServices: readonly EgressService[];
   /** npm registry URL given to the sandbox; its host must be an egress service alias. */
   readonly npmRegistry: string | undefined;
+  /** How the runner clones (never the sandbox, QUESTIONS #52). */
+  readonly git: GitSettings;
+  /** Where the runner clones before the upload; each run gets its own subfolder, removed after. */
+  readonly workDir: string;
+  /** Largest workspace the runner uploads (file content, `.git` included). */
+  readonly workspaceMaxBytes: number;
+  /** How long the runner waits for the sandbox health check. */
+  readonly readyTimeoutMs: number;
 }
 
 export const DEFAULT_DOCKER_SOCKET = '/var/run/docker.sock';
@@ -57,6 +75,10 @@ export const DEFAULTS = {
   cpus: '1.5',
   pids: 512,
   tmpMb: 512,
+  gitBaseUrl: 'https://github.com',
+  gitTimeoutSeconds: 300,
+  workspaceMaxMb: 1024,
+  readyTimeoutSeconds: 120,
 } as const;
 /** More than this on one host is a mistake, not a setting (each sandbox reserves ~2 GiB). */
 export const MAX_SANDBOXES_LIMIT = 16;
@@ -83,6 +105,12 @@ function intSetting(
   const value = Number(raw);
   if (value < min || value > max) throw invalid(name);
   return value;
+}
+
+function workDir(raw: string | undefined): string {
+  const dir = raw || path.join(os.tmpdir(), 'sdlc-runner');
+  if (!path.isAbsolute(dir)) throw invalid(RUNNER_ENV.workDir);
+  return dir;
 }
 
 /** Parses `alias=container:port,alias=container:port`. */
@@ -128,6 +156,34 @@ function npmRegistry(
   return url.toString();
 }
 
+function gitSettings(env: NodeJS.ProcessEnv): GitSettings {
+  const allow = env[RUNNER_ENV.gitAllowPlaintext] ?? '';
+  if (!['', '0', '1'].includes(allow)) throw invalid(RUNNER_ENV.gitAllowPlaintext);
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(env[RUNNER_ENV.gitBaseUrl] || DEFAULTS.gitBaseUrl);
+  } catch {
+    throw invalid(RUNNER_ENV.gitBaseUrl);
+  }
+  const plaintextOk = baseUrl.protocol === 'http:' && allow === '1';
+  if (
+    (baseUrl.protocol !== 'https:' && !plaintextOk) ||
+    baseUrl.username !== '' ||
+    baseUrl.password !== '' ||
+    baseUrl.pathname !== '/' ||
+    baseUrl.search !== '' ||
+    baseUrl.hash !== ''
+  ) {
+    throw invalid(RUNNER_ENV.gitBaseUrl);
+  }
+  return {
+    baseUrl,
+    allowPlaintext: allow === '1',
+    timeoutMs:
+      intSetting(env, RUNNER_ENV.gitTimeoutSeconds, DEFAULTS.gitTimeoutSeconds, 10, 3600) * 1000,
+  };
+}
+
 /** Reads and checks the runner settings from environment variables. */
 export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): RunnerSettings {
   const dockerSocket = env[RUNNER_ENV.dockerSocket] || DEFAULT_DOCKER_SOCKET;
@@ -155,5 +211,11 @@ export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Run
     },
     egressServices,
     npmRegistry: npmRegistry(env[RUNNER_ENV.npmRegistry], egressServices),
+    git: gitSettings(env),
+    workDir: workDir(env[RUNNER_ENV.workDir]),
+    workspaceMaxBytes:
+      intSetting(env, RUNNER_ENV.workspaceMaxMb, DEFAULTS.workspaceMaxMb, 1, 16_384) * MIB,
+    readyTimeoutMs:
+      intSetting(env, RUNNER_ENV.readyTimeoutSeconds, DEFAULTS.readyTimeoutSeconds, 5, 1800) * 1000,
   };
 }

@@ -54,7 +54,7 @@ Who may read what is **only** in `bootstrap/policies/<name>.hcl`. The scripts co
 |---|---|---|
 | `api` | `api/*`, `shared/github-app` | — |
 | `worker` | `worker/*`, `shared/github-app` (QUESTIONS #42) | sign and verify with `run-contract`; read the public key |
-| `runner` | `runner/*`, `shared/github-app` | verify; read the public key |
+| `runner` | `runner/*` (not `shared/github-app` since C04, QUESTIONS #44) | verify; read the public key |
 | `cost-controller` | `cost-controller/*` (includes `litellm-master-key`) | — |
 | `litellm` (since C03) | read `litellm/providers/*`, list `kv/metadata/litellm/providers/`, read `litellm/salt-key` and exactly `cost-controller/litellm-master-key` | — |
 | `platform-admin` | create, read, update `kv/*` (no delete, no destroy) | read the public key |
@@ -89,7 +89,7 @@ Who may read what is **only** in `bootstrap/policies/<name>.hcl`. The scripts co
 
 ### 2.8. Note for C04 (runner)
 
-The `runner` policy can read the GitHub App private key (`kv/shared/github-app`), because the runner creates the short-lived token for each run. **This key must never enter a sandbox.** The sandbox receives only a short-lived installation token limited to one repository (D-03 §9, D-08 C04 AC2, AC4). C04 must test this.
+Since C04 (QUESTIONS #44, ADR-M25 §2.11) the `runner` policy can **not** read the GitHub App private key. The worker issues the run's short-lived single-repository token and hands it to the runner as a single-use response-wrapped token (`worker.hcl` states `sys/wrapping/wrap`; OpenBao's `default` policy allows it too). The runner uses the token only to clone and push; it never enters a sandbox (D-03 §9 v1.6, D-08 C04 AC2, AC4).
 
 ## 3. Open items
 
@@ -130,3 +130,4 @@ The `runner` policy can read the GitHub App private key (`kv/shared/github-app`)
 | 0.3 | 2026-09-26 | Claude (task A11), approved by Harry | §2.5: no host port (QUESTIONS #27, option A); gateway pinned and left out of the bound CIDRs, trust model (QUESTIONS #37, option A2) |
 | 0.4 | 2026-09-26 | Claude (task B05), approved by Harry | §2.4: `worker` also reads `shared/github-app` (it polls GitHub, posts gate comments, reads spec files; QUESTIONS #42) |
 | 0.5 | 2026-09-26 | Claude (task C03), approved by Harry | §2.3, §2.4: AppRole `litellm` for the LiteLLM sidecar (provider keys, salt key, the master key path); §3 open item done (QUESTIONS #1, ADR-M24) |
+| 0.6 | 2026-09-27 | Claude (task C04), approved by Harry | §2.4, §2.8: the `runner` AppRole no longer reads `shared/github-app`; the worker hands it a response-wrapped token; `worker.hcl` gets `sys/wrapping/wrap` (QUESTIONS #44, ADR-M25) |

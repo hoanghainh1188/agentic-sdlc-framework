@@ -478,7 +478,7 @@ describe.skipIf(!enabled)('OpenBao bootstrap (live)', { timeout: TEST_TIMEOUT_MS
       },
       runner: {
         [MASTER_KEY]: 'denied',
-        [GITHUB_APP]: 'allowed',
+        [GITHUB_APP]: 'denied', // QUESTIONS #44: the worker hands the runner a wrapped token
         [RUNNER_DB]: 'allowed',
         [EXPORT]: 'denied',
       },

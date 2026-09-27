@@ -83,7 +83,7 @@ Steps:
 What `configure` sets up (details: `design/ADR-M19-openbao-bootstrap.md`):
 - KV version 2 at `kv/`;
 - Transit at `transit/`, with the Ed25519 key `run-contract` (not exportable, not deletable);
-- AppRoles `api`, `worker`, `runner`, `cost-controller`, each reading only `kv/<its name>/…` (plus `kv/shared/github-app` for `api`, `worker` and `runner`);
+- AppRoles `api`, `worker`, `runner`, `cost-controller`, each reading only `kv/<its name>/…` (plus `kv/shared/github-app` for `api` and `worker`; the `runner` receives each run's GitHub token from the worker as a single-use wrapped token, `design/ADR-M25-runner-sandbox.md` §2.11);
 - the AppRole `litellm` for the LiteLLM sidecar: it reads the model provider keys, the LiteLLM salt key and the LiteLLM master key, nothing else (section 5d);
 - the token role `platform-admin` (tokens of at most 1 hour);
 - a check that the file audit device is on.
@@ -148,7 +148,7 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 
 | Secret | Path | Read by |
 |---|---|---|
-| GitHub App private key | `kv/shared/github-app` | `api`, `worker`, `runner` |
+| GitHub App private key | `kv/shared/github-app` | `api`, `worker` (not `runner`, `design/QUESTIONS.md` #44) |
 | LiteLLM master key (field `value`) | `kv/cost-controller/litellm-master-key` | `cost-controller`, `litellm` (one source for both, section 5d) |
 | LiteLLM salt key (field `value`) | `kv/litellm/salt-key` | `litellm` |
 | Model provider keys (field `api_key`), one entry per provider | `kv/litellm/providers/<provider>`, for example `kv/litellm/providers/anthropic` | `litellm` |
@@ -382,3 +382,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.5 | 2026-09-26 | Claude Code (task B05) | The `worker` AppRole also reads the GitHub App key `kv/shared/github-app` (`design/QUESTIONS.md` #42); section 5b: creating the GitHub App, storing and rotating its key (not yet tested with a real App) |
 | 0.6 | 2026-09-26 | Claude Code (task C03) | Section 5d: LiteLLM keys through the OpenBao Agent sidecar (profile `models`), `litellm-credentials`, rotation; AppRole `litellm`; key table; troubleshooting rows (`design/QUESTIONS.md` #1, ADR-M24) |
 | 0.7 | 2026-09-27 | Claude Code (task B03) | Section 5e: the API reads the `platform_app` password from `kv/api/database` with the AppRole `api`; `api-credentials`, rotation; key table row; troubleshooting row (`design/QUESTIONS.md` #67, ADR-M26). Tested with throw-away keys (`pnpm test:api`) |
+| 0.8 | 2026-09-27 | Claude Code (task C04) | The `runner` AppRole no longer reads `kv/shared/github-app`; the worker hands it each run's token as a single-use response-wrapped token (`design/QUESTIONS.md` #44). Existing installations: run `configure` again to load the new `runner` and `worker` policies |

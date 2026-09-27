@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { OpenBaoClient, SecretsError } = require(process.env.SECRETS_DIST);
+const { OpenBaoClient, Redacted, SecretsError } = require(process.env.SECRETS_DIST);
 
 const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 const dir = '/run/sdlc';
@@ -36,6 +36,8 @@ const outcome = async (fn) => {
   }
 };
 const bytes = (text) => new TextEncoder().encode(text);
+// A wrapping token made by the `wrap` step. It stays inside this process: never in the output.
+let wrappingToken;
 
 const steps = {
   ready: () => client.assertReady().then(() => 'ready'),
@@ -72,6 +74,19 @@ const steps = {
     return res.status;
   },
   loginCount: () => events.filter((e) => e.event === 'openbao.login').length,
+  wrap: ({ value, ttlSeconds }) =>
+    client
+      .wrapping()
+      .wrap({ token: new Redacted(value) }, { ttlSeconds })
+      .then((token) => {
+        wrappingToken = token;
+        return 'wrapped';
+      }),
+  unwrap: ({ expect }) =>
+    client
+      .wrapping()
+      .unwrap(wrappingToken)
+      .then((fields) => ({ matches: fields.token?.reveal() === expect })),
   close: () => client.close().then(() => 'closed'),
 };
 

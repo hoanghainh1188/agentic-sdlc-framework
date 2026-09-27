@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C04, session 1, PR for review) |
+| Status | **Proposed** (task C04; session 1 merged in PR #89, approved by Harry 2026-09-27; session 2 in review) |
 | Date | 2026-09-27 |
 | Decided by | Harry (C04 plan approved 2026-09-27; QUESTIONS #44, #52, #53, #54, #59) |
 | Related | D-02 FR-30, FR-33, FR-34, FR-50; D-03 sections 4, 5.1, 6.5, 7.2, 8, 8.2, 9, 10, 10.1, 13 (version 1.6); D-05 section 6.4; D-08 tasks C04, C05, C06, C08, C09, C11, R01; ADR-M10, ADR-M17, ADR-M19, ADR-M21, ADR-M22, ADR-M23, ADR-M24 |
@@ -54,8 +54,14 @@ There is no default route.
 
 - Names come from the run ID (a lowercase UUID): container `sdlc-sandbox-<id>`, network `sdlc-run-<id>`, volume `sdlc-ws-<id>`. Labels: `sdlc.managed-by=sdlc-runner`, `sdlc.runner-instance`, `sdlc.run-id`, `sdlc.tenant-id`.
 - The workspace is a **per-run Docker volume** mounted at `/workspace`. A tmpfs (ADR-M10) cannot receive an archive before the start.
+- **What goes into the archive (packing the clone):**
+  - A symbolic link is stored as a link entry, holding only its target path. The target is never read or followed, wherever it points (`/etc/passwd`, `../..`, the runner's own files). The runner uses `lstat`, never descends into a linked directory, and opens each regular file with `O_NOFOLLOW`. The open file must be the same file (device and inode) the walk saw, so a swap after `lstat` is refused.
+  - Hard links, devices, FIFOs and sockets are refused (`workspace_invalid`). A root that is itself a link is refused too.
+  - Every entry path is relative and stays inside the workspace after normalisation: no `..`, no `.` segment, no `//`, no backslash, no absolute path (`workspace_invalid`).
+  - Inside the sandbox a link resolves in the sandbox's own file system, never on the runner's host.
+  - Tests: a repository with an absolute link, a `../` link, a link to `/etc/passwd` and a link to a directory outside the clone packs as link entries with none of the targets' bytes. Hard links, sockets, FIFOs and escaping entry names are refused.
 - The runner uploads the working copy as a tar archive into the created (not yet started) container, through the Docker archive API with `copyUIDGID`. Every entry belongs to the sandbox user 10001. The runner's own tar writer fixes owners, modes and times, so nothing from the runner's host leaks into the archive.
-- **Image contract:** the project image must own `/workspace` as `10001:10001`. Docker copies that owner into the run's empty volume when the sandbox is created; the archive cannot change the owner of the volume root (found in the live test). The session 3 images do this in their Dockerfile.
+- **Image contract:** the project image must define a Docker `HEALTHCHECK` that passes when the Agent Server is ready (the runner waits for it and refuses an image without one: `image_has_no_healthcheck`), and it must own `/workspace` as `10001:10001`. Docker copies that owner into the run's empty volume when the sandbox is created; the archive cannot change the owner of the volume root (found in the live test). The session 3 images do this in their Dockerfile.
 - Creation order: volume → network → attach services → container → archive → start. A failure at any step removes everything created so far.
 
 ### 2.4. Sandbox hardening
@@ -98,6 +104,12 @@ Deployment settings come from the environment (`SDLC_RUNNER_*`), not from the pr
 | `SDLC_RUNNER_SANDBOX_MEMORY_MB`, `_CPUS`, `_PIDS`, `_TMP_MB` | 2048, 1.5, 512, 512 | ADR-M10 §2.5 |
 | `SDLC_RUNNER_EGRESS_SERVICES` | none | `alias=container:port,…`, for example `litellm=sdlc-litellm-1:4000,npm-proxy=sdlc-npm-proxy-1:4873` |
 | `SDLC_RUNNER_NPM_REGISTRY` | none | For example `http://npm-proxy:4873/`; its host and port must be an egress service |
+| `SDLC_RUNNER_GIT_BASE_URL` | `https://github.com` | Git host origin the runner clones from; no user, password or path |
+| `SDLC_RUNNER_GIT_ALLOW_PLAINTEXT` | off | `1` allows an `http://` Git host: development and tests only |
+| `SDLC_RUNNER_GIT_TIMEOUT_SECONDS` | 300 | Per git command |
+| `SDLC_RUNNER_WORK_DIR` | `<tmp>/sdlc-runner` | Absolute path; each run clones into its own subfolder, removed right after the upload |
+| `SDLC_RUNNER_WORKSPACE_MAX_MB` | 1024 | Largest workspace (file content, `.git` included) the runner uploads |
+| `SDLC_RUNNER_READY_TIMEOUT_SECONDS` | 120 | How long the runner waits for the sandbox health check |
 
 ### 2.7. Worker ↔ runner, and where extra runs wait (QUESTIONS #53)
 
@@ -108,10 +120,21 @@ Deployment settings come from the environment (`SDLC_RUNNER_*`), not from the pr
 
 ### 2.8. Claim, clean-up, run events
 
+- **Provisioning order (`provisionRun`, session 2):**
+  1. verify the Run Contract (ADR-M22; a refused contract is recorded there, and nothing else happens: no claim, no unwrap);
+  2. claim the run;
+  3. unwrap the GitHub token (§2.11);
+  4. check that the egress list can be enforced;
+  5. load `sandbox.image` from the project configuration;
+  6. clone and pack the workspace → `workspace_prepared`;
+  7. create the sandbox → `sandbox_created`;
+  8. wait for its health check, then `provisioning → running` → `sandbox_ready`.
+
+  Any failure after the claim removes what was created, records `provisioning_failed` (and `sandbox_removed` when a sandbox was started), and ends the run as `failed` with the reason as `stop_reason`. The clone on the runner's disk is removed in every case. `releaseSandbox` removes the sandbox at the end of a run (C05) or on a kill (C11) and records `sandbox_removed`; the run status stays the caller's.
 - **Claim (QUESTIONS #35):** after the contract is verified, the runner moves the run `queued → provisioning` with one conditional update (`RunRepository.claimForProvisioning`) and checks the row count. Zero rows → no sandbox. Tested with concurrent claims on PostgreSQL: exactly one wins.
 - **Clean-up (`teardownSandbox`):** remove the container, detach the shared services, remove the network, remove the workspace volume. Idempotent (objects already gone are skipped), every step runs even when one fails, and the first error is reported at the end. Used after success and failure (session 2), and for orphans (session 3).
 - **Restart (session 3):** at start, the runner removes every object with its instance label. Runs still in `provisioning` or `running` become `failed` with `runner_restarted`; their outputs are lost. A periodic sweep removes objects of runs already in a final state.
-- **Run events** (coded payloads only, ADR-M22 §2.5): `workspace_prepared {base_sha, duration_ms}`, `sandbox_created {image_sha256}`, `sandbox_ready {duration_ms}`, `provisioning_failed {reason}`, `sandbox_removed {reason, duration_ms}`. Reasons are codes: `egress_not_enforceable`, `image_unavailable`, `docker_error`; `finished`, `failed`, `provisioning_failed`, `killed`, `orphan`.
+- **Run events** (coded payloads only, ADR-M22 §2.5): `workspace_prepared {base_sha, duration_ms}`, `sandbox_created {image_sha256}`, `sandbox_ready {duration_ms}`, `provisioning_failed {reason}`, `sandbox_removed {reason, duration_ms}`. Reasons are codes. `provisioning_failed`: `token_unavailable`, `config_unavailable`, `egress_not_enforceable`, `clone_failed`, `base_sha_not_found`, `token_leaked`, `workspace_too_large`, `workspace_invalid`, `image_unavailable`, `image_has_no_healthcheck`, `sandbox_unhealthy`, `sandbox_not_ready`, `run_stopped`, `docker_error`. `sandbox_removed`: `finished`, `failed`, `provisioning_failed`, `killed`, `orphan`.
 
 ### 2.9. Sandbox image per project (QUESTIONS #59 option A, #54)
 
@@ -130,8 +153,10 @@ Deployment settings come from the environment (`SDLC_RUNNER_*`), not from the pr
 
 - The worker issues the single-repository installation token (`GitHostAdapter.issueShortLivedToken`, ADR-M23) and hands it to the runner as an **OpenBao response-wrapped token**: single use, time to live equal to the contract validity. Only the wrapping token travels with the envelope (Temporal keeps activity inputs in its history, so a raw token would be stored in PostgreSQL).
 - The runner unwraps it once and keeps the token in memory only. If someone else unwrapped it first, the unwrap fails and the runner refuses the run.
-- The token reaches git through `GIT_CONFIG_*` environment variables of the git process (an `http.extraHeader`), never through process arguments, `.git/config` or the sandbox.
-- `runner.hcl` loses `kv/data/shared/github-app`; `worker.hcl` gets `sys/wrapping/wrap`; `@sdlc/secrets` gets `wrap` and `unwrap`.
+- The runner checks with `sys/wrapping/lookup` that the wrapping token was made by `sys/wrapping/wrap` before it unwraps, so a wrapped response of another endpoint is refused. Unwrapping is authenticated by the wrapping token itself.
+- The token reaches git through `GIT_CONFIG_*` environment variables of the git process (`http.<Git host origin>/.extraheader`), never through process arguments, the clone URL, `.git/config` or the sandbox. The git process gets no system or user configuration, no prompt, no hooks, no submodules and HTTPS only. After the clone the runner checks that the token is not in `.git/config`.
+- `runner.hcl` loses `kv/data/shared/github-app`; `worker.hcl` gets `sys/wrapping/wrap`; `@sdlc/secrets` gets `wrapping()` (`wrap`, `unwrap`; interfaces `SecretWrapper`, `SecretUnwrapper` in `@sdlc/contracts`).
+- **Found in the live OpenBao test:** OpenBao's built-in `default` policy, which every AppRole token carries (the client needs it for its own token lookup, renewal and revocation), already allows `sys/wrapping/wrap` for every token. This is harmless: wrapping packages only data the caller already holds and grants no access. The `worker.hcl` line keeps the handoff working if the default policy is ever tightened.
 
 ## 3. Rules and where they live
 
@@ -173,3 +198,6 @@ C04 adds no handbook threshold. Budget, iteration and loop limits belong to C05 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task C04, session 1) | First version |
+| 0.2 | 2026-09-27 | Claude (task C04, session 1 fix) | §2.2: per-run networks set `inhibit_ipv4` (host reachable through the gateway on Linux, found by CI) |
+| 0.3 | 2026-09-27 | Claude (task C04, session 2) | §2.3: health check in the image contract; §2.6: Git, work folder, workspace size and readiness settings; §2.8: provisioning order, failure codes, `releaseSandbox`; §2.11: lookup before unwrap, git process hardening, the OpenBao default policy finding |
+| 0.4 | 2026-09-27 | Claude (task C04, session 2 review) | §2.3: what goes into the archive: links as link entries only (never read or followed, O_NOFOLLOW, same inode), hard links and special files refused, paths inside the workspace after normalisation (Harry's review of PR #91) |

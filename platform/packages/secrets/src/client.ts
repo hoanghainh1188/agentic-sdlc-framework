@@ -25,6 +25,7 @@ import {
 } from './options.js';
 import { TransitKey } from './transit.js';
 import { Transport, type HttpResponse } from './transport.js';
+import { Wrapping } from './wrapping.js';
 
 export interface CallRequest {
   /** Short name of the operation, used in error messages (for example `read`, `sign`). */
@@ -34,6 +35,8 @@ export interface CallRequest {
   readonly body?: unknown;
   /** Status codes the caller handles itself, besides 2xx. */
   readonly accept?: readonly number[];
+  /** Extra `X-Vault-*` headers. */
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 export type Caller = (request: CallRequest) => Promise<HttpResponse>;
@@ -151,6 +154,18 @@ export class OpenBaoClient {
     return new TransitKey(this.#options.mounts.transit, key, (request) => this.#call(request));
   }
 
+  /**
+   * Response wrapping (ADR-M25 §2.11): `wrap` needs this process's token and the policy
+   * `sys/wrapping/wrap` (worker); `unwrap` is authenticated by the wrapping token itself, so any
+   * process can open a token handed to it, once.
+   */
+  wrapping(): Wrapping {
+    return new Wrapping(
+      (request) => this.#call(request),
+      (method, path, input) => this.#transport.request(method, path, input),
+    );
+  }
+
   /** Stops renewal and revokes the token. The client cannot be used afterwards. */
   async close(): Promise<void> {
     if (this.#closed) return;
@@ -169,6 +184,7 @@ export class OpenBaoClient {
     const res = await this.#transport.request(request.method, request.path, {
       token,
       body: request.body,
+      ...(request.headers ? { headers: request.headers } : {}),
     });
     if ((res.status >= 200 && res.status < 300) || request.accept?.includes(res.status)) {
       return res;

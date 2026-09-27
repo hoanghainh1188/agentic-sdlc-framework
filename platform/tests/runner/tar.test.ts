@@ -1,13 +1,16 @@
 // Workspace archive (ADR-M25 §2.3): entries owned by the sandbox user, relative paths only, and a
 // valid tar that the system `tar` reads back.
 import { execFileSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import net from 'node:net';
 
-import { packTar } from '../../apps/runner/src/index.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { packDirectory, packTar, RunnerError } from '../../apps/runner/src/index.js';
 
 describe('packTar', () => {
   const archive = packTar([
@@ -43,10 +46,159 @@ describe('packTar', () => {
     }
   });
 
-  it.each(['/etc/passwd', '../x', 'a/../../x', 'a//b', '', 'x'.repeat(101), 'a\nb'])(
+  it.each(['/etc/passwd', '../x', 'a/../../x', 'a//b', '', 'a\nb', './x', 'a/./b', 'a\\..\\b'])(
     'refuses the path %j',
     (bad) => {
       expect(() => packTar([{ type: 'file', path: bad, content: Buffer.alloc(0) }])).toThrow(
+        TypeError,
+      );
+    },
+  );
+
+  it('writes long names and link targets with PAX headers', () => {
+    const long = `${'d'.repeat(80)}/${'f'.repeat(80)}.txt`;
+    const target = `../${'t'.repeat(120)}`;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-tar-'));
+    try {
+      const file = path.join(dir, 'a.tar');
+      fs.writeFileSync(
+        file,
+        packTar([
+          { type: 'dir', path: 'd'.repeat(80) },
+          { type: 'file', path: long, content: Buffer.from('x') },
+          { type: 'symlink', path: 'link', target },
+        ]),
+      );
+      execFileSync('tar', ['-xf', file, '-C', dir]);
+      expect(fs.readFileSync(path.join(dir, long), 'utf8')).toBe('x');
+      expect(fs.readlinkSync(path.join(dir, 'link'))).toBe(target);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('packDirectory', () => {
+  const tree = () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-pack-'));
+    fs.mkdirSync(path.join(dir, 'src'));
+    fs.writeFileSync(path.join(dir, 'src', 'a.ts'), 'export {};\n');
+    fs.writeFileSync(path.join(dir, 'run.sh'), '#!/bin/sh\n', { mode: 0o755 });
+    fs.symlinkSync('src/a.ts', path.join(dir, 'link.ts'));
+    return dir;
+  };
+
+  it('packs files, directories, symbolic links and the executable bit, owned by 10001', () => {
+    const dir = tree();
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-unpack-'));
+    try {
+      const file = path.join(out, 'w.tar');
+      fs.writeFileSync(file, packDirectory(dir, 1024 * 1024));
+      const listing = execFileSync('tar', ['-tvnf', file], { encoding: 'utf8' });
+      expect(listing).toMatch(/^drwxr-xr-x(?:\s+\d+)?\s+10001[ /]+10001\s.* \.\/$/m);
+      expect(listing).toMatch(/^l.* link\.ts -> src\/a\.ts$/m);
+      execFileSync('tar', ['-xf', file, '-C', out]);
+      expect(fs.readFileSync(path.join(out, 'src', 'a.ts'), 'utf8')).toBe('export {};\n');
+      expect(fs.statSync(path.join(out, 'run.sh')).mode & 0o111).not.toBe(0);
+      expect(fs.statSync(path.join(out, 'src', 'a.ts')).mode & 0o111).toBe(0);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(out, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses a workspace above the size limit', () => {
+    const dir = tree();
+    try {
+      expect(() => packDirectory(dir, 10)).toThrow(RunnerError);
+      expect(() => packDirectory(dir, 10)).toThrow(/SDLC_RUNNER_WORKSPACE_MAX_MB/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses special files (a FIFO)', () => {
+    const dir = tree();
+    try {
+      execFileSync('mkfifo', [path.join(dir, 'pipe')]);
+      expect(() => packDirectory(dir, 1024 * 1024)).toThrow(/FIFO/);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('packDirectory: symbolic links, hard links, special files, escapes (ADR-M25 §2.3)', () => {
+  const CANARY = `outside-canary-${crypto.randomBytes(8).toString('hex')}`;
+  let outside: string;
+  let secret: string;
+  let repo: string;
+
+  beforeEach(() => {
+    outside = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-outside-'));
+    secret = path.join(outside, 'secret.txt');
+    fs.writeFileSync(secret, CANARY);
+    repo = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-repo-'));
+    fs.writeFileSync(path.join(repo, 'README.md'), 'pilot\n');
+  });
+  afterEach(() => {
+    fs.rmSync(outside, { recursive: true, force: true });
+    fs.rmSync(repo, { recursive: true, force: true });
+  });
+
+  const listing = (archive: Buffer): string => {
+    const file = path.join(outside, 'w.tar');
+    fs.writeFileSync(file, archive);
+    return execFileSync('tar', ['-tvnf', file], { encoding: 'utf8' });
+  };
+
+  it('stores absolute, ../ and directory links as link entries, never the target bytes', () => {
+    fs.symlinkSync(secret, path.join(repo, 'absolute-link'));
+    fs.symlinkSync(path.relative(repo, secret), path.join(repo, 'dotdot-link'));
+    fs.symlinkSync('/etc/passwd', path.join(repo, 'passwd'));
+    fs.symlinkSync(outside, path.join(repo, 'outside-dir'));
+    const archive = packDirectory(repo, 1024 * 1024);
+
+    expect(archive.includes(Buffer.from(CANARY))).toBe(false);
+    const passwd = fs.readFileSync('/etc/passwd');
+    expect(archive.includes(passwd.subarray(0, Math.min(passwd.length, 64)))).toBe(false);
+    const list = listing(archive);
+    expect(list).toMatch(
+      new RegExp(`^l.* absolute-link -> ${secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm'),
+    );
+    expect(list).toMatch(/^l.* dotdot-link -> \.\.\/.*secret\.txt$/m);
+    expect(list).toMatch(/^l.* passwd -> \/etc\/passwd$/m);
+    expect(list).toMatch(/^l.* outside-dir -> /m);
+    // Nothing from inside the linked directory.
+    expect(list).not.toMatch(/outside-dir\/secret\.txt/);
+  });
+
+  it('refuses a hard link', () => {
+    fs.linkSync(path.join(repo, 'README.md'), path.join(repo, 'hard-link'));
+    expect(() => packDirectory(repo, 1024 * 1024)).toThrow(/hard link/);
+  });
+
+  it('refuses a socket', async () => {
+    const socketPath = path.join(repo, 's.sock');
+    const server = net.createServer();
+    await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+    try {
+      expect(() => packDirectory(repo, 1024 * 1024)).toThrow(/socket/);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('refuses a root that is a symbolic link', () => {
+    const linkedRoot = path.join(outside, 'linked-root');
+    fs.symlinkSync(repo, linkedRoot);
+    expect(() => packDirectory(linkedRoot, 1024 * 1024)).toThrow(RunnerError);
+  });
+
+  it.each(['../escape', 'a/../../escape', './dot', 'a/./b'])(
+    'refuses the entry name %s (path escape after normalisation)',
+    (name) => {
+      expect(() => packTar([{ type: 'file', path: name, content: Buffer.from('x') }])).toThrow(
         TypeError,
       );
     },

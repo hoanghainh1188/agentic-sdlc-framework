@@ -44,6 +44,13 @@ export class StubOpenBao {
   /** When set, login answers wait for this promise. */
   holdLogin: Promise<void> | undefined;
   readonly keys: KeyVersion[] = [newKey()];
+  /** Wrapping token → wrapped data, expiry and creation path (like OpenBao's cubbyhole). */
+  readonly wrapped = new Map<
+    string,
+    { data: Record<string, unknown>; expiresAt: number; path: string }
+  >();
+  /** Wrap TTL headers received, in order. */
+  readonly wrapTtls: string[] = [];
   #server: http.Server | undefined;
   #tokenCount = 0;
 
@@ -103,9 +110,41 @@ export class StubOpenBao {
       return { status: 503, body: { errors: ['Vault is sealed'] } };
     if (route === 'POST auth/approle/login') return this.#login(body);
     const token = String(req.headers['x-vault-token'] ?? '');
+    // Response wrapping: lookup needs no token; unwrap is authenticated by the wrapping token.
+    if (route === 'POST sys/wrapping/lookup') {
+      const entry = this.#liveWrap(String(body['token']));
+      if (!entry) return { status: 400, body: { errors: ['wrapping token is not valid'] } };
+      return { status: 200, body: { data: { creation_path: entry.path, creation_ttl: 900 } } };
+    }
+    if (route === 'POST sys/wrapping/unwrap') {
+      const entry = this.#liveWrap(token);
+      if (!entry) return { status: 400, body: { errors: ['wrapping token is not valid'] } };
+      this.wrapped.delete(token);
+      return { status: 200, body: { data: entry.data } };
+    }
     if ((this.tokens.get(token) ?? 0) <= Date.now()) return denied(token);
     if (this.denied.has(route.split(' ')[1]!)) return denied(token);
+    if (route === 'POST sys/wrapping/wrap') {
+      const ttlHeader = String(req.headers['x-vault-wrap-ttl'] ?? '');
+      this.wrapTtls.push(ttlHeader);
+      const wrapToken = `wrap-${MARKER}-${++this.#tokenCount}`;
+      const ttl = Number(/^(\d+)s$/.exec(ttlHeader)?.[1] ?? 300);
+      this.wrapped.set(wrapToken, {
+        data: body,
+        expiresAt: Date.now() + ttl * 1000,
+        path: 'sys/wrapping/wrap',
+      });
+      return {
+        status: 200,
+        body: { wrap_info: { token: wrapToken, ttl, creation_path: 'sys/wrapping/wrap' } },
+      };
+    }
     return this.#authenticated(route, url, token, body) ?? { status: 404, body: { errors: [] } };
+  }
+
+  #liveWrap(token: string) {
+    const entry = this.wrapped.get(token);
+    return entry && entry.expiresAt > Date.now() ? entry : undefined;
   }
 
   #login(body: Record<string, unknown>): Reply {

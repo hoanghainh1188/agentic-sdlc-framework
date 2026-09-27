@@ -22,7 +22,7 @@
     "test:openbao": "SDLC_OPENBAO_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/openbao",
     "test:litellm": "SDLC_LITELLM_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/litellm",
     "test:api": "SDLC_API_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/api",
-    "test:runner": "SDLC_RUNNER_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/runner",
+    "test:runner": "SDLC_RUNNER_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/runner platform/deploy/scripts/test-db.sh",
     "openbao:bootstrap": "platform/deploy/openbao/bootstrap.sh",
     "db:migrate": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js latest",
     "db:status": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js status",

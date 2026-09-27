@@ -39,9 +39,11 @@ describe('client defaults match the OpenBao bootstrap', () => {
 });
 
 describe('GitHub App key path (D-03 §8.2, B05, QUESTIONS #42)', () => {
-  it('the adapter default path is readable by api, worker and runner, and by no other role', () => {
+  it('the adapter default path is readable by api and worker, and by no other role (QUESTIONS #44)', () => {
     const readable = `path "${DEFAULT_MOUNTS.kv}/data/${DEFAULT_GITHUB_APP_SECRET_PATH}"`;
-    for (const role of ['api', 'worker', 'runner']) expect(policy(role), role).toContain(readable);
-    expect(policy('cost-controller')).not.toContain(readable);
+    for (const role of ['api', 'worker']) expect(policy(role), role).toContain(readable);
+    for (const role of ['runner', 'cost-controller']) {
+      expect(policy(role), role).not.toContain(readable);
+    }
   });
 });
