@@ -131,7 +131,7 @@ describe.skipIf(!liveEnabled)('C04 live: sandbox egress and hardening on Docker'
     delete process.env.ANTHROPIC_API_KEY;
     if (client) {
       for (const run of [runA, runB]) {
-        await teardownSandbox(client, settings.egressServices, run).catch(() => undefined);
+        await teardownSandbox(client, run).catch(() => undefined);
       }
     }
     hostServer?.close();
@@ -250,7 +250,7 @@ describe.skipIf(!liveEnabled)('C04 live: sandbox egress and hardening on Docker'
     // AC5: teardown removes the containers, networks and workspaces of both runs and detaches the
     // shared services; the services themselves keep running.
     for (const run of [runA, runB]) {
-      expect(await teardownSandbox(client, settings.egressServices, run)).toMatchObject({
+      expect(await teardownSandbox(client, run)).toMatchObject({
         container: true,
         network: true,
         volume: true,

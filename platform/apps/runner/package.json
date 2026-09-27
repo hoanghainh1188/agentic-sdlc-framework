@@ -10,6 +10,7 @@
     "dist"
   ],
   "dependencies": {
+    "@sdlc/adapter-agent-openhands": "workspace:*",
     "@sdlc/contracts": "workspace:*",
     "@sdlc/core": "workspace:*",
     "@sdlc/messages": "workspace:*",

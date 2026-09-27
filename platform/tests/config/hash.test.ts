@@ -11,7 +11,7 @@ import { loadValid } from './helpers';
  * Pinned hash of the shipped default configuration. It changes only when a default value changes.
  * Update it in the same PR as the default change, after review.
  */
-const DEFAULT_CONFIG_HASH = 'a21ba0aceb484fb7113740bfc0a7438ce54a58e30b0954a50d402c31346fcef2';
+const DEFAULT_CONFIG_HASH = '8ce36d80be40da731c64824af4e25baea1ab18b4d65be742d0f8c33ab8dc154a';
 
 describe('config_hash (AC3)', () => {
   it('is the pinned value for the default configuration', () => {

@@ -109,10 +109,10 @@ jobs:
             image=true; reason="$EVENT_NAME run"
           elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             image=true; reason="base commit unknown, running to be safe"
-          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/)" ]; then
-            image=true; reason="a sandbox image, the runner, the package proxy or their live test changed"
+          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/)" ]; then
+            image=true; reason="a sandbox image, the runner, the agent adapter, the package proxy or their live tests changed"
           else
-            reason="sandbox images, runner, package proxy and their live test unchanged"
+            reason="sandbox images, runner, agent adapter, package proxy and their live tests unchanged"
           fi
           echo "run_sandbox_image=$image" >> "$GITHUB_OUTPUT"
           echo "Sandbox image job: run=$image ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -230,6 +230,9 @@ jobs:
       # Hardened sandbox from the image by digest (throw-away registry:2), with Verdaccio: Node 24,
       # pnpm through corepack and the proxy, no other way out.
       - run: pnpm test:sandbox-image
+      # C05 (design/ADR-M29): the runner drives the real OpenHands Agent Server in a node24 sandbox
+      # with a scripted stub model (no provider, no key) and a throw-away PostgreSQL.
+      - run: pnpm test:agent
       - name: Remove the image archive
         if: always()
         run: rm -f "$RUNNER_TEMP/node24.tar"

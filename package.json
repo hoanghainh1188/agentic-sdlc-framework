@@ -26,6 +26,7 @@
     "test:runner-compose": "SDLC_RUNNER_COMPOSE_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/runner/compose-live.test.ts",
     "test:sandbox-image": "SDLC_SANDBOX_IMAGE_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/sandbox-image",
     "test:sandbox-live": "SDLC_TEST_DB_DIR=platform/tests/integration/sandbox-image/pilot-live.test.ts platform/deploy/scripts/test-db.sh",
+    "test:agent": "SDLC_AGENT_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/agent platform/deploy/scripts/test-db.sh",
     "openbao:bootstrap": "platform/deploy/openbao/bootstrap.sh",
     "db:migrate": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js latest",
     "db:status": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js status",
@@ -43,6 +44,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@sdlc/adapter-agent-openhands": "workspace:*",
     "@sdlc/adapter-git-github": "workspace:*",
     "@sdlc/adapter-model-litellm": "workspace:*",
     "@sdlc/adapter-policy-simple": "workspace:*",

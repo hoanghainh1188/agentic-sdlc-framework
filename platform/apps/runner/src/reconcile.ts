@@ -107,7 +107,7 @@ async function cleanUpRun(
   labelled: LabelledRun,
   why: { readonly teardown: TeardownReason; readonly stopReason: string },
 ): Promise<boolean> {
-  const result = await teardownSandbox(deps.docker, deps.settings.egressServices, labelled.runId);
+  const result = await teardownSandbox(deps.docker, labelled.runId);
   const scope = deps.db.forTenant(parseTenantId(labelled.tenantId));
   const run = await scope.runs.getById(labelled.runId);
   // No row (another database, a deleted test tenant) or still `queued` (a workspace reserved just
