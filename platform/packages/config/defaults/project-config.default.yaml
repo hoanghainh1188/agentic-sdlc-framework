@@ -164,3 +164,9 @@ retention:
 github:
   # D-02 §6.3; ADR-M11.
   poll_interval_seconds: 30
+
+sandbox:
+  # QUESTIONS #59 (A), ADR-M25: one sandbox image per project, built on the pinned OpenHands
+  # agent-server base plus the project toolchain, referenced by digest (a tag alone is refused).
+  # Default: the pinned base itself (ADR-M10 §2.1), which has no project toolchain.
+  image: ghcr.io/openhands/agent-server:1.48.0-python-slim@sha256:8fcfab2dedb4b41b6aef219b9fa9b1f2588033fad3d998ae6aa11fe8c4fcf8b7

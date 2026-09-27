@@ -3,10 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Runner: provisions sandboxes and runs the agent. See design/D-03 section 5.1.",
+  "description": "Runner: provisions sandboxes and runs the agent. See design/D-03 section 5.1 and ADR-M25.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@sdlc/messages": "workspace:*"
+  }
 }

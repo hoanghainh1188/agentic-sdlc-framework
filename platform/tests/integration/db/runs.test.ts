@@ -512,4 +512,46 @@ describeDb('C02: Run Contracts on PostgreSQL', () => {
       expect(await b.scope.runEvents.list(run.id)).toEqual([]);
     });
   });
+  describe('claiming a run for provisioning (C04, QUESTIONS #35)', () => {
+    const LATER = new Date(NOW.getTime() + MINUTE);
+
+    it('two concurrent claims of the same run: exactly one succeeds', async () => {
+      const s = await seed();
+      const { run } = await issue(s);
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => s.scope.runs.claimForProvisioning(run.id, LATER)),
+      );
+      expect(results.filter(Boolean)).toHaveLength(1);
+      const stored = await s.scope.runs.getById(run.id);
+      expect(stored).toMatchObject({ status: 'provisioning' });
+      expect(stored?.updated_at.toISOString()).toBe(LATER.toISOString());
+    });
+
+    it('refuses a claim after the run left queued, an unknown run and another tenant', async () => {
+      const s = await seed();
+      const other = await seed();
+      const { run } = await issue(s);
+      expect(await other.scope.runs.claimForProvisioning(run.id, LATER)).toBe(false);
+      expect(await s.scope.runs.claimForProvisioning(crypto.randomUUID(), LATER)).toBe(false);
+      expect(await s.scope.runs.claimForProvisioning('not-a-uuid', LATER)).toBe(false);
+      expect(await s.scope.runs.claimForProvisioning(run.id, LATER)).toBe(true);
+      expect(await s.scope.runs.claimForProvisioning(run.id, LATER)).toBe(false);
+      expect(await s.scope.runs.getById(run.id)).toMatchObject({ status: 'provisioning' });
+    });
+
+    it('stores the C04 sandbox events with coded payloads', async () => {
+      const s = await seed();
+      const { run } = await issue(s);
+      await s.scope.runEvents.append(run.id, 'sandbox_created', { image_sha256: SHA('d') });
+      await s.scope.runEvents.append(run.id, 'sandbox_removed', {
+        reason: 'finished',
+        duration_ms: 120,
+      });
+      expect((await s.scope.runEvents.list(run.id)).map((e) => e.event_type)).toEqual([
+        'contract_issued',
+        'sandbox_created',
+        'sandbox_removed',
+      ]);
+    });
+  });
 });

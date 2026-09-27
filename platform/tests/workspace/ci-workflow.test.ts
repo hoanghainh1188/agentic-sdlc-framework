@@ -178,6 +178,7 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(compose).toContain('platform/deploy/scripts/up.sh core');
     expect(compose).toContain('pnpm test:integration');
     expect(compose).toContain('pnpm test:litellm');
+    expect(compose).toContain('pnpm test:runner');
     const cleanup = job('compose').steps.find((s) => s.run?.includes('down --volumes'));
     expect(cleanup?.if).toBe('always()');
   });
