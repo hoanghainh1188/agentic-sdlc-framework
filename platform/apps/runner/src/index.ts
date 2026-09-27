@@ -12,6 +12,22 @@ export {
   SANDBOX_ENV_ALLOWLIST,
   type ContainerSpec,
 } from './docker/guard.js';
+export { agentUrl, attachRunner } from './agent/access.js';
+export {
+  AGENT_WORKING_DIR,
+  agentCommitAuthor,
+  driveAgent,
+  llmReachable,
+  outcomeOf,
+  type AgentDriveDeps,
+  type AgentOutcome,
+  type AgentRunRequest,
+  type AgentRunResult,
+} from './agent/drive.js';
+export { AgentRunError, type AgentRunFailure } from './agent/errors.js';
+export { AGENT_ERROR_MESSAGES, agentErrorMessage } from './agent/messages.js';
+export { loadAgentTask } from './agent/task.js';
+export { assertSafeNetworkConnect } from './docker/guard.js';
 export { RunnerError, type RunnerErrorKey } from './errors.js';
 export { HeldRuns } from './held.js';
 export {
@@ -39,7 +55,7 @@ export {
   type ReconcileDeps,
   type ReconcileResult,
 } from './reconcile.js';
-export { Runner, type RunnerHooks } from './runner.js';
+export { Runner, type RunnerAgentOptions, type RunnerHooks } from './runner.js';
 export {
   createSandbox,
   ProvisioningError,
@@ -75,6 +91,7 @@ export {
   parseEgressServices,
   RUNNER_ENV,
   runnerSettingsFromEnv,
+  type AgentSettings,
   type EgressService,
   type RunnerSettings,
   type SandboxLimits,

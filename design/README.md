@@ -26,6 +26,7 @@
 | ADR-M25 | [Runner: sandbox egress, image, workspace, Docker access, clean-up](ADR-M25-runner-sandbox.md) (task C04) | Proposed | |
 | ADR-M26 | [API app (NestJS), personal API tokens, admin bootstrap, gate commands](ADR-M26-api-app.md) (task B03) | Proposed | |
 | ADR-M27 | [GitHub poller and comment commands](ADR-M27-github-poller.md) (task B06) | Proposed | |
+| ADR-M29 | [OpenHands adapter: driving the agent in the sandbox](ADR-M29-openhands-adapter.md) (task C05) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

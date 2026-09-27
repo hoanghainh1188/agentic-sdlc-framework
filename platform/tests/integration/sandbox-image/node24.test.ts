@@ -81,7 +81,7 @@ describe.skipIf(!enabled)('C04 live: sandbox image node24 with the package proxy
   }, 1_200_000);
 
   afterAll(async () => {
-    if (client) await teardownSandbox(client, settings.egressServices, RUN_ID).catch(() => 0);
+    if (client) await teardownSandbox(client, RUN_ID).catch(() => 0);
     infra?.cleanup();
   }, 120_000);
 

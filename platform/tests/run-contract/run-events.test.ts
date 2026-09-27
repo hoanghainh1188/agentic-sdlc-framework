@@ -10,7 +10,7 @@ const refused = (type: string, payload: Record<string, unknown>) => () =>
   checkRunEvent(type, payload);
 
 describe('run event payloads', () => {
-  it('declares the C02 and C04 event types', () => {
+  it('declares the C02, C04 and C05 event types', () => {
     expect(Object.keys(RUN_EVENT_TYPES)).toEqual([
       'contract_issued',
       'contract_accepted',
@@ -21,6 +21,10 @@ describe('run event payloads', () => {
       'provisioning_failed',
       'sandbox_removed',
       'run_abandoned',
+      'agent_started',
+      'agent_stopped',
+      'agent_finished',
+      'agent_failed',
     ]);
   });
 

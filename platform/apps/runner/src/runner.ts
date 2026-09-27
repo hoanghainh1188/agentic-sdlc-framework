@@ -9,6 +9,10 @@
 //
 // The Temporal task queue `sdlc-runner` with one heartbeat activity per run (QUESTIONS #53) is
 // wired in C06, where the worker side exists (D-08 C06, ADR-M25 §2.7).
+import type { AgentAdapter } from '@sdlc/contracts';
+
+import { driveAgent, type AgentRunRequest, type AgentRunResult } from './agent/drive.js';
+import { RunnerError } from './errors.js';
 import { HeldRuns } from './held.js';
 import { SlotPool, type Slot } from './pool.js';
 import {
@@ -28,18 +32,31 @@ export interface RunnerHooks {
   readonly onSweepError?: (error: unknown) => void;
 }
 
+export interface RunnerAgentOptions {
+  /** The agent adapter (OpenHands in the MVP). Needed for `runAgent`. */
+  readonly adapter?: AgentAdapter;
+  /** Tests only: reach the Agent Server another way than on the run's network. */
+  readonly agentUrl?: (runId: string) => string;
+}
+
 export class Runner {
   readonly held = new HeldRuns();
   readonly pool: SlotPool;
   readonly #deps: RunnerDeps;
   readonly #hooks: RunnerHooks;
+  readonly #agent: RunnerAgentOptions;
   readonly #slots = new Map<string, Slot>();
   #timer: NodeJS.Timeout | undefined;
   #sweeping: Promise<void> | undefined;
 
-  constructor(deps: Omit<RunnerDeps, 'held'>, hooks: RunnerHooks = {}) {
+  constructor(
+    deps: Omit<RunnerDeps, 'held'>,
+    hooks: RunnerHooks = {},
+    agent: RunnerAgentOptions = {},
+  ) {
     this.#deps = { ...deps, held: this.held };
     this.#hooks = hooks;
+    this.#agent = agent;
     this.pool = new SlotPool(deps.settings.maxSandboxes);
   }
 
@@ -74,6 +91,38 @@ export class Runner {
       else slot.release();
     }
     return result;
+  }
+
+  /**
+   * Runs the agent of a provisioned run to its end (C05, ADR-M29), then removes the sandbox and
+   * frees the slot, whatever happened. The run's virtual key is the caller's to revoke
+   * (`CostController.endRun`).
+   */
+  async runAgent(request: AgentRunRequest): Promise<AgentRunResult> {
+    const adapter = this.#agent.adapter;
+    if (!adapter) throw new RunnerError('runner.agent_not_configured');
+    const { contract } = request;
+    let result: AgentRunResult | undefined;
+    try {
+      result = await driveAgent(
+        {
+          db: this.#deps.db,
+          docker: this.#deps.docker,
+          settings: this.#deps.settings,
+          adapter,
+          ...(this.#deps.now ? { now: this.#deps.now } : {}),
+          ...(this.#agent.agentUrl ? { agentUrl: this.#agent.agentUrl } : {}),
+        },
+        request,
+      );
+      return result;
+    } finally {
+      await this.release(
+        contract.tenant_id,
+        contract.run_id,
+        result?.outcome === 'finished' ? 'finished' : 'failed',
+      );
+    }
   }
 
   /** Removes the sandbox of a run (end of run, kill) and frees its slot. */

@@ -205,3 +205,17 @@ export function assertSafeNetworkSpec(spec: {
     refuse('network_options');
   }
 }
+
+/**
+ * Throws unless `container` may join the run's network `network` (ADR-M25 §2.2, ADR-M29): only a
+ * run's own network, and only a container the runner was configured to attach (the egress services
+ * and the runner itself). Everything else stays off the sandbox's network.
+ */
+export function assertSafeNetworkConnect(
+  network: string,
+  container: string,
+  allowed: readonly string[],
+): void {
+  if (!RUN_NETWORK.test(network)) refuse('connect_network');
+  if (!allowed.includes(container)) refuse('connect_container');
+}

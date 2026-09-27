@@ -49,7 +49,7 @@ export async function startInfrastructure(suffix: string): Promise<Infrastructur
     quietly('network', 'rm', names.platformNet);
   };
   try {
-    const image = process.env.SDLC_SANDBOX_IMAGE || (await buildImage(names.registry));
+    const image = process.env.SDLC_SANDBOX_IMAGE || (await buildSandboxImage(names.registry));
     docker('pull', '-q', VERDACCIO);
     docker('network', 'create', names.platformNet);
     startStub(names.litellm, names.platformNet, 4000);
@@ -83,7 +83,11 @@ export async function startInfrastructure(suffix: string): Promise<Infrastructur
   }
 }
 
-async function buildImage(registry: string): Promise<string> {
+/**
+ * Builds node24 and returns its reference by digest (see startInfrastructure). `registry` names a
+ * throw-away registry:2 container, started only on the classic image store; the caller removes it.
+ */
+export async function buildSandboxImage(registry: string): Promise<string> {
   const script = path.join(repoRoot(), 'platform/sandbox-images/build.sh');
   const run = (args: string[], env: NodeJS.ProcessEnv = {}) =>
     execFileSync(script, args, {

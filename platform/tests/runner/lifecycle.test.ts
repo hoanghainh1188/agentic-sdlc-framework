@@ -75,7 +75,7 @@ describe('sandbox lifecycle (stub Docker)', () => {
     expect(stub.containers.get(sandbox.containerId)?.archives).toEqual(['/workspace']);
 
     // AC5: clean-up after success removes everything and detaches the shared services.
-    const result = await teardownSandbox(docker, s.egressServices, RUN_ID);
+    const result = await teardownSandbox(docker, RUN_ID);
     expect(result).toMatchObject({ container: true, network: true, volume: true });
     empty();
   });
@@ -118,13 +118,13 @@ describe('sandbox lifecycle (stub Docker)', () => {
   it('teardown detaches only the services attached to this run', async () => {
     stub.images.add(IMAGE);
     await createSandbox(docker, s, { ...input, egressAllowlist: ['litellm:4000'] });
-    await teardownSandbox(docker, s.egressServices, RUN_ID);
+    await teardownSandbox(docker, RUN_ID);
     expect(stub.trace.filter((call) => call.endsWith('/disconnect'))).toHaveLength(1);
     empty();
   });
 
   it('teardown is idempotent: nothing left, nothing to remove', async () => {
-    expect(await teardownSandbox(docker, s.egressServices, RUN_ID)).toMatchObject({
+    expect(await teardownSandbox(docker, RUN_ID)).toMatchObject({
       container: false,
       network: false,
       volume: false,
@@ -135,10 +135,10 @@ describe('sandbox lifecycle (stub Docker)', () => {
     stub.images.add(IMAGE);
     await createSandbox(docker, s, input);
     stub.failures.set(/^DELETE \/containers\//, 500);
-    await expect(teardownSandbox(docker, s.egressServices, RUN_ID)).rejects.toThrow(/HTTP 500/);
+    await expect(teardownSandbox(docker, RUN_ID)).rejects.toThrow(/HTTP 500/);
     expect(stub.volumes.size).toBe(0);
     stub.failures.clear();
-    await teardownSandbox(docker, s.egressServices, RUN_ID);
+    await teardownSandbox(docker, RUN_ID);
     empty();
   });
 

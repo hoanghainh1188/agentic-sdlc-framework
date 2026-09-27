@@ -214,7 +214,7 @@ export async function releaseSandbox(
   reason: TeardownReason,
 ): Promise<void> {
   const scope = deps.db.forTenant(parseTenantId(tenantId));
-  const result = await teardownSandbox(deps.docker, deps.settings.egressServices, runId);
+  const result = await teardownSandbox(deps.docker, runId);
   await scope.runEvents.append(runId, 'sandbox_removed', {
     reason,
     duration_ms: result.durationMs,
@@ -235,7 +235,7 @@ async function failRun(
   await (
     sandboxCreated
       ? releaseSandbox(deps, scope.tenantId, runId, 'provisioning_failed')
-      : teardownSandbox(deps.docker, deps.settings.egressServices, runId)
+      : teardownSandbox(deps.docker, runId)
   ).catch(() => undefined);
   const now = clock(deps);
   await scope.runs.transition(runId, {

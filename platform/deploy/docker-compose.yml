@@ -640,6 +640,10 @@ services:
       SDLC_RUNNER_SWEEP_INTERVAL_SECONDS: ${SDLC_RUNNER_SWEEP_INTERVAL_SECONDS:-300}
       SDLC_RUNNER_EGRESS_SERVICES: litellm=${COMPOSE_PROJECT_NAME:-sdlc}-litellm-1:4000,npm-proxy=${COMPOSE_PROJECT_NAME:-sdlc}-npm-proxy-1:4873
       SDLC_RUNNER_NPM_REGISTRY: http://npm-proxy:4873/
+      # C05 (ADR-M29): the runner joins each run's network with its own container to call the
+      # Agent Server, and leaves at clean-up. LiteLLM as the sandbox sees it.
+      SDLC_RUNNER_SELF_CONTAINER: ${COMPOSE_PROJECT_NAME:-sdlc}-sdlc-runner-1
+      SDLC_RUNNER_AGENT_LLM_URL: http://litellm:4000
       SDLC_RUNNER_WORK_DIR: /var/lib/sdlc-runner/work
       SDLC_RUNNER_DB_HOST: postgres
       SDLC_RUNNER_DB_NAME: platform

@@ -110,6 +110,10 @@ export interface ProjectConfig {
     readonly contract_validity_minutes: number;
     /** Tolerated clock difference for the "not yet valid" check only; expiry has none (ADR-M22). */
     readonly contract_clock_skew_seconds: number;
+    /** Iteration cap of a run when the task sets none (FR-32, template T13; QUESTIONS.md #13). */
+    readonly default_max_iterations: number;
+    /** Time cap of a run in minutes when the task sets none (FR-32, template T13; QUESTIONS.md #13). */
+    readonly default_max_duration_minutes: number;
   };
   readonly budget: {
     readonly warn_percent: number;

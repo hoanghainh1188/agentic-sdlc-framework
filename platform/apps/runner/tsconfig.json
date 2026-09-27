@@ -6,6 +6,7 @@
   },
   "include": ["src"],
   "references": [
+    { "path": "../../packages/adapters/agent-openhands" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
     { "path": "../../packages/messages" },

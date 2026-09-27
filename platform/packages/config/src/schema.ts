@@ -166,6 +166,8 @@ export const projectConfigSchema = z.strictObject({
     }),
     contract_validity_minutes: positiveInt,
     contract_clock_skew_seconds: nonNegativeInt,
+    default_max_iterations: positiveInt,
+    default_max_duration_minutes: positiveInt,
   }),
   budget: z.strictObject({
     warn_percent: positiveInt,
