@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// Entry point of the worker process (task B06, design/ADR-M27). Today it runs the GitHub poller
-// and the escalation clock loop (B11, ADR-M28); B07 adds the Temporal worker with the G1–G8
-// workflow. Settings come from the environment, the database password and the GitHub App key
-// from OpenBao (AppRole `worker`).
+// Entry point of the worker process (task B06, design/ADR-M27). It runs the GitHub poller, the
+// escalation clock loop (B11, ADR-M28), and the Temporal worker of the intent workflow with its
+// reconcile loop (B07, ADR-M30). Settings come from the environment, the database password and the
+// GitHub App key from OpenBao (AppRole `worker`).
 import fs from 'node:fs';
 
 import { GitHubAdapter } from '@sdlc/adapter-git-github';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import { GitHostError } from '@sdlc/contracts';
+import { GitHostError, type IntentWorkflowSignals } from '@sdlc/contracts';
 import {
   advanceEscalation,
   gitHostErrorMessage,
@@ -17,12 +17,21 @@ import {
 } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OpenBaoClient, SecretsError } from '@sdlc/secrets';
+import {
+  connectTemporal,
+  NO_INTENT_SIGNALS,
+  TemporalIntentSignals,
+  type TemporalClient,
+} from '@sdlc/workflow-client';
 
 import { connectDatabase } from './database.js';
+import { createIntentActivities } from './activities/intent-activities.js';
 import { EscalationLoop } from './escalation-loop.js';
 import { jsonLogger } from './logger.js';
 import { PollerLoop } from './poller-loop.js';
+import { ReconcileLoop } from './reconcile-loop.js';
 import { loadSettings, SettingsError } from './settings.js';
+import { installTemporalLogging, startIntentWorker, type IntentWorkerHandle } from './temporal.js';
 
 const logger = jsonLogger((line) => process.stdout.write(line));
 
@@ -41,6 +50,29 @@ async function main(): Promise<void> {
     policyFactory: (config) => createSimplePolicyEngine({ config }),
   });
 
+  // The intent workflow (B07, ADR-M30): Temporal worker, wake signals and the reconcile loop.
+  let temporal: TemporalClient | undefined;
+  let intentWorker: IntentWorkerHandle | undefined;
+  let signals: IntentWorkflowSignals = NO_INTENT_SIGNALS;
+  if (settings.temporal) {
+    installTemporalLogging(logger);
+    temporal = await connectTemporal(settings.temporal);
+    signals = new TemporalIntentSignals(temporal.client);
+    intentWorker = await startIntentWorker({
+      settings: settings.temporal,
+      activities: createIntentActivities({ db, registry }),
+      workflowBundlePath: settings.workflowBundle,
+    });
+    // A failed Temporal worker stops the process; Compose restarts it.
+    intentWorker.running.catch(() => {
+      logger.log('error', 'worker.temporal_failed', {});
+      process.exitCode = 1;
+      process.kill(process.pid, 'SIGTERM');
+    });
+  } else {
+    logger.log('warn', 'worker.temporal_off', { message: t('worker.start.temporal_off') });
+  }
+
   const loop = new PollerLoop({
     listProjects: () => db.system.listPollableProjects(),
     intervalSeconds: async (project) => {
@@ -57,6 +89,7 @@ async function main(): Promise<void> {
           logger,
           maxReplyAttempts: settings.maxReplyAttempts,
           maxEventAttempts: settings.maxEventAttempts,
+          intentSignals: signals,
         },
         project,
       ),
@@ -75,14 +108,23 @@ async function main(): Promise<void> {
     batchSize: settings.escalationBatch,
   });
   escalations.start(settings.escalationTickMs);
+  const reconcile = settings.temporal
+    ? new ReconcileLoop({
+        listOpen: (limit, after) => db.system.listOpenIntents(limit, after),
+        signals,
+        logger,
+        batchSize: settings.reconcileBatch,
+      })
+    : undefined;
+  reconcile?.start(settings.reconcileMs);
   logger.log('info', 'worker.started', {
     tick_ms: settings.tickMs,
     escalation_tick_ms: settings.escalationTickMs,
   });
 
   const shutdown = (): void => {
-    void Promise.all([loop.stop(), escalations.stop()])
-      .then(() => Promise.all([db.close(), openbao.close()]))
+    void Promise.all([loop.stop(), escalations.stop(), reconcile?.stop(), intentWorker?.shutdown()])
+      .then(() => Promise.all([db.close(), openbao.close(), temporal?.close()]))
       .then(() => logger.log('info', 'worker.stopped', {}));
   };
   process.once('SIGTERM', shutdown);

@@ -12,6 +12,7 @@ import { EscalationNoticeRepository, EscalationRepository } from './repositories
 import { GateDecisionRepository } from './repositories/gate-decisions.js';
 import { GitEventCursorRepository } from './repositories/git-event-cursors.js';
 import { GitEventReceiptRepository } from './repositories/git-event-receipts.js';
+import { IntentNoticeRepository } from './repositories/intent-notices.js';
 import { IntentRepository } from './repositories/intents.js';
 import { PlanRepository } from './repositories/plans.js';
 import { ProjectAiRecordRepository } from './repositories/project-ai-records.js';
@@ -42,6 +43,7 @@ export class TenantScope {
   readonly gitEventReceipts: GitEventReceiptRepository;
   readonly audit: AuditLogRepository;
   readonly intents: IntentRepository;
+  readonly intentNotices: IntentNoticeRepository;
   readonly specRefs: SpecRefRepository;
   readonly plans: PlanRepository;
   readonly gateDecisions: GateDecisionRepository;
@@ -72,6 +74,7 @@ export class TenantScope {
     this.gitEventReceipts = new GitEventReceiptRepository(this.db, this.tenantId);
     this.audit = new AuditLogRepository(this.db, this.tenantId);
     this.intents = new IntentRepository(this.db, this.tenantId);
+    this.intentNotices = new IntentNoticeRepository(this.db, this.tenantId);
     this.specRefs = new SpecRefRepository(this.db, this.tenantId);
     this.plans = new PlanRepository(this.db, this.tenantId);
     this.gateDecisions = new GateDecisionRepository(this.db, this.tenantId);

@@ -56,6 +56,25 @@ export class AuditLogRepository extends TenantRepository {
     return await this.run(this.transactional((db) => appendIn(db, this.tenantId, prepared)));
   }
 
+  /**
+   * The events of one entity, in chain order (`seq`), optionally only some actions. The chain is
+   * written under the tenant's audit lock, so `seq` orders the events exactly as they committed;
+   * the intent workflow reads its gate history this way (task B07, ADR-M30 §2.4).
+   */
+  listForEntity(entityId: string, actions?: readonly AuditAction[]): Promise<AuditLogRow[]> {
+    if (!isUuid(entityId)) return Promise.resolve([]);
+    return this.run(
+      this.db
+        .selectFrom('audit_log')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('entity_id', '=', entityId)
+        .$if(actions !== undefined, (qb) => qb.where('action', 'in', [...actions!]))
+        .orderBy('seq')
+        .execute(),
+    );
+  }
+
   /** Reads the tenant's chain in `seq` order and checks it (D-05 section 7.3, FR-41). */
   async verify(batchSize: number = VERIFY_BATCH_SIZE): Promise<ChainState> {
     let state = INITIAL_CHAIN_STATE;

@@ -14,6 +14,7 @@ import {
   type EventCursor,
   type GitEvent,
   type GitHostAdapter,
+  type IntentWorkflowSignals,
   type RepoRef,
 } from '@sdlc/contracts';
 
@@ -28,6 +29,7 @@ import type { PollableProject } from '../db/system-scope.js';
 import type { TenantId } from '../db/tenant-id.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { flushEscalationNotices, type NoticeLogEvent } from './escalation-notices.js';
+import { flushIntentNotices, type IntentNoticeLogEvent } from './intent-notices.js';
 import { renderCommentReply } from './replies.js';
 
 export type PollLogEvent =
@@ -41,7 +43,9 @@ export type PollLogEvent =
   | 'reply.bookkeeping_failed'
   | 'poll.event_attempt_failed'
   | 'worker.event_failed'
-  | NoticeLogEvent;
+  | 'poll.wake_failed'
+  | NoticeLogEvent
+  | IntentNoticeLogEvent;
 
 /** Structured log hook. Fields hold IDs and codes only: never comment text or tokens. */
 export interface PollLogger {
@@ -67,6 +71,11 @@ export interface PollDeps extends GitEventHandlerDeps {
    * Default 3. A technical setting, not a handbook rule (ADR-M27 §2.2).
    */
   readonly maxEventAttempts?: number;
+  /**
+   * Wakes the workflow of an intent after the commit (B07, ADR-M30 §2.3). A failure is logged,
+   * never thrown: the worker's reconcile loop wakes every open intent later.
+   */
+  readonly intentSignals?: IntentWorkflowSignals;
 }
 
 export interface PollResult {
@@ -79,6 +88,9 @@ export interface PollResult {
   /** Escalation notice comments posted and failed in this poll (B11). */
   readonly noticesPosted: number;
   readonly noticesFailed: number;
+  /** Gate status comments posted and failed in this poll (B07, FR-22). */
+  readonly statusPosted: number;
+  readonly statusFailed: number;
 }
 
 class CursorMoved extends Error {
@@ -122,6 +134,8 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
       repliesFailed: 0,
       noticesPosted: 0,
       noticesFailed: 0,
+      statusPosted: 0,
+      statusFailed: 0,
     };
   }
 
@@ -133,13 +147,19 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
   );
 
   let outcomes: Partial<Record<GitEventOutcome, number>> = {};
+  let woken: readonly string[] = [];
   let status: PollResult['status'] = 'polled';
   let givenUp = 0;
   // Each round either commits the batch, or gives one more event up and runs the batch again
   // without it; so at most one round per event, plus one.
   for (let round = 0; round <= events.length; round += 1) {
     try {
-      outcomes = await runBatch(deps, scope, project.id, events, { expected, next, now, ids });
+      ({ counts: outcomes, intentIds: woken } = await runBatch(deps, scope, project.id, events, {
+        expected,
+        next,
+        now,
+        ids,
+      }));
       break;
     } catch (error) {
       if (error instanceof CursorMoved) {
@@ -156,6 +176,9 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
   if (givenUp > 0 && status === 'polled') {
     outcomes = { ...outcomes, failed_internal: givenUp };
   }
+
+  // The workflows see the decisions only after the commit (B07, ADR-M30 §2.3).
+  if (status === 'polled') await wakeIntents(deps, target, woken);
 
   // The poller that lost the cursor race leaves the replies to the winner, which is flushing them.
   const replies =
@@ -178,6 +201,22 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
           ref,
         )
       : { posted: 0, failed: 0 };
+  // Gate status comments (B07, FR-22): after the escalation notices, same delivery rules.
+  const status_ =
+    status === 'polled'
+      ? await flushIntentNotices(
+          {
+            gitHost: deps.gitHost,
+            maxAttempts: deps.maxReplyAttempts ?? 5,
+            limit: deps.repliesPerPoll ?? 20,
+            now,
+            log: (level, event, fields) => log.log(level, event, fields),
+          },
+          scope,
+          project.id,
+          ref,
+        )
+      : { posted: 0, failed: 0 };
   log.log('info', 'poll.completed', {
     ...ids,
     status,
@@ -186,6 +225,8 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
     replies_failed: replies.failed,
     notices_posted: notices.posted,
     notices_failed: notices.failed,
+    status_posted: status_.posted,
+    status_failed: status_.failed,
   });
   return {
     status,
@@ -195,7 +236,28 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
     repliesFailed: replies.failed,
     noticesPosted: notices.posted,
     noticesFailed: notices.failed,
+    statusPosted: status_.posted,
+    statusFailed: status_.failed,
   };
+}
+
+async function wakeIntents(
+  deps: PollDeps,
+  target: PollableProject,
+  intentIds: readonly string[],
+): Promise<void> {
+  if (!deps.intentSignals) return;
+  for (const intentId of new Set(intentIds)) {
+    try {
+      await deps.intentSignals.wake({ tenantId: target.tenantId, intentId });
+    } catch {
+      deps.logger?.log('warn', 'poll.wake_failed', {
+        tenant_id: target.tenantId,
+        project_id: target.projectId,
+        intent_id: intentId,
+      });
+    }
+  }
 }
 
 interface BatchContext {
@@ -212,18 +274,20 @@ function runBatch(
   projectId: string,
   events: readonly GitEvent[],
   ctx: BatchContext,
-): Promise<Partial<Record<GitEventOutcome, number>>> {
+): Promise<BatchResult> {
   const log = deps.logger ?? { log: () => undefined };
   return scope.transaction(async (tx) => {
     const counts: Partial<Record<GitEventOutcome, number>> = {};
+    const intentIds: string[] = [];
     // First, so the cursor row stays locked for the whole batch.
     if (!(await tx.gitEventCursors.saveIfUnchanged(projectId, ctx.expected, ctx.next, ctx.now()))) {
       throw new CursorMoved();
     }
     for (const event of events) {
       let outcome: GitEventOutcome;
+      let intentId: string | undefined;
       try {
-        ({ outcome } = await handleGitEvent(
+        ({ outcome, intentId } = await handleGitEvent(
           tx,
           { registry: deps.registry, now: ctx.now },
           { id: projectId, provider: 'github' },
@@ -233,12 +297,19 @@ function runBatch(
         throw new EventFailed(event, error);
       }
       counts[outcome] = (counts[outcome] ?? 0) + 1;
+      if (intentId !== undefined) intentIds.push(intentId);
       if (outcome !== 'not_a_command' && outcome !== 'not_handled') {
         log.log('info', 'poll.event_handled', { ...ctx.ids, event_id: event.id, outcome });
       }
     }
-    return counts;
+    return { counts, intentIds };
   });
+}
+
+interface BatchResult {
+  readonly counts: Partial<Record<GitEventOutcome, number>>;
+  /** Intents whose workflow must look again once the batch is committed. */
+  readonly intentIds: readonly string[];
 }
 
 /**

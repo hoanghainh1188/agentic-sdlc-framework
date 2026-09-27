@@ -53,7 +53,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
   // Append-only (D-05 D3, A07): no column is updatable.
   audit_log: [],
   // B02: only the current state of an intent changes; history is in gate_decisions and audit_log.
-  intents: ['current_gate', 'status', 'issue_number', 'pr_number', 'updated_at'],
+  // B07: when the intent entered its gate (waiting time, FR-12).
+  intents: ['current_gate', 'status', 'issue_number', 'pr_number', 'updated_at', 'gate_entered_at'],
   spec_refs: [],
   plans: [],
   // Append-only (D-05 D3, B02).
@@ -125,6 +126,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
     'last_recertified_at',
     'updated_at',
   ],
+  // B07: the status comments; only the delivery moves (trigger: final once posted or abandoned).
+  intent_notices: ['attempts', 'posted_at', 'abandoned_at'],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -250,7 +253,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // C03: cost_records → projects, intents, runs; B06: receipts → projects, gate_decisions;
     // B11: escalations → intents, runs, users ×4; notices → escalations; receipts → escalations.
     // C10: agents → users; runs → agents.
-    expect(fks).toHaveLength(40);
+    // B07: intent_notices → intents, gate_decisions.
+    expect(fks).toHaveLength(42);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

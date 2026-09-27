@@ -478,11 +478,16 @@ services:
         condition: service_healthy
       openbao:
         condition: service_healthy
+      temporal-namespace:
+        condition: service_completed_successfully
     environment:
       SDLC_API_HOST: 0.0.0.0
       SDLC_API_PORT: '8080'
       SDLC_API_DB_HOST: postgres
       SDLC_API_DB_NAME: platform
+      # Wakes the intent workflow after a change (B07, ADR-M30). Plain gRPC on the Compose network.
+      SDLC_API_TEMPORAL_ADDRESS: temporal:7233
+      SDLC_API_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       SDLC_OPENBAO_ADDR: http://openbao:8200
       # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
       SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'
@@ -500,8 +505,9 @@ services:
       <<: *healthcheck-defaults
       test: [CMD, node, /app/dist/healthcheck.js]
 
-  # The worker: GitHub poller (B06); later the Temporal worker with the G1–G8 workflow (B07).
-  # No published port. It reaches GitHub (HTTPS), PostgreSQL and OpenBao.
+  # The worker: GitHub poller (B06), escalation clocks (B11) and the Temporal worker of the intent
+  # workflow (B07, task queue sdlc-intents). No published port. It reaches GitHub (HTTPS),
+  # PostgreSQL, OpenBao and Temporal.
   sdlc-worker:
     image: sdlc-worker:0.0.0
     build:
@@ -515,9 +521,13 @@ services:
         condition: service_healthy
       openbao:
         condition: service_healthy
+      temporal-namespace:
+        condition: service_completed_successfully
     environment:
       SDLC_WORKER_DB_HOST: postgres
       SDLC_WORKER_DB_NAME: platform
+      SDLC_WORKER_TEMPORAL_ADDRESS: temporal:7233
+      SDLC_WORKER_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       SDLC_OPENBAO_ADDR: http://openbao:8200
       # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
       SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'

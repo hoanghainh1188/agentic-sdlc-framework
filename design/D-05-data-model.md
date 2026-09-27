@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.11 |
+| Version | 1.12 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the C10 plan (agent register; ADR-M31) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the C10 plan (agent register; ADR-M31); 1.12 approved by Harry on 2026-09-27 in the B07 plan (intent workflow: `gate_entered_at`, one open intent per issue, status notices; ADR-M30, QUESTIONS #68, #91) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -63,6 +63,7 @@ erDiagram
     intents ||--o{ spec_refs : "links spec"
     intents ||--o{ plans : "has plan"
     intents ||--o{ gate_decisions : "passes gates"
+    intents ||--o{ intent_notices : "announces status"
     intents ||--o{ runs : "runs"
     runs ||--|| run_contracts : "is granted"
     runs ||--o{ run_events : "logs events"
@@ -287,8 +288,12 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | issue_number | int null | GitHub issue linked to the intent |
 | pr_number | int null | PR created by the agent |
 | updated_at | timestamptz | |
+| gate_entered_at | timestamptz null | When the intent last entered `current_gate` (B07). Gives the gate's waiting time (FR-12, E06). Null when `current_gate` is null (CHECK) |
 
 - This is the **only** table in the intent group that is UPDATEd (current state). History lives in `gate_decisions` and `audit_log`.
+- Only the intent workflow moves `status`, `current_gate` and `gate_entered_at`, with a compare-and-set on status and gate (ADR-M30 §2.2).
+- One open intent per issue and per pull request of a project: partial unique indexes on (`tenant_id`, `project_id`, `issue_number`) and (`tenant_id`, `project_id`, `pr_number`) for intents not `done`, `rejected` or `cancelled`. A comment command always names exactly one intent (QUESTIONS #68, ADR-M30 §2.6).
+- A gate decision counts only when recorded after the intent last entered the gate, and after the last request for changes at that gate. The order comes from the audit chain (`audit_log.seq`), indexed by (`tenant_id`, `entity_id`, `seq`) (ADR-M30 §2.4).
 
 **`spec_refs`**
 
@@ -314,6 +319,23 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | plan_sha256 | char(64) | |
 | proposed_by_type | actor_type | `human` or `agent` |
 | change_flags | change_flag[] | Set by Person A / B at G3; drive forced HITL (G3) and dual approval (G7) |
+
+**`intent_notices`** (task B07, ADR-M30 §2.5): the outbox of the gate status comments (FR-22).
+
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint identity PK | Posted in `id` order |
+| intent_id | uuid FK | |
+| kind | text | Code: `submitted`, `advanced`, `rejected`, `changes_requested` |
+| status | intent_status | The intent's status after the change |
+| gate, previous_gate | gate_code null | The gate after and before the change |
+| decision_id | uuid FK gate_decisions null | The decision that caused the change; null for the submit |
+| audience_roles | project_role[] | Roles mentioned in the comment: the people who act next. Never `viewer`, at most 8 |
+| attempts | smallint | |
+| posted_at, abandoned_at | timestamptz null | Delivery; final once set (trigger, `SDA10`) |
+
+- The workflow records one notice per status change, in the transaction of the change. The poller posts it on the intent's issue after its replies and escalation notices; the text comes from the message catalog, and logins are read at posting time, never stored.
+- `platform_app` may update the delivery columns only. No DELETE.
 
 ### 6.3. Gates
 
@@ -659,3 +681,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.9 | 2026-09-27 | Claude (task B11), approved by Harry | §5: new enums `escalation_route`, `escalation_step`; §6.4b `escalations` as built (route, producers, nullable owners, clock columns, coded packet and decision) and new `escalation_notices`; §6.1b `git_event_receipts.escalation_id` (ADR-M28, QUESTIONS #73–#77) |
 | 1.10 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §6.4: `run_events` types of C04 and C05, `runs.stop_reason` codes of C05; the iteration cap ends as `stopped_budget` with `max_iterations` (ADR-M29, QUESTIONS #82) |
 | 1.11 | 2026-09-27 | Claude (task C10), approved by Harry | §6.1 `agents` as built: `model_ref` is the gateway model name with its version, `instructions_ref` format, status moves, config changes only with a new version, tombstones; §6.4 `runs.agent_id` foreign key (ADR-M31, QUESTIONS #32, #93, #94) |
+| 1.12 | 2026-09-27 | Claude (task B07, session 1), approved by Harry | §4 ERD and §6.2: `intents.gate_entered_at`, one open intent per issue and pull request, decisions ordered by the audit chain, new table `intent_notices` (ADR-M30, QUESTIONS #68, #91) |

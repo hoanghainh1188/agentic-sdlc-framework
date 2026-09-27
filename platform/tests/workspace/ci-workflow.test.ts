@@ -191,6 +191,10 @@ describe('A06: database integration job', () => {
     expect(job('ci-ok').needs).toContain('db');
   });
 
+  it('B07: runs the intent workflow tests on the pinned Temporal test server', () => {
+    expect(runText('db')).toContain('pnpm test:workflow');
+  });
+
   it('pnpm test:db uses a throw-away container and requires a database', () => {
     const script = fs.readFileSync(path.join(root, 'platform/deploy/scripts/test-db.sh'), 'utf8');
     expect(script).toContain('SDLC_REQUIRE_DB=1');

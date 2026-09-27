@@ -22,6 +22,7 @@
     "@sdlc/core": "workspace:*",
     "@sdlc/messages": "workspace:*",
     "@sdlc/secrets": "workspace:*",
+    "@sdlc/workflow-client": "workspace:*",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "zod": "4.6.5"

@@ -195,6 +195,11 @@ export interface IntentsTable {
   pr_number: ColumnType<number | null, number | null, number | null>;
   updated_at: ColumnType<Date, never, Date>;
   created_at: CreatedAt;
+  /**
+   * When the intent last entered its current gate (migration 0009, B07). Decisions count only when
+   * recorded after it; it also gives the gate's waiting time (FR-12).
+   */
+  gate_entered_at: ColumnType<Date | null, never, Date | null>;
 }
 
 /** A spec linked to an intent: path, commit and content hash, one row per version (FR-02). */
@@ -445,6 +450,26 @@ export interface AgentsTable {
   created_at: CreatedAt;
 }
 
+/** Outbox of the gate status comments (FR-22, B07, ADR-M30): codes and IDs only. */
+export interface IntentNoticesTable {
+  /** bigint identity; `pg` returns int8 as a string. */
+  id: ColumnType<string, never, never>;
+  tenant_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  kind: Immutable<string>;
+  status: Immutable<IntentStatus>;
+  gate: Immutable<GateCode | null>;
+  previous_gate: Immutable<GateCode | null>;
+  /** The gate decision that caused the change; null when none did (the intent was submitted). */
+  decision_id: Immutable<string | null>;
+  /** Roles mentioned in the comment: the people who act next. Never `viewer`. */
+  audience_roles: ColumnType<ProjectRole[], ProjectRole[] | undefined, never>;
+  attempts: ColumnType<number, number | undefined, number>;
+  posted_at: ColumnType<Date | null, never, Date>;
+  abandoned_at: ColumnType<Date | null, never, Date>;
+  created_at: CreatedAt;
+}
+
 export interface Database {
   tenants: TenantsTable;
   projects: ProjectsTable;
@@ -468,6 +493,7 @@ export interface Database {
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
   agents: AgentsTable;
+  intent_notices: IntentNoticesTable;
 }
 
 export type TableName = keyof Database;
@@ -602,6 +628,7 @@ export const TABLE_COLUMNS = {
     'pr_number',
     'updated_at',
     'created_at',
+    'gate_entered_at',
   ]),
   spec_refs: columns<SpecRefsTable>()([
     'id',
@@ -787,6 +814,21 @@ export const TABLE_COLUMNS = {
     'updated_at',
     'created_at',
   ]),
+  intent_notices: columns<IntentNoticesTable>()([
+    'id',
+    'tenant_id',
+    'intent_id',
+    'kind',
+    'status',
+    'gate',
+    'previous_gate',
+    'decision_id',
+    'audience_roles',
+    'attempts',
+    'posted_at',
+    'abandoned_at',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -816,6 +858,7 @@ export const TENANT_COLUMN = {
   escalations: 'tenant_id',
   escalation_notices: 'tenant_id',
   agents: 'tenant_id',
+  intent_notices: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -840,6 +883,7 @@ export type GitEventReceipt = Selectable<GitEventReceiptsTable>;
 export type Escalation = Selectable<EscalationsTable>;
 export type EscalationNotice = Selectable<EscalationNoticesTable>;
 export type Agent = Selectable<AgentsTable>;
+export type IntentNotice = Selectable<IntentNoticesTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

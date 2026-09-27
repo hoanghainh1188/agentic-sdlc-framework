@@ -1,6 +1,7 @@
 // Intents and gate decisions for the authenticated caller (D-08 B03 AC3). Access follows the
 // project configuration (`access.*`, QUESTIONS.md #66): no role on the project → 404; a read role
 // without a create role → 403 on create. Gate decisions go through the shared command handler.
+// After a change, the intent's workflow is woken (B07, ADR-M30): creating an intent is its submit.
 import {
   CommandError,
   decideGate,
@@ -11,9 +12,11 @@ import {
   type Registry,
   type TenantScope,
 } from '@sdlc/core';
+import type { IntentWorkflowSignals } from '@sdlc/contracts';
 import type { z } from 'zod';
 
 import type { Principal } from '../auth/principal.js';
+import { wakeQuietly, type WakeLogger } from '../intent-signals.js';
 import { decodeCursor, encodeCursor } from './cursor.js';
 import {
   presentDecision,
@@ -30,7 +33,11 @@ export interface IntentPage {
 }
 
 export class IntentsService {
-  constructor(private readonly registry: Registry) {}
+  constructor(
+    private readonly registry: Registry,
+    private readonly signals: IntentWorkflowSignals,
+    private readonly logger: WakeLogger,
+  ) {}
 
   async create(p: Principal, body: z.infer<typeof createIntentSchema>): Promise<IntentBody> {
     const project = await p.scope.projects.getBySlug(body.project);
@@ -51,6 +58,11 @@ export class IntentsService {
       ...(body.budget_usd === undefined ? {} : { budgetUsd: body.budget_usd }),
       ...(body.issue_number === undefined ? {} : { issueNumber: body.issue_number }),
     });
+    await wakeQuietly(
+      this.signals,
+      { tenantId: p.scope.tenantId, intentId: intent.id },
+      this.logger,
+    );
     return presentIntent(intent, project);
   }
 
@@ -106,6 +118,11 @@ export class IntentsService {
       scope: body.scope ?? null,
       source: 'cli',
     });
+    await wakeQuietly(
+      this.signals,
+      { tenantId: p.scope.tenantId, intentId: intent.id },
+      this.logger,
+    );
     return presentDecision(row);
   }
 

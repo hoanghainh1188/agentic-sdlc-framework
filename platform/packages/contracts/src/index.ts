@@ -9,3 +9,4 @@ export * from './run-contract.js';
 export * from './model-gateway.js';
 export type * from './secrets.js';
 export * from './agent.js';
+export * from './intent-workflow.js';

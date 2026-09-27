@@ -1,6 +1,7 @@
 // One handler for gate decisions from people: the API (task B03) and, later, comment commands
 // (B06) and the workflow signal (B07) (ADR-M26 section 2.4, QUESTIONS.md #64).
-// B03 records the decision only. Moving the intent to the next gate is the workflow's job (B07).
+// It records the decision only. Moving the intent to the next gate is the workflow's job (B07,
+// ADR-M30): the caller wakes the intent's workflow after the commit.
 import type { EventSource, GateReasonCode, UserId } from '@sdlc/contracts';
 
 import type { GateDecisionRow, Intent } from '../db/schema.js';
@@ -51,18 +52,32 @@ export async function decideGate(
   if (!isCommandGate(command.gate)) {
     throw new CommandError('gate_not_supported', `${command.gate} cannot be decided by a command`);
   }
-  const inputSha256 = await gateInputSha256(scope, intent, command.gate);
-  return registry.decide(scope, {
-    intentId: intent.id,
-    gate: command.gate,
-    decision: command.decision,
-    actor: { type: 'human', id: command.actorId },
-    producers: [],
-    inputSha256,
-    reasonCode: command.reasonCode ?? null,
-    reasonRef: command.reasonRef ?? null,
-    ...(command.decision === 'approve' ? { scope: command.scope ?? null } : {}),
-    source: command.source,
-    eventSource: command.eventSource ?? null,
+  const gate = command.gate;
+  // The workflow counts decisions only for the gate the intent waits at (B07, ADR-M30 §2.4).
+  // Checked on the intent read under its lock, in the transaction of the decision: the workflow
+  // cannot move the intent between the check and the record.
+  return scope.transaction(async (tx) => {
+    const current = await tx.intents.lockAndGet(intent.id);
+    if (!current) throw new CommandError('intent_not_found', `intent ${intent.code} not found`);
+    if (current.status !== 'in_gate' || current.current_gate !== gate) {
+      throw new CommandError(
+        'gate_not_current',
+        `${current.code} is not waiting at ${gate} (${current.status}, ${String(current.current_gate)})`,
+      );
+    }
+    const inputSha256 = await gateInputSha256(tx, current, gate);
+    return registry.decide(tx, {
+      intentId: current.id,
+      gate: gate,
+      decision: command.decision,
+      actor: { type: 'human', id: command.actorId },
+      producers: [],
+      inputSha256,
+      reasonCode: command.reasonCode ?? null,
+      reasonRef: command.reasonRef ?? null,
+      ...(command.decision === 'approve' ? { scope: command.scope ?? null } : {}),
+      source: command.source,
+      eventSource: command.eventSource ?? null,
+    });
   });
 }

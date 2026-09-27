@@ -8,6 +8,7 @@ import { migration0005CostRecords } from './0005-cost-records.js';
 import { migration0006GitEventReceipts } from './0006-git-event-receipts.js';
 import { migration0007Escalations } from './0007-escalations.js';
 import { migration0008Agents } from './0008-agents.js';
+import { migration0009IntentWorkflow } from './0009-intent-workflow.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -19,4 +20,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0006-git-event-receipts': migration0006GitEventReceipts,
   '0007-escalations': migration0007Escalations,
   '0008-agents': migration0008Agents,
+  '0009-intent-workflow': migration0009IntentWorkflow,
 };

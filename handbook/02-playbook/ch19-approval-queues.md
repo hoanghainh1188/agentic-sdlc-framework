@@ -103,7 +103,7 @@ If anything differs → **cancel and ask again**. Three rules always hold:
 
 ## 19.8b. Using the platform: gate commands in comments
 
-> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B06, 2026-09-27, and kept in line with the platform code (`design/ADR-M27-github-poller.md`). The rest of this chapter is Draft 0.1 and is written outside Claude Code.
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B06, 2026-09-27, updated with task B07 (the gate workflow and status comments), and kept in line with the platform code (`design/ADR-M27-github-poller.md`, `design/ADR-M30-intent-workflow.md`). The rest of this chapter is Draft 0.1 and is written outside Claude Code.
 
 You can decide a gate by writing a comment on the GitHub issue or pull request of the intent. The platform reads new comments about every 30 seconds (project setting `github.poll_interval_seconds`). The CLI (`sdlc gate …`, task B04) does the same through the API.
 
@@ -126,11 +126,23 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - Your GitHub account must be linked to your platform user. The link uses the numeric account ID, so renaming your GitHub login does not break it. Ask the platform admin to link it.
 - You need the gate's role on the project, for example Person A for G1 and Person B for G3 (codes table §4). The producer of a change never approves it.
 - Bots and automation accounts never decide.
-- The intent must be linked to the issue or pull request.
+- The intent must be linked to the issue or pull request. One issue (or pull request) has at most one open intent; the platform refuses a second one until the first is closed.
+- **You can decide only the gate the intent is waiting at.** The last status comment shows it. A command for another gate gets a reply, and nothing is recorded.
 
 **Answers.**
 
-- **A successful command gets no reply.** The platform posts the gate status on the issue or pull request when the gate changes (FR-22, task B07).
+- **A successful command gets no reply of its own.** The platform posts a **status comment** on the issue when the intent's status changes (FR-22). It confirms your decision: it names who decided and mentions the people who act next.
+
+  | Status comment | When |
+  |---|---|
+  | Submitted, waits at G1 | The intent was created |
+  | G*n* approved, waits at the next gate | The gate had the approvals it needs, bound to the current spec or plan |
+  | Rejected at G*n* (reason code) | Someone rejected the gate; the intent is closed |
+  | Changes requested at G*n* (reason code) | Someone asked for changes; the intent stays at the gate |
+
+- The status comment comes a little later than your command: the platform moves the intent, then posts on the next poll (about 30 seconds).
+- **A request for changes** keeps the intent at the gate. Approvals written before it no longer count. Update the gate's input (a new spec version for G2, a new plan for G3), then approve again; an approval of an older spec or plan no longer counts either.
+- **No gate passes by silence.** At G1–G3 the intent waits until a person with the gate's role approves. While an escalation freezes the intent, it does not move on, even with the approvals; it continues once the escalation is decided (Chapter 18 §18.8b).
 - A command that the platform cannot read or refuses gets a reply that says why and shows the syntax. Nothing is recorded in that case: fix the command and write a new comment.
 - If the platform itself fails while handling your command, it tries again on the next polls. After a few failed attempts it gives up and replies that it could not record the command. Nothing is recorded; write the command again later, and tell the platform operator.
 

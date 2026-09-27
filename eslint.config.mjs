@@ -56,6 +56,34 @@ export default tseslint.config(
             { from: '@sdlc/core', deny: ['@sdlc/adapter-*'] },
             // Adapters implement interfaces from contracts and depend on nothing else in the workspace.
             { from: '@sdlc/adapter-*', allowOnly: ['@sdlc/contracts'] },
+            // The Temporal client wraps the intent workflow's names from contracts (ADR-M30).
+            { from: '@sdlc/workflow-client', allowOnly: ['@sdlc/contracts'] },
+            // Core never imports Temporal through the workflow client (ADR-M30).
+            { from: '@sdlc/core', deny: ['@sdlc/workflow-client'] },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    // Temporal workflow code runs in a deterministic sandbox (ADR-M30 §2.2): it imports only the
+    // workflow API, the shared contracts and type-only modules (activities are proxied).
+    files: ['platform/apps/worker/src/workflows/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@temporalio/workflow$|@sdlc/contracts$|\\./|\\.\\./activities/)',
+              message: 'Workflow code imports only @temporalio/workflow and @sdlc/contracts.',
+            },
+            {
+              regex: '^\\.\\./activities/',
+              allowTypeImports: true,
+              message: 'Workflow code may import activity types only.',
+            },
           ],
         },
       ],

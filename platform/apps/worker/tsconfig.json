@@ -26,6 +26,9 @@
     },
     {
       "path": "../../packages/adapters/policy-simple"
+    },
+    {
+      "path": "../../packages/workflow-client"
     }
   ]
 }

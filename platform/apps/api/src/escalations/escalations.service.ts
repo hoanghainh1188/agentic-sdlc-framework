@@ -11,14 +11,20 @@ import {
   type Intent,
   type TenantScope,
 } from '@sdlc/core';
+import type { IntentWorkflowSignals } from '@sdlc/contracts';
 import type { z } from 'zod';
 
 import type { Principal } from '../auth/principal.js';
+import { wakeQuietly, type WakeLogger } from '../intent-signals.js';
 import { presentEscalation } from './present.js';
 import type { escalationDecisionSchema, listEscalationsSchema } from './schemas.js';
 
 export class EscalationsService {
-  constructor(private readonly now: () => Date) {}
+  constructor(
+    private readonly now: () => Date,
+    private readonly signals: IntentWorkflowSignals,
+    private readonly logger: WakeLogger,
+  ) {}
 
   async list(
     p: Principal,
@@ -55,6 +61,7 @@ export class EscalationsService {
       { escalationId: escalation.id, actorId: p.userId },
       { now: this.now },
     );
+    await this.wake(p, intent);
     return presentEscalation(updated, intent);
   }
 
@@ -79,7 +86,17 @@ export class EscalationsService {
       },
       { now: this.now },
     );
+    await this.wake(p, intent);
     return presentEscalation(updated, intent);
+  }
+
+  /** A decision may unfreeze the intent: its workflow looks again (B07, ADR-M30). */
+  private wake(p: Principal, intent: Intent): Promise<void> {
+    return wakeQuietly(
+      this.signals,
+      { tenantId: p.scope.tenantId, intentId: intent.id },
+      this.logger,
+    );
   }
 
   /** The escalation and its intent, or `escalation_not_found` when the caller cannot read it. */

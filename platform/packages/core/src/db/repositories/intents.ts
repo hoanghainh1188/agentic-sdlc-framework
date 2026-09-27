@@ -11,7 +11,7 @@ import type { Database, Intent } from '../schema.js';
 import { isUuid } from '../tenant-id.js';
 import { AuditLogRepository } from './audit-log.js';
 import { TenantRepository } from './base.js';
-import { lockIntentCodes } from './locks.js';
+import { lockIntent, lockIntentCodes } from './locks.js';
 import { ProjectConfigRepository } from './project-configs.js';
 
 export interface NewIntent {
@@ -33,6 +33,14 @@ export interface IntentStateChange {
   readonly actorType: Exclude<ActorType, 'agent'>;
   /** Required for `human`; null for `system`. */
   readonly actorId: string | null;
+}
+
+/** A move of the intent workflow (B07): applied only when the intent is still in `from`. */
+export interface IntentMove {
+  readonly from: { readonly status: IntentStatus; readonly currentGate: GateCode | null };
+  readonly to: { readonly status: IntentStatus; readonly currentGate: GateCode | null };
+  /** When the move enters `to.currentGate` (null when it leaves the gates). */
+  readonly at: Date;
 }
 
 export interface IntentQuery {
@@ -109,7 +117,19 @@ export class IntentRepository extends TenantRepository {
             issue_number: input.issueNumber ?? null,
           })
           .returningAll()
-          .executeTakeFirstOrThrow();
+          .executeTakeFirstOrThrow()
+          .catch((error: unknown) => {
+            // One open intent per issue (QUESTIONS #68): a comment always names exactly one.
+            if (
+              (error as { constraint?: unknown } | null)?.constraint === 'intents_open_issue_key'
+            ) {
+              throw new RegistryError(
+                'issue_already_linked',
+                `another open intent is linked to issue ${String(input.issueNumber)}`,
+              );
+            }
+            throw error;
+          });
         await new AuditLogRepository(db, this.tenantId).append({
           action: 'intent.created',
           actorType: 'human',
@@ -257,6 +277,69 @@ export class IntentRepository extends TenantRepository {
           action: 'intent.state_changed',
           actorType: change.actorType,
           actorId: change.actorId,
+          entityId: intent.id,
+          payload: {
+            status: intent.status,
+            ...(intent.current_gate === null ? {} : { current_gate: intent.current_gate }),
+          },
+        });
+        return intent;
+      }),
+    );
+  }
+
+  /** Holds the intent lock until the transaction ends, then reads the intent (B07 workflow step). */
+  async lockAndGet(id: string): Promise<Intent | undefined> {
+    if (!isUuid(id)) return undefined;
+    if (!this.db.isTransaction) {
+      throw new DbError('invalid_value', 'lockAndGet must run inside a transaction');
+    }
+    await lockIntent(this.db, id);
+    return this.getById(id);
+  }
+
+  /**
+   * Moves the intent with compare-and-set (task B07, ADR-M30): only when its status and gate still
+   * equal `move.from`. Returns the moved intent, or undefined when it is no longer in `from` (for
+   * example an activity retried after the move was committed). A move to another gate sets
+   * `gate_entered_at`; staying at the same gate keeps it. The workflow is the only caller; it
+   * checks which moves are allowed. Appends `intent.state_changed` (system actor) in the same
+   * transaction.
+   */
+  async moveState(id: string, move: IntentMove): Promise<Intent | undefined> {
+    for (const state of [move.from, move.to]) {
+      if (!INTENT_STATUSES.includes(state.status)) throw new DbError('invalid_value', 'status');
+      if (state.currentGate !== null && !GATE_CODES.includes(state.currentGate)) {
+        throw new DbError('invalid_value', 'unknown gate');
+      }
+    }
+    const entersGate = move.to.currentGate !== move.from.currentGate;
+    return this.run(
+      this.transactional(async (db) => {
+        const intent = await db
+          .updateTable('intents')
+          .set({
+            status: move.to.status,
+            current_gate: move.to.currentGate,
+            ...(entersGate
+              ? { gate_entered_at: move.to.currentGate === null ? null : move.at }
+              : {}),
+            updated_at: sql<Date>`now()`,
+          })
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', id)
+          .where('status', '=', move.from.status)
+          .$if(move.from.currentGate === null, (qb) => qb.where('current_gate', 'is', null))
+          .$if(move.from.currentGate !== null, (qb) =>
+            qb.where('current_gate', '=', move.from.currentGate!),
+          )
+          .returningAll()
+          .executeTakeFirst();
+        if (!intent) return undefined;
+        await new AuditLogRepository(db, this.tenantId).append({
+          action: 'intent.state_changed',
+          actorType: 'system',
+          actorId: null,
           entityId: intent.id,
           payload: {
             status: intent.status,

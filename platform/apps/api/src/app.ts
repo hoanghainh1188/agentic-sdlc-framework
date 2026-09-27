@@ -4,7 +4,9 @@ import { Logger, Module, type DynamicModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, NestFactory, Reflector } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
+import type { IntentWorkflowSignals } from '@sdlc/contracts';
 import { Registry, type PlatformDatabase } from '@sdlc/core';
+import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
 import { AuthGuard } from './auth/auth.guard.js';
 import { RateLimiter } from './auth/rate-limiter.js';
@@ -28,12 +30,19 @@ export interface ApiDeps {
   readonly now?: () => Date;
   /** Default: Nest's logger. Tests pass their own to check that no token is logged. */
   readonly logger?: Pick<Logger, 'error'>;
+  /**
+   * Wakes the intent workflow after a change (B07, ADR-M30). Default: no signals; the worker's
+   * reconcile loop then catches up.
+   */
+  readonly intentSignals?: IntentWorkflowSignals;
 }
 
 @Module({})
 class ApiModule {
   static create(deps: ApiDeps): DynamicModule {
     const now = deps.now ?? (() => new Date());
+    const signals = deps.intentSignals ?? NO_INTENT_SIGNALS;
+    const wakeLogger = new Logger('sdlc-api');
     return {
       module: ApiModule,
       controllers: [HealthController, MeController, IntentsController, EscalationsController],
@@ -50,10 +59,10 @@ class ApiModule {
         },
         {
           provide: INTENTS,
-          useFactory: (registry: Registry) => new IntentsService(registry),
+          useFactory: (registry: Registry) => new IntentsService(registry, signals, wakeLogger),
           inject: [REGISTRY],
         },
-        { provide: ESCALATIONS, useValue: new EscalationsService(now) },
+        { provide: ESCALATIONS, useValue: new EscalationsService(now, signals, wakeLogger) },
         {
           provide: APP_GUARD,
           useFactory: (reflector: Reflector) =>

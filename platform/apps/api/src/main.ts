@@ -5,6 +5,7 @@ import 'reflect-metadata';
 
 import { Logger } from '@nestjs/common';
 import { t } from '@sdlc/messages';
+import { connectTemporal, TemporalIntentSignals } from '@sdlc/workflow-client';
 
 import { createApp } from './app.js';
 import { connectDatabase } from './database.js';
@@ -16,11 +17,21 @@ async function main(): Promise<void> {
   const settings = loadSettings(process.env);
   if (settings.database.kind === 'dev_url') logger.warn(t('api.start.dev_mode'));
   const db = await connectDatabase(settings, process.env);
-  const app = await createApp({ db, settings });
+  // Wakes the intent workflow after a change (B07, ADR-M30).
+  const temporal = settings.temporal ? await connectTemporal(settings.temporal) : undefined;
+  if (!temporal) logger.warn(t('api.start.temporal_off'));
+  const app = await createApp({
+    db,
+    settings,
+    ...(temporal ? { intentSignals: new TemporalIntentSignals(temporal.client) } : {}),
+  });
   app
     .getHttpAdapter()
     .getInstance()
-    .addHook('onClose', async () => db.close());
+    .addHook('onClose', async () => {
+      await temporal?.close();
+      await db.close();
+    });
   await app.listen({ host: settings.host, port: settings.port });
   logger.log(t('api.start.listening', { host: settings.host, port: settings.port }));
 }

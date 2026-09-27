@@ -434,13 +434,67 @@ describeDb('B03: API app on PostgreSQL', () => {
   });
 
   describe('AC3: gate decisions (FR-11, FR-17, ADR-M20)', () => {
-    const decide = (
+    /** B07: a decision counts only at the intent's current gate; the workflow is not running here. */
+    const atGate = async (tenant: Tenant, code: string, gate: string) => {
+      const intent = await tenant.scope.intents.getByCode(code);
+      if (!intent || !['G1', 'G2', 'G3'].includes(gate) || intent.current_gate === gate) return;
+      await tenant.scope.intents.updateState(intent.id, {
+        status: 'in_gate',
+        currentGate: gate as 'G1' | 'G2' | 'G3',
+        actorType: 'system',
+        actorId: null,
+      });
+    };
+    const decide = async (
       tenant: Tenant,
       who: keyof Tenant['tokens'],
       code: string,
       gate: string,
       body: unknown,
-    ) => inject('POST', `/v1/intents/${code}/gates/${gate}/decisions`, tenant.tokens[who], body);
+    ) => {
+      await atGate(tenant, code, gate);
+      return inject(
+        'POST',
+        `/v1/intents/${code}/gates/${gate}/decisions`,
+        tenant.tokens[who],
+        body,
+      );
+    };
+
+    it('B07: a decision for a gate the intent is not waiting at is refused (409)', async () => {
+      const created = await createIntent(tenantA);
+      // A new intent is a draft until its workflow submits it (QUESTIONS #89).
+      expectError(
+        await inject('POST', `/v1/intents/${created.code}/gates/G1/decisions`, tenantA.tokens.a, {
+          decision: 'approve',
+        }),
+        409,
+        'gate_not_current',
+      );
+      await atGate(tenantA, created.code, 'G1');
+      expectError(
+        await inject('POST', `/v1/intents/${created.code}/gates/G2/decisions`, tenantA.tokens.a, {
+          decision: 'approve',
+        }),
+        409,
+        'gate_not_current',
+      );
+    });
+
+    it('B07: one open intent per issue (QUESTIONS #68): a second one gets 409', async () => {
+      await createIntent(tenantA, { issue_number: 4242 });
+      expectError(
+        await inject('POST', '/v1/intents', tenantA.tokens.a, {
+          project: 'shop',
+          title: 'Same issue',
+          risk_tier: 'low',
+          data_class: 'internal',
+          issue_number: 4242,
+        }),
+        409,
+        'issue_already_linked',
+      );
+    });
 
     it('G1: person_a approves, bound to the intent and an expiry', async () => {
       const created = await createIntent(tenantA);
