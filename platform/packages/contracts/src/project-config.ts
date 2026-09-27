@@ -130,6 +130,8 @@ export interface ProjectConfig {
     readonly intent_create_roles: readonly ProjectRole[];
     readonly intent_read_roles: readonly ProjectRole[];
   };
+  /** Sandbox image of the project, pinned by digest (QUESTIONS #59, ADR-M25). */
+  readonly sandbox: { readonly image: string };
 }
 
 declare const validatedConfig: unique symbol;

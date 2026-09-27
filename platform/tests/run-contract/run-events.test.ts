@@ -10,12 +10,43 @@ const refused = (type: string, payload: Record<string, unknown>) => () =>
   checkRunEvent(type, payload);
 
 describe('run event payloads', () => {
-  it('declares the C02 event types', () => {
+  it('declares the C02 and C04 event types', () => {
     expect(Object.keys(RUN_EVENT_TYPES)).toEqual([
       'contract_issued',
       'contract_accepted',
       'contract_rejected',
+      'workspace_prepared',
+      'sandbox_created',
+      'sandbox_ready',
+      'provisioning_failed',
+      'sandbox_removed',
     ]);
+  });
+
+  it('accepts the C04 sandbox events with coded fields only (ADR-M25)', () => {
+    expect(
+      checkRunEvent('workspace_prepared', { base_sha: 'f'.repeat(40), duration_ms: 812 }),
+    ).toEqual({ base_sha: 'f'.repeat(40), duration_ms: 812 });
+    expect(checkRunEvent('sandbox_created', { image_sha256: SHA })).toEqual({ image_sha256: SHA });
+    expect(checkRunEvent('sandbox_ready', { duration_ms: 5000 })).toEqual({ duration_ms: 5000 });
+    expect(checkRunEvent('provisioning_failed', { reason: 'egress_not_enforceable' })).toEqual({
+      reason: 'egress_not_enforceable',
+    });
+    expect(checkRunEvent('sandbox_removed', { reason: 'orphan', duration_ms: 0 })).toEqual({
+      reason: 'orphan',
+      duration_ms: 0,
+    });
+  });
+
+  it.each([
+    ['workspace_prepared', { base_sha: 'agent/INT-2026-0001', duration_ms: 1 }],
+    ['workspace_prepared', { base_sha: 'f'.repeat(40), duration_ms: -1 }],
+    ['sandbox_created', { image_sha256: 'sha256:' + SHA }],
+    ['sandbox_created', { image_sha256: SHA, image: 'registry/name' }],
+    ['provisioning_failed', { reason: 'git clone failed: auth' }],
+    ['sandbox_removed', { reason: 'finished' }],
+  ])('refuses a bad %s payload', (type, payload) => {
+    expect(refused(type, payload)).toThrow(DbError);
   });
 
   it('accepts the declared fields', () => {

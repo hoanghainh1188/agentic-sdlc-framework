@@ -65,7 +65,11 @@ describe('sdlc-api service', () => {
     expect(api.privileged).toBeUndefined();
     expect(api.user).toBeUndefined(); // the image's USER node applies
     const text = readDeployFile('docker-compose.yml');
-    const block = text.slice(text.indexOf('\n  sdlc-api:\n'));
+    const start = text.indexOf('\n  sdlc-api:\n');
+    const rest = text.slice(start + 1);
+    const next = rest.slice(1).search(/\n {2}[a-z][a-z0-9-]*:\n/);
+    const block = next === -1 ? rest : rest.slice(0, next + 1);
+    expect(block).toContain('cap_drop: [ALL]');
     expect(block).not.toMatch(/cap_add|privileged|pid:|network_mode|docker\.sock/);
     for (const port of api.ports) expect(port).toMatch(/^\$\{SDLC_BIND_ADDR:-127\.0\.0\.1\}:/);
   });
