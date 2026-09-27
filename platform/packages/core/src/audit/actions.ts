@@ -133,6 +133,31 @@ export const AUDIT_ACTIONS = {
   },
   /** A Critical escalation passed its resolve deadline: the incident process is due (Ch.6 §6.7). */
   'escalation.incident_due': { entityType: 'escalation', fields: { code: 'code' } },
+  /** A person acknowledged the escalation (B11 PR 2); `step` is where it was. */
+  'escalation.acknowledged': { entityType: 'escalation', fields: { code: 'code', step: 'code' } },
+  /** A person decided (T16 §4), bound to the reviewed hash. Never the reason text (a link only). */
+  'escalation.decided': {
+    entityType: 'escalation',
+    fields: {
+      code: 'code',
+      decision: 'code',
+      subject_sha256: 'sha256',
+      reason_code: 'code?',
+      budget_increase_usd: 'code?',
+    },
+  },
+  /** A person moved the escalation to governance (`escalate_further`). */
+  'escalation.escalated_further': {
+    entityType: 'escalation',
+    fields: { code: 'code', from_step: 'code' },
+  },
+  /** A decision expired or no longer matched the version acted on (Ch.6 §6.6); `reason` is a code. */
+  'escalation.decision_voided': {
+    entityType: 'escalation',
+    fields: { code: 'code', reason: 'code' },
+  },
+  /** The escalation was closed; `status` is the status it had before. */
+  'escalation.closed': { entityType: 'escalation', fields: { code: 'code', status: 'code' } },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

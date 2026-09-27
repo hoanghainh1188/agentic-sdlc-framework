@@ -5,3 +5,4 @@ export const REGISTRY = Symbol('Registry');
 export const SETTINGS = Symbol('ApiSettings');
 export const CLOCK = Symbol('Clock');
 export const INTENTS = Symbol('IntentsService');
+export const ESCALATIONS = Symbol('EscalationsService');

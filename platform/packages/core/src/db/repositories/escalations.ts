@@ -51,6 +51,24 @@ export interface EscalationClockUpdate {
   readonly nextCheckAt: Date | null;
 }
 
+/** Changes of an acknowledgement, a decision, a void or a close (B11 PR 2, ADR-M28 §2.4). */
+export interface EscalationStateUpdate {
+  readonly status?: EscalationStatus;
+  readonly currentStep?: EscalationStep;
+  readonly stepDueAt?: Date;
+  readonly remindAt?: Date | null;
+  readonly resolveDueAt?: Date | null;
+  readonly resolveOverdueAt?: Date | null;
+  readonly nextCheckAt?: Date | null;
+  readonly acknowledgedBy?: string;
+  readonly acknowledgedAt?: Date;
+  /** Null clears the decision (void). Checked by `checkDecision` before it gets here. */
+  readonly decision?: Readonly<Record<string, string | boolean>> | null;
+  readonly decidedBy?: string | null;
+  readonly decidedAt?: Date | null;
+  readonly closedAt?: Date;
+}
+
 export interface EscalationQuery {
   readonly statuses?: readonly EscalationStatus[];
 }
@@ -131,6 +149,34 @@ export class EscalationRepository extends TenantRepository {
     );
   }
 
+  /** Escalations of the intents of these projects, newest first (API list, B11 PR 2). */
+  listForProjects(
+    projectIds: readonly string[],
+    query: EscalationQuery & { readonly limit: number },
+  ): Promise<Escalation[]> {
+    const ids = projectIds.filter((id) => isUuid(id));
+    if (ids.length === 0) return Promise.resolve([]);
+    const statuses = query.statuses;
+    return this.run(
+      this.db
+        .selectFrom('escalations as e')
+        .innerJoin('intents as i', (join) =>
+          join
+            .onRef('i.tenant_id', '=', 'e.tenant_id')
+            .onRef('i.id', '=', 'e.intent_id')
+            .on('i.tenant_id', '=', this.tenantId),
+        )
+        .selectAll('e')
+        .where('e.tenant_id', '=', this.tenantId)
+        .where('i.project_id', 'in', ids)
+        .$if(statuses !== undefined, (qb) => qb.where('e.status', 'in', [...(statuses ?? [])]))
+        .orderBy('e.created_at', 'desc')
+        .orderBy('e.code', 'desc')
+        .limit(query.limit)
+        .execute(),
+    );
+  }
+
   /**
    * Locks the escalation for the clock, inside the caller's transaction. Returns undefined when
    * another transaction holds the lock (`SKIP LOCKED`): that worker advances it instead.
@@ -164,6 +210,51 @@ export class EscalationRepository extends TenantRepository {
           next_check_at: update.nextCheckAt,
           updated_at: at,
         })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .returningAll()
+        .executeTakeFirstOrThrow(),
+    );
+  }
+
+  /** Locks the row until the transaction ends (acknowledge, decide, void, close). */
+  lockForUpdate(id: string): Promise<Escalation | undefined> {
+    if (!isUuid(id)) return Promise.resolve(undefined);
+    return this.run(
+      this.db
+        .selectFrom('escalations')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .forUpdate()
+        .executeTakeFirst(),
+    );
+  }
+
+  updateState(id: string, update: EscalationStateUpdate, at: Date): Promise<Escalation> {
+    const set = {
+      ...(update.status === undefined ? {} : { status: update.status }),
+      ...(update.currentStep === undefined ? {} : { current_step: update.currentStep }),
+      ...(update.stepDueAt === undefined ? {} : { step_due_at: update.stepDueAt }),
+      ...(update.remindAt === undefined ? {} : { remind_at: update.remindAt }),
+      ...(update.resolveDueAt === undefined ? {} : { resolve_due_at: update.resolveDueAt }),
+      ...(update.resolveOverdueAt === undefined
+        ? {}
+        : { resolve_overdue_at: update.resolveOverdueAt }),
+      ...(update.nextCheckAt === undefined ? {} : { next_check_at: update.nextCheckAt }),
+      ...(update.acknowledgedBy === undefined ? {} : { acknowledged_by: update.acknowledgedBy }),
+      ...(update.acknowledgedAt === undefined ? {} : { acknowledged_at: update.acknowledgedAt }),
+      ...(update.decision === undefined
+        ? {}
+        : { decision: update.decision === null ? null : JSON.stringify(update.decision) }),
+      ...(update.decidedBy === undefined ? {} : { decided_by: update.decidedBy }),
+      ...(update.decidedAt === undefined ? {} : { decided_at: update.decidedAt }),
+      ...(update.closedAt === undefined ? {} : { closed_at: update.closedAt }),
+    };
+    return this.run(
+      this.db
+        .updateTable('escalations')
+        .set({ ...set, updated_at: at })
         .where('tenant_id', '=', this.tenantId)
         .where('id', '=', id)
         .returningAll()
@@ -211,6 +302,61 @@ export class EscalationNoticeRepository extends TenantRepository {
           oc.columns(['tenant_id', 'escalation_id', 'kind', 'step', 'audience_role']).doNothing(),
         )
         .returningAll()
+        .execute(),
+    );
+  }
+
+  /** Notices still to post for the escalations of one project's intents, oldest first. */
+  pendingForProject(projectId: string, limit: number): Promise<EscalationNotice[]> {
+    if (!isUuid(projectId)) return Promise.resolve([]);
+    return this.run(
+      this.db
+        .selectFrom('escalation_notices as n')
+        .innerJoin('escalations as e', (join) =>
+          join
+            .onRef('e.tenant_id', '=', 'n.tenant_id')
+            .onRef('e.id', '=', 'n.escalation_id')
+            .on('e.tenant_id', '=', this.tenantId),
+        )
+        .innerJoin('intents as i', (join) =>
+          join
+            .onRef('i.tenant_id', '=', 'e.tenant_id')
+            .onRef('i.id', '=', 'e.intent_id')
+            .on('i.tenant_id', '=', this.tenantId),
+        )
+        .selectAll('n')
+        .where('n.tenant_id', '=', this.tenantId)
+        .where('i.project_id', '=', projectId)
+        .where('n.posted_at', 'is', null)
+        .where('n.abandoned_at', 'is', null)
+        .orderBy('n.id')
+        .limit(limit)
+        .execute(),
+    );
+  }
+
+  /**
+   * Records the delivery of notices (one comment may carry several). Conditional: notices another
+   * poller already finished stay as they are. `abandonAt` gives them up.
+   */
+  async markDelivery(
+    ids: readonly string[],
+    result: { readonly attempts: number; readonly postedAt?: Date; readonly abandonAt?: Date },
+  ): Promise<void> {
+    if (ids.length === 0) return;
+    await this.run(
+      this.db
+        .updateTable('escalation_notices')
+        .set({
+          attempts: result.attempts,
+          ...(result.postedAt ? { posted_at: result.postedAt } : {}),
+          ...(result.abandonAt ? { abandoned_at: result.abandonAt } : {}),
+        })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', 'in', [...ids])
+        .where('posted_at', 'is', null)
+        .where('abandoned_at', 'is', null)
+        .where('attempts', '<=', result.attempts)
         .execute(),
     );
   }

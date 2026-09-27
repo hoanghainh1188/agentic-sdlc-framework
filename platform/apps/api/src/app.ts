@@ -9,12 +9,14 @@ import { Registry, type PlatformDatabase } from '@sdlc/core';
 import { AuthGuard } from './auth/auth.guard.js';
 import { RateLimiter } from './auth/rate-limiter.js';
 import { ErrorFilter } from './errors/error.filter.js';
+import { EscalationsController } from './escalations/escalations.controller.js';
+import { EscalationsService } from './escalations/escalations.service.js';
 import { HealthController } from './health/health.controller.js';
 import { IntentsController } from './intents/intents.controller.js';
 import { IntentsService } from './intents/intents.service.js';
 import { MeController } from './me/me.controller.js';
 import type { ApiSettings } from './settings.js';
-import { CLOCK, DATABASE, INTENTS, REGISTRY, SETTINGS } from './tokens.js';
+import { CLOCK, DATABASE, ESCALATIONS, INTENTS, REGISTRY, SETTINGS } from './tokens.js';
 
 /** Largest accepted request body. Intents carry at most ~10 kB of text. */
 const BODY_LIMIT_BYTES = 64 * 1024;
@@ -34,7 +36,7 @@ class ApiModule {
     const now = deps.now ?? (() => new Date());
     return {
       module: ApiModule,
-      controllers: [HealthController, MeController, IntentsController],
+      controllers: [HealthController, MeController, IntentsController, EscalationsController],
       providers: [
         { provide: DATABASE, useValue: deps.db },
         { provide: SETTINGS, useValue: deps.settings },
@@ -51,6 +53,7 @@ class ApiModule {
           useFactory: (registry: Registry) => new IntentsService(registry),
           inject: [REGISTRY],
         },
+        { provide: ESCALATIONS, useValue: new EscalationsService(now) },
         {
           provide: APP_GUARD,
           useFactory: (reflector: Reflector) =>

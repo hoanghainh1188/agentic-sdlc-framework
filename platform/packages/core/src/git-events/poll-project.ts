@@ -19,6 +19,7 @@ import {
 
 import { parseCommentCommand } from '../commands/comment-command.js';
 import {
+  commandReplyParams,
   handleGitEvent,
   type GitEventOutcome,
   type GitEventHandlerDeps,
@@ -26,6 +27,7 @@ import {
 import type { PollableProject } from '../db/system-scope.js';
 import type { TenantId } from '../db/tenant-id.js';
 import type { TenantScope } from '../db/tenant-scope.js';
+import { flushEscalationNotices, type NoticeLogEvent } from './escalation-notices.js';
 import { renderCommentReply } from './replies.js';
 
 export type PollLogEvent =
@@ -38,7 +40,8 @@ export type PollLogEvent =
   | 'reply.abandoned'
   | 'reply.bookkeeping_failed'
   | 'poll.event_attempt_failed'
-  | 'worker.event_failed';
+  | 'worker.event_failed'
+  | NoticeLogEvent;
 
 /** Structured log hook. Fields hold IDs and codes only: never comment text or tokens. */
 export interface PollLogger {
@@ -73,6 +76,9 @@ export interface PollResult {
   readonly outcomes: Readonly<Partial<Record<GitEventOutcome, number>>>;
   readonly repliesPosted: number;
   readonly repliesFailed: number;
+  /** Escalation notice comments posted and failed in this poll (B11). */
+  readonly noticesPosted: number;
+  readonly noticesFailed: number;
 }
 
 class CursorMoved extends Error {
@@ -108,7 +114,15 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
   const ref = project ? repoRef(project.repo_full_name) : undefined;
   if (!project || project.status !== 'active' || project.git_provider !== 'github' || !ref) {
     log.log('warn', 'poll.project_skipped', ids);
-    return { status: 'skipped', events: 0, outcomes: {}, repliesPosted: 0, repliesFailed: 0 };
+    return {
+      status: 'skipped',
+      events: 0,
+      outcomes: {},
+      repliesPosted: 0,
+      repliesFailed: 0,
+      noticesPosted: 0,
+      noticesFailed: 0,
+    };
   }
 
   const stored = await scope.gitEventCursors.get(project.id);
@@ -148,12 +162,30 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
     status === 'polled'
       ? await flushReplies(deps, scope, project.id, ref, now)
       : { posted: 0, failed: 0 };
+  // Escalation notices (B11, ADR-M28 §2.5): same project, same Git host, same delivery rules.
+  const notices =
+    status === 'polled'
+      ? await flushEscalationNotices(
+          {
+            gitHost: deps.gitHost,
+            maxAttempts: deps.maxReplyAttempts ?? 5,
+            limit: deps.repliesPerPoll ?? 20,
+            now,
+            log: (level, event, fields) => log.log(level, event, fields),
+          },
+          scope,
+          project.id,
+          ref,
+        )
+      : { posted: 0, failed: 0 };
   log.log('info', 'poll.completed', {
     ...ids,
     status,
     events: events.length,
     replies_posted: replies.posted,
     replies_failed: replies.failed,
+    notices_posted: notices.posted,
+    notices_failed: notices.failed,
   });
   return {
     status,
@@ -161,6 +193,8 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
     outcomes,
     repliesPosted: replies.posted,
     repliesFailed: replies.failed,
+    noticesPosted: notices.posted,
+    noticesFailed: notices.failed,
   };
 }
 
@@ -191,7 +225,7 @@ function runBatch(
       try {
         ({ outcome } = await handleGitEvent(
           tx,
-          { registry: deps.registry },
+          { registry: deps.registry, now: ctx.now },
           { id: projectId, provider: 'github' },
           event,
         ));
@@ -224,8 +258,7 @@ async function countFailure(
   // Only command comments can fail: other events are not handled yet.
   if (event.kind !== 'comment_created') throw failure.cause;
   const command = parseCommentCommand(event.body);
-  const replyParams: Record<string, string> =
-    command.kind === 'gate_decision' ? { gate: command.gate } : {};
+  const replyParams = commandReplyParams(command);
   let counted: { attempts: number; final: boolean };
   try {
     counted = await scope.gitEventReceipts.recordFailure(

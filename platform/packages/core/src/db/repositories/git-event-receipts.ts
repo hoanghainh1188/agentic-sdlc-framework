@@ -8,6 +8,8 @@ export interface NewGitEventReceipt {
   readonly eventId: string;
   readonly outcome: string;
   readonly gateDecisionId?: string | null;
+  /** The escalation a `/ack` or `/decide` command acted on (B11). */
+  readonly escalationId?: string | null;
   readonly issueNumber?: number | null;
   /** A reply to post on the issue or pull request: a code and code parameters, never text. */
   readonly reply?: { readonly code: string; readonly params: Readonly<Record<string, string>> };
@@ -37,6 +39,7 @@ export class GitEventReceiptRepository extends TenantRepository {
           event_id: input.eventId,
           outcome: input.outcome,
           gate_decision_id: input.gateDecisionId ?? null,
+          escalation_id: input.escalationId ?? null,
           issue_number: input.issueNumber ?? null,
           reply_code: input.reply?.code ?? null,
           reply_params: input.reply ? JSON.stringify(input.reply.params) : null,
@@ -57,6 +60,7 @@ export class GitEventReceiptRepository extends TenantRepository {
         .set({
           outcome: input.outcome,
           gate_decision_id: input.gateDecisionId ?? null,
+          escalation_id: input.escalationId ?? null,
           reply_code: input.reply?.code ?? null,
           reply_params: input.reply ? JSON.stringify(input.reply.params) : null,
         })
