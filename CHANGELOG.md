@@ -137,6 +137,7 @@
 - Docs fixes (found during A01 planning): README task count 44 and codes table v1.3; leftover pre-2+N roles table removed from D-02 §3.
 - ADR-M16 accepted (Harry, 2026-09-25, with PR #46); design/README.md index updated.
 - CLAUDE.md: new `Current constraints` section (at most 2 parallel sessions, one task per session in its own worktree, A09 in parallel with A02, A03 waits for the OpenBao key holders).
+- CI: a change to documents only (`design/`, `handbook/`, `_review/`, `diagrams/`, root Markdown; env `DOCS_ONLY_PATHS`) skips the database, Semgrep and Trivy jobs to save GitHub Actions minutes. The checks job (some unit tests read documents) and Gitleaks still run; nightly and manual runs are always full. The job `detect compose changes` is renamed `detect changes`.
 
 ## [1.3.0-review] — 2026-09-24
 

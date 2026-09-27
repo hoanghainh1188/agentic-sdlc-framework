@@ -185,8 +185,9 @@ describe('AC2: integration job runs the Compose core profile', () => {
 });
 
 describe('A06: database integration job', () => {
-  it('runs the DB tests on every PR, without a skip condition, and ci-ok waits for it', () => {
-    expect(job('db').if).toBeUndefined();
+  it('runs the DB tests on every PR except a documents-only change, and ci-ok waits for it', () => {
+    expect(job('db').needs).toBe('detect');
+    expect(job('db').if).toBe("needs.detect.outputs.docs_only != 'true'");
     expect(runText('db')).toContain('pnpm test:db');
     expect(job('ci-ok').needs).toContain('db');
   });
@@ -201,6 +202,51 @@ describe('A06: database integration job', () => {
     expect(script).toContain('-p 127.0.0.1::5432');
     expect(script).toContain('postgres/init:/docker-entrypoint-initdb.d:ro');
     expect(script).toMatch(/trap cleanup EXIT/);
+  });
+});
+
+describe('documents-only changes save Actions minutes', () => {
+  const pattern = new RegExp(ciEnv.DOCS_ONLY_PATHS ?? '');
+
+  it('the documents are design/, handbook/, _review/, diagrams/ and root Markdown files only', () => {
+    for (const file of [
+      'design/QUESTIONS.md',
+      'design/D-08-backlog.csv',
+      'handbook/00-introduction/05-codes.md',
+      '_review/notes.md',
+      'diagrams/src/d11.mmd',
+      'CHANGELOG.md',
+      'CLAUDE.md',
+    ]) {
+      expect(file).toMatch(pattern);
+    }
+    for (const file of [
+      '.github/pull_request_template.md',
+      '.github/workflows/ci.yml',
+      'platform/deploy/README.md',
+      'platform/packages/core/src/index.ts',
+      'package.json',
+      'pnpm-lock.yaml',
+      'scripts/generate-backlog.py',
+    ]) {
+      expect(file).not.toMatch(pattern);
+    }
+  });
+
+  it('only the database, Semgrep and Trivy jobs are skipped; nightly and manual runs are full', () => {
+    const skipped = Object.entries(ci.jobs)
+      .filter(([, j]) => j.if?.includes('docs_only'))
+      .map(([name]) => name)
+      .sort();
+    expect(skipped).toEqual(['db', 'semgrep', 'trivy']);
+    for (const name of skipped) expect(job(name).needs).toBe('detect');
+    for (const name of ['checks', 'gitleaks']) expect(job(name).if).toBeUndefined();
+    expect(job('detect').outputs?.docs_only).toBe('${{ steps.docs.outputs.docs_only }}');
+    const docs = job('detect').steps.find((s) => s.run?.includes('docs_only='))?.run ?? '';
+    expect(docs).toContain('schedule');
+    expect(docs).toContain('workflow_dispatch');
+    expect(docs).toContain('grep -vE "$DOCS_ONLY_PATHS"');
+    expect(docs).toMatch(/if \[ -z "\$changed" \]; then\s+reason="no changed files/);
   });
 });
 

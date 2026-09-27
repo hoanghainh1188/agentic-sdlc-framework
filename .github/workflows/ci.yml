@@ -38,6 +38,8 @@ env:
   SEMGREP_IMAGE: semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b
   # Infrastructure owned by task A02. The compose job runs only when this file exists.
   COMPOSE_FILE_PATH: platform/deploy/docker-compose.yml
+  # Paths that count as documents (job detect, docs_only). An extended regular expression.
+  DOCS_ONLY_PATHS: '^(design/|handbook/|_review/|diagrams/|[^/]+\.md$)'
 
 jobs:
   checks:
@@ -69,10 +71,11 @@ jobs:
           "$RUNNER_TEMP/actionlint" -color
 
   detect:
-    name: detect compose changes
+    name: detect changes
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
+      docs_only: ${{ steps.docs.outputs.docs_only }}
       run_compose: ${{ steps.decide.outputs.run_compose }}
       run_sandbox_image: ${{ steps.decide.outputs.run_sandbox_image }}
     steps:
@@ -80,6 +83,35 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # Saves Actions minutes: a change to documents only skips the database, Semgrep and Trivy
+      # jobs (no code, dependency or container file changed). The checks job still runs, because
+      # some unit tests read documents (codes table, D-03, ADR-M09), and Gitleaks still runs,
+      # because a secret can be pasted into a document. Nightly and manual runs are always full.
+      - id: docs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          docs=false
+          if [ "$EVENT_NAME" = schedule ] || [ "$EVENT_NAME" = workflow_dispatch ]; then
+            reason="$EVENT_NAME run"
+          elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            reason="base commit unknown, running everything to be safe"
+          else
+            changed="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+            # Documents: design/, handbook/, _review/, diagrams/ and Markdown files at the root.
+            other="$(printf '%s\n' "$changed" | grep -vE "$DOCS_ONLY_PATHS" || true)"
+            if [ -z "$changed" ]; then
+              reason="no changed files, running everything to be safe"
+            elif [ -z "$other" ]; then
+              docs=true; reason="only documents changed"
+            else
+              reason="files outside the documents changed"
+            fi
+          fi
+          echo "docs_only=$docs" >> "$GITHUB_OUTPUT"
+          echo "Documents only: $docs ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
       - id: decide
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -243,8 +275,11 @@ jobs:
 
   db:
     # Task A06: migrations and tenant isolation on a throw-away PostgreSQL (same image and init
-    # script as Compose). Runs on every PR: DB code changes outside platform/deploy/ too.
+    # script as Compose). Runs on every PR except a documents-only change: DB code changes outside
+    # platform/deploy/ too.
     name: integration (database)
+    needs: detect
+    if: needs.detect.outputs.docs_only != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -309,6 +344,8 @@ jobs:
 
   semgrep:
     name: code (semgrep)
+    needs: detect
+    if: needs.detect.outputs.docs_only != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -330,6 +367,8 @@ jobs:
 
   trivy:
     name: dependencies (trivy)
+    needs: detect
+    if: needs.detect.outputs.docs_only != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
