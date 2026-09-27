@@ -16,6 +16,9 @@ interface ApiService {
   volumes: string[];
   read_only: boolean;
   cap_drop: string[];
+  cap_add?: string[];
+  privileged?: boolean;
+  user?: string;
   security_opt: string[];
   healthcheck: { test: string[] };
 }
@@ -55,6 +58,31 @@ describe('sdlc-api service', () => {
     expect(api.cap_drop).toEqual(['ALL']);
     expect(api.security_opt).toEqual(['no-new-privileges:true']);
     expect(api.healthcheck.test).toEqual(['CMD', 'node', '/app/dist/healthcheck.js']);
+  });
+
+  it('the long-running service never gets a capability back (review of PR #90)', () => {
+    expect(api.cap_add).toBeUndefined();
+    expect(api.privileged).toBeUndefined();
+    expect(api.user).toBeUndefined(); // the image's USER node applies
+    const text = readDeployFile('docker-compose.yml');
+    const block = text.slice(text.indexOf('\n  sdlc-api:\n'));
+    expect(block).not.toMatch(/cap_add|privileged|pid:|network_mode|docker\.sock/);
+    for (const port of api.ports) expect(port).toMatch(/^\$\{SDLC_BIND_ADDR:-127\.0\.0\.1\}:/);
+  });
+
+  it('capabilities are added back only to the one-shot credentials step, as root, removed after', () => {
+    const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
+    const lines = bootstrap.split('\n');
+    const withCaps = lines.filter((line) => line.includes('--cap-add'));
+    expect(withCaps).toHaveLength(1);
+    const at = lines.indexOf(withCaps[0]!);
+    const command = lines.slice(at - 1, at + 1).join(' ');
+    expect(command).toMatch(/compose .*run --rm -T --no-deps --user root/);
+    expect(withCaps[0]).toMatch(
+      /^\s+--cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh sdlc-api -c '$/,
+    );
+    const inFunction = bootstrap.slice(bootstrap.indexOf('cmd_api_credentials() {'));
+    expect(inFunction.indexOf('--cap-add')).toBeLessThan(inFunction.indexOf('\n}'));
   });
 
   it('bootstrap.sh delivers the api credentials; the Dockerfile runs as node', () => {
