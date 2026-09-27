@@ -5,7 +5,7 @@
 | Status | **Proposed** (task B07, session 1 for review; session 2 adds HOTL, the gate deadline and overdue escalations) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27: QUESTIONS #88–#92, #68 option A, with conditions; review of PR #101: §2.4 current-gate rule accepted, strict re-approval kept for the pilot) |
-| Related | D-02 FR-10, FR-12, FR-14, FR-17, FR-18, FR-22; D-03 sections 5.1, 6, 6.1–6.4, 12 (ADR-M02, ADR-M14); D-05 sections 6.2, 6.2b, 6.3 (version 1.11); D-08 tasks B07, B08, B09, B10, B12, C06, E06; handbook codes table §4, Ch.11, Ch.12, Ch.19 §19.8b; ADR-M16, ADR-M20, ADR-M26, ADR-M27, ADR-M28; QUESTIONS #16, #21, #53, #55, #64, #68, #73, #76, #88–#92 |
+| Related | D-02 FR-10, FR-12, FR-14, FR-17, FR-18, FR-22; D-03 sections 5.1, 6, 6.1–6.4, 12 (ADR-M02, ADR-M14); D-05 sections 6.2, 6.2b, 6.3 (version 1.12); D-08 tasks B07, B08, B09, B10, B12, C06, E06; handbook codes table §4, Ch.11, Ch.12, Ch.19 §19.8b; ADR-M16, ADR-M20, ADR-M26, ADR-M27, ADR-M28; QUESTIONS #16, #21, #53, #55, #64, #68, #73, #76, #88–#92 |
 
 ## 1. Context
 
@@ -95,7 +95,7 @@ loop:
 
 ### 2.5. Gate status comments (FR-22)
 
-- New table `intent_notices`: the outbox of the status comments. Codes and IDs only: kind (`submitted`, `advanced`, `rejected`, `changes_requested`), status, gate, previous gate, the decision that caused it, and the roles to mention (never `viewer`). Posted or abandoned is final (trigger, `SDA09`).
+- New table `intent_notices`: the outbox of the status comments. Codes and IDs only: kind (`submitted`, `advanced`, `rejected`, `changes_requested`), status, gate, previous gate, the decision that caused it, and the roles to mention (never `viewer`). Posted or abandoned is final (trigger, `SDA10`).
 - The workflow records one notice per status change, in the transaction of the change.
 - The poller posts them after its replies and escalation notices, with the same delivery rules (ADR-M27 §2.4: at least once, retries, give-up).
 - The comment is rendered from the catalog (`intent.status.*`, `gate.name.*`). It names the people who decided and mentions the current holders of the roles that act next. Logins are read at posting time and never stored.
@@ -105,7 +105,7 @@ loop:
 
 - Partial unique indexes on (`tenant_id`, `project_id`, `issue_number`) and on `pr_number`, for intents not `done`, `rejected` or `cancelled`.
 - `POST /v1/intents` answers 409 `issue_already_linked`. A closed intent frees its issue.
-- The poller's `intent_ambiguous` reply stays for data created before migration 0008 only.
+- The poller's `intent_ambiguous` reply stays for data created before migration 0009 only.
 
 ### 2.7. Tests and the Temporal test server (QUESTIONS #92)
 
@@ -147,8 +147,8 @@ Session 2 adds config `oversight.gate_overdue` (severity and response level of a
 
 ## 4. Consequences
 
-- D-05 version 1.11: `intents.gate_entered_at`, the one-open-intent indexes, table `intent_notices`, the audit index by entity.
-- Migration `0008-intent-workflow`. SQLSTATE `SDA09`.
+- D-05 version 1.12: `intents.gate_entered_at`, the one-open-intent indexes, table `intent_notices`, the audit index by entity.
+- Migration `0009-intent-workflow`. SQLSTATE `SDA10`.
 - Catalog: `intent.status.*`, `gate.name.*`, `api.error.gate_not_current`, `api.error.issue_already_linked`, `comment.reply.gate_not_current`, settings and start messages.
 - Handbook Ch.19 §19.8b: status comments, decisions at the current gate, one open intent per issue.
 - New package `@sdlc/workflow-client`; new command `pnpm test:workflow`; CI job `db` runs it.

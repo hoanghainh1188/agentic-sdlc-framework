@@ -1,5 +1,5 @@
-// Migration 0008: what the intent workflow needs (design/D-05 sections 6.2 and 6.2b, version
-// 1.11; D-08 B07; design/ADR-M30; QUESTIONS #68, #91).
+// Migration 0009: what the intent workflow needs (design/D-05 sections 6.2 and 6.2b, version
+// 1.12; D-08 B07; design/ADR-M30; QUESTIONS #68, #91).
 // Rules for every migration: see the header of 0001-tenancy.ts and design/ADR-M09.
 //
 // - `intents.gate_entered_at`: when the intent last entered its current gate. Approvals and other
@@ -15,13 +15,13 @@
 //   only: the text comes from the message catalog when the comment is posted.
 //
 // Custom SQLSTATE (translated in errors.ts):
-//   SDA09  a status notice that was posted or abandoned is final
+//   SDA10  a status notice that was posted or abandoned is final
 import { defineMigration } from './define.js';
 
 const CODE = `~ '^[a-z][a-z0-9_]{0,63}$'`;
 const OPEN = `status NOT IN ('done', 'rejected', 'cancelled')`;
 
-export const migration0008IntentWorkflow = defineMigration({
+export const migration0009IntentWorkflow = defineMigration({
   up: [
     `ALTER TABLE intents ADD COLUMN gate_entered_at timestamptz`,
     `ALTER TABLE intents ADD CONSTRAINT intents_gate_entered_with_gate CHECK (
@@ -67,7 +67,7 @@ export const migration0008IntentWorkflow = defineMigration({
          IF OLD.posted_at IS NOT NULL OR OLD.abandoned_at IS NOT NULL
             OR NEW.attempts < OLD.attempts THEN
            RAISE EXCEPTION 'intent_notices: notice % is final', OLD.id
-             USING ERRCODE = 'SDA09';
+             USING ERRCODE = 'SDA10';
          END IF;
          RETURN NEW;
        END $$`,

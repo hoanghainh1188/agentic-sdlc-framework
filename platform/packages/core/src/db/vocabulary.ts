@@ -2,11 +2,12 @@
 // Canonical codes (data classes, 2+N roles, …) come from `@sdlc/contracts`; this file lists only
 // the values that exist in the database layer alone. Only the enums used by existing tables exist
 // yet (A06; `actor_type` from A07; the registry enums from B02; `run_status` from C02; the
-// escalation enums from B11); later tasks add theirs with their
+// escalation enums from B11; `agent_status` from C10); later tasks add theirs with their
 // tables.
 // Changing a list needs a migration: design/ADR-M09-database-tooling.md section 2.5.
 import {
   ACTOR_TYPES,
+  AGENT_STATUSES,
   AUTONOMY_LEVELS,
   CHANGE_FLAGS,
   DATA_CLASSES,
@@ -52,6 +53,7 @@ export const DB_ENUMS = {
   escalation_status: ESCALATION_STATUSES,
   escalation_route: ESCALATION_ROUTES,
   escalation_step: ESCALATION_STEPS,
+  agent_status: AGENT_STATUSES,
 } as const;
 
 // Text columns with a CHECK constraint (D-05 section 6.1).
@@ -86,3 +88,8 @@ export const GATE_DECISION_SOURCES = [
   'workflow',
 ] as const;
 export type GateDecisionSource = (typeof GATE_DECISION_SOURCES)[number];
+
+// Agent register (D-05 section 6.1, handbook Ch.20, task C10, ADR-M31).
+/** Environments an agent may be approved for (handbook template T6). Runs are `sandbox`. */
+export const AGENT_ENVIRONMENTS = ['sandbox', 'staging', 'production'] as const;
+export type AgentEnvironment = (typeof AGENT_ENVIRONMENTS)[number];

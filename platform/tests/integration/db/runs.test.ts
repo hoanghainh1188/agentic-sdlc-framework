@@ -26,6 +26,7 @@ import {
   type IssueRunContract,
 } from '../../../packages/core/src/run-contract/index.js';
 import { credentialFiles, StubOpenBao } from '../../secrets/stub-openbao.js';
+import { seedAgent } from '../agent-seed.js';
 import { createTestDatabase, describeDb, tamper, type TestDatabase } from './helpers.js';
 
 const NOW = new Date('2026-09-26T08:00:00.000Z');
@@ -43,6 +44,7 @@ interface Seeded {
   readonly planId: string;
   readonly personA: string;
   readonly personB: string;
+  readonly agentId: string;
 }
 
 describeDb('C02: Run Contracts on PostgreSQL', () => {
@@ -127,7 +129,11 @@ describeDb('C02: Run Contracts on PostgreSQL', () => {
       actorType: 'human',
       actorId: personA,
     });
-    return { scope, intentId: intent.id, planId: plan.id, personA, personB };
+    const agent = await seedAgent(scope, personA, {
+      version: '1.4.0',
+      tools: ['shell:test', 'git', 'editor', 'browser'],
+    });
+    return { scope, intentId: intent.id, planId: plan.id, personA, personB, agentId: agent.id };
   }
 
   const input = (s: Seeded, extra: Partial<IssueRunContract> = {}): IssueRunContract => ({
@@ -135,7 +141,7 @@ describeDb('C02: Run Contracts on PostgreSQL', () => {
     planId: s.planId,
     baseSha: 'a'.repeat(40),
     agent: {
-      id: '66666666-6666-4666-8666-666666666666',
+      id: s.agentId,
       version: '1.4.0',
       instructionsSha256: SHA('c'),
       tools: ['shell:test', 'git', 'editor', 'browser'],
@@ -501,6 +507,24 @@ describeDb('C02: Run Contracts on PostgreSQL', () => {
           t.appRaw,
         ),
       ).rejects.toMatchObject({ code: '23503' });
+    });
+
+    it('refuses a run of an agent that is not registered in the tenant (C10, QUESTIONS #32)', async () => {
+      const a = await seed();
+      const b = await seed();
+      for (const agentId of [crypto.randomUUID(), b.agentId]) {
+        await expect(
+          sql`INSERT INTO runs (id, tenant_id, intent_id, plan_id, attempt, agent_id, agent_version,
+              branch, base_sha)
+            VALUES (${crypto.randomUUID()}, ${a.scope.tenantId}, ${a.intentId}, ${a.planId}, 1,
+              ${agentId}, '1.0', 'agent/INT-2026-0001', ${'a'.repeat(40)})`.execute(t.appRaw),
+        ).rejects.toMatchObject({ code: '23503', constraint: 'runs_agent_fkey' });
+      }
+      await expect(issue(a, { agent: { ...input(a).agent, id: b.agentId } })).rejects.toMatchObject(
+        {
+          code: 'reference_not_found',
+        },
+      );
     });
 
     it('a tenant never sees another tenant’s runs', async () => {

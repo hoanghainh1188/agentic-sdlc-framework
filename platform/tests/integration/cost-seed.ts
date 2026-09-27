@@ -10,6 +10,7 @@ import { parseTenantId } from '../../packages/core/src/db/tenant-id.js';
 import type { TenantScope } from '../../packages/core/src/db/tenant-scope.js';
 import { Registry } from '../../packages/core/src/registry/registry.js';
 import { issueRunContract } from '../../packages/core/src/run-contract/index.js';
+import { seedAgent } from './agent-seed.js';
 
 export interface SeedOptions {
   readonly slug: string;
@@ -29,6 +30,8 @@ export interface SeededRun {
   readonly intentCode: string;
   readonly planId: string;
   readonly personA: string;
+  /** The registered, active agent of the runs (C10). */
+  readonly agentId: string;
   readonly runId: string;
 }
 
@@ -73,7 +76,9 @@ export async function seedRun(db: PlatformDatabase, options: SeedOptions): Promi
     actorType: 'human',
     actorId: personA,
   });
-  const runId = await issueRun(scope, { intentId: intent.id, planId: plan.id, personA }, options);
+  const agent = await seedAgent(scope, personA, { version: '1.4.0' });
+  const ids = { intentId: intent.id, planId: plan.id, personA, agentId: agent.id };
+  const runId = await issueRun(scope, ids, options);
   return {
     scope,
     slug: options.slug,
@@ -82,6 +87,7 @@ export async function seedRun(db: PlatformDatabase, options: SeedOptions): Promi
     intentCode: intent.code,
     planId: plan.id,
     personA,
+    agentId: agent.id,
     runId,
   };
 }
@@ -89,7 +95,12 @@ export async function seedRun(db: PlatformDatabase, options: SeedOptions): Promi
 /** Issues one more queued run (the next attempt) for the same intent and plan. */
 export async function issueRun(
   scope: TenantScope,
-  ids: { readonly intentId: string; readonly planId: string; readonly personA: string },
+  ids: {
+    readonly intentId: string;
+    readonly planId: string;
+    readonly personA: string;
+    readonly agentId: string;
+  },
   options: Pick<SeedOptions, 'runBudget' | 'models' | 'now'>,
 ): Promise<string> {
   const issued = await issueRunContract(
@@ -99,7 +110,7 @@ export async function issueRun(
       planId: ids.planId,
       baseSha: 'a'.repeat(40),
       agent: {
-        id: '66666666-6666-4666-8666-666666666666',
+        id: ids.agentId,
         version: '1.4.0',
         instructionsSha256: 'c'.repeat(64),
         tools: ['editor'],

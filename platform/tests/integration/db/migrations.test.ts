@@ -112,6 +112,20 @@ const UPDATABLE: Record<string, readonly string[]> = {
   ],
   // B11: only the delivery moves (trigger: final once posted or abandoned).
   escalation_notices: ['attempts', 'posted_at', 'abandoned_at'],
+  // C10: state, owner and configuration (trigger: allowed moves, new version); never the key.
+  agents: [
+    'version',
+    'status',
+    'owner_id',
+    'model_ref',
+    'instructions_ref',
+    'instructions_sha256',
+    'allowed_tools',
+    'max_autonomy',
+    'approved_environments',
+    'last_recertified_at',
+    'updated_at',
+  ],
   // B07: the status comments; only the delivery moves (trigger: final once posted or abandoned).
   intent_notices: ['attempts', 'posted_at', 'abandoned_at'],
 };
@@ -238,8 +252,9 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       WHERE c.contype = 'f' AND c.conrelid::regclass::text NOT LIKE 'kysely_%'`);
     // C03: cost_records → projects, intents, runs; B06: receipts → projects, gate_decisions;
     // B11: escalations → intents, runs, users ×4; notices → escalations; receipts → escalations.
+    // C10: agents → users; runs → agents.
     // B07: intent_notices → intents, gate_decisions.
-    expect(fks).toHaveLength(40);
+    expect(fks).toHaveLength(42);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {
@@ -281,6 +296,7 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       'public.spec_refs (tenant_id, intent_id, version)',
       'public.plans (tenant_id, intent_id, version)',
       'public.gate_decisions (tenant_id, voids_decision_id) WHERE (voids_decision_id IS NOT NULL)',
+      'public.agents (tenant_id, agent_key)',
     ]) {
       expect(defs, expected).toContain(expected);
     }

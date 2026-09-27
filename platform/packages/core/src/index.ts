@@ -10,4 +10,5 @@ export * from './admin/index.js';
 export * from './commands/index.js';
 export * from './git-events/index.js';
 export * from './escalation/index.js';
+export * from './agents/index.js';
 export * from './workflow/index.js';

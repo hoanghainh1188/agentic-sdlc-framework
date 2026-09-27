@@ -19,7 +19,7 @@ export type RegistryErrorCode =
   | 'approval_refused'
   /**
    * Another open intent of the project is linked to the same issue or pull request
-   * (design/QUESTIONS.md #68, migration 0008).
+   * (design/QUESTIONS.md #68, migration 0009).
    */
   | 'issue_already_linked';
 

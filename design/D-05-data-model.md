@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.11 |
+| Version | 1.12 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the B07 plan (intent workflow: `gate_entered_at`, one open intent per issue, status notices; ADR-M30, QUESTIONS #68, #91) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the C10 plan (agent register; ADR-M31); 1.12 approved by Harry on 2026-09-27 in the B07 plan (intent workflow: `gate_entered_at`, one open intent per issue, status notices; ADR-M30, QUESTIONS #68, #91) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -224,23 +224,26 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 
 - G1 fails when the record is missing, or when the intent's `data_class` is not in `allowed_data_classes`.
 
-**`agents`** (agent register; handbook Chapter 20)
+**`agents`** (agent register; handbook Chapter 20; task C10, ADR-M31)
 
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| agent_key | text | e.g. `coder-openhands`; unique per tenant |
-| version | text | |
-| status | agent_status | Only `active` agents may run |
-| owner_id | uuid FK users | Technical owner |
-| model_ref | text | Pinned, e.g. `provider/model@version` |
-| instructions_ref | text | e.g. `AGENTS.md@v5`, with hash |
-| instructions_sha256 | char(64) | Checked before each run |
-| allowed_tools | text[] | |
-| max_autonomy | autonomy_level | |
-| approved_environments | text[] | |
-| last_recertified_at | date null | Warning when older than 3 months |
+| agent_key | text | e.g. `coder-openhands`; unique per tenant, also after retirement: an identity is never reused (handbook Ch.20 §20.10) |
+| version | text | Version label. A change of the configuration is a new version (Ch.20 §20.9) |
+| status | agent_status | Only `active` agents may run. Allowed moves: see below |
+| owner_id | uuid FK users | Technical owner; receives the recertification warning |
+| model_ref | text null | The LiteLLM gateway model name, which includes the model version, e.g. `claude-haiku-4-5-20251001`, `gpt-oss-20b`. Must be in the run's `allowed_models` (QUESTIONS #79, #93). Changing the model behind a gateway name counts as a new agent version. Required once `active` |
+| instructions_ref | text | `<path in the repository>@<label>`, e.g. `AGENTS.md@v5` |
+| instructions_sha256 | char(64) | SHA-256 of that file; checked before each run against the file at the run's `base_sha`. Any edit of the file means a new agent version (QUESTIONS #94) |
+| allowed_tools | text[] | Tool codes |
+| max_autonomy | autonomy_level | At most L2 in the MVP |
+| approved_environments | text[] | `sandbox`, `staging`, `production`; runs need `sandbox` |
+| last_recertified_at | date null | Warning when older than config `agents.recertification_months` (default 3, rule M18). Set by the first activation when empty (ADR-M31 §2.7) |
 | updated_at | timestamptz | |
+
+- Codes only, no free text; rows are never deleted (no DELETE grant). Every change appends an `agent.*` audit event with keys, codes and hashes only.
+- Status moves (trigger, `SDA09`): `proposed` → `active`, `retired`; `active` → `suspended`, `quarantined`, `retired`; `suspended` → `active`, `quarantined`, `retired`; `quarantined` → `suspended`, `retired`; `retired` is final. The configuration columns change only while `proposed` or `suspended`, and only with a new `version`.
 
 ### 6.1b. Git event receipts
 
@@ -329,7 +332,7 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | decision_id | uuid FK gate_decisions null | The decision that caused the change; null for the submit |
 | audience_roles | project_role[] | Roles mentioned in the comment: the people who act next. Never `viewer`, at most 8 |
 | attempts | smallint | |
-| posted_at, abandoned_at | timestamptz null | Delivery; final once set (trigger, `SDA09`) |
+| posted_at, abandoned_at | timestamptz null | Delivery; final once set (trigger, `SDA10`) |
 
 - The workflow records one notice per status change, in the transaction of the change. The poller posts it on the intent's issue after its replies and escalation notices; the text comes from the message catalog, and logins are read at posting time, never stored.
 - `platform_app` may update the delivery columns only. No DELETE.
@@ -373,7 +376,7 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | intent_id | uuid FK | |
 | plan_id | uuid FK | Plan approved at G3 |
 | attempt | int | Attempt number for the intent (retries) |
-| agent_id | uuid FK agents | Registered agent (FR-36). No foreign key until the agent register exists: C10 adds `(tenant_id, agent_id) → agents`; C06 checks the agent is registered and active before a contract is issued (QUESTIONS #32) |
+| agent_id | uuid FK agents | Registered agent (FR-36). Foreign key `(tenant_id, agent_id) → agents` since C10 (migration `0008-agents`, QUESTIONS #32); C06 calls `checkAgentForRun` before a contract is issued (ADR-M31 §2.6) |
 | agent_version | text | Copied from the register at start |
 | branch | text | `agent/INT-…` |
 | base_sha | char(40) | |
@@ -677,4 +680,5 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.8 | 2026-09-27 | Claude (task B06), approved by Harry | New §6.1b `git_event_receipts` (with `event_attempts`, outcomes `failing` and `failed_internal` from the review of PR #94); §6.1 notes: users mapped by numeric account ID, cursor compare-and-set (ADR-M27, QUESTIONS #43, #45) |
 | 1.9 | 2026-09-27 | Claude (task B11), approved by Harry | §5: new enums `escalation_route`, `escalation_step`; §6.4b `escalations` as built (route, producers, nullable owners, clock columns, coded packet and decision) and new `escalation_notices`; §6.1b `git_event_receipts.escalation_id` (ADR-M28, QUESTIONS #73–#77) |
 | 1.10 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §6.4: `run_events` types of C04 and C05, `runs.stop_reason` codes of C05; the iteration cap ends as `stopped_budget` with `max_iterations` (ADR-M29, QUESTIONS #82) |
-| 1.11 | 2026-09-27 | Claude (task B07, session 1), approved by Harry | §4 ERD and §6.2: `intents.gate_entered_at`, one open intent per issue and pull request, decisions ordered by the audit chain, new table `intent_notices` (ADR-M30, QUESTIONS #68, #91) |
+| 1.11 | 2026-09-27 | Claude (task C10), approved by Harry | §6.1 `agents` as built: `model_ref` is the gateway model name with its version, `instructions_ref` format, status moves, config changes only with a new version, tombstones; §6.4 `runs.agent_id` foreign key (ADR-M31, QUESTIONS #32, #93, #94) |
+| 1.12 | 2026-09-27 | Claude (task B07, session 1), approved by Harry | §4 ERD and §6.2: `intents.gate_entered_at`, one open intent per issue and pull request, decisions ordered by the audit chain, new table `intent_notices` (ADR-M30, QUESTIONS #68, #91) |

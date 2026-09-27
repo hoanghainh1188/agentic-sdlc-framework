@@ -380,6 +380,14 @@ const CASES: Case[] = [
     key: 'config.rule.escalation_viewer',
     path: 'escalation.notify_on_raise.low',
   },
+  // M18: agent recertification at least every 3 months (C10, handbook Ch.20 §20.8, ADR-M31).
+  {
+    name: 'agents recertified every 4 months',
+    rule: 'M18',
+    yaml: 'agents:\n  recertification_months: 4\n',
+    key: 'config.rule.recertification_max',
+    path: 'agents.recertification_months',
+  },
 ];
 
 describe('mandatory rules refuse loosening (AC2)', () => {
@@ -426,6 +434,7 @@ describe('tightening is always allowed (AC2)', () => {
     ['medium risk at L1', 'autonomy:\n  max_by_risk: { medium: L1 }\n'],
     ['warning at 70 %, stop at 90 %', 'budget:\n  warn_percent: 70\n  stop_percent: 90\n'],
     ['loop limit 2', 'run:\n  loop_detection:\n    identical_tool_calls_max: 2\n'],
+    ['agents recertified every 2 months', 'agents:\n  recertification_months: 2\n'],
     [
       'critical acknowledge 10 minutes',
       sla('critical', 'acknowledge', '{ value: 10, unit: minutes }'),
