@@ -33,6 +33,26 @@ model_list:
 {{- end }}
 {{- end }}
 
+{{- if in $providers "ollama" }}
+{{- with secret "kv/data/litellm/providers/ollama" }}
+  # DEVELOPER MACHINES ONLY (QUESTIONS #78, ADR-M10 section 3): a local Ollama model, used for the
+  # C05 real-model run. Never on the internal server (no GPU). Ollama has no key: the entry holds
+  # its address as LiteLLM sees it (field api_base, for example http://host.docker.internal:11434).
+  # Local tag only: Ollama ":cloud" models send data to ollama.com and are not self-hosted.
+  # Internal cost above 0 so budgets still apply (D-07 section 3); [Proposal] placeholder values
+  # until the GPU cost per token is known.
+  - model_name: gpt-oss-20b
+    litellm_params:
+      model: ollama_chat/gpt-oss:20b
+      api_base: {{ .Data.data.api_base | toJSON }}
+      num_ctx: 32768
+      reasoning_effort: low
+      input_cost_per_token: 0.0000001
+      output_cost_per_token: 0.0000004
+    model_info:
+      provider_type: self_hosted
+{{- end }}
+{{- end }}
 general_settings:
 {{- with secret "kv/data/cost-controller/litellm-master-key" }}
   master_key: {{ .Data.data.value | toJSON }}

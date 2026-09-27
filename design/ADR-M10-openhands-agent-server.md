@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C01, PR for review) |
+| Status | **Proposed** (task C01, PR for review); condition met in C05 session 2 (§3, QUESTIONS #78) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25) |
 | Related | D-08 tasks C01, C04, C05, C11; D-02 FR-30…FR-35, FR-50, FR-51; D-03 sections 5.3, 7.2, 8, 9, 12 (ADR-M04), 13; D-07 section 3; D-01 section 5.1; ADR-M17; design/QUESTIONS.md #13, #14, #15 |
@@ -16,10 +16,12 @@ All sources were accessed on 2026-09-25.
 
 ## 2. Decision
 
-**CONDITIONAL GO for C05** (Harry, 2026-09-25).
+**CONDITIONAL GO for C05** (Harry, 2026-09-25). **Condition met** on 2026-09-27 with a local model (§3, QUESTIONS #78): GO.
 
 - **Proven with the stub model:** OpenHands Agent Server `1.48.0` can be controlled from Node.js over REST. Every model call goes through LiteLLM on a per-run virtual key with the seven labels. The sandbox has no route out except LiteLLM, drops all capabilities and runs with a read-only root filesystem. The kill switch, the budget block and loop detection work.
-- **Condition:** one real run with Claude on a company API key must pass before C05 is done (section 3, QUESTIONS.md #15). The stub model returns scripted tool calls; it does not show how a real model uses the tools, how many tokens a task costs, or how much memory a real run needs.
+- **Condition:** one real run with a real model must pass before C05 is done (section 3, QUESTIONS.md #15). The stub model returns scripted tool calls; it does not show how a real model uses the tools, how many tokens a task costs, or how much memory a real run needs.
+  - Originally: Claude on a company API key. No company key is planned, so the condition was changed (Harry, 2026-09-27, QUESTIONS #78): one real run through LiteLLM with a **local Ollama model on a developer machine** (`gpt-oss:20b`). Met in C05 session 2.
+  - What the local run does not show: Claude-level quality, real API token cost, behaviour on the internal server (which has no GPU and is not a target for this model). One API-model run is still needed before the trial M-E (QUESTIONS #81).
 
 ### 2.1. Pinned image and licence
 
@@ -92,19 +94,33 @@ With the default of 1–2 concurrent runs, reserve about 2 GiB per sandbox (the 
 
 ## 3. Real-model run
 
-**Deferred** (Harry, 2026-09-25): no company Anthropic API key is available yet. C01 closes without the real run.
-
-The run is ready and must pass before C05 is done (QUESTIONS.md #15):
+**Passed** (C05 session 2, 2026-09-27, QUESTIONS #78). Two runs, both passed. The test is `pnpm test:agent-real` (developer machines only, never in CI; ADR-M29 §2.9).
 
 | Item | Value |
 |---|---|
-| Model | `anthropic/claude-haiku-4-5-20251001` (small current Claude model), LiteLLM alias `poc-claude` in `litellm.poc.yaml` |
-| Key | Company API key as `POC_ANTHROPIC_API_KEY` in the Git-ignored `platform/deploy/.env`; given to LiteLLM only |
-| Cap | Per-run virtual key budget `min(budget.default_run_usd, 1.00)` = USD 1.00 |
-| Data sent | Fixture workspace only (a README and the new file); no client data |
-| How | Live test case `real Claude run through LiteLLM` (spike README); it skips while the key is missing |
-| Pass | Conversation `finished`; `hello.txt` reported as `ADDED` by `/api/git/changes`; spend at or below the cap |
-| Record here | Status, run time, number of model calls, spend, sandbox RAM during the run |
+| Model | `gpt-oss:20b` (Apache-2.0), Ollama 0.34.4 on the developer's Mac (Apple M4 Pro, 24 GB unified memory), local tag, MXFP4, 100 % on the GPU. LiteLLM alias `gpt-oss-20b` (`ollama_chat/`), `reasoning_effort: low`, `num_ctx` 32768, `provider_type: self_hosted` |
+| Path | Agent Server 1.48.0 in a node24 sandbox → LiteLLM (pinned image, own database) with a per-run virtual key from the Cost Controller (seven labels) → Ollama at `host.docker.internal:11434`. The sandbox reaches only LiteLLM |
+| Cap | Virtual key budget `min(budget.default_run_usd, 1.00)` = USD 1.00. Internal cost of the model: [Proposal] USD 0.10 / 0.40 per million input / output tokens |
+| Data sent | Fixture workspace only: a README, an AGENTS.md and a two-line spec. No client data |
+| Pass criteria | Run `succeeded` (agent `finished`); `hello.txt` reported as added; spend at or below the cap; calls in `cost_records` with the model name; the key refused after `endRun` |
+
+| Measure | Run 1 | Run 2 |
+|---|---|---|
+| Result | Passed | Passed |
+| Time, agent start to end of run | 110 s | 89 s |
+| Agent steps / model calls | 3 / 3 | 3 / 3 |
+| Tokens in / out | 17 896 / 156 | 17 870 / 158 |
+| Cost (internal) | USD 0.001852 | USD 0.001850 |
+| Changed files | `hello.txt` (added) | `hello.txt` (added) |
+| Ollama memory (resident, all processes) | 12 552 MiB | 12 569 MiB |
+| Sandbox peak memory | 518 MiB | 506 MiB |
+| LiteLLM peak memory | 700 MiB | 544 MiB |
+| Lowest free system memory | 10 % | 8 % |
+
+- **Memory is tight on 24 GB** but was enough. The development stack (profiles `core` and `platform`, about 1 GiB in Docker) kept running during both runs; stopping it would save little, because Ollama (12.5 GiB) and the Docker Desktop VM (7.7 GiB) take most of the memory. Close other large applications before a run.
+- About 6 000 input tokens per call: the OpenHands system prompt and the tool definitions. The first call takes longest, while Ollama reads the long prompt.
+- `reasoning_effort: low` keeps the output short (156 tokens for the whole task). It is set at the gateway, not in the adapter (ADR-M29 §2.9).
+- The runs check the path and the tool use, not the quality of a larger task. The quality of a small local model on real tasks is not measured here.
 
 ## 4. Limitations and findings for later tasks
 
@@ -158,3 +174,4 @@ The run is ready and must pass before C05 is done (QUESTIONS.md #15):
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task C01) | First version |
+| 0.2 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §2: the condition is one real run with a local Ollama model (QUESTIONS #78); §3: two runs with `gpt-oss:20b` passed, numbers recorded; API-model run before M-E (QUESTIONS #81) |

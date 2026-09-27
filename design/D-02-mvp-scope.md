@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.0 |
+| Version | 1.1 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78) |
 | Readers | Leadership (sections 1–4, 10–12), tech lead / developers (all), Claude Code (sections 5–9, 13) |
 | Related documents | D-01 (build vs buy), D-07 (models and tokens), handbook codes table and Chapters 2–6, 10–20 |
 
@@ -75,7 +75,7 @@ The **producer of a change never approves it**. One person may hold several role
 | Second Git host | MVP+1 |
 | Second agent, multi-agent | MVP+1 |
 | WeKnora (document knowledge), code index, full context snapshots (#11) | MVP+1 |
-| Self-hosted models (vLLM) | When the GPU decision is made. The MVP gateway only needs to be able to add models |
+| Self-hosted models (vLLM) | When the GPU decision is made. The MVP gateway only needs to be able to add models. Exception: a local Ollama model on a **developer machine** proves the agent path in C05 (QUESTIONS #78); it is not a deployment target |
 | Converting BMAD/Spec Kit specs into our own format | MVP+1 |
 | Full OPA/Cedar policy engine (#8) | MVP+1. The MVP uses simple rules in code, behind an interface |
 | Backlog / Jira integration (#12) | MVP+1 |
@@ -315,7 +315,7 @@ The MVP is done when **all** of the following are true:
 | Item | Assumption in the MVP | Who decides, when |
 |---|---|---|
 | Monthly token budget | A **config parameter**. The pilot uses a small cap approved by Harry | Leadership, after 2–4 weeks of trial |
-| GPUs / self-hosted models | The MVP **uses API models only**. The gateway is ready to add vLLM | Leadership, when token data exists |
+| GPUs / self-hosted models | The MVP **uses API models only**. The gateway is ready to add vLLM. Only exception: a local Ollama model on a developer machine for the C05 proof (QUESTIONS #78); one API-model run is still needed before M-E (QUESTIONS #81) | Leadership, when token data exists |
 | Charging clients for tokens | The MVP **records cost per tenant**. No charging yet | Leadership, before selling |
 | Team and timeline for building | Not set | Leadership |
 
@@ -397,4 +397,5 @@ The MVP is done when **all** of the following are true:
 | 0.3 | 2026-09-24 | Claude (draft) | Platform first, trial later. M-0 moved to right before M-C. Added M-E trial, M-F adjustment |
 | 0.4 | 2026-09-24 | Claude (draft) | After review: SeaweedFS, Valkey, GitHub polling, FR-11 (G7 ≠ intent creator), MVP vs M-F criteria separated |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Aligned with the handbook: 2+N roles, L0–L4, gate × risk oversight matrix, forced HITL (G3), dual approval (G7), approval binding, escalation with SLA, project AI record, agent register, kill switch, retention. New FR-14…19, FR-34…36, FR-43…44 |
+| 1.1 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §4.2 and §12: a local Ollama model on developer machines for the C05 proof only, not a deployment target; API-model run before M-E (QUESTIONS #78, #81) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. NFR-08 and Q5 updated for the English decision (message catalog). Section 11.1 fixed: step C belongs to M-F |
