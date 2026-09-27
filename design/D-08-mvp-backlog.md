@@ -38,11 +38,11 @@
 | Milestone | Content | Tasks | Sizes |
 |---|---|---|---|
 | M-A | Foundation: infrastructure, security, audit | 11 | S×6 · M×5 |
-| M-B | Intent + G1–G3 | 12 | S×4 · M×7 · L×1 |
+| M-B | Intent + G1–G3 | 13 | S×4 · M×8 · L×1 |
 | M-0 | Sample pilot repo (separate repo, right before M-C) | 4 | S×1 · M×2 · L×1 |
 | M-C | Run + G4–G6 | 11 | S×3 · M×7 · L×1 |
 | M-D | G7–G8 + evidence + cost | 7 | S×4 · M×3 |
-| **Total** | | **45** | |
+| **Total** | | **46** | |
 
 ### Order and dependencies between milestones
 
@@ -370,6 +370,23 @@ flowchart LR
 - [ ] AC2: G1 fails when the record is missing or the intent's data class is not allowed; unknown consent → only `client_restricted` handling
 - [ ] AC3: `prod_logs_allowed` exposed to policy for operations tasks
 
+#### B13. Admin onboarding: projects, users, identities, roles, config
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | B03, B12 | FR-11, FR-19 | platform/apps/api (admin), platform/apps/cli (sdlc admin …), platform/packages/core (admin services), design/ADR (next free number) |
+
+**Acceptance criteria**
+
+- [ ] AC1: Decide the tenant-admin model (QUESTIONS from B03, D3: A = new tenant-level role table, B = project `admin` counts as tenant admin); record it in an ADR and D-05
+- [ ] AC2: Admin API endpoints and `sdlc admin project|user|identity|role|config`, all through TenantScope; every change audited (IDs, codes, hashes only); roles revoked through revoked_at
+- [ ] AC3: GitHub identities in user_identities are linked by the numeric GitHub account ID, never by login (QUESTIONS #45)
+- [ ] AC4: Project config upload: validated and hashed by @sdlc/config (mandatory rules; warnings recorded in the config.changed audit event)
+- [ ] AC5: Token issuing moves behind the API; `sdlc audit verify` moves behind the API once a tenant admin exists (update CLAUDE.md)
+- [ ] AC6: Integration tests: cross-tenant isolation, wrong role refused, audit chain intact
+
+> Note: Follows B03 (decision D1). Needed before E07: a real tenant must be set up without direct database access
+
 #### B10. Integration tests G1–G3
 
 | Size | Depends on | Requirements | Code area |
@@ -665,7 +682,7 @@ flowchart LR
 
 | Size | Depends on | Requirements | Code area |
 |---|---|---|---|
-| M | E03, E04, E05, C09 | D-02 section 10 | platform/tests/integration/*, README |
+| M | E03, E04, E05, C09, B13 | D-02 section 10 | platform/tests/integration/*, README |
 
 **Acceptance criteria**
 
@@ -725,4 +742,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.1 | 2026-09-25 | Claude, approved by Harry | C03: provider keys via an OpenBao Agent sidecar (QUESTIONS #1). A10: internal CA and TLS on OpenBao 8200, size S → M (QUESTIONS #20) |
 | 1.2 | 2026-09-25 | Claude, approved by Harry | New task A11: stop publishing the OpenBao port on the host (QUESTIONS #27); A10 now depends on A11 |
 | 1.3 | 2026-09-27 | Claude (task C04), approved by Harry | C04 AC1: sandbox egress to LiteLLM and the package proxy only, GitHub through the runner; C08 note: the runner pushes, update the D-03 §4 flow and D11 (QUESTIONS #52, #59, ADR-M25) |
+| 1.4 | 2026-09-27 | Claude, approved by Harry | New task B13 (admin onboarding, B03 decision D1); E07 depends on B13 |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
