@@ -103,7 +103,7 @@ If anything differs → **cancel and ask again**. Three rules always hold:
 
 ## 19.8b. Using the platform: gate commands in comments
 
-> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B06, 2026-09-27, updated with task B07 (the gate workflow and status comments) and task B12 (the project AI record before G1), and kept in line with the platform code (`design/ADR-M27-github-poller.md`, `design/ADR-M30-intent-workflow.md`, `design/ADR-M32-project-ai-record.md`). The rest of this chapter is Draft 0.1 and is written outside Claude Code.
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B06, 2026-09-27, updated with task B07 (the gate workflow and status comments; session 2: HOTL gates, block windows, gate deadlines) and task B12 (the project AI record before G1), and kept in line with the platform code (`design/ADR-M27-github-poller.md`, `design/ADR-M30-intent-workflow.md`, `design/ADR-M32-project-ai-record.md`). The rest of this chapter is Draft 0.1 and is written outside Claude Code.
 
 You can decide a gate by writing a comment on the GitHub issue or pull request of the intent. The platform reads new comments about every 30 seconds (project setting `github.poll_interval_seconds`). The CLI (`sdlc gate …`, task B04) does the same through the API.
 
@@ -127,7 +127,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - You need the gate's role on the project, for example Person A for G1 and Person B for G3 (codes table §4). The producer of a change never approves it.
 - Bots and automation accounts never decide.
 - The intent must be linked to the issue or pull request. One issue (or pull request) has at most one open intent; the platform refuses a second one until the first is closed.
-- **You can decide only the gate the intent is waiting at.** The last status comment shows it. A command for another gate gets a reply, and nothing is recorded.
+- **You can decide only the gate the intent is waiting at.** The last status comment shows it. A command for another gate gets a reply, and nothing is recorded. One exception: a gate the platform passed on HOTL can still be rejected or sent back during its block window (below).
 
 **Answers.**
 
@@ -140,12 +140,37 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
   | G*n* approved, waits at the next gate | The gate had the approvals it needs, bound to the current spec or plan |
   | Rejected at G*n* (reason code) | Someone rejected the gate; the intent is closed |
   | Changes requested at G*n* (reason code) | Someone asked for changes; the intent stays at the gate |
+  | The platform passed G*n* (HOTL), waits at the next gate | The gate's conditions hold at Low risk; the comment shows until when you can block it |
+  | Back at G*n* | Someone requested changes at a passed gate during its block window; the intent went back |
 
 - The status comment comes a little later than your command: the platform moves the intent, then posts on the next poll (about 30 seconds).
 - **A request for changes** keeps the intent at the gate. Approvals written before it no longer count. Update the gate's input (a new spec version for G2, a new plan for G3), then approve again; an approval of an older spec or plan no longer counts either.
-- **No gate passes by silence.** At G1–G3 the intent waits until a person with the gate's role approves. While an escalation freezes the intent, it does not move on, even with the approvals; it continues once the escalation is decided (Chapter 18 §18.8b).
+- **No gate passes by silence.** At a HITL gate the intent waits until a person with the gate's role approves. HOTL gates pass only when their conditions hold, and you can still block them (below). While an escalation freezes the intent, it does not move on, even with the approvals; it continues once the escalation is decided (Chapter 18 §18.8b).
 - A command that the platform cannot read or refuses gets a reply that says why and shows the syntax. Nothing is recorded in that case: fix the command and write a new comment.
 - If the platform itself fails while handling your command, it tries again on the next polls. After a few failed attempts it gives up and replies that it could not record the command. Nothing is recorded; write the command again later, and tell the platform operator.
+
+**HOTL gates (Low risk: G2 and G3 by default).** The project setting `oversight.matrix` says which gates are HOTL at which risk tier.
+
+- The platform **passes** the gate by itself when its conditions hold:
+  - G2: a spec is linked to the intent;
+  - G3: a plan with at least one planned file is submitted, and no change flag forces HITL (for example `migration`; Chapter 12).
+- It posts a status comment that mentions the people of the gate (G2: Person A; G3: Person B) and says **until when you can block it**. This is the **block window**: 4 working hours by default (project setting `oversight.hotl_block_window`, counted on the project's working calendar).
+- **To block a passed gate**, write within the window `/request-changes G2 <reason>` or `/reject G2 <reason>`, even though the intent already waits at a later gate. You need the gate's role.
+  - A request for changes takes the intent **back** to that gate. Approvals given at the later gates no longer count; they must be given again when the intent gets there.
+  - A rejection closes the intent.
+  - After the window, the gate can no longer be blocked. `/approve` of a passed gate is always refused: there is nothing to approve.
+- After a request for changes, the platform does **not** pass the gate again with the same spec or plan. Link a new spec or submit a new plan, or approve the gate yourself with `/approve G2`.
+- `/approve` at a HOTL gate always passes it at once, and then there is no block window: a person decided.
+- **No agent run starts while a block window is open** (task C06): a person may still take the intent back.
+
+**Deadlines of the gates (FR-12).**
+
+- A gate that waits for a person has a deadline: 1 working day by default (project setting `oversight.hitl_gate_deadline`). The clock starts when the intent enters the gate, and starts again at each request for changes. It also runs while the gate waits for its spec or plan.
+- When the deadline passes, the platform raises **one escalation** (Chapter 18 §18.8b): Medium, level Notify by default (project setting `oversight.gate_overdue`). It goes to Person A when Person A holds the gate's role (G1, G2), otherwise to Person B (G3).
+- When the gate is decided (approved, rejected, changes requested, passed), the platform closes that escalation itself. You do not need to `/ack` or `/decide` it.
+- The platform records how long each gate waited for the person who decided (`waited_seconds`). The report comes with task E06.
+
+**Scopes.** An approval of G1, G2 or G3 has no scope. The API refuses an approval that sends one (`scope_not_allowed`).
 
 **The project AI record (before G1).** An intent enters G1 only when the project's AI record allows the intent's data class (Chapter 2 §2.5, D-02 FR-19).
 
@@ -192,3 +217,4 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 |---|---|---|---|
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content |
+| 0.2 | 2026-09-27 | Claude (task B07, session 2) | §19.8b platform usage: HOTL gates and the block window, gate deadlines and their escalation, no scope at G1–G3 (ADR-M30 §2.4b, §2.9) |

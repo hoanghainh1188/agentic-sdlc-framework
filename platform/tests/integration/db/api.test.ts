@@ -607,16 +607,22 @@ describeDb('B03: API app on PostgreSQL', () => {
         planSha256: HASH('e'),
         changeFlags: ['migration'],
       });
-      const reply = await decide(tenantA, 'b', created.code, 'G3', {
-        decision: 'approve',
-        scope: { environment: 'staging' },
-      });
+      // B07 session 2 (D3): the gate advance at G1–G3 has no scope, so a scoped approval is refused.
+      expectError(
+        await decide(tenantA, 'b', created.code, 'G3', {
+          decision: 'approve',
+          scope: { environment: 'staging' },
+        }),
+        422,
+        'scope_not_allowed',
+      );
+      const reply = await decide(tenantA, 'b', created.code, 'G3', { decision: 'approve' });
       expect(reply.statusCode, JSON.stringify(reply.json())).toBe(201);
       expect(reply.json()).toMatchObject({
         oversight_mode: 'HITL',
         approver_role: 'person_b',
         input_sha256: HASH('e'),
-        scope: { environment: 'staging' },
+        scope: null,
       });
     });
 

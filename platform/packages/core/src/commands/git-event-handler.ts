@@ -330,7 +330,13 @@ async function linkedUser(
 function refusalReply(error: unknown, gate: Readonly<Record<string, string>>): Reply | undefined {
   if (error instanceof CommandError) {
     // `project_not_found` cannot happen here (the project is the polled one); same text as no role.
-    const code = error.code === 'project_not_found' ? 'intent_not_found' : error.code;
+    // `scope_not_allowed` cannot happen either: a comment never carries a scope.
+    const code =
+      error.code === 'project_not_found'
+        ? 'intent_not_found'
+        : error.code === 'scope_not_allowed'
+          ? 'decision_not_allowed'
+          : error.code;
     return { code, params: gate };
   }
   if (error instanceof RegistryError) {

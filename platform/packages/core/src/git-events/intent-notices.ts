@@ -15,6 +15,9 @@ import { t, type MessageKey } from '@sdlc/messages';
 import { isCommandGate } from '../commands/gate-input.js';
 import type { GateDecisionRow, Intent, IntentNotice } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
+import { loadEffectiveConfig } from '../registry/effective-config.js';
+import { decisionRecordedAt } from '../workflow/gate-history.js';
+import { blockWindowEnd } from '../workflow/hotl.js';
 import { mentionsFor, type NoticeDeps } from './escalation-notices.js';
 
 export type IntentNoticeLogEvent =
@@ -55,6 +58,10 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.rejected';
     case 'changes_requested':
       return 'intent.status.changes_requested';
+    case 'hotl_passed':
+      return 'intent.status.hotl_passed';
+    case 'returned':
+      return 'intent.status.returned';
     case 'ai_record_refused':
       return 'intent.status.ai_record_refused';
     default:
@@ -69,6 +76,13 @@ export interface IntentNoticeView {
   readonly deciders: readonly string[];
   readonly mentions: readonly string[];
   readonly reasonCode: string | null;
+  /** HOTL pass: when its block window closes (UTC). */
+  readonly windowEnd?: Date | null;
+}
+
+/** `YYYY-MM-DD HH:MM UTC`: the same text whatever the reader's locale. */
+export function formatUtcMinute(at: Date): string {
+  return `${at.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 }
 
 /** The Markdown body of one status comment. A hidden marker names the intent and the notice. */
@@ -92,6 +106,7 @@ export function renderIntentNotice(
           ? view.mentions.join(' ')
           : t('escalation.notice.nobody', {}, locale),
       reason: view.reasonCode ?? 'other',
+      window_end: view.windowEnd ? formatUtcMinute(view.windowEnd) : '—',
     },
     locale,
   );
@@ -117,11 +132,18 @@ async function viewOf(
 ): Promise<IntentNoticeView> {
   const decision: GateDecisionRow | undefined =
     notice.decision_id === null ? undefined : await scope.gateDecisions.getById(notice.decision_id);
+  let windowEnd: Date | null = null;
+  if (notice.kind === 'hotl_passed' && decision) {
+    const { config } = await loadEffectiveConfig(scope.projectConfigs, intent.project_id);
+    const passAt = await decisionRecordedAt(scope, intent.id, decision.id);
+    windowEnd = passAt === null ? null : blockWindowEnd(passAt, config);
+  }
   return {
     code: intent.code,
     deciders: decision ? await loginsOf(scope, decision.decided_by) : [],
     mentions: await mentionsFor(scope, intent.project_id, notice.audience_roles, []),
     reasonCode: decision?.reason_code ?? null,
+    windowEnd,
   };
 }
 

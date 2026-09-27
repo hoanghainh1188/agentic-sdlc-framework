@@ -39,7 +39,7 @@ escalation:
 | Section | Settings |
 |---|---|
 | `oversight.matrix` | `G1`…`G7`, and `G8.production` / `G8.non_production`; each has `low`, `medium`, `high`, `critical` cells: `mode` (`HITL`, `HOTL`, `AUDIT`; `POLICY` at G4 only), `roles`, `approvals` (default 1), `on_breach` (HITL) |
-| `oversight` | `forced_hitl_g3.change_flags`, `dual_approval_g7.change_flags` and `.roles`, `g6_security_findings.mode` and `.min_severity`, `hitl_gate_deadline`, `hotl_block_window`, `approval_expiry` |
+| `oversight` | `forced_hitl_g3.change_flags`, `dual_approval_g7.change_flags` and `.roles`, `g6_security_findings.mode` and `.min_severity`, `hitl_gate_deadline`, `hotl_block_window`, `approval_expiry`, `gate_overdue.severity` and `.response_level` |
 | `autonomy.max_by_risk` | Maximum autonomy per risk tier |
 | `escalation` | `sla.<severity>.acknowledge` and `.resolve`; `calendar` (`time_zone`, `working_days`, `working_hours`, `holidays`) |
 | `run` | `g6_ci_retries`, `loop_detection.identical_tool_calls_max`, `loop_detection.no_progress_window_minutes` |

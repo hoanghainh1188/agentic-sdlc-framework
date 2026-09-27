@@ -398,7 +398,8 @@ describeDb('B12: the project AI record on PostgreSQL', () => {
       expect(await step(intent)).toEqual({ outcome: 'moved' });
       expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G1' });
       // The refusals before the submit never count at G1: Person A still decides.
-      expect(await step(intent)).toEqual({ outcome: 'waiting', reason: 'decision' });
+      // (Session 2 of B07 adds the wake at the gate deadline, `wakeInMs`.)
+      expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
     });
 
     it('unknown consent: client data only as client_restricted (Ch.2 Rule 3)', async () => {

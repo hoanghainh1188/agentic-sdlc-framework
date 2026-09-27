@@ -53,10 +53,10 @@ describeDb('B07: the intent workflow step on PostgreSQL', () => {
       expect(await step(intent)).toEqual({ outcome: 'moved' });
       expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G1' });
       expect((await reload(intent)).gate_entered_at).toEqual(T0);
-      expect(await step(intent)).toEqual({ outcome: 'waiting', reason: 'decision' });
+      expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
 
       // No gate passes by silence: nothing moves without a person's approval.
-      expect(await settle(intent)).toEqual({ outcome: 'waiting', reason: 'decision' });
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
 
       const woken: IntentWorkflowRef[] = [];
       const signals = {
@@ -70,14 +70,14 @@ describeDb('B07: the intent workflow step on PostgreSQL', () => {
       // The poller wakes the workflow after its commit (ADR-M30 §2.3).
       expect(woken).toEqual([{ tenantId: f.target.tenantId, intentId: intent.id }]);
 
-      expect(await settle(intent)).toEqual({ outcome: 'waiting', reason: 'input_missing' });
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'input_missing' });
       expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G2' });
 
       await f.addInputs(intent);
-      expect(await settle(intent)).toEqual({ outcome: 'waiting', reason: 'decision' });
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
       f.comment(intent, '/approve G2', 'a');
       await f.poll();
-      expect(await settle(intent)).toEqual({ outcome: 'waiting', reason: 'decision' });
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
       expect(await reload(intent)).toMatchObject({ current_gate: 'G3' });
 
       f.comment(intent, '/approve G3', 'b');
@@ -176,7 +176,7 @@ describeDb('B07: the intent workflow step on PostgreSQL', () => {
       f.comment(intent, '/approve G2', 'a');
       f.comment(intent, '/request-changes G2 tests_insufficient', 'a');
       await f.poll();
-      expect(await settle(intent)).toEqual({ outcome: 'waiting', reason: 'decision' });
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
       expect(await reload(intent)).toMatchObject({ current_gate: 'G2' });
       // Announced once, however often the workflow looks.
       await settle(intent);
@@ -220,7 +220,7 @@ describeDb('B07: the intent workflow step on PostgreSQL', () => {
         actorType: 'human',
         actorId: f.users.a,
       });
-      expect(await settle(intent)).toEqual({ outcome: 'waiting', reason: 'decision' });
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
       const g2 = await f.scope.gateDecisions.listForIntent(intent.id, 'G2');
       expect(g2.map((d) => [d.decision, d.input_sha256])).toEqual([
         ['approve', SPEC_HASH],

@@ -102,6 +102,8 @@ export class EscalationRepository extends TenantRepository {
             remind_at: input.remindAt,
             resolve_due_at: input.resolveDueAt,
             next_check_at: input.nextCheckAt,
+            // The escalation clock, like the other clock columns (B07 session 2: one clock).
+            created_at: input.createdAt,
           })
           .returningAll()
           .executeTakeFirstOrThrow();

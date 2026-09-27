@@ -5,7 +5,7 @@
 | Status | **Proposed** (task B12, for review) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27: D1 = A, D2 = A, D3, D4 = C, D5 = A, D6 = A; no re-check before G1 → G2) |
-| Related | D-02 §3, FR-03, FR-19, FR-43; D-03 sections 5.2, 6 ("submit (AI record checked)"); D-05 sections 5, 6.1 (version 1.13); D-07 §4; D-08 tasks B04, B10 AC6, B12, B13, C06, E02, E03; handbook Ch.2 §2.3–§2.5, template T7; ADR-M18, ADR-M20, ADR-M26, ADR-M30, ADR-M31; QUESTIONS #89, #103–#106 |
+| Related | D-02 §3, FR-03, FR-19, FR-43; D-03 sections 5.2, 6 ("submit (AI record checked)"); D-05 sections 5, 6.1, 6.2 (version 1.14); D-07 §4; D-08 tasks B04, B10 AC6, B12, B13, C06, E02, E03; handbook Ch.2 §2.3–§2.5, template T7; ADR-M18, ADR-M20, ADR-M26, ADR-M30, ADR-M31; QUESTIONS #89, #103–#106 |
 
 ## 1. Context
 
@@ -46,7 +46,7 @@ Six points were open in the B12 plan:
 - `saveAiRecord` (core) checks that the accountable person (`updatedBy`) is an active user with a write role (`not_a_writer`), then saves; a stale version is `version_conflict`.
 - **API** (the path with a logged-in user): `GET` and `PUT /v1/projects/:project/ai-record`. No role on the project → 404 `project_not_found`; a read role only → 403 on `PUT`; a rule broken → 422 `ai_record_invalid` with the reason code; a stale `expected_version` → 409 `ai_record_version_conflict`; no record yet → 404 `ai_record_not_found`. After a save, the project's draft intents are woken (§2.5).
 - **Operator command** (onboarding before B04 and B13): `sdlc admin ai-record set|show`, direct database access with `SDLC_DB_URL`, like `sdlc admin agent`. `--on-behalf-of <email>` names the accountable person, who must hold a write role; the audit event has actor `system` and that person in `updated_by`.
-- **B04** adds `sdlc ai-record show|set` over the API (backlog 1.9, B04 AC5). B13 may retire the operator command once a tenant admin exists.
+- **B04** adds `sdlc ai-record show|set` over the API (backlog 1.10, B04 AC5). B13 may retire the operator command once a tenant admin exists.
 
 ### 2.5. The G1 check (FR-19, D5 = A, D6 = A, QUESTIONS #105, #106)
 
@@ -91,8 +91,8 @@ The fixed rules stay in code (Harry, B12 plan): they are the floor of handbook C
 
 ## 5. Consequences
 
-- D-05 version 1.13: §6.1 `project_ai_records` as built, new `project_ai_record_versions`, ERD (diagram D13). B07 session 2 also changes D-05: the second to merge takes the next number.
-- D-03 version 1.9: §5.2 Project AI Record row.
+- D-05 version 1.14: §6.1 `project_ai_records` as built, new `project_ai_record_versions`, §6.2 notice kind `ai_record_refused`, ERD (diagram D13).
+- D-03 version 1.10: §5.2 Project AI Record row.
 - `@sdlc/contracts`: the AI record codes move here (`AI_ALLOWED_VALUES`, `PROD_LOGS_ALLOWED_VALUES`, `DISCLOSURE_FORMATS`, `ProjectAiFacts`), wait reason `ai_record`, `PolicyEngine.productionDataAccess`.
 - `@sdlc/config`: keys `access.ai_record_write_roles`, `access.ai_record_read_roles`, rule M19; the default `config_hash` changes (QUESTIONS #95: no stored configuration exists yet).
 - Tests that step intents create a record first (`platform/tests/integration/ai-record-seed.ts`; the workflow fixture does it).

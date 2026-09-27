@@ -158,16 +158,20 @@ export class GateDecisionRepository extends TenantRepository {
           voids_decision_id: null,
         };
         if (!isHuman(input)) {
-          return this.insert(db, {
-            ...base,
-            actor_type: 'system',
-            decided_by: null,
-            approver_role: null,
-            scope: null,
-            expires_at: null,
-            source: 'workflow',
-            event_source: null,
-          });
+          return this.insert(
+            db,
+            {
+              ...base,
+              actor_type: 'system',
+              decided_by: null,
+              approver_role: null,
+              scope: null,
+              expires_at: null,
+              source: 'workflow',
+              event_source: null,
+            },
+            now,
+          );
         }
 
         const actorId = input.actor.id;
@@ -220,16 +224,20 @@ export class GateDecisionRepository extends TenantRepository {
           }
           role = match;
         }
-        return this.insert(db, {
-          ...base,
-          actor_type: 'human',
-          decided_by: actorId,
-          approver_role: role,
-          scope: scope === null ? null : canonicalJson(scope),
-          expires_at: expiresAt,
-          source: input.source,
-          event_source: input.eventSource ?? null,
-        });
+        return this.insert(
+          db,
+          {
+            ...base,
+            actor_type: 'human',
+            decided_by: actorId,
+            approver_role: role,
+            scope: scope === null ? null : canonicalJson(scope),
+            expires_at: expiresAt,
+            source: input.source,
+            event_source: input.eventSource ?? null,
+          },
+          now,
+        );
       }),
     );
   }
@@ -260,25 +268,29 @@ export class GateDecisionRepository extends TenantRepository {
             continue;
           }
           voided.push(
-            await this.insert(db, {
-              intent_id: intent.id,
-              gate: approval.gate,
-              decision: 'void',
-              oversight_mode: approval.oversight_mode,
-              approver_role: null,
-              actor_type: 'system',
-              decided_by: null,
-              reason_code: status,
-              reason_ref: null,
-              input_sha256: approval.input_sha256,
-              scope: null,
-              expires_at: null,
-              config_hash: effective.configHash,
-              source: 'workflow',
-              event_source: null,
-              waited_seconds: null,
-              voids_decision_id: approval.id,
-            }),
+            await this.insert(
+              db,
+              {
+                intent_id: intent.id,
+                gate: approval.gate,
+                decision: 'void',
+                oversight_mode: approval.oversight_mode,
+                approver_role: null,
+                actor_type: 'system',
+                decided_by: null,
+                reason_code: status,
+                reason_ref: null,
+                input_sha256: approval.input_sha256,
+                scope: null,
+                expires_at: null,
+                config_hash: effective.configHash,
+                source: 'workflow',
+                event_source: null,
+                waited_seconds: null,
+                voids_decision_id: approval.id,
+              },
+              now,
+            ),
           );
         }
         return { valid, voided };
@@ -366,20 +378,27 @@ export class GateDecisionRepository extends TenantRepository {
       .execute();
   }
 
-  private async insert(db: Kysely<Database>, row: Insert): Promise<GateDecisionRow> {
+  /**
+   * Inserts one decision and its `gate.decided` audit event. The event's `occurred_at` is the
+   * registry clock (the time the rules were checked with): time rules on decisions (the HOTL block
+   * window, the gate clock after a request for changes) read it from the audit chain, on one clock
+   * with the intent's `gate_entered_at` (B07 session 2).
+   */
+  private async insert(db: Kysely<Database>, row: Insert, at: Date): Promise<GateDecisionRow> {
     const saved = await db
       .insertInto('gate_decisions')
       .values({ ...row, tenant_id: this.tenantId })
       .returningAll()
       .executeTakeFirstOrThrow();
-    await appendDecided(db, this.tenantId, saved);
+    await appendDecided(db, this.tenantId, saved, at);
     return saved;
   }
 }
 
-function appendDecided(db: Kysely<Database>, tenantId: TenantId, row: GateDecisionRow) {
+function appendDecided(db: Kysely<Database>, tenantId: TenantId, row: GateDecisionRow, at: Date) {
   return new AuditLogRepository(db, tenantId).append({
     action: 'gate.decided',
+    occurredAt: at,
     actorType: row.actor_type,
     actorId: row.decided_by,
     entityId: row.intent_id,
