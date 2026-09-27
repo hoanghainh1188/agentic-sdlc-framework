@@ -1,0 +1,48 @@
+# Verdaccio: npm package proxy of the sandboxes (task C04, design/ADR-M25 §2.10, QUESTIONS #59 C).
+# Read-only proxy: packages come from registry.npmjs.org only and are cached in the volume.
+# Nobody can publish or unpublish, and there is no web UI. Sandboxes reach it on their run's
+# internal network under the alias npm-proxy; it is never published on the host.
+storage: /verdaccio/storage/data
+plugins: /verdaccio/plugins
+
+web:
+  enable: false
+
+auth:
+  htpasswd:
+    file: /verdaccio/storage/htpasswd
+    # No accounts: registration is off.
+    max_users: -1
+
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+    timeout: 60s
+    maxage: 10m
+    cache: true
+
+packages:
+  '@*/*':
+    access: $all
+    publish: $nobody
+    unpublish: $nobody
+    proxy: npmjs
+  '**':
+    access: $all
+    publish: $nobody
+    unpublish: $nobody
+    proxy: npmjs
+
+server:
+  keepAliveTimeout: 60
+
+# Request log with the package name and the client address. A sandbox's address belongs to its
+# run's own network (sdlc-run-<run_id>), so an operator can tell which run asked for what
+# (ADR-M25 §2.10). Nothing from this log goes into the platform database.
+log:
+  type: stdout
+  format: json
+  level: http
+
+publish:
+  allow_offline: false

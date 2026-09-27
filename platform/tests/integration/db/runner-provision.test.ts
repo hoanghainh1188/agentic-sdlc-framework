@@ -4,7 +4,9 @@
 // - AC3: one contract starts at most one sandbox (concurrent provisioning, QUESTIONS #35);
 // - AC5: clean-up after a failure at each late step, and after the run (releaseSandbox);
 // - QUESTIONS #44: a wrapping token used by someone else stops the run (`token_unavailable`);
-// - run events and final run status for each outcome (coded payloads only).
+// - run events and final run status for each outcome (coded payloads only);
+// - the workspace reserved before the claim (ADR-M25 §2.8), the clean-up at start and the sweep
+//   (AC5 after a crash), and the slot pool around provisioning (AC3).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,9 +18,14 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 
 import {
   DockerClient,
+  HeldRuns,
   provisionRun,
+  reconcileOnStart,
   releaseSandbox,
+  Runner,
+  runLabels,
   runnerSettingsFromEnv,
+  sweepOrphans,
   type RunnerDeps,
   type RunnerSettings,
 } from '../../../apps/runner/src/index.js';
@@ -102,6 +109,7 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
       settings,
       verifier,
       unwrapper: runner.wrapping(),
+      held: new HeldRuns(),
     };
   }, 60_000);
 
@@ -187,6 +195,7 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
     (await s.scope.runEvents.list(runId)).map((e) => [e.event_type, e.payload] as const);
 
   const leftovers = () => [docker.containers.size, docker.networks.size, docker.volumes.size];
+  const created = () => docker.trace.filter((c) => /^POST .*\/(create|start)$/.test(c));
   const workDirEmpty = () => fs.readdirSync(workDir).length === 0;
 
   it('provisions: verify, claim, clone at base_sha, sandbox, healthy, running (AC2)', async () => {
@@ -241,6 +250,7 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(results.find((r) => !r.ok)).toMatchObject({ reason: 'run_not_startable' });
     expect(docker.calls.filter((c) => c.path === '/containers/create')).toHaveLength(1);
+    expect(docker.calls.filter((c) => c.path === '/volumes/create')).toHaveLength(1);
     await releaseSandbox(deps, s.scope.tenantId, envelope.contract.run_id, 'finished');
   });
 
@@ -260,7 +270,9 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
       status: 'failed',
       stop_reason: 'token_unavailable',
     });
-    expect(docker.calls).toEqual([]);
+    // Only the workspace reserved before the claim was created, and it is gone again.
+    expect(created()).toEqual(['POST /volumes/create']);
+    expect(leftovers()).toEqual([0, 0, 0]);
     expect(git.requests).toHaveLength(gitRequests); // no clone was attempted
   });
 
@@ -314,7 +326,8 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
       .wrap({ token: new Redacted('ghs_revoked') }, { ttlSeconds: 60 });
     const result = await provisionRun(deps, { envelope, wrappedGitToken: wrapped });
     expect(result).toMatchObject({ ok: false, reason: 'clone_failed' });
-    expect(docker.calls).toEqual([]);
+    expect(created()).toEqual(['POST /volumes/create']);
+    expect(leftovers()).toEqual([0, 0, 0]);
     expect(workDirEmpty()).toBe(true);
   });
 
@@ -332,5 +345,190 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
     // The wrapping token was not used: the real provisioning still works with it.
     expect((await provisionRun(deps, { envelope, wrappedGitToken: wrapped })).ok).toBe(true);
     await releaseSandbox(deps, s.scope.tenantId, envelope.contract.run_id, 'finished');
+  });
+
+  // ---------------------------------------------------------------- reserve, reconcile, sweep --
+
+  const labelsOf = (s: Seeded, runId: string, instance = settings.instance) =>
+    runLabels(instance, runId, s.scope.tenantId);
+
+  it('a contract whose run already left `queued` is refused before any Docker call (D3)', async () => {
+    const s = await seed();
+    const envelope = await issue(s);
+    const runId = envelope.contract.run_id;
+    await s.scope.runs.claimForProvisioning(runId, new Date()); // another runner claimed it
+    const result = await provisionRun(deps, { envelope, wrappedGitToken: await wrapToken() });
+    expect(result).toMatchObject({ ok: false, reason: 'run_not_startable' });
+    expect(docker.calls).toEqual([]);
+    expect(deps.held.has(runId)).toBe(false);
+  });
+
+  it('a second provisioning of a run this process holds is refused before Docker (D3)', async () => {
+    const s = await seed();
+    const envelope = await issue(s);
+    const runId = envelope.contract.run_id;
+    deps.held.hold(runId);
+    try {
+      const result = await provisionRun(deps, { envelope, wrappedGitToken: await wrapToken() });
+      expect(result).toMatchObject({ ok: false, reason: 'run_not_startable' });
+      expect(docker.calls).toEqual([]);
+      expect(await s.scope.runs.getById(runId)).toMatchObject({ status: 'queued' });
+    } finally {
+      deps.held.release(runId);
+    }
+  });
+
+  it('reserves the workspace before the claim: a claimed run always has a labelled object (D3)', async () => {
+    const s = await seed();
+    const envelope = await issue(s);
+    const runId = envelope.contract.run_id;
+    docker.failures.set(/^POST \/networks\/create$/, 500); // stop right after the clone
+    const result = await provisionRun(deps, { envelope, wrappedGitToken: await wrapToken() });
+    expect(result).toMatchObject({ ok: false, reason: 'docker_error' });
+    const order = docker.trace.filter((c) => c.startsWith('POST'));
+    expect(order[0]).toBe('POST /volumes/create'); // before the clone and the network
+    expect(docker.calls.find((c) => c.path === '/volumes/create')?.body).toMatchObject({
+      Labels: labelsOf(s, runId),
+    });
+    expect(leftovers()).toEqual([0, 0, 0]);
+  });
+
+  it('cleans up after a restart: fails active runs, keeps other instances and queued runs (AC5)', async () => {
+    const s = await seed();
+    // A run that was running when the old process died.
+    const running = await issue(s);
+    const runningId = running.contract.run_id;
+    expect(
+      (await provisionRun(deps, { envelope: running, wrappedGitToken: await wrapToken() })).ok,
+    ).toBe(true);
+    // A run that finished, whose objects were left behind.
+    const done = await issue(s);
+    const doneId = done.contract.run_id;
+    expect(
+      (await provisionRun(deps, { envelope: done, wrappedGitToken: await wrapToken() })).ok,
+    ).toBe(true);
+    await s.scope.runs.transition(doneId, { from: ['running'], to: 'succeeded', now: new Date() });
+    // A run whose workspace was reserved just before the crash; the claim never happened.
+    const queued = await issue(s);
+    const queuedId = queued.contract.run_id;
+    docker.volumes.set(`sdlc-ws-${queuedId}`, labelsOf(s, queuedId));
+    // Another runner deployment on the same Docker host.
+    const foreign = '77777777-7777-4777-8777-777777777777';
+    docker.volumes.set(`sdlc-ws-${foreign}`, labelsOf(s, foreign, 'staging'));
+    // A clone the old process left on disk.
+    fs.mkdirSync(path.join(workDir, 'run-old'));
+
+    // New process: fresh held set, nothing in memory.
+    const fresh = { ...deps, held: new HeldRuns() };
+    const result = await reconcileOnStart(fresh);
+    expect(result).toEqual({ runs: 3, failedRuns: 1, errors: 0 });
+
+    expect(await s.scope.runs.getById(runningId)).toMatchObject({
+      status: 'failed',
+      stop_reason: 'runner_restarted',
+    });
+    expect((await events(s, runningId)).slice(-2)).toEqual([
+      ['run_abandoned', { previous_status: 'running' }],
+      ['sandbox_removed', expect.objectContaining({ reason: 'runner_restarted' })],
+    ]);
+    expect(await s.scope.runs.getById(doneId)).toMatchObject({ status: 'succeeded' });
+    expect((await events(s, doneId)).at(-1)).toEqual([
+      'sandbox_removed',
+      expect.objectContaining({ reason: 'orphan' }),
+    ]);
+    expect(await s.scope.runs.getById(queuedId)).toMatchObject({ status: 'queued' });
+    expect((await events(s, queuedId)).map(([type]) => type)).toEqual(['contract_issued']);
+
+    expect(docker.containers.size).toBe(0);
+    expect(docker.networks.size).toBe(0);
+    expect([...docker.volumes.keys()]).toEqual([`sdlc-ws-${foreign}`]); // never touched
+    expect(fs.existsSync(path.join(workDir, 'run-old'))).toBe(false);
+    docker.volumes.clear();
+  });
+
+  it('sweeps orphans but never a held run; a lost active run ends as failed (AC5)', async () => {
+    const s = await seed();
+    const held = await issue(s);
+    const heldId = held.contract.run_id;
+    expect(
+      (await provisionRun(deps, { envelope: held, wrappedGitToken: await wrapToken() })).ok,
+    ).toBe(true);
+    const lost = await issue(s);
+    const lostId = lost.contract.run_id;
+    const other = { ...deps, held: new HeldRuns() }; // "another" holder: lost is not in deps.held
+    expect(
+      (await provisionRun(other, { envelope: lost, wrappedGitToken: await wrapToken() })).ok,
+    ).toBe(true);
+
+    expect(await sweepOrphans(deps, deps.held)).toEqual({ runs: 1, failedRuns: 1, errors: 0 });
+    expect(await s.scope.runs.getById(heldId)).toMatchObject({ status: 'running' });
+    expect(await s.scope.runs.getById(lostId)).toMatchObject({
+      status: 'failed',
+      stop_reason: 'sandbox_lost',
+    });
+    expect((await events(s, lostId)).slice(-2)).toEqual([
+      ['run_abandoned', { previous_status: 'running' }],
+      ['sandbox_removed', expect.objectContaining({ reason: 'orphan' })],
+    ]);
+    expect(docker.containers.size).toBe(1); // the held run's sandbox
+    await releaseSandbox(deps, s.scope.tenantId, heldId, 'finished');
+    expect(leftovers()).toEqual([0, 0, 0]);
+  });
+
+  it('a clean-up error on one run does not stop the others', async () => {
+    const s = await seed();
+    const a = await issue(s);
+    const b = await issue(s);
+    for (const e of [a, b]) {
+      const r = await provisionRun(
+        { ...deps, held: new HeldRuns() },
+        {
+          envelope: e,
+          wrappedGitToken: await wrapToken(),
+        },
+      );
+      expect(r.ok).toBe(true);
+    }
+    docker.failures.set(new RegExp(`^DELETE /containers/sdlc-sandbox-${a.contract.run_id}$`), 500);
+    const result = await reconcileOnStart(deps);
+    expect(result).toEqual({ runs: 2, failedRuns: 1, errors: 1 });
+    expect(await s.scope.runs.getById(b.contract.run_id)).toMatchObject({ status: 'failed' });
+    docker.failures.clear();
+    expect(await reconcileOnStart(deps)).toMatchObject({ errors: 0 });
+    expect(leftovers()).toEqual([0, 0, 0]);
+  });
+
+  it('limits concurrent sandboxes: the second run waits for the first to be released (AC3)', async () => {
+    const s = await seed();
+    const pooled = new Runner({ ...deps, settings: { ...settings, maxSandboxes: 1 } });
+    const first = await issue(s);
+    const second = await issue(s);
+    const failing = await issue(s, { egressAllowlist: ['github.com'] });
+
+    // A failed provisioning frees its slot at once.
+    expect(
+      await pooled.provision({ envelope: failing, wrappedGitToken: await wrapToken() }),
+    ).toMatchObject({ ok: false, reason: 'egress_not_enforceable' });
+    expect(pooled.pool.active).toBe(0);
+
+    expect(
+      (await pooled.provision({ envelope: first, wrappedGitToken: await wrapToken() })).ok,
+    ).toBe(true);
+    let secondDone = false;
+    const waiting = pooled
+      .provision({ envelope: second, wrappedGitToken: await wrapToken() })
+      .then((r) => ((secondDone = true), r));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(secondDone).toBe(false);
+    expect(pooled.pool.waiting).toBe(1);
+    expect(docker.containers.size).toBe(1);
+
+    await pooled.release(s.scope.tenantId, first.contract.run_id, 'finished');
+    expect((await waiting).ok).toBe(true);
+    expect(docker.containers.size).toBe(1);
+    await pooled.release(s.scope.tenantId, second.contract.run_id, 'finished');
+    expect(pooled.pool.active).toBe(0);
+    expect(pooled.held.size).toBe(0);
+    expect(leftovers()).toEqual([0, 0, 0]);
   });
 });

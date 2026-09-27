@@ -80,6 +80,8 @@ describe('the sandbox spec (ADR-M10 §2.4)', () => {
       /ANTHROPIC|OPENAI|PROVIDER|LITELLM_MASTER|VAULT|OPENBAO|BAO_|GITHUB|GH_TOKEN|GIT_/,
     );
     expect(spec().Env).toContain('NPM_CONFIG_REGISTRY=http://npm-proxy:4873/');
+    // Corepack fetches a project's `packageManager` pin through the same proxy.
+    expect(spec().Env).toContain('COREPACK_NPM_REGISTRY=http://npm-proxy:4873');
   });
 
   it('takes random per-run keys only', () => {

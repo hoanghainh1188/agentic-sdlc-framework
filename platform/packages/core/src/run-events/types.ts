@@ -45,6 +45,12 @@ export const RUN_EVENT_TYPES = {
    * `TeardownReason` code (`finished`, `failed`, `orphan`, …).
    */
   sandbox_removed: { reason: 'code', duration_ms: 'count' },
+  /**
+   * The runner ended a run that had not reached a final status because its sandbox was lost: the
+   * runner restarted (`stop_reason` `runner_restarted`) or the sweep found the sandbox without its
+   * process (`sandbox_lost`). `previous_status` is the run status before `failed` (C04, ADR-M25).
+   */
+  run_abandoned: { previous_status: 'code' },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;

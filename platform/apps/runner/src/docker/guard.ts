@@ -15,7 +15,8 @@ export const SANDBOX_ENV_ALLOWLIST = [
   'OH_TELEMETRY_EXPORTER',
   'DO_NOT_TRACK',
   'OPENHANDS_SUPPRESS_BANNER',
-  'NPM_CONFIG_REGISTRY',
+  'NPM_CONFIG_REGISTRY', // the package proxy (QUESTIONS #59 C)
+  'COREPACK_NPM_REGISTRY', // same proxy, so a project's `packageManager` pin can be fetched
 ] as const;
 
 export const WORKSPACE_PATH = '/workspace';

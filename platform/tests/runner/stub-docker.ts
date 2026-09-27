@@ -84,6 +84,29 @@ export class StubDocker {
     });
   }
 
+  private list(p: string, query: Record<string, string>): unknown {
+    if (p === '/containers/json') {
+      return [...this.containers.values()]
+        .filter((x) => matches(x.spec.Labels as Record<string, string>, query))
+        .map((x) => ({
+          Id: x.id,
+          Names: [`/${x.name}`],
+          Labels: x.spec.Labels,
+          State: x.running ? 'running' : 'created',
+        }));
+    }
+    if (p === '/networks') {
+      return [...this.networks]
+        .filter(([, n]) => matches(n.labels, query))
+        .map(([name, n]) => ({ Id: name, Name: name, Internal: true, Labels: n.labels }));
+    }
+    return {
+      Volumes: [...this.volumes]
+        .filter(([, labels]) => matches(labels, query))
+        .map(([name, labels]) => ({ Name: name, Labels: labels })),
+    };
+  }
+
   private route(c: Call): [number, unknown] {
     const m = c.method;
     const p = c.path;
@@ -98,10 +121,13 @@ export class StubDocker {
       this.images.add(c.query.fromImage!);
       return [200, { status: 'Downloaded' }];
     }
+    if (m === 'GET' && (p === '/containers/json' || p === '/networks' || p === '/volumes')) {
+      return [200, this.list(p, c.query)];
+    }
     if (m === 'POST' && p === '/volumes/create') {
+      // Like Docker: creating an existing volume is not an error, and keeps the first labels.
       const b = c.body as { Name: string; Labels: Record<string, string> };
-      if (this.volumes.has(b.Name)) return [409, {}];
-      this.volumes.set(b.Name, b.Labels);
+      if (!this.volumes.has(b.Name)) this.volumes.set(b.Name, b.Labels);
       return [201, { Name: b.Name }];
     }
     if (m === 'DELETE' && (match = /^\/volumes\/(.+)$/.exec(p))) {
@@ -201,6 +227,18 @@ export class StubDocker {
     }
     return [500, { message: `stub: no route for ${m} ${p}` }];
   }
+}
+
+/** `filters={"label":["k=v",…]}`: every pair must match. */
+function matches(
+  labels: Record<string, string> | undefined,
+  query: Record<string, string>,
+): boolean {
+  const wanted = (JSON.parse(query.filters ?? '{}') as { label?: string[] }).label ?? [];
+  return wanted.every((pair) => {
+    const at = pair.indexOf('=');
+    return labels?.[pair.slice(0, at)] === pair.slice(at + 1);
+  });
 }
 
 function send(res: http.ServerResponse, status: number, payload: unknown): void {

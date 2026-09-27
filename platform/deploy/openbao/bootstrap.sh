@@ -42,6 +42,9 @@ Commands:
                        again to rotate, then restart sdlc-api (runbook T11).
   worker-credentials   The same for the worker: kv/worker/database, AppRole "worker", volume of
                        sdlc-worker. Run it again to rotate, then restart sdlc-worker (runbook T11).
+  runner-credentials   The same for the runner: kv/runner/database, AppRole "runner", volume of
+                       sdlc-runner (Compose profile "sandbox"). Run it again to rotate, then
+                       restart sdlc-runner (runbook T11 §5g).
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -87,7 +90,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -271,7 +274,8 @@ cmd_litellm_credentials() {
 # of the platform service through a pipe. Never a host file, a command line or an environment
 # variable. The platform services drop every capability; this one-shot root container gets back
 # only what it needs to write the files and give them to the user node.
-# platform_credentials <AppRole and KV prefix: api | worker> <Compose service>
+# platform_credentials <AppRole and KV prefix: api | worker | runner> <Compose service> [profile]
+# The profile is "platform" by default; the runner lives in the profile "sandbox" (C04).
 platform_credentials() {
   role="$1"
   service="$2"
@@ -290,7 +294,7 @@ platform_credentials() {
     bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
       bao read -field=role_id "auth/approle/role/$1/role-id" && echo &&
       bao write -f -field=secret_id "auth/approle/role/$1/secret-id" && echo' sh "$role" |
-    compose --profile core --profile platform run --rm -T --no-deps --user root \
+    compose --profile core --profile "${3:-platform}" run --rm -T --no-deps --user root \
       --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "$service" -c '
       set -e
       umask 077
@@ -307,6 +311,7 @@ platform_credentials() {
 
 cmd_api_credentials() { platform_credentials api sdlc-api; }
 cmd_worker_credentials() { platform_credentials worker sdlc-worker; }
+cmd_runner_credentials() { platform_credentials runner sdlc-runner sandbox; }
 
 case "$command" in
   status) cmd_status ;;
@@ -317,4 +322,5 @@ case "$command" in
   litellm-credentials) cmd_litellm_credentials ;;
   api-credentials) cmd_api_credentials ;;
   worker-credentials) cmd_worker_credentials ;;
+  runner-credentials) cmd_runner_credentials ;;
 esac

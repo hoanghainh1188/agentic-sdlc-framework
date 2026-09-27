@@ -193,11 +193,13 @@ t("C05","M-C","OpenHands adapter","M",["C01","C04","C03"],"FR-31, FR-32","platfo
   "Pass spec, plan and AGENTS.md to the agent",
   "Iteration and time caps; exceeded → stop, record `stop_reason`",
   "Collect changed files, logs and the last commit"])
-t("C06","M-C","Automatic gate G4","S",["C05","C10","B07"],"FR-36",
- "platform/apps/worker (G4)",
+t("C06","M-C","Automatic gate G4","M",["C05","C10","B07"],"FR-36",
+ "platform/apps/worker (G4), platform/apps/runner (Temporal activity)",
  ["Checks: agent registered and active, pinned model, instructions hash matches; autonomy within max; contract valid; key capped; sandbox correct; AI record allows the data class",
   "Critical → `blocked`, the agent does not run (T10)",
-  "High (L1) → the agent only submits a proposal, pushes no code; stored as evidence `proposal`, the run ends `succeeded_proposal_only` (T09); G4 is HITL for High"])
+  "High (L1) → the agent only submits a proposal, pushes no code; stored as evidence `proposal`, the run ends `succeeded_proposal_only` (T09); G4 is HITL for High",
+  "Worker → runner handoff (QUESTIONS #53, #55; ADR-M25 §2.7): Temporal task queue `sdlc-runner`, one long-running activity per run with heartbeats; the runner worker's activity slots = `SDLC_RUNNER_MAX_SANDBOXES`, so extra runs wait in Temporal; a contract that expires while waiting → run `cancelled` (`contract_expired`) and a new attempt; a lost heartbeat → the workflow ends the run (test with a worker restart)"],
+ "Moved from C04 session 3 (QUESTIONS #55): the runner process, slot pool, restart clean-up and sweep exist; C06 adds the Temporal side")
 t("C07","M-C","Gate G5: file scope + budget","M",["C06","C03","B11"],"FR-13, FR-52",
  "platform/apps/worker (G5), platform/packages/core/cost/*",
  ["Files changed outside the plan → stop, back to G3 (N1)",
@@ -398,6 +400,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.2 | 2026-09-25 | Claude, approved by Harry | New task A11: stop publishing the OpenBao port on the host (QUESTIONS #27); A10 now depends on A11 |
 | 1.3 | 2026-09-27 | Claude (task C04), approved by Harry | C04 AC1: sandbox egress to LiteLLM and the package proxy only, GitHub through the runner; C08 note: the runner pushes, update the D-03 §4 flow and D11 (QUESTIONS #52, #59, ADR-M25) |
 | 1.4 | 2026-09-27 | Claude, approved by Harry | New task B13 (admin onboarding, B03 decision D1); E07 depends on B13 |
+| 1.5 | 2026-09-27 | Claude (task C04), approved by Harry | C06 AC4: the `sdlc-runner` task queue and heartbeat activity move from C04 to C06; size S → M (QUESTIONS #55, ADR-M25 §2.7) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))

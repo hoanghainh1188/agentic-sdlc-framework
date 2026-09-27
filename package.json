@@ -23,6 +23,9 @@
     "test:litellm": "SDLC_LITELLM_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/litellm",
     "test:api": "SDLC_API_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/api",
     "test:runner": "SDLC_RUNNER_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/runner platform/deploy/scripts/test-db.sh",
+    "test:runner-compose": "SDLC_RUNNER_COMPOSE_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/runner/compose-live.test.ts",
+    "test:sandbox-image": "SDLC_SANDBOX_IMAGE_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/sandbox-image",
+    "test:sandbox-live": "SDLC_TEST_DB_DIR=platform/tests/integration/sandbox-image/pilot-live.test.ts platform/deploy/scripts/test-db.sh",
     "openbao:bootstrap": "platform/deploy/openbao/bootstrap.sh",
     "db:migrate": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js latest",
     "db:status": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js status",
@@ -34,7 +37,9 @@
     "compose:obs": "platform/deploy/scripts/up.sh core observability",
     "compose:models": "platform/deploy/scripts/up.sh core models",
     "compose:platform": "platform/deploy/scripts/up.sh core platform",
-    "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform down"
+    "compose:sandbox": "platform/deploy/scripts/up.sh core sandbox",
+    "sandbox-image:build": "platform/sandbox-images/build.sh",
+    "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox down"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

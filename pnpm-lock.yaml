@@ -135,6 +135,9 @@ importers:
       '@sdlc/messages':
         specifier: workspace:*
         version: link:../../packages/messages
+      '@sdlc/secrets':
+        specifier: workspace:*
+        version: link:../../packages/secrets
 
   platform/apps/worker:
     dependencies:

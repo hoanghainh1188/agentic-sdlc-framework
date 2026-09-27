@@ -50,3 +50,28 @@ export function runLabels(
     [LABELS.tenantId]: tenantId,
   };
 }
+
+/** Run and tenant of a Docker object, read back from its labels. */
+export interface LabelledRun {
+  readonly runId: string;
+  readonly tenantId: string;
+}
+
+/**
+ * Reads the run of a Docker object from its labels, for the clean-up after a restart and the
+ * sweep (ADR-M25 §2.8). The `sdlc.*` labels count only on an object that the runner manages and
+ * that carries **this** runner's instance label; anything else returns undefined and is left alone.
+ */
+export function runOfLabels(
+  labels: Readonly<Record<string, string>> | null | undefined,
+  instance: string,
+): LabelledRun | undefined {
+  if (!labels) return undefined;
+  if (labels[LABELS.managed] !== MANAGED_BY || labels[LABELS.instance] !== instance) {
+    return undefined;
+  }
+  const runId = labels[LABELS.runId];
+  const tenantId = labels[LABELS.tenantId];
+  if (!isRunId(runId) || !isRunId(tenantId)) return undefined;
+  return { runId, tenantId };
+}

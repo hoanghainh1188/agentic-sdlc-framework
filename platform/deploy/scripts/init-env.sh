@@ -34,6 +34,16 @@ value_for() {
   esac
 }
 
+# Group of the Docker socket, for the socket proxy of the profile "sandbox" (design/ADR-M25 §2.5).
+# Linux: the group of /var/run/docker.sock. Docker Desktop: the socket inside its VM is root:root.
+docker_gid() {
+  if [ "$(uname -s)" = Linux ] && [ -S /var/run/docker.sock ]; then
+    stat -c %g /var/run/docker.sock
+  else
+    echo 0
+  fi
+}
+
 umask 077
 tmp="$(mktemp "$output.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
@@ -44,6 +54,7 @@ while IFS= read -r line || [ -n "$line" ]; do
       key="${line%%=*}"
       printf '%s=%s\n' "$key" "$(value_for "$key")" >>"$tmp"
       ;;
+    SDLC_DOCKER_GID=) printf 'SDLC_DOCKER_GID=%s\n' "$(docker_gid)" >>"$tmp" ;;
     *) printf '%s\n' "$line" >>"$tmp" ;;
   esac
 done <"$template"

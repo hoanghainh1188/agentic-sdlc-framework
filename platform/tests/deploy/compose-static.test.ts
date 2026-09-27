@@ -153,18 +153,28 @@ describe('AC3: healthchecks and pinned images', () => {
     }
   });
 
-  it('pins every image to an exact version (tag only, no digest yet: design/ADR-M17)', () => {
+  it('pins every image to an exact version; the sandbox profile also by digest (ADR-M17, ADR-M25)', () => {
     // PostgreSQL (17.11) and SeaweedFS (4.47) release with two-part versions; the others use three or more.
     const twoPartVersioning = ['postgres', 'chrislusf/seaweedfs'];
+    // Built from this repo; the tag follows the package version.
+    const built = ['sdlc-api', 'sdlc-runner'];
     for (const [name, s] of Object.entries(services)) {
-      const image = s.image ?? '';
+      const full = s.image ?? '';
+      const at = full.indexOf('@');
+      const image = at < 0 ? full : full.slice(0, at);
+      const digest = at < 0 ? undefined : full.slice(at + 1);
       const repository = image.slice(0, image.lastIndexOf(':'));
       const tag = image.slice(image.lastIndexOf(':') + 1);
-      expect(image, name).not.toMatch(/\$|@sha256|:latest/);
+      expect(full, name).not.toMatch(/\$|:latest/);
       const exact = twoPartVersioning.includes(repository)
         ? /^\d+\.\d+(-[a-z0-9.]+)?$/
         : /^v?\d+\.\d+\.\d+(\.\d+)?(-[a-z0-9.]+)?$/;
-      expect(tag, `${name}: ${image}`).toMatch(exact);
+      expect(tag, `${name}: ${full}`).toMatch(exact);
+      // ADR-M17 pins by tag until Dependabot keeps digests current. The runner's services are
+      // pinned by tag AND digest (ADR-M25 §2.5, §2.9, §2.10; QUESTIONS #54).
+      const sandbox = (s.profiles ?? []).includes('sandbox') && !built.includes(name);
+      if (sandbox) expect(digest, `${name} digest`).toMatch(/^sha256:[0-9a-f]{64}$/);
+      else expect(digest, `${name} digest`).toBeUndefined();
     }
   });
 
@@ -242,10 +252,20 @@ describe('AC4: no secrets in the repo', () => {
     expect(envExample.get('SDLC_BIND_ADDR')).toBe('127.0.0.1');
     for (const [name, s] of Object.entries(services)) {
       for (const port of s.ports ?? []) {
-        expect(port, name).toMatch(/^\$\{SDLC_BIND_ADDR:-127\.0\.0\.1\}:/);
+        // The sandbox image registry has no authentication: always 127.0.0.1 (runbook T11).
+        if (name === 'registry') expect(port, name).toMatch(/^127\.0\.0\.1:/);
+        else expect(port, name).toMatch(/^\$\{SDLC_BIND_ADDR:-127\.0\.0\.1\}:/);
       }
     }
-    for (const name of ['valkey', 'clickhouse', 'langfuse-worker', 'openbao'])
+    for (const name of [
+      'valkey',
+      'clickhouse',
+      'langfuse-worker',
+      'openbao',
+      'npm-proxy',
+      'docker-socket-proxy',
+      'sdlc-runner',
+    ])
       expect(service(name).ports).toBeUndefined();
   });
 });
@@ -285,6 +305,8 @@ describe('init-env.sh', () => {
         expect(value, key).not.toBe('CHANGEME');
         expect(value.length, key).toBeGreaterThanOrEqual(16);
         expect(stdout).not.toContain(value);
+      } else if (key === 'SDLC_DOCKER_GID') {
+        expect(value, key).toMatch(/^[0-9]+$/); // detected (C04, ADR-M25 §2.5)
       } else {
         expect(value, key).toBe(envExample.get(key));
       }

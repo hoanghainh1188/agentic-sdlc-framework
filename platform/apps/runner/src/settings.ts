@@ -26,6 +26,7 @@ export const RUNNER_ENV = {
   workDir: 'SDLC_RUNNER_WORK_DIR',
   workspaceMaxMb: 'SDLC_RUNNER_WORKSPACE_MAX_MB',
   readyTimeoutSeconds: 'SDLC_RUNNER_READY_TIMEOUT_SECONDS',
+  sweepIntervalSeconds: 'SDLC_RUNNER_SWEEP_INTERVAL_SECONDS',
 } as const;
 
 /**
@@ -65,6 +66,8 @@ export interface RunnerSettings {
   readonly workspaceMaxBytes: number;
   /** How long the runner waits for the sandbox health check. */
   readonly readyTimeoutMs: number;
+  /** How often the runner removes objects of runs it does not hold (ADR-M25 §2.8). */
+  readonly sweepIntervalMs: number;
 }
 
 export const DEFAULT_DOCKER_SOCKET = '/var/run/docker.sock';
@@ -79,6 +82,7 @@ export const DEFAULTS = {
   gitTimeoutSeconds: 300,
   workspaceMaxMb: 1024,
   readyTimeoutSeconds: 120,
+  sweepIntervalSeconds: 300,
 } as const;
 /** More than this on one host is a mistake, not a setting (each sandbox reserves ~2 GiB). */
 export const MAX_SANDBOXES_LIMIT = 16;
@@ -217,5 +221,8 @@ export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Run
       intSetting(env, RUNNER_ENV.workspaceMaxMb, DEFAULTS.workspaceMaxMb, 1, 16_384) * MIB,
     readyTimeoutMs:
       intSetting(env, RUNNER_ENV.readyTimeoutSeconds, DEFAULTS.readyTimeoutSeconds, 5, 1800) * 1000,
+    sweepIntervalMs:
+      intSetting(env, RUNNER_ENV.sweepIntervalSeconds, DEFAULTS.sweepIntervalSeconds, 30, 3600) *
+      1000,
   };
 }

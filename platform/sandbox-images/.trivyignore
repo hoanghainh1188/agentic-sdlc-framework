@@ -1,0 +1,13 @@
+# Trivy accepted exceptions for the sandbox images (task C04, design/ADR-M25 §2.9). CRITICAL
+# findings block the CI job `sandbox-image`. Same rules as the repo's .trivyignore: one ID per
+# line, a reason, a date and Person B's approval in the pull request. Review at every upgrade of
+# the OpenHands base image, and remove an entry as soon as Debian ships a fix.
+#
+# 2026-09-27 libxml2 in the Debian 13 base of ghcr.io/openhands/agent-server:1.48.0-python-slim;
+# no fixed version released yet. Nothing in the sandbox parses untrusted XML on the platform's
+# behalf. Approved by Harry (C04 session 3 plan review, PR for issue #31).
+CVE-2026-6653
+# 2026-09-27 linux-libc-dev (kernel headers, used only to compile native modules) in the same
+# base; no fixed version released yet; a sandbox runs on the host's kernel, not these headers.
+# Approved by Harry (C04 session 3 plan review, PR for issue #31).
+CVE-2026-43185
