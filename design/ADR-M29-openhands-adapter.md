@@ -87,7 +87,7 @@ The runner loads the task from the database (`loadAgentTask`): the contract's pl
   - if the agent already committed, only what is left is committed; `head_sha` is the final `HEAD`.
 - Every value put into a command is checked against a strict pattern and single-quoted. Answers are read from marker lines (`sdlc:…`) only; a missing marker fails closed.
 - Git runs as `/usr/bin/git` with no system or global configuration (`GIT_CONFIG_NOSYSTEM`, `GIT_CONFIG_GLOBAL=/dev/null`), no replace refs (`--no-replace-objects`), no fsmonitor, and none of the `GIT_*` variables that move the repository.
-- **These answers are what the sandbox reports.** The agent controls everything inside the sandbox (files, `.git`, its shell), so it could make them lie. They are good enough to record the run and to choose what to push; G5 (C07) and the push (C08) must recompute the changed files and `head_sha` from the pushed branch outside the sandbox (the runner's clone or the Git host) before any gate relies on them (D-08 1.6 notes on C07 and C08).
+- **These answers are what the sandbox reports.** The agent controls everything inside the sandbox (files, `.git`, its shell), so it could make them lie. They are good enough to record the run and to choose what to push; G5 (C07) and the push (C08) must recompute the changed files and `head_sha` from the pushed branch outside the sandbox (the runner's clone or the Git host) before any gate relies on them (D-08 1.7 notes on C07 and C08).
 - `collectOutputs` lists the files changed between `base_sha` and `HEAD` (`git diff --no-renames --name-status`: a rename is a delete and an add, so G5 sees both paths; Git's C-quoted paths are unquoted), the final `HEAD`, the step count and the whole log.
 - **Only a finished agent's leftovers are committed.** After the iteration or time cap, a stuck agent or an error, the runner does not commit: `changed_files` then counts only what the agent committed itself (between `base_sha` and `HEAD`). Such runs do not reach G6; C07 decides whether uncommitted work of a stopped run is kept as evidence (from the code review).
 - **Where outputs go:** changed paths and the log are client data. They are returned to the caller only; storing them is E02 (evidence) and G5 (C07). The database gets `runs.head_sha`, `runs.iterations` and coded run events.
@@ -173,4 +173,4 @@ These are technical settings, not handbook rules.
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task C05, session 1) | First version |
-| 0.2 | 2026-09-27 | Claude (task C05, session 1 review) | §2.4: iteration cap status accepted (QUESTIONS #82); §2.5: recomputation outside the sandbox tracked in D-08 1.6 (C07, C08) |
+| 0.2 | 2026-09-27 | Claude (task C05, session 1 review) | §2.4: iteration cap status accepted (QUESTIONS #82); §2.5: recomputation outside the sandbox tracked in D-08 1.7 (C07, C08) |
