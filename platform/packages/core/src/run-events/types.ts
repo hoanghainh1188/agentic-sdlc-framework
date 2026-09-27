@@ -51,6 +51,31 @@ export const RUN_EVENT_TYPES = {
    * process (`sandbox_lost`). `previous_status` is the run status before `failed` (C04, ADR-M25).
    */
   run_abandoned: { previous_status: 'code' },
+  /**
+   * The runner started the agent in the sandbox with the contract's caps (C05, ADR-M29). The model
+   * name is not repeated here: model names may hold `/` or `@`; `cost_records` has the model.
+   */
+  agent_started: { max_iterations: 'count', max_duration_min: 'count' },
+  /**
+   * The runner interrupted the agent (C05): `reason` `max_duration`; `method` `interrupt` (the agent
+   * stopped within the grace period) or `kill` (the sandbox was removed without waiting).
+   */
+  agent_stopped: { reason: 'code', method: 'code' },
+  /**
+   * The agent run ended (C05, ADR-M29). `outcome`: `finished`, `max_iterations`, `max_duration`,
+   * `stuck`, `agent_error`. `commit`: `committed` (the runner committed what the agent left, QUESTIONS
+   * #80) or `nothing`; left out when the runner did not commit. `head_sha` is the final `HEAD`;
+   * `changed_files` counts the files changed since `base_sha` (the paths are client data).
+   */
+  agent_finished: {
+    outcome: 'code',
+    iterations: 'count',
+    changed_files: 'count?',
+    head_sha: 'code?',
+    commit: 'code?',
+  },
+  /** An agent call failed (C05); `reason` is an `AgentErrorCode` or `model_unreachable`. */
+  agent_failed: { reason: 'code' },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;

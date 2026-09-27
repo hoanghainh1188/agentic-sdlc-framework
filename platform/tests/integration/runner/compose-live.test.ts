@@ -200,6 +200,27 @@ describe.skipIf(!enabled)(
       expect(probe).toBe('200 403 403');
     });
 
+    it('listens on no port, so joining a run network gives the sandbox nothing to reach (C05)', () => {
+      // /proc/net/tcp{,6}: state 0A is LISTEN. The runner container has no listening socket of its
+      // own. Docker's embedded DNS listens on 127.0.0.11 inside every container on a user network
+      // (0B00007F, ADR-M10 §2.4); it is Docker's, reachable only from inside the container.
+      const sockets = ok(
+        compose(...profiles, 'exec', '-T', 'sdlc-runner', 'cat', '/proc/net/tcp', '/proc/net/tcp6'),
+        'proc net',
+      ).stdout;
+      const listening = sockets
+        .split('\n')
+        .slice(1)
+        .map((line) => line.trim().split(/\s+/))
+        .filter((f) => f[3] === '0A' && !f[1]?.startsWith('0B00007F:'));
+      expect(listening).toEqual([]);
+      const env = ok(
+        run('docker', ['inspect', '--format', '{{json .Config.Env}}', `${project}-sdlc-runner-1`]),
+        'inspect env',
+      ).stdout;
+      expect(env).toContain(`SDLC_RUNNER_SELF_CONTAINER=${project}-sdlc-runner-1`);
+    });
+
     it('holds no secret in its environment, image or logs; credential files are private', () => {
       const container = ok(compose(...profiles, 'ps', '-q', 'sdlc-runner'), 'ps').stdout.trim();
       const inspect = ok(run('docker', ['inspect', container]), 'inspect').stdout;

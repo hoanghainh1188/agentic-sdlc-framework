@@ -27,6 +27,11 @@ export const RUNNER_ENV = {
   workspaceMaxMb: 'SDLC_RUNNER_WORKSPACE_MAX_MB',
   readyTimeoutSeconds: 'SDLC_RUNNER_READY_TIMEOUT_SECONDS',
   sweepIntervalSeconds: 'SDLC_RUNNER_SWEEP_INTERVAL_SECONDS',
+  selfContainer: 'SDLC_RUNNER_SELF_CONTAINER',
+  agentPort: 'SDLC_RUNNER_AGENT_PORT',
+  agentLlmUrl: 'SDLC_RUNNER_AGENT_LLM_URL',
+  agentPollMs: 'SDLC_RUNNER_AGENT_POLL_MS',
+  agentStopGraceSeconds: 'SDLC_RUNNER_AGENT_STOP_GRACE_SECONDS',
 } as const;
 
 /**
@@ -45,6 +50,23 @@ export interface SandboxLimits {
   readonly nanoCpus: number;
   readonly pids: number;
   readonly tmpBytes: number;
+}
+
+/** How the runner drives the agent in a sandbox (C05, ADR-M29). Technical, not handbook rules. */
+export interface AgentSettings {
+  /**
+   * The runner's own container. The runner joins each run's network with it to call the Agent
+   * Server (ADR-M25 §5, ADR-M29), and leaves at clean-up. Required to run an agent.
+   */
+  readonly selfContainer: string | undefined;
+  /** Port of the Agent Server inside the sandbox. */
+  readonly port: number;
+  /** LiteLLM as the sandbox sees it; its `host:port` must be in the contract's `egress_allowlist`. */
+  readonly llmBaseUrl: string;
+  /** How often the runner asks the agent for its state. */
+  readonly pollMs: number;
+  /** After an interrupt at the time cap, how long the runner waits before it removes the sandbox. */
+  readonly stopGraceMs: number;
 }
 
 export interface RunnerSettings {
@@ -68,6 +90,7 @@ export interface RunnerSettings {
   readonly readyTimeoutMs: number;
   /** How often the runner removes objects of runs it does not hold (ADR-M25 §2.8). */
   readonly sweepIntervalMs: number;
+  readonly agent: AgentSettings;
 }
 
 export const DEFAULT_DOCKER_SOCKET = '/var/run/docker.sock';
@@ -83,6 +106,10 @@ export const DEFAULTS = {
   workspaceMaxMb: 1024,
   readyTimeoutSeconds: 120,
   sweepIntervalSeconds: 300,
+  agentPort: 8000,
+  agentLlmUrl: 'http://litellm:4000',
+  agentPollMs: 1000,
+  agentStopGraceSeconds: 30,
 } as const;
 /** More than this on one host is a mistake, not a setting (each sandbox reserves ~2 GiB). */
 export const MAX_SANDBOXES_LIMIT = 16;
@@ -188,6 +215,40 @@ function gitSettings(env: NodeJS.ProcessEnv): GitSettings {
   };
 }
 
+function agentSettings(env: NodeJS.ProcessEnv): AgentSettings {
+  const self = env[RUNNER_ENV.selfContainer];
+  if (self !== undefined && self !== '' && !NAME.test(self))
+    throw invalid(RUNNER_ENV.selfContainer);
+  const raw = env[RUNNER_ENV.agentLlmUrl] || DEFAULTS.agentLlmUrl;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw invalid(RUNNER_ENV.agentLlmUrl);
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    !ALIAS.test(url.hostname) ||
+    url.port === '' ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.pathname !== '/' ||
+    url.search !== '' ||
+    url.hash !== ''
+  ) {
+    throw invalid(RUNNER_ENV.agentLlmUrl);
+  }
+  return {
+    selfContainer: self || undefined,
+    port: intSetting(env, RUNNER_ENV.agentPort, DEFAULTS.agentPort, 1, 65_535),
+    llmBaseUrl: url.origin,
+    pollMs: intSetting(env, RUNNER_ENV.agentPollMs, DEFAULTS.agentPollMs, 100, 10_000),
+    stopGraceMs:
+      intSetting(env, RUNNER_ENV.agentStopGraceSeconds, DEFAULTS.agentStopGraceSeconds, 1, 600) *
+      1000,
+  };
+}
+
 /** Reads and checks the runner settings from environment variables. */
 export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): RunnerSettings {
   const dockerSocket = env[RUNNER_ENV.dockerSocket] || DEFAULT_DOCKER_SOCKET;
@@ -224,5 +285,6 @@ export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Run
     sweepIntervalMs:
       intSetting(env, RUNNER_ENV.sweepIntervalSeconds, DEFAULTS.sweepIntervalSeconds, 30, 3600) *
       1000,
+    agent: agentSettings(env),
   };
 }

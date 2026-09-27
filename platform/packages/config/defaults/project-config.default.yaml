@@ -162,6 +162,12 @@ run:
   # D-03 §8; ADR-M22. Tolerated clock difference between worker and runner for the "not yet
   # valid" check only. Expiry has no tolerance.
   contract_clock_skew_seconds: 0
+  # D-02 FR-32; handbook template T13 (`max_iterations: 30`, `max_minutes: 60`); QUESTIONS.md #13
+  # (values chosen by Harry in the C05 plan, 2026-09-27). Caps of a run when
+  # the task sets none: the agent stops itself at the iteration cap; the runner interrupts the agent
+  # at the time cap, then removes the sandbox. A higher value gives a warning.
+  default_max_iterations: 30
+  default_max_duration_minutes: 60
 
 budget:
   # D-07 §6; D-02 FR-52; handbook Ch.3 §3.6: warning at 80 %, stop at 100 %.

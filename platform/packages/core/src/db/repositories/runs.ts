@@ -54,6 +54,10 @@ export class RunRepository extends TenantRepository {
       readonly stopReason?: string;
       readonly startedAt?: Date;
       readonly finishedAt?: Date;
+      /** Last commit of the run's branch (C05). */
+      readonly headSha?: string;
+      /** Agent steps completed (C05). */
+      readonly iterations?: number;
     },
   ): Promise<boolean> {
     if (!isUuid(id) || change.from.length === 0) return false;
@@ -66,6 +70,8 @@ export class RunRepository extends TenantRepository {
           ...(change.stopReason === undefined ? {} : { stop_reason: change.stopReason }),
           ...(change.startedAt === undefined ? {} : { started_at: change.startedAt }),
           ...(change.finishedAt === undefined ? {} : { finished_at: change.finishedAt }),
+          ...(change.headSha === undefined ? {} : { head_sha: change.headSha }),
+          ...(change.iterations === undefined ? {} : { iterations: change.iterations }),
         })
         .where('tenant_id', '=', this.tenantId)
         .where('id', '=', id)

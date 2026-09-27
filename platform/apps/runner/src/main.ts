@@ -7,6 +7,7 @@
 // Runs reach it through the Temporal task queue `sdlc-runner` from C06 (QUESTIONS #53).
 import fs from 'node:fs';
 
+import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { PlatformDatabase } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OpenBaoClient } from '@sdlc/secrets';
@@ -80,6 +81,8 @@ async function main(): Promise<void> {
           }),
         ),
     },
+    // Runs reach `runAgent` through the Temporal activity from C06 (QUESTIONS #53, #55).
+    { adapter: new OpenHandsAdapter() },
   );
   await runner.start();
   log(

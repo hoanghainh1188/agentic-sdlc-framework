@@ -7,9 +7,10 @@
 import crypto from 'node:crypto';
 
 import type { DockerClient } from '../docker/client.js';
+import { assertSafeNetworkConnect } from '../docker/guard.js';
 import { RunnerError } from '../errors.js';
 import { LABELS, runLabels, runNames, type RunNames } from '../names.js';
-import type { EgressService, RunnerSettings } from '../settings.js';
+import type { RunnerSettings } from '../settings.js';
 import { planEgress, runNetworkSpec } from './network.js';
 import { buildSandboxSpec } from './spec.js';
 
@@ -102,7 +103,9 @@ export async function createSandbox(
   try {
     if (!input.workspaceReserved) await docker.volumeCreate(names.volume, labels);
     await docker.networkCreate(runNetworkSpec(names, labels));
+    const attachable = settings.egressServices.map((s) => s.container);
     for (const service of egress.services) {
+      assertSafeNetworkConnect(names.network, service.container, attachable);
       await docker.networkConnect(names.network, service.container, [service.alias]);
     }
     const spec = buildSandboxSpec(
@@ -114,7 +117,7 @@ export async function createSandbox(
     await docker.containerStart(containerId);
     return { names, containerId, imageSha256, sessionApiKey };
   } catch (error) {
-    await teardownSandbox(docker, settings.egressServices, input.runId);
+    await teardownSandbox(docker, input.runId);
     if (error instanceof RunnerError) throw error;
     throw new ProvisioningError('docker_error');
   }
@@ -157,10 +160,12 @@ export interface TeardownResult {
  * Removes the sandbox, its network and its workspace volume (D-08 C04 AC5). Idempotent: objects
  * that are already gone are skipped, so it is safe after a success, a failure, a kill or a crash.
  * Every step runs even when an earlier one fails; the first error is thrown at the end.
+ *
+ * Every container still on the run's network is detached first: the egress services, and the
+ * runner itself, which joins the network to call the Agent Server (C05, ADR-M29).
  */
 export async function teardownSandbox(
   docker: DockerClient,
-  services: readonly EgressService[],
   runId: string,
 ): Promise<TeardownResult> {
   const started = Date.now();
@@ -176,13 +181,14 @@ export async function teardownSandbox(
   };
 
   const container = await attempt(() => docker.containerRemove(names.container));
-  // Detach the shared services before the network can be removed. Only those actually attached:
-  // Docker answers 500, not 404, for a container that is not on the network.
+  // Detach every container still attached (services, the runner) before the network can be
+  // removed. Only those actually attached: Docker answers 500, not 404, for a container that is not
+  // on the network.
   const network = await docker.networkInspect(names.network).catch(() => undefined);
   const attached = new Set(Object.values(network?.Containers ?? {}).map((c) => c.Name));
-  for (const service of services) {
-    if (!attached.has(service.container)) continue;
-    await attempt(() => docker.networkDisconnect(names.network, service.container));
+  for (const container of attached) {
+    if (container === names.container) continue;
+    await attempt(() => docker.networkDisconnect(names.network, container));
   }
   const removedNetwork = await attempt(() => docker.networkRemove(names.network));
   const volume = await attempt(() => docker.volumeRemove(names.volume));

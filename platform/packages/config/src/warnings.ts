@@ -108,11 +108,30 @@ function longContractValidity(config: ProjectConfig): ConfigIssue[] {
     : [];
 }
 
+/**
+ * A run cap above the default lets an agent run longer or spend more steps than template T13
+ * allows (FR-32): a warning, reviewed with the change (ADR-M13).
+ */
+function raisedRunCaps(config: ProjectConfig, defaults: ProjectConfig): ConfigIssue[] {
+  const caps = ['default_max_iterations', 'default_max_duration_minutes'] as const;
+  return caps.flatMap((key) =>
+    config.run[key] > defaults.run[key]
+      ? [
+          issue('config.warning.run_cap_raised', `run.${key}`, {
+            from: defaults.run[key],
+            to: config.run[key],
+          }),
+        ]
+      : [],
+  );
+}
+
 export function loosenedSettings(config: ProjectConfig, defaults: ProjectConfig): ConfigIssue[] {
   return [
     ...loosenedCells(config, defaults),
     ...raisedSecurityThreshold(config, defaults),
     ...loosenedCalendar(config, defaults),
     ...longContractValidity(config),
+    ...raisedRunCaps(config, defaults),
   ];
 }
