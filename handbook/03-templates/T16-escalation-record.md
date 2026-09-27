@@ -1,6 +1,6 @@
 # T16 Escalation record
 
-> Status: **Draft 0.1**, awaiting approval
+> Status: **Draft 0.2**, awaiting approval
 
 | Item | Value |
 |---|---|
@@ -56,6 +56,10 @@
 | Decided by / at | |
 ```
 
+## On the platform
+
+The platform keeps each escalation as a record of **codes, IDs, one hash and one link** (task B11, `design/ADR-M28-escalations.md`), because escalation records are kept for at least 2 years (Chapter 3 §3.9.3). The words of sections 1, 2 and 4 (goal, action, payload, evidence, impact, the reason of the decision) stay on the intent's issue or pull request, where they can be edited or deleted. The record links to them. Acknowledge and decide with `/ack` and `/decide` (Chapter 18 §18.8b).
+
 ---
 
 ## Version history
@@ -64,3 +68,4 @@
 |---|---|---|---|
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content |
+| 0.2 | 2026-09-27 | Claude (task B11) | "On the platform": the record keeps codes and links; the words stay on the issue |

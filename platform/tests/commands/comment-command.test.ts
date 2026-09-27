@@ -67,7 +67,7 @@ describe('comment command grammar', () => {
     ['Thanks!\n/approve G3'],
     ['```\n/approve G3\n```'],
     ['/label bug'],
-    ['/ack ESC-1'],
+    ['/acknowledge ESC-2026-0001'],
     ['/approveG3'],
     ['/ approve G3'],
   ])('%j is not a command of the platform', (body) => {

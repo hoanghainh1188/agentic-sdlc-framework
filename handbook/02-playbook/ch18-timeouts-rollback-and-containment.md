@@ -1,7 +1,7 @@
 # Chapter 18. Timeouts, rollback and containment
 
 > Readers: **developers, Person A, Person B**, operators · Reading time: about 15 minutes
-> Status: **Draft 0.2**, awaiting Harry's comments.
+> Status: **Draft 0.3**, awaiting Harry's comments. §18.8b (platform usage) is owned by Claude Code.
 
 ---
 
@@ -131,6 +131,71 @@ Reviewed at Sprint 0 (Chapter 10 §10.7) and after every incident. Every project
 
 ---
 
+## 18.8b. Using the platform: escalations, `/ack` and `/decide`
+
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B11, 2026-09-27, and kept in line with the platform code (`design/ADR-M28-escalations.md`). The rest of this chapter is Draft 0.2 and is written outside Claude Code.
+
+The platform raises an escalation when a run or a gate needs a decision from a person with independent authority (Chapter 6 §6.4). For example, it raises one when a run breaks its budget or its file scope at G5, when a gate is overdue, or when a run is stopped. Each escalation has a code such as `ESC-2026-0001`.
+
+**What happens when an escalation is raised.**
+
+- The platform posts a notice on the intent's GitHub issue. The notice mentions the people who must act, and it states the deadlines in UTC.
+- Who receives it first depends on the kind of problem:
+
+  | Route | Owner | Backup |
+  |---|---|---|
+  | Intent or business scope | Person A | Person B |
+  | Code, tests, architecture | Person B | Second approver |
+  | Security, data, permissions | Person B | Second approver |
+  | Policy or autonomy | Governance | none |
+
+- The producer of the change is never chosen: authority never passes back to them.
+- A Critical escalation also tells governance at once. High tells governance, Person A and Person B. Medium tells Person A and Person B. Low tells Person A.
+- **The work is frozen** while the escalation is open, if its response level is Pause, Contain or Incident. At Observe and Notify, the work is frozen once the acknowledge deadline is missed.
+  - Frozen means that only safe actions continue: read-only work, tests in the sandbox, unpublished drafts, collecting metrics (project setting `escalation.safe_actions`).
+  - Stopping a run and revoking its credentials are always possible.
+- **Two clocks run** (Chapter 6 §6.4 SLA): acknowledge, and resolve.
+  - If nobody acknowledges, the platform reminds the owner at 75 % of the acknowledge time.
+  - Then it moves the escalation to the backup owner, then to governance, with a new acknowledge time at each step.
+  - If nobody decides by the resolve deadline, governance takes over. For Critical, the incident process is due (Chapter 6 §6.7).
+  - No answer never means "go ahead".
+
+**Commands.** Write the command on the **first line of a new comment** on the intent's issue. You can leave out the escalation code when the intent has only one escalation that is not decided yet.
+
+| Command | Does |
+|---|---|
+| `/ack ESC-2026-0001` | Acknowledges the escalation: "I have it". The acknowledge clock stops; the resolve clock keeps running. Nothing may follow the code on that line |
+| `/decide ESC-2026-0001 resume` | Decides to continue as before (for example with more budget) |
+| `/decide ESC-2026-0001 modify` | Decides that the plan or the work must change first |
+| `/decide ESC-2026-0001 roll-back` | Decides to roll back |
+| `/decide ESC-2026-0001 terminate` | Decides to stop this work |
+| `/decide ESC-2026-0001 escalate` | Hands the escalation to governance (not possible for governance itself) |
+
+- After the decision you may add a reason code and a sentence, for example `/decide ESC-2026-0001 resume budget_exceeded The estimate was too low`.
+- The sentence stays in your comment. The platform stores only codes and a link to the comment, because escalations are kept for at least 2 years (Chapter 3 §3.9.3).
+- The same API is available for the CLI (`sdlc escalation …`, task B04): `GET /v1/escalations`, `POST /v1/escalations/<code>/ack`, `POST /v1/escalations/<code>/decisions`.
+
+**Who may act.**
+
+- The owner may act at any time.
+- The backup owner may act once the escalation has reached the backup step.
+- Governance may act at any time.
+- A producer of the change never acts, and neither do bots.
+- Your GitHub account must be linked to your platform user (by its numeric account ID, as for gate commands, §19.8b).
+
+**What a decision allows** (Chapter 6 §6.6).
+
+- A decision is bound to the version that was reviewed, to the actions it allows, and to an expiry (project setting `oversight.approval_expiry`, 7 days by default).
+  - `resume` allows the run to continue or start again, more budget, and the next gate.
+  - `modify` allows moving through the gates again.
+  - `roll-back` and `terminate` allow no protected action.
+- Just before acting, the platform checks the decision again. If the decision has expired, or the plan or input changed, the decision is voided and the escalation waits for a new decision.
+- The platform closes the escalation after it has acted on the decision.
+
+**Answers.** A successful command gets no reply. A command that the platform cannot read or refuses gets a reply that says why. Nothing is recorded in that case.
+
+---
+
 ## 18.9. Drills and metrics
 
 Drill **once per release cycle** for systems with High or Critical risk (decision: Harry, 2026-09-24). Scenarios:
@@ -186,3 +251,4 @@ Track:
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content |
 | 0.2 | 2026-09-24 | Claude (draft) | Recovery runbook per project; drills each release cycle for High+ systems (Harry) |
+| 0.3 | 2026-09-27 | Claude (task B11) | §18.8b platform usage: escalations, `/ack`, `/decide`, freeze, clocks (ADR-M28) |

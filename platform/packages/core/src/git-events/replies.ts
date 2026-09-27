@@ -13,6 +13,8 @@ export const COMMENT_REPLY_KEYS: Readonly<Record<CommentReplyCode, MessageKey>> 
   syntax_gate_invalid: 'comment.reply.syntax_gate_invalid',
   syntax_unexpected_text: 'comment.reply.syntax_unexpected_text',
   syntax_reason_missing: 'comment.reply.syntax_reason_missing',
+  syntax_decision_missing: 'comment.reply.syntax_decision_missing',
+  syntax_decision_invalid: 'comment.reply.syntax_decision_invalid',
   user_not_linked: 'comment.reply.user_not_linked',
   intent_not_linked: 'comment.reply.intent_not_linked',
   intent_ambiguous: 'comment.reply.intent_ambiguous',
@@ -24,6 +26,12 @@ export const COMMENT_REPLY_KEYS: Readonly<Record<CommentReplyCode, MessageKey>> 
   decision_not_allowed: 'comment.reply.decision_not_allowed',
   project_not_active: 'comment.reply.project_not_active',
   config_invalid: 'comment.reply.config_invalid',
+  escalation_not_found: 'comment.reply.escalation_not_found',
+  escalation_ambiguous: 'comment.reply.escalation_ambiguous',
+  escalation_forbidden: 'comment.reply.escalation_forbidden',
+  escalation_not_open: 'comment.reply.escalation_not_open',
+  escalation_already_acknowledged: 'comment.reply.escalation_already_acknowledged',
+  escalation_decision_not_allowed: 'comment.reply.escalation_decision_not_allowed',
   failed: 'comment.reply.failed',
 };
 
@@ -43,7 +51,10 @@ export function renderCommentReply(
 ): string {
   // A code from a newer version of the platform (rolled back since): answer generically.
   const key = isReplyCode(code) ? COMMENT_REPLY_KEYS[code] : COMMENT_REPLY_KEYS.failed;
-  const parts = [t(key, { gate: params.gate ?? '' }, locale)];
+  // Gate commands name their gate; escalation commands (B11) their command word, `/ack` or `/decide`.
+  const command = params.command === 'ack' || params.command === 'decide' ? params.command : '';
+  const label = params.gate ?? (command ? `/${command}` : '');
+  const parts = [t(key, { gate: label }, locale)];
   // Known reason codes only: the text of an unknown code is never echoed into a comment.
   if (params.reason !== undefined && isRefusalReason(params.reason)) {
     parts.push(
@@ -51,7 +62,8 @@ export function renderCommentReply(
     );
   }
   if (code.startsWith('syntax_')) {
-    parts.push(t('comment.reply.usage', { codes: GATE_REASON_CODES.join(', ') }, locale));
+    const usage = command ? 'comment.reply.usage_escalation' : 'comment.reply.usage';
+    parts.push(t(usage, { codes: GATE_REASON_CODES.join(', ') }, locale));
   }
   parts.push(t('comment.reply.footer', {}, locale));
   return `${parts.join('\n\n')}\n\n<!-- sdlc-reply ${eventId} -->`;

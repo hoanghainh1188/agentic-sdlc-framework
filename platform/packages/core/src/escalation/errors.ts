@@ -10,7 +10,16 @@ export type EscalationErrorCode =
   /** A G5 breach needs at least response level `pause` (QUESTIONS #21, ADR-M28 §2.6). */
   | 'response_level_too_low'
   /** An open escalation freezes the intent and the action is not on the safe list (#76). */
-  | 'frozen';
+  | 'frozen'
+  /** The person holds none of the roles that may act at the escalation's current step, or is a
+   *  producer of the change (FR-18). */
+  | 'forbidden'
+  /** The escalation is closed, or already decided: nothing to acknowledge or decide. */
+  | 'not_open'
+  /** The escalation was already acknowledged. */
+  | 'already_acknowledged'
+  /** The decision is not allowed here (for example governance cannot escalate further). */
+  | 'decision_not_allowed';
 
 export class EscalationError extends Error {
   override readonly name = 'EscalationError';

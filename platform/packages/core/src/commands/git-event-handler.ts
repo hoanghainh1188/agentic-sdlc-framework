@@ -12,12 +12,18 @@
 import type { CommentCreatedEvent, GitEvent } from '@sdlc/contracts';
 
 import { DbError, TenantGuardError } from '../db/errors.js';
-import type { GitEventReceipt } from '../db/schema.js';
+import type { Escalation, GitEventReceipt, Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import type { GitProvider } from '../db/vocabulary.js';
+import { acknowledgeEscalation, decideEscalation } from '../escalation/decide.js';
+import { EscalationError, type EscalationErrorCode } from '../escalation/errors.js';
 import { RegistryError } from '../registry/errors.js';
 import type { Registry } from '../registry/registry.js';
-import { parseCommentCommand, type CommentSyntaxProblem } from './comment-command.js';
+import {
+  parseCommentCommand,
+  type CommentSyntaxProblem,
+  type ParsedComment,
+} from './comment-command.js';
 import { CommandError } from './errors.js';
 import { decideGate } from './gate-command.js';
 
@@ -25,6 +31,10 @@ import { decideGate } from './gate-command.js';
 export type GitEventOutcome =
   /** The gate decision was recorded. No reply: B07's status comment confirms it (FR-22). */
   | 'decided'
+  /** `/ack`: the escalation was acknowledged (B11). No reply. */
+  | 'acknowledged'
+  /** `/decide`: the escalation decision was recorded, or it moved to governance (B11). No reply. */
+  | 'escalation_decided'
   /** The command was understood but refused (permission, gate, input); a reply says why. */
   | 'refused'
   /** The command could not be read; a reply shows the syntax. */
@@ -56,6 +66,8 @@ export const COMMENT_REPLY_CODES = [
   'syntax_gate_invalid',
   'syntax_unexpected_text',
   'syntax_reason_missing',
+  'syntax_decision_missing',
+  'syntax_decision_invalid',
   'user_not_linked',
   'intent_not_linked',
   'intent_ambiguous',
@@ -67,6 +79,12 @@ export const COMMENT_REPLY_CODES = [
   'decision_not_allowed',
   'project_not_active',
   'config_invalid',
+  'escalation_not_found',
+  'escalation_ambiguous',
+  'escalation_forbidden',
+  'escalation_not_open',
+  'escalation_already_acknowledged',
+  'escalation_decision_not_allowed',
   'failed',
 ] as const;
 export type CommentReplyCode = (typeof COMMENT_REPLY_CODES)[number];
@@ -79,6 +97,8 @@ export interface GitEventProject {
 export interface GitEventHandlerDeps {
   /** The registry with the apps' policy factory (`createSimplePolicyEngine`). */
   readonly registry: Registry;
+  /** Clock of escalation commands (decision expiry). Default: `new Date()`. */
+  readonly now?: () => Date;
 }
 
 export interface HandledGitEvent {
@@ -99,7 +119,26 @@ const SYNTAX_REPLY: Readonly<Record<CommentSyntaxProblem, CommentReplyCode>> = {
   gate_invalid: 'syntax_gate_invalid',
   unexpected_text: 'syntax_unexpected_text',
   reason_missing: 'syntax_reason_missing',
+  decision_missing: 'syntax_decision_missing',
+  decision_invalid: 'syntax_decision_invalid',
 };
+
+/** Reply of an escalation refusal (B11). `frozen` and packet errors cannot come from a command. */
+const ESCALATION_REPLY: Readonly<Partial<Record<EscalationErrorCode, CommentReplyCode>>> = {
+  not_found: 'escalation_not_found',
+  forbidden: 'escalation_forbidden',
+  not_open: 'escalation_not_open',
+  already_acknowledged: 'escalation_already_acknowledged',
+  decision_not_allowed: 'escalation_decision_not_allowed',
+};
+
+/** Reply parameters of a command: the gate, or the escalation command word (codes only). */
+export function commandReplyParams(command: ParsedComment): Record<string, string> {
+  if (command.kind === 'gate_decision') return { gate: command.gate };
+  if (command.kind === 'none') return {};
+  // `invalid` carries the verb too; a gate verb has no gate param when its gate could not be read.
+  return command.verb === 'ack' || command.verb === 'decide' ? { command: command.verb } : {};
+}
 
 /**
  * Handles one event in the scope's transaction (one is opened when the scope has none). Throws
@@ -123,7 +162,7 @@ export function handleGitEvent(
     if (existing && existing.outcome !== 'failing') return { outcome: 'duplicate' };
     const record = async (
       outcome: GitEventOutcome,
-      extra: { gateDecisionId?: string; reply?: Reply } = {},
+      extra: { gateDecisionId?: string; escalationId?: string; reply?: Reply } = {},
     ): Promise<HandledGitEvent> => {
       const input = {
         projectId: project.id,
@@ -131,6 +170,7 @@ export function handleGitEvent(
         outcome,
         issueNumber: event.issueNumber,
         gateDecisionId: extra.gateDecisionId ?? null,
+        escalationId: extra.escalationId ?? null,
         ...(extra.reply ? { reply: extra.reply } : {}),
       };
       return {
@@ -145,7 +185,7 @@ export function handleGitEvent(
     if (command.kind === 'invalid') {
       return record('syntax_error', { reply: { code: SYNTAX_REPLY[command.problem], params: {} } });
     }
-    const gate = { gate: command.gate };
+    const gate = commandReplyParams(command);
 
     const actorId = await linkedUser(tx, project.provider, event);
     if (actorId === undefined) {
@@ -160,6 +200,18 @@ export function handleGitEvent(
       return record(code, { reply: { code, params: gate } });
     }
 
+    if (command.kind !== 'gate_decision') {
+      return handleEscalationCommand(
+        tx,
+        deps,
+        intents[0]!,
+        command,
+        actorId,
+        event.url,
+        gate,
+        record,
+      );
+    }
     try {
       const decision = await tx.savepoint((sp) =>
         decideGate(deps.registry, sp, {
@@ -182,6 +234,77 @@ export function handleGitEvent(
   });
 }
 
+type EscalationCommand = Extract<ParsedComment, { kind: 'escalation_ack' | 'escalation_decision' }>;
+type Recorder = (
+  outcome: GitEventOutcome,
+  extra?: { gateDecisionId?: string; escalationId?: string; reply?: Reply },
+) => Promise<HandledGitEvent>;
+
+/** `/ack` and `/decide` (B11, ADR-M28 §2.7): same linking, receipts and refusal handling. */
+async function handleEscalationCommand(
+  tx: TenantScope,
+  deps: GitEventHandlerDeps,
+  intent: Intent,
+  command: EscalationCommand,
+  actorId: string,
+  url: string,
+  params: Readonly<Record<string, string>>,
+  record: Recorder,
+): Promise<HandledGitEvent> {
+  const found = await findEscalation(tx, intent, command.code);
+  if (typeof found === 'string') return record('refused', { reply: { code: found, params } });
+  const clock = deps.now ? { now: deps.now } : {};
+  try {
+    await tx.savepoint((sp) =>
+      command.kind === 'escalation_ack'
+        ? acknowledgeEscalation(sp, { escalationId: found.id, actorId }, clock)
+        : decideEscalation(
+            sp,
+            {
+              escalationId: found.id,
+              actorId,
+              decision: command.decision,
+              reasonCode: command.reasonCode,
+              reasonRef: REASON_REF.test(url) ? url : null,
+            },
+            clock,
+          ),
+    );
+    const outcome = command.kind === 'escalation_ack' ? 'acknowledged' : 'escalation_decided';
+    return await record(outcome, { escalationId: found.id });
+  } catch (error) {
+    const reply =
+      error instanceof EscalationError
+        ? { code: ESCALATION_REPLY[error.code] ?? 'failed', params }
+        : refusalReply(error, params);
+    if (reply === undefined) throw error;
+    return record(reply.code === 'failed' ? 'failed' : 'refused', {
+      escalationId: found.id,
+      reply,
+    });
+  }
+}
+
+/**
+ * The escalation a command names: by code (it must belong to the intent), or the intent's only
+ * unresolved escalation. Returns a reply code when there is none or more than one.
+ */
+async function findEscalation(
+  tx: TenantScope,
+  intent: Intent,
+  code: string | null,
+): Promise<Escalation | 'escalation_not_found' | 'escalation_ambiguous'> {
+  if (code !== null) {
+    const byCode = await tx.escalations.getByCode(code);
+    return byCode?.intent_id === intent.id ? byCode : 'escalation_not_found';
+  }
+  const open = await tx.escalations.listForIntent(intent.id, {
+    statuses: ['open', 'acknowledged'],
+  });
+  if (open.length === 0) return 'escalation_not_found';
+  return open.length === 1 ? open[0]! : 'escalation_ambiguous';
+}
+
 /** The active platform user linked to the comment author, by numeric account ID only. */
 async function linkedUser(
   scope: TenantScope,
@@ -195,7 +318,7 @@ async function linkedUser(
 }
 
 /** The reply for an expected refusal; undefined for errors that must stop the poll. */
-function refusalReply(error: unknown, gate: Readonly<{ gate: string }>): Reply | undefined {
+function refusalReply(error: unknown, gate: Readonly<Record<string, string>>): Reply | undefined {
   if (error instanceof CommandError) {
     // `project_not_found` cannot happen here (the project is the polled one); same text as no role.
     const code = error.code === 'project_not_found' ? 'intent_not_found' : error.code;
