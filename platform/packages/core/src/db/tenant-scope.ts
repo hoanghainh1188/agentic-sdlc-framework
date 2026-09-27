@@ -72,8 +72,12 @@ export class TenantScope {
     this.costRecords = new CostRecordRepository(this.db, this.tenantId);
   }
 
-  /** Runs `work` in one database transaction, with repositories bound to the same tenant. */
+  /**
+   * Runs `work` in one database transaction, with repositories bound to the same tenant. Inside a
+   * transaction already (a scope from `transaction` or `SystemScope.createTenantWith`), `work` joins it.
+   */
   transaction<T>(work: (scope: TenantScope) => Promise<T>): Promise<T> {
+    if (this.db.isTransaction) return work(this);
     return this.db.transaction().execute((trx) => work(new TenantScope(trx, this.tenantId)));
   }
 }

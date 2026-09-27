@@ -1,6 +1,7 @@
 // `sdlc audit verify` (D-02 FR-41, D-08 A07 AC4, design/D-05 section 7.3).
 // Temporary: connects straight to the platform database as `platform_app` (SDLC_DB_URL), because
-// the API does not exist yet. Task B04 moves this command behind the API (ADR-M09 section 2.8).
+// the API has no tenant admin role yet. Task B13 moves this command behind the API once a tenant
+// admin role exists (QUESTIONS.md #65, ADR-M26; ADR-M09 section 2.8).
 import { PlatformDatabase, parseTenantId, type ChainBreakReason, type Tenant } from '@sdlc/core';
 import { t, type MessageKey } from '@sdlc/messages';
 

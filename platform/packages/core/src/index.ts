@@ -6,3 +6,5 @@ export * from './run-contract/index.js';
 export * from './run-events/index.js';
 export * from './git-host/index.js';
 export * from './cost/index.js';
+export * from './admin/index.js';
+export * from './commands/index.js';

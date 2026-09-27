@@ -31,6 +31,14 @@ export interface AuditActionSpec {
 }
 
 export const AUDIT_ACTIONS = {
+  /** A tenant was created by the one-time bootstrap (B03, ADR-M26). Never its slug or name. */
+  'tenant.created': { entityType: 'tenant', fields: {} },
+  /** A user was created (B03 bootstrap). Never the name or e-mail address. */
+  'user.created': { entityType: 'user', fields: {} },
+  /** A personal API token was issued (B03). Never the token or its hash; the token ID is the entity. */
+  'api_token.issued': { entityType: 'api_token', fields: { user_id: 'uuid' } },
+  /** A personal API token was revoked (B03). Written once, on the first revocation. */
+  'api_token.revoked': { entityType: 'api_token', fields: { user_id: 'uuid' } },
   /** A project configuration was created or replaced (FR-14, ADR-M13). Never the config text. */
   'config.changed': {
     entityType: 'project',

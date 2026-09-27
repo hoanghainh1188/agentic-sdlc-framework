@@ -176,6 +176,10 @@ export const projectConfigSchema = z.strictObject({
   }),
   retention: z.strictObject({ evidence_retention_days: positiveInt }),
   github: z.strictObject({ poll_interval_seconds: positiveInt }),
+  access: z.strictObject({
+    intent_create_roles: uniqueList(role).min(1),
+    intent_read_roles: uniqueList(role).min(1),
+  }),
 });
 
 /** Maps zod issues to catalog-keyed configuration issues. Zod's own English text is never used. */

@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M15: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M16: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -328,6 +328,14 @@ const CASES: Case[] = [
     yaml: cell('G6', 'low', '{ mode: POLICY, roles: [] }'),
     key: 'config.rule.g6_independent_verification',
     path: 'oversight.matrix.G6.low.mode',
+  },
+  // M16: the viewer role never creates intents (B03, QUESTIONS.md #66).
+  {
+    name: 'viewer may create intents',
+    rule: 'M16',
+    yaml: 'access:\n  intent_create_roles: [person_a, viewer]\n',
+    key: 'config.rule.viewer_never_creates',
+    path: 'access.intent_create_roles',
   },
 ];
 

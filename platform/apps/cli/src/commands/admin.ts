@@ -1,0 +1,263 @@
+// `sdlc admin bootstrap` and `sdlc admin token issue|list|revoke` (task B03, QUESTIONS.md #58 and
+// #63, ADR-M26 section 2.2). Operator commands, run on the server: they connect straight to the
+// platform database as `platform_app` (SDLC_DB_URL), like `sdlc audit verify`. Task B13 moves
+// token issuing behind the API once a tenant admin role exists (QUESTIONS.md #65).
+// A token is printed once, to stdout, and never logged. Run these in a terminal, not in a chat.
+import { parseArgs } from 'node:util';
+
+import {
+  bootstrapTenant,
+  DbError,
+  issueApiToken,
+  parseTenantId,
+  revokeApiToken,
+  type ApiToken,
+  type PlatformDatabase,
+  type TenantScope,
+} from '@sdlc/core';
+import { t } from '@sdlc/messages';
+
+import { EXIT, type CliContext } from '../context.js';
+
+type Values = Record<string, string | boolean | undefined>;
+
+const COMMON = { json: { type: 'boolean', default: false } } as const;
+
+const SPECS = {
+  bootstrap: {
+    ...COMMON,
+    tenant: { type: 'string' },
+    'tenant-name': { type: 'string' },
+    email: { type: 'string' },
+    name: { type: 'string' },
+    'token-name': { type: 'string' },
+    days: { type: 'string' },
+  },
+  'token issue': {
+    ...COMMON,
+    tenant: { type: 'string' },
+    email: { type: 'string' },
+    name: { type: 'string' },
+    days: { type: 'string' },
+  },
+  'token list': { ...COMMON, tenant: { type: 'string' }, email: { type: 'string' } },
+  'token revoke': { ...COMMON, tenant: { type: 'string' }, id: { type: 'string' } },
+} as const;
+
+const REQUIRED: Readonly<Record<keyof typeof SPECS, readonly string[]>> = {
+  bootstrap: ['tenant', 'tenant-name', 'email', 'name'],
+  'token issue': ['tenant', 'email', 'name'],
+  'token list': ['tenant', 'email'],
+  'token revoke': ['tenant', 'id'],
+};
+
+/** `args` starts after `admin`. Returns the exit code. */
+export async function runAdmin(args: readonly string[], ctx: CliContext): Promise<number> {
+  const [first, second, ...rest] = args;
+  const command = (first === 'token' ? `token ${second ?? ''}` : first) as keyof typeof SPECS;
+  if (!Object.hasOwn(SPECS, command)) return usage(ctx);
+  const values = parse(command, first === 'token' ? rest : [second, ...rest]);
+  if (!values) return usage(ctx);
+
+  const url = ctx.env.SDLC_DB_URL;
+  if (!url) {
+    ctx.stderr(t('cli.admin.missing_url'));
+    return EXIT.usage;
+  }
+  const days = values.days === undefined ? undefined : Number(values.days);
+  if (days !== undefined && !Number.isSafeInteger(days)) return usage(ctx);
+
+  const db = ctx.connect({
+    connectionString: url,
+    maxConnections: 1,
+    applicationName: 'sdlc-admin',
+  });
+  try {
+    switch (command) {
+      case 'bootstrap':
+        return await bootstrap(db, values, days, ctx);
+      case 'token issue':
+        return await issue(db, values, days, ctx);
+      case 'token list':
+        return await list(db, values, ctx);
+      case 'token revoke':
+        return await revoke(db, values, ctx);
+    }
+  } catch (error) {
+    if (error instanceof DbError && error.code === 'conflict') {
+      ctx.stderr(t('cli.admin.conflict'));
+      return EXIT.failed;
+    }
+    if (error instanceof DbError && error.code === 'invalid_value') {
+      ctx.stderr(t('cli.admin.invalid', { reason: error.message }));
+      return EXIT.usage;
+    }
+    throw error;
+  } finally {
+    await db.close();
+  }
+}
+
+function parse(
+  command: keyof typeof SPECS,
+  args: readonly (string | undefined)[],
+): Values | undefined {
+  try {
+    const { values } = parseArgs({
+      args: args.filter((a): a is string => a !== undefined),
+      options: SPECS[command],
+      strict: true,
+      allowPositionals: false,
+    });
+    const found = values as Values;
+    return REQUIRED[command].every((key) => typeof found[key] === 'string') ? found : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function usage(ctx: CliContext): number {
+  ctx.stderr(t('cli.admin.usage'));
+  return EXIT.usage;
+}
+
+const str = (values: Values, key: string): string => String(values[key]);
+
+async function bootstrap(
+  db: PlatformDatabase,
+  values: Values,
+  days: number | undefined,
+  ctx: CliContext,
+): Promise<number> {
+  const result = await bootstrapTenant(db, {
+    tenantSlug: str(values, 'tenant'),
+    tenantName: str(values, 'tenant-name'),
+    adminEmail: str(values, 'email'),
+    adminName: str(values, 'name'),
+    ...(values['token-name'] === undefined ? {} : { tokenName: str(values, 'token-name') }),
+    ...(days === undefined ? {} : { lifetimeDays: days }),
+  });
+  printToken(ctx, values.json === true, {
+    tenant: result.tenant.slug,
+    tenant_id: result.tenant.id,
+    user_id: result.user.id,
+    record: result.token.record,
+    token: result.token.token,
+  });
+  return EXIT.ok;
+}
+
+async function issue(
+  db: PlatformDatabase,
+  values: Values,
+  days: number | undefined,
+  ctx: CliContext,
+): Promise<number> {
+  const found = await tenantUser(db, values, ctx);
+  if (!found) return EXIT.usage;
+  const issued = await issueApiToken(found.scope, {
+    userId: found.userId,
+    name: str(values, 'name'),
+    ...(days === undefined ? {} : { lifetimeDays: days }),
+  });
+  printToken(ctx, values.json === true, {
+    tenant: str(values, 'tenant'),
+    tenant_id: found.scope.tenantId,
+    user_id: found.userId,
+    record: issued.record,
+    token: issued.token,
+  });
+  return EXIT.ok;
+}
+
+async function list(db: PlatformDatabase, values: Values, ctx: CliContext): Promise<number> {
+  const found = await tenantUser(db, values, ctx);
+  if (!found) return EXIT.usage;
+  const tokens = (await found.scope.apiTokens.listForUser(found.userId)).map(describe);
+  if (values.json === true) {
+    ctx.stdout(JSON.stringify(tokens, null, 2));
+    return EXIT.ok;
+  }
+  if (tokens.length === 0) ctx.stdout(t('cli.admin.token.none'));
+  for (const token of tokens) ctx.stdout(t('cli.admin.token.line', { ...token }));
+  return EXIT.ok;
+}
+
+async function revoke(db: PlatformDatabase, values: Values, ctx: CliContext): Promise<number> {
+  const scope = await tenantScope(db, str(values, 'tenant'), ctx);
+  if (!scope) return EXIT.usage;
+  const revoked = await revokeApiToken(scope, str(values, 'id'));
+  if (!revoked) {
+    ctx.stderr(t('cli.admin.token.not_found', { id: str(values, 'id') }));
+    return EXIT.failed;
+  }
+  ctx.stdout(
+    values.json === true
+      ? JSON.stringify(describe(revoked))
+      : t('cli.admin.token.revoked', { id: revoked.id }),
+  );
+  return EXIT.ok;
+}
+
+async function tenantScope(
+  db: PlatformDatabase,
+  slug: string,
+  ctx: CliContext,
+): Promise<TenantScope | undefined> {
+  const tenant = await db.system.getTenantBySlug(slug);
+  if (!tenant) {
+    ctx.stderr(t('cli.admin.tenant_not_found', { slug }));
+    return undefined;
+  }
+  return db.forTenant(parseTenantId(tenant.id));
+}
+
+async function tenantUser(
+  db: PlatformDatabase,
+  values: Values,
+  ctx: CliContext,
+): Promise<{ scope: TenantScope; userId: string } | undefined> {
+  const scope = await tenantScope(db, str(values, 'tenant'), ctx);
+  if (!scope) return undefined;
+  const user = await scope.users.getByEmail(str(values, 'email'));
+  if (!user) {
+    ctx.stderr(t('cli.admin.user_not_found'));
+    return undefined;
+  }
+  return { scope, userId: user.id };
+}
+
+function describe(token: ApiToken): Record<string, string> {
+  return {
+    id: token.id,
+    name: token.name,
+    expires_at: token.expires_at.toISOString(),
+    revoked_at: token.revoked_at?.toISOString() ?? '-',
+    last_used_at: token.last_used_at?.toISOString() ?? '-',
+  };
+}
+
+interface PrintedToken {
+  readonly tenant: string;
+  readonly tenant_id: string;
+  readonly user_id: string;
+  readonly record: ApiToken;
+  readonly token: string;
+}
+
+function printToken(ctx: CliContext, json: boolean, printed: PrintedToken): void {
+  const summary = {
+    tenant: printed.tenant,
+    tenant_id: printed.tenant_id,
+    user_id: printed.user_id,
+    token_id: printed.record.id,
+    expires_at: printed.record.expires_at.toISOString(),
+  };
+  if (json) {
+    ctx.stdout(JSON.stringify({ ...summary, token: printed.token }, null, 2));
+    return;
+  }
+  ctx.stdout(t('cli.admin.token.issued', summary));
+  ctx.stdout(printed.token);
+  ctx.stdout(t('cli.admin.token.shown_once'));
+}

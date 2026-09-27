@@ -39,6 +39,23 @@ export interface IntentQuery {
   readonly status?: IntentStatus;
 }
 
+/** Keyset position: the last intent of the previous page (task B03). */
+export interface IntentPosition {
+  readonly createdAt: Date;
+  readonly id: string;
+}
+
+export interface IntentPageQuery {
+  /** Projects to include. An empty list gives an empty page. */
+  readonly projectIds: readonly string[];
+  readonly status?: IntentStatus;
+  /** 1 to `MAX_INTENT_PAGE`. */
+  readonly limit: number;
+  readonly after?: IntentPosition;
+}
+
+export const MAX_INTENT_PAGE = 100;
+
 const MONEY = /^\d{1,12}(\.\d{1,6})?$/;
 
 export class IntentRepository extends TenantRepository {
@@ -143,6 +160,42 @@ export class IntentRepository extends TenantRepository {
         .where('project_id', '=', projectId)
         .$if(query.status !== undefined, (qb) => qb.where('status', '=', query.status!))
         .orderBy('code')
+        .execute(),
+    );
+  }
+
+  /**
+   * One page of intents of the given projects, newest first, by (`created_at`, `id`). Returns at
+   * most `limit` rows; callers ask for one more to know whether a next page exists.
+   */
+  page(query: IntentPageQuery): Promise<Intent[]> {
+    if (
+      !Number.isSafeInteger(query.limit) ||
+      query.limit < 1 ||
+      query.limit > MAX_INTENT_PAGE + 1
+    ) {
+      throw new DbError('invalid_value', `limit must be 1 to ${String(MAX_INTENT_PAGE)}`);
+    }
+    if (query.projectIds.length === 0) return Promise.resolve([]);
+    const after = query.after;
+    return this.run(
+      this.db
+        .selectFrom('intents')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('project_id', 'in', [...query.projectIds])
+        .$if(query.status !== undefined, (qb) => qb.where('status', '=', query.status!))
+        .$if(after !== undefined, (qb) =>
+          qb.where((eb) =>
+            eb.or([
+              eb('created_at', '<', after!.createdAt),
+              eb.and([eb('created_at', '=', after!.createdAt), eb('id', '<', after!.id)]),
+            ]),
+          ),
+        )
+        .orderBy('created_at', 'desc')
+        .orderBy('id', 'desc')
+        .limit(query.limit)
         .execute(),
     );
   }

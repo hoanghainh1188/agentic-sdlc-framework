@@ -1,5 +1,5 @@
 // The adapter accepts only a configuration validated by `@sdlc/config` (ADR-M18 §2.2): the
-// mandatory rules M1–M15 run once, when the configuration is loaded, never in the adapter.
+// mandatory rules M1–M16 run once, when the configuration is loaded, never in the adapter.
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
 import { defaultProjectConfig, loadProjectConfig } from '@sdlc/config';
 import type { ProjectConfig } from '@sdlc/contracts';
