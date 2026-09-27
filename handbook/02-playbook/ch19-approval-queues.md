@@ -116,7 +116,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 | `/request-changes G3 <reason>` | A request for changes. The reason is required |
 
 - Gates G1, G2 and G3 can be decided by comment today; G7 and G8 come later.
-- The reason may start with a reason code: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other`. A code other than `other` may stand alone (`/reject G2 spec_unclear`). Without a code, the platform records `other` and you must write a sentence. Example: `/reject G2 spec_unclear AC2 does not say which warehouse`.
+- The reason may start with a reason code: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other`. A code other than `other` may stand alone: `/reject G2 spec_unclear` is accepted. `other` alone is not a reason: `/reject G2 other` without text is refused. Without a code, the platform records `other`, and you must write a sentence. Example: `/reject G2 spec_unclear AC2 does not say which warehouse`.
 - The reason text stays in your comment. The platform stores only the reason code and a link to the comment, because its records are kept for years and can never be edited. Write the reason so that it can stay on GitHub, and do not put personal or client data in it.
 - Only new comments count. **Editing a comment never changes a decision.** To change your mind, write a new comment.
 - Text on later lines, quoted text (`> /approve G3`) and commands inside code blocks are not read.
@@ -132,6 +132,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 
 - **A successful command gets no reply.** The platform posts the gate status on the issue or pull request when the gate changes (FR-22, task B07).
 - A command that the platform cannot read or refuses gets a reply that says why and shows the syntax. Nothing is recorded in that case: fix the command and write a new comment.
+- If the platform itself fails while handling your command, it tries again on the next polls. After a few failed attempts it gives up and replies that it could not record the command. Nothing is recorded; write the command again later, and tell the platform operator.
 
 ---
 

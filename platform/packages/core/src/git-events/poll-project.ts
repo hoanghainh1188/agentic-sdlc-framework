@@ -12,10 +12,12 @@ import {
   GitHostError,
   INITIAL_EVENT_CURSOR,
   type EventCursor,
+  type GitEvent,
   type GitHostAdapter,
   type RepoRef,
 } from '@sdlc/contracts';
 
+import { parseCommentCommand } from '../commands/comment-command.js';
 import {
   handleGitEvent,
   type GitEventOutcome,
@@ -34,7 +36,9 @@ export type PollLogEvent =
   | 'reply.posted'
   | 'reply.failed'
   | 'reply.abandoned'
-  | 'reply.bookkeeping_failed';
+  | 'reply.bookkeeping_failed'
+  | 'poll.event_attempt_failed'
+  | 'worker.event_failed';
 
 /** Structured log hook. Fields hold IDs and codes only: never comment text or tokens. */
 export interface PollLogger {
@@ -54,6 +58,12 @@ export interface PollDeps extends GitEventHandlerDeps {
   readonly maxReplyAttempts?: number;
   /** Replies posted per poll at most. Default 20. */
   readonly repliesPerPoll?: number;
+  /**
+   * An event whose handling fails with an unexpected error (not a refusal) is given up after this
+   * many failed attempts: `failed_internal`, one `failed` reply, and the cursor moves past it.
+   * Default 3. A technical setting, not a handbook rule (ADR-M27 §2.2).
+   */
+  readonly maxEventAttempts?: number;
 }
 
 export interface PollResult {
@@ -67,6 +77,18 @@ export interface PollResult {
 
 class CursorMoved extends Error {
   override readonly name = 'CursorMoved';
+}
+
+/** The handling of one event failed; the batch rolls back and the attempt is counted outside it. */
+class EventFailed extends Error {
+  override readonly name = 'EventFailed';
+
+  constructor(
+    readonly event: GitEvent,
+    override readonly cause: unknown,
+  ) {
+    super('event failed');
+  }
 }
 
 const REPO_FULL_NAME = /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9._-]{1,100})$/;
@@ -98,31 +120,27 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
 
   let outcomes: Partial<Record<GitEventOutcome, number>> = {};
   let status: PollResult['status'] = 'polled';
-  try {
-    outcomes = await scope.transaction(async (tx) => {
-      const counts: Partial<Record<GitEventOutcome, number>> = {};
-      // First, so the cursor row stays locked for the whole batch.
-      if (!(await tx.gitEventCursors.saveIfUnchanged(project.id, expected, next, now()))) {
-        throw new CursorMoved();
+  let givenUp = 0;
+  // Each round either commits the batch, or gives one more event up and runs the batch again
+  // without it; so at most one round per event, plus one.
+  for (let round = 0; round <= events.length; round += 1) {
+    try {
+      outcomes = await runBatch(deps, scope, project.id, events, { expected, next, now, ids });
+      break;
+    } catch (error) {
+      if (error instanceof CursorMoved) {
+        status = 'cursor_moved';
+        log.log('warn', 'poll.cursor_moved', ids);
+        break;
       }
-      for (const event of events) {
-        const { outcome } = await handleGitEvent(
-          tx,
-          { registry: deps.registry },
-          { id: project.id, provider: 'github' },
-          event,
-        );
-        counts[outcome] = (counts[outcome] ?? 0) + 1;
-        if (outcome !== 'not_a_command' && outcome !== 'not_handled') {
-          log.log('info', 'poll.event_handled', { ...ids, event_id: event.id, outcome });
-        }
-      }
-      return counts;
-    });
-  } catch (error) {
-    if (!(error instanceof CursorMoved)) throw error;
-    status = 'cursor_moved';
-    log.log('warn', 'poll.cursor_moved', ids);
+      if (!(error instanceof EventFailed)) throw error;
+      const final = await countFailure(deps, scope, project.id, error, ids);
+      if (!final) throw error.cause;
+      givenUp += 1;
+    }
+  }
+  if (givenUp > 0 && status === 'polled') {
+    outcomes = { ...outcomes, failed_internal: givenUp };
   }
 
   // The poller that lost the cursor race leaves the replies to the winner, which is flushing them.
@@ -144,6 +162,93 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
     repliesPosted: replies.posted,
     repliesFailed: replies.failed,
   };
+}
+
+interface BatchContext {
+  readonly expected: string | null;
+  readonly next: EventCursor;
+  readonly now: () => Date;
+  readonly ids: Readonly<Record<string, string>>;
+}
+
+/** The cursor compare-and-set and every event, in one transaction. */
+function runBatch(
+  deps: PollDeps,
+  scope: TenantScope,
+  projectId: string,
+  events: readonly GitEvent[],
+  ctx: BatchContext,
+): Promise<Partial<Record<GitEventOutcome, number>>> {
+  const log = deps.logger ?? { log: () => undefined };
+  return scope.transaction(async (tx) => {
+    const counts: Partial<Record<GitEventOutcome, number>> = {};
+    // First, so the cursor row stays locked for the whole batch.
+    if (!(await tx.gitEventCursors.saveIfUnchanged(projectId, ctx.expected, ctx.next, ctx.now()))) {
+      throw new CursorMoved();
+    }
+    for (const event of events) {
+      let outcome: GitEventOutcome;
+      try {
+        ({ outcome } = await handleGitEvent(
+          tx,
+          { registry: deps.registry },
+          { id: projectId, provider: 'github' },
+          event,
+        ));
+      } catch (error) {
+        throw new EventFailed(event, error);
+      }
+      counts[outcome] = (counts[outcome] ?? 0) + 1;
+      if (outcome !== 'not_a_command' && outcome !== 'not_handled') {
+        log.log('info', 'poll.event_handled', { ...ctx.ids, event_id: event.id, outcome });
+      }
+    }
+    return counts;
+  });
+}
+
+/**
+ * Counts a failed attempt of the event in its own transaction (the batch was rolled back). Returns
+ * true when the event is now given up. When the count cannot be written (for example the database
+ * is gone), the original error stops the poll and nothing is counted.
+ */
+async function countFailure(
+  deps: PollDeps,
+  scope: TenantScope,
+  projectId: string,
+  failure: EventFailed,
+  ids: Readonly<Record<string, string>>,
+): Promise<boolean> {
+  const log = deps.logger ?? { log: () => undefined };
+  const { event } = failure;
+  // Only command comments can fail: other events are not handled yet.
+  if (event.kind !== 'comment_created') throw failure.cause;
+  const command = parseCommentCommand(event.body);
+  const replyParams: Record<string, string> =
+    command.kind === 'gate_decision' ? { gate: command.gate } : {};
+  let counted: { attempts: number; final: boolean };
+  try {
+    counted = await scope.gitEventReceipts.recordFailure(
+      { projectId, eventId: event.id, issueNumber: event.issueNumber, replyParams },
+      deps.maxEventAttempts ?? 3,
+    );
+  } catch {
+    throw failure.cause;
+  }
+  const fields = {
+    ...ids,
+    event_id: event.id,
+    attempts: counted.attempts,
+    error: errorName(failure.cause),
+  };
+  if (counted.final) log.log('error', 'worker.event_failed', fields);
+  else log.log('warn', 'poll.event_attempt_failed', fields);
+  return counted.final;
+}
+
+/** A code for logs: the error class name, never its message (it may hold data). */
+function errorName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unexpected';
 }
 
 /** Posts the pending replies of a project (the outbox), oldest first. */

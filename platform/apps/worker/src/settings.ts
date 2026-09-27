@@ -14,6 +14,7 @@ export const WORKER_ENV = {
   tickMs: 'SDLC_WORKER_TICK_MS',
   maxConcurrentPolls: 'SDLC_WORKER_MAX_CONCURRENT_POLLS',
   maxReplyAttempts: 'SDLC_WORKER_MAX_REPLY_ATTEMPTS',
+  maxEventAttempts: 'SDLC_WORKER_MAX_EVENT_ATTEMPTS',
   heartbeatFile: 'SDLC_WORKER_HEARTBEAT_FILE',
   devMode: 'SDLC_WORKER_DEV_MODE',
   devDbUrl: 'SDLC_WORKER_DEV_DB_URL',
@@ -43,6 +44,7 @@ const schema = z.object({
   [WORKER_ENV.tickMs]: z.coerce.number().int().min(100).max(60_000).default(1000),
   [WORKER_ENV.maxConcurrentPolls]: z.coerce.number().int().min(1).max(32).default(4),
   [WORKER_ENV.maxReplyAttempts]: z.coerce.number().int().min(1).max(100).default(5),
+  [WORKER_ENV.maxEventAttempts]: z.coerce.number().int().min(1).max(20).default(3),
   [WORKER_ENV.heartbeatFile]: z.string().min(1).default('/tmp/sdlc-worker.heartbeat'),
   [WORKER_ENV.devMode]: z.enum(['', '0', '1']).default(''),
   [WORKER_ENV.devDbUrl]: z.string().optional(),
@@ -66,6 +68,8 @@ export interface WorkerSettings {
   readonly tickMs: number;
   readonly maxConcurrentPolls: number;
   readonly maxReplyAttempts: number;
+  /** Failed attempts before an event is given up (`failed_internal`, ADR-M27 §2.2). */
+  readonly maxEventAttempts: number;
   readonly heartbeatFile: string;
 }
 
@@ -119,6 +123,7 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     tickMs: v[WORKER_ENV.tickMs],
     maxConcurrentPolls: v[WORKER_ENV.maxConcurrentPolls],
     maxReplyAttempts: v[WORKER_ENV.maxReplyAttempts],
+    maxEventAttempts: v[WORKER_ENV.maxEventAttempts],
     heartbeatFile: v[WORKER_ENV.heartbeatFile],
   };
 }

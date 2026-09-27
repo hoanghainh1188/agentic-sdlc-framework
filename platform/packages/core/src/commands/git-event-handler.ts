@@ -39,6 +39,10 @@ export type GitEventOutcome =
   | 'ignored_bot'
   /** The platform could not record the command (a stored value was refused). */
   | 'failed'
+  /** Handling failed with an unexpected error; retried on the next polls (receipt only). */
+  | 'failing'
+  /** Given up after the maximum number of failed attempts; a `failed` reply is posted. */
+  | 'failed_internal'
   /** Not stored: the event already has a receipt. */
   | 'duplicate'
   /** Not stored: a comment that is not a command of the platform. */
@@ -113,21 +117,29 @@ export function handleGitEvent(
   if (command.kind === 'none') return Promise.resolve({ outcome: 'not_a_command' });
 
   return scope.transaction(async (tx) => {
-    if (await tx.gitEventReceipts.find(project.id, event.id)) return { outcome: 'duplicate' };
+    // A `failing` receipt is an event whose earlier attempts failed: try it again. Any other
+    // receipt means the event is done (including `failed_internal`: given up, skipped).
+    const existing = await tx.gitEventReceipts.find(project.id, event.id);
+    if (existing && existing.outcome !== 'failing') return { outcome: 'duplicate' };
     const record = async (
       outcome: GitEventOutcome,
       extra: { gateDecisionId?: string; reply?: Reply } = {},
-    ): Promise<HandledGitEvent> => ({
-      outcome,
-      receipt: await tx.gitEventReceipts.record({
+    ): Promise<HandledGitEvent> => {
+      const input = {
         projectId: project.id,
         eventId: event.id,
         outcome,
         issueNumber: event.issueNumber,
         gateDecisionId: extra.gateDecisionId ?? null,
         ...(extra.reply ? { reply: extra.reply } : {}),
-      }),
-    });
+      };
+      return {
+        outcome,
+        receipt: existing
+          ? await tx.gitEventReceipts.complete(existing.id, input)
+          : await tx.gitEventReceipts.record(input),
+      };
+    };
 
     if (event.author.type === 'bot') return record('ignored_bot');
     if (command.kind === 'invalid') {

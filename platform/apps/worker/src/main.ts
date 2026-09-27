@@ -42,7 +42,14 @@ async function main(): Promise<void> {
     },
     poll: (project) =>
       pollProject(
-        { db, gitHost, registry, logger, maxReplyAttempts: settings.maxReplyAttempts },
+        {
+          db,
+          gitHost,
+          registry,
+          logger,
+          maxReplyAttempts: settings.maxReplyAttempts,
+          maxEventAttempts: settings.maxEventAttempts,
+        },
         project,
       ),
     now: () => Date.now(),

@@ -75,8 +75,17 @@ const UPDATABLE: Record<string, readonly string[]> = {
   run_events: [],
   // Append-only (D-05 D3, C03).
   cost_records: [],
-  // B06: only the reply delivery moves forward (trigger); the event and its outcome never change.
-  git_event_receipts: ['reply_attempts', 'reply_posted_at', 'reply_abandoned_at'],
+  // B06: a `failing` receipt gets its result once; then only the reply delivery moves (trigger).
+  git_event_receipts: [
+    'outcome',
+    'gate_decision_id',
+    'reply_code',
+    'reply_params',
+    'event_attempts',
+    'reply_attempts',
+    'reply_posted_at',
+    'reply_abandoned_at',
+  ],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {

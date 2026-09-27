@@ -46,6 +46,90 @@ export class GitEventReceiptRepository extends TenantRepository {
     );
   }
 
+  /**
+   * Gives a `failing` receipt its result, when a retry of the event succeeds or is refused
+   * (the same fields as `record`). The attempt count stays.
+   */
+  async complete(id: string, input: NewGitEventReceipt): Promise<GitEventReceipt> {
+    return this.run(
+      this.db
+        .updateTable('git_event_receipts')
+        .set({
+          outcome: input.outcome,
+          gate_decision_id: input.gateDecisionId ?? null,
+          reply_code: input.reply?.code ?? null,
+          reply_params: input.reply ? JSON.stringify(input.reply.params) : null,
+        })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .where('outcome', '=', 'failing')
+        .returningAll()
+        .executeTakeFirstOrThrow(),
+    );
+  }
+
+  /**
+   * Counts one failed attempt to handle an event (an error that is not a refusal), in its own
+   * transaction, so the count survives the rollback of the batch and a restart. At `maxAttempts`
+   * the receipt becomes final: `failed_internal`, with the reply `failed`. Returns the count and
+   * whether the event is now given up. A receipt that already has a result is left as it is.
+   */
+  recordFailure(
+    input: {
+      readonly projectId: string;
+      readonly eventId: string;
+      readonly issueNumber: number;
+      readonly replyParams: Readonly<Record<string, string>>;
+    },
+    maxAttempts: number,
+  ): Promise<{ readonly attempts: number; readonly final: boolean }> {
+    return this.run(
+      this.transactional(async (db) => {
+        const existing = await db
+          .selectFrom('git_event_receipts')
+          .selectAll()
+          .where('tenant_id', '=', this.tenantId)
+          .where('project_id', '=', input.projectId)
+          .where('event_id', '=', input.eventId)
+          .forUpdate()
+          .executeTakeFirst();
+        if (existing && existing.outcome !== 'failing') {
+          return { attempts: existing.event_attempts, final: true };
+        }
+        const attempts = (existing?.event_attempts ?? 0) + 1;
+        const final = attempts >= maxAttempts;
+        const result = final
+          ? {
+              outcome: 'failed_internal',
+              reply_code: 'failed',
+              reply_params: JSON.stringify(input.replyParams),
+            }
+          : { outcome: 'failing' };
+        if (existing) {
+          await db
+            .updateTable('git_event_receipts')
+            .set({ ...result, event_attempts: attempts })
+            .where('tenant_id', '=', this.tenantId)
+            .where('id', '=', existing.id)
+            .execute();
+        } else {
+          await db
+            .insertInto('git_event_receipts')
+            .values({
+              tenant_id: this.tenantId,
+              project_id: input.projectId,
+              event_id: input.eventId,
+              issue_number: input.issueNumber,
+              event_attempts: attempts,
+              ...result,
+            })
+            .execute();
+        }
+        return { attempts, final };
+      }),
+    );
+  }
+
   /** Replies not yet posted or abandoned, in the order of the events. */
   pendingReplies(projectId: string, limit: number): Promise<GitEventReceipt[]> {
     return this.run(

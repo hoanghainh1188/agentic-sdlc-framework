@@ -315,11 +315,12 @@ export interface GitEventReceiptsTable {
   tenant_id: Immutable<string>;
   project_id: Immutable<string>;
   event_id: Immutable<string>;
-  outcome: Immutable<string>;
-  gate_decision_id: ColumnType<string | null, string | null | undefined, never>;
+  outcome: ColumnType<string, string, string>;
+  gate_decision_id: ColumnType<string | null, string | null | undefined, string | null>;
   issue_number: ColumnType<number | null, number | null | undefined, never>;
-  reply_code: ColumnType<string | null, string | null | undefined, never>;
-  reply_params: ColumnType<Record<string, string> | null, string | null | undefined, never>;
+  reply_code: ColumnType<string | null, string | null | undefined, string | null>;
+  reply_params: ColumnType<Record<string, string> | null, string | null | undefined, string | null>;
+  event_attempts: ColumnType<number, number | undefined, number>;
   reply_attempts: ColumnType<number, number | undefined, number>;
   reply_posted_at: ColumnType<Date | null, never, Date>;
   reply_abandoned_at: ColumnType<Date | null, never, Date>;
@@ -620,6 +621,7 @@ export const TABLE_COLUMNS = {
     'issue_number',
     'reply_code',
     'reply_params',
+    'event_attempts',
     'reply_attempts',
     'reply_posted_at',
     'reply_abandoned_at',

@@ -17,6 +17,7 @@ describe('worker settings', () => {
       tickMs: 1000,
       maxConcurrentPolls: 4,
       maxReplyAttempts: 5,
+      maxEventAttempts: 3,
       heartbeatFile: '/tmp/sdlc-worker.heartbeat',
     });
   });
@@ -27,6 +28,7 @@ describe('worker settings', () => {
     ['SDLC_WORKER_TICK_MS', '10'],
     ['SDLC_WORKER_MAX_CONCURRENT_POLLS', '0'],
     ['SDLC_WORKER_DB_PORT', 'x'],
+    ['SDLC_WORKER_MAX_EVENT_ATTEMPTS', '0'],
   ])('refuses %s=%s', (name, value) => {
     expect(() => loadSettings({ [name]: value })).toThrow(
       expect.objectContaining({ key: 'worker.settings.invalid', setting: name }),

@@ -51,7 +51,11 @@ These points were open:
   - `RegistryError`;
   - any `DbError` (a constraint, privilege or trigger refused a statement) or `TenantGuardError`. These are deterministic: a retry would fail the same way and block every later event of the project, so the command is answered `failed` instead.
   The refusal is then recorded as a receipt with a reply.
-- Any other error (for example a lost connection, which `DbError` never wraps) rolls back the whole batch, and the next tick retries.
+- Any other error (a programming error in the handler, or a lost connection, which `DbError` never wraps) rolls back the whole batch. The failed event is then counted **in its own small transaction** (`gitEventReceipts.recordFailure`), so the count survives the rollback and a worker restart:
+  - the receipt gets the outcome `failing` and `event_attempts` = the number of failed attempts; it holds no decision and no reply;
+  - below the limit, the poll stops with the error and the next tick retries the whole batch; a later success or refusal gives the `failing` receipt its result;
+  - at `SDLC_WORKER_MAX_EVENT_ATTEMPTS` failed attempts (default 3; a technical setting, not a handbook rule), the receipt becomes final: `failed_internal`, never a gate decision (a CHECK enforces it), and the catalog reply `failed` once. `worker.event_failed` is logged at error level with IDs, the attempt count and the error class name only. The batch then runs again without that event, so the other events are applied and the cursor moves past it;
+  - when the count itself cannot be written (for example the database is gone), nothing is counted and the error stops the poll.
 - Only command comments get a receipt. Other comments, reviews and checks only move the cursor: reviews and checks are read by later gates (E01, C08).
 
 ### 2.3. Command grammar and reason codes (D3)
@@ -68,7 +72,8 @@ These points were open:
   - Gates other than G1–G3 are refused by `decideGate` (`gate_not_supported`); E01 and E03 add G7 and G8.
 - `/reject` and `/request-changes` need a reason. The reason is the rest of the first line and the lines below.
   - An optional first word may be a code from `GATE_REASON_CODES` (`spec_unclear`, `spec-unclear`, any case).
-  - A code other than `other` is a reason by itself (`/reject G3 spec_unclear`).
+  - A code other than `other` is a reason by itself: `/reject G3 spec_unclear` is accepted.
+  - `other` is never a reason by itself: `/reject G3 other` without text is refused (`syntax_reason_missing`).
   - Without a code, the platform records `other`, and a sentence is required.
 - **The reason text stays in the comment on GitHub.** The decision stores `reason_code` and `reason_ref` = the comment's `https://` URL (ADR-M20). The parser returns codes only. Receipts and logs never hold text from GitHub.
 - Other slash words (`/label`, later `/ack`, `/decide`, `/kill`) are not ours and are ignored. B11 and C11 add their verbs to the same parser.
@@ -116,6 +121,7 @@ These points were open:
   | `TICK_MS` | `1000` |
   | `MAX_CONCURRENT_POLLS` | `4` |
   | `MAX_REPLY_ATTEMPTS` | `5` |
+  | `MAX_EVENT_ATTEMPTS` | `3` |
   | `HEARTBEAT_FILE` | `/tmp/sdlc-worker.heartbeat` |
 
   These are technical settings, not handbook rules.
@@ -145,7 +151,7 @@ These points were open:
   - static Compose and bootstrap checks;
   - the API refusal texts unchanged.
 - `pnpm test:db` (`git-poller.test.ts`), with the in-process GitHub stub:
-  - AC1: a crash before the commit, a reply failure after the commit, a replayed event, two concurrent pollers, reply give-up;
+  - AC1: a crash before the commit, a reply failure after the commit, a replayed event, two concurrent pollers, reply give-up, a poison event retried N times across restarts and then given up with one reply while the other events are applied;
   - AC2: the three commands;
   - AC3: numeric IDs, bots, roles, a disabled user, another tenant;
   - AC4: the replies;
@@ -153,6 +159,8 @@ These points were open:
   - the receipt privileges and trigger;
   - `listPollableProjects` returns IDs only.
 - Optional live test `platform/tests/integration/github/poller-live.test.ts`, with the test App and a throw-away database. It is **never run in CI**, and the owner runs it in a terminal. The App posts `/approve G9`; the poller records `ignored_bot`, no decision and no reply.
+  - The test App is a bot, so the live test only proves that bots are ignored. **The reply path is covered by the stub tests** (`git-poller.test.ts`: every reply code, posted after the commit, once).
+  - A live check with a human GitHub account (a person comments `/approve G9` and gets the reply) is a manual step for later, when a second test account exists.
 
 ## 3. Risks
 
@@ -167,7 +175,7 @@ These points were open:
 - `intents.issue_number` is not unique per project. Two open intents on one issue give `intent_ambiguous`, and nothing is decided (QUESTIONS #68).
 - Replies are at least once, so a rare duplicate reply is possible. A successful command gets no reply until B07.
 - One worker instance is the MVP. The compare-and-set makes a second instance safe, but not efficient: its polls roll back. Two instances flushing the same project at the same moment can post a reply twice (at least once).
-- An unexpected error that is not a database refusal (for example a bug in the handler) rolls the batch back on every poll, so that project's commands wait until it is fixed. `worker.poll_failed` is logged on every attempt; watch it.
+- An event that fails with a programming error delays the project's other commands for up to `SDLC_WORKER_MAX_EVENT_ATTEMPTS` polls (default 3, about 1.5 minutes at 30 s), then it is given up (`failed_internal`, `worker.event_failed`). A person must write the command again after the fix.
 
 ## 4. Consequences
 
@@ -182,3 +190,4 @@ These points were open:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task B06) | First version |
+| 0.2 | 2026-09-27 | Claude (task B06, review of PR #94) | §2.2: failed attempts counted per event outside the batch, `failed_internal` after `SDLC_WORKER_MAX_EVENT_ATTEMPTS`; §2.3: exact rule for a reason code alone; §2.7: live test scope, human-account check later; §3 updated |

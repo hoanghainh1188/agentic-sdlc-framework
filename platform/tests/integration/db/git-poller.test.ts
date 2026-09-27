@@ -181,7 +181,7 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       body: comments.filter((c) => Date.parse(c.updated_at) >= Date.parse(req.query.get('since')!)),
     }));
     h.stub.on('GET', '/repos/acme/shop/pulls', { body: [] });
-    for (const issue of [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 99]) {
+    for (const issue of [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 99]) {
       h.stub.on('POST', `/repos/acme/shop/issues/${String(issue)}/comments`, {
         status: 201,
         body: { id: 1 },
@@ -409,14 +409,88 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
         'process crashed',
       );
       expect((await decisions()).length).toBe(before);
-      expect(await receipt(id)).toBeUndefined();
+      // The attempt is counted outside the rolled-back batch; nothing else is recorded.
+      expect(await receipt(id)).toMatchObject({
+        outcome: 'failing',
+        event_attempts: 1,
+        gate_decision_id: null,
+        reply_code: null,
+      });
       expect((await seeded.scope.gitEventCursors.get(seeded.target.projectId))?.cursor).toBe(
         cursorBefore?.cursor,
       );
       await poll();
       await poll();
       expect((await decisions()).length).toBe(before + 1);
-      expect(await receipt(id)).toMatchObject({ outcome: 'decided' });
+      expect(await receipt(id)).toMatchObject({ outcome: 'decided', event_attempts: 1 });
+      expect(replies(14)).toEqual([]);
+    });
+
+    it('a poison event is retried N times across restarts, then given up with one reply; the rest is applied', async () => {
+      const poisonIntent = await newIntent(17);
+      const goodIntent = await newIntent(18);
+      /** A programming error for one intent only; a new instance per poll, as after a restart. */
+      class BuggyRegistry extends Registry {
+        override async decide(
+          ...args: Parameters<Registry['decide']>
+        ): ReturnType<Registry['decide']> {
+          if (args[1].intentId === poisonIntent.id) throw new TypeError('bug in the handler');
+          return super.decide(...args);
+        }
+      }
+      const logs: { level: string; event: string; fields: Record<string, unknown> }[] = [];
+      const pollBuggy = () =>
+        poll({
+          registry: new BuggyRegistry({ policyFactory }),
+          maxEventAttempts: 3,
+          logger: {
+            log: (level, event, fields) => logs.push({ level, event, fields: { ...fields } }),
+          },
+        });
+      const poison = post(17, '/approve G1');
+      const good = post(18, '/approve G1');
+
+      for (const attempt of [1, 2]) {
+        await expect(pollBuggy()).rejects.toThrow(TypeError);
+        expect(await receipt(poison)).toMatchObject({
+          outcome: 'failing',
+          event_attempts: attempt,
+        });
+        expect(await receipt(good)).toBeUndefined(); // rolled back with the batch
+      }
+      const third = await pollBuggy();
+      expect(third).toMatchObject({
+        status: 'polled',
+        outcomes: { failed_internal: 1, decided: 1 },
+      });
+      expect(await receipt(poison)).toMatchObject({
+        outcome: 'failed_internal',
+        event_attempts: 3,
+        gate_decision_id: null,
+        reply_code: 'failed',
+        reply_params: { gate: 'G1' },
+      });
+      expect(await receipt(good)).toMatchObject({ outcome: 'decided' });
+      const rows = await decisions();
+      expect(rows.filter((d) => d.intent_id === poisonIntent.id)).toEqual([]);
+      expect(rows.filter((d) => d.intent_id === goodIntent.id)).toHaveLength(1);
+
+      const failedLog = logs.find((l) => l.event === 'worker.event_failed');
+      expect(failedLog).toMatchObject({
+        level: 'error',
+        fields: { event_id: `github:comment:${String(poison)}`, attempts: 3, error: 'TypeError' },
+      });
+      expect(JSON.stringify(logs)).not.toContain('bug in the handler');
+
+      // Later batches are applied, the given-up event is skipped, and the reply is posted once.
+      const later = post(18, '/request-changes G1 tests_insufficient');
+      await pollBuggy();
+      await pollBuggy();
+      expect(await receipt(later)).toMatchObject({ outcome: 'decided' });
+      expect(await receipt(poison)).toMatchObject({ event_attempts: 3 });
+      expect(replies(17)).toEqual([
+        expect.stringContaining(t('comment.reply.failed', { gate: 'G1' })),
+      ]);
     });
 
     it('a value the database refuses is answered "failed"; it never blocks the later events', async () => {
@@ -558,7 +632,7 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       }
     });
 
-    it('platform_app cannot delete receipts, change their outcome or reopen a delivered reply', async () => {
+    it('platform_app cannot delete receipts, change a final result or reopen a delivered reply', async () => {
       const [row] = (
         await sql<{ id: string }>`SELECT id FROM git_event_receipts
           WHERE reply_posted_at IS NOT NULL LIMIT 1`.execute(db.owner)
@@ -567,15 +641,38 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
         sql`DELETE FROM git_event_receipts WHERE id = ${row!.id}`.execute(db.appRaw),
       ).rejects.toThrow(/permission denied/);
       await expect(
-        sql`UPDATE git_event_receipts SET outcome = 'decided' WHERE id = ${row!.id}`.execute(
+        sql`UPDATE git_event_receipts SET event_id = 'github:comment:1' WHERE id = ${row!.id}`.execute(
           db.appRaw,
         ),
       ).rejects.toThrow(/permission denied/);
+      // The result of a receipt is fixed once it is no longer `failing`.
+      for (const change of [
+        sql`outcome = 'decided'`,
+        sql`reply_code = 'forbidden'`,
+        sql`event_attempts = event_attempts + 1`,
+      ]) {
+        await expect(
+          sql`UPDATE git_event_receipts SET ${change} WHERE id = ${row!.id}`.execute(db.appRaw),
+        ).rejects.toThrow(/final/);
+      }
       await expect(
         sql`UPDATE git_event_receipts SET reply_attempts = 50 WHERE id = ${row!.id}`.execute(
           db.appRaw,
         ),
       ).rejects.toThrow(/final/);
+    });
+
+    it('a given-up event can never get a gate decision; a failing receipt holds no result', async () => {
+      const [row] = (
+        await sql<{ id: string }>`SELECT id FROM gate_decisions LIMIT 1`.execute(db.owner)
+      ).rows;
+      const insert = (outcome: string, extra: string) =>
+        sql`INSERT INTO git_event_receipts
+              (tenant_id, project_id, event_id, outcome, issue_number, gate_decision_id, reply_code, reply_params)
+            VALUES (${seeded.tenantId}, ${seeded.target.projectId}, ${`github:comment:${extra}`},
+                    ${outcome}, 3, ${row!.id}, NULL, NULL)`.execute(db.appRaw);
+      await expect(insert('failed_internal', '901')).rejects.toThrow(/check/);
+      await expect(insert('failing', '902')).rejects.toThrow(/check/);
     });
 
     it('the database refuses free text in reply parameters and event IDs', async () => {
