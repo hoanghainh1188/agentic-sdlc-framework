@@ -94,11 +94,12 @@ jobs:
           elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
             run=true; reason="base commit unknown, running to be safe"
           # Infrastructure (A02, A03), the OpenBao client (A04), the LiteLLM adapter and Cost
-          # Controller (C03), the runner (C04): their live tests need Docker.
-          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/)" ]; then
-            run=true; reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner or a live test changed"
+          # Controller (C03), the runner (C04), the intent workflow on Temporal (B07): their live
+          # tests need Docker.
+          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts)" ]; then
+            run=true; reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner, the intent workflow or a live test changed"
           else
-            reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner and their live tests unchanged"
+            reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner, the intent workflow and their live tests unchanged"
           fi
           echo "run_compose=$run" >> "$GITHUB_OUTPUT"
           echo "Compose integration job: run=$run ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -160,6 +161,9 @@ jobs:
       # B03: the sdlc-api image, its database password from OpenBao (api-credentials) and a token
       # from `sdlc admin bootstrap`, on its own throw-away Compose project (throw-away test keys).
       - run: pnpm test:api
+      # B07 session 2: the intent workflow on the real Temporal (sticky queues), workers stopped
+      # and started; own throw-away Compose project and a throw-away platform PostgreSQL.
+      - run: pnpm test:workflow-compose
       - name: Show service state and logs
         if: failure()
         run: |

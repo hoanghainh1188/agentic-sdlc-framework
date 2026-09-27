@@ -95,6 +95,10 @@ oversight:
   hotl_block_window: { value: 4, unit: working_hours }
   # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-02 FR-17; QUESTIONS.md #9.
   approval_expiry: { value: 7, unit: days }
+  # [Proposal] pilot default (QUESTIONS.md #90). The escalation raised once when a gate waits for a
+  # person longer than hitl_gate_deadline (D-02 FR-12, FR-18). Severity sets its SLA clocks
+  # (escalation.sla); notify does not freeze the intent until its acknowledgement is missed.
+  gate_overdue: { severity: medium, response_level: notify }
 
 autonomy:
   # Codes table §3 "Maximum autonomy"; D-02 FR-03. The MVP never allows above L2 (D-02 §4.2).

@@ -37,6 +37,27 @@ describe('B07: gate status comments', () => {
     expect(body).toContain('<!-- sdlc-status INT-2026-0007 advanced G3 12 -->');
   });
 
+  it('a HOTL pass says when its block window closes and how to block it', () => {
+    const body = renderIntentNotice(
+      { id: '16', kind: 'hotl_passed', gate: 'G3', previous_gate: 'G2' },
+      { ...view, deciders: [], windowEnd: new Date('2026-09-28T06:00:00Z') },
+    );
+    expect(body).toContain('the platform passed **G2** (HOTL)');
+    expect(body).toContain('now waits at **G3**');
+    expect(body).toContain('@bob: until **2026-09-28 06:00 UTC**');
+    expect(body).toContain('`/request-changes G2 <reason>`');
+  });
+
+  it('a return names who sent the gate back and the gate the intent left', () => {
+    const body = renderIntentNotice(
+      { id: '17', kind: 'returned', gate: 'G3', previous_gate: 'G4' },
+      { ...view, reasonCode: 'tests_insufficient' },
+    );
+    expect(body).toContain('@alice requested changes at **G3** within its block window');
+    expect(body).toContain('went back from G4 to **G3**');
+    expect(body).toContain('`tests_insufficient`');
+  });
+
   it('a gate the platform checks (G4) asks nobody to comment', () => {
     const body = renderIntentNotice(
       { id: '13', kind: 'advanced', gate: 'G4', previous_gate: 'G3' },

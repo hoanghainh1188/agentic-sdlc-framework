@@ -41,6 +41,11 @@ import type {
 } from './vocabulary.js';
 
 type CreatedAt = ColumnType<Date, never, never>;
+/**
+ * `created_at` written from the escalation clock when given, so that the workflow compares it
+ * with the intent's `gate_entered_at` on one clock (B07 session 2).
+ */
+type ClockedCreatedAt = ColumnType<Date, Date | undefined, never>;
 /** Set by the database on insert; never changed afterwards. */
 type Immutable<T> = ColumnType<T, T, never>;
 type GeneratedId = ColumnType<string, never, never>;
@@ -408,7 +413,7 @@ export interface EscalationsTable {
   decided_at: MutableNullable<Date>;
   closed_at: MutableNullable<Date>;
   updated_at: ColumnType<Date, never, Date>;
-  created_at: CreatedAt;
+  created_at: ClockedCreatedAt;
 }
 
 /** Outbox of escalation notices (ADR-M28 §2.5): codes only; PR 2 of B11 posts them. */

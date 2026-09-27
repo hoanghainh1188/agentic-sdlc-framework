@@ -10,6 +10,11 @@ export type CommandErrorCode =
    * workflow is at, so an early or late decision is refused instead of being ignored.
    */
   | 'gate_not_current'
+  /**
+   * An approval at G1–G3 carries a scope (task B07 session 2, D3): the gate advance has no
+   * environment, resources or actions, so a scoped approval could never count.
+   */
+  | 'scope_not_allowed'
   /** Unknown intent, or an intent of a project the actor cannot read. */
   | 'intent_not_found'
   /** Unknown project, or a project the actor has no role on. */

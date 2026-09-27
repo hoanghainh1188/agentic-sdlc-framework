@@ -154,6 +154,7 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 - **The work is frozen** while the escalation is open, if its response level is Pause, Contain or Incident. At Observe and Notify, the work is frozen once the acknowledge deadline is missed.
   - Frozen means that only safe actions continue: read-only work, tests in the sandbox, unpublished drafts, collecting metrics (project setting `escalation.safe_actions`).
   - Stopping a run and revoking its credentials are always possible.
+- **An overdue gate** (Chapter 19 §19.8b) raises a Medium escalation at level Notify by default (project setting `oversight.gate_overdue`). The platform closes it itself when the gate is decided.
 - **Two clocks run** (Chapter 6 §6.4 SLA): acknowledge, and resolve.
   - If nobody acknowledges, the platform reminds the owner at 75 % of the acknowledge time.
   - Then it moves the escalation to the backup owner, then to governance, with a new acknowledge time at each step.
@@ -253,3 +254,4 @@ Track:
 | 0.1 | 2026-09-24 | Claude (draft) | First content |
 | 0.2 | 2026-09-24 | Claude (draft) | Recovery runbook per project; drills each release cycle for High+ systems (Harry) |
 | 0.3 | 2026-09-27 | Claude (task B11) | §18.8b platform usage: escalations, `/ack`, `/decide`, freeze, clocks (ADR-M28) |
+| 0.4 | 2026-09-27 | Claude (task B07, session 2) | §18.8b: the escalation of an overdue gate, closed by the platform (ADR-M30 §2.9) |

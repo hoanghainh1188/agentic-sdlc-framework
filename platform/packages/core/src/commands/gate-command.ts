@@ -6,12 +6,14 @@ import type { EventSource, GateReasonCode, UserId } from '@sdlc/contracts';
 
 import type { GateDecisionRow, Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
-import type { ApprovalScope } from '../registry/approval-binding.js';
+import { normalizeScope, type ApprovalScope } from '../registry/approval-binding.js';
 import type { HumanDecision } from '../registry/decision-rules.js';
 import type { Registry } from '../registry/registry.js';
+import { openBlockWindow } from '../workflow/hotl.js';
+import { waitedSeconds } from '../workflow/step.js';
 import { projectAccess } from './access.js';
 import { CommandError } from './errors.js';
-import { gateInputSha256, isCommandGate } from './gate-input.js';
+import { gateInputSha256, isCommandGate, type CommandGate } from './gate-input.js';
 
 /** Decisions a person may send as a command (D-08 B03 AC3, B06 AC2). */
 export const COMMAND_DECISIONS = [
@@ -53,13 +55,22 @@ export async function decideGate(
     throw new CommandError('gate_not_supported', `${command.gate} cannot be decided by a command`);
   }
   const gate = command.gate;
-  // The workflow counts decisions only for the gate the intent waits at (B07, ADR-M30 §2.4).
+  // D3 (B07 session 2): the gate advance at G1–G3 has no scope, so an approval with one is refused
+  // here instead of being recorded and then voided (`scope_mismatch`, which stays as a safeguard).
+  if (command.decision === 'approve' && normalizeScope(command.scope) !== null) {
+    throw new CommandError('scope_not_allowed', `${gate} approvals take no scope`);
+  }
+  // The workflow counts decisions only for the gate the intent waits at (B07, ADR-M30 §2.4), with
+  // one exception: within its HOTL block window, a gate the platform passed may still be rejected
+  // or sent back although the intent waits at a later gate (QUESTIONS #88, ADR-M30 §2.4b).
   // Checked on the intent read under its lock, in the transaction of the decision: the workflow
   // cannot move the intent between the check and the record.
   return scope.transaction(async (tx) => {
     const current = await tx.intents.lockAndGet(intent.id);
     if (!current) throw new CommandError('intent_not_found', `intent ${intent.code} not found`);
-    if (current.status !== 'in_gate' || current.current_gate !== gate) {
+    const now = registry.now();
+    const atGate = current.status === 'in_gate' && current.current_gate === gate;
+    if (!atGate && !(await mayBlockPassedGate(registry, tx, current, gate, command, now))) {
       throw new CommandError(
         'gate_not_current',
         `${current.code} is not waiting at ${gate} (${current.status}, ${String(current.current_gate)})`,
@@ -76,8 +87,24 @@ export async function decideGate(
       reasonCode: command.reasonCode ?? null,
       reasonRef: command.reasonRef ?? null,
       ...(command.decision === 'approve' ? { scope: command.scope ?? null } : {}),
+      // FR-12: the time the gate waited for this person; none for a block of a passed gate.
+      waitedSeconds: atGate ? waitedSeconds(current, now) : null,
       source: command.source,
       eventSource: command.eventSource ?? null,
     });
   });
+}
+
+/** A rejection or request for changes of a gate the platform passed, within its block window. */
+async function mayBlockPassedGate(
+  registry: Registry,
+  tx: TenantScope,
+  intent: Intent,
+  gate: CommandGate,
+  command: GateCommand,
+  now: Date,
+): Promise<boolean> {
+  if (command.decision === 'approve' || intent.status !== 'in_gate') return false;
+  const { config } = await registry.policyFor(tx, intent.project_id);
+  return (await openBlockWindow(tx, intent, gate, config, now)) !== null;
 }
