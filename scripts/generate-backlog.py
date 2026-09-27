@@ -94,8 +94,9 @@ t("B04","M-B","CLI `sdlc`","S",["B03"],"FR-20, NFR-08","platform/apps/cli/*",
  ["`sdlc login`, `sdlc intent create|show|list`, `sdlc gate approve|reject <G> <INT>`",
   "Human-readable output from the message catalog; `--json` mode",
   "Command tests against a mocked API",
-  "`sdlc escalation list|show|ack|decide` against the B11 API endpoints (QUESTIONS #77, ADR-M28 §2.7)"],
- "The escalation commands need the B11 API (B11 PR 2)")
+  "`sdlc escalation list|show|ack|decide` against the B11 API endpoints (QUESTIONS #77, ADR-M28 §2.7)",
+  "`sdlc ai-record show|set` against `GET` / `PUT /v1/projects/:project/ai-record` (B12, QUESTIONS #103, ADR-M32 §2.4)"],
+ "The escalation commands need the B11 API (B11 PR 2); the AI record commands need the B12 API")
 t("B05","M-B","GitHub adapter (part 1): App, events, comments","M",["A04"],"—",
  "platform/packages/adapters/git-github/*",
  ["GitHub App authentication with the private key from OpenBao; short-lived installation tokens",
@@ -136,7 +137,8 @@ t("B12","M-B","Project AI record + G1 check","S",["A06","B03"],"FR-19",
  "platform/packages/core/ai-record/*, platform/apps/cli",
  ["CLI to create and update the project AI record (versioned, audited)",
   "G1 fails when the record is missing or the intent's data class is not allowed; unknown consent → only `client_restricted` handling",
-  "`prod_logs_allowed` exposed to policy for operations tasks"])
+  "`prod_logs_allowed` exposed to policy for operations tasks"],
+ "Codes only, version history, write roles in config (QUESTIONS #103–#106, ADR-M32). AC1: API endpoints and the operator command `sdlc admin ai-record`; the user CLI over the API comes with B04 (AC5)")
 t("B13","M-B","Admin onboarding: projects, users, identities, roles, config","M",["B03","B12"],"FR-11, FR-19",
  "platform/apps/api (admin), platform/apps/cli (sdlc admin …), platform/packages/core (admin services), design/ADR (next free number)",
  ["Decide the tenant-admin model (QUESTIONS from B03, D3: A = new tenant-level role table, B = project `admin` counts as tenant admin); record it in an ADR and D-05",
@@ -412,6 +414,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.7 | 2026-09-27 | Claude (task C05), approved by Harry | C07 and C08 notes: sandbox outputs are untrusted, changed files and `head_sha` recomputed from the pushed branch outside the sandbox (ADR-M29 §2.5); C07: iteration cap vs cost cap by `stop_reason`, uncommitted edits of a stopped run (QUESTIONS #82) |
 | 1.8 | 2026-09-27 | Claude (task C10), approved by Harry | E07 AC4: QUESTIONS #81 (a real run with an API model before M-E); B13 AC7: admin endpoints for the agent register with the Ch.20 approval rules; B13 AC8: stored configurations after a change of platform defaults (QUESTIONS #95); C06 note: the agent check and the recertification notice (ADR-M31) |
 | 1.9 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | C06 note: no run before the last HOTL block window closes (`hotlBlockWindowOpenUntil`; QUESTIONS #88, ADR-M30 §2.4b) |
+| 1.10 | 2026-09-27 | Claude (task B12), approved by Harry | B04 AC5: `sdlc ai-record show|set` over the B12 API; B12 note: codes only, version history, write roles, API + operator command (QUESTIONS #103–#106, ADR-M32) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))

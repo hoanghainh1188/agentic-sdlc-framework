@@ -1,11 +1,12 @@
 // Policy engine adapter: simple rules read from the validated project configuration.
 // See design/D-03 section 7.3, D-08 B01. The app loads the configuration with `@sdlc/config`
-// (schema and mandatory rules M1–M16) and passes it here; this package imports contracts only.
+// (schema and mandatory rules M1–M19) and passes it here; this package imports contracts only.
 import type { ModelRef, PolicyEngine, ValidatedProjectConfig } from '@sdlc/contracts';
 
 import { canApprove } from './approvers.js';
 import { isForbidden } from './forbidden.js';
 import { resolveOversight } from './oversight.js';
+import { productionDataAccess } from './production-data.js';
 import { allowedModels, maxAutonomy } from './routing.js';
 import { checkScope } from './scope.js';
 
@@ -25,5 +26,6 @@ export function createSimplePolicyEngine(options: SimplePolicyEngineOptions): Po
     checkScope: (input) => checkScope(input),
     canApprove: (input) => canApprove(config, input),
     isForbidden: (input) => isForbidden(input),
+    productionDataAccess: (input) => productionDataAccess(input),
   };
 }

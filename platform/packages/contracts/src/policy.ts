@@ -14,6 +14,7 @@ import type {
   RiskTier,
   Severity,
 } from './codes.js';
+import type { ProductionDataAccess, ProjectAiFacts } from './ai-record.js';
 import type { GateCheckMode } from './project-config.js';
 
 /** Platform user id (`users.id`, design/D-05 section 6.1). */
@@ -156,4 +157,9 @@ export interface PolicyEngine {
   canApprove(input: ApproverInput): ApproveDecision;
   /** Handbook Ch.4 §4.7. Never overridable by configuration. */
   isForbidden(input: { action: AgentAction; now?: Date }): boolean;
+  /**
+   * What operations tasks may do with production logs and data, from the project AI record
+   * (D-08 B12 AC3, handbook Ch.2 §2.5, T7). No record means `none`. No caller in the MVP yet.
+   */
+  productionDataAccess(input: { aiRecord: ProjectAiFacts | null }): ProductionDataAccess;
 }

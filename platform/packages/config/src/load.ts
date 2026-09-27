@@ -38,7 +38,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-/** The only place that brands a configuration as validated: schema and M1–M18 both passed. */
+/** The only place that brands a configuration as validated: schema and M1–M19 both passed. */
 function validate(raw: unknown): { config: ValidatedProjectConfig } | { errors: ConfigIssue[] } {
   const parsed = projectConfigSchema.safeParse(raw, { reportInput: true });
   if (!parsed.success) return { errors: toConfigIssues(parsed.error.issues) };

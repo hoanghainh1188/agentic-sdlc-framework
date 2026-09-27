@@ -211,6 +211,8 @@ export const projectConfigSchema = z.strictObject({
   access: z.strictObject({
     intent_create_roles: uniqueList(role).min(1),
     intent_read_roles: uniqueList(role).min(1),
+    ai_record_write_roles: uniqueList(role).min(1),
+    ai_record_read_roles: uniqueList(role).min(1),
   }),
   agents: z.strictObject({ recertification_months: positiveInt }),
   sandbox: z.strictObject({ image: pinnedImage }),

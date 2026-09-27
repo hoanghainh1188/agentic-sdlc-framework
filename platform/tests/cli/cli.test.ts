@@ -110,6 +110,47 @@ describe('sdlc', () => {
     expect(err).toEqual([t('cli.admin.agent.usage')]);
   });
 
+  const setArgs = [
+    'admin',
+    'ai-record',
+    'set',
+    '--tenant',
+    'x',
+    '--project',
+    'p',
+    '--on-behalf-of',
+    'pm@example.test',
+    '--expected-version',
+    '0',
+    '--ai-allowed',
+    'yes',
+    '--classes',
+    'internal',
+    '--prod-logs',
+    'no',
+    '--disclosure',
+    'standard_note',
+  ];
+
+  it.each([
+    [['admin', 'ai-record']],
+    [['admin', 'ai-record', 'delete', '--tenant', 'x', '--project', 'p']],
+    [['admin', 'ai-record', 'show', '--tenant', 'x']],
+    [setArgs.filter((a) => a !== '--on-behalf-of' && a !== 'pm@example.test')],
+    [setArgs.map((a) => (a === '0' ? 'one' : a))],
+    [[...setArgs, '--confirmed-by', 'Client contact']],
+  ])('admin ai-record (B12): prints the AI record usage and exits 2 for %j', async (argv) => {
+    const { ctx, err } = context({ SDLC_DB_URL: 'postgres://x' });
+    expect(await runCli(argv, ctx)).toBe(EXIT.usage);
+    expect(err).toEqual([t('cli.admin.ai_record.usage')]);
+  });
+
+  it('admin ai-record needs SDLC_DB_URL', async () => {
+    const { ctx, err } = context();
+    expect(await runCli(setArgs, ctx)).toBe(EXIT.usage);
+    expect(err).toEqual([t('cli.admin.missing_url')]);
+  });
+
   it('admin agent needs SDLC_DB_URL', async () => {
     const { ctx, err } = context();
     expect(await runCli(['admin', 'agent', 'list', '--tenant', 'x'], ctx)).toBe(EXIT.usage);

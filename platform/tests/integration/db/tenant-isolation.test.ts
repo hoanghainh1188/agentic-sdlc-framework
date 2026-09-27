@@ -71,10 +71,10 @@ describeDb('AC3 + AC4: tenant isolation on PostgreSQL', () => {
     await scope.projectAiRecords.save(project.id, {
       aiAllowed: 'yes_with_conditions',
       allowedDataClasses: ['internal', 'client_confidential'],
-      allowedToolsLocations: 'business plan, data in Japan',
       prodLogsAllowed: 'yes_masked',
       disclosureFormat: 'standard_note',
-      confirmedBy: 'Client contact',
+      recordRef: 'https://docs.example.test/project/ai-record',
+      actorType: 'human',
       confirmedAt: '2026-09-24',
       updatedBy: user.id,
       expectedVersion: 0,
@@ -336,10 +336,10 @@ describeDb('AC3 + AC4: tenant isolation on PostgreSQL', () => {
       const v2 = await a.scope.projectAiRecords.save(a.projectId, {
         aiAllowed: 'no',
         allowedDataClasses: [],
-        allowedToolsLocations: null,
         prodLogsAllowed: 'no',
         disclosureFormat: 'client_format',
-        confirmedBy: null,
+        recordRef: null,
+        actorType: 'human',
         confirmedAt: null,
         updatedBy: a.userId,
         expectedVersion: 1,
@@ -349,15 +349,15 @@ describeDb('AC3 + AC4: tenant isolation on PostgreSQL', () => {
         a.scope.projectAiRecords.save(a.projectId, {
           aiAllowed: 'yes',
           allowedDataClasses: ['not_a_class' as never],
-          allowedToolsLocations: null,
           prodLogsAllowed: 'no',
           disclosureFormat: 'client_format',
-          confirmedBy: null,
+          recordRef: null,
+          actorType: 'human',
           confirmedAt: null,
           updatedBy: a.userId,
           expectedVersion: 2,
         }),
-      ).rejects.toMatchObject({ code: 'invalid_value' });
+      ).rejects.toMatchObject({ code: 'invalid_input', field: 'allowed_data_classes' });
     });
 
     it('git event cursor: insert then update', async () => {

@@ -154,6 +154,13 @@ export interface ProjectConfig {
   readonly access: {
     readonly intent_create_roles: readonly ProjectRole[];
     readonly intent_read_roles: readonly ProjectRole[];
+    /**
+     * Who may create and update the project AI record (task B12, ADR-M32; D-02 §3, handbook Ch.2
+     * §2.3 and §2.5, template T7). The viewer role never writes it (mandatory rule M19).
+     */
+    readonly ai_record_write_roles: readonly ProjectRole[];
+    /** Who may read the project AI record. Writers may always read. */
+    readonly ai_record_read_roles: readonly ProjectRole[];
   };
   /** Agent register (task C10, ADR-M31). */
   readonly agents: {

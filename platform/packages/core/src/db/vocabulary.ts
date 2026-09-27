@@ -66,15 +66,16 @@ export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 export const USER_STATUSES = ['active', 'disabled'] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
 
-// Project AI record (handbook Chapter 2 section 2.5, template T7).
-export const AI_ALLOWED_VALUES = ['no', 'yes', 'yes_with_conditions'] as const;
-export type AiAllowed = (typeof AI_ALLOWED_VALUES)[number];
-
-export const PROD_LOGS_ALLOWED_VALUES = ['no', 'yes_masked'] as const;
-export type ProdLogsAllowed = (typeof PROD_LOGS_ALLOWED_VALUES)[number];
-
-export const DISCLOSURE_FORMATS = ['client_format', 'standard_note'] as const;
-export type DisclosureFormat = (typeof DISCLOSURE_FORMATS)[number];
+// Project AI record (handbook Chapter 2 section 2.5, template T7): the codes live in
+// `@sdlc/contracts` since B12, because the policy engine reads them (ADR-M32).
+export {
+  AI_ALLOWED_VALUES,
+  DISCLOSURE_FORMATS,
+  PROD_LOGS_ALLOWED_VALUES,
+  type AiAllowed,
+  type DisclosureFormat,
+  type ProdLogsAllowed,
+} from '@sdlc/contracts';
 
 // Registry (D-05 sections 6.2 and 6.3, B02).
 export const SPEC_SOURCE_TOOLS = ['spec-kit', 'bmad', 'manual'] as const;

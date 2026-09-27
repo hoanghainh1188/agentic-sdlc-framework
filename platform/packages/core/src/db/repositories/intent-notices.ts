@@ -16,6 +16,8 @@ import { TenantRepository } from './base.js';
  * rejected, or a person requested changes at its gate (the status stays; the notice confirms it).
  * Session 2: the platform passed a HOTL gate (`hotl_passed`), or a person's request for changes
  * within the block window took the intent back to the passed gate (`returned`).
+ * `ai_record_refused` (B12): the project AI record check stopped the submit; the intent stays
+ * `draft` until the record allows it.
  */
 export const INTENT_NOTICE_KINDS = [
   'submitted',
@@ -24,6 +26,7 @@ export const INTENT_NOTICE_KINDS = [
   'changes_requested',
   'hotl_passed',
   'returned',
+  'ai_record_refused',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

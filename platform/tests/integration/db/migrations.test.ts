@@ -38,12 +38,12 @@ const UPDATABLE: Record<string, readonly string[]> = {
     'version',
     'ai_allowed',
     'allowed_data_classes',
-    'allowed_tools_locations',
     'prod_logs_allowed',
     'disclosure_format',
-    'confirmed_by',
     'confirmed_at',
     'updated_by',
+    'record_ref',
+    'record_sha256',
   ],
   users: ['display_name', 'email', 'status'],
   user_identities: ['external_login'],
@@ -128,6 +128,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
   ],
   // B07: the status comments; only the delivery moves (trigger: final once posted or abandoned).
   intent_notices: ['attempts', 'posted_at', 'abandoned_at'],
+  // Append-only (B12, ADR-M32): every version of the project AI record, written by a trigger.
+  project_ai_record_versions: [],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -254,7 +256,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // B11: escalations → intents, runs, users ×4; notices → escalations; receipts → escalations.
     // C10: agents → users; runs → agents.
     // B07: intent_notices → intents, gate_decisions.
-    expect(fks).toHaveLength(42);
+    // B12: project_ai_record_versions → project_ai_records, users.
+    expect(fks).toHaveLength(44);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {
@@ -262,6 +265,12 @@ describeDb('AC2: migrations on PostgreSQL', () => {
         expect([fk.child_cols, fk.parent_cols]).toEqual([
           ['tenant_id', 'intent_id', 'gate', 'voids_decision_id'],
           ['tenant_id', 'intent_id', 'gate', 'id'],
+        ]);
+      } else if (fk.name === 'project_ai_record_versions_record_fkey') {
+        // The AI record's key is its project (1–1, D-05 §6.1); the history refers to it (B12).
+        expect([fk.child_cols, fk.parent_cols]).toEqual([
+          ['tenant_id', 'project_id'],
+          ['tenant_id', 'project_id'],
         ]);
       } else if (fk.parent === 'tenants') {
         expect([fk.child_cols, fk.parent_cols], fk.name).toEqual([['tenant_id'], ['id']]);

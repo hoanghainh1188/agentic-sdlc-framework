@@ -30,6 +30,7 @@
 | ADR-M29 | [OpenHands adapter: driving the agent in the sandbox](ADR-M29-openhands-adapter.md) (task C05) | Proposed | |
 | ADR-M30 | [Intent workflow on Temporal: a thin loop over the database](ADR-M30-intent-workflow.md) (task B07) | Proposed | |
 | ADR-M31 | [Agent register: table, lifecycle, operator commands, the check before a run](ADR-M31-agent-register.md) (task C10) | Proposed | |
+| ADR-M32 | [Project AI record: codes only, version history, who writes it, the G1 check](ADR-M32-project-ai-record.md) (task B12) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

@@ -103,7 +103,7 @@ If anything differs → **cancel and ask again**. Three rules always hold:
 
 ## 19.8b. Using the platform: gate commands in comments
 
-> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B06, 2026-09-27, updated with task B07 (the gate workflow and status comments; session 2: HOTL gates, block windows, gate deadlines), and kept in line with the platform code (`design/ADR-M27-github-poller.md`, `design/ADR-M30-intent-workflow.md`). The rest of this chapter is Draft 0.1 and is written outside Claude Code.
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B06, 2026-09-27, updated with task B07 (the gate workflow and status comments; session 2: HOTL gates, block windows, gate deadlines) and task B12 (the project AI record before G1), and kept in line with the platform code (`design/ADR-M27-github-poller.md`, `design/ADR-M30-intent-workflow.md`, `design/ADR-M32-project-ai-record.md`). The rest of this chapter is Draft 0.1 and is written outside Claude Code.
 
 You can decide a gate by writing a comment on the GitHub issue or pull request of the intent. The platform reads new comments about every 30 seconds (project setting `github.poll_interval_seconds`). The CLI (`sdlc gate …`, task B04) does the same through the API.
 
@@ -135,7 +135,8 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 
   | Status comment | When |
   |---|---|
-  | Submitted, waits at G1 | The intent was created |
+  | Submitted, waits at G1 | The intent was created, and the project AI record allows its data class |
+  | Cannot enter G1 yet (reason code) | The project has no AI record (`ai_record_missing`), or the record does not allow the intent's data class (`data_class_not_allowed`). See "The project AI record" below |
   | G*n* approved, waits at the next gate | The gate had the approvals it needs, bound to the current spec or plan |
   | Rejected at G*n* (reason code) | Someone rejected the gate; the intent is closed |
   | Changes requested at G*n* (reason code) | Someone asked for changes; the intent stays at the gate |
@@ -170,6 +171,16 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - The platform records how long each gate waited for the person who decided (`waited_seconds`). The report comes with task E06.
 
 **Scopes.** An approval of G1, G2 or G3 has no scope. The API refuses an approval that sends one (`scope_not_allowed`).
+
+**The project AI record (before G1).** An intent enters G1 only when the project's AI record allows the intent's data class (Chapter 2 §2.5, D-02 FR-19).
+
+- The platform keeps the record as codes: AI use allowed (`no`, `yes`, `yes_with_conditions`), the allowed data classes, AI on production logs and data (`no`, `yes_masked`), the disclosure format (`client_format`, `standard_note`), the date the client confirmed in writing, and a link (`https://`) to the human record of template T7 (for example `docs/project/ai-record.md`). The client contact, the allowed tools and locations and any special conditions stay in that human record, never in the platform.
+- Until the client has answered in writing (no confirmation date), client data is handled only as `client_restricted`: the record cannot allow `client_confidential`, and an intent with that data class waits. `prohibited` is never allowed. When AI use is `no`, no client data class is allowed. The platform never changes an intent's data class: get the written answer, or create the intent again with the right class.
+- When the check fails, the intent stays a draft and the platform posts one status comment with the reason code, mentioning the people who may write the record. When the record is fixed, the intent enters G1 by itself within a few minutes.
+- Who may write the record: Person A and PM / BrSE by default (project setting `access.ai_record_write_roles`; the viewer role never may). Every change is a new version; the platform keeps every version and records who made it.
+- How to write it:
+  - through the API: `GET` and `PUT /v1/projects/<project>/ai-record` with your personal token. `PUT` needs `expected_version` (the version you read; `0` for the first version). The CLI command `sdlc ai-record show|set` comes with task B04.
+  - the platform operator, on the server, for a new project: `sdlc admin ai-record set --tenant <slug> --project <slug> --on-behalf-of <email> --expected-version <n> --ai-allowed <…> --classes <a,b | none> --prod-logs <…> --disclosure <…> [--confirmed-at YYYY-MM-DD] [--record-ref https://…]` and `sdlc admin ai-record show --tenant <slug> --project <slug>`. The person named with `--on-behalf-of` must hold a write role on the project: they are accountable for the content.
 
 ---
 

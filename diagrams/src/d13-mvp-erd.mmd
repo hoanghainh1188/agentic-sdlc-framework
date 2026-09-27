@@ -10,6 +10,7 @@ erDiagram
     projects ||--o{ git_event_receipts : "handled events"
     projects ||--o{ intents : "contains"
     projects ||--|| project_ai_records : "has AI record"
+    project_ai_records ||--o{ project_ai_record_versions : "keeps versions"
     tenants ||--o{ agents : "registers"
     agents ||--o{ runs : "executes"
     intents ||--o{ escalations : "escalates"

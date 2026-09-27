@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M18 and their sources:
+// Rule ids M1–M19 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -24,6 +24,7 @@
 //   M17 escalation routing: policy → governance, no viewer, backup ≠ . Ch.6 §6.4, codes table §6.3,
 //       owner; notify lists contain the handbook's roles ............ QUESTIONS.md #74
 //   M18 agent recertification at least every 3 months ............... Ch.20 §20.8, ADR-M31
+//   M19 the viewer role never writes the project AI record ........... ADR-M32, QUESTIONS.md #103
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -475,6 +476,11 @@ const m18: Rule = (c) =>
       ]
     : [];
 
+const m19: Rule = (c) =>
+  c.access.ai_record_write_roles.includes('viewer')
+    ? [issue('config.rule.viewer_never_writes_ai_record', 'access.ai_record_write_roles')]
+    : [];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -496,6 +502,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M16: m16,
   M17: m17,
   M18: m18,
+  M19: m19,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

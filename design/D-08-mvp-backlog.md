@@ -277,8 +277,9 @@ flowchart LR
 - [ ] AC2: Human-readable output from the message catalog; `--json` mode
 - [ ] AC3: Command tests against a mocked API
 - [ ] AC4: `sdlc escalation list|show|ack|decide` against the B11 API endpoints (QUESTIONS #77, ADR-M28 §2.7)
+- [ ] AC5: `sdlc ai-record show|set` against `GET` / `PUT /v1/projects/:project/ai-record` (B12, QUESTIONS #103, ADR-M32 §2.4)
 
-> Note: The escalation commands need the B11 API (B11 PR 2)
+> Note: The escalation commands need the B11 API (B11 PR 2); the AI record commands need the B12 API
 
 #### B05. GitHub adapter (part 1): App, events, comments
 
@@ -374,6 +375,8 @@ flowchart LR
 - [ ] AC1: CLI to create and update the project AI record (versioned, audited)
 - [ ] AC2: G1 fails when the record is missing or the intent's data class is not allowed; unknown consent → only `client_restricted` handling
 - [ ] AC3: `prod_logs_allowed` exposed to policy for operations tasks
+
+> Note: Codes only, version history, write roles in config (QUESTIONS #103–#106, ADR-M32). AC1: API endpoints and the operator command `sdlc admin ai-record`; the user CLI over the API comes with B04 (AC5)
 
 #### B13. Admin onboarding: projects, users, identities, roles, config
 
@@ -761,4 +764,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.7 | 2026-09-27 | Claude (task C05), approved by Harry | C07 and C08 notes: sandbox outputs are untrusted, changed files and `head_sha` recomputed from the pushed branch outside the sandbox (ADR-M29 §2.5); C07: iteration cap vs cost cap by `stop_reason`, uncommitted edits of a stopped run (QUESTIONS #82) |
 | 1.8 | 2026-09-27 | Claude (task C10), approved by Harry | E07 AC4: QUESTIONS #81 (a real run with an API model before M-E); B13 AC7: admin endpoints for the agent register with the Ch.20 approval rules; B13 AC8: stored configurations after a change of platform defaults (QUESTIONS #95); C06 note: the agent check and the recertification notice (ADR-M31) |
 | 1.9 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | C06 note: no run before the last HOTL block window closes (`hotlBlockWindowOpenUntil`; QUESTIONS #88, ADR-M30 §2.4b) |
+| 1.10 | 2026-09-27 | Claude (task B12), approved by Harry | B04 AC5: `sdlc ai-record show|set` over the B12 API; B12 note: codes only, version history, write roles, API + operator command (QUESTIONS #103–#106, ADR-M32) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

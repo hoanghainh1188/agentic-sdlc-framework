@@ -62,6 +62,8 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.hotl_passed';
     case 'returned':
       return 'intent.status.returned';
+    case 'ai_record_refused':
+      return 'intent.status.ai_record_refused';
     default:
       return notice.gate !== null && isCommandGate(notice.gate)
         ? 'intent.status.advanced'

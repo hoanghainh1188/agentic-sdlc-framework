@@ -12,6 +12,7 @@ import { Registry } from '../../../packages/core/src/registry/registry.js';
 import type { IntentWorkflowSignals } from '../../../packages/contracts/src/intent-workflow.js';
 import { startHarness, type Harness } from '../../git-github/helpers.js';
 import { comment, user } from '../../git-github/stub-github.js';
+import { seedAiRecord } from '../ai-record-seed.js';
 import type { TestDatabase } from '../db/helpers.js';
 
 export const SPEC_HASH = '5'.repeat(64);
@@ -77,6 +78,8 @@ export async function createWorkflowFixture(
       external_login: p.login,
     });
   }
+  // B12: the submit (Draft → G1) needs a project AI record that allows the data class (FR-19).
+  await seedAiRecord(scope, project.id, users.a);
   const target: PollableProject = { tenantId, projectId: project.id, repoFullName: 'acme/shop' };
 
   const h = await startHarness();

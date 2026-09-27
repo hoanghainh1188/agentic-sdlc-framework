@@ -3,7 +3,8 @@
 // platform database as `platform_app` (SDLC_DB_URL), like `sdlc audit verify`. Task B13 moves
 // token issuing behind the API once a tenant admin role exists (QUESTIONS.md #65).
 // A token is printed once, to stdout, and never logged. Run these in a terminal, not in a chat.
-// `sdlc admin agent …` (task C10, the agent register) lives in admin-agent.ts.
+// `sdlc admin agent …` (task C10, the agent register) lives in admin-agent.ts;
+// `sdlc admin ai-record …` (task B12, the project AI record) in admin-ai-record.ts.
 import { parseArgs } from 'node:util';
 
 import {
@@ -16,10 +17,11 @@ import {
   type PlatformDatabase,
   type TenantScope,
 } from '@sdlc/core';
-import { t } from '@sdlc/messages';
+import { t, type MessageKey } from '@sdlc/messages';
 
 import { EXIT, type CliContext } from '../context.js';
 import { parseAgentCommand, runAgentCommand } from './admin-agent.js';
+import { parseAiRecordCommand, runAiRecordCommand } from './admin-ai-record.js';
 
 type Values = Record<string, string | boolean | undefined>;
 
@@ -56,7 +58,18 @@ const REQUIRED: Readonly<Record<keyof typeof SPECS, readonly string[]>> = {
 /** `args` starts after `admin`. Returns the exit code. */
 export async function runAdmin(args: readonly string[], ctx: CliContext): Promise<number> {
   const [first, second, ...rest] = args;
-  if (first === 'agent') return runAgent(args.slice(1), ctx);
+  if (first === 'agent') {
+    return runScoped(
+      parseAgentCommand(args.slice(1)),
+      runAgentCommand,
+      'cli.admin.agent.usage',
+      ctx,
+    );
+  }
+  if (first === 'ai-record') {
+    const parsed = parseAiRecordCommand(args.slice(1));
+    return runScoped(parsed, runAiRecordCommand, 'cli.admin.ai_record.usage', ctx);
+  }
   const command = (first === 'token' ? `token ${second ?? ''}` : first) as keyof typeof SPECS;
   if (!Object.hasOwn(SPECS, command)) return usage(ctx);
   const values = parse(command, first === 'token' ? rest : [second, ...rest]);
@@ -101,11 +114,18 @@ export async function runAdmin(args: readonly string[], ctx: CliContext): Promis
   }
 }
 
-/** `sdlc admin agent …`: same connection and tenant lookup as the token commands. */
-async function runAgent(args: readonly string[], ctx: CliContext): Promise<number> {
-  const parsed = parseAgentCommand(args);
+/**
+ * `sdlc admin agent …` and `sdlc admin ai-record …`: same connection and tenant lookup as the
+ * token commands.
+ */
+async function runScoped<C extends string>(
+  parsed: { command: C; values: Values } | undefined,
+  run: (scope: TenantScope, command: C, values: Values, ctx: CliContext) => Promise<number>,
+  usageKey: MessageKey,
+  ctx: CliContext,
+): Promise<number> {
   if (!parsed) {
-    ctx.stderr(t('cli.admin.agent.usage'));
+    ctx.stderr(t(usageKey));
     return EXIT.usage;
   }
   const url = ctx.env.SDLC_DB_URL;
@@ -121,7 +141,7 @@ async function runAgent(args: readonly string[], ctx: CliContext): Promise<numbe
   try {
     const scope = await tenantScope(db, String(parsed.values.tenant), ctx);
     if (!scope) return EXIT.usage;
-    return await runAgentCommand(scope, parsed.command, parsed.values, ctx);
+    return await run(scope, parsed.command, parsed.values, ctx);
   } finally {
     await db.close();
   }

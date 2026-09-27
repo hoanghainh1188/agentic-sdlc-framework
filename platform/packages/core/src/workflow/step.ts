@@ -6,7 +6,7 @@
 // nothing, because the move is a compare-and-set on the intent's status and gate.
 //
 // Moves (D-03 section 6):
-//   draft → G1 (the submit; B12 adds the AI-record check here) → G2 → G3 → G4 (C06 continues);
+//   draft → G1 (the submit, after the project AI record check of B12) → G2 → G3 → G4 (C06 continues);
 //   a rejection at G1–G3 ends the intent as `rejected`; a request for changes keeps it at the gate;
 //   HOTL (session 2, QUESTIONS #88): the platform passes G2 or G3 when the policy conditions hold;
 //   a person's block within the block window takes the intent back to the passed gate, or ends it.
@@ -35,6 +35,7 @@ import type {
   ValidatedProjectConfig,
 } from '@sdlc/contracts';
 
+import { checkAiRecordAtSubmit } from '../ai-record/g1-check.js';
 import {
   gateInputSha256,
   intentInputSha256,
@@ -129,7 +130,8 @@ export async function stepIntent(
 
 /** Draft → G1. Creating the intent is the submit (QUESTIONS #89). */
 async function submit(tx: TenantScope, deps: StepDeps, intent: Intent): Promise<IntentStepResult> {
-  // B12 adds the project AI record check here (FR-19): G1 fails without it.
+  // FR-19 (B12, ADR-M32 §2.5): no G1 without a project AI record that allows the data class.
+  if (await checkAiRecordAtSubmit(tx, deps.registry, intent)) return waiting('ai_record');
   if (!(await gateAdvanceAllowed(tx, intent, deps.registry.now()))) return waiting('frozen');
   const policy = await deps.registry.policyFor(tx, intent.project_id);
   return move(tx, deps, policy, intent, { status: 'in_gate', gate: 'G1' }, 'submitted', null);
