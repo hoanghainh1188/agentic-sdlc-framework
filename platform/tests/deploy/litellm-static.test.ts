@@ -166,6 +166,18 @@ describe('AC1: the template', () => {
     for (const p of secretLists) expect(allows(p, 'list'), p).toBe(true);
   });
 
+  it('the Ollama model (developer machines only) is a local tag, self-hosted, low reasoning (#78)', () => {
+    const ollama = template.split(/\n\s+- model_name: /).find((m) => m.includes('ollama_chat/'));
+    expect(ollama).toBeDefined();
+    expect(ollama).toMatch(/model: ollama_chat\/gpt-oss:20b\n/);
+    expect(template).not.toMatch(/ollama\S*:cloud|-cloud\b/);
+    expect(ollama).toContain('api_base: {{ .Data.data.api_base | toJSON }}');
+    expect(ollama).toContain('provider_type: self_hosted');
+    expect(ollama).toContain('reasoning_effort: low');
+    expect(ollama).toContain('num_ctx: 32768');
+    expect(ollama).not.toContain('api_key');
+  });
+
   it('every model declares a provider type; self-hosted models declare a cost above 0 (D-07)', () => {
     const models = template.split(/\n\s+- model_name: /).slice(1);
     expect(models.length).toBeGreaterThan(0);

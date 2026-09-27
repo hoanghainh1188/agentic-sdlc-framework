@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C05, session 1; PR for review) |
+| Status | **Proposed** (task C05; session 1 merged in PR #97; session 2 in review) |
 | Date | 2026-09-27 |
 | Decided by | Harry (C05 plan approved 2026-09-27, with conditions; QUESTIONS #13, #78–#80) |
 | Related | D-02 FR-11, FR-30…FR-33, FR-35, FR-50; D-03 sections 7.2, 8, 9; D-05 section 6.4; D-07 sections 3, 4, 6; D-08 tasks C05, C06, C07, C08, C11; ADR-M04, ADR-M10, ADR-M22, ADR-M24, ADR-M25 |
@@ -120,6 +120,14 @@ These are technical settings, not handbook rules.
 
 `Runner.runAgent(request)` drives the agent of a provisioned run, then removes the sandbox (`sandbox_removed {reason: finished | failed}`) and frees the slot, whatever happened. The run's virtual key is the caller's to create and revoke (`CostController.issueRunKey`, `endRun`). The Temporal activity that calls it comes in C06 (QUESTIONS #53, #55).
 
+### 2.9. The real-model run (session 2, QUESTIONS #78)
+
+- The ADR-M10 condition is met with a **local Ollama model on a developer machine**: `gpt-oss:20b` (Apache-2.0), local tag only, never an Ollama `:cloud` model. Results: ADR-M10 §3.
+- **LiteLLM entry** in `config.ctmpl` (and the test template): `gpt-oss-20b` → `ollama_chat/gpt-oss:20b`, `api_base` from OpenBao `kv/litellm/providers/ollama` (field `api_base`, not a secret; the entry exists only on developer machines), `provider_type: self_hosted`, an internal cost above 0 ([Proposal] USD 0.10 / 0.40 per million input / output tokens, until a GPU cost per token is known; D-07 §3).
+- `reasoning_effort: low` and `num_ctx: 32768` are set in the entry, at the gateway, so no model-specific setting enters the adapter. Checked before the run: `low` gave 27 completion tokens where `high` gave 121 for the same question; Ollama loaded the model with context 32768, 100 % on the GPU. OpenHands needs a large context; Ollama's default is too small for its system prompt.
+- **Network:** Ollama runs on the machine (in Docker on macOS it has no GPU). LiteLLM reaches it at `http://host.docker.internal:11434`; the sandbox cannot (its run network has no route out, ADR-M25 §2.2). Docker Desktop reaches an Ollama bound to the host's 127.0.0.1 (checked).
+- **Test:** `pnpm test:agent-real` (developer machines only, never in CI). A throw-away LiteLLM with the template's Ollama entry and its own database, the Cost Controller's virtual key (seven labels, cap `min(budget.default_run_usd, 1.00)`), a node24 sandbox, the runner driving the agent, then `endRun` (revoke, sync into `cost_records`). No secret is involved. It samples memory every 2 s (Ollama processes, sandbox, LiteLLM, free memory).
+
 ## 3. Rules and where they live
 
 | Rule | Source | Where |
@@ -147,7 +155,7 @@ These are technical settings, not handbook rules.
 
 | Item | Where |
 |---|---|
-| Real-model run (local Ollama, `gpt-oss:20b`), numbers recorded; D-02, D-07, ADR-M10 wording | C05 session 2 (QUESTIONS #78) |
+| Real-model run (local Ollama, `gpt-oss:20b`), numbers recorded; D-02, D-07, ADR-M10 wording | Done in session 2 (§2.9, ADR-M10 §3) |
 | One API-model run before M-E | QUESTIONS #81 |
 | Status for the iteration cap: accepted (`stopped_budget` / `max_iterations`) | QUESTIONS #82, C07 |
 | Temporal activity around `runAgent`; the virtual key per run; contract caps from config | C06 |
@@ -155,7 +163,7 @@ These are technical settings, not handbook rules.
 | Push of `agent/INT-…` by the runner; the commit made here is what it pushes | C08 |
 | Platform loop detection with `loop_threshold`; kill switch | C11 |
 | Store the log and changed files as evidence | E02 |
-| A D-03 §7.2 note on the exact `AgentAdapter` (like the §7.1, §7.3, §7.4 notes), and D-05 §6.4 event names, for approval with the session 2 design changes | C05 session 2 |
+| A D-03 §7.2 note on the exact `AgentAdapter`, and D-05 §6.4 event names | Done in session 2 (D-03 1.8, D-05 1.10) |
 
 ## 6. Alternatives not chosen
 
@@ -174,3 +182,4 @@ These are technical settings, not handbook rules.
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task C05, session 1) | First version |
 | 0.2 | 2026-09-27 | Claude (task C05, session 1 review) | §2.4: iteration cap status accepted (QUESTIONS #82); §2.5: recomputation outside the sandbox tracked in D-08 1.7 (C07, C08) |
+| 0.3 | 2026-09-27 | Claude (task C05, session 2) | §2.9: the real-model run with a local Ollama model, the LiteLLM entry, reasoning effort and context at the gateway, `pnpm test:agent-real`; open items done |

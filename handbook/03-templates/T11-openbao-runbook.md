@@ -263,6 +263,13 @@ LiteLLM (the model gateway) gets its keys from OpenBao through a sidecar: an Ope
 4. Start: `pnpm compose:models`. LiteLLM waits until the sidecar has written the configuration.
 5. Check: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models ps` shows `litellm-agent` and `litellm` as healthy.
 
+**Developer machines only: a local Ollama model** (`design/QUESTIONS.md` #78). Ollama has no key; its entry holds the address LiteLLM uses (on Docker Desktop, `http://host.docker.internal:11434`). Store it with an admin token, then restart `litellm-agent` and `litellm`:
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao \
+  sh -c 'read -rs BAO_TOKEN && export BAO_TOKEN && bao kv put -mount=kv litellm/providers/ollama api_base=http://host.docker.internal:11434'
+```
+Pull the model first on the machine (`ollama pull gpt-oss:20b`, a local tag, never a `:cloud` model). Never on the internal server: it has no GPU.
+
 A model appears in LiteLLM only when its provider has a key in `kv/litellm/providers/`. The list of models is in `platform/deploy/litellm/config.ctmpl`. To add a model, change that file in a reviewed pull request: every model declares `provider_type` (`api` or `self_hosted`), and a self-hosted model declares a cost per token above 0, because LiteLLM skips budget checks for a model that costs 0 (`design/D-07-model-and-token-management.md` section 3). Then restart LiteLLM.
 
 ### Rotation
@@ -482,3 +489,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.9 | 2026-09-27 | Claude Code (task B06) | Section 5b.1: storing the test GitHub App key in the development OpenBao from its file (run by the owner in the macOS Terminal); section 5f: the worker reads `kv/worker/database` and `kv/shared/github-app` with the AppRole `worker`, `worker-credentials`, rotation; key table row |
 | 0.10 | 2026-09-27 | Claude Code (task C04, session 3) | Section 5g: the runner reads the `platform_app` password from `kv/runner/database` (`runner-credentials`); `SDLC_DOCKER_GID`; the local registry (127.0.0.1 only, no authentication, images by digest, clean-up); clean-up after a restart; troubleshooting rows (ADR-M25). Tested with throw-away keys (`pnpm test:runner-compose`) |
 | 0.11 | 2026-09-27 | Claude Code (task C05) | Troubleshooting row: agent runs that cannot reach the Agent Server or LiteLLM (ADR-M29) |
+| 0.12 | 2026-09-27 | Claude Code (task C05, session 2) | Section 5d: a local Ollama model on developer machines only (`kv/litellm/providers/ollama`, field `api_base`; QUESTIONS #78) |
