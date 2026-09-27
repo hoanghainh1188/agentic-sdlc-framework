@@ -279,6 +279,24 @@ SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=~/.config/sdlc-secrets/github-
    It issues a one-repository token, posts a comment on the issue, polls it back and reads a file.
 8. **OpenBao (when the worker polls GitHub, B06):** store `client_id` and `private_key` in `kv/shared/github-app` of the dev OpenBao, reading the key from the file (never typing it). The commands go in runbook T11 with B06.
 
+## Step 12. Start the API and create the first admin (dev)
+
+The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people with personal API tokens. Run the commands below yourself, in a terminal: they print a token **once**. Never run them through a chat tool, and never paste the token anywhere except your password manager.
+
+1. OpenBao is initialised, unsealed and configured (runbook T11 sections 3 and 4). Deliver the API's credentials, then start it:
+   ```bash
+   pnpm openbao:bootstrap api-credentials
+   pnpm compose:platform
+   curl -s http://127.0.0.1:8090/health/ready
+   ```
+2. Migrate the database (`pnpm db:migrate`), then create your tenant, your user and your first token. `SDLC_DB_URL` is the `platform_app` URL (`platform/deploy/README.md`, "First admin and API tokens"):
+   ```bash
+   pnpm sdlc admin bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
+   ```
+3. Check the token: `curl -s -H "Authorization: Bearer <token>" http://127.0.0.1:8090/v1/me`.
+
+Projects, roles and project configuration have no command yet: that is task B13 (`design/QUESTIONS.md` #58). Until then they are created in tests only.
+
 ## Sending handbook comments
 
 Any format works. To make changes fast, one line per comment is ideal:

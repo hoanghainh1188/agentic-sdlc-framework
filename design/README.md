@@ -23,6 +23,7 @@
 | ADR-M22 | [Run Contract: schema, signed form, verification, run events](ADR-M22-run-contract.md) (task C02) | Proposed | |
 | ADR-M23 | [GitHub adapter: HTTP client, App authentication, polling cursor, webhook check](ADR-M23-github-adapter.md) (task B05) | Proposed | |
 | ADR-M24 | [LiteLLM adapter, keys from OpenBao, Cost Controller (part 1)](ADR-M24-litellm-cost-controller.md) (task C03) | Proposed | |
+| ADR-M26 | [API app (NestJS), personal API tokens, admin bootstrap, gate commands](ADR-M26-api-app.md) (task B03) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 
