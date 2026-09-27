@@ -14,7 +14,21 @@ import { planEgress, runNetworkSpec } from './network.js';
 import { buildSandboxSpec } from './spec.js';
 
 /** Why provisioning stopped before the sandbox was ready (run event `provisioning_failed`). */
-export type ProvisioningFailure = 'egress_not_enforceable' | 'image_unavailable' | 'docker_error';
+export type ProvisioningFailure =
+  | 'token_unavailable' // the wrapped GitHub token was unknown, expired or already used
+  | 'config_unavailable' // the project configuration could not be loaded
+  | 'egress_not_enforceable'
+  | 'clone_failed'
+  | 'base_sha_not_found'
+  | 'token_leaked' // the token was found in the clone's configuration (never expected)
+  | 'workspace_too_large'
+  | 'workspace_invalid' // a special file (device, FIFO, socket) in the repository
+  | 'image_unavailable'
+  | 'image_has_no_healthcheck'
+  | 'sandbox_unhealthy'
+  | 'sandbox_not_ready'
+  | 'run_stopped' // the run left `provisioning` meanwhile (kill switch)
+  | 'docker_error';
 
 /** Why the runner removed a sandbox (run event `sandbox_removed`). */
 export type TeardownReason = 'finished' | 'failed' | 'provisioning_failed' | 'killed' | 'orphan';

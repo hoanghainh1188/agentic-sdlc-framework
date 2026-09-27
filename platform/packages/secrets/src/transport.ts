@@ -17,6 +17,8 @@ export interface HttpResponse {
 export interface RequestInput {
   readonly token?: string;
   readonly body?: unknown;
+  /** Extra `X-Vault-*` headers (for example the wrapping TTL). */
+  readonly headers?: Readonly<Record<string, string>>;
 }
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -44,7 +46,7 @@ export class Transport {
 
   request(method: 'GET' | 'POST', path: string, input: RequestInput = {}): Promise<HttpResponse> {
     const payload = input.body === undefined ? undefined : JSON.stringify(input.body);
-    const headers: Record<string, string> = { 'X-Vault-Request': 'true' };
+    const headers: Record<string, string> = { ...input.headers, 'X-Vault-Request': 'true' };
     if (input.token) headers['X-Vault-Token'] = input.token;
     if (payload !== undefined) {
       headers['Content-Type'] = 'application/json';

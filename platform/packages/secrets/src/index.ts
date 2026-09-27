@@ -16,3 +16,4 @@ export {
 } from './options.js';
 export { REDACTED, Redacted } from './redacted.js';
 export { TransitKey } from './transit.js';
+export { MAX_WRAP_TTL_SECONDS, Wrapping } from './wrapping.js';

@@ -26,6 +26,8 @@ export class StubDocker {
   readonly networks = new Map<string, { labels: Record<string, string>; attached: Set<string> }>();
   readonly volumes = new Map<string, Record<string, string>>();
   readonly images = new Set<string>();
+  /** Health status reported for started containers; undefined = the image has no health check. */
+  health: 'healthy' | 'unhealthy' | 'starting' | undefined = 'healthy';
   /** `METHOD /path` pattern → HTTP status to answer instead of the normal result. */
   readonly failures = new Map<RegExp, number>();
   #seq = 0;
@@ -166,6 +168,23 @@ export class StubDocker {
       if (!x) return [404, {}];
       x.archives.push(c.query.path!);
       return [200, ''];
+    }
+    if (m === 'GET' && (match = /^\/containers\/([^/]+)\/json$/.exec(p))) {
+      const x = container(match[1]!);
+      if (!x) return [404, {}];
+      return [
+        200,
+        {
+          Id: x.id,
+          Name: `/${x.name}`,
+          State: {
+            Status: x.running ? 'running' : 'created',
+            Running: x.running,
+            ExitCode: 0,
+            ...(this.health && x.running ? { Health: { Status: this.health } } : {}),
+          },
+        },
+      ];
     }
     if (m === 'POST' && (match = /^\/containers\/([^/]+)\/start$/.exec(p))) {
       const x = container(match[1]!);

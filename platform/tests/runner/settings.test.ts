@@ -9,7 +9,8 @@ const refused = (env: NodeJS.ProcessEnv) => () => runnerSettingsFromEnv(env);
 
 describe('runner settings', () => {
   it('has safe defaults: one sandbox, 2 GiB, 1.5 CPUs, 512 processes, no egress', () => {
-    expect(runnerSettingsFromEnv({})).toEqual({
+    const s = runnerSettingsFromEnv({});
+    expect(s).toMatchObject({
       dockerSocket: '/var/run/docker.sock',
       instance: 'sdlc',
       maxSandboxes: 1,
@@ -21,7 +22,12 @@ describe('runner settings', () => {
       },
       egressServices: [],
       npmRegistry: undefined,
+      workspaceMaxBytes: 1024 * 1024 * 1024,
+      readyTimeoutMs: 120_000,
     });
+    expect(s.git).toMatchObject({ allowPlaintext: false, timeoutMs: 300_000 });
+    expect(s.git.baseUrl.origin).toBe('https://github.com');
+    expect(s.workDir).toMatch(/sdlc-runner$/);
   });
 
   it('reads the concurrent sandbox limit (D-08 C04 AC3: configurable)', () => {
@@ -50,6 +56,10 @@ describe('runner settings', () => {
     ['SDLC_RUNNER_EGRESS_SERVICES', 'litellm=sdlc-litellm-1'],
     ['SDLC_RUNNER_EGRESS_SERVICES', 'github.com=github.com:443'],
     ['SDLC_RUNNER_EGRESS_SERVICES', 'litellm=a:4000,litellm=b:4000'],
+    ['SDLC_RUNNER_WORK_DIR', 'relative/dir'],
+    ['SDLC_RUNNER_WORKSPACE_MAX_MB', '0'],
+    ['SDLC_RUNNER_READY_TIMEOUT_SECONDS', '1'],
+    ['SDLC_RUNNER_GIT_ALLOW_PLAINTEXT', 'yes'],
   ])('refuses %s=%s', (name, value) => {
     expect(refused({ [name]: value })).toThrow(RunnerError);
     expect(refused({ [name]: value })).toThrow(name);

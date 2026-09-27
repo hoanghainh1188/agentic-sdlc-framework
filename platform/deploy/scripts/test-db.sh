@@ -12,7 +12,8 @@ set -eu
 
 repo_root="$(cd "$(dirname "$0")/../../.." && pwd)"
 deploy_dir="$repo_root/platform/deploy"
-tests="platform/tests/integration/db"
+# SDLC_TEST_DB_DIR: another test folder that needs the database (for example the runner live tests).
+tests="${SDLC_TEST_DB_DIR:-platform/tests/integration/db}"
 
 run_tests() {
   cd "$repo_root"

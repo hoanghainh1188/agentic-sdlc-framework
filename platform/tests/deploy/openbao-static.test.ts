@@ -144,9 +144,14 @@ describe('OpenBao policies', () => {
     for (const name of allPolicies) expect(policyRules(name).length, name).toBeGreaterThan(0);
   });
 
-  it('no policy touches sys/, Transit export, backup, restore or key changes', () => {
+  it('no policy touches sys/ (except worker wrapping), Transit export, backup, restore or key changes', () => {
     for (const name of allPolicies) {
       for (const rule of policyRules(name)) {
+        // One exception (QUESTIONS #44): the worker wraps the run token for the runner.
+        if (name === 'worker' && rule.path === 'sys/wrapping/wrap') {
+          expect(rule.capabilities).toEqual(['update']);
+          continue;
+        }
         expect(rule.path, name).not.toMatch(/^sys\/|^transit\/(export|backup|restore)\//);
         if (rule.path.startsWith('transit/keys/'))
           expect(rule.capabilities, name).toEqual(['read']);
@@ -180,12 +185,18 @@ describe('OpenBao policies', () => {
     expect(canRead('litellm', 'kv/data/shared/github-app')).toBe(false);
   });
 
-  it('only api, worker and runner can read the GitHub App key (D-03 section 8.2, QUESTIONS #42)', () => {
-    expect(roles.filter((r) => canRead(r, 'kv/data/shared/github-app'))).toEqual([
-      'api',
-      'worker',
-      'runner',
-    ]);
+  it('only api and worker can read the GitHub App key; not the runner (D-03 §8.2, QUESTIONS #42, #44)', () => {
+    expect(roles.filter((r) => canRead(r, 'kv/data/shared/github-app'))).toEqual(['api', 'worker']);
+  });
+
+  it('the worker policy states the wrapping it needs (QUESTIONS #44); no other policy adds it', () => {
+    // OpenBao's built-in `default` policy also allows sys/wrapping/wrap for every token. Wrapping
+    // only packages data the caller already holds, so it grants no access (ADR-M25 §2.11); the
+    // worker line keeps the handoff working even if the default policy is ever tightened.
+    const wrappers = roles.filter((r) =>
+      policyRules(r).some((rule) => matches(rule.path, 'sys/wrapping/wrap')),
+    );
+    expect(wrappers).toEqual(['worker']);
   });
 
   it('each AppRole reads only its own kv subtree besides shared/github-app', () => {

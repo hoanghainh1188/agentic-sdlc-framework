@@ -85,6 +85,12 @@ importers:
 
   platform/apps/runner:
     dependencies:
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@sdlc/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@sdlc/messages':
         specifier: workspace:*
         version: link:../../packages/messages

@@ -29,6 +29,26 @@ export interface SecretReader {
   read(path: string, options?: { version?: number }): Promise<SecretEntry>;
 }
 
+/**
+ * Hands a secret from one process to another without storing it on the way (OpenBao response
+ * wrapping, ADR-M25 §2.11). The result is a single-use wrapping token that expires after
+ * `ttlSeconds`; only the receiver's `unwrap` turns it back into the fields.
+ */
+export interface SecretWrapper {
+  wrap(
+    fields: Readonly<Record<string, RedactedSecret>>,
+    options: { ttlSeconds: number },
+  ): Promise<RedactedSecret>;
+}
+
+/**
+ * Opens a wrapping token once. Fails when the token is unknown, expired, already used (someone
+ * else unwrapped it first) or was not made by `SecretWrapper.wrap`.
+ */
+export interface SecretUnwrapper {
+  unwrap(wrappingToken: RedactedSecret): Promise<Readonly<Record<string, RedactedSecret>>>;
+}
+
 /** A signature and the version of the signing key that made it. */
 export interface SignatureResult {
   /** The signature as returned by the signing service, including its version prefix. */

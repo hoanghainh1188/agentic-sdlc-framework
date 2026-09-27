@@ -27,7 +27,23 @@ export {
 } from './sandbox/lifecycle.js';
 export { planEgress, runNetworkSpec, type EgressPlan } from './sandbox/network.js';
 export { buildSandboxSpec, type SandboxSpecInput } from './sandbox/spec.js';
-export { packTar, SANDBOX_UID, type TarEntry } from './workspace/tar.js';
+export {
+  releaseSandbox,
+  provisionRun,
+  type ProvisionRequest,
+  type ProvisionResult,
+  type RunnerDeps,
+} from './provision.js';
+export {
+  authEnv,
+  CloneError,
+  cloneForRun,
+  cloneUrl,
+  type CloneFailure,
+  type CloneInput,
+  type GitSettings,
+} from './workspace/git.js';
+export { packDirectory, packTar, SANDBOX_UID, type TarEntry } from './workspace/tar.js';
 export {
   parseEgressServices,
   RUNNER_ENV,

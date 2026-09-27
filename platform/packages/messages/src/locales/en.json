@@ -120,6 +120,9 @@
   "secrets.transit.unknown_key_version": "The Transit key {key} has no version {version}.",
   "secrets.transit.rejected": "OpenBao refused to {operation} with the Transit key {key}.",
   "secrets.transit.not_ed25519": "The Transit key {key} is not an Ed25519 key.",
+  "secrets.wrapping.invalid_input": "Wrapping needs at least one field with a lower-case name and a lifetime between 1 second and 1 hour.",
+  "secrets.wrapping.invalid_token": "The wrapping token is unknown, expired or already used. If this run did not use it, someone else did: treat it as a security incident.",
+  "secrets.wrapping.wrong_origin": "The wrapping token was not made by the platform (sys/wrapping/wrap). It is refused.",
   "git_host.error.invalid_input": "A value given to the Git host adapter is not valid: {field}.",
   "git_host.error.secret_invalid": "The GitHub App entry {path} in the secret manager is missing or not valid. It needs client_id (or app_id) and an RSA private_key.",
   "git_host.error.auth_failed": "The Git host refused the platform's credentials. Check the GitHub App key and installation.",
@@ -154,5 +157,8 @@
   "runner.docker.unreachable": "The runner cannot reach the Docker socket ({code}).",
   "runner.docker.response_too_large": "Docker sent an answer larger than the runner accepts.",
   "runner.slot_wait_aborted": "The run stopped waiting for a free sandbox slot.",
-  "runner.provisioning_failed": "The sandbox could not be created: {reason}."
+  "runner.provisioning_failed": "The sandbox could not be created: {reason}.",
+  "runner.workspace.clone_failed": "The runner could not prepare the workspace: {reason}.",
+  "runner.workspace.too_large": "The repository is larger than the runner uploads into a sandbox (SDLC_RUNNER_WORKSPACE_MAX_MB).",
+  "runner.workspace.special_file": "The repository holds a special file (device, FIFO or socket) that cannot go into a sandbox."
 }

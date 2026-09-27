@@ -31,7 +31,7 @@ Task B05 builds the first Git host adapter: GitHub, through a GitHub App. D-03 �
 ### 2.2. GitHub App authentication
 
 - The App key is read with `SecretReader.read('shared/github-app')` (D-03 §8.2): fields `client_id` (or `app_id`) and `private_key` (RSA PEM). Never from an environment variable or a file. It is held as a `KeyObject` and read again after `keyCacheSeconds` (default 600 s), so a rotated key needs no restart.
-- The OpenBao policies of `api`, `worker` and `runner` can read this path (QUESTIONS #42; QUESTIONS #44 asks C04 whether the runner still needs it).
+- The OpenBao policies of `api` and `worker` can read this path (QUESTIONS #42). The `runner` cannot since C04: the worker hands it the run's token response-wrapped (QUESTIONS #44, ADR-M25 §2.11).
 - App JWT: RS256, `iat` = now − 60 s, `exp` = now + 9 min, `iss` = the client ID.
 - The installation is found with `GET /repos/{owner}/{repo}/installation` and cached. The database needs no installation ID.
 - **Every installation token is limited to one repository** (`repositories: [name]`) and to the requested permissions. The answer is checked: a token for other or more repositories, or with wider permissions, is refused (`invalid_response`).
@@ -96,7 +96,7 @@ Task B05 builds the first Git host adapter: GitHub, through a GitHub App. D-03 �
 
 - Later tasks add methods with a D-03 update: opening a pull request (C08), revoking a short-lived token (C11 AC2), the merge event (E01).
 - B06 stores the cursor, handles events idempotently by `event.id`, maps users by numeric ID and ignores bots as approvers.
-- C04 decides whether the runner still reads the App key (QUESTIONS #44).
+- C04 decided that the runner no longer reads the App key (QUESTIONS #44, ADR-M25 §2.11).
 - GitHub Free has no branch protection on private repositories; C08 AC3 (an agent push to `main` is blocked) needs a plan that has it, or a public test repository (R03, C08).
 
 ## Version history

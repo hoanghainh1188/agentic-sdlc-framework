@@ -7,4 +7,6 @@ COPY probe.sh /probe.sh
 # the run's empty workspace volume when the sandbox is created.
 RUN mkdir /workspace && chown 10001:10001 /workspace
 USER 10001:10001
+# Image contract (ADR-M25 §2.3): a health check the runner waits for, like the Agent Server's /ready.
+HEALTHCHECK --interval=1s --timeout=2s --retries=180 CMD wget -q -O /dev/null http://127.0.0.1:8000/index.html || exit 1
 CMD ["sh", "/probe.sh"]
