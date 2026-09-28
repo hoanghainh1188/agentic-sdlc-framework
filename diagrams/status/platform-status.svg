@@ -1,0 +1,261 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 960" width="1280" height="960" font-family="-apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif">
+  <title>Agentic SDLC Platform: MVP architecture and progress (2026-09-28)</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A929C"/>
+    </marker>
+    <style>
+      .bg { fill: #FFFFFF; }
+      .title { font-size: 22px; font-weight: 700; fill: #1F2328; }
+      .sub { font-size: 13px; fill: #57606A; }
+      .warn { font-size: 12px; font-weight: 600; fill: #B42318; }
+      .group { fill: #F7F8FA; stroke: #D0D7DE; stroke-width: 1.2; }
+      .glabel { font-size: 13px; font-weight: 700; fill: #3B4450; letter-spacing: 0.3px; }
+      .gnote { font-size: 11px; fill: #6E7781; }
+      .done { fill: #E6F4EA; stroke: #2E8B57; stroke-width: 1.5; }
+      .part { fill: #FFF5DB; stroke: #C98A00; stroke-width: 1.5; }
+      .todo { fill: #F3F4F6; stroke: #9AA0A6; stroke-width: 1.2; stroke-dasharray: 5 4; }
+      .next { fill: #E8F0FE; stroke: #3B6FD4; stroke-width: 2; stroke-dasharray: 5 3; }
+      .ext  { fill: #FFFFFF; stroke: #6E7781; stroke-width: 1.2; }
+      .name { font-size: 13px; font-weight: 600; fill: #1F2328; }
+      .meta { font-size: 11px; fill: #57606A; }
+      .tag-done { font-size: 11px; font-weight: 700; fill: #2E8B57; }
+      .tag-part { font-size: 11px; font-weight: 700; fill: #A06E00; }
+      .tag-todo { font-size: 11px; font-weight: 700; fill: #7A8088; }
+      .tag-next { font-size: 11px; font-weight: 700; fill: #3B6FD4; }
+      .flow { stroke: #8A929C; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .flabel { font-size: 11px; fill: #6E7781; }
+      .bar-bg { fill: #EAEEF2; }
+      .bar { fill: #2E8B57; }
+      .ms { font-size: 12px; fill: #3B4450; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="960"/>
+
+  <!-- Title -->
+  <text class="title" x="40" y="42">Agentic SDLC Platform: MVP architecture and progress</text>
+  <text class="sub" x="40" y="64">State of main (864f45d), 2026-09-28 · 27/46 tasks merged · in review: C06 2b (#112) · being planned: C07</text>
+  <text class="warn" x="40" y="80">CI of this repository is blocked (GitHub Actions minutes used up) until the quota resets on 2026-10-01</text>
+
+  <!-- Legend -->
+  <g transform="translate(820,24)">
+    <rect class="done" x="0" y="0" width="18" height="14" rx="3"/><text class="meta" x="24" y="12">Done</text>
+    <rect class="part" x="90" y="0" width="18" height="14" rx="3"/><text class="meta" x="114" y="12">Partly done</text>
+    <rect class="next" x="190" y="0" width="18" height="14" rx="3"/><text class="meta" x="214" y="12">In progress / review</text>
+    <rect class="todo" x="330" y="0" width="18" height="14" rx="3"/><text class="meta" x="354" y="12">Not started</text>
+    <text class="meta" x="0" y="34">Codes are D-08 backlog tasks</text>
+  </g>
+
+  <!-- ============ Users ============ -->
+  <rect class="group" x="40" y="90" width="560" height="78" rx="10"/>
+  <text class="glabel" x="56" y="110">USERS</text>
+  <rect class="part" x="56" y="118" width="250" height="40" rx="6"/>
+  <text class="name" x="68" y="135">CLI sdlc</text>
+  <text class="meta" x="68" y="150">audit, admin (token, agent, AI record) · B04</text>
+  <rect class="done" x="320" y="118" width="264" height="40" rx="6"/>
+  <text class="name" x="332" y="135">GitHub comment commands</text>
+  <text class="tag-done" x="332" y="150">✓ /approve /reject (B06) · /ack /decide (B11)</text>
+
+  <!-- ============ External ============ -->
+  <rect class="group" x="880" y="90" width="360" height="78" rx="10"/>
+  <text class="glabel" x="896" y="110">EXTERNAL</text>
+  <rect class="ext" x="896" y="118" width="160" height="40" rx="6"/>
+  <text class="name" x="908" y="135">GitHub</text>
+  <text class="meta" x="908" y="150">repo, PR, Actions CI</text>
+  <rect class="ext" x="1066" y="118" width="158" height="40" rx="6"/>
+  <text class="name" x="1078" y="135">Model</text>
+  <text class="meta" x="1078" y="150">Ollama (dev) ✓ · API: #81</text>
+
+  <!-- ============ Control plane ============ -->
+  <rect class="group" x="40" y="186" width="820" height="384" rx="10"/>
+  <text class="glabel" x="56" y="208">CONTROL PLANE (TypeScript, built by us)</text>
+
+  <!-- Apps -->
+  <rect class="done" x="56" y="220" width="250" height="46" rx="6"/>
+  <text class="name" x="68" y="239">api (NestJS + Fastify)</text>
+  <text class="tag-done" x="68" y="256">✓ B03, B11, B12 · intent, gate, escalation</text>
+  <rect class="part" x="320" y="220" width="524" height="46" rx="6"/>
+  <text class="name" x="332" y="239">worker: poller ✓ B06 · workflow G1–G3 ✓ B07 · G4 + runner handoff ✓ C06</text>
+  <text class="tag-part" x="332" y="256">Review: C06 2b · To do: C07 G5 · C08 G6 · E01 G7 · E03 G8</text>
+
+  <!-- Core modules -->
+  <text class="glabel" x="56" y="292">Core modules (@sdlc/core)</text>
+
+  <!-- row 1 -->
+  <rect class="done" x="56" y="300" width="190" height="48" rx="6"/>
+  <text class="name" x="68" y="319">Tenancy + database</text>
+  <text class="tag-done" x="68" y="337">✓ A06 · 11 migration</text>
+  <rect class="done" x="254" y="300" width="190" height="48" rx="6"/>
+  <text class="name" x="266" y="319">Registry</text>
+  <text class="tag-done" x="266" y="337">✓ B02 · intent, spec, plan, gate</text>
+  <rect class="done" x="452" y="300" width="190" height="48" rx="6"/>
+  <text class="name" x="464" y="319">Audit log</text>
+  <text class="tag-done" x="464" y="337">✓ A07 · hash chain / tenant</text>
+  <rect class="done" x="650" y="300" width="194" height="48" rx="6"/>
+  <text class="name" x="662" y="319">Run Contract + run lifecycle</text>
+  <text class="tag-done" x="662" y="337">✓ C02, C06 · signed, run, run end</text>
+
+  <!-- row 2 -->
+  <rect class="done" x="56" y="356" width="190" height="48" rx="6"/>
+  <text class="name" x="68" y="375">Git events + receipts</text>
+  <text class="tag-done" x="68" y="393">✓ B05, B06 · never handled twice</text>
+  <rect class="done" x="254" y="356" width="190" height="48" rx="6"/>
+  <text class="name" x="266" y="375">Gate commands + G4</text>
+  <text class="tag-done" x="266" y="393">✓ B06, B07, C06 · HOTL, binding</text>
+  <rect class="done" x="452" y="356" width="190" height="48" rx="6"/>
+  <text class="name" x="464" y="375">Escalation + freeze</text>
+  <text class="tag-done" x="464" y="393">✓ B11 · clocks in the database</text>
+  <rect class="done" x="650" y="356" width="194" height="48" rx="6"/>
+  <text class="name" x="662" y="375">Agent register</text>
+  <text class="tag-done" x="662" y="393">✓ C10 · checked before a run</text>
+
+  <!-- row 3 -->
+  <rect class="done" x="56" y="412" width="190" height="48" rx="6"/>
+  <text class="name" x="68" y="431">Cost Controller</text>
+  <text class="tag-done" x="68" y="449">✓ C03 · key per run · G5: C07</text>
+  <rect class="done" x="254" y="412" width="190" height="48" rx="6"/>
+  <text class="name" x="266" y="431">Project AI record</text>
+  <text class="tag-done" x="266" y="449">✓ B12 · checked at G1 and G4</text>
+  <rect class="next" x="452" y="412" width="190" height="48" rx="6"/>
+  <text class="name" x="464" y="431">Evidence + retention</text>
+  <text class="tag-next" x="464" y="449">C06 2b (review) · E02, E05</text>
+  <rect class="todo" x="650" y="412" width="194" height="48" rx="6"/>
+  <text class="name" x="662" y="431">Logging + OpenTelemetry</text>
+  <text class="tag-todo" x="662" y="449">A08 · waits for QUESTIONS #4</text>
+
+  <!-- shared packages -->
+  <text class="glabel" x="56" y="486">Shared packages</text>
+  <rect class="done" x="56" y="494" width="190" height="60" rx="6"/>
+  <text class="name" x="68" y="513">@sdlc/contracts</text>
+  <text class="meta" x="68" y="529">codes, interface adapter</text>
+  <text class="tag-done" x="68" y="545">✓ extended by each task</text>
+  <rect class="done" x="254" y="494" width="190" height="60" rx="6"/>
+  <text class="name" x="266" y="513">@sdlc/config</text>
+  <text class="meta" x="266" y="529">matrix, SLA, rules M1–M20</text>
+  <text class="tag-done" x="266" y="545">✓ A05</text>
+  <rect class="done" x="452" y="494" width="190" height="60" rx="6"/>
+  <text class="name" x="464" y="513" style="font-size:11.5px">@sdlc/messages, workflow-client</text>
+  <text class="meta" x="464" y="529">catalog (en), Temporal signals</text>
+  <text class="tag-done" x="464" y="545">✓ A05, B07</text>
+  <rect class="done" x="650" y="494" width="194" height="60" rx="6"/>
+  <text class="name" x="662" y="513">@sdlc/secrets</text>
+  <text class="meta" x="662" y="529">AppRole, KV v2, Transit, wrap</text>
+  <text class="tag-done" x="662" y="545">✓ A04</text>
+
+  <!-- ============ Adapters ============ -->
+  <rect class="group" x="880" y="186" width="360" height="384" rx="10"/>
+  <text class="glabel" x="896" y="208">ADAPTERS (behind interfaces)</text>
+  <text class="gnote" x="896" y="224">import @sdlc/contracts only (ADR-M16)</text>
+
+  <rect class="done" x="896" y="236" width="328" height="54" rx="6"/>
+  <text class="name" x="908" y="256">git-github</text>
+  <text class="tag-done" x="908" y="275">✓ B05, C06 · App, polling, comment · PR: C08</text>
+  <rect class="done" x="896" y="298" width="328" height="54" rx="6"/>
+  <text class="name" x="908" y="318">policy-simple</text>
+  <text class="tag-done" x="908" y="337">✓ B01 · autonomy, oversight, approver</text>
+  <rect class="done" x="896" y="360" width="328" height="54" rx="6"/>
+  <text class="name" x="908" y="380">model-litellm</text>
+  <text class="tag-done" x="908" y="399">✓ C03, C06 · virtual key, revoked by run</text>
+  <rect class="done" x="896" y="422" width="328" height="54" rx="6"/>
+  <text class="name" x="908" y="442">agent-openhands</text>
+  <text class="tag-done" x="908" y="461">✓ C05 · real run with gpt-oss:20b (#78)</text>
+  <rect class="next" x="896" y="484" width="328" height="54" rx="6"/>
+  <text class="name" x="908" y="504">evidence-s3</text>
+  <text class="tag-next" x="908" y="523">C06 2b (review, #112) · packing: E02</text>
+
+  <!-- ============ Execution plane ============ -->
+  <rect class="group" x="40" y="592" width="520" height="228" rx="10"/>
+  <text class="glabel" x="56" y="614">EXECUTION PLANE</text>
+  <rect class="done" x="56" y="626" width="236" height="60" rx="6"/>
+  <text class="name" x="68" y="646">runner</text>
+  <text class="meta" x="68" y="662">sandbox, Temporal queue sdlc-runner</text>
+  <text class="tag-done" x="68" y="678">✓ C04, C06 · kill switch: C11</text>
+  <rect class="done" x="308" y="626" width="236" height="60" rx="6"/>
+  <text class="name" x="320" y="646">Sandbox: OpenHands Agent Server</text>
+  <text class="meta" x="320" y="662">image node24 · agent driven by the runner</text>
+  <text class="tag-done" x="320" y="678">✓ C05 · proposal L1: C06 2b</text>
+  <text class="gnote" x="56" y="712">Sandbox reaches LiteLLM and the npm proxy only; the runner (not the sandbox) clones and pushes.</text>
+  <text class="gnote" x="56" y="728">No OpenBao access, no real provider key: a virtual key only.</text>
+  <text class="gnote" x="56" y="744">Docker only through the socket proxy; the runner guard refuses privileged containers.</text>
+  <text class="gnote" x="56" y="760">Model: Ollama gpt-oss:20b on a developer machine (#78); one API-model run before M-E (#81).</text>
+  <text class="gnote" x="56" y="792">✓ Sample repo pilot-order-inventory done (R01–R04): public, CI, branch protection.</text>
+  <text class="gnote" x="56" y="808">Runner in its own VM / rootless Docker: A10.</text>
+
+  <!-- ============ Infrastructure ============ -->
+  <rect class="group" x="580" y="592" width="660" height="228" rx="10"/>
+  <text class="glabel" x="596" y="614">SELF-HOSTED INFRASTRUCTURE (Docker Compose)</text>
+  <text class="gnote" x="1224" y="614" text-anchor="end">profile core · observability · models · platform · sandbox</text>
+
+  <rect class="done" x="596" y="626" width="200" height="54" rx="6"/>
+  <text class="name" x="608" y="646">PostgreSQL</text>
+  <text class="tag-done" x="608" y="664">✓ A02 · one database per component</text>
+  <rect class="done" x="806" y="626" width="200" height="54" rx="6"/>
+  <text class="name" x="818" y="646">Temporal + UI</text>
+  <text class="tag-done" x="818" y="664">✓ B07, C06 · 2 task queues</text>
+  <rect class="part" x="1016" y="626" width="208" height="54" rx="6"/>
+  <text class="name" x="1028" y="646">LiteLLM + Valkey</text>
+  <text class="tag-part" x="1028" y="664">✓ C03 · Ollama dev · model API: #81</text>
+
+  <rect class="done" x="596" y="690" width="200" height="54" rx="6"/>
+  <text class="name" x="608" y="710">SeaweedFS (S3)</text>
+  <text class="tag-done" x="608" y="728">✓ A02 · versioning: C06 2b</text>
+  <rect class="part" x="806" y="690" width="200" height="54" rx="6"/>
+  <text class="name" x="818" y="710">OpenBao</text>
+  <text class="tag-part" x="818" y="728">✓ A03, A11 · TLS/backup: A10</text>
+  <rect class="part" x="1016" y="690" width="208" height="54" rx="6"/>
+  <text class="name" x="1028" y="710">Langfuse + ClickHouse</text>
+  <text class="tag-part" x="1028" y="728">Running ✓ · traces: A08</text>
+
+  <rect class="done" x="596" y="754" width="200" height="54" rx="6"/>
+  <text class="name" x="608" y="774">sdlc-api, worker, runner</text>
+  <text class="tag-done" x="608" y="792">✓ profile platform, sandbox</text>
+  <rect class="done" x="806" y="754" width="200" height="54" rx="6"/>
+  <text class="name" x="818" y="774">Verdaccio + socket proxy</text>
+  <text class="tag-done" x="818" y="792">✓ profile sandbox (C04)</text>
+  <rect class="done" x="1016" y="754" width="208" height="54" rx="6"/>
+  <text class="name" x="1028" y="774">Local registry (registry:2)</text>
+  <text class="tag-done" x="1028" y="792">✓ C04 · images by digest</text>
+
+  <!-- ============ Flows (on group edges only) ============ -->
+  <path class="flow" d="M330,168 L330,184"/>
+  <text class="flabel" x="338" y="180">CLI → API</text>
+  <path class="flow" d="M862,380 L878,380"/>
+  <path class="flow" d="M1060,186 L1060,170"/>
+  <text class="flabel" x="1068" y="182">GitHub API, model</text>
+  <path class="flow" d="M300,572 L300,590"/>
+  <text class="flabel" x="308" y="586">Run Contract + Temporal</text>
+  <path class="flow" d="M562,706 L578,706"/>
+  <path class="flow" d="M1060,572 L1060,590"/>
+  <text class="flabel" x="1068" y="586">SQL, S3, OpenBao, LiteLLM</text>
+
+  <!-- ============ Foundation ============ -->
+  <rect class="group" x="40" y="838" width="1200" height="44" rx="10"/>
+  <rect class="done" x="56" y="848" width="18" height="24" rx="4"/>
+  <text class="name" x="84" y="865">Foundation:</text>
+  <text class="meta" x="160" y="865">✓ Monorepo pnpm 10 + TypeScript, module boundary lint (A01) · ✓ CI: test, test:db, workflow, Compose, image, Gitleaks, Semgrep, Trivy (A09) · fewer CI minutes: #113</text>
+
+  <!-- ============ Progress ============ -->
+  <text class="glabel" x="40" y="908">PROGRESS BY MILESTONE (27/46)</text>
+  <g transform="translate(40,918)">
+    <text class="ms" x="0" y="14">M-A Foundation</text>
+    <rect class="bar-bg" x="120" y="4" width="140" height="12" rx="6"/><rect class="bar" x="120" y="4" width="115" height="12" rx="6"/>
+    <text class="ms" x="268" y="14">9/11</text>
+
+    <text class="ms" x="320" y="14">M-B G1–G3</text>
+    <rect class="bar-bg" x="410" y="4" width="140" height="12" rx="6"/><rect class="bar" x="410" y="4" width="86" height="12" rx="6"/>
+    <text class="ms" x="558" y="14">8/13</text>
+
+    <text class="ms" x="610" y="14">M-C G4–G6</text>
+    <rect class="bar-bg" x="700" y="4" width="140" height="12" rx="6"/><rect class="bar" x="700" y="4" width="76" height="12" rx="6"/>
+    <text class="ms" x="848" y="14">6/11</text>
+
+    <text class="ms" x="900" y="14">M-0 sample repo</text>
+    <rect class="bar-bg" x="995" y="4" width="60" height="12" rx="6"/><rect class="bar" x="995" y="4" width="60" height="12" rx="6"/>
+    <text class="ms" x="1062" y="14">4/4</text>
+
+    <text class="ms" x="1100" y="14">M-D</text>
+    <rect class="bar-bg" x="1132" y="4" width="50" height="12" rx="6"/>
+    <text class="ms" x="1188" y="14">0/7</text>
+  </g>
+</svg>
