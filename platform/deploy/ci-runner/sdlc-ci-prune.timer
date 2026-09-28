@@ -1,0 +1,10 @@
+# 17:00 UTC (02:00 JST): one hour before the scheduled CI runs (ci.yml, 18:00 UTC).
+[Unit]
+Description=Daily clean-up of the CI runner
+
+[Timer]
+OnCalendar=*-*-* 17:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

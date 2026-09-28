@@ -7,6 +7,10 @@
 # Actions minutes (GitHub Free: 2,000 per month for the whole organization). GitHub bills every
 # job rounded up to a whole minute, so short checks share one job (`scan`). A push to main runs
 # nothing: the pull request already ran every check, and the daily run checks main again.
+#
+# Runner (design/ADR-M34): the repository variable CI_RUNNER picks it for every job. Unset: the
+# GitHub-hosted ubuntu-24.04. `sdlc-ci`: the self-hosted runner (platform/deploy/ci-runner/).
+# Delete the variable to go back at once, for example while the runner is offline.
 name: ci
 
 on:
@@ -52,7 +56,7 @@ jobs:
   # Gitleaks, Trivy and Semgrep. Every scanner runs even when an earlier one fails.
   scan:
     name: detect changes, secrets, dependencies, code
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 15
     outputs:
       run_checks: ${{ steps.decide.outputs.run_checks }}
@@ -209,7 +213,7 @@ jobs:
     needs: scan
     # Runs even when a scanner failed. != 'false': runs when scan could not decide.
     if: ${{ !cancelled() && needs.scan.outputs.run_checks != 'false' }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -241,7 +245,7 @@ jobs:
     needs: [scan, checks]
     # Shows as "skipped" (not passed) when scan says no.
     if: needs.scan.outputs.run_compose == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -301,7 +305,7 @@ jobs:
     name: sandbox image (node24)
     needs: [scan, checks]
     if: needs.scan.outputs.run_sandbox_image == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -366,7 +370,7 @@ jobs:
     needs: scan
     # Same condition as checks: only the daily run on an unchanged main skips it.
     if: ${{ !cancelled() && needs.scan.outputs.run_checks != 'false' }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -396,7 +400,7 @@ jobs:
     # The summary for pull requests (the future required check). Scheduled runs need no summary:
     # a failed job there already marks the run red.
     if: ${{ always() && github.event_name != 'schedule' }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 5
     steps:
       - name: All jobs passed or were skipped

@@ -32,6 +32,7 @@
 | ADR-M31 | [Agent register: table, lifecycle, operator commands, the check before a run](ADR-M31-agent-register.md) (task C10) | Proposed | |
 | ADR-M32 | [Project AI record: codes only, version history, who writes it, the G1 check](ADR-M32-project-ai-record.md) (task B12) | Proposed | |
 | ADR-M33 | [Gate G4: the checks, the run proposal, and the handoff to the runner](ADR-M33-gate-g4.md) (task C06) | Proposed | |
+| ADR-M34 | [Self-hosted runner for the platform CI](ADR-M34-self-hosted-ci-runner.md) (CI, A09 follow-up) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

@@ -23,6 +23,7 @@ interface Job {
   needs?: string | string[];
   if?: string;
   'timeout-minutes'?: number;
+  'runs-on'?: string;
   permissions?: unknown;
   outputs?: Record<string, string>;
   steps: Step[];
@@ -173,6 +174,21 @@ describe('workflow hardening (all workflows)', () => {
     for (const job of Object.values(wf.jobs)) {
       expect(job['timeout-minutes']).toBeGreaterThan(0);
       expect(job['timeout-minutes']).toBeLessThanOrEqual(40);
+    }
+  });
+
+  // ADR-M34: the repository variable CI_RUNNER picks the self-hosted runner; unset = GitHub-hosted.
+  it('every ci job runs on CI_RUNNER, with GitHub-hosted ubuntu-24.04 as the default', () => {
+    for (const job of Object.values(ci.jobs)) {
+      expect(job['runs-on']).toBe("${{ vars.CI_RUNNER || 'ubuntu-24.04' }}");
+    }
+  });
+
+  it('a workflow that can write contents never runs on the self-hosted runner', () => {
+    for (const { wf } of workflows.filter(({ wf }) => wf.permissions?.contents === 'write')) {
+      for (const job of Object.values(wf.jobs)) {
+        expect(job['runs-on']).toMatch(/^ubuntu-/);
+      }
     }
   });
 

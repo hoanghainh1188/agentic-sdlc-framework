@@ -1,0 +1,10 @@
+# Daily clean-up of the CI runner VM (design/ADR-M34 §2.3): unused images and build cache.
+[Unit]
+Description=Remove unused Docker images and build cache on the CI runner
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker system prune -af
+ExecStart=/usr/bin/docker builder prune -af

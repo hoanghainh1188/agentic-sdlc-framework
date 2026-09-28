@@ -116,6 +116,7 @@
 - C06 session 2a tests: runner activity and settings, worker settings, config (`pnpm test`); the run lifecycle (`pnpm test:db`); the handoff on Temporal (`pnpm test:workflow`); revoke by run (`pnpm test:litellm`).
 
 ### Changed
+- CI: every `ci` job runs on the repository variable `CI_RUNNER` (default GitHub-hosted `ubuntu-24.04`). ADR-M34 (proposed) and `platform/deploy/ci-runner/`: a self-hosted runner on a dedicated VM (setup script with pinned runner and Docker key checks, clean-up hooks before and after each job, daily prune timer, runbook).
 - CI: fewer Actions minutes, same checks. Gitleaks, Trivy, Semgrep and the change detection share one `scan` job; no run on a push to `main` (a daily run checks `main` when it changed, a weekly run runs every job); `compose` and `sandbox-image` wait for `checks` and skip draft pull requests; `ci-ok` does not run on schedules; `timeout-minutes` on every job. `sandbox-image` runs weekly instead of nightly, as ADR-M25 §2.9 states.
 - CLAUDE.md `Current constraints` after B07 session 2 (#103) and B12 (#102), both merged: C06 next (critical path); also ready B04, B13, E04, R01. B12 used QUESTIONS #103–#106 and ADR-M32; `project_ai_record_versions` listed with the append-only tables; docs follow-up for QUESTIONS #103 (D-02 §3 vs handbook Ch.2 §2.5).
 - B07: CLAUDE.md `Current constraints`: session order (C05 sessions 1–2 merged; now B07 and C10; then C06), QUESTIONS blocks B07 #88–#92 and C10 #93–#97 (next free #98–#102), ADR-M30 (B07) and ADR-M31 (C10) (next free ADR-M32).
