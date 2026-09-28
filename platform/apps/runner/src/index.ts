@@ -94,13 +94,21 @@ export {
   type ProposalDeps,
   type StoredProposal,
 } from './workspace/export.js';
+export { IgnoreChecker } from './workspace/ignore.js';
 export {
   computeProposal,
   mirrorWorkspace,
+  neutraliseAttributes,
   type Proposal,
   type ProposalGitOptions,
 } from './workspace/proposal.js';
-export { untarWorkspace, type UntarLimits, type WorkspaceEntry } from './workspace/untar.js';
+export {
+  untarWorkspace,
+  type EntryDecision,
+  type EntryFilter,
+  type UntarLimits,
+  type WorkspaceEntry,
+} from './workspace/untar.js';
 export {
   parseEgressServices,
   RUNNER_ENV,

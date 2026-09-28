@@ -12,7 +12,10 @@
 //    - two entries whose paths fold to the same path are refused: on a case-insensitive file
 //      system they would be one file (security review).
 // 2. `computeProposal` runs hardened git in the clone: no system or user configuration, no hooks,
-//    no fsmonitor, no replace objects, no external diff or textconv. `git add -A`, then the binary
+//    no fsmonitor, no replace objects, no external diff or textconv, and no attributes from the
+//    workspace (`neutraliseAttributes`: a `.gitattributes` could turn text into an unreadable
+//    binary patch or change line endings). `git add -A -f` (paths ignored at `base_sha` never got
+//    this far, `ignore.ts`; `-f` so an ignore rule the agent adds hides nothing), then the binary
 //    diff of the index against `base_sha`, and the changed paths. Nothing the sandbox reports is
 //    used. C07 and C08 can reuse both to recompute changed files outside the sandbox.
 import { execFile } from 'node:child_process';
@@ -61,13 +64,36 @@ function kindOf(stat: fs.Stats): 'dir' | 'file' | 'symlink' | 'other' {
   return 'other';
 }
 
-/** SHA-256 of the clone's git configuration, or null when there is none. */
-function gitConfigHash(cloneDir: string): string | null {
-  const file = path.join(cloneDir, '.git', 'config');
-  const stat = fs.lstatSync(file, { throwIfNoEntry: false });
-  if (!stat) return null;
-  if (!stat.isFile()) return 'not-a-file';
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+/** The runner's own git files that decide what git runs or reads; checked around the mirror. */
+const GUARDED_GIT_FILES = ['config', 'info/attributes', 'info/exclude'];
+
+/** SHA-256 of the clone's guarded git files (a missing file counts as missing). */
+function gitConfigHash(cloneDir: string): string {
+  const hash = crypto.createHash('sha256');
+  for (const name of GUARDED_GIT_FILES) {
+    const file = path.join(cloneDir, '.git', name);
+    const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+    hash.update(`${name}\0`);
+    if (!stat) hash.update('missing\0');
+    else if (!stat.isFile()) hash.update('not-a-file\0');
+    else hash.update(fs.readFileSync(file)).update('\0');
+  }
+  return hash.digest('hex');
+}
+
+/**
+ * Attributes of the runner's clone: `.git/info/attributes` wins over every `.gitattributes`, so
+ * the workspace cannot change how git stores or shows a file (text and line-ending conversion,
+ * filters, `-diff` that hides a text file behind a binary patch). Git decides text or binary by
+ * the content alone.
+ */
+export function neutraliseAttributes(repoDir: string): void {
+  const info = path.join(repoDir, '.git', 'info');
+  fs.mkdirSync(info, { recursive: true });
+  fs.writeFileSync(
+    path.join(info, 'attributes'),
+    '* !text !eol !crlf !diff !filter !ident !merge !working-tree-encoding\n',
+  );
 }
 
 /**
@@ -120,7 +146,10 @@ function mirrorEntries(cloneDir: string, entries: readonly WorkspaceEntry[]): vo
     assertRealParents(cloneDir, entry.path);
     const full = path.join(cloneDir, entry.path);
     if (entry.type === 'symlink') {
-      fs.rmSync(full, { force: true });
+      const existing = fs.lstatSync(full, { throwIfNoEntry: false });
+      // A link is removed as a link (never through it); a directory in its place is removed.
+      if (existing?.isDirectory()) fs.rmSync(full, { recursive: true, force: true });
+      else if (existing) fs.unlinkSync(full);
       fs.symlinkSync(entry.target, full);
       continue;
     }
@@ -155,14 +184,9 @@ export interface Proposal {
 
 const SHA = /^[0-9a-f]{40}$/;
 
-/** Hardened git in the runner's clone: no configuration, hooks, fsmonitor or replace objects. */
-function gitIn(
-  repoDir: string,
-  home: string,
-  args: string[],
-  options: ProposalGitOptions,
-): Promise<Buffer> {
-  const env: NodeJS.ProcessEnv = {
+/** The environment of every git process in the runner's clone: no system or user configuration. */
+export function gitEnv(home: string): NodeJS.ProcessEnv {
+  return {
     PATH: process.env.PATH ?? '/usr/bin:/bin',
     HOME: home,
     LC_ALL: 'C',
@@ -170,6 +194,10 @@ function gitIn(
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_TERMINAL_PROMPT: '0',
   };
+}
+
+/** Hardened git arguments: no hooks, fsmonitor, replace objects or external diff. */
+export function gitArgs(repoDir: string, args: readonly string[]): string[] {
   const safety = [
     '--no-replace-objects',
     '-c',
@@ -183,11 +211,26 @@ function gitIn(
     '-c',
     'diff.external=',
   ];
+  return [...safety, '-C', repoDir, ...args];
+}
+
+/** Hardened git in the runner's clone (`gitArgs`, `gitEnv`). */
+function gitIn(
+  repoDir: string,
+  home: string,
+  args: string[],
+  options: ProposalGitOptions,
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     execFile(
       'git',
-      [...safety, '-C', repoDir, ...args],
-      { env, timeout: options.timeoutMs, maxBuffer: options.maxPatchBytes, encoding: 'buffer' },
+      gitArgs(repoDir, args),
+      {
+        env: gitEnv(home),
+        timeout: options.timeoutMs,
+        maxBuffer: options.maxPatchBytes,
+        encoding: 'buffer',
+      },
       (error, stdout) => {
         // Git's own text is never passed on.
         if (error) reject(new RunnerError('runner.workspace.proposal_failed'));
@@ -205,7 +248,7 @@ export async function computeProposal(
   options: ProposalGitOptions,
 ): Promise<Proposal> {
   if (!SHA.test(baseSha)) throw new RunnerError('runner.workspace.proposal_failed');
-  await gitIn(repoDir, home, ['add', '-A', '--', '.'], options);
+  await gitIn(repoDir, home, ['add', '-A', '-f', '--', '.'], options);
   const diffArgs = ['diff', '--cached', '--no-renames', '--no-ext-diff', '--no-textconv'];
   const patch = await gitIn(
     repoDir,

@@ -28,6 +28,7 @@
     "test:runner-compose": "SDLC_RUNNER_COMPOSE_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/runner/compose-live.test.ts",
     "test:sandbox-image": "SDLC_SANDBOX_IMAGE_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/sandbox-image",
     "test:sandbox-live": "SDLC_TEST_DB_DIR=platform/tests/integration/sandbox-image/pilot-live.test.ts platform/deploy/scripts/test-db.sh",
+    "test:proposal-pilot": "SDLC_PROPOSAL_PILOT_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/sandbox-image/proposal-pilot.test.ts platform/deploy/scripts/test-db.sh",
     "test:agent": "SDLC_AGENT_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/agent platform/deploy/scripts/test-db.sh",
     "test:agent-real": "SDLC_AGENT_REAL_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/agent/agent-real.test.ts platform/deploy/scripts/test-db.sh",
     "openbao:bootstrap": "platform/deploy/openbao/bootstrap.sh",

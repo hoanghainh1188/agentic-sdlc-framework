@@ -260,7 +260,8 @@ t("E05","M-D","Retention jobs + audit anchoring","S",["E02","A07"],"FR-44",
  ["Delete Evidence Pack files older than `evidence_retention_days` (default 180); skip when `retention_hold`",
   "Audit log, gate decisions and escalations kept at least 2 years (no deletion path in the MVP)",
   "Project archive → purge its evidence files and stored client material unless on hold; keep hashes; audit `project.purged`",
-  "Daily: write each tenant's latest audit hash to SeaweedFS"])
+  "Daily: write each tenant's latest audit hash to SeaweedFS"],
+ "Object lock for evidence (ADR-M33 §2.9 gap 1, Harry's review of PR #112: not in C06): SeaweedFS can lock objects (COMPLIANCE, even the admin cannot delete a locked version), but only on a bucket created with lock enabled, and the lock period is set per bucket or per object, while retention is per project (`evidence_retention_days`) and `retention_hold` must be able to keep an object longer. Decide how they meet (for example a lock per object at write time equal to the project's retention, and legal hold for `retention_hold`) before the purge job deletes anything; the runner's proposal identity can delete under `proposals/` until then")
 t("E06","M-D","Gate waiting-time metrics","S",["B07"],"FR-12","platform/apps/cli",
  ["`sdlc metrics gates`: average / maximum waiting time per gate, per project"])
 t("E07","M-D","MVP definition-of-done check","M",["E03","E04","E05","C09","B13"],"D-02 section 10","platform/tests/integration/*, README",
@@ -416,7 +417,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.8 | 2026-09-27 | Claude (task C10), approved by Harry | E07 AC4: QUESTIONS #81 (a real run with an API model before M-E); B13 AC7: admin endpoints for the agent register with the Ch.20 approval rules; B13 AC8: stored configurations after a change of platform defaults (QUESTIONS #95); C06 note: the agent check and the recertification notice (ADR-M31) |
 | 1.9 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | C06 note: no run before the last HOTL block window closes (`hotlBlockWindowOpenUntil`; QUESTIONS #88, ADR-M30 §2.4b) |
 | 1.10 | 2026-09-27 | Claude (task B12), approved by Harry | B04 AC5: `sdlc ai-record show|set` over the B12 API; B12 note: codes only, version history, write roles, API + operator command (QUESTIONS #103–#106, ADR-M32) |
-| 1.11 | 2026-09-27 | Claude (task C06, session 2b), approved by Harry | C07, C08 notes: reuse the runner's workspace export and hardened git; E02 note: builds on `EvidenceStore` and `evidence_items`, re-checks hashes, own identity for packs (ADR-M33 §2.9) |
+| 1.11 | 2026-09-27 | Claude (task C06, session 2b), approved by Harry | C07, C08 notes: reuse the runner's workspace export and hardened git; E02 note: builds on `EvidenceStore` and `evidence_items`, re-checks hashes, own identity for packs; E05 note: object lock (per-bucket lock vs per-project retention and `retention_hold`) (ADR-M33 §2.9) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))

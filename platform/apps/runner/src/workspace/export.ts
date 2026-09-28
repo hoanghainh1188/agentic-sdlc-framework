@@ -3,7 +3,8 @@
 //
 // `exportWorkspace` reads `/workspace` with Docker's archive endpoint only from the run's own
 // sandbox: the container must have the run's sandbox name and this runner's instance and run
-// labels. The archive is untrusted (`untar.ts`).
+// labels. The archive is untrusted (`untar.ts`) and streamed: paths the ignore rules of
+// `base_sha` ignore (`ignore.ts`, `node_modules`) are read past, never kept.
 //
 // `storeProposal` mirrors it onto the runner's clone, computes the patch with hardened git
 // (`proposal.ts`), stores it through the evidence store at `<intent>/<run>.patch` (the store adds
@@ -18,18 +19,22 @@ import type { DockerClient } from '../docker/client.js';
 import { RunnerError } from '../errors.js';
 import { runNames, runOfLabels } from '../names.js';
 import type { RunnerSettings } from '../settings.js';
-import { computeProposal, mirrorWorkspace } from './proposal.js';
-import { untarWorkspace, type WorkspaceEntry } from './untar.js';
+import { IgnoreChecker } from './ignore.js';
+import { computeProposal, mirrorWorkspace, neutraliseAttributes } from './proposal.js';
+import { untarWorkspace, type EntryFilter, type WorkspaceEntry } from './untar.js';
 
-/** Upper bound of the entries of a workspace archive. */
+/** Upper bound of the entries kept from a workspace archive. */
 export const MAX_WORKSPACE_ENTRIES = 100_000;
-/** Tar headers and padding on top of the file contents, per entry at most 1.5 KiB. */
-const ARCHIVE_OVERHEAD_PER_ENTRY = 1536;
 
+/**
+ * Reads the run's workspace out of its own sandbox, as a stream, keeping only what `filter`
+ * keeps (for a proposal: `IgnoreChecker.filter`, the ignore rules of `base_sha`).
+ */
 export async function exportWorkspace(
   docker: DockerClient,
-  settings: Pick<RunnerSettings, 'instance' | 'workspaceMaxBytes'>,
+  settings: Pick<RunnerSettings, 'instance' | 'workspaceMaxBytes' | 'exportMaxBytes'>,
   runId: string,
+  filter?: EntryFilter,
 ): Promise<WorkspaceEntry[]> {
   const names = runNames(runId);
   const info = await docker.containerInspect(names.container);
@@ -40,15 +45,42 @@ export async function exportWorkspace(
   ) {
     throw new RunnerError('runner.workspace.not_own_sandbox');
   }
-  const archive = await docker.getArchive(
-    names.container,
-    '/workspace',
-    settings.workspaceMaxBytes + MAX_WORKSPACE_ENTRIES * ARCHIVE_OVERHEAD_PER_ENTRY,
-  );
-  return untarWorkspace(archive, 'workspace', {
-    maxBytes: settings.workspaceMaxBytes,
-    maxEntries: MAX_WORKSPACE_ENTRIES,
-  });
+  const archive = await docker.getArchive(names.container, '/workspace');
+  try {
+    return await untarWorkspace(
+      archive,
+      'workspace',
+      {
+        maxBytes: settings.workspaceMaxBytes,
+        maxEntries: MAX_WORKSPACE_ENTRIES,
+        maxStreamBytes: settings.exportMaxBytes,
+      },
+      filter,
+    );
+  } catch (error) {
+    if (error instanceof RunnerError) throw error;
+    throw new RunnerError('runner.workspace.archive_invalid'); // the stream broke off
+  } finally {
+    archive.destroy();
+  }
+}
+
+/** Exports the workspace and lays it over the runner's clone; the file contents go out of scope. */
+async function exportAndMirror(
+  deps: Pick<ProposalDeps, 'docker' | 'settings'>,
+  runId: string,
+  repoDir: string,
+  home: string,
+): Promise<{ readonly asked: number }> {
+  neutraliseAttributes(repoDir);
+  const ignore = await IgnoreChecker.start(repoDir, home, deps.settings.git.timeoutMs);
+  try {
+    const entries = await exportWorkspace(deps.docker, deps.settings, runId, ignore.filter);
+    mirrorWorkspace(repoDir, entries);
+    return { asked: ignore.asked };
+  } finally {
+    ignore.close();
+  }
 }
 
 export interface ProposalDeps {
@@ -74,10 +106,10 @@ export async function storeProposal(
   contract: RunContract,
   cloneDir: string,
 ): Promise<StoredProposal> {
-  const entries = await exportWorkspace(deps.docker, deps.settings, contract.run_id);
   const repoDir = path.join(cloneDir, 'repo');
-  mirrorWorkspace(repoDir, entries);
-  const proposal = await computeProposal(repoDir, path.join(cloneDir, 'home'), contract.base_sha, {
+  const home = path.join(cloneDir, 'home');
+  await exportAndMirror(deps, contract.run_id, repoDir, home);
+  const proposal = await computeProposal(repoDir, home, contract.base_sha, {
     timeoutMs: deps.settings.git.timeoutMs,
     maxPatchBytes: deps.settings.workspaceMaxBytes,
   });

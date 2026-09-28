@@ -69,6 +69,15 @@ const errorKey = (fn: () => unknown): string | undefined => {
   return undefined;
 };
 
+const asyncKey = async (work: Promise<unknown>): Promise<string | undefined> => {
+  try {
+    await work;
+  } catch (error) {
+    return error instanceof RunnerError ? error.key : 'other';
+  }
+  return undefined;
+};
+
 let tmp: string;
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-proposal-'));
@@ -78,7 +87,7 @@ afterEach(() => {
 });
 
 describe('untarWorkspace: the archive is untrusted', () => {
-  it('reads an archive of the system tar: directories, files, the executable bit, links as links', () => {
+  it('reads an archive of the system tar: directories, files, the executable bit, links as links', async () => {
     const root = path.join(tmp, 'workspace');
     fs.mkdirSync(path.join(root, 'src'), { recursive: true });
     fs.mkdirSync(path.join(root, '.git', 'hooks'), { recursive: true });
@@ -94,7 +103,7 @@ describe('untarWorkspace: the archive is untrusted', () => {
       env: { ...process.env, COPYFILE_DISABLE: '1' },
     });
 
-    const entries = untarWorkspace(archive, 'workspace', LIMITS);
+    const entries = await untarWorkspace(archive, 'workspace', LIMITS);
     const byPath = new Map(entries.map((e) => [e.path, e]));
     expect(byPath.get('src')).toEqual({ type: 'dir', path: 'src' });
     expect(byPath.get('src/a.ts')).toMatchObject({ type: 'file', executable: false });
@@ -118,8 +127,8 @@ describe('untarWorkspace: the archive is untrusted', () => {
     ['a block device', header('workspace/disk', '4')],
     ['a FIFO', header('workspace/fifo', '6')],
     ['an unknown type', header('workspace/z', 'Z')],
-  ])('refuses %s', (_name, entry) => {
-    expect(errorKey(() => untarWorkspace(tar(entry), 'workspace', LIMITS))).toBe(
+  ])('refuses %s', async (_name, entry) => {
+    expect(await asyncKey(untarWorkspace(tar(entry), 'workspace', LIMITS))).toBe(
       'runner.workspace.special_file',
     );
   });
@@ -133,13 +142,13 @@ describe('untarWorkspace: the archive is untrusted', () => {
     'workspace/./x',
     'workspace/a\\b',
     'workspacex/y',
-  ])('refuses the path %j', (name) => {
-    expect(errorKey(() => untarWorkspace(tar(header(name, '0')), 'workspace', LIMITS))).toBe(
+  ])('refuses the path %j', async (name) => {
+    expect(await asyncKey(untarWorkspace(tar(header(name, '0')), 'workspace', LIMITS))).toBe(
       'runner.workspace.archive_invalid',
     );
   });
 
-  it('skips `.git` in any case or with ignorable characters (case-insensitive file systems)', () => {
+  it('skips `.git` in any case or with ignorable characters (case-insensitive file systems)', async () => {
     const archive = tar(
       header('workspace/.GIT/', '5'),
       header('workspace/.GIT/config', '0', 5),
@@ -148,25 +157,27 @@ describe('untarWorkspace: the archive is untrusted', () => {
       header('workspace/.g\u200cit/config', '0'),
       header('workspace/keep.txt', '0'),
     );
-    expect(untarWorkspace(archive, 'workspace', LIMITS).map((e) => e.path)).toEqual(['keep.txt']);
+    expect((await untarWorkspace(archive, 'workspace', LIMITS)).map((e) => e.path)).toEqual([
+      'keep.txt',
+    ]);
   });
 
-  it('refuses a bad checksum, truncated data and a missing end', () => {
+  it('refuses a bad checksum, truncated data and a missing end', async () => {
     const bad = header('workspace/x', '0');
     bad[0] = 0x78;
-    expect(errorKey(() => untarWorkspace(tar(bad), 'workspace', LIMITS))).toBe(
+    expect(await asyncKey(untarWorkspace(tar(bad), 'workspace', LIMITS))).toBe(
       'runner.workspace.archive_invalid',
     );
     const truncated = Buffer.concat([header('workspace/x', '0', 4096), data('abc')]);
-    expect(errorKey(() => untarWorkspace(truncated, 'workspace', LIMITS))).toBe(
+    expect(await asyncKey(untarWorkspace(truncated, 'workspace', LIMITS))).toBe(
       'runner.workspace.archive_invalid',
     );
-    expect(errorKey(() => untarWorkspace(header('workspace/x', '0'), 'workspace', LIMITS))).toBe(
+    expect(await asyncKey(untarWorkspace(header('workspace/x', '0'), 'workspace', LIMITS))).toBe(
       'runner.workspace.archive_invalid',
     );
   });
 
-  it('refuses a PAX path that escapes, even when the short name is fine', () => {
+  it('refuses a PAX path that escapes, even when the short name is fine', async () => {
     const record = (key: string, value: string) => {
       const body = ` ${key}=${value}\n`;
       let length = body.length + 1;
@@ -179,19 +190,19 @@ describe('untarWorkspace: the archive is untrusted', () => {
       data(pax),
       header('workspace/fine', '0'),
     );
-    expect(errorKey(() => untarWorkspace(archive, 'workspace', LIMITS))).toBe(
+    expect(await asyncKey(untarWorkspace(archive, 'workspace', LIMITS))).toBe(
       'runner.workspace.archive_invalid',
     );
   });
 
-  it('caps the total size and the number of entries', () => {
+  it('caps the total size and the number of entries', async () => {
     const big = tar(header('workspace/a', '0', 600), data('x'.repeat(600)));
     expect(
-      errorKey(() => untarWorkspace(big, 'workspace', { maxBytes: 500, maxEntries: 10 })),
+      await asyncKey(untarWorkspace(big, 'workspace', { maxBytes: 500, maxEntries: 10 })),
     ).toBe('runner.workspace.too_large');
     const many = tar(...['a', 'b', 'c'].map((n) => header(`workspace/${n}`, '0')));
     expect(
-      errorKey(() => untarWorkspace(many, 'workspace', { maxBytes: 500, maxEntries: 2 })),
+      await asyncKey(untarWorkspace(many, 'workspace', { maxBytes: 500, maxEntries: 2 })),
     ).toBe('runner.workspace.too_large');
   });
 });
@@ -403,7 +414,7 @@ describe('exportWorkspace: only the run own sandbox', () => {
 
   it('the Docker client reads archives of run sandboxes only, before the socket', async () => {
     for (const name of ['postgres', 'sdlc-sdlc-runner-1', `${runNames(RUN).container}x`]) {
-      await expect(docker.getArchive(name, '/', 1024)).rejects.toBeInstanceOf(RunnerError);
+      await expect(docker.getArchive(name, '/')).rejects.toBeInstanceOf(RunnerError);
     }
     expect(stub.calls).toEqual([]);
   });

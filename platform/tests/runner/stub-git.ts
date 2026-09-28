@@ -95,6 +95,18 @@ export class StubGitHost {
     }
   }
 
+  /**
+   * Imports an existing repository (for example a public one) as the bare `owner/name.git`.
+   * Returns the commit of its default branch.
+   */
+  importRepo(repo: string, source: string): string {
+    const bare = path.join(this.root, `${repo}.git`);
+    fs.mkdirSync(path.dirname(bare), { recursive: true });
+    git(this.root, 'clone', '--quiet', '--bare', source, bare);
+    git(bare, 'config', 'http.receivepack', 'false');
+    return git(bare, 'rev-parse', 'HEAD');
+  }
+
   async stop(): Promise<void> {
     this.server.closeAllConnections();
     await new Promise<void>((resolve) => this.server.close(() => resolve()));

@@ -685,6 +685,8 @@ flowchart LR
 - [ ] AC3: Project archive → purge its evidence files and stored client material unless on hold; keep hashes; audit `project.purged`
 - [ ] AC4: Daily: write each tenant's latest audit hash to SeaweedFS
 
+> Note: Object lock for evidence (ADR-M33 §2.9 gap 1, Harry's review of PR #112: not in C06): SeaweedFS can lock objects (COMPLIANCE, even the admin cannot delete a locked version), but only on a bucket created with lock enabled, and the lock period is set per bucket or per object, while retention is per project (`evidence_retention_days`) and `retention_hold` must be able to keep an object longer. Decide how they meet (for example a lock per object at write time equal to the project's retention, and legal hold for `retention_hold`) before the purge job deletes anything; the runner's proposal identity can delete under `proposals/` until then
+
 #### E06. Gate waiting-time metrics
 
 | Size | Depends on | Requirements | Code area |
@@ -767,5 +769,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.8 | 2026-09-27 | Claude (task C10), approved by Harry | E07 AC4: QUESTIONS #81 (a real run with an API model before M-E); B13 AC7: admin endpoints for the agent register with the Ch.20 approval rules; B13 AC8: stored configurations after a change of platform defaults (QUESTIONS #95); C06 note: the agent check and the recertification notice (ADR-M31) |
 | 1.9 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | C06 note: no run before the last HOTL block window closes (`hotlBlockWindowOpenUntil`; QUESTIONS #88, ADR-M30 §2.4b) |
 | 1.10 | 2026-09-27 | Claude (task B12), approved by Harry | B04 AC5: `sdlc ai-record show|set` over the B12 API; B12 note: codes only, version history, write roles, API + operator command (QUESTIONS #103–#106, ADR-M32) |
-| 1.11 | 2026-09-27 | Claude (task C06, session 2b), approved by Harry | C07, C08 notes: reuse the runner's workspace export and hardened git; E02 note: builds on `EvidenceStore` and `evidence_items`, re-checks hashes, own identity for packs (ADR-M33 §2.9) |
+| 1.11 | 2026-09-27 | Claude (task C06, session 2b), approved by Harry | C07, C08 notes: reuse the runner's workspace export and hardened git; E02 note: builds on `EvidenceStore` and `evidence_items`, re-checks hashes, own identity for packs; E05 note: object lock (per-bucket lock vs per-project retention and `retention_hold`) (ADR-M33 §2.9) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

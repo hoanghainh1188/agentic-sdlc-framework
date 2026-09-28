@@ -10,9 +10,14 @@
 //   agent's is never read. Segments are compared folded (`foldSegment`: NFC, invisible characters
 //   removed, lower case), so `.GIT` or `.g\u200cit` is `.git` too: on a case-insensitive or
 //   normalising file system (macOS) they would name the runner's real `.git` (security review).
-// - Caps: the total size of file contents and the number of entries.
-// - Header checksums are verified; PAX (`x`) and GNU long names (`L`, `K`) are read, global PAX
-//   headers (`g`) ignored.
+// - The archive is read as a stream, never held whole in memory (Harry's review of PR #112: a real
+//   workspace holds `node_modules`). A `filter` decides per entry before its content is read:
+//   skipped files are read past, never copied; a skipped directory skips everything under it.
+//   Kept file contents are copied once, into a buffer of the file's size.
+// - Caps: the bytes streamed (`maxStreamBytes`), the total size of kept file contents and the
+//   number of kept entries.
+// - Header checksums are verified; PAX (`x`) and GNU long names (`L`, `K`, at most 64 KiB) are
+//   read, global PAX headers (`g`) ignored.
 import path from 'node:path';
 
 import { RunnerError } from '../errors.js';
@@ -28,10 +33,22 @@ export type WorkspaceEntry =
   | { readonly type: 'symlink'; readonly path: string; readonly target: string };
 
 export interface UntarLimits {
-  /** Sum of file contents, in bytes. */
+  /** Sum of the kept file contents, in bytes. */
   readonly maxBytes: number;
+  /** Number of kept entries. */
   readonly maxEntries: number;
+  /** Bytes read from the archive stream, skipped entries included. Default: `maxBytes` × 4. */
+  readonly maxStreamBytes?: number;
 }
+
+/** What to do with an entry: keep it, skip it, or (a directory) skip it and everything under it. */
+export type EntryDecision = 'keep' | 'skip' | 'skip_tree';
+
+/** Decides before the content is read. `path` is relative to the root; `.git` never reaches it. */
+export type EntryFilter = (
+  path: string,
+  type: WorkspaceEntry['type'],
+) => EntryDecision | Promise<EntryDecision>;
 
 const BLOCK = 512;
 
@@ -118,51 +135,106 @@ export function isGitPath(p: string): boolean {
   return p.split('/').some((segment) => foldSegment(segment) === '.git');
 }
 
+/** Reads exact byte counts from a stream of chunks; counts every byte against a cap. */
+class ByteReader {
+  readonly #chunks: AsyncIterator<Buffer> | Iterator<Buffer>;
+  readonly #max: number;
+  #chunk: Buffer = Buffer.alloc(0);
+  #pos = 0;
+  #total = 0;
+
+  constructor(source: AsyncIterable<Buffer> | Iterable<Buffer>, max: number) {
+    this.#chunks =
+      Symbol.asyncIterator in source ? source[Symbol.asyncIterator]() : source[Symbol.iterator]();
+    this.#max = max;
+  }
+
+  async #next(): Promise<boolean> {
+    for (;;) {
+      const next = await this.#chunks.next();
+      if (next.done) return false;
+      const chunk = next.value;
+      this.#total += chunk.length;
+      if (this.#total > this.#max) throw new RunnerError('runner.workspace.too_large');
+      if (chunk.length === 0) continue;
+      this.#chunk = chunk;
+      this.#pos = 0;
+      return true;
+    }
+  }
+
+  /** Exactly `n` bytes, copied once into a new buffer. */
+  async read(n: number): Promise<Buffer> {
+    const out = Buffer.allocUnsafe(n);
+    let filled = 0;
+    while (filled < n) {
+      if (this.#pos >= this.#chunk.length && !(await this.#next())) throw invalid();
+      const take = Math.min(n - filled, this.#chunk.length - this.#pos);
+      this.#chunk.copy(out, filled, this.#pos, this.#pos + take);
+      this.#pos += take;
+      filled += take;
+    }
+    return out;
+  }
+
+  async skip(n: number): Promise<void> {
+    let left = n;
+    while (left > 0) {
+      if (this.#pos >= this.#chunk.length && !(await this.#next())) throw invalid();
+      const take = Math.min(left, this.#chunk.length - this.#pos);
+      this.#pos += take;
+      left -= take;
+    }
+  }
+}
+
+/** Long names and PAX records are small; anything bigger is not an archive Docker writes. */
+const MAX_META_BYTES = 64 * 1024;
+
+const keepAll: EntryFilter = () => 'keep';
+
 /**
  * Parses the archive of `root` (the folder Docker puts at the top, `workspace` for `/workspace`).
- * Returns the entries under it, in archive order, `.git` paths left out.
+ * Returns the kept entries under it, in archive order, `.git` paths left out.
  */
-export function untarWorkspace(
-  archive: Buffer,
+export async function untarWorkspace(
+  archive: AsyncIterable<Buffer> | Iterable<Buffer> | Buffer,
   root: string,
   limits: UntarLimits,
-): WorkspaceEntry[] {
+  filter: EntryFilter = keepAll,
+): Promise<WorkspaceEntry[]> {
+  const reader = new ByteReader(
+    Buffer.isBuffer(archive) ? [archive] : archive,
+    limits.maxStreamBytes ?? limits.maxBytes * 4,
+  );
   const entries: WorkspaceEntry[] = [];
+  const skippedTrees: string[] = [];
   let total = 0;
   let count = 0;
-  let at = 0;
   let longName: string | undefined;
   let longLink: string | undefined;
   let pax: Record<string, string> = {};
   for (;;) {
-    if (at + BLOCK > archive.length) throw invalid();
-    const header = archive.subarray(at, at + BLOCK);
+    const header = await reader.read(BLOCK);
     if (header.every((byte) => byte === 0)) break;
     if (!checksumOk(header)) throw invalid();
     const type = String.fromCharCode(header[156]!);
     const size = octal(header, 124, 12);
-    const dataStart = at + BLOCK;
-    const dataEnd = dataStart + size;
-    if (dataEnd > archive.length) throw invalid();
-    const data = archive.subarray(dataStart, dataEnd);
-    at = dataStart + Math.ceil(size / BLOCK) * BLOCK;
+    const padded = Math.ceil(size / BLOCK) * BLOCK;
 
-    if (type === 'x') {
-      pax = paxRecords(data);
+    if (type === 'x' || type === 'L' || type === 'K') {
+      if (size > MAX_META_BYTES) throw invalid();
+      const data = (await reader.read(padded)).subarray(0, size);
+      if (type === 'x') pax = paxRecords(data);
+      else if (type === 'L') longName = data.toString('utf8').replace(/\0+$/, '');
+      else longLink = data.toString('utf8').replace(/\0+$/, '');
       continue;
     }
-    if (type === 'g') continue;
-    if (type === 'L') {
-      longName = data.toString('utf8').replace(/\0+$/, '');
-      continue;
-    }
-    if (type === 'K') {
-      longLink = data.toString('utf8').replace(/\0+$/, '');
+    if (type === 'g') {
+      await reader.skip(padded);
       continue;
     }
 
-    count += 1;
-    if (count > limits.maxEntries) throw new RunnerError('runner.workspace.too_large');
     const prefix = field(header, 345, 155);
     const shortName = field(header, 0, 100);
     const name = pax.path ?? longName ?? (prefix ? `${prefix}/${shortName}` : shortName);
@@ -177,21 +249,32 @@ export function untarWorkspace(
       throw new RunnerError('runner.workspace.special_file');
     }
     const rel = relative(name, root);
-    if (rel === null || isGitPath(rel)) continue;
-    if (type === '5') {
-      entries.push({ type: 'dir', path: rel });
-    } else if (type === '2') {
+    const kind: WorkspaceEntry['type'] = type === '5' ? 'dir' : type === '2' ? 'symlink' : 'file';
+    const decision =
+      rel === null || isGitPath(rel) || skippedTrees.some((tree) => rel.startsWith(tree))
+        ? 'skip'
+        : await filter(rel, kind);
+    if (decision !== 'keep') {
+      if (decision === 'skip_tree' && kind === 'dir') skippedTrees.push(`${rel!}/`);
+      await reader.skip(padded);
+      continue;
+    }
+
+    count += 1;
+    if (count > limits.maxEntries) throw new RunnerError('runner.workspace.too_large');
+    if (kind === 'dir') {
+      await reader.skip(padded);
+      entries.push({ type: 'dir', path: rel! });
+    } else if (kind === 'symlink') {
+      await reader.skip(padded);
       if (link.length === 0 || link.length > 4096 || link.includes('\0')) throw invalid();
-      entries.push({ type: 'symlink', path: rel, target: link });
+      entries.push({ type: 'symlink', path: rel!, target: link });
     } else {
       total += size;
       if (total > limits.maxBytes) throw new RunnerError('runner.workspace.too_large');
-      entries.push({
-        type: 'file',
-        path: rel,
-        content: Buffer.from(data),
-        executable: (mode & 0o111) !== 0,
-      });
+      const content = await reader.read(size);
+      await reader.skip(padded - size);
+      entries.push({ type: 'file', path: rel!, content, executable: (mode & 0o111) !== 0 });
     }
   }
   return entries;

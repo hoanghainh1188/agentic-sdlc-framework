@@ -191,21 +191,51 @@ export class DockerClient {
   }
 
   /**
-   * Reads a path of a container as a tar archive (C06 session 2b). The caller checks that the
-   * container is the run's own sandbox (`workspace/export.ts`) and treats the archive as untrusted.
+   * Reads a path of a container as a tar archive, as a stream (C06 session 2b): the archive of a
+   * workspace with `node_modules` is never held whole in memory. The caller checks that the
+   * container is the run's own sandbox (`workspace/export.ts`), treats the archive as untrusted,
+   * and destroys the stream when it stops reading early.
    */
-  async getArchive(name: string, path: string, maxBytes: number): Promise<Buffer> {
-    const res = await this.request(
-      'GET',
-      `/containers/${name}/archive`,
-      undefined,
-      { path },
-      {
-        maxBytes,
-      },
-    );
-    this.#check(res, [200], 'GET');
-    return res.body;
+  getArchive(name: string, path: string): Promise<http.IncomingMessage> {
+    const apiPath = `/containers/${name}/archive`;
+    if (!isAllowedEndpoint('GET', apiPath)) {
+      return Promise.reject(new RunnerError('runner.docker.endpoint_refused', { method: 'GET' }));
+    }
+    const search = new URLSearchParams({ path }).toString();
+    return new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          socketPath: this.#socketPath,
+          method: 'GET',
+          path: `/${DOCKER_API_VERSION}${apiPath}?${search}`,
+          headers: { host: 'docker' },
+          timeout: this.#timeoutMs,
+        },
+        (res) => {
+          const status = res.statusCode ?? 0;
+          if (status === 200) {
+            resolve(res);
+            return;
+          }
+          res.resume();
+          try {
+            this.#check({ status, body: Buffer.alloc(0) }, [200], 'GET');
+          } catch (error) {
+            reject(
+              error instanceof Error
+                ? error
+                : new RunnerError('runner.docker.api_error', { method: 'GET', status }),
+            );
+          }
+        },
+      );
+      req.on('timeout', () => {
+        req.destroy(new RunnerError('runner.docker.timeout', { method: 'GET' }));
+        reject(new RunnerError('runner.docker.timeout', { method: 'GET' }));
+      });
+      req.on('error', (error: NodeJS.ErrnoException) => reject(unreachable(error.code ?? 'error')));
+      req.end();
+    });
   }
 
   async containerStart(id: string): Promise<void> {
