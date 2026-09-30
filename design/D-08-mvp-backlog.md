@@ -683,6 +683,8 @@ flowchart LR
 - [ ] AC3: Project archive → purge its evidence files and stored client material unless on hold; keep hashes; audit `project.purged`
 - [ ] AC4: Daily: write each tenant's latest audit hash to SeaweedFS
 
+> Note: Langfuse holds client data: LiteLLM's traces carry prompts and responses (D-05 §2, D-07; ADR-M35 §2.5, §4). Project archive (FR-44) and retention must also purge the project's Langfuse data (traces tagged with its `tenant:` and `project:` labels)
+
 #### E06. Gate waiting-time metrics
 
 | Size | Depends on | Requirements | Code area |
@@ -765,4 +767,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.8 | 2026-09-27 | Claude (task C10), approved by Harry | E07 AC4: QUESTIONS #81 (a real run with an API model before M-E); B13 AC7: admin endpoints for the agent register with the Ch.20 approval rules; B13 AC8: stored configurations after a change of platform defaults (QUESTIONS #95); C06 note: the agent check and the recertification notice (ADR-M31) |
 | 1.9 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | C06 note: no run before the last HOTL block window closes (`hotlBlockWindowOpenUntil`; QUESTIONS #88, ADR-M30 §2.4b) |
 | 1.10 | 2026-09-27 | Claude (task B12), approved by Harry | B04 AC5: `sdlc ai-record show|set` over the B12 API; B12 note: codes only, version history, write roles, API + operator command (QUESTIONS #103–#106, ADR-M32) |
+| 1.11 | 2026-09-30 | Claude (task A08), approved by Harry | E05 note: project archive and retention also purge the project's Langfuse data (prompts and responses are client data; ADR-M35) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

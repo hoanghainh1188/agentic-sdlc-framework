@@ -10,11 +10,13 @@ import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp, type ApiDeps } from '../../../apps/api/src/app.js';
+import { NestJsonLogger } from '../../../apps/api/src/observability/logging.js';
 import { issueApiToken, revokeApiToken } from '../../../packages/core/src/admin/tokens.js';
 import { intentInputSha256 } from '../../../packages/core/src/commands/gate-input.js';
 import type { Intent } from '../../../packages/core/src/db/schema.js';
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
 import type { TenantScope } from '../../../packages/core/src/db/tenant-scope.js';
+import { createJsonLogger } from '../../../packages/core/src/observability/index.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
 type App = Awaited<ReturnType<typeof createApp>>;
@@ -660,6 +662,51 @@ describeDb('B03: API app on PostgreSQL', () => {
       const all = logged.join('\n');
       for (const token of [...Object.values(tenantA.tokens), ...Object.values(tenantB.tokens)]) {
         expect(all).not.toContain(token);
+      }
+    });
+
+    it('A08 AC1: a failed wake is a JSON line with the tenant and intent IDs, no token', async () => {
+      const lines: string[] = [];
+      const log = createJsonLogger({ write: (line) => lines.push(line) });
+      const failing = await createApp({
+        db: asApiDb(t0),
+        settings: { rateLimitPerMinute: 1000, authFailuresPerMinute: 1000 },
+        now: () => NOW,
+        log,
+        nestLogger: new NestJsonLogger(log),
+        intentSignals: { wake: () => Promise.reject(new Error('temporal down: token=secret')) },
+      });
+      try {
+        const reply = await failing
+          .getHttpAdapter()
+          .getInstance()
+          .inject({
+            method: 'POST',
+            url: '/v1/intents',
+            headers: { authorization: `Bearer ${tenantA.tokens.a}` },
+            payload: {
+              project: 'shop',
+              title: 'Wake fails',
+              risk_tier: 'low',
+              data_class: 'internal',
+            },
+          });
+        expect(reply.statusCode).toBe(201);
+        const created = reply.json<{ id: string }>();
+        const entries = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+        expect(entries).toContainEqual(
+          expect.objectContaining({
+            level: 'warn',
+            event: 'api.intent_wake_failed',
+            tenant_id: tenantA.scope.tenantId,
+            intent_id: created.id,
+          }),
+        );
+        const all = lines.join('');
+        expect(all).not.toContain(tenantA.tokens.a);
+        expect(all).not.toContain('secret');
+      } finally {
+        await failing.close();
       }
     });
   });

@@ -3,6 +3,9 @@
 // escalation clock loop (B11, ADR-M28), and the Temporal worker of the intent workflow with its
 // reconcile loop (B07, ADR-M30). Settings come from the environment, the database password and the
 // GitHub App key from OpenBao (AppRole `worker`).
+// Tracing starts first (A08, ADR-M35): `./telemetry.js` must stay the first import.
+import { tracing, tracingEndpointValid } from './telemetry.js';
+
 import fs from 'node:fs';
 
 import { GitHubAdapter } from '@sdlc/adapter-git-github';
@@ -17,6 +20,7 @@ import {
 } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OpenBaoClient, SecretsError } from '@sdlc/secrets';
+import { OTEL_ENDPOINT_ENV } from '@sdlc/telemetry';
 import {
   connectTemporal,
   NO_INTENT_SIGNALS,
@@ -37,6 +41,9 @@ import { installTemporalLogging, startIntentWorker, type IntentWorkerHandle } fr
 const logger = jsonLogger((line) => process.stdout.write(line));
 
 async function main(): Promise<void> {
+  if (!tracingEndpointValid) {
+    throw new SettingsError('worker.settings.invalid', OTEL_ENDPOINT_ENV);
+  }
   const settings = loadSettings(process.env);
   if (settings.database.kind === 'dev_url') {
     logger.log('warn', 'worker.dev_mode', { message: t('worker.start.dev_mode') });
@@ -145,12 +152,19 @@ async function main(): Promise<void> {
   logger.log('info', 'worker.started', {
     tick_ms: settings.tickMs,
     escalation_tick_ms: settings.escalationTickMs,
+    tracing: tracing !== undefined,
   });
 
   const shutdown = (): void => {
     void Promise.all([loop.stop(), escalations.stop(), reconcile?.stop(), intentWorker?.shutdown()])
       .then(() =>
-        Promise.all([db.close(), openbao.close(), temporal?.close(), workerRuns?.close()]),
+        Promise.all([
+          db.close(),
+          openbao.close(),
+          temporal?.close(),
+          workerRuns?.close(),
+          tracing?.shutdown(),
+        ]),
       )
       .then(() => logger.log('info', 'worker.stopped', {}));
   };

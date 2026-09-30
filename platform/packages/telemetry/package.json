@@ -1,0 +1,24 @@
+{
+  "name": "@sdlc/telemetry",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "OpenTelemetry tracing for the api, worker and runner processes: OTLP export, safe instrumentation, Temporal activity spans. See D-08 A08, design/ADR-M35.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
+    "@opentelemetry/instrumentation": "0.222.0",
+    "@opentelemetry/instrumentation-http": "0.222.0",
+    "@opentelemetry/instrumentation-pg": "0.74.0",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-trace-base": "2.11.0",
+    "@opentelemetry/sdk-trace-node": "2.11.0",
+    "@opentelemetry/semantic-conventions": "1.43.0",
+    "@sdlc/core": "workspace:*"
+  }
+}

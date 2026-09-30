@@ -1,0 +1,45 @@
+# OpenTelemetry Collector (task A08, design/ADR-M35 §2.4; QUESTIONS #4 answer A).
+# One OTLP pipeline: the api, the worker and LiteLLM (`langfuse_otel`) send traces here without
+# credentials; the collector forwards them to Langfuse v4 over OTLP/HTTP. Only this service holds
+# the Langfuse project key (from .env for now; OpenBao with the real server, A10).
+# No published port and only the Compose network `sdlc`: sandboxes never reach it (ADR-M25).
+
+extensions:
+  # Read by the container health check (wget in the image).
+  health_check:
+    endpoint: 127.0.0.1:13133
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # A modest server (D-03 §10.1): drop data instead of growing without limit.
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 50
+  batch: {}
+
+exporters:
+  otlp_http/langfuse:
+    traces_endpoint: http://langfuse-web:3000/api/public/otel/v1/traces
+    headers:
+      Authorization: Basic ${env:LANGFUSE_OTLP_AUTH}
+      # Langfuse's v4 ingestion path (the same header LiteLLM's langfuse_otel sends).
+      x-langfuse-ingestion-version: '4'
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/langfuse]
+  telemetry:
+    logs:
+      level: warn
+    metrics:
+      level: none

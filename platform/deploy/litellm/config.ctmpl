@@ -11,6 +11,10 @@
     self-hosted model must declare an internal cost per token above 0: with cost 0, LiteLLM
     skips budget checks (D-07 section 3).
   - Adding a model: add an entry below inside "if in $providers ...", then restart LiteLLM.
+  - Tracing (A08, design/ADR-M35 §2.4): when the sidecar has SDLC_OTEL_ENDPOINT (up.sh sets it with
+    the profile observability), LiteLLM's langfuse_otel callback sends one span per model call to
+    the OpenTelemetry Collector, which forwards it to Langfuse v4. LiteLLM holds no Langfuse key.
+    The run's labels reach the trace from the virtual key's metadata and tags (ADR-M24 §2.2).
 */ -}}
 {{- $providers := secrets "kv/metadata/litellm/providers/" }}
 model_list:
@@ -55,6 +59,17 @@ general_settings:
 environment_variables:
 {{- with secret "kv/data/litellm/salt-key" }}
   LITELLM_SALT_KEY: {{ .Data.data.value | toJSON }}
+{{- end }}
+{{- with env "SDLC_OTEL_ENDPOINT" }}
+  # Read before the callbacks are set up. LiteLLM adds /v1/traces.
+  OTEL_EXPORTER: otlp_http
+  OTEL_ENDPOINT: {{ . | toJSON }}
+  OTEL_SERVICE_NAME: sdlc-litellm
+{{- end }}
+{{- with env "SDLC_OTEL_ENDPOINT" }}
+
+litellm_settings:
+  callbacks: ["langfuse_otel"]
 {{- end }}
 
 # Same as config.yaml: Valkey keys must expire (noeviction, design/ADR-M17 section 2.4).

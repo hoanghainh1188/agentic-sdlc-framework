@@ -7,6 +7,8 @@ import {
   type ActivityContextLike,
 } from '../../apps/runner/src/activities.js';
 import { processSettingsFromEnv } from '../../apps/runner/src/index.js';
+import { createJsonLogger, withLogContext } from '../../packages/core/src/observability/index.js';
+import { activityTracingInterceptor } from '../../packages/telemetry/src/index.js';
 
 const TENANT = '11111111-1111-4111-8111-111111111111';
 const RUN = '22222222-2222-4222-8222-222222222222';
@@ -39,6 +41,7 @@ function harness(
     },
   };
   const abort = new AbortController();
+  const lines: string[] = [];
   let beats = 0;
   const ctx: ActivityContextLike = {
     heartbeat: () => {
@@ -82,6 +85,7 @@ function harness(
     },
     context: () => ctx,
     heartbeatMs: 5,
+    logger: createJsonLogger({ write: (line) => lines.push(line) }),
   });
   const input = {
     tenantId: TENANT,
@@ -90,7 +94,7 @@ function harness(
     wrappedGitToken: 'wrap-git',
     wrappedVirtualKey: 'wrap-key',
   };
-  return { activities, calls, input, abort, beats: () => beats };
+  return { activities, calls, input, abort, lines, beats: () => beats };
 }
 
 describe('executeRun', () => {
@@ -100,6 +104,30 @@ describe('executeRun', () => {
     expect(result).toEqual({ outcome: 'ended', status: 'succeeded', stopReason: null });
     expect(h.calls).toEqual(['provision:vault:v1:x', 'runAgent:gpt-oss-20b:key-of-wrap-key']);
     expect(h.beats()).toBeGreaterThanOrEqual(1);
+  });
+
+  it('A08 AC1: through the activity interceptor, its log lines carry tenant_id and run_id', async () => {
+    const h = harness();
+    const { inbound } = activityTracingInterceptor({ withLogContext })({
+      info: { activityType: 'executeRun', attempt: 1, taskQueue: 'sdlc-runner' },
+    });
+    await inbound.execute({ args: [h.input] }, (input) =>
+      h.activities.executeRun(input.args[0] as typeof h.input),
+    );
+    const entries = h.lines.map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(entries).toEqual([
+      expect.objectContaining({ event: 'runner.run_started', tenant_id: TENANT, run_id: RUN }),
+      expect.objectContaining({
+        event: 'runner.run_ended',
+        tenant_id: TENANT,
+        run_id: RUN,
+        outcome: 'ended',
+        status: 'succeeded',
+        stop_reason: '',
+      }),
+    ]);
+    // Never the wrapping tokens or the key.
+    expect(h.lines.join('')).not.toMatch(/wrap-|key-of/);
   });
 
   it('a refused contract (for example expired) is returned as refused, with its code', async () => {

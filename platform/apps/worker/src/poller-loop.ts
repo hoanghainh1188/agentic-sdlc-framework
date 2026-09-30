@@ -9,7 +9,7 @@
 // - All state (cursor, receipts) is in PostgreSQL: after a restart, every project is polled once
 //   right away and continues from its stored cursor.
 import { GitHostError } from '@sdlc/contracts';
-import type { PollableProject } from '@sdlc/core';
+import { withLogContext, type PollableProject } from '@sdlc/core';
 
 import type { WorkerLogger } from './logger.js';
 
@@ -115,7 +115,8 @@ export class PollerLoop {
       return;
     }
     try {
-      await this.#deps.poll(project);
+      // The GitHub adapter's and OpenBao's log lines of this poll carry the tenant (A08).
+      await withLogContext({ tenantId: project.tenantId }, () => this.#deps.poll(project));
       this.#nextDue.set(id, this.#deps.now() + intervalMs);
     } catch (error) {
       let due = this.#deps.now() + intervalMs;

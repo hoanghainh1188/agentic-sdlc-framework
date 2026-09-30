@@ -10,6 +10,7 @@
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
     { "path": "../../packages/messages" },
-    { "path": "../../packages/secrets" }
+    { "path": "../../packages/secrets" },
+    { "path": "../../packages/telemetry" }
   ]
 }

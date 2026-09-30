@@ -8,6 +8,7 @@
     { "path": "platform/packages/core" },
     { "path": "platform/packages/secrets" },
     { "path": "platform/packages/workflow-client" },
+    { "path": "platform/packages/telemetry" },
     { "path": "platform/packages/adapters/git-github" },
     { "path": "platform/packages/adapters/agent-openhands" },
     { "path": "platform/packages/adapters/model-litellm" },

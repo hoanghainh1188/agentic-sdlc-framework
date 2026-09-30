@@ -7,7 +7,7 @@ This folder runs the infrastructure that the platform reuses, on one server, wit
 | Profile | Services | When to use |
 |---|---|---|
 | `core` | PostgreSQL, Temporal (+ Temporal UI), LiteLLM, Valkey, SeaweedFS (S3 API), OpenBao | Always. Required by the platform |
-| `observability` | Langfuse (web + worker), ClickHouse. Reuses PostgreSQL, Valkey and SeaweedFS | Optional. The heaviest part; enable it when the server has room (D-03 section 10.1) |
+| `observability` | Langfuse (web + worker), ClickHouse, the OpenTelemetry Collector (A08). Reuses PostgreSQL, Valkey and SeaweedFS | Optional. The heaviest part; enable it when the server has room (D-03 section 10.1) |
 | `models` | `litellm-agent`: OpenBao Agent that gives LiteLLM its model provider keys, master key and salt key from OpenBao (task C03, [ADR-M24](../../design/ADR-M24-litellm-cost-controller.md)) | **Always on the server** (`pnpm compose:models`). Needs OpenBao unsealed and configured and the sidecar's credentials (runbook T11 §5d). Without it, LiteLLM has no models and uses the development keys from `.env` |
 | `platform` | `sdlc-api`: the REST API for the CLI (task B03, [ADR-M26](../../design/ADR-M26-api-app.md)); `sdlc-worker`: the GitHub poller and comment commands (task B06, [ADR-M27](../../design/ADR-M27-github-poller.md)), the escalation clocks (B11) and the Temporal worker of the intent workflow (B07, [ADR-M30](../../design/ADR-M30-intent-workflow.md)). Both built from this repo; both reach Temporal on the Compose network | With `core` (`pnpm compose:platform`). Needs OpenBao unsealed and configured, `pnpm openbao:bootstrap api-credentials` and `worker-credentials` first, and the GitHub App key stored (runbook T11 §5b, §5e, §5f) |
 | `sandbox` | `sdlc-runner` (built from this repo), `docker-socket-proxy` (wollomatic/socket-proxy: the runner's only way to Docker), `npm-proxy` (Verdaccio: npm packages for the sandboxes), `registry` (local registry for sandbox images, 127.0.0.1 only) (task C04, [ADR-M25](../../design/ADR-M25-runner-sandbox.md)) | With `core` (`pnpm compose:sandbox`). Needs OpenBao unsealed and configured, `SDLC_DOCKER_GID` right and `pnpm openbao:bootstrap runner-credentials` first (runbook T11 §5g) |
@@ -70,7 +70,7 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 | API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI |
 | Sandbox image registry | 5050 | `sandbox` profile only. **Always 127.0.0.1** (not `SDLC_BIND_ADDR`): it has no authentication. Not 5000: macOS uses it |
 
-Valkey, ClickHouse, the Langfuse worker, **OpenBao**, the runner, the socket proxy and the npm proxy publish no port.
+Valkey, ClickHouse, the Langfuse worker, the OpenTelemetry Collector, **OpenBao**, the runner, the socket proxy and the npm proxy publish no port.
 
 OpenBao is reachable only on the Compose network (`design/QUESTIONS.md` #27, task A11). The platform processes run in Compose and use `http://openbao:8200`. Key holders and admins work inside the container with `pnpm openbao:bootstrap …` or `docker compose … exec openbao …` (runbook T11). There is no host port for `curl`.
 
@@ -162,9 +162,26 @@ pnpm openbao:bootstrap status
 | PostgreSQL | `pg_isready` answers |
 | Temporal | The frontend gRPC port accepts connections. The `temporal-namespace` job then checks full cluster health with the Temporal CLI |
 | Temporal UI, Langfuse web and worker, ClickHouse, SeaweedFS | Their HTTP health endpoint answers |
+| OpenTelemetry Collector | Its `health_check` extension answers (inside the container) |
 | Valkey | `PING` with the password returns `PONG` |
 | LiteLLM | `/health/liveliness` answers |
 | **OpenBao** | **The API is reachable. It does NOT mean initialised or unsealed.** A new volume is uninitialised and sealed; initialise it with `openbao/bootstrap.sh` (see above). After every restart, OpenBao is sealed again until two key holders unseal it (D-03 section 10.2). Check with `pnpm openbao:bootstrap status` (OpenBao publishes no host port) |
+
+## Logs and traces (A08)
+
+Design: [ADR-M35](../../design/ADR-M35-observability.md). Usage for operators: handbook Chapter 18 §18.8c.
+
+- **Logs.** `sdlc-api`, `sdlc-worker` and `sdlc-runner` write one JSON line per event, with `tenant_id`, `intent_id` and `run_id` when known. Only codes, IDs and counts; never a token, a key or client data.
+- **Traces are off unless `SDLC_OTEL_ENDPOINT` is set.** `up.sh` sets it to `http://otel-collector:4318` when `observability` is one of the profiles of the same call, so start the profiles that use it together:
+
+  ```bash
+  platform/deploy/scripts/up.sh core models platform observability
+  ```
+
+  `pnpm compose:obs` alone starts Langfuse and the collector, but no traced process.
+- The **OpenTelemetry Collector** (`otel-collector`, image `sdlc-otel-collector:0.161.0` built from `otel-collector/`) receives OTLP from the api, the worker and LiteLLM without credentials and forwards it to Langfuse v4. It is the only service with the Langfuse project key (`LANGFUSE_INIT_PROJECT_PUBLIC_KEY` / `…_SECRET_KEY` from `.env`; OpenBao with A10). No host port; sandboxes never reach it.
+- **LiteLLM** traces every model call with its `langfuse_otel` callback (rendered by `litellm/config.ctmpl` when the sidecar has `SDLC_OTEL_ENDPOINT`). Each call is one Langfuse trace tagged with the seven labels (`tenant:`, `project:`, `intent_id:`, `run_id:`, `gate:`, `agent:`, `data_class:`). It holds the prompt and the answer: client data (ADR-M35 §2.5).
+- Langfuse runs v4 in `events_only` mode: read traces through `GET /api/public/v2/observations` (the old `/api/public/traces` answers 404).
 
 ## Shared Valkey: memory limit
 
@@ -197,4 +214,5 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 | `pnpm test:runner` | The runner on the local Docker Engine: sandbox egress and hardening, the provisioning flow, the clean-up after a restart (throw-away PostgreSQL, fixture image) | Yes |
 | `pnpm test:runner-compose` | The `sdlc-runner` container in the profile `sandbox` on a throw-away Compose project: `runner-credentials`, socket proxy, clean-up at start, health check, no secret in the container. About 1 minute | Yes |
 | `pnpm test:sandbox-image` | Builds the sandbox image `node24` and runs it hardened with the real Verdaccio: Node 24, pnpm through corepack and the proxy, no other way out. Needs internet | Yes |
+| `pnpm test:observability` | A08 AC3: `core + models + observability` on a throw-away Compose project (ports +27000) with a stub model and throw-away OpenBao keys. One model call through LiteLLM must give a Langfuse trace with all seven labels; a span of a platform process must reach Langfuse through the collector; the collector has no host port. About 2 minutes | Yes |
 | `pnpm test:compose` | Starts `core`, then `core + observability`, with a throw-away env file, its own project name and ports shifted by 20000. Checks health, databases, namespace, buckets, Valkey policy, OpenBao state, Langfuse sign-up and trace upload. Removes everything afterwards. Takes about 2–5 minutes | Yes |

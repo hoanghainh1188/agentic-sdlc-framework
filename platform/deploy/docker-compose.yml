@@ -2,7 +2,8 @@
 #
 # Profiles:
 #   core           PostgreSQL, Temporal (+ UI), LiteLLM, Valkey, SeaweedFS, OpenBao
-#   observability  Langfuse (web + worker) and ClickHouse; reuses PostgreSQL, Valkey, SeaweedFS
+#   observability  Langfuse (web + worker), ClickHouse and the OpenTelemetry Collector (A08,
+#                  design/ADR-M35); reuses PostgreSQL, Valkey, SeaweedFS
 #   models         OpenBao Agent sidecar that gives LiteLLM its keys from OpenBao (C03,
 #                  design/ADR-M24). Always on on the server: pnpm compose:models
 #   platform       The platform processes built from this repo: sdlc-api (B03, design/ADR-M26) and
@@ -279,6 +280,9 @@ services:
     command: [agent, -config=/openbao/agent/agent.hcl]
     environment:
       BAO_ADDR: http://openbao:8200
+      # Tracing (A08, ADR-M35 §2.4): when set, config.ctmpl turns on LiteLLM's langfuse_otel and
+      # points it at the collector. Empty: no tracing. Set by up.sh with the profile observability.
+      SDLC_OTEL_ENDPOINT: ${SDLC_OTEL_ENDPOINT:-}
     volumes:
       - ./litellm/agent.hcl:/openbao/agent/agent.hcl:ro
       # The template. Live tests point SDLC_LITELLM_TEMPLATE at a test template (stub model).
@@ -463,6 +467,31 @@ services:
           'wget -q -O /dev/null "http://$$(hostname -i | cut -d" " -f1):3000/api/public/health" || exit 1',
         ]
 
+  # OpenTelemetry Collector (task A08, design/ADR-M35 §2.4; QUESTIONS #4). One OTLP pipeline to
+  # Langfuse v4: sdlc-api, sdlc-worker and LiteLLM send traces here without credentials, and only
+  # this service holds the Langfuse project key. up.sh points SDLC_OTEL_ENDPOINT at it when the
+  # profile is on. No published port, only the network sdlc: sandboxes never reach it (ADR-M25).
+  otel-collector:
+    image: sdlc-otel-collector:0.161.0
+    build:
+      context: ./otel-collector
+    profiles: [observability]
+    restart: unless-stopped
+    networks: [sdlc]
+    depends_on:
+      langfuse-web:
+        condition: service_healthy
+    environment:
+      # The key of the project Langfuse creates at start (.env); OpenBao with A10 (ADR-M35 §4).
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:?set LANGFUSE_INIT_PROJECT_PUBLIC_KEY in .env}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:?set LANGFUSE_INIT_PROJECT_SECRET_KEY in .env}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:13133/']
+
   # ------------------------------------------------------------ platform ----
 
   # REST API for the CLI (B03, design/ADR-M26). Built from platform/apps/api/Dockerfile; the tag
@@ -491,6 +520,8 @@ services:
       # Wakes the intent workflow after a change (B07, ADR-M30). Plain gRPC on the Compose network.
       SDLC_API_TEMPORAL_ADDRESS: temporal:7233
       SDLC_API_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      # Traces over OTLP to the collector (A08, ADR-M35). Empty: off. Set by up.sh (observability).
+      SDLC_OTEL_ENDPOINT: ${SDLC_OTEL_ENDPOINT:-}
       SDLC_OPENBAO_ADDR: http://openbao:8200
       # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
       SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'
@@ -531,6 +562,8 @@ services:
       SDLC_WORKER_DB_NAME: platform
       SDLC_WORKER_TEMPORAL_ADDRESS: temporal:7233
       SDLC_WORKER_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      # Traces over OTLP to the collector (A08, ADR-M35). Empty: off. Set by up.sh (observability).
+      SDLC_OTEL_ENDPOINT: ${SDLC_OTEL_ENDPOINT:-}
       SDLC_OPENBAO_ADDR: http://openbao:8200
       # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
       SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'

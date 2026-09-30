@@ -3,7 +3,15 @@ import { defineConfig } from 'vitest/config';
 
 // Tests import workspace packages by name. Point them at the TypeScript sources, so `pnpm test`
 // does not need a build first. `pnpm typecheck` checks the same imports against the built types.
-const SOURCE_PACKAGES = ['contracts', 'config', 'messages', 'core', 'secrets', 'workflow-client'];
+const SOURCE_PACKAGES = [
+  'contracts',
+  'config',
+  'messages',
+  'core',
+  'secrets',
+  'workflow-client',
+  'telemetry',
+];
 const SOURCE_ADAPTERS = ['policy-simple', 'git-github', 'model-litellm', 'agent-openhands'];
 
 export default defineConfig({

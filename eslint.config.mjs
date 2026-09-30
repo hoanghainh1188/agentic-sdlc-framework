@@ -60,6 +60,10 @@ export default tseslint.config(
             { from: '@sdlc/workflow-client', allowOnly: ['@sdlc/contracts'] },
             // Core never imports Temporal through the workflow client (ADR-M30).
             { from: '@sdlc/core', deny: ['@sdlc/workflow-client'] },
+            // Tracing is loaded before `pg`: it imports core for types only, and core never imports
+            // it (ADR-M35 §2.3). The type-only rule is checked by platform/tests/observability.
+            { from: '@sdlc/telemetry', allowOnly: ['@sdlc/core'] },
+            { from: '@sdlc/core', deny: ['@sdlc/telemetry'] },
           ],
         },
       ],

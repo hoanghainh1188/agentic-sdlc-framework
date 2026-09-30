@@ -1,7 +1,7 @@
 # Chapter 18. Timeouts, rollback and containment
 
 > Readers: **developers, Person A, Person B**, operators · Reading time: about 15 minutes
-> Status: **Draft 0.3**, awaiting Harry's comments. §18.8b (platform usage) is owned by Claude Code.
+> Status: **Draft 0.3**, awaiting Harry's comments. §18.8b and §18.8c (platform usage) are owned by Claude Code.
 
 ---
 
@@ -196,6 +196,25 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 
 **Answers.** A successful command gets no reply. A command that the platform cannot read or refuses gets a reply that says why. Nothing is recorded in that case.
 
+## 18.8c. Using the platform: logs and traces of a run
+
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task A08, 2026-09-30 (`design/ADR-M35-observability.md`).
+
+Before you change anything after a timeout or a stopped run (§18.4), find what the platform recorded. You need two things: the run's ID (`run_id`, a UUID) and the intent code.
+
+**Logs.** Every platform process (`sdlc-api`, `sdlc-worker`, `sdlc-runner`) writes one JSON line per event. Read them with `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env logs <service>`.
+
+- Each line has `time`, `level` and `event` (a code such as `runner.run_ended`).
+- Lines about a tenant, an intent or a run also carry `tenant_id`, `intent_id` and `run_id`. Filter on them, for example with `grep '"run_id":"<run_id>"'`.
+- A line never holds a token, a key, comment text or client data: only codes, IDs and counts. A field that looks like one of these is dropped, and the line counts it in `dropped_fields`.
+
+**Traces** (optional: Compose profile `observability`, which needs more memory).
+
+- Start the profiles together, for example `platform/deploy/scripts/up.sh core models platform observability`. Then the api, the worker and LiteLLM send traces to Langfuse through the OpenTelemetry Collector. Without the profile, nothing is traced.
+- Every model call is one trace in Langfuse, tagged with the seven labels: `tenant:`, `project:`, `intent_id:`, `run_id:`, `gate:`, `agent:`, `data_class:`. In Langfuse, filter the traces by the tag `run_id:<run_id>` to see every model call of a run, with its tokens and cost.
+- A log line written inside a traced request or activity also carries `trace_id`: search for it in Langfuse to see the whole request.
+- **Langfuse holds the prompts and the model's answers.** They are client data: treat Langfuse like the repository of the client project (Chapter 3). Only people who may see the project's code may have a Langfuse account.
+
 ---
 
 ## 18.9. Drills and metrics
@@ -255,3 +274,4 @@ Track:
 | 0.2 | 2026-09-24 | Claude (draft) | Recovery runbook per project; drills each release cycle for High+ systems (Harry) |
 | 0.3 | 2026-09-27 | Claude (task B11) | §18.8b platform usage: escalations, `/ack`, `/decide`, freeze, clocks (ADR-M28) |
 | 0.4 | 2026-09-27 | Claude (task B07, session 2) | §18.8b: the escalation of an overdue gate, closed by the platform (ADR-M30 §2.9) |
+| 0.5 | 2026-09-30 | Claude (task A08) | §18.8c platform usage: logs and traces of a run (ADR-M35) |
