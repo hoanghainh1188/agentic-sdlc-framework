@@ -9,6 +9,7 @@
 // are THROW-AWAY TEST KEYS: kept in variables, never printed, never in an assertion message.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -25,6 +26,10 @@ import { isolateEnv } from '../throwaway-compose';
 const enabled = process.env.SDLC_API_TEST === '1';
 const PORT_OFFSET = 24000;
 const SETUP_TIMEOUT_MS = 10 * 60 * 1000;
+const READY_TIMEOUT_MS = 60_000;
+const READY_POLL_MS = 500;
+// Errors that only mean "the api is not listening yet" (for example right after a restart).
+const NOT_READY_ERRORS = new Set(['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT']);
 
 interface Result {
   status: number | null;
@@ -110,6 +115,46 @@ describe.skipIf(!enabled)('sdlc-api container (live)', { timeout: 120_000 }, () 
 
   const get = (route: string, token = apiToken) =>
     fetch(`${apiUrl}${route}`, { headers: { authorization: `Bearer ${token}` } });
+
+  // One request on a new connection (no keep-alive agent), so no socket from before a restart is reused.
+  const freshGet = (route: string, headers: http.OutgoingHttpHeaders = {}): Promise<number> =>
+    new Promise((resolve, reject) => {
+      const req = http.request(`${apiUrl}${route}`, {
+        agent: false,
+        headers: { ...headers, connection: 'close' },
+      });
+      req.setTimeout(5_000, () =>
+        req.destroy(Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' })),
+      );
+      req.on('response', (res) => {
+        res.resume();
+        res.on('end', () => resolve(res.statusCode ?? 0));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+
+  // Bounded wait until /health/ready answers 200 on a new connection. Only "not listening yet"
+  // errors and non-200 answers are waited out; any other error fails at once.
+  async function waitReady(): Promise<void> {
+    const deadline = Date.now() + READY_TIMEOUT_MS;
+    let last = 'no answer';
+    while (Date.now() < deadline) {
+      try {
+        const status = await freshGet('/health/ready');
+        if (status === 200) return;
+        last = `status ${status}`;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code ?? '';
+        if (!NOT_READY_ERRORS.has(code)) {
+          throw error;
+        }
+        last = code;
+      }
+      await new Promise((r) => setTimeout(r, READY_POLL_MS));
+    }
+    throw new Error(`sdlc-api not ready after ${READY_TIMEOUT_MS} ms (last: ${last})`);
+  }
 
   beforeAll(async () => {
     ok(run(path.join(deployDir, 'scripts/init-env.sh'), [envFile]), 'init-env');
@@ -229,11 +274,10 @@ describe.skipIf(!enabled)('sdlc-api container (live)', { timeout: 120_000 }, () 
     ok(bootstrapCmd(['api-credentials'], `${rootToken}\n`), 'api-credentials again');
     ok(compose('', '--profile', 'core', '--profile', 'platform', 'restart', 'sdlc-api'), 'restart');
     upApi();
-    // The HTTP client may still hold a keep-alive socket to the old container: retry once.
-    const status = await get('/v1/me').then(
-      (r) => r.status,
-      () => get('/v1/me').then((r) => r.status),
-    );
-    expect(status).toBe(200);
+    // "Healthy" inside the container does not mean the published port answers yet, and the
+    // global fetch may hold keep-alive sockets to the old process: wait for readiness, then send
+    // the request once on a new connection. No retry: a refused credential still fails here.
+    await waitReady();
+    expect(await freshGet('/v1/me', { authorization: `Bearer ${apiToken}` })).toBe(200);
   });
 });
