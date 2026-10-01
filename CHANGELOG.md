@@ -138,6 +138,7 @@
 - Docs fixes (found during A01 planning): README task count 44 and codes table v1.3; leftover pre-2+N roles table removed from D-02 §3.
 - ADR-M16 accepted (Harry, 2026-09-25, with PR #46); design/README.md index updated.
 - CLAUDE.md: new `Current constraints` section (at most 2 parallel sessions, one task per session in its own worktree, A09 in parallel with A02, A03 waits for the OpenBao key holders).
+- QUESTIONS #140: `bootstrap.sh` `api-credentials`, `worker-credentials` (`worker`, `cost-controller`), `runner-credentials` and `litellm-credentials` now destroy every other secret ID of the AppRole after the new one is written (the accessor to keep comes from the create response). Before, the old secret ID stayed valid for up to 90 days. Live test `approle-rotation.test.ts` in `pnpm test:openbao`; ADR-M19 §2.5 and runbook T11 §8.1, new §8.3 (one process per AppRole; revoking an AppRole's tokens after a leak).
 
 ## [1.3.0-review] — 2026-09-24
 

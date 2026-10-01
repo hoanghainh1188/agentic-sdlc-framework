@@ -246,53 +246,89 @@ cmd_root_token() {
   printf '%s' "$input" | bao_exec sh "$in_container/root-token.sh"
 }
 
+# Prints the role ID, a new secret ID and the new secret ID's accessor, one per line, from the
+# openbao container. The accessor comes from the same create response, never from a list. The
+# admin token comes on stdin. issue_secret_id <AppRole>
+issue_secret_id() {
+  printf '%s\n' "$token" |
+    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
+      bao read -field=role_id "auth/approle/role/$1/role-id" && echo &&
+      bao write -f -format=table "auth/approle/role/$1/secret-id" |
+        awk '"'"'$1 == "secret_id" { s = $2 } $1 == "secret_id_accessor" { a = $2 }
+          END { if (s == "" || a == "") exit 1; print s; print a }'"'"'' sh "$1"
+}
+
+# Destroys every secret ID of an AppRole except the one with the given accessor, so a rotation
+# cuts off the previous secret ID at once (QUESTIONS #140). Runs only after the new secret ID is
+# written to the service's volume. One process per AppRole: a second instance of a service would
+# lose its secret ID here (ADR-M19). Tokens already issued from an old secret ID stay valid until
+# their TTL (runbook T11 section 8). revoke_other_secret_ids <AppRole> <accessor to keep>
+revoke_other_secret_ids() {
+  case "$2" in
+    '' | *[!0-9a-f-]*) fail "no valid accessor for the new $1 secret ID; old secret IDs NOT revoked" ;;
+  esac
+  printf '%s\n%s\n' "$token" "$2" |
+    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN && IFS= read -r keep || exit 1
+      accessors="$(bao list -format=json "auth/approle/role/$1/secret-id" | tr -d "[]\", ")" || exit 1
+      printf "%s\n" "$accessors" | grep -qxF "$keep" || { echo "new secret ID not listed" >&2; exit 1; }
+      for a in $accessors; do
+        [ "$a" = "$keep" ] && continue
+        bao write "auth/approle/role/$1/secret-id-accessor/destroy" secret_id_accessor="$a" >/dev/null || exit 1
+      done' sh "$1" ||
+    fail "the new $1 credentials are delivered, but old secret IDs could NOT be revoked; run the command again (runbook T11 section 8)"
+}
+
 # The role ID and a new secret ID go from the openbao container straight into the sidecar's volume
 # through a pipe: never a host file, a command line or an environment variable. The admin token
-# goes to the openbao container on stdin.
+# goes to the openbao container on stdin. The old secret IDs are revoked afterwards.
 cmd_litellm_credentials() {
   require_unsealed
   token="$(read_secret 'Admin or root token (hidden)')"
   [ -n "$token" ] || fail "no token given"
-  printf '%s\n' "$token" |
-    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
-      bao read -field=role_id auth/approle/role/litellm/role-id && echo &&
-      bao write -f -field=secret_id auth/approle/role/litellm/secret-id && echo' |
+  accessor="$(issue_secret_id litellm |
     compose --profile core --profile models run --rm -T --no-deps --user root --entrypoint sh \
       litellm-agent -c '
+      set -e
       umask 077
       IFS= read -r role_id || role_id=""
       IFS= read -r secret_id || secret_id=""
-      [ -n "$role_id" ] && [ -n "$secret_id" ] || { echo "no role ID or secret ID received" >&2; exit 1; }
+      IFS= read -r accessor || accessor=""
+      [ -n "$role_id" ] && [ -n "$secret_id" ] && [ -n "$accessor" ] ||
+        { echo "no role ID or secret ID received" >&2; exit 1; }
       printf "%s\n" "$role_id" >/openbao/approle/role_id
       printf "%s\n" "$secret_id" >/openbao/approle/secret_id
       chown -R openbao:openbao /openbao/approle
-      chmod 700 /openbao/approle' ||
+      chmod 700 /openbao/approle
+      printf "%s\n" "$accessor"')" ||
     fail "could not deliver the litellm credentials (token valid? OpenBao configured with the litellm AppRole?)"
-  say "litellm AppRole credentials written to the litellm-approle volume; restart litellm-agent to use them"
+  revoke_other_secret_ids litellm "$accessor"
+  say "litellm AppRole credentials written to the litellm-approle volume, old secret IDs revoked; restart litellm-agent to use them"
 }
 
 # Writes the role ID and a new secret ID of an AppRole straight into a volume of a platform
 # service: from the openbao container through a pipe, never a host file, a command line or an
 # environment variable. The platform services drop every capability; this one-shot root container
-# gets back only what it needs to write the files and give them to the user node. Needs $token.
+# gets back only what it needs to write the files and give them to the user node. It prints the
+# new accessor only after the files are written; then the old secret IDs are revoked. Needs $token.
 # deliver_approle <AppRole> <Compose service> <directory in the service> <profile>
 deliver_approle() {
-  printf '%s\n' "$token" |
-    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
-      bao read -field=role_id "auth/approle/role/$1/role-id" && echo &&
-      bao write -f -field=secret_id "auth/approle/role/$1/secret-id" && echo' sh "$1" |
+  accessor="$(issue_secret_id "$1" |
     compose --profile core --profile "$4" run --rm -T --no-deps --user root \
       --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "$2" -c '
       set -e
       umask 077
       IFS= read -r role_id || role_id=""
       IFS= read -r secret_id || secret_id=""
-      [ -n "$role_id" ] && [ -n "$secret_id" ] || { echo "no role ID or secret ID received" >&2; exit 1; }
+      IFS= read -r accessor || accessor=""
+      [ -n "$role_id" ] && [ -n "$secret_id" ] && [ -n "$accessor" ] ||
+        { echo "no role ID or secret ID received" >&2; exit 1; }
       printf "%s\n" "$role_id" >"$0/role_id"
       printf "%s\n" "$secret_id" >"$0/secret_id"
       chown -R node:node "$0"
-      chmod 700 "$0"' "$3" ||
+      chmod 700 "$0"
+      printf "%s\n" "$accessor"' "$3")" ||
     fail "could not deliver the $1 credentials (token valid? OpenBao configured with the $1 AppRole?)"
+  revoke_other_secret_ids "$1" "$accessor"
 }
 
 # The database password goes from the env file to the openbao container on stdin, after the admin
@@ -314,7 +350,7 @@ platform_credentials() {
       bao kv put -mount=kv "$1/database" password=- >/dev/null' sh "$role" ||
     fail "could not store kv/$role/database (token valid? OpenBao configured?)"
   deliver_approle "$role" "$service" /run/sdlc/approle "${3:-platform}"
-  say "kv/$role/database stored; $role AppRole credentials written to the $role-approle volume; restart $service to use them"
+  say "kv/$role/database stored; $role AppRole credentials written to the $role-approle volume, old secret IDs revoked; restart $service to use them"
 }
 
 # The worker also holds the Cost Controller capability (C06, ADR-M33 §2.5, QUESTIONS #112): the
@@ -322,7 +358,7 @@ platform_credentials() {
 # by platform_credentials.
 cost_controller_credentials() {
   deliver_approle cost-controller sdlc-worker /run/sdlc/cost-approle platform
-  say "cost-controller AppRole credentials written to the worker-cost-approle volume; restart sdlc-worker to use them"
+  say "cost-controller AppRole credentials written to the worker-cost-approle volume, old secret IDs revoked; restart sdlc-worker to use them"
 }
 
 cmd_api_credentials() { platform_credentials api sdlc-api; }
