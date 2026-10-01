@@ -3,15 +3,21 @@
 # GitHub Free: a private repository cannot make a check "required". A red check blocks the
 # merge by process only (PR template, Person B). After the GitHub Team upgrade, make the
 # `ci-ok` job the single required check (platform/GETTING-STARTED.md).
+#
+# Actions minutes (GitHub Free: 2,000 per month for the whole organization). GitHub bills every
+# job rounded up to a whole minute, so short checks share one job (`scan`). A push to main runs
+# nothing: the pull request already ran every check, and the daily run checks main again.
 name: ci
 
 on:
+  # Every branch, no path filter. ready_for_review: a draft skips the heavy jobs until then.
   pull_request:
-  push:
-    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   schedule:
-    - cron: '0 18 * * *' # nightly, 03:00 JST: new CVEs and the Compose core profile
-  workflow_dispatch:
+    # Keep these two strings equal to DAILY_CRON and WEEKLY_CRON below.
+    - cron: '0 18 * * 1-6' # daily, 03:00 JST: new CVEs; checks and db when main changed
+    - cron: '0 18 * * 0' # weekly, Monday 03:00 JST: every job, including the heavy ones
+  workflow_dispatch: # every job
 
 # Every job only reads the repository. Do not widen this without review.
 permissions:
@@ -38,10 +44,171 @@ env:
   SEMGREP_IMAGE: semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b
   # Infrastructure owned by task A02. The compose job runs only when this file exists.
   COMPOSE_FILE_PATH: platform/deploy/docker-compose.yml
+  DAILY_CRON: '0 18 * * 1-6'
+  WEEKLY_CRON: '0 18 * * 0'
 
 jobs:
+  # One job for the short checks (each one alone takes under a minute): what to run, then
+  # Gitleaks, Trivy and Semgrep. Every scanner runs even when an earlier one fails.
+  scan:
+    name: detect changes, secrets, dependencies, code
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      run_checks: ${{ steps.decide.outputs.run_checks }}
+      run_compose: ${{ steps.decide.outputs.run_compose }}
+      run_sandbox_image: ${{ steps.decide.outputs.run_sandbox_image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # gitleaks scans the full history; the change detection needs the base
+          persist-credentials: false
+      - id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          # all = every job runs (manual and weekly runs); daily = the daily run on main.
+          all=false; daily=false
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            all=true
+          elif [ "$EVENT_NAME" = schedule ] && [ "$SCHEDULE" = "$WEEKLY_CRON" ]; then
+            all=true
+          elif [ "$EVENT_NAME" = schedule ]; then
+            daily=true
+          fi
+
+          # checks and db: every pull request. The daily run skips them when main has no commit
+          # in the last 25 hours (the pull requests already ran them on that code).
+          checks=true; reason="always, except on a daily run without changes on main"
+          if [ "$daily" = true ] && [ -z "$(git log -1 --since='25 hours ago' --format=%H HEAD)" ]; then
+            checks=false; reason="daily run and main unchanged in the last 25 hours"
+          fi
+          echo "run_checks=$checks" >> "$GITHUB_OUTPUT"
+          echo "checks and db jobs: run=$checks ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # Heavy jobs: pull requests that change their paths (not while a draft), weekly and
+          # manual runs. They also wait for the checks job to pass.
+          # $1 = output name, $2 = label, $3 = reason when the paths changed, rest = paths.
+          decide_heavy() {
+            name=$1; label=$2; changed=$3; shift 3
+            run=false
+            if [ "$name" = run_compose ] && [ ! -f "$COMPOSE_FILE_PATH" ]; then
+              why="$COMPOSE_FILE_PATH does not exist yet (task A02)"
+            elif [ "$all" = true ]; then
+              run=true; why="$EVENT_NAME run"
+            elif [ "$daily" = true ]; then
+              why="daily run: the heavy jobs run on the weekly schedule"
+            elif [ "$DRAFT" = true ]; then
+              why="draft pull request: runs when marked ready for review"
+            elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+              run=true; why="base commit unknown, running to be safe"
+            elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "$@")" ]; then
+              run=true; why="$changed changed"
+            else
+              why="$changed unchanged"
+            fi
+            echo "$name=$run" >> "$GITHUB_OUTPUT"
+            echo "$label: run=$run ($why)" | tee -a "$GITHUB_STEP_SUMMARY"
+          }
+
+          # Infrastructure (A02, A03), the OpenBao client (A04), the LiteLLM adapter and Cost
+          # Controller (C03), the runner (C04), the intent workflow on Temporal (B07): their live
+          # tests need Docker.
+          decide_heavy run_compose "Compose integration job" \
+            "platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner, the intent workflow or a live test" \
+            platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts
+
+          # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
+          decide_heavy run_sandbox_image "Sandbox image job" \
+            "a sandbox image, the runner, the agent adapter, the package proxy or a live test" \
+            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/
+
+      # Gitleaks
+      - name: Install gitleaks
+        if: ${{ !cancelled() }}
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$archive"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
+      - name: Gitleaks rule self-test (sdlc-api-token, task B03)
+        if: ${{ !cancelled() }}
+        run: |
+          # A leaked platform token must be found; the fake fixture must stay allow-listed.
+          dir="$RUNNER_TEMP/gitleaks-selftest"
+          mkdir -p "$dir"
+          printf 'sdlc_pat_%s\n' "$(head -c 32 /dev/urandom | basenc --base64url | tr -d '=\n')" > "$dir/leak.txt"
+          if "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner --exit-code 1 "$dir"; then
+            echo "the sdlc-api-token rule did not find a platform token" >&2
+            exit 1
+          fi
+          "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner --exit-code 1 platform/tests/gitleaks
+      - name: Gitleaks scan (any finding blocks)
+        if: ${{ !cancelled() }}
+        run: |
+          status=0
+          # --log-opts HEAD: the full history of the checked-out commit only. The default (--all)
+          # would also scan other branches fetched by fetch-depth 0, such as open PRs of other tasks.
+          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --log-opts HEAD --redact --verbose --exit-code 1 \
+            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json" . || status=$?
+          count=$(jq length "$RUNNER_TEMP/gitleaks.json" 2>/dev/null || echo "unknown")
+          echo "### gitleaks: $count finding(s) (values redacted)" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      # Trivy (before Semgrep, which writes semgrep.json into the working tree)
+      - name: Install trivy
+        if: ${{ !cancelled() }}
+        run: |
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$archive" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$archive"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" trivy
+      - name: Trivy report (does not block)
+        if: ${{ !cancelled() }}
+        run: |
+          "$RUNNER_TEMP/trivy" fs --scanners vuln,misconfig --include-dev-deps \
+            --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" --ignorefile .trivyignore \
+            --disable-telemetry --skip-version-check --exit-code 0 \
+            --format table --output "$RUNNER_TEMP/trivy.txt" .
+          {
+            echo "### trivy: $TRIVY_REPORT_SEVERITY and $TRIVY_BLOCK_SEVERITY findings (only $TRIVY_BLOCK_SEVERITY blocks)"
+            echo '```text'
+            cat "$RUNNER_TEMP/trivy.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Trivy scan (severity CRITICAL blocks)
+        if: ${{ !cancelled() }}
+        run: |
+          "$RUNNER_TEMP/trivy" fs --scanners vuln,misconfig --include-dev-deps \
+            --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile .trivyignore \
+            --disable-telemetry --skip-version-check --exit-code 1 .
+
+      # Semgrep
+      - name: Semgrep scan (severity ERROR blocks)
+        if: ${{ !cancelled() }}
+        run: |
+          configs=""
+          for ruleset in $SEMGREP_RULESETS; do configs="$configs --config $ruleset"; done
+          status=0
+          # shellcheck disable=SC2086 # $configs is a list of flags
+          docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE" \
+            semgrep scan $configs --severity "$SEMGREP_BLOCK_SEVERITY" --error \
+            --metrics off --disable-version-check --json-output semgrep.json || status=$?
+          count=$(jq '.results | length' semgrep.json 2>/dev/null || echo "unknown")
+          echo "### semgrep: $count finding(s) at severity $SEMGREP_BLOCK_SEVERITY" >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
   checks:
     name: build, lint, test
+    needs: scan
+    # Runs even when a scanner failed. != 'false': runs when scan could not decide.
+    if: ${{ !cancelled() && needs.scan.outputs.run_checks != 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -68,61 +235,12 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -color
 
-  detect:
-    name: detect compose changes
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    outputs:
-      run_compose: ${{ steps.decide.outputs.run_compose }}
-      run_sandbox_image: ${{ steps.decide.outputs.run_sandbox_image }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - id: decide
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          run=false
-          if [ ! -f "$COMPOSE_FILE_PATH" ]; then
-            reason="$COMPOSE_FILE_PATH does not exist yet (task A02)"
-          elif [ "$EVENT_NAME" = schedule ] || [ "$EVENT_NAME" = workflow_dispatch ]; then
-            run=true; reason="$EVENT_NAME run"
-          elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            run=true; reason="base commit unknown, running to be safe"
-          # Infrastructure (A02, A03), the OpenBao client (A04), the LiteLLM adapter and Cost
-          # Controller (C03), the runner (C04), the intent workflow on Temporal (B07): their live
-          # tests need Docker.
-          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts)" ]; then
-            run=true; reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner, the intent workflow or a live test changed"
-          else
-            reason="platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner, the intent workflow and their live tests unchanged"
-          fi
-          echo "run_compose=$run" >> "$GITHUB_OUTPUT"
-          echo "Compose integration job: run=$run ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
-
-          # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
-          image=false
-          if [ "$EVENT_NAME" = schedule ] || [ "$EVENT_NAME" = workflow_dispatch ]; then
-            image=true; reason="$EVENT_NAME run"
-          elif ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            image=true; reason="base commit unknown, running to be safe"
-          elif [ -n "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/)" ]; then
-            image=true; reason="a sandbox image, the runner, the agent adapter, the package proxy or their live tests changed"
-          else
-            reason="sandbox images, runner, agent adapter, package proxy and their live tests unchanged"
-          fi
-          echo "run_sandbox_image=$image" >> "$GITHUB_OUTPUT"
-          echo "Sandbox image job: run=$image ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
-
   compose:
     name: integration (compose core)
-    needs: detect
-    # Shows as "skipped" (not passed) when detect says no.
-    if: needs.detect.outputs.run_compose == 'true'
+    # Starts only after scan and checks passed: no heavy run on a change that fails the checks.
+    needs: [scan, checks]
+    # Shows as "skipped" (not passed) when scan says no.
+    if: needs.scan.outputs.run_compose == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -181,8 +299,8 @@ jobs:
     # proxy. Nothing is pushed anywhere except a throw-away registry:2 on 127.0.0.1 inside the job:
     # no GHCR, no GitHub secrets, no keys.
     name: sandbox image (node24)
-    needs: detect
-    if: needs.detect.outputs.run_sandbox_image == 'true'
+    needs: [scan, checks]
+    if: needs.scan.outputs.run_sandbox_image == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -245,6 +363,9 @@ jobs:
     # Task A06: migrations and tenant isolation on a throw-away PostgreSQL (same image and init
     # script as Compose). Runs on every PR: DB code changes outside platform/deploy/ too.
     name: integration (database)
+    needs: scan
+    # Same condition as checks: only the daily run on an unchanged main skips it.
+    if: ${{ !cancelled() && needs.scan.outputs.run_checks != 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -269,102 +390,12 @@ jobs:
       - name: Intent workflow tests (Temporal test server + database)
         run: pnpm test:workflow
 
-  gitleaks:
-    name: secrets (gitleaks)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0 # scan the full history
-          persist-credentials: false
-      - name: Install gitleaks
-        run: |
-          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          curl -fsSLo "$RUNNER_TEMP/$archive" \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$archive"
-          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
-      - name: Rule self-test (sdlc-api-token, task B03)
-        run: |
-          # A leaked platform token must be found; the fake fixture must stay allow-listed.
-          dir="$RUNNER_TEMP/gitleaks-selftest"
-          mkdir -p "$dir"
-          printf 'sdlc_pat_%s\n' "$(head -c 32 /dev/urandom | basenc --base64url | tr -d '=\n')" > "$dir/leak.txt"
-          if "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner --exit-code 1 "$dir"; then
-            echo "the sdlc-api-token rule did not find a platform token" >&2
-            exit 1
-          fi
-          "$RUNNER_TEMP/gitleaks" dir --config .gitleaks.toml --redact --no-banner --exit-code 1 platform/tests/gitleaks
-      - name: Scan (any finding blocks)
-        run: |
-          status=0
-          # --log-opts HEAD: the full history of the checked-out commit only. The default (--all)
-          # would also scan other branches fetched by fetch-depth 0, such as open PRs of other tasks.
-          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --log-opts HEAD --redact --verbose --exit-code 1 \
-            --report-format json --report-path "$RUNNER_TEMP/gitleaks.json" . || status=$?
-          count=$(jq length "$RUNNER_TEMP/gitleaks.json" 2>/dev/null || echo "unknown")
-          echo "### gitleaks: $count finding(s) (values redacted)" >> "$GITHUB_STEP_SUMMARY"
-          exit "$status"
-
-  semgrep:
-    name: code (semgrep)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Scan (severity ERROR blocks)
-        run: |
-          configs=""
-          for ruleset in $SEMGREP_RULESETS; do configs="$configs --config $ruleset"; done
-          status=0
-          # shellcheck disable=SC2086 # $configs is a list of flags
-          docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE" \
-            semgrep scan $configs --severity "$SEMGREP_BLOCK_SEVERITY" --error \
-            --metrics off --disable-version-check --json-output semgrep.json || status=$?
-          count=$(jq '.results | length' semgrep.json 2>/dev/null || echo "unknown")
-          echo "### semgrep: $count finding(s) at severity $SEMGREP_BLOCK_SEVERITY" >> "$GITHUB_STEP_SUMMARY"
-          exit "$status"
-
-  trivy:
-    name: dependencies (trivy)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install trivy
-        run: |
-          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-          curl -fsSLo "$RUNNER_TEMP/$archive" \
-            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$archive"
-          echo "$TRIVY_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" trivy
-      - name: Report (does not block)
-        run: |
-          "$RUNNER_TEMP/trivy" fs --scanners vuln,misconfig --include-dev-deps \
-            --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" --ignorefile .trivyignore \
-            --disable-telemetry --skip-version-check --exit-code 0 \
-            --format table --output "$RUNNER_TEMP/trivy.txt" .
-          {
-            echo "### trivy: $TRIVY_REPORT_SEVERITY and $TRIVY_BLOCK_SEVERITY findings (only $TRIVY_BLOCK_SEVERITY blocks)"
-            echo '```text'
-            cat "$RUNNER_TEMP/trivy.txt"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Scan (severity CRITICAL blocks)
-        run: |
-          "$RUNNER_TEMP/trivy" fs --scanners vuln,misconfig --include-dev-deps \
-            --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile .trivyignore \
-            --disable-telemetry --skip-version-check --exit-code 1 .
-
   ci-ok:
     name: ci-ok
-    needs: [checks, detect, compose, sandbox-image, db, gitleaks, semgrep, trivy]
-    if: always()
+    needs: [scan, checks, compose, sandbox-image, db]
+    # The summary for pull requests (the future required check). Scheduled runs need no summary:
+    # a failed job there already marks the run red.
+    if: ${{ always() && github.event_name != 'schedule' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
