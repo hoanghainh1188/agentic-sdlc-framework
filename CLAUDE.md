@@ -161,6 +161,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
   - Tests: `pnpm test:db` (`intent-workflow-2.test.ts`), `pnpm test:workflow` (`intent-workflow-2.test.ts`, its own test environment).
   - `pnpm test:workflow-compose` — smoke test on the real Compose Temporal (sticky queues, workers stopped and started), own throw-away Compose project (ports +25000) and a throw-away platform PostgreSQL (CI `compose` job).
 - CI: `.github/workflows/ci.yml` (A09) runs the checks above, Gitleaks, Semgrep and Trivy, and the Compose `core` integration job. Actions are pinned by commit SHA; thresholds live in the workflow `env:`.
+  - Actions minutes are limited (GitHub Free, 2,000 per month for the organization; each job is billed rounded up to a whole minute). Triggers: pull requests, a daily run on `main`, a weekly run with every job, manual dispatch; no run on a push to `main`. Short checks share the `scan` job; do not add a job for a check under a minute. The heavy jobs (`compose`, `sandbox-image`) run only when their paths change, after `checks` passed, never on a draft pull request. Every job has `timeout-minutes`.
 
 ## Current constraints
 - At most 2 sessions at the same time (a docs PR session counts as one).
