@@ -121,6 +121,7 @@
 - C06 session 2b tests: archive parsing and attack cases, mirror, hardened git with a real repository, the archive guard, the S3 adapter (`pnpm test`); the driver's L1 paths, `finishRun`, `evidence_items` (`pnpm test:db`); the write-only identity against the real SeaweedFS, rotation (`pnpm test:runner-compose`).
 
 ### Changed
+- CI: fewer Actions minutes, same checks. Gitleaks, Trivy, Semgrep and the change detection share one `scan` job; no run on a push to `main` (a daily run checks `main` when it changed, a weekly run runs every job); `compose` and `sandbox-image` wait for `checks` and skip draft pull requests; `ci-ok` does not run on schedules; `timeout-minutes` on every job. `sandbox-image` runs weekly instead of nightly, as ADR-M25 §2.9 states.
 - CLAUDE.md `Current constraints` after B07 session 2 (#103) and B12 (#102), both merged: C06 next (critical path); also ready B04, B13, E04, R01. B12 used QUESTIONS #103–#106 and ADR-M32; `project_ai_record_versions` listed with the append-only tables; docs follow-up for QUESTIONS #103 (D-02 §3 vs handbook Ch.2 §2.5).
 - B07: CLAUDE.md `Current constraints`: session order (C05 sessions 1–2 merged; now B07 and C10; then C06), QUESTIONS blocks B07 #88–#92 and C10 #93–#97 (next free #98–#102), ADR-M30 (B07) and ADR-M31 (C10) (next free ADR-M32).
 - B07 session 2 (ADR-M30 0.3): HOTL at G2 and G3 (QUESTIONS #88 option A): a system `pass` when the conditions hold, the notice `hotl_passed` with the end of the block window; within `oversight.hotl_block_window` a person with the gate's role can reject or send back the passed gate (the intent returns, notice `returned`); no pass again on a sent-back input; `hotlBlockWindowOpenUntil` for C06.
@@ -142,6 +143,7 @@
 - Docs fixes (found during A01 planning): README task count 44 and codes table v1.3; leftover pre-2+N roles table removed from D-02 §3.
 - ADR-M16 accepted (Harry, 2026-09-25, with PR #46); design/README.md index updated.
 - CLAUDE.md: new `Current constraints` section (at most 2 parallel sessions, one task per session in its own worktree, A09 in parallel with A02, A03 waits for the OpenBao key holders).
+- QUESTIONS #140: `bootstrap.sh` `api-credentials`, `worker-credentials` (`worker`, `cost-controller`), `runner-credentials` and `litellm-credentials` now destroy every other secret ID of the AppRole after the new one is written (the accessor to keep comes from the create response). Before, the old secret ID stayed valid for up to 90 days. Live test `approle-rotation.test.ts` in `pnpm test:openbao`; ADR-M19 §2.5 and runbook T11 §8.1, new §8.3 (one process per AppRole; revoking an AppRole's tokens after a leak).
 
 ## [1.3.0-review] — 2026-09-24
 
