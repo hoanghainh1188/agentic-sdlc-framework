@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C06; session 1 merged in PR #105; session 2a in review: the Temporal `sdlc-runner` handoff and the run's end; session 2b: the L1 proposal as evidence) |
+| Status | **Proposed** (task C06; session 1 merged in PR #105; session 2a merged in PR #108: the Temporal `sdlc-runner` handoff and the run's end; session 2b in review: the L1 proposal as evidence) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27: QUESTIONS #108–#112, two sessions, with conditions on #111 and #112 and the rule for lost runs, §2.7; session 2 plan approved 2026-09-27: PRs 2a and 2b, D1–D3 with conditions, §2.6–§2.7, §2.9) |
 | Related | D-02 FR-03, FR-17, FR-19, FR-30…FR-36, FR-50; D-03 sections 6, 6.1, 7.1, 8, 8.2, 9 (version 1.11); D-05 sections 5, 6.2, 6.3 (version 1.15); D-08 tasks C06, C07, C08, C09, C11, E02; handbook codes table §3–§4, Ch.13 §13.5 Step 1 and §13.8, Ch.20; ADR-M22, ADR-M24, ADR-M25, ADR-M28, ADR-M29, ADR-M30, ADR-M31, ADR-M32; QUESTIONS #5, #6, #17, #21, #22, #32, #44, #53, #55, #79, #82, #88, #94, #108–#112 |
@@ -100,7 +100,7 @@ lost runner  → abandonRun    revoke the key at once, the run fails (runner_los
 - **Any other refusal of `prepareRun`** (the budget is used up, the proposal changed) takes the intent back to `in_gate G4` (notice `run_not_started`), where G4 is decided again; a HITL approval must be given again, because approvals count only after the last entry into G4.
 - **The runner is a Temporal worker** on `sdlc-runner` (`apps/runner/src/activities.ts`, settings `SDLC_RUNNER_TEMPORAL_ADDRESS`, `SDLC_RUNNER_TEMPORAL_NAMESPACE`). Its activity slots are `SDLC_RUNNER_MAX_SANDBOXES`, so extra runs wait in Temporal (tested with one slot and two intents); the slot pool stays as the backstop. `executeRun` reads the signed contract stored for the run (the input holds IDs only), provisions (C04), unwraps the virtual key, drives the agent (C05) and returns the run's final status as codes.
 - **What the Temporal history holds** (Harry, session 2 plan): IDs, codes, the model name, and the two single-use wrapping tokens. Their time to live is `run.contract_validity_minutes` (the contract's validity, never longer): a runner that takes the run later cannot unwrap them, and the contract has expired anyway. **The key ID never enters the history:** the run's key is revoked by its run (`ModelGateway.revokeRunKey`, LiteLLM `key_alias = run-<run_id>`, D-03 §7.4). The key ID is LiteLLM's hash of the key; the pinned LiteLLM refuses it as a key (live test `pnpm test:litellm`), but it stays out of Temporal anyway. The test reads the decoded history and finds neither the key, the key ID nor the GitHub token.
-- **L1 (High risk) runs wait for session 2b** (Harry): a decided L1 G4 does not move to `running`; the intent waits at G4 with the reason `proposal_runs_unavailable`, so no `proposal_ready` notice exists without a stored proposal.
+- **L1 (High risk) runs** waited at G4 in session 2a (`proposal_runs_unavailable`, Harry: no `proposal_ready` notice without a stored proposal). Session 2b removes that wait: a decided L1 G4 moves to `running` like L2, and the run ends with a stored proposal (§2.9).
 - **When the activity is cancelled** (the runner stops gracefully; the kill switch comes with C11), the driver stops the agent first, like at the time cap (interrupt, then kill), records `agent_stopped` (`cancelled`), ends the run `failed` (`agent_cancelled`), and only then is the sandbox removed (`release`): never a teardown while the agent is being driven (code review of session 2a). **After a runner restart**, its clean-up at start and its sweep remove what is left and end the run `runner_restarted` or `sandbox_lost` (ADR-M25 §2.8).
 - No escalation timer in the workflow (ADR-M28). The workflow code changed for new step outcomes only; old histories never saw them and replay unchanged (tested), so no `patched()` is needed.
 
@@ -110,6 +110,7 @@ lost runner  → abandonRun    revoke the key at once, the run fails (runner_los
 |---|---|
 | `succeeded`, `stopped_budget`, `stopped_scope`, `stopped_timeout`, `stopped_stalled` | `in_gate G5` (notice `run_finished`). C07 decides; a budget or scope stop never resumes by itself (QUESTIONS #21, #82) |
 | `failed` (the agent, provisioning, the infrastructure, `runner_lost`), or the contracts kept expiring | `paused` at G4 and a `technical` escalation (notice `run_failed`) |
+| `succeeded_proposal_only` (L1, session 2b) | `paused` at G4, no escalation (notice `proposal_ready` to Person A); it waits (`proposal_review`): Person A takes the proposal forward, no new run starts by itself (§2.9) |
 | `stopped_killed` | `paused` at G4, no escalation here: C11 raises its own |
 | `cancelled` before it started (`budget_exceeded`, `not_decided`, `prepare_failed`) | Back to `in_gate G4` (notice `run_not_started`) |
 
@@ -138,10 +139,60 @@ lost runner  → abandonRun    revoke the key at once, the run fails (runner_los
 
 Adding the default key `run.agent_key` changes the effective `config_hash` of every stored configuration (QUESTIONS #95). No configuration is stored outside tests yet; B13 AC8 handles it.
 
-### 2.9. Session 2b (planned): the L1 proposal as evidence (QUESTIONS #111, option A)
+### 2.9. Session 2b: the L1 proposal as evidence (QUESTIONS #111, option A)
 
-- The runner keeps its own clone until the run ends, pulls the working files out of the sandbox with Docker `GET /containers/{id}/archive` (a new endpoint, allowed only on the run's own sandbox container with this runner's instance label), and computes the diff there with the hardened git commands of ADR-M29 §2.5. The archive is untrusted: regular files and directories only, symlinks kept as symlinks and never followed, hardlinks, devices and path escapes refused, total size and file count capped; deletions are mirrored (files of the clone that are not in the archive are removed, `.git` excepted). C07 and C08 can reuse this to recompute changed files outside the sandbox.
-- The patch is stored through `EvidenceStore` (D-03 §7.5), the adapter `evidence-s3` (`@aws-sdk/client-s3`, exact version) on SeaweedFS, and `evidence_items` (kind `proposal`). The runner's `runner-evidence` credential lives in OpenBao (`kv/runner/…`), never in `.env`; it is write-only (no read, list or delete) and limited to a prefix where SeaweedFS allows it. If Write also allows delete: object keys are never overwritten (one path per run, refused if it exists), E02 re-checks the SHA-256, and bucket versioning is enabled if SeaweedFS supports it. Every remaining gap is recorded here; per-tenant credentials go to B13 / MVP+1.
+**Checks before building** (Harry, session 2b; throw-away containers, nothing kept, 2026-09-27):
+
+- `@aws-sdk/client-s3` **3.1141.0**, pinned exactly: 26 packages, none with an install script (nothing to allow in `pnpm.onlyBuiltDependencies`); a strict type-check with library types passes; licences Apache-2.0 (24), MIT (`bowser`), 0BSD (`tslib`): all allow commercial use. The CI Trivy licence scan runs on the lockfile.
+- **SeaweedFS 4.47** (the pinned image):
+
+  | Question | `Write:evidence` (bucket) | `Write:evidence/proposals/*` (prefix) |
+  |---|---|---|
+  | Write inside its scope | yes | yes |
+  | Write outside its prefix | — | refused |
+  | Read, Head, List, Copy | refused | refused |
+  | DeleteObject, DeleteObjects | **allowed** | **allowed inside the prefix** |
+  | Overwrite an existing key | allowed | allowed |
+  | `If-None-Match: *` on an existing key | refused (412) | refused (412) |
+  | Delete a specific version (`VersionId`) | **allowed** | **allowed inside the prefix** |
+  | Suspend versioning | **allowed** | refused |
+  | Delete the bucket, set a bucket policy | refused | refused |
+
+  - Versioning is supported (`weed shell s3.bucket.versioning -enable`): a plain delete leaves a delete marker and the older versions.
+  - Object lock (COMPLIANCE) is supported on a bucket created with it: even the admin cannot delete a locked version (403).
+  - A **dynamic** identity (`weed shell s3.configure … -apply`) is stored in the filer, survives a restart, and coexists with the admin identity from the environment. Its key can reach `weed shell` on stdin, never as a process argument. `s3.config.show` prints secrets: never used.
+
+**What 2b builds** (Harry's conditions):
+
+- The runner keeps its own clone of an L1 run until the run ends (`run-<run_id>` in its work folder, removed at release and by the clean-up at start). When the agent finished, the runner reads the sandbox's `/workspace` with Docker `GET /containers/{name}/archive`: a new endpoint of the runner's Docker client and the socket proxy, allowed only on the run's own sandbox container, after checking its name and this runner's instance and run labels.
+- The archive is untrusted:
+  - regular files and directories only; symbolic links are kept as links and never followed; hard links, devices, FIFOs and path escapes are refused;
+  - total size (`SDLC_RUNNER_WORKSPACE_MAX_MB`) and entry count are capped;
+  - every `.git` path is ignored, so the agent's `.git` never replaces the runner's;
+  - deletions are mirrored: a file of the clone that is not in the archive is removed (`.git` excepted).
+- The runner computes the proposal in its own clone with hardened git (no system or user configuration, no hooks, no fsmonitor, no replace objects, no external diff or textconv): `git add -A`, then `git diff --cached --binary --no-renames <base_sha>`. Nothing the sandbox reports is used. **C07 and C08 can reuse this export to recompute changed files outside the sandbox.**
+- The patch goes to SeaweedFS through `EvidenceStore` (D-03 §7.5) and the adapter `@sdlc/adapter-evidence-s3`, at `s3://evidence/proposals/<tenant>/<intent>/<run>.patch`, with `If-None-Match: *` (one path per run; never overwritten). A row in `evidence_items` (kind `proposal`, SHA-256, size) records it; E02 re-checks the SHA-256 when it builds the pack. The run ends `succeeded_proposal_only`; the intent is `paused` with the notice `proposal_ready` to Person A, who takes it forward (handbook Ch.13 §13.5 Step 4).
+- The runner's credential `runner-evidence` lives in OpenBao (`kv/runner/evidence`), never in `.env`; `openbao:bootstrap runner-evidence-credentials` creates it and applies it to SeaweedFS as a dynamic identity limited to `Write:evidence/proposals/*`. The bucket `evidence` gets versioning (`seaweedfs-init`).
+
+**As built** (session 2b):
+
+- **Runner:** `Runner` keeps the clone of an L1 run (`provisionRun` returns `cloneDir`) and gives the driver a `proposal` step when it has an evidence store. When the agent `finished`, the driver calls it instead of `commitWork`: `storeProposal` = `exportWorkspace` → `mirrorWorkspace` → `computeProposal` → `EvidenceStore.put` → one transaction with the `evidence_items` row (kind `proposal`) and the run event `proposal_stored` (SHA-256, size, number of changed paths; never the paths). The run ends `succeeded_proposal_only` with no `head_sha`; what the sandbox reports is not used. Without an evidence store the run fails `agent_proposal_unavailable`; any error while reading, computing or storing fails it `agent_proposal_failed` (the intent is paused and escalated like any failed run). An L1 run that stops at a cap goes to G5 like L2 (C07). The clone is removed at release, and by the clean-up at start (`run-*` in the work folder).
+- **Realistic workspaces** (Harry, review of PR #112): the archive is **streamed** (`DockerClient.getArchive` returns the response stream; `untarWorkspace` reads it with a byte reader), capped at `SDLC_RUNNER_EXPORT_MAX_MB` (default 8192) streamed bytes. Paths ignored by the ignore rules **of `base_sha`** are read past and never kept: one `git check-ignore --stdin -z --verbose --non-matching` process in the runner's clone, before the mirror, answers each path (`ignore.ts`; paths sent as `./<path>`, so pathspec magic never applies); an ignored directory (`node_modules/`) is skipped with everything under it, unless it holds a tracked path; paths git tracks at `base_sha` are never ignored; a path beyond a tracked link is kept without asking. A kept file is copied once, into a buffer of its size; only kept files count against `SDLC_RUNNER_WORKSPACE_MAX_MB`. Then `git add -A -f`, so a `.gitignore` the agent adds hides nothing (its change shows in the proposal), and `.git/info/attributes` unsets `text`, `eol`, `crlf`, `diff`, `filter`, `ident`, `merge` and `working-tree-encoding` for every path, so a `.gitattributes` from the workspace cannot turn a text change into an unreadable binary patch or convert line endings (git 2.39 in the runner image has no `--attr-source`). The mirror check covers `.git/config`, `.git/info/attributes` and `.git/info/exclude`. Measured on the pilot repository (`pnpm test:proposal-pilot`, 2026-09-28, a developer machine): after `pnpm install` the workspace held 317 MB (316 MB of `node_modules`) in 37 011 entries; the proposal (2 changed files, a 717-byte patch) took 5.5 s, and the runner process's peak resident memory rose by 44 MB (heap by 1 MB) against a workspace cap of 1024 MB.
+- **Case-insensitive file systems** (security review of 2b): `.git` is matched folded (NFC, invisible characters removed, lower case), so `.GIT/config` in the archive is never written into the runner's real `.git` on macOS, where it could set a git `alias` that runs a program. Two archive paths that fold to the same path are refused, and the SHA-256 of `.git/config` must be the same before and after the mirror.
+- **Symbolic links** in a proposal can point anywhere (they are kept as links, never followed by the runner). Whoever applies a proposal later (Person A, C07, C08, E02) must not follow them blindly.
+- **Docker:** the runner's allowlist and the socket proxy's allow `GET /containers/sdlc-sandbox-<uuid>/archive` only (a run sandbox name; the static test keeps the two lists equal); `exportWorkspace` also checks the container's name and this runner's instance and run labels before reading.
+- **Settings:** `SDLC_RUNNER_EVIDENCE_URL` (default `http://seaweedfs:8333`; `off` = no proposals), `SDLC_RUNNER_EVIDENCE_BUCKET` (`evidence`), `SDLC_RUNNER_EVIDENCE_SECRET_PATH` (`runner/evidence`, fields `access_key`, `secret_key`). A missing credential is a warning at start (`runner.evidence_missing`), not a failure.
+- **Bootstrap:** `openbao:bootstrap runner-evidence-credentials` makes the key pair inside the openbao container, stores it at `kv/runner/evidence` (JSON on stdin) and pipes the `s3.configure … -actions Write:evidence/proposals/* -apply` line to `weed shell` on its stdin; `weed shell` output (it prints secrets) is discarded, and the check reads the identity's name only and the KV version. The old identity is deleted first, so a rotation disables the old key (live test). `seaweedfs-init` enables versioning on `evidence` (`SEAWEEDFS_VERSIONED_BUCKETS`) and checks it.
+- **Core:** `finishRun` moves `succeeded_proposal_only` to `paused` G4 with the notice `proposal_ready`; `stepPaused` then waits (`proposal_review`). How Person A records a decision on the proposal (a new intent, a manual change, a rejection) is not built here; the handbook Ch.13 §13.10 describes the manual path.
+- **Data:** migration `0012-evidence-items` (D-05 §6.6 version 1.17).
+- **Tests:** untar attack cases and a real system tar archive, mirror (links never followed, `.git` kept, deletions mirrored), `computeProposal` with real git (a tampered repository configuration never runs a program; the binary patch applies at `base_sha`), the archive guard, the S3 adapter against a stub, the driver's L1 paths, `finishRun` and the step on PostgreSQL, and the live runner Compose test: the identity writes under `proposals/` only, cannot read or overwrite, a delete keeps the versions, a rotation disables the old key.
+
+**Remaining gaps** (recorded as Harry asked):
+
+1. **Write includes delete.** SeaweedFS has no write-only action: the runner's credential can delete, and delete a specific version of, any object under `proposals/`. It cannot touch anything else in the bucket (E02 packs), cannot read or list, and cannot suspend versioning. Mitigations: `If-None-Match: *`, versioning (a plain delete keeps the versions), the SHA-256 in `evidence_items` checked by E02. **Object lock: not now** (Harry, review of PR #112). SeaweedFS supports it (COMPLIANCE) on a bucket created with lock enabled; the lock period is per bucket or per object while the retention is per project and `retention_hold` must keep objects longer. The question moved to a note on E05 (D-08).
+2. **No per-tenant limit.** One static identity covers `proposals/` for every tenant. Per-tenant identities (issued at onboarding) go to B13 / MVP+1.
+3. The admin identity of SeaweedFS still comes from `.env` (A02); unchanged here.
+4. **The evidence secret is on disk inside SeaweedFS** (checked on the pinned image, review of PR #112). `weed shell` without a terminal writes no history file, and neither the container logs nor the glog files show the secret after `s3.configure`. But SeaweedFS keeps dynamic identities, secret keys included, in plain text in its filer store (`/data/filerldb2` on the volume `seaweedfs-data`). Whoever can read that volume (or its backups, A10) can read the key; the same volume holds the evidence the key protects. **Possible follow-up:** static identities rendered by an OpenBao Agent sidecar into a tmpfs file for `-s3.config`, as for LiteLLM (ADR-M24), so no S3 secret is written to disk; it would replace the admin identity from `.env` too (gap 3).
 
 ## 3. Alternatives considered
 
@@ -160,6 +211,7 @@ Adding the default key `run.agent_key` changes the effective `config_hash` of ev
 - Commands: `/approve G4`, `/reject G4`, `/request-changes G4` and the API gate decisions accept G4 (when it waits for a person).
 - Handbook Ch.13 §13.10: G4 usage.
 - Session 1 did not wire G4 into the worker process. Session 2a does: the worker evaluates G4 and hands runs to the runner when its second AppRole `cost-controller` is delivered (`openbao:bootstrap worker-credentials`); without it, runs are off and intents wait at G4 (`worker.runs_off`).
+- Session 2b: D-03 1.13 (§6 L1 runs, §7.5 `EvidenceStore` as built, §10), D-05 1.17 (§6.6 `evidence_items`, notice kind `proposal_ready`, run event `proposal_stored`, stop reasons), D-08 1.11 (C07, C08, E02 notes), migration `0012-evidence-items`, `@sdlc/adapter-evidence-s3` (`@aws-sdk/client-s3` 3.1141.0, pinned), Compose (runner evidence settings, socket-proxy archive read, `evidence` versioning), bootstrap `runner-evidence-credentials`, runbook T11 §5g, handbook Ch.13 §13.10.
 - Session 2a: D-03 1.12 (§6 the run's round, §7.4 `revokeRunKey`, §10 the runner's task queue), D-05 1.16 (notice kinds `run_started`, `run_finished`, `run_failed`, `run_not_started`, `run_resumed`; run stop reasons), config `run.contract_attempts_max`, `run.failed_run_escalation`, rule M20 (the default `config_hash` changes), Compose (worker `worker-cost-approle`, runner Temporal settings), runbook T11 §5f, handbook Ch.13 §13.10.
 
 ## Version history
@@ -168,3 +220,4 @@ Adding the default key `run.agent_key` changes the effective `config_hash` of ev
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task C06, session 1) | First version: §2.1–§2.5 built; §2.6–§2.7 planned for session 2 |
 | 0.2 | 2026-09-27 | Claude (task C06, session 2a) | §2.4 check 7 includes the tenant's monthly budget; §2.6 the handoff as built (a cancel stops the agent before the sandbox is removed) (the round from the database, no run twice, the re-check after signing, what the history holds, L1 waits); §2.7 how a run ends, lost runs, back from `paused`; §2.9 session 2b plan with Harry's conditions |
+| 0.3 | 2026-09-27 | Claude (task C06, session 2b) | §2.6 L1 no longer waits; §2.7 `succeeded_proposal_only` → `paused` (`proposal_ready`); §2.9 SeaweedFS and `@aws-sdk/client-s3` checks, as built, remaining gaps; §4 consequences of 2b |

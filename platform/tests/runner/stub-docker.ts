@@ -18,6 +18,8 @@ interface StubContainer {
   spec: Record<string, unknown>;
   running: boolean;
   archives: string[];
+  /** Answer of `GET /containers/{id}/archive` (a tar), when a test sets it. */
+  exported?: Buffer;
 }
 
 export class StubDocker {
@@ -195,6 +197,11 @@ export class StubDocker {
       x.archives.push(c.query.path!);
       return [200, ''];
     }
+    if (m === 'GET' && (match = /^\/containers\/([^/]+)\/archive$/.exec(p))) {
+      const x = container(match[1]!);
+      if (!x?.exported) return [404, {}];
+      return [200, x.exported];
+    }
     if (m === 'GET' && (match = /^\/containers\/([^/]+)\/json$/.exec(p))) {
       const x = container(match[1]!);
       if (!x) return [404, {}];
@@ -203,6 +210,7 @@ export class StubDocker {
         {
           Id: x.id,
           Name: `/${x.name}`,
+          Config: { Labels: (x.spec.Labels as Record<string, string> | undefined) ?? null },
           State: {
             Status: x.running ? 'running' : 'created',
             Running: x.running,
@@ -242,6 +250,11 @@ function matches(
 }
 
 function send(res: http.ServerResponse, status: number, payload: unknown): void {
+  if (Buffer.isBuffer(payload)) {
+    res.writeHead(status, { 'content-type': 'application/x-tar' });
+    res.end(payload);
+    return;
+  }
   const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(body);

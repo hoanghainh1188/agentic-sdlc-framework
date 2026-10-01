@@ -82,6 +82,8 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.run_not_started';
     case 'run_resumed':
       return 'intent.status.run_resumed';
+    case 'proposal_ready':
+      return 'intent.status.proposal_ready';
     default:
       return notice.gate !== null && isCommandGate(notice.gate)
         ? 'intent.status.advanced'

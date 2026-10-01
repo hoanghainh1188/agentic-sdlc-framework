@@ -3,7 +3,9 @@
 #   evidence  Evidence Packs and run logs (D-05 section 6.6). No lifecycle rule here:
 #             retention is evidence_retention_days in project config (A05, E05).
 #   langfuse  Langfuse event and media uploads (observability profile).
-# Safe to re-run: existing buckets are kept.
+# Buckets in SEAWEEDFS_VERSIONED_BUCKETS get versioning (C06 session 2b, design/ADR-M33 §2.9):
+# a delete by the runner's write-only identity leaves a delete marker and keeps the versions.
+# Safe to re-run: existing buckets are kept; enabling versioning again changes nothing.
 set -eu
 
 : "${SEAWEEDFS_BUCKETS:?}"
@@ -26,4 +28,16 @@ for bucket in $SEAWEEDFS_BUCKETS; do
     echo "s3.bucket.create -name $bucket" | weed shell -master=seaweedfs:9333
     echo "seaweedfs-init: bucket $bucket created"
   fi
+done
+
+for bucket in ${SEAWEEDFS_VERSIONED_BUCKETS:-}; do
+  echo "s3.bucket.versioning -name $bucket -enable" | weed shell -master=seaweedfs:9333 >/dev/null
+  state="$(echo "s3.bucket.versioning -name $bucket" | weed shell -master=seaweedfs:9333 2>/dev/null)"
+  case "$state" in
+    *'Versioning: Enabled'*) echo "seaweedfs-init: bucket $bucket versioned" ;;
+    *)
+      echo "seaweedfs-init: versioning of bucket $bucket could not be enabled" >&2
+      exit 1
+      ;;
+  esac
 done

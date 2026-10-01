@@ -5,7 +5,7 @@
 | Status | **Proposed** (task A03, PR for review) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25, with changes) |
-| Related | D-03 sections 8, 8.1, 8.2, 10.2; D-08 tasks A03, A11; ADR-M05, ADR-M17; handbook Ch.3; runbook T11; QUESTIONS #1, #2, #20, #27, #37, #42 |
+| Related | D-03 sections 8, 8.1, 8.2, 10.2; D-08 tasks A03, A11; ADR-M05, ADR-M17; handbook Ch.3; runbook T11; QUESTIONS #1, #2, #20, #27, #37, #42, #140 |
 
 ## 1. Context
 
@@ -73,6 +73,9 @@ Who may read what is **only** in `bootstrap/policies/<name>.hcl`. The scripts co
 - The subnet and the gateway are fixed in Compose (`SDLC_NETWORK_SUBNET`, default `172.30.0.0/24`; `SDLC_NETWORK_GATEWAY`, default `172.30.0.1`) so that they do not change when the network is recreated. `configure` reads both from the running network and binds the roles to the subnet minus the gateway (`openbao/cidr-exclude.sh`: one CIDR block per host bit, for example 8 blocks for a `/24`).
 - `configure` writes the roles again on every run. This keeps `role_id` and the secret IDs already issued (live test, AC4).
 - `configure` does **not** issue secret IDs. Delivering them to the processes belongs to A04 and to the deployment of the platform processes.
+- Rotation (QUESTIONS #140): `api-credentials`, `worker-credentials` (AppRoles `worker` and `cost-controller`), `runner-credentials` and `litellm-credentials` issue a new secret ID, write it into the service's volume, and **then** destroy every other secret ID of the AppRole. The secret ID to keep is named by the accessor from the same create response, never guessed by order or time. When the delivery fails, nothing is destroyed. When destroying fails, the command fails and says so; running it again finishes the job. Live test: `platform/tests/integration/openbao/approle-rotation.test.ts` (all five AppRoles: after a rotation the role has one secret ID, the new one logs in, the old one is refused).
+- **One process per AppRole.** A rotation leaves exactly one valid secret ID, so a second instance of a service with its own secret ID would lose it at the next rotation. Running several instances of a service needs a new design (for example one AppRole per instance).
+- Tokens already issued from an old secret ID stay valid until their TTL (1 hour, at most 4 hours). After a leak: rotate at once and, if needed, revoke the role's tokens (runbook T11 §8.3).
 
 ### 2.6. Key-holder listener
 
@@ -131,3 +134,4 @@ Since C04 (QUESTIONS #44, ADR-M25 §2.11) the `runner` policy can **not** read t
 | 0.4 | 2026-09-26 | Claude (task B05), approved by Harry | §2.4: `worker` also reads `shared/github-app` (it polls GitHub, posts gate comments, reads spec files; QUESTIONS #42) |
 | 0.5 | 2026-09-26 | Claude (task C03), approved by Harry | §2.3, §2.4: AppRole `litellm` for the LiteLLM sidecar (provider keys, salt key, the master key path); §3 open item done (QUESTIONS #1, ADR-M24) |
 | 0.6 | 2026-09-27 | Claude (task C04), approved by Harry | §2.4, §2.8: the `runner` AppRole no longer reads `shared/github-app`; the worker hands it a response-wrapped token; `worker.hcl` gets `sys/wrapping/wrap` (QUESTIONS #44, ADR-M25) |
+| 0.7 | 2026-09-30 | Claude (test maintenance), approved by Harry | §2.5: a rotation destroys every other secret ID of the AppRole after the delivery (accessor from the create response); one process per AppRole; tokens of an old secret ID stay valid until their TTL, revoke them after a leak (QUESTIONS #140, runbook T11 §8.3) |

@@ -3,10 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Evidence store adapter: S3 API (SeaweedFS). See design/D-03 section 7.",
+  "description": "Evidence store adapter: S3 API (SeaweedFS). See design/D-03 section 7.5, ADR-M33 \u00a72.9.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1141.0",
+    "@sdlc/contracts": "workspace:*"
+  }
 }

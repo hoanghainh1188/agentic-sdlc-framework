@@ -25,6 +25,7 @@ export const RUNNER_ENV = {
   gitTimeoutSeconds: 'SDLC_RUNNER_GIT_TIMEOUT_SECONDS',
   workDir: 'SDLC_RUNNER_WORK_DIR',
   workspaceMaxMb: 'SDLC_RUNNER_WORKSPACE_MAX_MB',
+  exportMaxMb: 'SDLC_RUNNER_EXPORT_MAX_MB',
   readyTimeoutSeconds: 'SDLC_RUNNER_READY_TIMEOUT_SECONDS',
   sweepIntervalSeconds: 'SDLC_RUNNER_SWEEP_INTERVAL_SECONDS',
   selfContainer: 'SDLC_RUNNER_SELF_CONTAINER',
@@ -86,6 +87,12 @@ export interface RunnerSettings {
   readonly workDir: string;
   /** Largest workspace the runner uploads (file content, `.git` included). */
   readonly workspaceMaxBytes: number;
+  /**
+   * Largest archive the runner reads out of a sandbox for an L1 proposal (C06 session 2b), ignored
+   * paths such as `node_modules` included. Streamed, never held in memory; only the files kept
+   * for the proposal count against `workspaceMaxBytes`.
+   */
+  readonly exportMaxBytes: number;
   /** How long the runner waits for the sandbox health check. */
   readonly readyTimeoutMs: number;
   /** How often the runner removes objects of runs it does not hold (ADR-M25 §2.8). */
@@ -104,6 +111,7 @@ export const DEFAULTS = {
   gitBaseUrl: 'https://github.com',
   gitTimeoutSeconds: 300,
   workspaceMaxMb: 1024,
+  exportMaxMb: 8192,
   readyTimeoutSeconds: 120,
   sweepIntervalSeconds: 300,
   agentPort: 8000,
@@ -280,6 +288,7 @@ export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Run
     workDir: workDir(env[RUNNER_ENV.workDir]),
     workspaceMaxBytes:
       intSetting(env, RUNNER_ENV.workspaceMaxMb, DEFAULTS.workspaceMaxMb, 1, 16_384) * MIB,
+    exportMaxBytes: intSetting(env, RUNNER_ENV.exportMaxMb, DEFAULTS.exportMaxMb, 1, 65_536) * MIB,
     readyTimeoutMs:
       intSetting(env, RUNNER_ENV.readyTimeoutSeconds, DEFAULTS.readyTimeoutSeconds, 5, 1800) * 1000,
     sweepIntervalMs:

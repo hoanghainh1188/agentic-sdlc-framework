@@ -52,6 +52,15 @@ export interface AgentDriveDeps {
   readonly sleep?: (ms: number) => Promise<void>;
   /** Default: the sandbox name on the run's network. Tests reach the Agent Server another way. */
   readonly agentUrl?: (runId: string) => string;
+  /**
+   * L1 runs (C06 session 2b, ADR-M33 §2.9): computes the proposal from the sandbox's workspace in
+   * the runner's own clone and stores it as evidence; returns the number of changed paths. Without
+   * it an L1 run that finished fails (`proposal_unavailable`).
+   */
+  readonly proposal?: (
+    contract: RunContract,
+    sandbox: Sandbox,
+  ) => Promise<{ changedFiles: number }>;
 }
 
 export interface AgentRunRequest {
@@ -206,6 +215,8 @@ async function endRun(
     readonly iterations: number | undefined;
     readonly outputs: AgentOutputs | undefined;
     readonly commit: 'committed' | 'nothing' | undefined;
+    /** L1: the changed paths of the proposal, computed by the runner. */
+    readonly changedFiles?: number;
   },
 ): Promise<RunStatus | undefined> {
   const now = nowOf(deps);
@@ -223,7 +234,9 @@ async function endRun(
     iterations: change.iterations ?? 0,
     ...(change.outputs
       ? { changed_files: change.outputs.changedFiles.length, head_sha: change.outputs.headSha }
-      : {}),
+      : change.changedFiles === undefined
+        ? {}
+        : { changed_files: change.changedFiles }),
     ...(change.commit ? { commit: change.commit } : {}),
   });
   return moved ? change.status : undefined;
@@ -328,9 +341,20 @@ export async function driveAgent(
 
   let commit: 'committed' | 'nothing' | undefined;
   let outputs: AgentOutputs | undefined;
+  // L1: the result is a proposal, never a commit or a push (FR-03, T09, ADR-M33 §2.9).
+  const proposalOnly = contract.autonomy_level === 'L1';
+  let proposed: { changedFiles: number } | undefined;
+  if (reachable && outcome === 'finished' && proposalOnly) {
+    if (!deps.proposal) return failRun(deps, scope, contract, 'proposal_unavailable');
+    try {
+      proposed = await deps.proposal(contract, sandbox);
+    } catch {
+      return failRun(deps, scope, contract, 'proposal_failed');
+    }
+  }
   if (reachable) {
     try {
-      if (outcome === 'finished') {
+      if (outcome === 'finished' && !proposalOnly) {
         const done = await deps.adapter.commitWork(handle, {
           branch: contract.branch,
           author: agentCommitAuthor(contract),
@@ -345,17 +369,21 @@ export async function driveAgent(
     }
   }
 
-  const status = STATUS_OF[outcome as Exclude<AgentOutcome, 'failed'>];
+  const status: RunStatus = proposed
+    ? 'succeeded_proposal_only'
+    : STATUS_OF[outcome as Exclude<AgentOutcome, 'failed'>];
   const stopReason = STOP_REASON_OF[outcome as Exclude<AgentOutcome, 'failed'>];
   const set = await endRun(deps, scope, contract, {
     outcome,
     status,
     stopReason,
     iterations,
-    outputs,
+    // What the sandbox reports is not the result of an L1 run: no head commit is recorded.
+    outputs: proposalOnly ? undefined : outputs,
     commit,
+    ...(proposed ? { changedFiles: proposed.changedFiles } : {}),
   });
-  return { outcome, status: set, stopReason, outputs };
+  return { outcome, status: set, stopReason, outputs: proposalOnly ? undefined : outputs };
 }
 
 function failureCode(error: unknown): string {

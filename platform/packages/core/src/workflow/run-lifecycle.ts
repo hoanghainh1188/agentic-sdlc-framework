@@ -20,6 +20,9 @@
 // - `failed` (the agent, provisioning or the infrastructure) or too many expired contracts →
 //   `paused` and a `technical` escalation at `run.failed_run_escalation` (at least `pause`, rule
 //   M20; Harry, C06 plan: "Stopped → Escalated: always reviewed", D-03 §6);
+// - `succeeded_proposal_only` (L1: the runner stored the proposal as evidence, session 2b) →
+//   `paused` with the notice `proposal_ready`; Person A takes the proposal forward (handbook
+//   Ch.13 §13.5 Step 4); the intent waits (`proposal_review`);
 // - `stopped_killed` → `paused`; the kill switch (C11) raises its own escalation;
 // - `cancelled` for another reason (budget, the proposal changed) → back to `in_gate G4`, where
 //   G4 is decided again.
@@ -117,7 +120,9 @@ export async function stepRunning(
 
 /**
  * The step while the intent is `paused` at G4 after a failed run: back to G4 once the run's
- * escalation lets a run start; otherwise wait (`run_review`). Under the intent lock.
+ * escalation lets a run start; otherwise wait (`run_review`). After an L1 proposal the intent
+ * waits for a person (`proposal_review`): the proposal is taken forward outside the run (handbook
+ * Ch.13 §13.5 Step 4), never by a new run. Under the intent lock.
  */
 export async function stepPaused(
   tx: TenantScope,
@@ -126,6 +131,9 @@ export async function stepPaused(
 ): Promise<IntentStepResult | 'resume'> {
   const latest = (await tx.runs.listForIntent(intent.id)).at(-1);
   if (!latest) return 'resume';
+  if (latest.status === 'succeeded_proposal_only') {
+    return { outcome: 'waiting', reason: 'proposal_review' };
+  }
   const now = registry.now();
   const escalation = (await tx.escalations.listForIntent(intent.id))
     .filter((e) => e.run_id === latest.id)
@@ -229,6 +237,8 @@ export async function finishRun(
     const { registry } = deps;
     if (TO_G5.includes(run.status)) {
       await moveTo(tx, registry, intent, 'in_gate', 'G5', 'run_finished');
+    } else if (run.status === 'succeeded_proposal_only') {
+      await moveTo(tx, registry, intent, 'paused', 'G4', 'proposal_ready');
     } else if (run.status === 'stopped_killed') {
       await moveTo(tx, registry, intent, 'paused', 'G4', 'run_failed');
     } else if (
@@ -239,7 +249,6 @@ export async function finishRun(
       await moveTo(tx, registry, intent, 'paused', 'G4', 'run_failed');
     } else {
       // `cancelled` before the run started (budget, the proposal changed): G4 decides again.
-      // `succeeded_proposal_only` cannot happen before session 2b (L1 runs wait at G4).
       await moveTo(tx, registry, intent, 'in_gate', 'G4', 'run_not_started');
     }
   });

@@ -6,7 +6,9 @@ export type AgentRunFailure =
   | 'runner_not_attachable' // no runner container configured, or the run's network is gone
   | 'model_unreachable' // LiteLLM is not in the contract's egress list
   | 'task_unavailable' // the plan or the spec of the run cannot be loaded, or they differ
-  | 'run_not_running'; // the run is not `running` (not provisioned, or stopped meanwhile)
+  | 'run_not_running' // the run is not `running` (not provisioned, or stopped meanwhile)
+  | 'proposal_unavailable' // an L1 run finished, but this runner cannot store proposals (C06)
+  | 'proposal_failed'; // the proposal could not be computed or stored (C06, ADR-M33 §2.9)
 
 export class AgentRunError extends RunnerError {
   constructor(readonly reason: AgentRunFailure) {

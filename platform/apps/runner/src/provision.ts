@@ -77,6 +77,12 @@ export type ProvisionResult =
       readonly ok: true;
       readonly contract: RunContract;
       readonly sandbox: Sandbox;
+      /**
+       * The runner's own clone of an L1 run (`<workDir>/run-…` with `repo` and `home`), kept until
+       * the run ends to compute the proposal outside the sandbox (C06 session 2b, ADR-M33 §2.9);
+       * the caller removes it. Null for other runs: their clone is removed at once.
+       */
+      readonly cloneDir: string | null;
     }
   | {
       readonly ok: false;
@@ -137,6 +143,9 @@ export async function provisionRun(
   }
 
   const workDir = fs.mkdtempSync(path.join(ensureDir(deps.settings.workDir), 'run-'));
+  // L1: the clone stays for the proposal (C06 session 2b); the token was only in git's environment.
+  const keepClone = contract.autonomy_level === 'L1';
+  let kept = false;
   let sandboxCreated = false;
   try {
     const token = await unwrapToken(deps.unwrapper, request.wrappedGitToken);
@@ -158,7 +167,7 @@ export async function provisionRun(
       base_sha: contract.base_sha,
       duration_ms: Date.now() - cloneStarted,
     });
-    fs.rmSync(workDir, { recursive: true, force: true });
+    if (!keepClone) fs.rmSync(workDir, { recursive: true, force: true });
 
     const startStarted = Date.now();
     sandboxCreated = true;
@@ -189,7 +198,8 @@ export async function provisionRun(
     await scope.runEvents.append(runId, 'sandbox_ready', {
       duration_ms: Date.now() - startStarted,
     });
-    return { ok: true, contract, sandbox };
+    kept = keepClone;
+    return { ok: true, contract, sandbox, cloneDir: keepClone ? workDir : null };
   } catch (error) {
     const reason = failureOf(error);
     try {
@@ -199,7 +209,7 @@ export async function provisionRun(
     }
     return { ok: false, reason, runId };
   } finally {
-    fs.rmSync(workDir, { recursive: true, force: true });
+    if (!kept) fs.rmSync(workDir, { recursive: true, force: true });
   }
 }
 

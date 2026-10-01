@@ -11,6 +11,7 @@
   ],
   "dependencies": {
     "@sdlc/adapter-agent-openhands": "workspace:*",
+    "@sdlc/adapter-evidence-s3": "workspace:*",
     "@sdlc/contracts": "workspace:*",
     "@sdlc/core": "workspace:*",
     "@sdlc/messages": "workspace:*",

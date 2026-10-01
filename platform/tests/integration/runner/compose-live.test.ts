@@ -6,7 +6,10 @@
 // `bootstrap.sh runner-credentials` stores the platform_app password at kv/runner/database and
 // delivers the runner's AppRole credentials. The runner reaches Docker through the socket proxy
 // only, cleans up at start (a leftover object of its instance is removed, one of another instance
-// stays) and turns healthy through its heartbeat file. Key shares, tokens and passwords are
+// stays) and turns healthy through its heartbeat file. C06 session 2b: `bootstrap.sh
+// runner-evidence-credentials` gives the runner a SeaweedFS identity that may only write under
+// `evidence/proposals/` (no read, no overwrite, versions kept after a delete; a rotation
+// disables the old key). Key shares, tokens and passwords are
 // THROW-AWAY TEST KEYS: kept in variables, never printed, never in an assertion message.
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -14,6 +17,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { DeleteObjectCommand, ListObjectVersionsCommand, S3Client } from '@aws-sdk/client-s3';
+import { S3EvidenceStore } from '@sdlc/adapter-evidence-s3';
+import type { RedactedSecret } from '@sdlc/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { LABELS, MANAGED_BY } from '../../../apps/runner/src/index.js';
@@ -54,6 +60,48 @@ describe.skipIf(!enabled)(
     const redact = (text: string): string =>
       secrets.reduce((acc, s) => acc.split(s).join('<redacted>'), text);
     let rootToken = '';
+    let s3Url = '';
+    let admin: { accessKeyId: string; secretAccessKey: string } | undefined;
+    const secret = (value: string): RedactedSecret =>
+      ({ reveal: () => value, toString: () => '[redacted]' }) as RedactedSecret;
+    /** The runner's evidence keys, read from OpenBao with the throw-away root token. */
+    const evidenceKeys = (): { access_key: string; secret_key: string } => {
+      const composeArgs = ['compose', '-f', path.join(deployDir, 'docker-compose.yml')];
+      const read = run(
+        'docker',
+        [
+          ...composeArgs,
+          '--env-file',
+          envFile,
+          '--profile',
+          'core',
+          'exec',
+          '-T',
+          'openbao',
+          'sh',
+          '-c',
+          'IFS= read -r BAO_TOKEN && export BAO_TOKEN BAO_ADDR=http://127.0.0.1:8200 && ' +
+            'bao kv get -mount=kv -format=json -field=data runner/evidence',
+        ],
+        `${rootToken}\n`,
+      );
+      const data = JSON.parse(ok(read, 'kv get runner/evidence').stdout) as {
+        access_key: string;
+        secret_key: string;
+      };
+      keep(data.access_key);
+      keep(data.secret_key);
+      return data;
+    };
+    const runnerStore = (keys: { access_key: string; secret_key: string }, keyPrefix: string) =>
+      new S3EvidenceStore({
+        endpoint: s3Url,
+        bucket: 'evidence',
+        keyPrefix,
+        accessKeyId: secret(keys.access_key),
+        secretAccessKey: secret(keys.secret_key),
+        timeoutMs: 10_000,
+      });
 
     const run = (cmd: string, args: string[], input = '', env: NodeJS.ProcessEnv = {}): Result => {
       const r = spawnSync(cmd, args, {
@@ -130,6 +178,11 @@ describe.skipIf(!enabled)(
       const env = parseEnvFile(text);
       keep(env.get('PLATFORM_APP_DB_PASSWORD')!);
       keep(env.get('PLATFORM_DB_PASSWORD')!);
+      admin = {
+        accessKeyId: keep(env.get('SEAWEEDFS_S3_ACCESS_KEY')!),
+        secretAccessKey: keep(env.get('SEAWEEDFS_S3_SECRET_KEY')!),
+      };
+      s3Url = `http://127.0.0.1:${env.get('SEAWEEDFS_S3_HOST_PORT')!}`;
 
       ok(compose('--profile', 'core', 'up', '-d', '--wait', 'openbao', 'postgres'), 'compose up');
       const init = ok(bootstrapCmd(['init', '--stdout-not-tty']), 'init');
@@ -160,6 +213,12 @@ describe.skipIf(!enabled)(
       volume(foreign, labels(`${project}-other`, foreign.slice('sdlc-ws-'.length)));
 
       ok(bootstrapCmd(['runner-credentials'], `${rootToken}\n`), 'runner-credentials');
+      ok(compose('--profile', 'core', 'up', '-d', '--wait', 'seaweedfs'), 'seaweedfs up');
+      const evidence = ok(
+        bootstrapCmd(['runner-evidence-credentials'], `${rootToken}\n`),
+        'runner-evidence-credentials',
+      );
+      expect(evidence.stdout).toContain('runner-evidence');
       upRunner();
     }, SETUP_TIMEOUT_MS);
 
@@ -242,6 +301,75 @@ describe.skipIf(!enabled)(
         'stat',
       ).stdout.trim();
       expect(files.split('\n')).toEqual(['600 node', '600 node']);
+    });
+
+    it('C06 2b: the runner starts with its evidence identity (no evidence_missing)', () => {
+      const logs = compose(...profiles, 'logs', '--no-color', 'sdlc-runner');
+      expect(logs.stdout + logs.stderr).not.toContain('runner.evidence_missing');
+      expect(logs.stdout + logs.stderr).not.toContain('runner.evidence_off');
+    });
+
+    it('C06 2b: the evidence identity writes under proposals/ only; no read, no overwrite; versions kept', async () => {
+      const keys = evidenceKeys();
+      const tenant = crypto.randomUUID();
+      const store = runnerStore(keys, 'proposals/');
+      const outside = runnerStore(keys, 'packs/');
+      const s3 = new S3Client({
+        endpoint: s3Url,
+        region: 'us-east-1',
+        forcePathStyle: true,
+        credentials: admin!,
+      });
+      try {
+        const stored = await store.put(tenant, 'i/r.patch', Buffer.from('diff\n'), 'text/x-diff');
+        expect(stored.uri).toBe(`s3://evidence/proposals/${tenant}/i/r.patch`);
+        await expect(
+          store.put(tenant, 'i/r.patch', Buffer.from('other\n'), 'text/x-diff'),
+        ).rejects.toMatchObject({ code: 'exists' });
+        await expect(store.get(stored.uri)).rejects.toMatchObject({ code: 'forbidden' });
+        await expect(
+          outside.put(tenant, 'i/r.patch', Buffer.from('x'), 'text/x-diff'),
+        ).rejects.toMatchObject({ code: 'forbidden' });
+
+        // Write includes delete in SeaweedFS (ADR-M33 §2.9 gap 1): versioning keeps the content.
+        const runnerS3 = new S3Client({
+          endpoint: s3Url,
+          region: 'us-east-1',
+          forcePathStyle: true,
+          credentials: { accessKeyId: keys.access_key, secretAccessKey: keys.secret_key },
+        });
+        const key = `proposals/${tenant}/i/r.patch`;
+        await runnerS3.send(new DeleteObjectCommand({ Bucket: 'evidence', Key: key }));
+        runnerS3.destroy();
+        const versions = await s3.send(
+          new ListObjectVersionsCommand({ Bucket: 'evidence', Prefix: key }),
+        );
+        expect(versions.Versions?.length ?? 0).toBeGreaterThanOrEqual(1);
+        expect(versions.DeleteMarkers?.length ?? 0).toBe(1);
+      } finally {
+        store.destroy();
+        outside.destroy();
+        s3.destroy();
+      }
+    });
+
+    it('C06 2b: runner-evidence-credentials rotates: the old key stops working', async () => {
+      const old = evidenceKeys();
+      ok(bootstrapCmd(['runner-evidence-credentials'], `${rootToken}\n`), 'rotate evidence');
+      const fresh = evidenceKeys();
+      expect(fresh.access_key).not.toBe(old.access_key);
+      const tenant = crypto.randomUUID();
+      const oldStore = runnerStore(old, 'proposals/');
+      const newStore = runnerStore(fresh, 'proposals/');
+      try {
+        await expect(
+          oldStore.put(tenant, 'i/a.patch', Buffer.from('x'), 'text/x-diff'),
+        ).rejects.toMatchObject({ code: 'forbidden' });
+        await newStore.put(tenant, 'i/b.patch', Buffer.from('x'), 'text/x-diff');
+      } finally {
+        oldStore.destroy();
+        newStore.destroy();
+      }
     });
 
     it('runner-credentials can run again (rotation); the runner starts with the new secret ID', () => {

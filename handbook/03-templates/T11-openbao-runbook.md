@@ -235,7 +235,7 @@ Each platform process (api, worker, runner, cost-controller) uses the OpenBao cl
 | `SDLC_OPENBAO_SECRET_ID_FILE` | File with the secret ID: mode 600, on a tmpfs mount, readable only by the process |
 
 - The role ID and the secret ID are **files**, never environment variables: anyone allowed to run `docker inspect` can read environment variables.
-- **Rotating a secret ID** (every 90 days, section 8.1): issue a new secret ID, replace the file, then destroy the old secret ID. No restart is needed: the client reads the file again at its next login (at the latest when its token reaches the 4-hour maximum).
+- **Rotating a secret ID** (every 90 days, section 8.1): run the service's credentials command (sections 5d–5g). It issues a new secret ID, replaces the file, then destroys the old secret ID. No restart is needed: the client reads the file again at its next login (at the latest when its token reaches the 4-hour maximum).
 - The client renews its token by itself and logs in again when needed. It never writes a token, secret ID or secret value to its logs.
 
 ## 5d. LiteLLM keys (Compose profile `models`)
@@ -278,7 +278,7 @@ A model appears in LiteLLM only when its provider has a key in `kv/litellm/provi
 |---|---|
 | A model provider key | Store the new value (step 2). The sidecar writes the new configuration within about 5 minutes. Then restart LiteLLM: `docker compose … --profile core --profile models restart litellm`. Revoke the old key at the provider |
 | The master key | Store the new value. Restart `litellm-agent`, then `litellm`. The Cost Controller reads the new value at its next read. Virtual keys already issued stay valid |
-| The sidecar's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap litellm-credentials`, then restart `litellm-agent`. Then destroy the old secret ID (section 8.1, step 4) |
+| The sidecar's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap litellm-credentials`, then restart `litellm-agent`. The command destroys the old secret ID itself (section 8.1) |
 | The salt key | Never |
 
 ## 5e. The API (Compose profile `platform`)
@@ -300,7 +300,7 @@ The API (service `sdlc-api`, task B03) logs in with the AppRole `api` and reads 
 
 | What | Steps |
 |---|---|
-| The API's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap api-credentials`, then restart `sdlc-api`. Then destroy the old secret ID (section 8.1, step 4) |
+| The API's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap api-credentials`, then restart `sdlc-api`. The command destroys the old secret ID itself (section 8.1) |
 | The `platform_app` password | Change it in PostgreSQL and in `.env`, run `pnpm openbao:bootstrap api-credentials`, then restart `sdlc-api` |
 
 ## 5f. The worker (Compose profile `platform`)
@@ -323,7 +323,7 @@ The worker (service `sdlc-worker`, task B06) polls GitHub and handles the commen
 
 | What | Steps |
 |---|---|
-| The worker's secret IDs (`worker` and `cost-controller`, every 90 days, section 8.1) | `pnpm openbao:bootstrap worker-credentials`, then restart `sdlc-worker`. Then destroy the old secret IDs (section 8.1, step 4) |
+| The worker's secret IDs (`worker` and `cost-controller`, every 90 days, section 8.1) | `pnpm openbao:bootstrap worker-credentials`, then restart `sdlc-worker`. The command destroys the old secret IDs itself (section 8.1) |
 | The `platform_app` password | Change it in PostgreSQL and in `.env`, run `api-credentials`, `worker-credentials` and `runner-credentials`, then restart `sdlc-api`, `sdlc-worker` and `sdlc-runner` |
 | The GitHub App key | Section 5b. No restart: the worker reads the key again after 10 minutes |
 
@@ -340,6 +340,11 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
    pnpm openbao:bootstrap runner-credentials
    ```
    Record it in the operations log (role `runner`, date, reason; not the secret ID).
+3b. Give the runner its SeaweedFS identity for the proposals of High-risk (L1) runs (task C06, `design/ADR-M33-gate-g4.md` §2.9). SeaweedFS must run (`pnpm compose:core`). The command asks for an admin token (hidden). It makes a new key pair inside the openbao container, stores it at `kv/runner/evidence` and gives it to SeaweedFS as the identity `runner-evidence`, which may only **write** under `evidence/proposals/` (no read, no list). It prints no secret:
+   ```bash
+   pnpm openbao:bootstrap runner-evidence-credentials
+   ```
+   Without it the runner still starts (log line `runner.evidence_missing`), but every High-risk run fails when it tries to store its proposal. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys.
 4. Start: `pnpm compose:sandbox` (profiles `core` and `sandbox`). It also starts the npm package proxy (`npm-proxy`, Verdaccio) and the local image registry (`registry`).
 5. Check: `docker compose … ps sdlc-runner` shows `healthy`. The runner's log has one line with `"event":"runner.started"`.
 
@@ -359,7 +364,8 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
 | What | Steps |
 |---|---|
 | The `platform_app` password | See section 5f: all three credentials commands, then restart the three services |
-| The runner's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap runner-credentials`, then restart `sdlc-runner`. Then destroy the old secret ID (section 8.1, step 4) |
+| The runner's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap runner-credentials`, then restart `sdlc-runner`. The command destroys the old secret ID itself (section 8.1) |
+| The runner's evidence key (`runner-evidence`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap runner-evidence-credentials`, then restart `sdlc-runner`. The old key stops working at once; do it when no High-risk run is ending |
 
 ### After a crash or restart
 
@@ -406,14 +412,37 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 
 Every 3 months, and when someone changes project:
 - check the list of key holders and people with Docker access on the server;
-- **rotate every AppRole secret ID**:
-  1. issue a new one (section 5b);
-  2. deploy it;
-  3. check the process logs in;
-  4. destroy the old one: `bao write auth/approle/role/<role>/secret-id-accessor/destroy secret_id_accessor=<accessor>`.
+- **rotate every AppRole secret ID** with the credentials commands: `api-credentials`, `worker-credentials` (AppRoles `worker` and `cost-controller`), `runner-credentials` and `litellm-credentials` (sections 5d–5g). Each command:
+  1. issues a new secret ID;
+  2. writes it with the role ID into the service's volume;
+  3. then destroys **every other** secret ID of the AppRole. It keeps the one named by the accessor of the new secret ID, never the newest by time (`design/QUESTIONS.md` #140).
+
+  If the delivery fails, nothing is destroyed. If destroying fails, the command fails with a message; run it again. Then restart the service and check it logs in.
 - record the review in the operations log.
 
 Secret IDs expire after 90 days in any case, so a missed rotation shows up as a failed login.
+
+- **One process per AppRole.** After a rotation an AppRole has exactly one secret ID. Do not run a second instance of a service with its own secret ID: the next rotation would cut it off. Several instances of a service need a new design.
+- A lost or leaked secret ID of a process that is not deployed through these commands: destroy it by its accessor, `bao write auth/approle/role/<role>/secret-id-accessor/destroy secret_id_accessor=<accessor>`.
+
+### 8.3. After a leaked secret ID or token
+
+Destroying a secret ID does **not** end the tokens already issued from it. They stay valid until their TTL (1 hour, at most 4 hours), and they work only from the Compose network.
+
+1. Rotate at once: run the service's credentials command (section 8.1) and restart the service.
+2. If a token of the role may have leaked too, revoke all tokens of that AppRole. This needs a root token (section 5), because it lists every token accessor. Replace `api` with the role. The command prints only a count:
+   ```bash
+   docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -it openbao sh -c '
+     stty -echo; printf "Root token (hidden): "; IFS= read -r BAO_TOKEN; stty echo; echo; export BAO_TOKEN
+     role=api; n=0
+     for a in $(bao list -format=json auth/token/accessors | tr -d "[]\", "); do
+       bao token lookup -format=json -accessor "$a" 2>/dev/null | grep -q "\"role_name\": \"$role\"" || continue
+       bao token revoke -accessor "$a" >/dev/null && n=$((n + 1))
+     done
+     echo "revoked $n token(s) of the AppRole $role"'
+   ```
+   The service logs in again with its new secret ID at its next request. Revoke the root token afterwards (section 5).
+3. Record the leak, the rotation and the revocation in the operations log.
 
 ### 8.2. Rekey when a key holder changes
 
@@ -457,6 +486,7 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | `could not deliver the litellm credentials` | Wrong or expired admin token, or `configure` has not created the AppRole `litellm` yet | Section 5.1; run `configure` again after an upgrade |
 | `sdlc-api` restarts with "Cannot read SDLC_OPENBAO_ROLE_ID_FILE" or "no password field" | `api-credentials` was not run, or the volume was removed | Section 5e, step 2 |
 | `sdlc-runner` restarts with `runner.start_failed` ("no password field", "Cannot read SDLC_OPENBAO_ROLE_ID_FILE") | `runner-credentials` was not run, or the volume was removed | Section 5g, step 3 |
+| The runner logs `runner.evidence_missing`, or High-risk runs fail with `agent_proposal_unavailable` or `agent_proposal_failed` | `runner-evidence-credentials` was not run, SeaweedFS was reset, or the bucket `evidence` is missing. Or the sandbox's workspace was larger than `SDLC_RUNNER_EXPORT_MAX_MB` (everything, `node_modules` included, default 8192), or its files outside the ignore rules were larger than `SDLC_RUNNER_WORKSPACE_MAX_MB` | Section 5g, step 3b; check that `seaweedfs-init` completed; raise the limit only if the workspace is really that large |
 | `docker-socket-proxy` stays unhealthy, or the runner says it cannot reach the Docker socket (`EACCES`) | `SDLC_DOCKER_GID` is not the group of the host's Docker socket | Section 5g, step 2; then `pnpm compose:sandbox` again |
 | A run fails with `image_unavailable` | `sandbox.image` names a digest the local registry does not have, or the registry is down | Section 5g, sandbox images: push the image again and check the digest |
 | A run fails with `agent_runner_not_attachable` or `agent_model_unreachable` | `SDLC_RUNNER_SELF_CONTAINER` is not the runner's container name, or `SDLC_RUNNER_AGENT_LLM_URL` (`alias:port`) is not in the run's egress list | Check the `sdlc-runner` environment in `platform/deploy/docker-compose.yml` (design/ADR-M29 §2.7) |
@@ -492,3 +522,5 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.11 | 2026-09-27 | Claude Code (task C05) | Troubleshooting row: agent runs that cannot reach the Agent Server or LiteLLM (ADR-M29) |
 | 0.12 | 2026-09-27 | Claude Code (task C05, session 2) | Section 5d: a local Ollama model on developer machines only (`kv/litellm/providers/ollama`, field `api_base`; QUESTIONS #78) |
 | 0.13 | 2026-09-27 | Claude Code (task C06, session 2a) | Section 5f: `worker-credentials` also delivers the AppRole `cost-controller` (volume `worker-cost-approle`); the worker runs agent runs with it; rotation row |
+| 0.14 | 2026-09-30 | Claude Code (test maintenance) | Section 8.1: the credentials commands destroy every other secret ID of the AppRole after the delivery; one process per AppRole; new section 8.3: tokens of an old secret ID stay valid until their TTL, how to revoke the tokens of one AppRole after a leak (`design/QUESTIONS.md` #140). Tested with throw-away keys (`pnpm test:openbao`) |
+| 0.15 | 2026-09-27 | Claude Code (task C06, session 2b) | Section 5g step 3b: `runner-evidence-credentials` (write-only SeaweedFS identity `runner-evidence` at `kv/runner/evidence`); rotation and troubleshooting rows (ADR-M33 §2.9). Tested with throw-away keys (`pnpm test:runner-compose`) |

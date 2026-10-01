@@ -135,7 +135,7 @@ async function cleanUpRun(
   return failed;
 }
 
-/** Clones of the old process (`run-*` in the work folder) never went into a sandbox: remove them. */
+/** Clones of the old process (`run-*` in the work folder, also the kept clones of L1 runs): remove them. */
 function removeOldClones(workDir: string): void {
   let entries: string[];
   try {
