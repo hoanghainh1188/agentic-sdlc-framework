@@ -62,7 +62,7 @@ Do this **after** the first push, so protection does not block it.
 > - Merge settings: squash merge only; delete branch after merge (available on Free).
 > - Local `pre-push` hook that blocks direct pushes to `main` (`.git/hooks/pre-push`; install it on every machine that pushes). Bypass with `--no-verify` only in an emergency, with Harry's approval.
 > - Process: every change through a pull request, reviewed by someone other than its producer (handbook Ch.5).
-> - CI (`.github/workflows/ci.yml`, task A09) runs on every pull request, on every push to `main` and nightly. A red check cannot block the merge on GitHub Free: **never merge a pull request whose `ci-ok` check is red or still running**. A red run on `main` means something was merged anyway: fix it first.
+> - CI (`.github/workflows/ci.yml`, task A09) runs on every pull request, daily on `main` (Tuesday to Sunday, 03:00 JST: security scans; build, tests and database tests when `main` changed) and weekly with every job (Monday 03:00 JST). A push to `main` runs nothing: the pull request already ran every check. To save Actions minutes, open a pull request as a **draft** while you iterate: the heavy jobs (Compose, sandbox image) wait until you mark it ready for review. A red check cannot block the merge on GitHub Free: **never merge a pull request whose `ci-ok` check is red or still running**. A red scheduled run on `main` means something was merged anyway: fix it first.
 > - Security scan exceptions (`.gitleaks.toml`, `.trivyignore`, `.semgrepignore`) change only with a reason, a date and Person B's approval in the pull request.
 > After the upgrade: turn on the branch protection below and add Person B to the repository (GitHub does not let authors approve their own pull requests).
 
