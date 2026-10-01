@@ -10,7 +10,7 @@ const refused = (type: string, payload: Record<string, unknown>) => () =>
   checkRunEvent(type, payload);
 
 describe('run event payloads', () => {
-  it('declares the C02, C04 and C05 event types', () => {
+  it('declares the C02, C04, C05 and C06 event types', () => {
     expect(Object.keys(RUN_EVENT_TYPES)).toEqual([
       'contract_issued',
       'contract_accepted',
@@ -25,7 +25,20 @@ describe('run event payloads', () => {
       'agent_stopped',
       'agent_finished',
       'agent_failed',
+      'proposal_stored',
     ]);
+  });
+
+  it('C06 2b: proposal_stored holds a hash and counts only, never paths', () => {
+    expect(
+      checkRunEvent('proposal_stored', { sha256: SHA, size_bytes: 1024, changed_files: 3 }),
+    ).toEqual({ sha256: SHA, size_bytes: 1024, changed_files: 3 });
+    expect(
+      refused('proposal_stored', { sha256: SHA, size_bytes: 1, changed_files: 1, path: 'a.ts' }),
+    ).toThrow(DbError);
+    expect(refused('proposal_stored', { sha256: 'x', size_bytes: 1, changed_files: 1 })).toThrow(
+      DbError,
+    );
   });
 
   it('accepts the C04 sandbox events with coded fields only (ADR-M25)', () => {

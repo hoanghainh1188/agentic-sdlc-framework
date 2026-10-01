@@ -340,6 +340,11 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
    pnpm openbao:bootstrap runner-credentials
    ```
    Record it in the operations log (role `runner`, date, reason; not the secret ID).
+3b. Give the runner its SeaweedFS identity for the proposals of High-risk (L1) runs (task C06, `design/ADR-M33-gate-g4.md` §2.9). SeaweedFS must run (`pnpm compose:core`). The command asks for an admin token (hidden). It makes a new key pair inside the openbao container, stores it at `kv/runner/evidence` and gives it to SeaweedFS as the identity `runner-evidence`, which may only **write** under `evidence/proposals/` (no read, no list). It prints no secret:
+   ```bash
+   pnpm openbao:bootstrap runner-evidence-credentials
+   ```
+   Without it the runner still starts (log line `runner.evidence_missing`), but every High-risk run fails when it tries to store its proposal. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys.
 4. Start: `pnpm compose:sandbox` (profiles `core` and `sandbox`). It also starts the npm package proxy (`npm-proxy`, Verdaccio) and the local image registry (`registry`).
 5. Check: `docker compose … ps sdlc-runner` shows `healthy`. The runner's log has one line with `"event":"runner.started"`.
 
@@ -360,6 +365,7 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
 |---|---|
 | The `platform_app` password | See section 5f: all three credentials commands, then restart the three services |
 | The runner's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap runner-credentials`, then restart `sdlc-runner`. The command destroys the old secret ID itself (section 8.1) |
+| The runner's evidence key (`runner-evidence`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap runner-evidence-credentials`, then restart `sdlc-runner`. The old key stops working at once; do it when no High-risk run is ending |
 
 ### After a crash or restart
 
@@ -480,6 +486,7 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | `could not deliver the litellm credentials` | Wrong or expired admin token, or `configure` has not created the AppRole `litellm` yet | Section 5.1; run `configure` again after an upgrade |
 | `sdlc-api` restarts with "Cannot read SDLC_OPENBAO_ROLE_ID_FILE" or "no password field" | `api-credentials` was not run, or the volume was removed | Section 5e, step 2 |
 | `sdlc-runner` restarts with `runner.start_failed` ("no password field", "Cannot read SDLC_OPENBAO_ROLE_ID_FILE") | `runner-credentials` was not run, or the volume was removed | Section 5g, step 3 |
+| The runner logs `runner.evidence_missing`, or High-risk runs fail with `agent_proposal_unavailable` or `agent_proposal_failed` | `runner-evidence-credentials` was not run, SeaweedFS was reset, or the bucket `evidence` is missing. Or the sandbox's workspace was larger than `SDLC_RUNNER_EXPORT_MAX_MB` (everything, `node_modules` included, default 8192), or its files outside the ignore rules were larger than `SDLC_RUNNER_WORKSPACE_MAX_MB` | Section 5g, step 3b; check that `seaweedfs-init` completed; raise the limit only if the workspace is really that large |
 | `docker-socket-proxy` stays unhealthy, or the runner says it cannot reach the Docker socket (`EACCES`) | `SDLC_DOCKER_GID` is not the group of the host's Docker socket | Section 5g, step 2; then `pnpm compose:sandbox` again |
 | A run fails with `image_unavailable` | `sandbox.image` names a digest the local registry does not have, or the registry is down | Section 5g, sandbox images: push the image again and check the digest |
 | A run fails with `agent_runner_not_attachable` or `agent_model_unreachable` | `SDLC_RUNNER_SELF_CONTAINER` is not the runner's container name, or `SDLC_RUNNER_AGENT_LLM_URL` (`alias:port`) is not in the run's egress list | Check the `sdlc-runner` environment in `platform/deploy/docker-compose.yml` (design/ADR-M29 §2.7) |
@@ -516,3 +523,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.12 | 2026-09-27 | Claude Code (task C05, session 2) | Section 5d: a local Ollama model on developer machines only (`kv/litellm/providers/ollama`, field `api_base`; QUESTIONS #78) |
 | 0.13 | 2026-09-27 | Claude Code (task C06, session 2a) | Section 5f: `worker-credentials` also delivers the AppRole `cost-controller` (volume `worker-cost-approle`); the worker runs agent runs with it; rotation row |
 | 0.14 | 2026-09-30 | Claude Code (test maintenance) | Section 8.1: the credentials commands destroy every other secret ID of the AppRole after the delivery; one process per AppRole; new section 8.3: tokens of an old secret ID stay valid until their TTL, how to revoke the tokens of one AppRole after a leak (`design/QUESTIONS.md` #140). Tested with throw-away keys (`pnpm test:openbao`) |
+| 0.15 | 2026-09-27 | Claude Code (task C06, session 2b) | Section 5g step 3b: `runner-evidence-credentials` (write-only SeaweedFS identity `runner-evidence` at `kv/runner/evidence`); rotation and troubleshooting rows (ADR-M33 §2.9). Tested with throw-away keys (`pnpm test:runner-compose`) |

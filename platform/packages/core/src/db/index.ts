@@ -21,6 +21,7 @@ export { hashApiToken } from './repositories/api-tokens.js';
 export type { AgentQuery, AgentUpdate, NewAgent } from './repositories/agents.js';
 export type { AuditEvent } from './repositories/audit-log.js';
 export type { NewCostRecord } from './repositories/cost-records.js';
+export type { NewEvidenceItem } from './repositories/evidence-items.js';
 export type {
   EscalationClockUpdate,
   EscalationQuery,
@@ -57,6 +58,7 @@ export type {
   AuditLogRow,
   CostRecordRow,
   Escalation,
+  EvidenceItem,
   EscalationNotice,
   GateDecisionRow,
   GitEventCursor,

@@ -18,6 +18,9 @@ describe('live GitHub test stays out of CI', () => {
       // C04: the pilot live test with the test App key (tests/integration/sandbox-image).
       expect(text, file).not.toContain('SDLC_SANDBOX_LIVE_TEST');
       expect(text, file).not.toContain('test:sandbox-live');
+      // C06 2b: the proposal measurement on the pilot repository (internet, a developer machine).
+      expect(text, file).not.toContain('SDLC_PROPOSAL_PILOT_TEST');
+      expect(text, file).not.toContain('test:proposal-pilot');
     }
   });
 });

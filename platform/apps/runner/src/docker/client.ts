@@ -19,6 +19,8 @@ const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 type Method = 'GET' | 'POST' | 'DELETE' | 'PUT' | 'HEAD';
 
 const NAME = '[a-zA-Z0-9][a-zA-Z0-9_.-]*';
+/** A run sandbox's container name (`names.ts`): the only container whose files are read. */
+const SANDBOX = 'sdlc-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 /** Every endpoint the runner may call. Anything else is refused before it reaches the socket. */
 export const ALLOWED_ENDPOINTS: readonly (readonly [Method, RegExp])[] = [
   ['GET', /^\/_ping$/],
@@ -36,6 +38,9 @@ export const ALLOWED_ENDPOINTS: readonly (readonly [Method, RegExp])[] = [
   ['POST', new RegExp(`^/containers/${NAME}/wait$`)],
   ['GET', new RegExp(`^/containers/${NAME}/logs$`)],
   ['PUT', new RegExp(`^/containers/${NAME}/archive$`)],
+  // C06 session 2b (ADR-M33 §2.9): read the workspace out of a run sandbox only;
+  // `exportWorkspace` also checks the container's name and this runner's labels first.
+  ['GET', new RegExp(`^/containers/${SANDBOX}/archive$`)],
   ['DELETE', new RegExp(`^/containers/${NAME}$`)],
   ['GET', /^\/networks$/],
   ['POST', /^\/networks\/create$/],
@@ -185,6 +190,54 @@ export class DockerClient {
     this.#check(res, [200], 'PUT');
   }
 
+  /**
+   * Reads a path of a container as a tar archive, as a stream (C06 session 2b): the archive of a
+   * workspace with `node_modules` is never held whole in memory. The caller checks that the
+   * container is the run's own sandbox (`workspace/export.ts`), treats the archive as untrusted,
+   * and destroys the stream when it stops reading early.
+   */
+  getArchive(name: string, path: string): Promise<http.IncomingMessage> {
+    const apiPath = `/containers/${name}/archive`;
+    if (!isAllowedEndpoint('GET', apiPath)) {
+      return Promise.reject(new RunnerError('runner.docker.endpoint_refused', { method: 'GET' }));
+    }
+    const search = new URLSearchParams({ path }).toString();
+    return new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          socketPath: this.#socketPath,
+          method: 'GET',
+          path: `/${DOCKER_API_VERSION}${apiPath}?${search}`,
+          headers: { host: 'docker' },
+          timeout: this.#timeoutMs,
+        },
+        (res) => {
+          const status = res.statusCode ?? 0;
+          if (status === 200) {
+            resolve(res);
+            return;
+          }
+          res.resume();
+          try {
+            this.#check({ status, body: Buffer.alloc(0) }, [200], 'GET');
+          } catch (error) {
+            reject(
+              error instanceof Error
+                ? error
+                : new RunnerError('runner.docker.api_error', { method: 'GET', status }),
+            );
+          }
+        },
+      );
+      req.on('timeout', () => {
+        req.destroy(new RunnerError('runner.docker.timeout', { method: 'GET' }));
+        reject(new RunnerError('runner.docker.timeout', { method: 'GET' }));
+      });
+      req.on('error', (error: NodeJS.ErrnoException) => reject(unreachable(error.code ?? 'error')));
+      req.end();
+    });
+  }
+
   async containerStart(id: string): Promise<void> {
     await this.#expect('POST', `/containers/${id}/start`, [204, 304]);
   }
@@ -198,7 +251,7 @@ export class DockerClient {
 
   /** Waits until the container exits; returns its exit code. */
   async containerWait(id: string, timeoutMs: number): Promise<number> {
-    const res = await this.request('POST', `/containers/${id}/wait`, undefined, {}, timeoutMs);
+    const res = await this.request('POST', `/containers/${id}/wait`, undefined, {}, { timeoutMs });
     this.#check(res, [200], 'POST');
     return (JSON.parse(res.body.toString('utf8')) as { StatusCode: number }).StatusCode;
   }
@@ -298,8 +351,10 @@ export class DockerClient {
     path: string,
     body?: unknown,
     query: Readonly<Record<string, string>> = {},
-    timeoutMs = this.#timeoutMs,
+    options: { readonly timeoutMs?: number; readonly maxBytes?: number } = {},
   ): Promise<DockerResponse> {
+    const timeoutMs = options.timeoutMs ?? this.#timeoutMs;
+    const maxBytes = options.maxBytes ?? MAX_RESPONSE_BYTES;
     if (!isAllowedEndpoint(method, path)) {
       return Promise.reject(new RunnerError('runner.docker.endpoint_refused', { method }));
     }
@@ -329,7 +384,7 @@ export class DockerClient {
           let size = 0;
           res.on('data', (chunk: Buffer) => {
             size += chunk.length;
-            if (size > MAX_RESPONSE_BYTES) {
+            if (size > maxBytes) {
               req.destroy();
               reject(new RunnerError('runner.docker.response_too_large'));
               return;

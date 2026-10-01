@@ -47,6 +47,12 @@ Commands:
   runner-credentials   The same for the runner: kv/runner/database, AppRole "runner", volume of
                        sdlc-runner (Compose profile "sandbox"). Run it again to rotate, then
                        restart sdlc-runner (runbook T11 §5g).
+  runner-evidence-credentials
+                       Ask for an admin token (hidden). Create a new SeaweedFS key pair for the
+                       runner's L1 proposals, store it at kv/runner/evidence and apply it to
+                       SeaweedFS as the identity "runner-evidence", limited to
+                       Write:evidence/proposals/* (C06, ADR-M33 §2.9). The old key stops working.
+                       Prints no secret. Run it again to rotate, then restart sdlc-runner.
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -92,7 +98,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -368,6 +374,45 @@ cmd_worker_credentials() {
 }
 cmd_runner_credentials() { platform_credentials runner sdlc-runner sandbox; }
 
+# The runner's write-only SeaweedFS identity for L1 proposals (C06 session 2b, ADR-M33 §2.9).
+# The openbao container makes the key pair, stores it at kv/runner/evidence (JSON on stdin) and
+# prints the two `s3.configure` lines, which go through a pipe to `weed shell` on its stdin: the
+# keys are never a host file, a command line or an environment variable. `weed shell` prints the
+# identities with their secrets, so its output is discarded; the check reads names only. The old
+# identity is deleted first, so a rotation leaves one key (that call fails harmlessly when there is
+# none yet: `weed shell` exits 1 after any failed command, so it runs on its own).
+cmd_runner_evidence_credentials() {
+  require_unsealed
+  token="$(read_secret 'Admin or root token (hidden)')"
+  [ -n "$token" ] || fail "no token given"
+  weed="weed shell -master=seaweedfs:9333"
+  # The KV version (no secret) tells whether the new key pair was stored: `weed shell` exits 0 even
+  # when it received nothing.
+  kv_version() {
+    printf '%s\n' "$token" | bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
+      bao read -field=current_version kv/metadata/runner/evidence 2>/dev/null || echo 0'
+  }
+  before="$(kv_version)"
+  echo "s3.configure -user runner-evidence -delete -apply" |
+    compose exec -T seaweedfs $weed >/dev/null 2>&1 || true
+  printf '%s\n' "$token" |
+    bao_exec sh -c 'set -e
+      IFS= read -r BAO_TOKEN && export BAO_TOKEN
+      access="sdlcrunner$(od -An -N10 -tx1 /dev/urandom | tr -d " \n")"
+      secret="$(od -An -N30 -tx1 /dev/urandom | tr -d " \n")"
+      [ "${#access}" -eq 30 ] && [ "${#secret}" -eq 60 ]
+      printf "{\"access_key\":\"%s\",\"secret_key\":\"%s\"}" "$access" "$secret" |
+        bao kv put -mount=kv runner/evidence - >/dev/null
+      printf "s3.configure -user runner-evidence -access_key %s -secret_key %s -actions Write:evidence/proposals/* -apply\n" "$access" "$secret"' |
+    compose exec -T seaweedfs $weed >/dev/null 2>&1 ||
+    fail "could not create the runner evidence credentials (token valid? OpenBao configured? SeaweedFS running?)"
+  [ "$(kv_version)" = "$((before + 1))" ] ||
+    fail "kv/runner/evidence was not stored (token valid? OpenBao configured?); run the command again"
+  echo "s3.configure" | compose exec -T seaweedfs sh -c "$weed 2>/dev/null | grep -q '\"name\": *\"runner-evidence\"'" ||
+    fail "SeaweedFS has no identity runner-evidence; run the command again"
+  say "kv/runner/evidence stored; SeaweedFS identity runner-evidence (Write:evidence/proposals/*) applied; restart sdlc-runner to use it"
+}
+
 case "$command" in
   status) cmd_status ;;
   init) cmd_init ;;
@@ -378,4 +423,5 @@ case "$command" in
   api-credentials) cmd_api_credentials ;;
   worker-credentials) cmd_worker_credentials ;;
   runner-credentials) cmd_runner_credentials ;;
+  runner-evidence-credentials) cmd_runner_evidence_credentials ;;
 esac

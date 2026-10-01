@@ -26,6 +26,8 @@ import { TenantRepository } from './base.js';
  * `run_finished` (the run ended; the intent waits at G5), `run_failed` (the run failed or was lost;
  * the intent is paused and escalated), `run_not_started` (the run could not start; G4 decides again),
  * `run_resumed` (the run's escalation allows a new run; the intent is back at G4).
+ * C06 session 2b (ADR-M33 §2.9): `proposal_ready` (an L1 run stored its proposal as evidence; the
+ * intent is paused and Person A takes the proposal forward).
  */
 export const INTENT_NOTICE_KINDS = [
   'submitted',
@@ -44,6 +46,7 @@ export const INTENT_NOTICE_KINDS = [
   'run_failed',
   'run_not_started',
   'run_resumed',
+  'proposal_ready',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 
