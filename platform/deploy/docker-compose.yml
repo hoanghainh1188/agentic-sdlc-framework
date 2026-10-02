@@ -120,7 +120,7 @@ services:
       test: [CMD-SHELL, pg_isready -U postgres -d postgres]
 
   temporal-schema:
-    image: temporalio/admin-tools:1.31.2
+    image: temporalio/admin-tools:1.32.0
     profiles: [core, observability]
     restart: 'no'
     networks: [sdlc]
@@ -134,7 +134,7 @@ services:
     entrypoint: [/bin/sh, /scripts/setup-schema.sh]
 
   temporal:
-    image: temporalio/server:1.31.2
+    image: temporalio/server:1.32.0
     profiles: [core, observability]
     restart: unless-stopped
     networks: [sdlc]
@@ -163,7 +163,7 @@ services:
       test: [CMD-SHELL, 'nc -z "$$(hostname -i | cut -d" " -f1)" 7233']
 
   temporal-namespace:
-    image: temporalio/admin-tools:1.31.2
+    image: temporalio/admin-tools:1.32.0
     profiles: [core, observability]
     restart: 'no'
     networks: [sdlc]
