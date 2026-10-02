@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { EscalationLoop, type EscalationLoopDeps } from '../../apps/worker/src/escalation-loop.js';
+import { currentLogContext } from '../../packages/core/src/observability/index.js';
 
 type Due = Awaited<ReturnType<EscalationLoopDeps['listDue']>>[number];
 
@@ -11,7 +12,11 @@ const TENANT = '00000000-0000-4000-8000-000000000001' as Due['tenantId'];
 const due = (id: string): Due => ({ tenantId: TENANT, escalationId: id });
 
 function harness(items: Due[], failing: ReadonlySet<string> = new Set()) {
-  const calls: { listed: number[]; advanced: string[] } = { listed: [], advanced: [] };
+  const calls: { listed: number[]; advanced: string[]; contexts: unknown[] } = {
+    listed: [],
+    advanced: [],
+    contexts: [],
+  };
   const logs: { level: string; event: string; fields: Record<string, unknown> }[] = [];
   const now = new Date('2026-09-28T03:00:00Z');
   const loop = new EscalationLoop({
@@ -21,6 +26,7 @@ function harness(items: Due[], failing: ReadonlySet<string> = new Set()) {
     },
     advance: (item) => {
       calls.advanced.push(item.escalationId);
+      calls.contexts.push(currentLogContext());
       if (failing.has(item.escalationId)) {
         return Promise.reject(Object.assign(new Error('boom'), { code: 'immutable' }));
       }
@@ -37,6 +43,12 @@ function harness(items: Due[], failing: ReadonlySet<string> = new Set()) {
 }
 
 describe('escalation clock loop', () => {
+  it('A08 AC1: an escalation advances with its tenant in the log context', async () => {
+    const h = harness([due('e1')]);
+    await h.loop.tick();
+    expect(h.calls.contexts).toEqual([{ tenantId: TENANT }]);
+  });
+
   it('advances the due escalations of one batch', async () => {
     const h = harness([due('e1'), due('e2'), due('e3')]);
     await h.loop.tick();

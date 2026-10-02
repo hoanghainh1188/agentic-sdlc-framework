@@ -63,6 +63,17 @@ environment_variables:
 {{- with secret "kv/data/litellm/salt-key" }}
   LITELLM_SALT_KEY: {{ .Data.data.value | toJSON }}
 {{- end }}
+{{- with env "SDLC_OTEL_ENDPOINT" }}
+  # Read before the callbacks are set up. LiteLLM adds /v1/traces.
+  OTEL_EXPORTER: otlp_http
+  OTEL_ENDPOINT: {{ . | toJSON }}
+  OTEL_SERVICE_NAME: sdlc-litellm
+{{- end }}
+{{- with env "SDLC_OTEL_ENDPOINT" }}
+
+litellm_settings:
+  callbacks: ["langfuse_otel"]
+{{- end }}
 
 # Same as config.yaml: Valkey keys must expire (noeviction, design/ADR-M17 section 2.4).
 router_settings:

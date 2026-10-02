@@ -10,9 +10,10 @@ import fs from 'node:fs';
 
 import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { S3EvidenceStore } from '@sdlc/adapter-evidence-s3';
-import { PlatformDatabase } from '@sdlc/core';
+import { createJsonLogger, PlatformDatabase, withLogContext } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OpenBaoClient, SecretsError } from '@sdlc/secrets';
+import { activityTracingInterceptor } from '@sdlc/telemetry';
 
 import { RUNNER_TASK_QUEUE } from '@sdlc/contracts';
 import { NativeConnection, Worker } from '@temporalio/worker';
@@ -33,11 +34,19 @@ import { runnerSettingsFromEnv } from './settings.js';
 
 const APPLICATION_NAME = 'sdlc-runner';
 
-/** One JSON line on stderr: codes and counts only, never a secret, a path or a Docker message. */
-function log(level: 'info' | 'warn' | 'error', event: string, message: string, fields = {}): void {
-  process.stderr.write(
-    `${JSON.stringify({ time: new Date().toISOString(), level, event, message, ...fields })}\n`,
-  );
+/**
+ * JSON lines on stderr (the platform logger, A08, ADR-M35): codes and counts only, never a secret,
+ * a path or a Docker message. Lines inside a run's activity carry its tenant_id and run_id.
+ */
+const logger = createJsonLogger({ write: (line) => process.stderr.write(line) });
+
+function log(
+  level: 'info' | 'warn' | 'error',
+  event: string,
+  message: string,
+  fields: Record<string, number> = {},
+): void {
+  logger.log(level, event, { message, ...fields });
 }
 
 async function connectDatabase(
@@ -95,7 +104,7 @@ async function evidenceStore(
 async function main(): Promise<void> {
   const settings = runnerSettingsFromEnv(process.env);
   const proc = processSettingsFromEnv(process.env);
-  const openbao = OpenBaoClient.fromEnv(process.env);
+  const openbao = OpenBaoClient.fromEnv(process.env, logger);
   await openbao.assertReady();
   const db = await connectDatabase(openbao, proc.db);
   const docker = new DockerClient({ socketPath: settings.dockerSocket });
@@ -144,7 +153,11 @@ async function main(): Promise<void> {
       connection,
       namespace: proc.temporal.namespace,
       taskQueue: RUNNER_TASK_QUEUE,
-      activities: { ...createRunnerActivities({ db, runner, unwrapper: openbao.wrapping() }) },
+      activities: {
+        ...createRunnerActivities({ db, runner, unwrapper: openbao.wrapping(), logger }),
+      },
+      // The log context (tenant, run) of each activity (A08, ADR-M35 §2.6). No runner traces yet.
+      interceptors: { activity: [activityTracingInterceptor({ withLogContext })] },
       maxConcurrentActivityTaskExecutions: settings.maxSandboxes,
     });
     const running = worker.run();

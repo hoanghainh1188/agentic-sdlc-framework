@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { INTENT_TASK_QUEUE } from '@sdlc/contracts';
+import { withLogContext } from '@sdlc/core';
+import { activityTracingInterceptor } from '@sdlc/telemetry';
 import type { TemporalSettings } from '@sdlc/workflow-client';
 import {
   bundleWorkflowCode,
@@ -67,6 +69,8 @@ export async function startIntentWorker(options: {
       ? { workflowBundle: { codePath: options.workflowBundlePath } }
       : { workflowsPath: WORKFLOWS_PATH }),
     activities: { ...options.activities },
+    // One span and one log context (tenant, intent, run) per activity (A08, ADR-M35 §2.6).
+    interceptors: { activity: [activityTracingInterceptor({ withLogContext })] },
     ...(options.maxCachedWorkflows === undefined
       ? {}
       : { maxCachedWorkflows: options.maxCachedWorkflows }),

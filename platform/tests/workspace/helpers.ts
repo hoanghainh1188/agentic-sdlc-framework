@@ -18,7 +18,7 @@ export interface WorkspacePackage {
 }
 
 /** The packages required by design/D-03 section 11 (D-08 A01 AC2), plus `messages` (ADR-M18), `secrets` (A04,
- * ADR-M21) and `workflow-client` (B07, ADR-M30). */
+ * ADR-M21), `workflow-client` (B07, ADR-M30) and `telemetry` (A08, ADR-M35). */
 export const EXPECTED_PACKAGES: readonly WorkspacePackage[] = [
   { dir: 'platform/apps/api', name: '@sdlc/api' },
   { dir: 'platform/apps/worker', name: '@sdlc/worker' },
@@ -30,6 +30,7 @@ export const EXPECTED_PACKAGES: readonly WorkspacePackage[] = [
   { dir: 'platform/packages/messages', name: '@sdlc/messages' },
   { dir: 'platform/packages/secrets', name: '@sdlc/secrets' },
   { dir: 'platform/packages/workflow-client', name: '@sdlc/workflow-client' },
+  { dir: 'platform/packages/telemetry', name: '@sdlc/telemetry' },
   { dir: 'platform/packages/adapters/git-github', name: '@sdlc/adapter-git-github' },
   { dir: 'platform/packages/adapters/agent-openhands', name: '@sdlc/adapter-agent-openhands' },
   { dir: 'platform/packages/adapters/model-litellm', name: '@sdlc/adapter-model-litellm' },

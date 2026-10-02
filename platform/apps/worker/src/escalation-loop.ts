@@ -8,7 +8,7 @@
 //   escalation that ran out while the worker was down catches up in order.
 // - Two worker processes never advance the same escalation at once (`SKIP LOCKED`), and the clock
 //   is idempotent, so a step is never repeated.
-import type { AdvanceResult, DueEscalation } from '@sdlc/core';
+import { withLogContext, type AdvanceResult, type DueEscalation } from '@sdlc/core';
 
 import type { WorkerLogger } from './logger.js';
 
@@ -47,7 +47,9 @@ export class EscalationLoop {
       if (this.#stopped) break;
       const fields = { tenant_id: item.tenantId, escalation_id: item.escalationId };
       try {
-        const result = await this.#deps.advance(item, now);
+        const result = await withLogContext({ tenantId: item.tenantId }, () =>
+          this.#deps.advance(item, now),
+        );
         for (const effect of result.effects) {
           this.#deps.logger.log('info', 'worker.escalation_clock', {
             ...fields,

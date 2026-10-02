@@ -1,11 +1,11 @@
 // Builds the Nest application (task B03, ADR-M26). `main.ts` runs it; tests build it with their
 // own database and clock and call it through Fastify `inject()`, without opening a port.
-import { Logger, Module, type DynamicModule } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD, NestFactory, Reflector } from '@nestjs/core';
+import { Logger, Module, type DynamicModule, type LoggerService } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, NestFactory, Reflector } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
 import type { IntentWorkflowSignals } from '@sdlc/contracts';
-import { Registry, type PlatformDatabase } from '@sdlc/core';
+import { Registry, type PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
 import { AiRecordsController } from './ai-records/ai-records.controller.js';
@@ -19,6 +19,8 @@ import { HealthController } from './health/health.controller.js';
 import { IntentsController } from './intents/intents.controller.js';
 import { IntentsService } from './intents/intents.service.js';
 import { MeController } from './me/me.controller.js';
+import { LogContextInterceptor } from './observability/log-context.interceptor.js';
+import { createApiLogger } from './observability/logging.js';
 import type { ApiSettings } from './settings.js';
 import { AI_RECORDS, CLOCK, DATABASE, ESCALATIONS, INTENTS, REGISTRY, SETTINGS } from './tokens.js';
 
@@ -30,8 +32,12 @@ export interface ApiDeps {
   readonly settings: Pick<ApiSettings, 'rateLimitPerMinute' | 'authFailuresPerMinute'>;
   /** Default: the system clock. */
   readonly now?: () => Date;
-  /** Default: Nest's logger. Tests pass their own to check that no token is logged. */
+  /** Unexpected errors. Default: Nest's logger. Tests pass their own to check that no token is logged. */
   readonly logger?: Pick<Logger, 'error'>;
+  /** The platform logger (A08, ADR-M35). Default: JSON lines on stdout. */
+  readonly log?: PlatformLogger;
+  /** Nest's own messages. Default: Nest's console logger, warnings and errors only. */
+  readonly nestLogger?: LoggerService;
   /**
    * Wakes the intent workflow after a change (B07, ADR-M30). Default: no signals; the worker's
    * reconcile loop then catches up.
@@ -44,7 +50,7 @@ class ApiModule {
   static create(deps: ApiDeps): DynamicModule {
     const now = deps.now ?? (() => new Date());
     const signals = deps.intentSignals ?? NO_INTENT_SIGNALS;
-    const wakeLogger = new Logger('sdlc-api');
+    const wakeLogger = deps.log ?? createApiLogger();
     return {
       module: ApiModule,
       controllers: [
@@ -84,6 +90,7 @@ class ApiModule {
             }),
           inject: [Reflector],
         },
+        { provide: APP_INTERCEPTOR, useValue: new LogContextInterceptor() },
         {
           provide: APP_FILTER,
           useValue: new ErrorFilter(deps.logger ?? new Logger('sdlc-api')),
@@ -97,7 +104,7 @@ export async function createApp(deps: ApiDeps): Promise<NestFastifyApplication> 
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.create(deps),
     new FastifyAdapter({ bodyLimit: BODY_LIMIT_BYTES, trustProxy: false }),
-    { logger: ['error', 'warn'] },
+    { logger: deps.nestLogger ?? ['error', 'warn'] },
   );
   app.enableShutdownHooks();
   await app.init();

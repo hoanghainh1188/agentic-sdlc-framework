@@ -23,7 +23,7 @@ import type {
   RunnerActivities,
   SecretUnwrapper,
 } from '@sdlc/contracts';
-import { parseTenantId, type PlatformDatabase } from '@sdlc/core';
+import { parseTenantId, type PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 import { Redacted } from '@sdlc/secrets';
 import { Context } from '@temporalio/activity';
 
@@ -45,6 +45,8 @@ export interface RunnerActivityDeps {
   /** Default: `Context.current()`. */
   readonly context?: () => ActivityContextLike;
   readonly heartbeatMs?: number;
+  /** Start and end of each run (codes only); the activity's log context adds tenant and run. */
+  readonly logger?: PlatformLogger;
 }
 
 export function createRunnerActivities(deps: RunnerActivityDeps): RunnerActivities {
@@ -53,8 +55,17 @@ export function createRunnerActivities(deps: RunnerActivityDeps): RunnerActiviti
       const ctx = (deps.context ?? (() => Context.current()))();
       ctx.heartbeat();
       const beat = setInterval(() => ctx.heartbeat(), deps.heartbeatMs ?? HEARTBEAT_MS);
+      deps.logger?.log('info', 'runner.run_started', {});
       try {
-        return await execute(deps, ctx, input);
+        const result = await execute(deps, ctx, input);
+        deps.logger?.log(
+          'info',
+          'runner.run_ended',
+          result.outcome === 'ended'
+            ? { outcome: 'ended', status: result.status, stop_reason: result.stopReason ?? '' }
+            : { outcome: 'refused', reason: result.reason },
+        );
+        return result;
       } finally {
         clearInterval(beat);
       }

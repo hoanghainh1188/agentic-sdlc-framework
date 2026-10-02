@@ -1,21 +1,17 @@
-// Structured JSON log lines of the worker (task B06). One logger serves the poller, the GitHub
-// adapter and the OpenBao client: their events are codes and their fields hold IDs, codes, counts
-// and times only, never comment text, tokens or keys. Task A08 replaces this with the platform
-// logger (OpenTelemetry).
-export type LogLevel = 'info' | 'warn' | 'error';
-export type LogFields = Readonly<Record<string, string | number | boolean>>;
+// Structured JSON log lines of the worker (tasks B06, A08; design/ADR-M35). The platform logger of
+// `@sdlc/core`: one logger serves the loops, the activities, the GitHub adapter and the OpenBao
+// client. Events are codes; fields hold IDs, codes, counts and times only, never comment text,
+// tokens or keys. Each line also carries the tenant_id, intent_id and run_id of its context, and the
+// trace and span IDs when tracing is on.
+import { createJsonLogger, type LogFields, type LogLevel, type PlatformLogger } from '@sdlc/core';
+import { activeTraceIds } from '@sdlc/telemetry';
 
-export interface WorkerLogger {
-  log(level: LogLevel, event: string, fields: LogFields): void;
-}
+export type { LogFields, LogLevel };
+export type WorkerLogger = PlatformLogger;
 
 export function jsonLogger(
   write: (line: string) => void,
   now: () => Date = () => new Date(),
 ): WorkerLogger {
-  return {
-    log(level, event, fields) {
-      write(`${JSON.stringify({ time: now().toISOString(), level, event, ...fields })}\n`);
-    },
-  };
+  return createJsonLogger({ write, now, traceIds: activeTraceIds });
 }

@@ -23,6 +23,18 @@ deploy_dir="$(cd "$(dirname "$0")/.." && pwd)"
 env_file="${SDLC_ENV_FILE:-$deploy_dir/.env}"
 [ -f "$env_file" ] || { echo "up: $env_file not found; run scripts/init-env.sh first" >&2; exit 1; }
 
+# Tracing (A08, design/ADR-M35 §2.4): with the profile observability, the platform processes and
+# LiteLLM send traces to the collector, unless SDLC_OTEL_ENDPOINT is set in the environment or the
+# env file. The profiles that use it (platform, models) must be started in the same call.
+case " $* " in
+  *" observability "*)
+    if [ -z "${SDLC_OTEL_ENDPOINT:-}" ] && ! grep -Eq '^SDLC_OTEL_ENDPOINT=.+' "$env_file"; then
+      SDLC_OTEL_ENDPOINT=http://otel-collector:4318
+      export SDLC_OTEL_ENDPOINT
+    fi
+    ;;
+esac
+
 set -- $(for p in "$@"; do printf -- '--profile %s ' "$p"; done)
 compose() { docker compose -f "$deploy_dir/docker-compose.yml" --env-file "$env_file" "$@"; }
 

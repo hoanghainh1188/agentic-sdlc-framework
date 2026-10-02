@@ -45,7 +45,7 @@ const CORE = [
   'temporal-ui',
   'valkey',
 ];
-const OBSERVABILITY_ONLY = ['clickhouse', 'langfuse-web', 'langfuse-worker'];
+const OBSERVABILITY_ONLY = ['clickhouse', 'langfuse-web', 'langfuse-worker', 'otel-collector'];
 const JOBS = ['seaweedfs-init', 'temporal-namespace', 'temporal-schema'];
 
 function createdDatabases(): string[] {
@@ -87,7 +87,7 @@ describe('AC1: core profile', () => {
 });
 
 describe('AC2: observability profile', () => {
-  it('adds Langfuse web and worker and ClickHouse; core services stay available', () => {
+  it('adds Langfuse web and worker, ClickHouse and the collector; core services stay available', () => {
     const observability = servicesInProfile(compose, 'observability');
     expect(observability.filter((s) => !CORE.includes(s))).toEqual(OBSERVABILITY_ONLY);
     for (const name of OBSERVABILITY_ONLY)
@@ -157,7 +157,7 @@ describe('AC3: healthchecks and pinned images', () => {
     // PostgreSQL (17.11) and SeaweedFS (4.47) release with two-part versions; the others use three or more.
     const twoPartVersioning = ['postgres', 'chrislusf/seaweedfs'];
     // Built from this repo; the tag follows the package version.
-    const built = ['sdlc-api', 'sdlc-runner'];
+    const built = ['sdlc-api', 'sdlc-runner', 'otel-collector'];
     for (const [name, s] of Object.entries(services)) {
       const full = s.image ?? '';
       const at = full.indexOf('@');

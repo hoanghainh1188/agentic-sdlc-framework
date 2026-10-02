@@ -9,6 +9,7 @@ import {
   PollerLoop,
   type PollerLoopDeps,
 } from '../../apps/worker/src/poller-loop.js';
+import { currentLogContext } from '../../packages/core/src/observability/index.js';
 
 /** The worker is typed against the built `@sdlc/core`; take its project type from the loop. */
 type PollableProject = Parameters<PollerLoopDeps['poll']>[0];
@@ -66,6 +67,18 @@ async function tickAt(h: Harness, ms: number): Promise<void> {
 }
 
 describe('poller loop', () => {
+  it('A08 AC1: a poll runs with its tenant in the log context', async () => {
+    const h = harness();
+    const seen: unknown[] = [];
+    h.pollImpl = async () => {
+      await Promise.resolve();
+      seen.push(currentLogContext());
+    };
+    await tickAt(h, 0);
+    expect(seen).toEqual([{ tenantId: TENANT }, { tenantId: TENANT }]);
+    expect(currentLogContext()).toEqual({});
+  });
+
   it('polls every project at once after a (re)start, then on its own interval', async () => {
     const h = harness();
     await tickAt(h, 0);

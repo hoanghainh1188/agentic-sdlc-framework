@@ -8,9 +8,10 @@ import {
   type ExceptionFilter,
   type Logger,
 } from '@nestjs/common';
-import { refusalReasonMessage } from '@sdlc/core';
+import { refusalReasonMessage, withLogContext } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 
+import type { AuthenticatedRequest } from '../auth/principal.js';
 import { ApiError, errorMessageKey, toApiError } from './api-error.js';
 import { localeOf } from './locale.js';
 
@@ -25,12 +26,17 @@ export class ErrorFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const http = host.switchToHttp();
-    const request = http.getRequest<{ headers: Record<string, string | string[] | undefined> }>();
+    const request = http.getRequest<
+      AuthenticatedRequest & { headers: Record<string, string | string[] | undefined> }
+    >();
     const error = fromNest(exception) ?? toApiError(exception);
     if (error.code === 'internal' && !(exception instanceof ApiError)) {
-      this.logger.error(
-        `unexpected error: ${exception instanceof Error ? exception.name : typeof exception}`,
-        exception instanceof Error ? exception.stack : undefined,
+      // The caller's tenant goes into the log line (A08); the filter runs outside the interceptor.
+      withLogContext({ tenantId: request.principal?.tenantId }, () =>
+        this.logger.error(
+          `unexpected error: ${exception instanceof Error ? exception.name : typeof exception}`,
+          exception instanceof Error ? exception.stack : undefined,
+        ),
       );
     }
     const locale = localeOf(request.headers['accept-language']);
