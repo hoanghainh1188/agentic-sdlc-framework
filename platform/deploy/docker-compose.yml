@@ -631,7 +631,7 @@ services:
   # Its only uplink is registry.npmjs.org; publishing is refused; no web UI; no host port. The
   # runner attaches it to each run's internal network under the alias npm-proxy.
   npm-proxy:
-    image: verdaccio/verdaccio:6.9.3@sha256:3b0591ab7612f3ed232fe5bb5888b9418ac9f34d712db781a03bd8dad43b4aa8
+    image: verdaccio/verdaccio:6.10.4@sha256:43c4067288b050422265407ea2fe747e511fcd0c407a85ec90ab9a326d9400cd
     profiles: [sandbox]
     restart: unless-stopped
     networks: [sdlc]
