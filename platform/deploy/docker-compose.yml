@@ -365,7 +365,7 @@ services:
   # ------------------------------------------------------- observability ----
 
   clickhouse:
-    image: clickhouse/clickhouse-server:26.3.32.14
+    image: clickhouse/clickhouse-server:26.3.36.6
     profiles: [observability]
     restart: unless-stopped
     networks: [sdlc]
