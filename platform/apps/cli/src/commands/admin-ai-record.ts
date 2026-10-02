@@ -18,6 +18,12 @@ import type { AiAllowed, DataClass, DisclosureFormat, ProdLogsAllowed } from '@s
 import { t } from '@sdlc/messages';
 
 import { EXIT, type CliContext } from '../context.js';
+import {
+  AI_RECORD_CONTENT_OPTIONS,
+  AI_RECORD_CONTENT_REQUIRED,
+  classList,
+  EXPECTED_VERSION_PATTERN,
+} from './ai-record-flags.js';
 
 type Values = Record<string, string | boolean | undefined>;
 
@@ -28,32 +34,13 @@ const BASE = {
 } as const;
 
 const SPECS = {
-  set: {
-    ...BASE,
-    'on-behalf-of': { type: 'string' },
-    'expected-version': { type: 'string' },
-    'ai-allowed': { type: 'string' },
-    classes: { type: 'string' },
-    'prod-logs': { type: 'string' },
-    disclosure: { type: 'string' },
-    'confirmed-at': { type: 'string' },
-    'record-ref': { type: 'string' },
-  },
+  set: { ...BASE, 'on-behalf-of': { type: 'string' }, ...AI_RECORD_CONTENT_OPTIONS },
   show: BASE,
 } as const;
 type Command = keyof typeof SPECS;
 
 const REQUIRED: Readonly<Record<Command, readonly string[]>> = {
-  set: [
-    'tenant',
-    'project',
-    'on-behalf-of',
-    'expected-version',
-    'ai-allowed',
-    'classes',
-    'prod-logs',
-    'disclosure',
-  ],
+  set: ['tenant', 'project', 'on-behalf-of', ...AI_RECORD_CONTENT_REQUIRED],
   show: ['tenant', 'project'],
 };
 
@@ -73,7 +60,7 @@ export function parseAiRecordCommand(
     });
     const found = values as Values;
     if (!REQUIRED[command].every((key) => typeof found[key] === 'string')) return undefined;
-    if (command === 'set' && !/^\d{1,9}$/.test(String(found['expected-version']))) {
+    if (command === 'set' && !EXPECTED_VERSION_PATTERN.test(String(found['expected-version']))) {
       return undefined;
     }
     return { command, values: found };
@@ -112,7 +99,7 @@ export async function runAiRecordCommand(
     const saved = await saveAiRecord(scope, project.id, {
       expectedVersion: Number(values['expected-version']),
       aiAllowed: String(values['ai-allowed']) as AiAllowed,
-      allowedDataClasses: list(String(values.classes)) as DataClass[],
+      allowedDataClasses: classList(String(values.classes)) as DataClass[],
       prodLogsAllowed: String(values['prod-logs']) as ProdLogsAllowed,
       disclosureFormat: String(values.disclosure) as DisclosureFormat,
       confirmedAt: typeof values['confirmed-at'] === 'string' ? values['confirmed-at'] : null,
@@ -128,15 +115,6 @@ export async function runAiRecordCommand(
     }
     throw error;
   }
-}
-
-/** `none` or an empty value: no classes. Otherwise a comma-separated list. */
-function list(value: string): string[] {
-  if (value === 'none') return [];
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter((item) => item !== '');
 }
 
 function print(

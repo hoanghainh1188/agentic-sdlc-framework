@@ -156,12 +156,18 @@ importers:
 
   platform/apps/cli:
     dependencies:
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       '@sdlc/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@sdlc/messages':
         specifier: workspace:*
         version: link:../../packages/messages
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
 
   platform/apps/runner:
     dependencies:
