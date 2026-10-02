@@ -290,7 +290,7 @@ services:
       test: [CMD-SHELL, 'test -s /run/litellm/config.yaml']
 
   seaweedfs:
-    image: chrislusf/seaweedfs:4.47
+    image: chrislusf/seaweedfs:4.48
     profiles: [core, observability]
     restart: unless-stopped
     networks: [sdlc]
@@ -320,7 +320,7 @@ services:
         ]
 
   seaweedfs-init:
-    image: chrislusf/seaweedfs:4.47
+    image: chrislusf/seaweedfs:4.48
     profiles: [core, observability]
     restart: 'no'
     networks: [sdlc]
