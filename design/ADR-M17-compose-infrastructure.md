@@ -20,15 +20,15 @@ Versions were checked against Docker Hub, GHCR and GitHub releases on 2026-09-25
 | Service | Profile | Image | Licence |
 |---|---|---|---|
 | postgres | core | `postgres:17.11-trixie` | PostgreSQL |
-| temporal | core | `temporalio/server:1.31.2` | MIT |
-| temporal-schema, temporal-namespace (jobs) | core | `temporalio/admin-tools:1.31.2` | MIT |
+| temporal | core | `temporalio/server:1.32.0` | MIT |
+| temporal-schema, temporal-namespace (jobs) | core | `temporalio/admin-tools:1.32.0` | MIT |
 | temporal-ui | core | `temporalio/ui:2.54.1` | MIT |
 | valkey | core | `valkey/valkey:8.1.10-alpine3.24` | BSD-3-Clause |
 | litellm | core | `ghcr.io/berriai/litellm:v1.102.1` | MIT (the `enterprise/` code is not activated) |
-| seaweedfs, seaweedfs-init (job) | core | `chrislusf/seaweedfs:4.47` | Apache-2.0 |
+| seaweedfs, seaweedfs-init (job) | core | `chrislusf/seaweedfs:4.48` | Apache-2.0 |
 | openbao | core | `openbao/openbao:2.6.3` | MPL-2.0 |
-| clickhouse | observability | `clickhouse/clickhouse-server:26.3.32.14` (LTS) | Apache-2.0 |
-| langfuse-web, langfuse-worker | observability | `langfuse/langfuse:4.45.1`, `langfuse/langfuse-worker:4.45.1` | MIT (the `ee/` code is not activated) |
+| clickhouse | observability | `clickhouse/clickhouse-server:26.3.36.6` (LTS) | Apache-2.0 |
+| langfuse-web, langfuse-worker | observability | `langfuse/langfuse:4.47.0`, `langfuse/langfuse-worker:4.47.0` | MIT (the `ee/` code is not activated) |
 
 All licences allow commercial use and redistribution (NFR-04). No MinIO, Redis or Elasticsearch (D-01 section 5.8e).
 
