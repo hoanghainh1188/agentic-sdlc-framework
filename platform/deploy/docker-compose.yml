@@ -383,7 +383,7 @@ services:
       test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:8123/ping || exit 1']
 
   langfuse-worker:
-    image: langfuse/langfuse-worker:4.45.1
+    image: langfuse/langfuse-worker:4.47.0
     profiles: [observability]
     restart: unless-stopped
     networks: [sdlc]
