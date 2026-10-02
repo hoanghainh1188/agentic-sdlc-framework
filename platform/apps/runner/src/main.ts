@@ -9,9 +9,10 @@
 import fs from 'node:fs';
 
 import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
+import { S3EvidenceStore } from '@sdlc/adapter-evidence-s3';
 import { createJsonLogger, PlatformDatabase, withLogContext } from '@sdlc/core';
 import { t } from '@sdlc/messages';
-import { OpenBaoClient } from '@sdlc/secrets';
+import { OpenBaoClient, SecretsError } from '@sdlc/secrets';
 import { activityTracingInterceptor } from '@sdlc/telemetry';
 
 import { RUNNER_TASK_QUEUE } from '@sdlc/contracts';
@@ -20,7 +21,14 @@ import { NativeConnection, Worker } from '@temporalio/worker';
 import { createRunnerActivities } from './activities.js';
 import { DockerClient } from './docker/client.js';
 import { RunnerError } from './errors.js';
-import { DB_PASSWORD_FIELD, DB_USER, processSettingsFromEnv } from './process.js';
+import {
+  DB_PASSWORD_FIELD,
+  DB_USER,
+  EVIDENCE_ACCESS_KEY_FIELD,
+  EVIDENCE_KEY_PREFIX,
+  EVIDENCE_SECRET_KEY_FIELD,
+  processSettingsFromEnv,
+} from './process.js';
 import { Runner } from './runner.js';
 import { runnerSettingsFromEnv } from './settings.js';
 
@@ -57,6 +65,42 @@ async function connectDatabase(
   });
 }
 
+/**
+ * The evidence store of L1 proposals (C06 session 2b, ADR-M33 §2.9), with the runner's write-only
+ * SeaweedFS credential from OpenBao (`kv/runner/evidence`). Without it the runner still starts; an
+ * L1 run that finishes then fails (`proposal_unavailable`) and the intent is paused.
+ */
+async function evidenceStore(
+  openbao: OpenBaoClient,
+  evidence: ReturnType<typeof processSettingsFromEnv>['evidence'],
+): Promise<S3EvidenceStore | undefined> {
+  if (!evidence) {
+    log('warn', 'runner.evidence_off', t('runner.start.evidence_off'));
+    return undefined;
+  }
+  let entry;
+  try {
+    entry = await openbao.kv().read(evidence.secretPath);
+  } catch (error) {
+    if (!(error instanceof SecretsError) || error.key !== 'secrets.not_found') throw error;
+    log('warn', 'runner.evidence_missing', t('runner.start.evidence_missing'));
+    return undefined;
+  }
+  const accessKeyId = entry.data[EVIDENCE_ACCESS_KEY_FIELD];
+  const secretAccessKey = entry.data[EVIDENCE_SECRET_KEY_FIELD];
+  if (!accessKeyId || !secretAccessKey) {
+    log('warn', 'runner.evidence_missing', t('runner.start.evidence_missing'));
+    return undefined;
+  }
+  return new S3EvidenceStore({
+    endpoint: evidence.url,
+    bucket: evidence.bucket,
+    keyPrefix: EVIDENCE_KEY_PREFIX,
+    accessKeyId,
+    secretAccessKey,
+  });
+}
+
 async function main(): Promise<void> {
   const settings = runnerSettingsFromEnv(process.env);
   const proc = processSettingsFromEnv(process.env);
@@ -65,6 +109,7 @@ async function main(): Promise<void> {
   const db = await connectDatabase(openbao, proc.db);
   const docker = new DockerClient({ socketPath: settings.dockerSocket });
   await docker.ping();
+  const evidence = await evidenceStore(openbao, proc.evidence);
 
   const beat = () =>
     fs.writeFileSync(proc.heartbeatFile, new Date().toISOString(), { mode: 0o600 });
@@ -95,7 +140,7 @@ async function main(): Promise<void> {
           }),
         ),
     },
-    { adapter: new OpenHandsAdapter() },
+    { adapter: new OpenHandsAdapter(), ...(evidence ? { evidence } : {}) },
   );
   await runner.start();
 
@@ -140,6 +185,7 @@ async function main(): Promise<void> {
     void (temporal?.running.catch(() => undefined) ?? Promise.resolve())
       .then(() => temporal?.connection.close())
       .then(() => runner.stop())
+      .then(() => evidence?.destroy())
       .then(() => Promise.all([db.close(), openbao.close()]))
       .finally(() => process.exit(0));
   };

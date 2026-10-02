@@ -212,13 +212,13 @@ t("C07","M-C","Gate G5: file scope + budget","M",["C06","C03","B11"],"FR-13, FR-
  ["Files changed outside the plan → stop, back to G3 (N1)",
   "Spend at 80% → warning comment; at 100% → stop and raise an escalation (N3)",
   "Owner decision `resume` with more budget → the run continues (bound, not expired)"],
- "Sandbox outputs are untrusted (ADR-M29 §2.5): recompute the changed files and `head_sha` from the pushed branch outside the sandbox before G5 relies on them. A cost cap and an iteration cap both end as `stopped_budget`; tell them apart by `stop_reason` (`max_iterations`); both need a human decision to resume (QUESTIONS #21, #82). Decide whether uncommitted edits of a stopped run are kept as evidence")
+ "Sandbox outputs are untrusted (ADR-M29 §2.5): recompute the changed files and `head_sha` from the pushed branch outside the sandbox before G5 relies on them; C06 session 2b built the pieces (`exportWorkspace`, `mirrorWorkspace`, `computeProposal` in the runner, ADR-M33 §2.9). A cost cap and an iteration cap both end as `stopped_budget`; tell them apart by `stop_reason` (`max_iterations`); both need a human decision to resume (QUESTIONS #21, #82). Decide whether uncommitted edits of a stopped run are kept as evidence")
 t("C08","M-C","Open PR + gate G6 (CI)","M",["C07","B05"],"—",
  "platform/packages/adapters/git-github (PR, checks), platform/apps/worker (G6)",
  ["Open a PR from the agent branch, filling template T2 (intent_id, run_id, AI-written parts)",
   "Read CI status by polling (checks API); fail → rerun the agent within the retry limit; no retries left → back to G3 (N2)",
   "An agent push to `main` is blocked by branch protection (N6)"],
- "The runner, not the sandbox, pushes `agent/INT-...` (QUESTIONS #52, ADR-M25): update the D-03 §4 flow and diagram D11 (and the D-02 §5 flow) in this task. Sandbox outputs are untrusted (ADR-M29 §2.5): the changed files and `head_sha` are recomputed from the pushed branch outside the sandbox")
+ "The runner, not the sandbox, pushes `agent/INT-...` (QUESTIONS #52, ADR-M25): update the D-03 §4 flow and diagram D11 (and the D-02 §5 flow) in this task. Sandbox outputs are untrusted (ADR-M29 §2.5): the changed files and `head_sha` are recomputed from the pushed branch outside the sandbox (reuse the runner's `exportWorkspace` and hardened git of C06, ADR-M33 §2.9)")
 t("C09","M-C","Integration tests G4–G6 on the sample repo","M",["C08","R04","B10","C11"],"—","platform/tests/integration/*",
  ["T01 runs from G1 to G6 successfully","N1, N2, N3, N6 are blocked correctly","T09 only produces a proposal; T10 is refused",
   "Kill switch and loop detection work on a live run","Unregistered or suspended agent cannot run"])
@@ -245,7 +245,8 @@ t("E02","M-D","Evidence Builder + Markdown export","M",["E01"],"FR-40, FR-42, FR
  ["Collects: spec + hash, plan, diff, CI/test/scan results, the 8 gate decisions with oversight modes, escalations, cost summary",
   "Includes the client AI disclosure note (`disclosure_note`) in the project's disclosure format",
   "Stored in SeaweedFS under a tenant prefix; manifest with a hash per item",
-  "Exports one readable Markdown file (English by default, via the message catalog)"])
+  "Exports one readable Markdown file (English by default, via the message catalog)"],
+ "Builds on C06 session 2b (ADR-M33 §2.9): `EvidenceStore` (`@sdlc/contracts`), `S3EvidenceStore` and the table `evidence_items` exist; L1 proposals are at `s3://evidence/proposals/…`. Re-check the SHA-256 of every item when the pack is built (the runner's identity can delete under `proposals/`; versioning keeps the content). Packs need their own write identity and prefix; decide object lock with E05 (ADR-M33 §2.9 gap 1)")
 t("E03","M-D","Gate G8: release approval, close the intent","S",["E02"],"FR-43",
  "platform/apps/worker (G8)",
  ["Person B approves G8 via CLI or comment (plus business/security owner for Critical); bound to the artifact digest",
@@ -260,7 +261,7 @@ t("E05","M-D","Retention jobs + audit anchoring","S",["E02","A07"],"FR-44",
   "Audit log, gate decisions and escalations kept at least 2 years (no deletion path in the MVP)",
   "Project archive → purge its evidence files and stored client material unless on hold; keep hashes; audit `project.purged`",
   "Daily: write each tenant's latest audit hash to SeaweedFS"],
- "Langfuse holds client data: LiteLLM's traces carry prompts and responses (D-05 §2, D-07; ADR-M35 §2.5, §4). Project archive (FR-44) and retention must also purge the project's Langfuse data (traces tagged with its `tenant:` and `project:` labels)")
+ "Object lock for evidence (ADR-M33 §2.9 gap 1, Harry's review of PR #112: not in C06): SeaweedFS can lock objects (COMPLIANCE, even the admin cannot delete a locked version), but only on a bucket created with lock enabled, and the lock period is set per bucket or per object, while retention is per project (`evidence_retention_days`) and `retention_hold` must be able to keep an object longer. Decide how they meet (for example a lock per object at write time equal to the project's retention, and legal hold for `retention_hold`) before the purge job deletes anything; the runner's proposal identity can delete under `proposals/` until then Langfuse holds client data: LiteLLM's traces carry prompts and responses (D-05 §2, D-07; ADR-M35 §2.5, §4). Project archive (FR-44) and retention must also purge the project's Langfuse data (traces tagged with its `tenant:` and `project:` labels)")
 t("E06","M-D","Gate waiting-time metrics","S",["B07"],"FR-12","platform/apps/cli",
  ["`sdlc metrics gates`: average / maximum waiting time per gate, per project"])
 t("E07","M-D","MVP definition-of-done check","M",["E03","E04","E05","C09","B13"],"D-02 section 10","platform/tests/integration/*, README",
@@ -416,7 +417,8 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.8 | 2026-09-27 | Claude (task C10), approved by Harry | E07 AC4: QUESTIONS #81 (a real run with an API model before M-E); B13 AC7: admin endpoints for the agent register with the Ch.20 approval rules; B13 AC8: stored configurations after a change of platform defaults (QUESTIONS #95); C06 note: the agent check and the recertification notice (ADR-M31) |
 | 1.9 | 2026-09-27 | Claude (task B07, session 2), approved by Harry | C06 note: no run before the last HOTL block window closes (`hotlBlockWindowOpenUntil`; QUESTIONS #88, ADR-M30 §2.4b) |
 | 1.10 | 2026-09-27 | Claude (task B12), approved by Harry | B04 AC5: `sdlc ai-record show|set` over the B12 API; B12 note: codes only, version history, write roles, API + operator command (QUESTIONS #103–#106, ADR-M32) |
-| 1.11 | 2026-09-30 | Claude (task A08), approved by Harry | E05 note: project archive and retention also purge the project's Langfuse data (prompts and responses are client data; ADR-M35) |
+| 1.11 | 2026-09-27 | Claude (task C06, session 2b), approved by Harry | C07, C08 notes: reuse the runner's workspace export and hardened git; E02 note: builds on `EvidenceStore` and `evidence_items`, re-checks hashes, own identity for packs; E05 note: object lock (per-bucket lock vs per-project retention and `retention_hold`) (ADR-M33 §2.9) |
+| 1.12 | 2026-09-30 | Claude (task A08), approved by Harry | E05 note: project archive and retention also purge the project's Langfuse data (prompts and responses are client data; ADR-M35) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))

@@ -12,3 +12,4 @@ export type * from './secrets.js';
 export * from './agent.js';
 export * from './intent-workflow.js';
 export * from './run-activity.js';
+export * from './evidence.js';

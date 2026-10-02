@@ -5,7 +5,7 @@
 | Status | **Proposed** (task A08, for review) |
 | Date | 2026-09-30 |
 | Decided by | Harry (QUESTIONS #4 answer A, 2026-09-30; A08 plan approved 2026-09-30 with D1–D4 and conditions 1–4) |
-| Related | D-02 NFR-06, FR-31, FR-44; D-03 sections 5.3, 10 (version 1.13); D-05 section 2; D-07 sections 3, 5; D-08 tasks A08, A10, E05; ADR-M17 §2.5, ADR-M24 §2.2, ADR-M25, ADR-M26, ADR-M27, ADR-M30, ADR-M33; QUESTIONS #4 |
+| Related | D-02 NFR-06, FR-31, FR-44; D-03 sections 5.3, 10 (version 1.14); D-05 section 2; D-07 sections 3, 5; D-08 tasks A08, A10, E05; ADR-M17 §2.5, ADR-M24 §2.2, ADR-M25, ADR-M26, ADR-M27, ADR-M30, ADR-M33; QUESTIONS #4 |
 
 ## 1. Context
 

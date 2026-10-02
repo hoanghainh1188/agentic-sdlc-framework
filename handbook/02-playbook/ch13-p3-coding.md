@@ -195,9 +195,15 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 |---|---|
 | finished, or stopped at its budget, time or iteration limit | The intent waits at **G5**, where the platform checks the changed files and the budget |
 | failed, or the runner was lost | The intent is **paused**, and a technical escalation goes to Person B (Chapter 18). When a person decides `resume`, the intent goes back to G4 and a new run starts after G4 |
+| finished at High risk (L1, a proposal only) | The platform stores the proposal and **pauses** the intent. Person A takes the proposal forward (see below) |
 | could not start (for example the budget is used up, or the run proposal changed) | The intent is back at **G4**, where the platform decides again |
 
-- High-risk runs (L1, a proposal only) do not start yet: the intent waits at G4 until the platform can store proposals.
+- **High-risk runs (L1)** never commit or push. When the agent finishes, the platform reads the agent's work out of the sandbox and computes the **proposal** (a patch against the start commit) outside the sandbox. It stores the patch as evidence of the intent and posts a comment: **the proposal is ready**. The comment mentions Person A.
+- The proposal is stored where only the platform can read it. Ask the platform operator for the patch of the run. A person then decides how to take it forward, for example as a normal pull request written or reviewed by a person, or as a new intent. The platform does not start another run for this intent by itself.
+- The proposal leaves out what the project's ignore rules ignored **at the start commit** (for example `node_modules`, build output, logs). A rule the agent adds hides nothing: the platform uses the start commit's rules and adds every other file.
+- **Check changes to `.gitignore` and `.gitattributes` in a proposal first.** They can hide files or change how files are compared, for example when the proposal is applied to a branch later, or in tools that respect them. Do not take such a change forward without a reason you understand.
+- The proposal can contain symbolic links, and they can point anywhere. Look at every link before you apply the proposal.
+- If the proposal cannot be stored, the run counts as failed: the intent is paused and escalated like any failed run.
 
 ### 13.10.5. Recertification warning
 
@@ -243,3 +249,4 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 | 0.2 | 2026-09-24 | Claude (draft) | §13.9 aligned with Ch.2 Rule 9 (supervised assistants only on client projects before the platform) |
 | 0.3 | 2026-09-27 | Claude (task C06, session 1) | §13.10 platform usage for G4: the configured agent, the checks, `/approve G4`, the recertification warning |
 | 0.4 | 2026-09-27 | Claude (task C06, session 2a) | §13.10.4: the start and end of a run, failed and lost runs, the queue |
+| 0.5 | 2026-09-27 | Claude (task C06, session 2b) | §13.10.4: High-risk (L1) runs end with a stored proposal; the intent is paused for Person A; what the proposal leaves out; check `.gitignore`, `.gitattributes` and symbolic links first |

@@ -6,9 +6,12 @@
 //   (`failed`, a lost runner, contracts that kept expiring), `paused` (`stopped_killed`), back to
 //   G4 (a refused start); the key is revoked by run, at once for a lost runner;
 // - a paused intent goes back to G4 once a person decides `resume` on the run's escalation;
-// - an L1 (High risk) intent does not start a run in session 2a.
+// - session 2b: an L1 (High risk) intent runs; its proposal-only end pauses the intent at G4
+//   (`proposal_ready`, no escalation) and it waits for a person (`proposal_review`).
+import { sql } from 'kysely';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 
+import { DbError } from '../../../packages/core/src/db/errors.js';
 import { CostError } from '../../../packages/core/src/cost/errors.js';
 import type { Intent } from '../../../packages/core/src/db/schema.js';
 import {
@@ -25,7 +28,7 @@ import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js'
 
 const MINUTE = 60_000;
 
-describeDb('C06 session 2a: the run after G4 on PostgreSQL', () => {
+describeDb('C06 session 2: the run after G4 on PostgreSQL', () => {
   let db: TestDatabase;
   let t: Harness;
 
@@ -63,7 +66,7 @@ describeDb('C06 session 2a: the run after G4 on PostgreSQL', () => {
   /** What the runner does to a run (the test plays the runner). */
   async function runnerEnds(
     runId: string,
-    to: 'succeeded' | 'failed' | 'stopped_killed' | 'stopped_budget',
+    to: 'succeeded' | 'succeeded_proposal_only' | 'failed' | 'stopped_killed' | 'stopped_budget',
   ) {
     const now = new Date();
     await t.f.scope.runs.claimForProvisioning(runId, now);
@@ -72,7 +75,7 @@ describeDb('C06 session 2a: the run after G4 on PostgreSQL', () => {
       from: ['running'],
       to,
       now,
-      ...(to === 'succeeded'
+      ...(to === 'succeeded' || to === 'succeeded_proposal_only'
         ? {}
         : { stopReason: to === 'failed' ? 'agent_error' : 'max_iterations' }),
       finishedAt: now,
@@ -254,15 +257,76 @@ describeDb('C06 session 2a: the run after G4 on PostgreSQL', () => {
     expect(t.calls.wrapped).toEqual([]);
   });
 
-  it('session 2a: an L1 (High risk) intent does not start a run; it waits at G4', async () => {
+  it('session 2b: an L1 (High risk) run ends with a proposal; the intent is paused for Person A', async () => {
     const intent = await atG4(t, 'high');
     await t.settleRuns(intent);
     await t.decide(await reload(intent), 'approve', 'a');
+    expect(await t.settleRuns(intent)).toEqual({ outcome: 'run_prepare' });
+    expect(await reload(intent)).toMatchObject({ status: 'running', current_gate: 'G4' });
+    const started = await startRun(t.f.scope, t.runDeps, intent.id);
+    if (!started.ok) throw new Error('not started');
+    const contract = await t.f.scope.runContracts.getByRunId(started.run.runId);
+    expect((contract?.contract_json as { autonomy_level: string }).autonomy_level).toBe('L1');
+
+    await runnerEnds(started.run.runId, 'succeeded_proposal_only');
     expect(await t.settleRuns(intent)).toEqual({
-      outcome: 'waiting',
-      reason: 'proposal_runs_unavailable',
+      outcome: 'run_ended',
+      runId: started.run.runId,
     });
-    expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G4' });
-    expect(await runs(intent)).toEqual([]);
+    await finishRun(t.f.scope, t.runDeps, intent.id, started.run.runId);
+    expect(t.calls.revoked).toEqual([started.run.runId]);
+    expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G4' });
+    expect(await notices(t, intent)).toContain('proposal_ready');
+    // Not a failure: no escalation, and no new run starts by itself.
+    expect(await t.f.scope.escalations.listForIntent(intent.id)).toEqual([]);
+    expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'proposal_review' });
+    expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G4' });
+    expect(await runs(intent)).toHaveLength(1);
+  });
+  it('session 2b: evidence items are written once, one row per URI, with coded values only', async () => {
+    const intent = await running();
+    const started = await startRun(t.f.scope, t.runDeps, intent.id);
+    if (!started.ok) throw new Error('not started');
+    const uri = `s3://evidence/proposals/${t.f.scope.tenantId}/${intent.id}/${started.run.runId}.patch`;
+    const item = {
+      intentId: intent.id,
+      runId: started.run.runId,
+      kind: 'proposal' as const,
+      storageUri: uri,
+      sha256: 'a'.repeat(64),
+      sizeBytes: 42,
+    };
+    const row = await t.f.scope.evidenceItems.record(item);
+    expect(row).toMatchObject({ kind: 'proposal', storage_uri: uri, purged_at: null });
+    expect((await t.f.scope.evidenceItems.listForIntent(intent.id)).map((r) => r.id)).toEqual([
+      row.id,
+    ]);
+    // The same URI never gets a second row (evidence is never overwritten).
+    await expect(t.f.scope.evidenceItems.record(item)).rejects.toBeInstanceOf(DbError);
+    // Bad values are refused before the database.
+    for (const bad of [
+      { storageUri: 's3://evidence/proposals/../x.patch' },
+      { storageUri: 'https://evidence/x.patch' },
+      { sha256: 'A'.repeat(64) },
+      { sizeBytes: -1 },
+      { kind: 'secret' as 'proposal' },
+    ]) {
+      await expect(t.f.scope.evidenceItems.record({ ...item, ...bad })).rejects.toBeInstanceOf(
+        DbError,
+      );
+    }
+    // The database refuses them too, and the application role cannot change or delete a row.
+    await expect(
+      sql`INSERT INTO evidence_items (tenant_id, intent_id, kind, storage_uri, sha256, size_bytes)
+          VALUES (${t.f.scope.tenantId}, ${intent.id}, 'proposal', 's3://evidence/a/./b', ${'b'.repeat(64)}, 1)`.execute(
+        db.appRaw,
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
+    for (const statement of [
+      sql`UPDATE evidence_items SET sha256 = ${'c'.repeat(64)} WHERE id = ${row.id}`,
+      sql`DELETE FROM evidence_items WHERE id = ${row.id}`,
+    ]) {
+      await expect(statement.execute(db.appRaw)).rejects.toMatchObject({ code: '42501' });
+    }
   });
 });

@@ -13,6 +13,7 @@ import type {
   EscalationStep,
   EscalationTrigger,
   EventSource,
+  EvidenceKind,
   GateCheckMode,
   GateCode,
   GateDecision,
@@ -390,6 +391,22 @@ export interface CostRecordsTable {
   created_at: CreatedAt;
 }
 
+/** Evidence files in the evidence store (D-05 section 6.6, C06 session 2b, ADR-M33 §2.9). */
+export interface EvidenceItemsTable {
+  id: Generated<string>;
+  tenant_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  run_id: ColumnType<string | null, string | null, never>;
+  kind: Immutable<EvidenceKind>;
+  storage_uri: Immutable<string>;
+  sha256: Immutable<string>;
+  /** bigint: `pg` returns int8 as a string. */
+  size_bytes: ColumnType<string, number, never>;
+  /** Set by the purge (E05); the row and the hash stay. */
+  purged_at: ColumnType<Date | null, never, never>;
+  created_at: CreatedAt;
+}
+
 type Mutable<T> = ColumnType<T, T | undefined, T>;
 type MutableNullable<T> = ColumnType<T | null, T | null | undefined, T | null>;
 
@@ -514,6 +531,7 @@ export interface Database {
   run_contracts: RunContractsTable;
   run_events: RunEventsTable;
   cost_records: CostRecordsTable;
+  evidence_items: EvidenceItemsTable;
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
@@ -870,6 +888,18 @@ export const TABLE_COLUMNS = {
     'updated_by',
     'created_at',
   ]),
+  evidence_items: columns<EvidenceItemsTable>()([
+    'id',
+    'tenant_id',
+    'intent_id',
+    'run_id',
+    'kind',
+    'storage_uri',
+    'sha256',
+    'size_bytes',
+    'purged_at',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -901,6 +931,7 @@ export const TENANT_COLUMN = {
   agents: 'tenant_id',
   intent_notices: 'tenant_id',
   project_ai_record_versions: 'tenant_id',
+  evidence_items: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -927,6 +958,7 @@ export type EscalationNotice = Selectable<EscalationNoticesTable>;
 export type Agent = Selectable<AgentsTable>;
 export type IntentNotice = Selectable<IntentNoticesTable>;
 export type ProjectAiRecordVersion = Selectable<ProjectAiRecordVersionsTable>;
+export type EvidenceItem = Selectable<EvidenceItemsTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

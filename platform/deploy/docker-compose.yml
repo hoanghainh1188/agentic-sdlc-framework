@@ -333,6 +333,8 @@ services:
         condition: service_healthy
     environment:
       SEAWEEDFS_BUCKETS: evidence langfuse
+      # A plain delete keeps the older versions (C06 session 2b, ADR-M33 §2.9).
+      SEAWEEDFS_VERSIONED_BUCKETS: evidence
     volumes:
       - ./seaweedfs/create-buckets.sh:/scripts/create-buckets.sh:ro
     entrypoint: [/bin/sh, /scripts/create-buckets.sh]
@@ -617,7 +619,7 @@ services:
       - -logjson
       - -loglevel=WARN
       - -shutdowngracetime=5
-      - '-allowGET=/v1\.44/(_ping|images/[a-zA-Z0-9][a-zA-Z0-9_.-]*(:[0-9]{1,5})?(/[a-zA-Z0-9][a-zA-Z0-9_.-]*)*(:[\w.-]+)?(@sha256:[0-9a-f]{64})?/json|containers/json|containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(json|logs)|networks|networks/[a-zA-Z0-9][a-zA-Z0-9_.-]*|volumes)'
+      - '-allowGET=/v1\.44/(_ping|images/[a-zA-Z0-9][a-zA-Z0-9_.-]*(:[0-9]{1,5})?(/[a-zA-Z0-9][a-zA-Z0-9_.-]*)*(:[\w.-]+)?(@sha256:[0-9a-f]{64})?/json|containers/json|containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(json|logs)|containers/sdlc-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/archive|networks|networks/[a-zA-Z0-9][a-zA-Z0-9_.-]*|volumes)'
       - '-allowPOST=/v1\.44/(images/create|containers/create|containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(start|wait)|networks/create|networks/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(connect|disconnect)|volumes/create)'
       - '-allowPUT=/v1\.44/containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/archive'
       - '-allowDELETE=/v1\.44/(containers|networks|volumes)/[a-zA-Z0-9][a-zA-Z0-9_.-]*'
@@ -687,6 +689,9 @@ services:
         condition: service_healthy
       temporal-namespace:
         condition: service_completed_successfully
+      # The bucket `evidence` with versioning (L1 proposals, C06 session 2b).
+      seaweedfs-init:
+        condition: service_completed_successfully
     # Group of the proxy socket (mode 0660, group = the socket proxy's group).
     group_add: ['${SDLC_DOCKER_GID:-0}']
     environment:
@@ -706,6 +711,10 @@ services:
       # C06 session 2 (ADR-M33 §2.6): the task queue sdlc-runner; one activity slot per sandbox.
       SDLC_RUNNER_TEMPORAL_ADDRESS: temporal:7233
       SDLC_RUNNER_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      # C06 session 2b (ADR-M33 §2.9): L1 proposals go to SeaweedFS with the runner's write-only
+      # identity from OpenBao (kv/runner/evidence, `openbao:bootstrap runner-evidence-credentials`).
+      SDLC_RUNNER_EVIDENCE_URL: http://seaweedfs:8333
+      SDLC_RUNNER_EVIDENCE_BUCKET: evidence
       SDLC_OPENBAO_ADDR: http://openbao:8200
       # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
       SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'

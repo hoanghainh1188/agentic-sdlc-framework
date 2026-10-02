@@ -200,8 +200,6 @@ async function atG4(
   if (outcome.kind === 'waiting') return outcome.result;
   if (outcome.kind === 'decided') {
     if (!deps.startRuns) return waiting('run_pending');
-    // Session 2a: runs that only propose (L1) come with session 2b (QUESTIONS #111).
-    if (outcome.proposal.autonomyLevel === 'L1') return waiting('proposal_runs_unavailable');
     // In the transaction that checked the block window and the freeze (ADR-M30 §2.4b).
     return (await moveToRunning(tx, deps.registry, intent)) ? moved : waiting('run_pending');
   }

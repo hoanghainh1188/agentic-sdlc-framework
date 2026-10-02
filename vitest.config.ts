@@ -12,7 +12,13 @@ const SOURCE_PACKAGES = [
   'workflow-client',
   'telemetry',
 ];
-const SOURCE_ADAPTERS = ['policy-simple', 'git-github', 'model-litellm', 'agent-openhands'];
+const SOURCE_ADAPTERS = [
+  'policy-simple',
+  'git-github',
+  'model-litellm',
+  'agent-openhands',
+  'evidence-s3',
+];
 
 export default defineConfig({
   resolve: {
