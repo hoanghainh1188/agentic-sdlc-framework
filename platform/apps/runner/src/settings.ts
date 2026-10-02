@@ -33,6 +33,8 @@ export const RUNNER_ENV = {
   agentLlmUrl: 'SDLC_RUNNER_AGENT_LLM_URL',
   agentPollMs: 'SDLC_RUNNER_AGENT_POLL_MS',
   agentStopGraceSeconds: 'SDLC_RUNNER_AGENT_STOP_GRACE_SECONDS',
+  agentSpendCheckSeconds: 'SDLC_RUNNER_AGENT_SPEND_CHECK_SECONDS',
+  agentSpendRecheckSeconds: 'SDLC_RUNNER_AGENT_SPEND_RECHECK_SECONDS',
 } as const;
 
 /**
@@ -68,6 +70,17 @@ export interface AgentSettings {
   readonly pollMs: number;
   /** After an interrupt at the time cap, how long the runner waits before it removes the sandbox. */
   readonly stopGraceMs: number;
+  /**
+   * How often the runner reads the spend of the run's key during the run (C07, ADR-M34 §2.6): a
+   * warning at `budget.warn_percent`, a stop at `budget.stop_percent` of the key's cap.
+   */
+  readonly spendCheckMs: number;
+  /**
+   * LiteLLM records spend with a delay. When the agent ends with an error below the stop share,
+   * the runner reads the spend once more after this wait, so a real budget stop is not reported
+   * as a technical failure (ADR-M34 §2.6).
+   */
+  readonly spendRecheckMs: number;
 }
 
 export interface RunnerSettings {
@@ -118,6 +131,10 @@ export const DEFAULTS = {
   agentLlmUrl: 'http://litellm:4000',
   agentPollMs: 1000,
   agentStopGraceSeconds: 30,
+  agentSpendCheckSeconds: 30,
+  // Above LiteLLM's spend write interval (`proxy_batch_write_at`, 10 s by default, measured in
+  // `pnpm test:litellm`): the re-read must see the spend that blocked the agent.
+  agentSpendRecheckSeconds: 25,
 } as const;
 /** More than this on one host is a mistake, not a setting (each sandbox reserves ~2 GiB). */
 export const MAX_SANDBOXES_LIMIT = 16;
@@ -254,6 +271,17 @@ function agentSettings(env: NodeJS.ProcessEnv): AgentSettings {
     stopGraceMs:
       intSetting(env, RUNNER_ENV.agentStopGraceSeconds, DEFAULTS.agentStopGraceSeconds, 1, 600) *
       1000,
+    spendCheckMs:
+      intSetting(env, RUNNER_ENV.agentSpendCheckSeconds, DEFAULTS.agentSpendCheckSeconds, 5, 600) *
+      1000,
+    spendRecheckMs:
+      intSetting(
+        env,
+        RUNNER_ENV.agentSpendRecheckSeconds,
+        DEFAULTS.agentSpendRecheckSeconds,
+        1,
+        60,
+      ) * 1000,
   };
 }
 

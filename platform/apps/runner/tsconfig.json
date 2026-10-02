@@ -8,6 +8,8 @@
   "references": [
     { "path": "../../packages/adapters/agent-openhands" },
     { "path": "../../packages/adapters/evidence-s3" },
+    { "path": "../../packages/adapters/model-litellm" },
+    { "path": "../../packages/adapters/policy-simple" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/core" },
     { "path": "../../packages/messages" },

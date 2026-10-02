@@ -177,6 +177,9 @@ export const GATE_REASON_CODES = [
   'agent_not_runnable',
   'instructions_mismatch',
   'autonomy_not_allowed',
+  // G4 (task C07, QUESTIONS #126, ADR-M34 §2.4): an agent instruction file the register does not
+  // pin exists at the base commit, or the commit's files cannot all be listed.
+  'instructions_unpinned',
   'other',
 ] as const;
 export type GateReasonCode = (typeof GATE_REASON_CODES)[number];

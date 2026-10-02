@@ -178,6 +178,12 @@ export interface GitHostAdapter {
   getFileAtCommit(ref: RepoRef, path: string, sha: string): Promise<string>;
   /** The commit a branch points to now (40 hex characters). G4 reads the run's base (C06). */
   getBranchHead(ref: RepoRef, branch: string): Promise<string>;
+  /**
+   * Every path of the commit's tree that is not a directory (files, symbolic links, submodules),
+   * sorted (task C07, QUESTIONS #126: G4 refuses agent instruction files the register does not
+   * pin). Never a partial list: a tree the host lists only in part fails with `tree_truncated`.
+   */
+  listPaths(ref: RepoRef, sha: string): Promise<string[]>;
   issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken>;
   /** MVP: polling. Pass `INITIAL_EVENT_CURSOR` for a project that has never been polled. */
   listEventsSince(
@@ -208,6 +214,7 @@ export const GIT_HOST_ERROR_CODES = [
   'file_not_utf8',
   'not_a_file',
   'too_many_files',
+  'tree_truncated',
   'webhook_disabled',
   'webhook_bad_signature',
   'unsupported_event',

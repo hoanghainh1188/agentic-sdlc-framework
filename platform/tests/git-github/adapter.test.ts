@@ -152,6 +152,58 @@ describe('getBranchHead (C06, QUESTIONS #109)', () => {
   );
 });
 
+describe('listPaths (C07, QUESTIONS #126)', () => {
+  const TREE = `/repos/acme/shop/git/trees/${SHA_A}`;
+
+  it('returns every non-directory path of the commit, sorted, in one recursive call', async () => {
+    h.stub.on('GET', TREE, {
+      body: {
+        sha: SHA_A,
+        truncated: false,
+        tree: [
+          { path: 'src', type: 'tree', mode: '040000', sha: SHA_A },
+          { path: 'src/main.ts', type: 'blob', mode: '100644', sha: SHA_A },
+          { path: 'AGENTS.md', type: 'blob', mode: '100644', sha: SHA_A },
+          { path: 'vendor/lib', type: 'commit', mode: '160000', sha: SHA_A },
+          { path: 'link', type: 'blob', mode: '120000', sha: SHA_A },
+        ],
+      },
+    });
+    await expect(h.adapter().listPaths(REPO, SHA_A)).resolves.toEqual([
+      'AGENTS.md',
+      'link',
+      'src/main.ts',
+      'vendor/lib',
+    ]);
+    const [request] = h.stub.requestsTo('GET', TREE);
+    expect(request?.query.get('recursive')).toBe('1');
+  });
+
+  it('fails closed on a truncated tree (tree_truncated)', async () => {
+    h.stub.on('GET', TREE, { body: { sha: SHA_A, truncated: true, tree: [] } });
+    await expect(h.adapter().listPaths(REPO, SHA_A)).rejects.toMatchObject({
+      code: 'tree_truncated',
+    });
+  });
+
+  it('refuses an unknown entry type', async () => {
+    h.stub.on('GET', TREE, {
+      body: { truncated: false, tree: [{ path: 'x', type: 'tag', sha: SHA_A }] },
+    });
+    await expect(h.adapter().listPaths(REPO, SHA_A)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
+
+  it('refuses a commit that is not a SHA without calling GitHub', async () => {
+    await expect(h.adapter().listPaths(REPO, 'main')).rejects.toMatchObject({
+      code: 'invalid_input',
+      params: { field: 'sha' },
+    });
+    expect(h.stub.requests).toHaveLength(0);
+  });
+});
+
 describe('getPullRequest and getChangedFiles', () => {
   it('returns the pull request without its free-text title or body', async () => {
     h.stub.on('GET', '/repos/acme/shop/pulls/7', { body: pull(7, '2026-09-26T07:00:00Z') });

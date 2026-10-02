@@ -26,6 +26,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   DockerClient,
+  driveAgent,
   Runner,
   teardownSandbox,
   type AgentDriveDeps,
@@ -35,7 +36,7 @@ import { createTestDatabase, type TestDatabase } from '../db/helpers.js';
 import { deployDir } from '../../deploy/compose';
 import { docker, dockerSocket, quietly } from '../runner/live-helpers';
 import { buildSandboxImage } from '../sandbox-image/helpers';
-import { startAgentRun } from './helpers';
+import { changesStep, startAgentRun } from './helpers';
 
 const enabled = process.env.SDLC_AGENT_REAL_TEST === '1' && !!process.env.SDLC_TEST_DATABASE_URL;
 const MODEL = 'gpt-oss-20b';
@@ -280,12 +281,24 @@ describe.skipIf(!enabled)('C05 real-model run: gpt-oss:20b through LiteLLM (ADR-
             agentUrl: () => run.relayUrl,
           },
         );
-        const result = await runner.runAgent({
-          contract: run.envelope.contract,
-          sandbox: run.sandbox,
-          model: MODEL,
-          virtualKey: virtualKey!,
-        });
+        // The runner did not provision this fixture run, so it holds no clone: drive the agent
+        // with the fixture's clone (C07 changes step), then release the run through the runner.
+        const result = await driveAgent(
+          {
+            db: t.app as unknown as AgentDriveDeps['db'],
+            docker: client,
+            settings: run.settings,
+            adapter: new OpenHandsAdapter({ requestTimeoutMs: 60_000 }),
+            agentUrl: () => run.relayUrl,
+            ...changesStep(t, client, run, []),
+          },
+          {
+            contract: run.envelope.contract,
+            sandbox: run.sandbox,
+            model: MODEL,
+            virtualKey: virtualKey!,
+          },
+        ).finally(() => runner.release(run.envelope.contract.tenant_id, runId, 'finished'));
         const seconds = Math.round((Date.now() - started) / 1000);
         const peaks = sampler.stop();
 

@@ -10,6 +10,7 @@ import fs from 'node:fs';
 
 import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { S3EvidenceStore } from '@sdlc/adapter-evidence-s3';
+import { LiteLLMKeySpendReader } from '@sdlc/adapter-model-litellm';
 import { createJsonLogger, PlatformDatabase, withLogContext } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OpenBaoClient, SecretsError } from '@sdlc/secrets';
@@ -25,6 +26,7 @@ import {
   DB_PASSWORD_FIELD,
   DB_USER,
   EVIDENCE_ACCESS_KEY_FIELD,
+  EVIDENCE_DIFF_KEY_PREFIX,
   EVIDENCE_KEY_PREFIX,
   EVIDENCE_SECRET_KEY_FIELD,
   processSettingsFromEnv,
@@ -66,14 +68,15 @@ async function connectDatabase(
 }
 
 /**
- * The evidence store of L1 proposals (C06 session 2b, ADR-M33 §2.9), with the runner's write-only
+ * The evidence stores of L1 proposals (C06 session 2b, ADR-M33 §2.9) and run diffs (C07, ADR-M34
+ * §2.2), with the runner's write-only
  * SeaweedFS credential from OpenBao (`kv/runner/evidence`). Without it the runner still starts; an
  * L1 run that finishes then fails (`proposal_unavailable`) and the intent is paused.
  */
-async function evidenceStore(
+async function evidenceStores(
   openbao: OpenBaoClient,
   evidence: ReturnType<typeof processSettingsFromEnv>['evidence'],
-): Promise<S3EvidenceStore | undefined> {
+): Promise<{ proposals: S3EvidenceStore; diffs: S3EvidenceStore } | undefined> {
   if (!evidence) {
     log('warn', 'runner.evidence_off', t('runner.start.evidence_off'));
     return undefined;
@@ -92,13 +95,16 @@ async function evidenceStore(
     log('warn', 'runner.evidence_missing', t('runner.start.evidence_missing'));
     return undefined;
   }
-  return new S3EvidenceStore({
-    endpoint: evidence.url,
-    bucket: evidence.bucket,
-    keyPrefix: EVIDENCE_KEY_PREFIX,
-    accessKeyId,
-    secretAccessKey,
-  });
+  // One credential, two key prefixes: L1 proposals (C06 2b) and run diffs (C07, ADR-M34 §2.2).
+  const store = (keyPrefix: string) =>
+    new S3EvidenceStore({
+      endpoint: evidence.url,
+      bucket: evidence.bucket,
+      keyPrefix,
+      accessKeyId,
+      secretAccessKey,
+    });
+  return { proposals: store(EVIDENCE_KEY_PREFIX), diffs: store(EVIDENCE_DIFF_KEY_PREFIX) };
 }
 
 async function main(): Promise<void> {
@@ -109,7 +115,9 @@ async function main(): Promise<void> {
   const db = await connectDatabase(openbao, proc.db);
   const docker = new DockerClient({ socketPath: settings.dockerSocket });
   await docker.ping();
-  const evidence = await evidenceStore(openbao, proc.evidence);
+  const evidence = await evidenceStores(openbao, proc.evidence);
+  // The runner reads its runs' spend with each run's own key (C07, ADR-M34 §2.6).
+  const spendReader = new LiteLLMKeySpendReader({ baseUrl: settings.agent.llmBaseUrl });
 
   const beat = () =>
     fs.writeFileSync(proc.heartbeatFile, new Date().toISOString(), { mode: 0o600 });
@@ -140,7 +148,11 @@ async function main(): Promise<void> {
           }),
         ),
     },
-    { adapter: new OpenHandsAdapter(), ...(evidence ? { evidence } : {}) },
+    {
+      adapter: new OpenHandsAdapter(),
+      spendReader,
+      ...(evidence ? { evidence: evidence.proposals, diffEvidence: evidence.diffs } : {}),
+    },
   );
   await runner.start();
 
@@ -185,7 +197,10 @@ async function main(): Promise<void> {
     void (temporal?.running.catch(() => undefined) ?? Promise.resolve())
       .then(() => temporal?.connection.close())
       .then(() => runner.stop())
-      .then(() => evidence?.destroy())
+      .then(() => {
+        evidence?.proposals.destroy();
+        evidence?.diffs.destroy();
+      })
       .then(() => Promise.all([db.close(), openbao.close()]))
       .finally(() => process.exit(0));
   };

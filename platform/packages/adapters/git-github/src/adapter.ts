@@ -225,6 +225,35 @@ export class GitHubAdapter implements GitHostAdapter {
     return sha(object.sha, 'ref.object.sha');
   }
 
+  /**
+   * Every non-directory path of the commit's tree (task C07, QUESTIONS #126): one recursive call to
+   * the Git trees API. GitHub cuts a large tree short (`truncated`); a partial list could hide an
+   * agent instruction file, so that fails with `tree_truncated` (fail closed, ADR-M34 §2.4).
+   */
+  async listPaths(ref: RepoRef, commitSha: string): Promise<string[]> {
+    const base = repoPath(ref);
+    if (!isSha(commitSha)) throw new GitHostError('invalid_input', { field: 'sha' });
+    const res = await this.#auth.withRepoAuth(ref, (auth) =>
+      this.#http.json('GET', `${base}/git/trees/${commitSha}`, {
+        auth,
+        query: { recursive: 1 },
+      }),
+    );
+    const body = obj(res.body, 'tree');
+    if (bool(body.truncated, 'tree.truncated')) throw new GitHostError('tree_truncated');
+    const paths = new Set<string>();
+    for (const item of arr(body.tree, 'tree.tree')) {
+      const entry = obj(item, 'tree.entry');
+      const type = str(entry.type, 'tree.entry.type');
+      if (type === 'tree') continue;
+      if (type !== 'blob' && type !== 'commit') {
+        throw new GitHostError('invalid_response', { field: 'tree.entry.type' });
+      }
+      paths.add(str(entry.path, 'tree.entry.path'));
+    }
+    return [...paths].sort();
+  }
+
   async issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken> {
     const repo = checkRepo(ref);
     const minted = await this.#auth.mint(repo, checkScope(scope));

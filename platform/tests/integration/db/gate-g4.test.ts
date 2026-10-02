@@ -7,6 +7,8 @@
 // - AC3: High risk → HITL: Person A approves the run proposal (`/approve G4`); a new commit on the
 //   default branch voids the approval (FR-17); a rejection ends the intent.
 // - `prepareRun`: contract, capped key, wrapped secrets; the recertification warning (FR-36).
+// - C07 (QUESTIONS #126): an unpinned agent instruction file at the base commit, or a commit the
+//   Git host lists only in part, fails G4 (`instructions_unpinned`); the run event `key_issued`.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { changeAgentStatus } from '../../../packages/core/src/agents/register.js';
@@ -59,6 +61,7 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       instructions: AGENTS_MD,
       models: [MODEL],
       tenantBudget: null,
+      paths: ['AGENTS.md', 'src/main.ts'],
     });
     t.world.gitDown = false;
     await t.setConfig(`run:\n  agent_key: ${t.agent.key}\n`);
@@ -148,6 +151,37 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'g4_check' });
       expect(await t.g4Decisions(intent)).toEqual([['fail', reason, 'POLICY']]);
       expect(await checksFailed(t, intent)).toEqual([check]);
+    });
+
+    it('C07 #126: another instruction file at the base commit → instructions_unpinned, once per set of files', async () => {
+      const intent = await atG4(t, 'medium');
+      t.world.paths = ['AGENTS.md', 'CLAUDE.md', 'src/main.ts'];
+      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'g4_check' });
+      await t.settle(intent);
+      expect(await t.g4Decisions(intent)).toEqual([['fail', 'instructions_unpinned', 'POLICY']]);
+      expect(await checksFailed(t, intent)).toEqual(['instructions_unpinned']);
+      // A second spelling of the pinned file is another file in Git: a new failure.
+      t.world.paths = ['AGENTS.md', 'CLAUDE.md', 'agents.md', 'src/main.ts'];
+      await t.settle(intent);
+      expect(await checksFailed(t, intent)).toEqual([
+        'instructions_unpinned',
+        'instructions_unpinned',
+      ]);
+      // Nothing about the paths is stored: the audit event holds the cause and the decision only.
+      const events = await t.f.scope.audit.listForEntity(intent.id, ['gate.g4_check_failed']);
+      expect(JSON.stringify(events.map((e) => e.payload))).not.toMatch(/CLAUDE|agents\.md/i);
+      // The files are removed: the run may start.
+      t.world.paths = ['AGENTS.md', 'src/main.ts'];
+      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'run_pending' });
+    });
+
+    it('C07 #126: a commit the Git host lists only in part → instructions_unpinned (tree_truncated)', async () => {
+      const intent = await atG4(t, 'medium');
+      t.world.paths = 'truncated';
+      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'g4_check' });
+      await t.settle(intent);
+      expect(await t.g4Decisions(intent)).toEqual([['fail', 'instructions_unpinned', 'POLICY']]);
+      expect(await checksFailed(t, intent)).toEqual(['tree_truncated']);
     });
 
     it('a suspended agent → agent_not_runnable (agent_not_active)', async () => {
@@ -479,6 +513,18 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
         max_iterations: 30,
         max_duration_min: 60,
       });
+    });
+
+    it('C07: records key_issued with the cap and the budget that set it; never the key', async () => {
+      const intent = await atG4(t, 'medium');
+      await t.settle(intent);
+      const result = await prepareRun(t.f.scope, deps(), intent.id);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const events = await t.f.scope.runEvents.list(result.run.runId);
+      const issued = events.filter((e) => e.event_type === 'key_issued');
+      expect(issued.map((e) => e.payload)).toEqual([{ max_budget_usd: '2', limited_by: 'run' }]);
+      expect(JSON.stringify(events)).not.toMatch(/sk-virtual|key-/);
     });
 
     it('refuses when the proposal changed since G4 passed, or when a check fails', async () => {

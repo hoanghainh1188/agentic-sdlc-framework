@@ -1,5 +1,7 @@
 // Shared set-up of the C05 live tests (ADR-M29): a fixture repository, a Run Contract bound to it,
 // a relay that stands in for the runner's own container, and a running sandbox with the clone.
+// C07: the fixture repository is laid out like the runner's own clone (`<clone>/repo`, `home`),
+// so the runs' changes are computed from the real sandbox (`changesStep`, ADR-M34 §2.2).
 // Test infrastructure goes through the docker CLI; the sandbox, the network attachment and the
 // clean-up are the runner code under test.
 import crypto from 'node:crypto';
@@ -8,12 +10,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type { RedactedSecret, RunContractEnvelope } from '@sdlc/contracts';
+import { loadProjectConfig } from '@sdlc/config';
+import type {
+  EvidenceStore,
+  RedactedSecret,
+  RunContractEnvelope,
+  StoredEvidence,
+} from '@sdlc/contracts';
 
 import {
   createSandbox,
   packDirectory,
   runnerSettingsFromEnv,
+  storeChanges,
+  type AgentDriveDeps,
   type DockerClient,
   type RunnerSettings,
   type Sandbox,
@@ -48,6 +58,8 @@ export interface AgentRunFixture {
   readonly relay: string;
   readonly relayUrl: string;
   readonly repoBase: string;
+  /** The fixture repository laid out like the runner's own clone (C07). */
+  readonly cloneDir: string;
 }
 
 export interface StartAgentRun {
@@ -79,7 +91,10 @@ const git = (dir: string, ...args: string[]) =>
 
 /** A fixture repository, a contract bound to it, and a running sandbox with the clone. */
 export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixture> {
-  const repo = fs.mkdtempSync(path.join(input.tmp, 'repo-'));
+  const cloneDir = fs.mkdtempSync(path.join(input.tmp, 'run-'));
+  const repo = path.join(cloneDir, 'repo');
+  fs.mkdirSync(repo);
+  fs.mkdirSync(path.join(cloneDir, 'home'));
   git(repo, 'init', '-q', '-b', 'main');
   fs.mkdirSync(path.join(repo, 'docs/specs'), { recursive: true });
   fs.writeFileSync(path.join(repo, 'README.md'), '# Fixture\n');
@@ -206,5 +221,48 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
     relay,
     relayUrl: `http://127.0.0.1:${port}`,
     repoBase: baseSha,
+    cloneDir,
+  };
+}
+
+/**
+ * The runner's changes step for a fixture run (C07, ADR-M34 §2.2): the real export from the
+ * sandbox, the hardened diff in the fixture clone, the default policy; diffs go to `puts`.
+ */
+export function changesStep(
+  t: TestDatabase,
+  client: DockerClient,
+  run: AgentRunFixture,
+  puts: { path: string; content: Buffer }[],
+): Pick<AgentDriveDeps, 'changes'> {
+  const evidence: EvidenceStore = {
+    put: (tenantId, p, content): Promise<StoredEvidence> => {
+      puts.push({ path: p, content });
+      return Promise.resolve({
+        uri: `s3://evidence/diffs/${tenantId}/${p}`,
+        sha256: crypto.createHash('sha256').update(content).digest('hex'),
+        sizeBytes: content.length,
+      });
+    },
+    get: () => Promise.reject(new Error('not used')),
+  };
+  const loaded = loadProjectConfig('');
+  if (!loaded.ok) throw new Error('default configuration refused');
+  const policy = createSimplePolicyEngine({ config: loaded.config });
+  return {
+    changes: async (contract) => {
+      const checked = await storeChanges(
+        {
+          db: t.app as unknown as AgentDriveDeps['db'],
+          docker: client,
+          settings: run.settings,
+          evidence,
+          policy,
+        },
+        contract,
+        run.cloneDir,
+      );
+      return { changedFiles: checked.changedFiles };
+    },
   };
 }

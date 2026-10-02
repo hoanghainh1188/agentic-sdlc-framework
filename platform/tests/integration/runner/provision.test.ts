@@ -6,6 +6,8 @@
 // LiteLLM and nothing else. Then the runner removes everything.
 // C06 session 2b: an L1 run keeps the runner's clone; the proposal is read out of the real sandbox
 // with Docker's archive endpoint and computed with hardened git (ADR-M33 §2.9).
+// C07: every run keeps its clone; an L2 run's changes are stored as a diff and checked against the
+// plan and the agent instruction paths (ADR-M34 §2.2–§2.4).
 //
 // `pnpm test:runner` (SDLC_RUNNER_TEST=1, throw-away PostgreSQL from test-db.sh; CI job `compose`).
 // OpenBao is the in-process stub (Transit and response wrapping); `pnpm test:openbao` checks
@@ -31,6 +33,7 @@ import {
   releaseSandbox,
   runLabels,
   runnerSettingsFromEnv,
+  storeChanges,
   storeProposal,
   type RunnerDeps,
 } from '../../../apps/runner/src/index.js';
@@ -229,7 +232,11 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
       const info = await deps.docker.containerInspect(result.sandbox.containerId);
       expect(JSON.stringify(info)).not.toContain(TOKEN);
       expect(info?.State.Health?.Status).toBe('healthy');
-      expect(fs.readdirSync(workDir)).toEqual([]); // the clone left the runner's disk
+      // The runner keeps its own clone for the run's changes (C07), without the token.
+      expect(fs.readdirSync(workDir)).toEqual([path.basename(result.cloneDir)]);
+      const gitConfig = path.join(result.cloneDir, 'repo', '.git', 'config');
+      expect(fs.readFileSync(gitConfig, 'utf8')).not.toContain(TOKEN);
+      fs.rmSync(result.cloneDir, { recursive: true, force: true });
 
       // AC5: release removes everything and records it.
       await releaseSandbox(deps, tenant.id, runId, 'finished');
@@ -252,8 +259,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
       const result = await provisionRun(deps, { envelope, wrappedGitToken: wrapped });
       if (!result.ok) throw new Error(`provisioning failed: ${result.reason}`);
       const runId = envelope.contract.run_id;
-      expect(result.cloneDir).not.toBeNull();
-      const cloneDir = result.cloneDir!;
+      const cloneDir = result.cloneDir;
       try {
         // What the agent leaves: an edit, a new file, a link out of the workspace, a deletion,
         // and a change to its own `.git` (never read).
@@ -312,6 +318,74 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
       } finally {
         await releaseSandbox(deps, tenant.id, runId, 'finished');
         fs.rmSync(cloneDir, { recursive: true, force: true });
+      }
+    }, 300_000);
+
+    it('C07: the changes of an L2 run come from the real sandbox, stored as a diff and checked', async () => {
+      const { tenant, scope, envelope, wrapped } = await prepareRun('changes');
+      const result = await provisionRun(deps, { envelope, wrappedGitToken: wrapped });
+      if (!result.ok) throw new Error(`provisioning failed: ${result.reason}`);
+      const runId = envelope.contract.run_id;
+      try {
+        // The plan allows README.md only. The agent edits it, commits nothing, adds a file and an
+        // agent instruction file (QUESTIONS #126).
+        docker(
+          'exec',
+          '-u',
+          '10001',
+          result.sandbox.containerId,
+          'sh',
+          '-c',
+          'echo changed >> /workspace/README.md && echo new > /workspace/new.txt && ' +
+            'echo "do more" > /workspace/AGENTS.md',
+        );
+        const puts: { path: string; content: Buffer }[] = [];
+        const evidence: EvidenceStore = {
+          put: (tenantId, p, content): Promise<StoredEvidence> => {
+            puts.push({ path: p, content });
+            return Promise.resolve({
+              uri: `s3://evidence/diffs/${tenantId}/${p}`,
+              sha256: crypto.createHash('sha256').update(content).digest('hex'),
+              sizeBytes: content.length,
+            });
+          },
+          get: () => Promise.reject(new Error('not used')),
+        };
+        const loaded = loadProjectConfig('');
+        if (!loaded.ok) throw new Error('default configuration refused');
+        const policy = createSimplePolicyEngine({ config: loaded.config });
+        const checked = await storeChanges(
+          { ...deps, evidence, policy },
+          envelope.contract,
+          result.cloneDir,
+        );
+        // `.write-test` is left by the fixture's own probe that the workspace is writable.
+        expect(checked).toMatchObject({ changedFiles: 4, outOfScope: 3, instructionFiles: 1 });
+        expect(puts.map((p) => p.path)).toEqual([`${envelope.contract.intent_id}/${runId}.patch`]);
+        expect(puts[0]!.content.toString()).toContain('+changed');
+        expect(puts[0]!.content.toString()).not.toContain(TOKEN);
+        const [item] = await scope.evidenceItems.listForIntent(envelope.contract.intent_id);
+        expect(item).toMatchObject({ kind: 'diff', run_id: runId, sha256: checked.diffSha256 });
+        const events = (await scope.runEvents.list(runId)).slice(-2);
+        expect(events.map((e) => [e.event_type, e.payload])).toEqual([
+          [
+            'diff_stored',
+            { sha256: checked.diffSha256, size_bytes: puts[0]!.content.length, changed_files: 4 },
+          ],
+          [
+            'changes_checked',
+            {
+              changed_files: 4,
+              out_of_scope: 3,
+              instruction_files: 1,
+              paths_sha256: checked.pathsSha256,
+            },
+          ],
+        ]);
+        expect(JSON.stringify(events)).not.toMatch(/new\.txt|AGENTS|README/);
+      } finally {
+        await releaseSandbox(deps, tenant.id, runId, 'finished');
+        fs.rmSync(result.cloneDir, { recursive: true, force: true });
       }
     }, 300_000);
 

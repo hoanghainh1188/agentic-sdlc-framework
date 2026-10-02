@@ -66,7 +66,7 @@ class VirtualKeySecret implements RedactedSecret {
   }
 }
 
-function checkBaseUrl(value: string): string {
+export function checkBaseUrl(value: string): string {
   let url: URL;
   try {
     url = new URL(value);

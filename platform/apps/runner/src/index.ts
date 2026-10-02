@@ -25,6 +25,12 @@ export {
   type AgentRunResult,
 } from './agent/drive.js';
 export { AgentRunError, type AgentRunFailure } from './agent/errors.js';
+export {
+  SpendWatch,
+  type BudgetWarning,
+  type SpendLimits,
+  type SpendState,
+} from './agent/spend.js';
 export { AGENT_ERROR_MESSAGES, agentErrorMessage } from './agent/messages.js';
 export { loadAgentTask } from './agent/task.js';
 export { assertSafeNetworkConnect } from './docker/guard.js';
@@ -88,12 +94,19 @@ export {
 } from './workspace/git.js';
 export { packDirectory, packTar, SANDBOX_UID, type TarEntry } from './workspace/tar.js';
 export {
+  computeRunPatch,
   exportWorkspace,
   MAX_WORKSPACE_ENTRIES,
   storeProposal,
   type ProposalDeps,
   type StoredProposal,
 } from './workspace/export.js';
+export {
+  checkChangedPaths,
+  storeChanges,
+  type ChangesDeps,
+  type CheckedChanges,
+} from './workspace/changes.js';
 export { IgnoreChecker } from './workspace/ignore.js';
 export {
   computeProposal,

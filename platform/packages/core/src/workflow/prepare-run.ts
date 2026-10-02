@@ -187,6 +187,12 @@ export async function prepareRun(
   }
 
   try {
+    // C07 (ADR-M34 §2.6): the key's cap and which budget set it (run, intent or tenant), so G5 and
+    // the runner's spend check can be traced. The key and its ID never go into run events.
+    await scope.runEvents.append(runId, 'key_issued', {
+      max_budget_usd: key.maxBudgetUsd,
+      limited_by: key.limitedBy,
+    });
     const project = await scope.projects.getById(peek.project_id);
     const ref = project ? projectRepoRef(project) : undefined;
     if (!ref) throw new GitHostError('invalid_input', { field: 'repo' });

@@ -5,7 +5,8 @@
 // - `gatherG4Facts` reads what G4 needs from outside the database, before the step's transaction
 //   (no HTTP call while the intent lock is held): the head of the project's default branch (the
 //   run's base commit, QUESTIONS #109), the SHA-256 of the agent's instructions file at that commit
-//   (read outside the sandbox, ADR-M31 §2.5), and the models the gateway allows for the intent's
+//   (read outside the sandbox, ADR-M31 §2.5), the agent instruction files at that commit other
+//   than the pinned one (C07, QUESTIONS #126), and the models the gateway allows for the intent's
 //   data class (QUESTIONS #17, #79).
 // - The run proposal: the terms a G4 pass or approval is bound to (FR-17). Its hash is the G4
 //   input: plan, spec, agent and its version, instructions, model, autonomy, tools, caps, allowed
@@ -15,6 +16,7 @@ import { createHash } from 'node:crypto';
 import { canonicalJson } from '@sdlc/config';
 import {
   GitHostError,
+  unpinnedInstructionPaths,
   type DataClass,
   type GitHostAdapter,
   type ValidatedProjectConfig,
@@ -31,7 +33,7 @@ import { loadEffectiveConfig } from '../registry/effective-config.js';
 /** What G4 needs from outside the database (the worker wires them in; tests pass fakes). */
 export interface G4Deps {
   /** The Git host of the platform's projects (GitHub in the MVP). */
-  readonly gitHost: Pick<GitHostAdapter, 'getBranchHead' | 'getFileAtCommit'>;
+  readonly gitHost: Pick<GitHostAdapter, 'getBranchHead' | 'getFileAtCommit' | 'listPaths'>;
   /**
    * The gateway's models that the data class may use under this configuration: the policy
    * engine's `allowedModels` over `ModelGateway.listModels()` (QUESTIONS #17).
@@ -56,6 +58,16 @@ export interface G4Facts {
     readonly agentId: string;
     /** Null when the file does not exist at `baseSha` (G4 fails with `instructions_mismatch`). */
     readonly sha256: string | null;
+    /**
+     * Agent instruction files at `baseSha` besides the pinned one (C07, QUESTIONS #126):
+     * `none`, `found` (with the SHA-256 of their sorted paths: a new file is a new failure; the
+     * paths are client data and stay out of the database), or `tree_truncated` (the Git host
+     * listed the commit only in part: fail closed, ADR-M34 §2.4).
+     */
+    readonly unpinned:
+      | { readonly kind: 'none' }
+      | { readonly kind: 'found'; readonly pathsSha256: string }
+      | { readonly kind: 'tree_truncated' };
   } | null;
   readonly allowedModels: readonly string[];
   /** The tenant's monthly budget (USD, decimal string); null: none set or not known. */
@@ -99,7 +111,11 @@ export async function gatherG4Facts(
       }
       sha256 = null;
     }
-    instructions = { agentId: agent.id, sha256 };
+    instructions = {
+      agentId: agent.id,
+      sha256,
+      unpinned: await unpinnedInstructions(deps, ref, baseSha, instructionsPath(agent)),
+    };
   }
   const allowedModels = await deps.allowedModels(config, intent.data_class);
   const tenantMonthlyBudgetUsd = deps.tenantMonthlyBudget
@@ -111,6 +127,28 @@ export async function gatherG4Facts(
     allowedModels: [...new Set(allowedModels)].sort(),
     tenantMonthlyBudgetUsd,
   };
+}
+
+/** The agent instruction files at `baseSha` other than the pinned one (QUESTIONS #126). */
+async function unpinnedInstructions(
+  deps: G4Deps,
+  ref: RepoRef,
+  baseSha: string,
+  pinnedPath: string,
+): Promise<NonNullable<G4Facts['instructions']>['unpinned']> {
+  let paths: string[];
+  try {
+    paths = await deps.gitHost.listPaths(ref, baseSha);
+  } catch (error) {
+    if (error instanceof GitHostError && error.code === 'tree_truncated') {
+      return { kind: 'tree_truncated' };
+    }
+    throw error;
+  }
+  const found = unpinnedInstructionPaths(paths, pinnedPath);
+  if (found.length === 0) return { kind: 'none' };
+  const pathsSha256 = createHash('sha256').update(canonicalJson([...found].sort()), 'utf8');
+  return { kind: 'found', pathsSha256: pathsSha256.digest('hex') };
 }
 
 /** The terms of the run that G4 passes or approves (ADR-M33 §2.3). Version 1. */

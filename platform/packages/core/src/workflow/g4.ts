@@ -11,7 +11,9 @@
 //   5. The project AI record still allows the data class (FR-19 at G4, ADR-M32 §2.6).
 //   6. The configured agent may run (FR-36, `checkAgentForRun`): registered, active, approved for
 //      the sandbox, autonomy within its maximum, pinned model among the allowed models, and the
-//      instructions file at the base commit equals the registered version.
+//      instructions file at the base commit equals the registered version, and no other agent
+//      instruction file exists at the base commit (C07, QUESTIONS #126, `instructions_unpinned`;
+//      a commit the Git host lists only in part is refused too: `tree_truncated`).
 //   7. The intent budget and the tenant's budget of this UTC month are not used up (the Cost
 //      Controller still caps the run's key when it starts).
 // Then it returns the run proposal (g4-proposal.ts), whose hash binds the G4 decision.
@@ -223,6 +225,26 @@ export async function evaluateG4(
       return { kind: 'fail', reason: agentReason(error.code), check: error.code, subject };
     }
     throw error;
+  }
+
+  // QUESTIONS #126 (C07): every other file the agent would read as instructions is unpinned. The
+  // exact cause goes to the audit event; the subject is the hash of the paths, never the paths.
+  const unpinned = facts.instructions.unpinned;
+  if (unpinned.kind === 'found') {
+    return {
+      kind: 'fail',
+      reason: 'instructions_unpinned',
+      check: 'instructions_unpinned',
+      subject: unpinned.pathsSha256,
+    };
+  }
+  if (unpinned.kind === 'tree_truncated') {
+    return {
+      kind: 'fail',
+      reason: 'instructions_unpinned',
+      check: 'tree_truncated',
+      subject: null,
+    };
   }
 
   const spent = toMicros(await tx.costRecords.totalForIntent(intent.id));

@@ -12,6 +12,7 @@ import { migration0009IntentWorkflow } from './0009-intent-workflow.js';
 import { migration0010AiRecord } from './0010-ai-record.js';
 import { migration0011GateG4 } from './0011-gate-g4.js';
 import { migration0012EvidenceItems } from './0012-evidence-items.js';
+import { migration0013GateG5Runner } from './0013-gate-g5-runner.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -27,4 +28,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0010-ai-record': migration0010AiRecord,
   '0011-gate-g4': migration0011GateG4,
   '0012-evidence-items': migration0012EvidenceItems,
+  '0013-gate-g5-runner': migration0013GateG5Runner,
 };

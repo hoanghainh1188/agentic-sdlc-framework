@@ -25,6 +25,8 @@ type Handler = (request: StubRequest) => StubReply | undefined;
 export class StubLiteLLM {
   readonly requests: StubRequest[] = [];
   private handlers: Handler[] = [];
+  /** Bearer keys accepted besides the master key (run keys, C07). */
+  private readonly keys = new Set<string>();
 
   private constructor(
     private readonly server: http.Server,
@@ -62,13 +64,20 @@ export class StubLiteLLM {
     this.handlers.unshift((r) => (r.method === method && r.path === path ? reply(r) : undefined));
   }
 
+  /** Accepts `key` as a bearer too (a run's virtual key, C07). */
+  allowKey(key: string): void {
+    this.keys.add(key);
+  }
+
   reset(): void {
     this.requests.length = 0;
     this.handlers = [];
+    this.keys.clear();
   }
 
   private reply(request: StubRequest): StubReply {
-    if (request.authorization !== `Bearer ${MASTER_KEY}`) {
+    const bearer = request.authorization?.replace(/^Bearer /, '');
+    if (bearer !== MASTER_KEY && (bearer === undefined || !this.keys.has(bearer))) {
       return { status: 401, body: { error: { message: `bad key ${ECHO_MARKER}` } } };
     }
     for (const handler of this.handlers) {

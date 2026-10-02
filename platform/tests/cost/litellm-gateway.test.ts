@@ -71,6 +71,8 @@ describe('AC2: createRunKey', () => {
     expect(key.expiresAt.toISOString()).toBe('2026-09-26T10:15:00.000Z');
     expect(stub.requests[0]!.body).toEqual({
       key_alias: `run-${RUN_ID}`,
+      // C07: each run key has its own owner, so it reads only its own info (ADR-M34 §2.6).
+      user_id: `run-${RUN_ID}`,
       team_id: 'sdlc-tenant-acme',
       models: ['claude-haiku-4-5'],
       max_budget: 0.5,
