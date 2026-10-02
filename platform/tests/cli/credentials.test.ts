@@ -1,6 +1,6 @@
 // The saved login of `sdlc login` (B04, design/ADR-M36 §2.1): file modes, refusal of unsafe files,
 // atomic replacement, and the API address rules (§2.3).
-import { chmod, mkdtemp, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -93,6 +93,26 @@ describe('saved login (ADR-M36 §2.1)', () => {
     const path = await writeSavedLogin(env, login);
     await writeFile(path, content, { mode: 0o600 });
     await expectProblem('malformed');
+  });
+
+  it('refuses a folder that is a link to somewhere else', async () => {
+    const elsewhere = join(home, 'elsewhere');
+    await mkdir(elsewhere, { mode: 0o755 });
+    await mkdir(join(home, '.config'));
+    await symlink(elsewhere, credentialsDir(env));
+    await expect(writeSavedLogin(env, login)).rejects.toSatisfy(
+      (error) => error instanceof CredentialsError && error.problem === 'not_a_file',
+    );
+    expect(await readdir(elsewhere)).toEqual([]);
+    expect((await stat(elsewhere)).mode & 0o777).toBe(0o755);
+  });
+
+  it('logout also removes temporary files a killed login left behind', async () => {
+    await writeSavedLogin(env, login);
+    const stale = join(credentialsDir(env), '.credentials.0123456789abcdef.tmp');
+    await writeFile(stale, 'x', { mode: 0o600 });
+    expect(await deleteSavedLogin(env)).toBe(true);
+    expect(await readdir(credentialsDir(env))).toEqual([]);
   });
 
   it('deletes the saved login once', async () => {

@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ApiCallError, ApiClient, MAX_RESPONSE_BYTES } from '../../apps/cli/src/api/client.js';
 import { exitCodeOf } from '../../apps/cli/src/api/errors.js';
 import { escalationListSchema } from '../../apps/cli/src/api/schemas.js';
+import { segment } from '../../apps/cli/src/api/session.js';
 import { EXIT } from '../../apps/cli/src/index.js';
 import { TOKEN } from './harness.js';
 
@@ -174,4 +175,14 @@ describe('exit codes (ADR-M36 §2.5)', () => {
       expect(exitCodeOf(new ApiCallError(kind))).toBe(EXIT.error);
     },
   );
+});
+
+describe('path segments', () => {
+  it.each(['', '.', '..'])('refuses %j', (value) => {
+    expect(() => segment(value)).toThrow('invalid_path_segment');
+  });
+
+  it('encodes everything else', () => {
+    expect(segment('a/b?c')).toBe('a%2Fb%3Fc');
+  });
 });

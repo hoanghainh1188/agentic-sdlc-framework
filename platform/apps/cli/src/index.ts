@@ -14,6 +14,7 @@ import { runGate } from './commands/gate.js';
 import { runIntent } from './commands/intent.js';
 import { runLogin, runLogout, runWhoami } from './commands/login.js';
 import { EXIT, type CliContext } from './context.js';
+import { clean } from './output.js';
 
 export { EXIT, processApiIo, processContext, type ApiIo, type CliContext } from './context.js';
 
@@ -40,7 +41,7 @@ export async function runCli(argv: readonly string[], ctx: CliContext): Promise<
       return await user(argv.slice(1), ctx);
     } catch (error) {
       ctx.stderr(
-        t('cli.failed', { reason: error instanceof Error ? error.message : String(error) }),
+        t('cli.failed', { reason: clean(error instanceof Error ? error.message : String(error)) }),
       );
       return EXIT.error;
     }
@@ -50,7 +51,7 @@ export async function runCli(argv: readonly string[], ctx: CliContext): Promise<
       return await runAdmin(argv.slice(1), ctx);
     } catch (error) {
       ctx.stderr(
-        t('cli.failed', { reason: error instanceof Error ? error.message : String(error) }),
+        t('cli.failed', { reason: clean(error instanceof Error ? error.message : String(error)) }),
       );
       return EXIT.error;
     }
@@ -65,7 +66,7 @@ export async function runCli(argv: readonly string[], ctx: CliContext): Promise<
       return await auditVerify(parsed, ctx);
     } catch (error) {
       ctx.stderr(
-        t('cli.failed', { reason: error instanceof Error ? error.message : String(error) }),
+        t('cli.failed', { reason: clean(error instanceof Error ? error.message : String(error)) }),
       );
       return EXIT.error;
     }

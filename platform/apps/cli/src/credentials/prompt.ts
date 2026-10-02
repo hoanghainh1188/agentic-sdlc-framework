@@ -15,9 +15,19 @@ export function readHiddenLine(prompt: string): Promise<string> {
   const stdin = process.stdin;
   return new Promise((resolve, reject) => {
     let value = '';
+    let escape = false;
+    let done = false;
+    const abort = (): void => finish(new InputAbortedError());
     const finish = (error?: Error): void => {
+      if (done) return;
+      done = true;
       stdin.removeListener('data', onData);
-      stdin.setRawMode(false);
+      stdin.removeListener('end', abort);
+      stdin.removeListener('error', abort);
+      process.removeListener('SIGTERM', abort);
+      process.removeListener('SIGHUP', abort);
+      // Always give the terminal back its echo, whatever ended the prompt.
+      if (stdin.isTTY) stdin.setRawMode(false);
       stdin.pause();
       process.stderr.write('\n');
       if (error) reject(error);
@@ -25,17 +35,31 @@ export function readHiddenLine(prompt: string): Promise<string> {
     };
     const onData = (chunk: Buffer): void => {
       for (const char of chunk.toString('utf8')) {
-        if (char === '\r' || char === '\n') return finish();
-        if (char === '\u0003' || char === '\u0004') return finish(new InputAbortedError());
-        if (char === '\u007f' || char === '\b') value = value.slice(0, -1);
+        // Escape sequences (arrow keys, bracketed paste markers) are skipped, never kept.
+        if (escape) {
+          if (/[A-Za-z~]/.test(char)) escape = false;
+          continue;
+        }
+        if (char === '\u001b') escape = true;
+        else if (char === '\r' || char === '\n') return finish();
+        else if (char === '\u0003' || char === '\u0004') return abort();
+        else if (char === '\u007f' || char === '\b') value = value.slice(0, -1);
         else if (char >= ' ') value += char;
-        if (value.length > MAX_SECRET_INPUT) return finish(new InputAbortedError());
+        if (value.length > MAX_SECRET_INPUT) return abort();
       }
     };
     process.stderr.write(prompt);
-    stdin.setRawMode(true);
-    stdin.resume();
-    stdin.on('data', onData);
+    stdin.on('end', abort);
+    stdin.on('error', abort);
+    process.once('SIGTERM', abort);
+    process.once('SIGHUP', abort);
+    try {
+      stdin.setRawMode(true);
+      stdin.resume();
+      stdin.on('data', onData);
+    } catch (error) {
+      finish(error instanceof Error ? error : new InputAbortedError());
+    }
   });
 }
 

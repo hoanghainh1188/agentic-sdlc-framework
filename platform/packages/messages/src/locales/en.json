@@ -141,6 +141,7 @@
   "cli.login.prompt": "API token (input hidden): ",
   "cli.login.url_required": "Give the API address with --api-url, for example --api-url https://sdlc.example.internal.",
   "cli.login.no_terminal": "Standard input is not a terminal. Pipe the token in with --token-stdin; never put it on the command line.",
+  "cli.login.stdin_is_terminal": "--token-stdin reads a pipe, not the terminal: typing there would show the token. Run sdlc login without --token-stdin to get a hidden prompt.",
   "cli.login.token_invalid": "This is not a personal API token: it must start with sdlc_pat_ and have 52 characters. Nothing was saved.",
   "cli.login.aborted": "The input was cancelled or too long. Nothing was saved.",
   "cli.login.done": "Logged in as {name} <{email}> in tenant {tenant} at {api_url}. The token is saved in {path} (readable only by you).",

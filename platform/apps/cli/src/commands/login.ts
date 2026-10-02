@@ -101,6 +101,11 @@ async function readToken(ctx: CliContext, fromStdin: boolean): Promise<string> {
   const io = apiIo(ctx);
   let token: string;
   if (fromStdin) {
+    if (io.stdinIsTTY) {
+      // Reading a terminal without raw mode would show the token as it is typed.
+      sayError(ctx, 'cli.login.stdin_is_terminal');
+      throw new CommandExit(EXIT.usage);
+    }
     token = (await io.readStdin()).trim();
   } else if (io.stdinIsTTY) {
     token = (await io.readHiddenLine(t('cli.login.prompt'))).trim();

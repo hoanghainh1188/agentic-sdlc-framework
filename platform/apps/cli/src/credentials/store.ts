@@ -3,7 +3,8 @@
 // mode 700 and the file mode 600, written through a temporary file that is never readable by
 // others; a file that group or others can read is refused, like ssh does.
 import { randomBytes } from 'node:crypto';
-import { chmod, lstat, mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { chmod, lstat, mkdir, open, readdir, rename, unlink } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
 import { z } from 'zod';
@@ -30,6 +31,7 @@ export class CredentialsError extends Error {
 const FILE_MODE = 0o600;
 const DIR_MODE = 0o700;
 const MAX_FILE_BYTES = 4096;
+const TEMP_FILE = /^\.credentials\.[0-9a-f]{16}\.tmp$/;
 
 const fileSchema = z.strictObject({
   version: z.literal(1),
@@ -55,21 +57,31 @@ export async function readSavedLogin(
   env: Readonly<Record<string, string | undefined>>,
 ): Promise<SavedLogin | undefined> {
   const path = credentialsPath(env);
-  let stats;
+  let handle;
   try {
-    stats = await lstat(path);
+    // O_NOFOLLOW: a symbolic link is refused (ELOOP); the checks below run on the opened file.
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   } catch (error) {
     if (isNotFound(error)) return undefined;
+    if ((error as NodeJS.ErrnoException).code === 'ELOOP') {
+      throw new CredentialsError('not_a_file', path);
+    }
     throw error;
   }
-  if (!stats.isFile()) throw new CredentialsError('not_a_file', path);
-  if ((stats.mode & 0o077) !== 0) throw new CredentialsError('unsafe_mode', path);
-  const uid = process.getuid?.();
-  if (uid !== undefined && stats.uid !== uid) throw new CredentialsError('not_owner', path);
-  if (stats.size > MAX_FILE_BYTES) throw new CredentialsError('malformed', path);
+  let text: string;
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile()) throw new CredentialsError('not_a_file', path);
+    if ((stats.mode & 0o077) !== 0) throw new CredentialsError('unsafe_mode', path);
+    if (!ownedByMe(stats.uid)) throw new CredentialsError('not_owner', path);
+    if (stats.size > MAX_FILE_BYTES) throw new CredentialsError('malformed', path);
+    text = await handle.readFile('utf8');
+  } finally {
+    await handle.close();
+  }
   let parsed;
   try {
-    parsed = fileSchema.parse(JSON.parse(await readFile(path, 'utf8')));
+    parsed = fileSchema.parse(JSON.parse(text));
   } catch {
     throw new CredentialsError('malformed', path);
   }
@@ -87,6 +99,10 @@ export async function writeSavedLogin(
 ): Promise<string> {
   const dir = credentialsDir(env);
   await mkdir(dir, { recursive: true, mode: DIR_MODE });
+  // The folder must be a real folder of this user, not a link to somewhere else.
+  const stats = await lstat(dir);
+  if (!stats.isDirectory()) throw new CredentialsError('not_a_file', dir);
+  if (!ownedByMe(stats.uid)) throw new CredentialsError('not_owner', dir);
   await chmod(dir, DIR_MODE);
   const path = join(dir, 'credentials.json');
   const temp = join(dir, `.credentials.${randomBytes(8).toString('hex')}.tmp`);
@@ -107,17 +123,30 @@ export async function writeSavedLogin(
   return path;
 }
 
-/** Deletes the saved login. Returns false when there was none. */
+/** Deletes the saved login, and temporary files a killed `sdlc login` left. False: there was none. */
 export async function deleteSavedLogin(
   env: Readonly<Record<string, string | undefined>>,
 ): Promise<boolean> {
+  const dir = credentialsDir(env);
+  const names = await readdir(dir).catch((error: unknown) => {
+    if (isNotFound(error)) return [] as string[];
+    throw error;
+  });
+  await Promise.all(
+    names.filter((name) => TEMP_FILE.test(name)).map((name) => unlink(join(dir, name))),
+  );
   try {
-    await unlink(credentialsPath(env));
+    await unlink(join(dir, 'credentials.json'));
     return true;
   } catch (error) {
     if (isNotFound(error)) return false;
     throw error;
   }
+}
+
+function ownedByMe(uid: number): boolean {
+  const me = process.getuid?.();
+  return me === undefined || uid === me;
 }
 
 function isNotFound(error: unknown): boolean {

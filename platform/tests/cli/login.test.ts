@@ -43,6 +43,13 @@ describe('sdlc login', () => {
     expect(json).not.toHaveProperty('token_id');
   });
 
+  it('refuses --token-stdin on a terminal, where the token would be shown', async () => {
+    const h = await harness({ routes: ME, loggedIn: false, tty: true, stdin: TOKEN });
+    expect(await h.run(['login', '--api-url', API_URL, '--token-stdin'])).toBe(EXIT.usage);
+    expect(h.err).toEqual([t('cli.login.stdin_is_terminal')]);
+    expect(h.requests).toEqual([]);
+  });
+
   it('reuses the saved address when --api-url is left out', async () => {
     const h = await harness({ routes: ME, tty: true, hidden: TOKEN });
     expect(await h.run(['login'])).toBe(EXIT.ok);

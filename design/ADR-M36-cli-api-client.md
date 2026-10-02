@@ -27,13 +27,16 @@ Points to settle:
 - `sdlc login` saves `{ version: 1, api_url, token }` in `<config>/sdlc/credentials.json`. `<config>` is `$XDG_CONFIG_HOME` when it is an absolute path, otherwise `~/.config`.
 - The folder is mode 700, the file mode 600. The file is written to a temporary file opened with mode 600 (`O_EXCL`), synced, then renamed over the old file: it is never readable by others, not even for a moment.
 - On every read the CLI refuses the file (exit 2, with the fix) when it is not a regular file (for example a symbolic link), when it belongs to another user, when group or others can read it, or when its content is not the expected shape. This is the rule ssh uses for private keys.
+- The file is opened with `O_NOFOLLOW` and checked through the open handle (`fstat`), so it cannot be swapped between the check and the read. Before writing, the folder must be a real folder (not a link) owned by the user.
+- `sdlc logout` also removes temporary files that a killed `sdlc login` left behind.
 - **The token is stored in plain text** in that file, like `gh` and `docker` do by default. The file mode is the only protection. An OS keychain (macOS Keychain, Secret Service) may come later; it would replace the file behind the same `readSavedLogin` / `writeSavedLogin` functions.
 - `sdlc logout` deletes the file only. **It does not revoke the token on the server**: the message says so. Revocation stays with the operator command `sdlc admin token revoke` until B13 (§4).
 
 ### 2.2. Typing the token
 
 - The token is never a command-line argument (it would stay in the shell history and in process listings). There is no `--token` flag.
-- On a terminal, `sdlc login` asks with a hidden prompt (raw mode, no echo). In a pipe, `--token-stdin` reads standard input. Without a terminal and without `--token-stdin`, the command stops (exit 2).
+- On a terminal, `sdlc login` asks with a hidden prompt (raw mode, no echo). Escape sequences (arrow keys, bracketed paste markers) are skipped. The terminal's echo is restored however the prompt ends (Enter, Ctrl-C, end of input, SIGTERM, SIGHUP).
+- In a pipe, `--token-stdin` reads standard input. `--token-stdin` on a terminal is refused, because the token would be shown as it is typed. Without a terminal and without `--token-stdin`, the command stops (exit 2).
 - The shape (`sdlc_pat_` + 43 base64url characters) is checked before anything is sent. A wrong value is never echoed back: it may be another secret pasted in the wrong place.
 - The token is checked with `GET /v1/me` **before** it is saved. A refused token is not saved.
 - The token never appears in any output, error message or `--json` body. The HTTP client never puts request headers into its errors. Tests sweep the output of every command for the token.
@@ -43,6 +46,7 @@ Points to settle:
 - The API address must be `https://`. `http://` is accepted only for this machine (`127.0.0.1`, `localhost`, `[::1]`), where the Compose API listens on `127.0.0.1:8090`. An address with a user name, a password, a query or a fragment is refused.
 - TLS is verified by Node's `fetch`. There is no flag to skip it. A company CA is added with Node's standard `NODE_EXTRA_CA_CERTS`. The CLI refuses to run when `NODE_TLS_REJECT_UNAUTHORIZED=0` is set.
 - Redirects are refused (`redirect: 'manual'`, any 3xx is an error): the token is never sent to another address.
+- Path segments are always encoded, and `.`, `..` and empty segments are refused, so a value can never point a request at another endpoint.
 - Each request has a 30-second time-out. A response body larger than 4 MiB is refused.
 - **CI:** `SDLC_API_URL` and `SDLC_API_TOKEN` are read once at start-up and replace the saved login; both or neither must be set. They are meant **for CI only**: environment variables can leak through process listings, crash reports and CI logs. People use `sdlc login`. `sdlc login` warns when `SDLC_API_TOKEN` is set in the same shell.
 

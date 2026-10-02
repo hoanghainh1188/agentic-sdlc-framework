@@ -150,7 +150,8 @@ export async function guarded(
   }
 }
 
-/** Path segment: always encoded. */
+/** Path segment: always encoded; `.`, `..` and empty never pass (the URL would collapse them). */
 export function segment(value: string): string {
+  if (value === '' || value === '.' || value === '..') throw new Error('invalid_path_segment');
   return encodeURIComponent(value);
 }
