@@ -23,7 +23,7 @@ describe('sdlc', () => {
   it.each([
     [[]],
     [['audit']],
-    [['intent', 'create']],
+    [['unknown']],
     [['audit', 'verify', '--bogus']],
     [['audit', 'verify', 'extra']],
   ])('prints the usage and exits 2 for %j', async (argv) => {

@@ -105,7 +105,7 @@ If anything differs → **cancel and ask again**. Three rules always hold:
 
 > **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B06, 2026-09-27, updated with task B07 (the gate workflow and status comments; session 2: HOTL gates, block windows, gate deadlines) and task B12 (the project AI record before G1), and kept in line with the platform code (`design/ADR-M27-github-poller.md`, `design/ADR-M30-intent-workflow.md`, `design/ADR-M32-project-ai-record.md`). The rest of this chapter is Draft 0.1 and is written outside Claude Code.
 
-You can decide a gate by writing a comment on the GitHub issue or pull request of the intent. The platform reads new comments about every 30 seconds (project setting `github.poll_interval_seconds`). The CLI (`sdlc gate …`, task B04) does the same through the API.
+You can decide a gate by writing a comment on the GitHub issue or pull request of the intent. The platform reads new comments about every 30 seconds (project setting `github.poll_interval_seconds`). The CLI does the same through the API: `sdlc gate approve|reject|request-changes <gate> <intent>` (§19.8c).
 
 **Commands.** Write the command on the **first line of a new comment**:
 
@@ -179,10 +179,57 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - When the check fails, the intent stays a draft and the platform posts one status comment with the reason code, mentioning the people who may write the record. When the record is fixed, the intent enters G1 by itself within a few minutes.
 - Who may write the record: Person A and PM / BrSE by default (project setting `access.ai_record_write_roles`; the viewer role never may). Every change is a new version; the platform keeps every version and records who made it.
 - How to write it:
-  - through the API: `GET` and `PUT /v1/projects/<project>/ai-record` with your personal token. `PUT` needs `expected_version` (the version you read; `0` for the first version). The CLI command `sdlc ai-record show|set` comes with task B04.
+  - through the API: `GET` and `PUT /v1/projects/<project>/ai-record` with your personal token. `PUT` needs `expected_version` (the version you read; `0` for the first version). The CLI does the same: `sdlc ai-record show|set` (§19.8c).
   - the platform operator, on the server, for a new project: `sdlc admin ai-record set --tenant <slug> --project <slug> --on-behalf-of <email> --expected-version <n> --ai-allowed <…> --classes <a,b | none> --prod-logs <…> --disclosure <…> [--confirmed-at YYYY-MM-DD] [--record-ref https://…]` and `sdlc admin ai-record show --tenant <slug> --project <slug>`. The person named with `--on-behalf-of` must hold a write role on the project: they are accountable for the content.
 
 ---
+
+## 19.8c. Using the platform: the `sdlc` command
+
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B04, 2026-10-03, and kept in line with the platform code (`design/ADR-M36-cli-api-client.md`).
+
+The `sdlc` command does through the API what the comment commands do on GitHub, and more: create and read intents, decide gates, act on escalations, keep the project AI record.
+
+**Log in once.**
+
+1. Get a personal API token (`sdlc_pat_…`) from the platform operator. Keep it in your password manager.
+2. Run `sdlc login --api-url https://<platform address>` and paste the token at the prompt. The prompt does not show what you type.
+   - The platform checks the token first. Only a valid token is saved.
+   - The address must use `https://`. `http://` works only for a platform on your own machine (`http://127.0.0.1:8090`).
+   - If your company uses its own certificate authority, add it with the standard Node setting `NODE_EXTRA_CA_CERTS=<file>`. The command never runs with certificate checks turned off.
+3. `sdlc whoami` shows who you are and your roles per project.
+
+- The token is saved in `~/.config/sdlc/credentials.json` (or under `$XDG_CONFIG_HOME`), readable only by you. It is stored as plain text, so protect your account and your disk. If the file can be read by others, the command stops until you fix it (`chmod 600`) and log in again.
+- **Never put the token on the command line**, in a script, in a chat or in a ticket. There is no `--token` option. To pipe a token in (for example from a password manager), use `--token-stdin`.
+- `sdlc logout` deletes the saved login on your machine. **It does not revoke the token**: it stays valid until it expires. If the token may be lost or seen by someone else, ask the platform operator to revoke it (`sdlc admin token revoke`).
+- In CI only, set `SDLC_API_URL` and `SDLC_API_TOKEN` (as CI secrets) instead of logging in. Do not use them on your own machine: environment variables can leak into process lists and logs.
+
+**Commands.** Add `--json` to any command for machine-readable output.
+
+| Command | Does |
+|---|---|
+| `sdlc intent create --project <slug> --title <text> --risk <tier> --data-class <class> [--description <text> \| --description-file <file>] [--budget <USD>] [--issue <number>]` | Creates an intent; you become its owner (Person A) |
+| `sdlc intent list [--project <slug>] [--status <status>] [--limit <n>] [--cursor <c>]` | Lists the intents you can read, newest first |
+| `sdlc intent show <INT-…>` | Shows an intent with its spec, plan and gate decisions |
+| `sdlc gate approve <gate> <INT-…>` | Approves the gate the intent waits at |
+| `sdlc gate reject <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Rejects the gate |
+| `sdlc gate request-changes <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Requests changes |
+| `sdlc escalation list\|show\|ack\|decide …` | Chapter 18 §18.8b |
+| `sdlc ai-record show --project <slug>` | Shows the project AI record |
+| `sdlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
+
+- Gate decisions take **codes only**: a reason code (§19.8b) and, if you want, `--reason-ref` with an `https://` link to a comment that explains it. The platform never stores your words, because its records are kept for years.
+- The rules are the same as for comments (§19.8b): you need the gate's role, you can decide only the gate the intent waits at, and a producer never approves.
+
+**When a command fails.** The message says why. The exit code tells scripts what happened:
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Done |
+| 1 | The platform refused (no role, not found, conflict, rule broken, too many requests) |
+| 2 | Wrong command or options, not logged in, unsafe saved login |
+| 3 | The platform could not be reached or answered something unexpected |
+| 4 | Your token is missing, expired or revoked: get a new one and run `sdlc login` |
 
 ## 19.9. Roles and approval points
 
@@ -218,3 +265,4 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content |
 | 0.2 | 2026-09-27 | Claude (task B07, session 2) | §19.8b platform usage: HOTL gates and the block window, gate deadlines and their escalation, no scope at G1–G3 (ADR-M30 §2.4b, §2.9) |
+| 0.3 | 2026-10-03 | Claude (task B04) | §19.8c platform usage: the `sdlc` command (login, intents, gates, AI record, exit codes); §19.8b points to it (ADR-M36) |
