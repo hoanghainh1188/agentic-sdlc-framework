@@ -10,8 +10,13 @@ Usage:
   python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework --dry-run
   python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework
   python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework --only A01,A02
+  python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework --update --dry-run
+  python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework --update
 
-Idempotent: skips issues whose title already exists.
+Idempotent: skips issues that already exist (matched by the "[ID] " title prefix).
+--update also brings the OPEN issues of existing tasks in line with the CSV after
+D-08 changes: title, body and size label (stale size labels removed), and the
+handbook-dependent label. Closed issues are never changed.
 """
 import argparse
 import csv
@@ -67,12 +72,46 @@ def ensure_labels(repo, dry_run):
         gh(["label", "create", name, "--repo", repo, "--color", color, "--force"], dry_run)
 
 
-def existing_titles(repo, dry_run):
-    if dry_run:
-        return set()
+def existing_issues(repo):
+    """Issues by task ID (the "[ID] " title prefix). Read even in dry-run mode."""
     out = gh(["issue", "list", "--repo", repo, "--state", "all", "--limit", "500",
-              "--json", "title"])
-    return {i["title"] for i in json.loads(out)}
+              "--json", "number,title,body,state,labels"])
+    found = {}
+    for issue in json.loads(out):
+        title = issue["title"]
+        if title.startswith("[") and "] " in title:
+            found[title[1:title.index("] ")]] = issue
+    return found
+
+
+def labels_for(row):
+    labels = ["backlog-mvp", f"size:{row['size']}"]
+    if row["milestone"] == "M-0":
+        labels.append("repo:pilot")
+    if row["id"] in HANDBOOK_DEPENDENT:
+        labels.append("handbook-dependent")
+    return labels
+
+
+def update_issue(repo, issue, row, dry_run):
+    """Brings an open issue in line with the CSV row. Returns True when it changed."""
+    title = f"[{row['id']}] {row['title']}"
+    body = build_body(row)
+    have = {lb["name"] for lb in issue["labels"]}
+    want = set(labels_for(row))
+    args = ["issue", "edit", str(issue["number"]), "--repo", repo]
+    if issue["title"] != title:
+        args += ["--title", title]
+    if issue["body"].strip() != body.strip():
+        args += ["--body", body]
+    for lb in sorted(want - have):
+        args += ["--add-label", lb]
+    for lb in sorted(lb for lb in have - want if lb.startswith("size:")):
+        args += ["--remove-label", lb]
+    if len(args) == 5:
+        return False
+    gh(args, dry_run)
+    return True
 
 
 def build_body(row):
@@ -97,12 +136,14 @@ def main():
     p.add_argument("--repo", required=True, help="owner/name")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--only", default="", help="comma-separated task IDs")
+    p.add_argument("--update", action="store_true",
+                   help="also update open issues of existing tasks from the CSV")
     a = p.parse_args()
     only = {x.strip() for x in a.only.split(",") if x.strip()}
 
     ensure_milestones(a.repo, a.dry_run)
     ensure_labels(a.repo, a.dry_run)
-    have = existing_titles(a.repo, a.dry_run)
+    have = existing_issues(a.repo)
 
     with open(CSV_PATH, encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
@@ -111,14 +152,18 @@ def main():
         if only and row["id"] not in only:
             continue
         title = f"[{row['id']}] {row['title']}"
-        if title in have:
-            print("skip (exists):", title)
+        issue = have.get(row["id"])
+        if issue:
+            if not a.update:
+                print("skip (exists):", title)
+            elif issue["state"] != "OPEN":
+                print("skip (closed):", title)
+            elif update_issue(a.repo, issue, row, a.dry_run):
+                print("updated:", title)
+            else:
+                print("up to date:", title)
             continue
-        labels = ["backlog-mvp", f"size:{row['size']}"]
-        if row["milestone"] == "M-0":
-            labels.append("repo:pilot")
-        if row["id"] in HANDBOOK_DEPENDENT:
-            labels.append("handbook-dependent")
+        labels = labels_for(row)
         args = ["issue", "create", "--repo", a.repo, "--title", title,
                 "--body", build_body(row), "--milestone", row["milestone"]]
         for lb in labels:
