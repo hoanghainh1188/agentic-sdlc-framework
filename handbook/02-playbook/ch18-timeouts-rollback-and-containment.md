@@ -1,7 +1,7 @@
 # Chapter 18. Timeouts, rollback and containment
 
 > Readers: **developers, Person A, Person B**, operators · Reading time: about 15 minutes
-> Status: **Draft 0.3**, awaiting Harry's comments. §18.8b and §18.8c (platform usage) are owned by Claude Code.
+> Status: **Draft 0.3**, awaiting Harry's comments. §18.8b, §18.8c and §18.8d (platform usage) are owned by Claude Code.
 
 ---
 
@@ -244,6 +244,41 @@ Before you change anything after a timeout or a stopped run (§18.4), find what 
 - A log line written inside a traced request or activity also carries `trace_id`: search for it in Langfuse to see the whole request.
 - **Langfuse holds the prompts and the model's answers.** They are client data: treat Langfuse like the repository of the client project (Chapter 3). Only people who may see the project's code may have a Langfuse account.
 
+## 18.8d. Using the platform: the kill switch
+
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task C11, 2026-10-03 (`design/ADR-M42-kill-switch.md`).
+
+Use the kill switch when an agent run must stop **now**: it does something it should not, it loops, it spends too fast, or you are not sure. It is step 2 "Contain" of an incident (Chapter 6 §6.7). Stopping a run is never wrong: a person reviews it afterwards.
+
+**How to stop a run.** Any of these:
+
+| Where | Command |
+|---|---|
+| On the intent's GitHub issue or pull request | A new comment whose first line is `/kill`. You may add the reason after it: `/kill it rewrites the payment module`. The reason stays on GitHub |
+| In a terminal | `sdlc run kill <INT-…>` (the intent's current run) or `sdlc run kill <run ID>`. `sdlc run list <INT-…>` shows the runs and their IDs |
+| On the server, when nobody with a role can act or the API is down | The operator runs `pnpm sdlc ops run kill --tenant <slug> --run <run ID>` (recorded as the system) |
+
+**Who may.** Person A, Person B and governance on the project (project setting `access.kill_roles`; a project may add roles, never remove these three; the viewer never). The person who started the run may stop it too. Your GitHub account must be linked to your platform user (§19.8b): a comment from an account that is not linked stops nothing.
+
+**What happens.**
+
+1. The platform records the kill at once. A run that has not started yet never starts. The run you stopped shows `stopping`, then `stopped_killed`.
+2. Within about a second the runner interrupts the agent, then removes the sandbox. The run's model key is revoked. The run's GitHub tokens are already gone: the runner revokes each one right after it used it.
+3. The platform keeps what the agent changed as evidence (the run's diff), when it can do so within about a minute. It never delays the stop for it.
+4. An **escalation** is raised at once (route technical, severity `high`, level `contain` by default: project setting `run.kill_escalation`). The intent is frozen until a person decides. Person B receives it first; the escalation clocks and the backup chain of §18.8b apply.
+5. The issue gets a status comment `run_killed`.
+
+**Afterwards.** Review the run with the escalation (§18.8b): the run's events, its diff, the logs and traces of §18.8c. Then decide:
+
+- `/decide resume` (or `sdlc escalation decide … resume`): the intent goes back to G4, and a new run starts after G4 is decided again;
+- `/decide terminate`: the intent is closed (`cancelled`).
+
+**Good to know.**
+
+- Stopping twice is harmless: the second time nothing changes.
+- A run that already ended cannot be stopped (`run_not_active`). To stop a push or a pull request at G6, raise or decide an escalation: its freeze stops the push.
+- The target is under 5 minutes from your command to everything removed (D-02 FR-34). The platform's own test measures about one second. If the runner itself is down, the run ends after at most 2 minutes, and the sandbox is removed when the runner starts again.
+
 ---
 
 ## 18.9. Drills and metrics
@@ -306,3 +341,4 @@ Track:
 | 0.5 | 2026-09-30 | Claude (task A08) | §18.8c platform usage: logs and traces of a run (ADR-M35) |
 | 0.6 | 2026-10-03 | Claude (task B04) | §18.8b: the `sdlc escalation` commands (ADR-M36) |
 | 0.7 | 2026-10-03 | Claude (task C07, PR 2) | §18.8b: resume a G5 breach with more budget (the request body, `run_start` and `budget_increase`; ADR-M34 §2.9) |
+| 0.8 | 2026-10-03 | Claude (task C11, PR 1) | §18.8d platform usage: the kill switch (`/kill`, `sdlc run kill`, `sdlc ops run kill`, who, what happens, afterwards; ADR-M42) |

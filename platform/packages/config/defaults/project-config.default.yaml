@@ -189,6 +189,11 @@ run:
   # escalation (route security or intent, by cause). [Proposal] pilot severity; mandatory rule M22:
   # the response level is pause or higher, so the intent stays frozen until a person decides.
   g5_breach_escalation: { severity: high, response_level: pause }
+  # Task C11 (ADR-M42; QUESTIONS.md #181; D-03 §6.5 "opens an escalation for review"; handbook
+  # Ch.6 §6.7 step 2 Contain): a kill raises a technical escalation at once. [Proposal] pilot
+  # severity; mandatory rule M26: the response level is pause or higher, so the intent stays frozen
+  # until a person decides.
+  kill_escalation: { severity: high, response_level: contain }
 
 budget:
   # D-07 §6; D-02 FR-52; handbook Ch.3 §3.6: warning at 80 %, stop at 100 %.
@@ -244,6 +249,11 @@ access:
   # G3. The submitter is a producer of the plan and never approves G3 (FR-11). The viewer role
   # never submits a plan (mandatory rule M24). Reading the plans follows `intent_read_roles`.
   plan_submit_roles: [person_a]
+  # Task C11, ADR-M42, QUESTIONS #180. D-02 FR-34: Person A, Person B and governance may stop any
+  # run with the kill switch (`sdlc run kill`, `/kill`). Mandatory rule M25: these three always stay
+  # in the list and the viewer role never kills. The producer of the run may kill it: killing is
+  # containment, never an approval, and the escalation it raises is decided by someone else.
+  kill_roles: [person_a, person_b, governance]
   # Task B13, ADR-M37, QUESTIONS #154. Separation of duties (handbook Ch.5, codes table §5): one
   # person never holds both roles of a pair on the same project. Person A (owner) and Person B
   # (independent reviewer) always stay apart (mandatory rule M21): G1–G3 have no producers

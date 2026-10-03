@@ -12,8 +12,9 @@
 // 4. drive the agent to its end (C05), then the sandbox is removed and the slot freed (`Runner`).
 // A heartbeat goes to Temporal every `HEARTBEAT_MS` while the activity lives; the workflow treats a
 // lost heartbeat as a lost runner (ADR-M33 §2.7). When the activity is cancelled (the runner stops
-// gracefully; the kill switch comes with C11), the driver stops the agent first (interrupt, then
-// kill), the run ends `failed` (`agent_cancelled`) and the sandbox is removed; there is never a
+// gracefully, or the workflow cancels it for the kill switch, C11), the driver stops the agent
+// first (interrupt, then kill), the run ends `failed` (`agent_cancelled`), or `stopped_killed` when
+// it is being killed (`stopping`), and the sandbox is removed; there is never a
 // teardown while the agent is being driven. After a runner restart, the clean-up at start and the
 // sweep remove what is left (ADR-M25 §2.8).
 // The result holds codes only; paths, logs and texts never go to Temporal.
@@ -33,6 +34,7 @@ import { Redacted } from '@sdlc/secrets';
 import { Context } from '@temporalio/activity';
 
 import type { Runner } from './runner.js';
+import { isRefusedWrapToken, recordWrapTokenReused } from './tokens.js';
 import { publishRun, type PublishDeps } from './workspace/publish.js';
 
 /** Heartbeat interval; the workflow's heartbeat timeout is 2 minutes. */
@@ -132,13 +134,19 @@ async function execute(
   let virtualKey;
   try {
     virtualKey = (await deps.unwrapper.unwrap(new Redacted(input.wrappedVirtualKey))).key;
-  } catch {
+  } catch (error) {
     virtualKey = undefined;
+    // The contract is valid, so its wrapping token should be too: someone else opened it (C11).
+    if (isRefusedWrapToken(error)) {
+      await recordWrapTokenReused(scope, input.runId, 'virtual_key');
+    }
   }
-  if (!virtualKey || ctx.cancellationSignal.aborted) {
+  const killed = (await scope.runs.getById(input.runId))?.status === 'stopping';
+  if (!virtualKey || ctx.cancellationSignal.aborted || killed) {
     await deps.runner.release(input.tenantId, input.runId, virtualKey ? 'killed' : 'failed');
     const now = new Date();
-    await scope.runs.transition(input.runId, {
+    // A run being killed ends as killed (C11, migration 0020); otherwise it fails. One update.
+    await scope.runs.end(input.runId, {
       from: ['provisioning', 'running'],
       to: 'failed',
       now,

@@ -521,18 +521,193 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     });
   });
 
-  it('changes nothing when the run left running meanwhile (kill switch, C11)', async () => {
+  it('C11: a run killed before the agent starts ends stopped_killed, the agent never starts', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    const runId = s.envelope.contract.run_id;
+    await s.scope.runs.transition(runId, { from: ['running'], to: 'stopping', now: new Date() });
+    const result = await driveAgent(deps(agent), request(s));
+    expect(result).toMatchObject({
+      outcome: 'killed',
+      status: 'stopped_killed',
+      stopReason: 'killed',
+    });
+    expect(agent.started).toBeUndefined();
+    expect(await s.scope.runs.getById(runId)).toMatchObject({
+      status: 'stopped_killed',
+      stop_reason: 'killed',
+    });
+  });
+
+  it('a run that left running otherwise is refused before the agent starts', async () => {
     const s = await seed();
     const agent = new FakeAgent();
     await s.scope.runs.transition(s.envelope.contract.run_id, {
       from: ['running'],
-      to: 'stopping',
+      to: 'failed',
       now: new Date(),
+      stopReason: 'sandbox_lost',
     });
     await expect(driveAgent(deps(agent), request(s))).rejects.toMatchObject({
       reason: 'run_not_running',
     });
     expect(agent.started).toBeUndefined();
+  });
+
+  /** Moves the run to `stopping` on the `at`-th status poll, as `requestRunKill` does. */
+  function killOnPoll(agent: FakeAgent, s: Seeded, at: number): void {
+    const runId = s.envelope.contract.run_id;
+    let polls = 0;
+    const original = agent.getStatus.bind(agent);
+    agent.getStatus = async () => {
+      polls += 1;
+      if (polls === at) {
+        await s.scope.runs.transition(runId, {
+          from: ['running'],
+          to: 'stopping',
+          now: new Date(),
+        });
+      }
+      return polls < at + 5 ? { state: 'running', iterations: polls } : original();
+    };
+  }
+
+  it('C11 AC2: a kill while the agent works stops it (interrupt), ends the run stopped_killed and stores its diff once the key is refused', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    killOnPoll(agent, s, 2);
+    const runId = s.envelope.contract.run_id;
+    let checks = 0;
+    const result = await driveAgent(
+      {
+        ...deps(agent),
+        // The worker revokes the key: refused from the third check on.
+        keyRevoked: (key) => {
+          expect(key.reveal()).toBe(VIRTUAL_KEY);
+          checks += 1;
+          return Promise.resolve(checks >= 3);
+        },
+      },
+      request(s),
+    );
+    expect(result).toMatchObject({
+      outcome: 'killed',
+      status: 'stopped_killed',
+      stopReason: 'killed',
+    });
+    expect(agent.stopped).toBe(1);
+    expect(agent.commits).toBe(0);
+    expect(checks).toBe(3);
+    expect(changed).toEqual([runId]);
+    // Every process of the sandbox was killed before the workspace was read (security review).
+    expect(stub.calls.map((c) => `${c.method} ${c.path}`)).toContain(
+      `POST /containers/${s.sandbox.names.container}/kill`,
+    );
+    expect(await s.scope.runs.getById(runId)).toMatchObject({
+      status: 'stopped_killed',
+      stop_reason: 'killed',
+      iterations: 4,
+    });
+    const events = (await s.scope.runEvents.list(runId)).map((e) => [e.event_type, e.payload]);
+    expect(events).toContainEqual(['agent_stopped', { reason: 'killed', method: 'interrupt' }]);
+    expect(events).toContainEqual(['agent_finished', { outcome: 'killed', iterations: 4 }]);
+    expect(events.map(([type]) => type)).not.toContain('kill_evidence_failed');
+    // Never the key or a path in the events.
+    expect(JSON.stringify(events)).not.toContain(VIRTUAL_KEY);
+    expect(JSON.stringify(events)).not.toContain(SECRET_PATH);
+  });
+
+  it('C11 (QUESTIONS #183): the diff waits for the key; never longer than killEvidenceMs, and the failure is only recorded', async () => {
+    let now = 0;
+    const clock = () => now;
+    const bounded = { ...settings, agent: { ...settings.agent, killEvidenceMs: 1000 } };
+
+    // The key is never refused: no diff, `key_not_revoked`.
+    const s1 = await seed();
+    const a1 = new FakeAgent();
+    killOnPoll(a1, s1, 1);
+    const r1 = await driveAgent(
+      {
+        ...deps(a1, clock),
+        settings: bounded,
+        sleep: (ms) => {
+          now += ms;
+          return Promise.resolve();
+        },
+        keyRevoked: () => Promise.resolve(false),
+      },
+      request(s1),
+    );
+    expect(r1).toMatchObject({ status: 'stopped_killed' });
+    expect(changed).toEqual([]);
+    const e1 = await s1.scope.runEvents.list(s1.envelope.contract.run_id);
+    expect(e1.at(-1)).toMatchObject({
+      event_type: 'kill_evidence_failed',
+      payload: { reason: 'key_not_revoked' },
+    });
+
+    // No key check configured: no diff, `unavailable`. The diff step fails: `failed`.
+    const s2 = await seed();
+    const a2 = new FakeAgent();
+    killOnPoll(a2, s2, 1);
+    await driveAgent(deps(a2), request(s2));
+    const e2 = await s2.scope.runEvents.list(s2.envelope.contract.run_id);
+    expect(e2.at(-1)?.payload).toEqual({ reason: 'unavailable' });
+
+    const s3 = await seed();
+    const a3 = new FakeAgent();
+    killOnPoll(a3, s3, 1);
+    await driveAgent(
+      {
+        ...deps(a3),
+        keyRevoked: () => Promise.resolve(true),
+        changes: () => Promise.reject(new Error(`export failed ${SECRET_PATH}`)),
+      },
+      request(s3),
+    );
+    const e3 = await s3.scope.runEvents.list(s3.envelope.contract.run_id);
+    expect(e3.at(-1)?.payload).toEqual({ reason: 'failed' });
+    expect(await s3.scope.runs.getById(s3.envelope.contract.run_id)).toMatchObject({
+      status: 'stopped_killed',
+    });
+  });
+
+  it('C11 (code review): a kill after the last poll, while the runner commits, still ends the run stopped_killed', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    const runId = s.envelope.contract.run_id;
+    const commit = agent.commitWork.bind(agent);
+    agent.commitWork = async (...args) => {
+      await s.scope.runs.transition(runId, { from: ['running'], to: 'stopping', now: new Date() });
+      return commit(...args);
+    };
+    const result = await driveAgent(deps(agent), request(s));
+    expect(result).toMatchObject({
+      outcome: 'killed',
+      status: 'stopped_killed',
+      stopReason: 'killed',
+    });
+    expect(await s.scope.runs.getById(runId)).toMatchObject({
+      status: 'stopped_killed',
+      stop_reason: 'killed',
+    });
+  });
+
+  it("C11: the activity's cancel of a run being killed is the kill (stopped_killed, not failed)", async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'running', iterations: 1 }];
+    const runId = s.envelope.contract.run_id;
+    const abort = new AbortController();
+    setTimeout(() => {
+      void s.scope.runs
+        .transition(runId, { from: ['running'], to: 'stopping', now: new Date() })
+        .then(() => abort.abort());
+    }, 50);
+    // Without its database poll the driver would only see the cancel.
+    const result = await driveAgent(deps(agent), { ...request(s), signal: abort.signal });
+    expect(result).toMatchObject({ status: 'stopped_killed' });
+    expect(agent.stopped).toBe(1);
   });
 
   it('a kill during polling wins: the driver does not overwrite the stopped run (C11 race)', async () => {

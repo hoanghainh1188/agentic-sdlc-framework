@@ -7,6 +7,7 @@ import {
   AgentRegisterError,
   AiRecordError,
   CommandError,
+  KillError,
   PLAN_ERROR_MESSAGES,
   PLAN_REFUSAL_MESSAGES,
   PlanError,
@@ -18,6 +19,7 @@ import {
   TenantGuardError,
   type AdminErrorCode,
   type CommandErrorCode,
+  type KillErrorCode,
   type DbErrorCode,
   type EscalationErrorCode,
   type RegistryErrorCode,
@@ -58,6 +60,9 @@ export const API_ERROR_CODES = [
   'plan_not_on_default_branch',
   'plan_submit_not_allowed',
   'git_host_unavailable',
+  'run_not_found',
+  'run_not_active',
+  'no_active_run',
   'user_not_found',
   'identity_not_found',
   'token_not_found',
@@ -111,6 +116,9 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   plan_not_on_default_branch: 'api.error.plan_not_on_default_branch',
   plan_submit_not_allowed: 'api.error.plan_submit_not_allowed',
   git_host_unavailable: 'api.error.git_host_unavailable',
+  run_not_found: 'api.error.run_not_found',
+  run_not_active: 'api.error.run_not_active',
+  no_active_run: 'api.error.no_active_run',
   user_not_found: 'api.error.user_not_found',
   identity_not_found: 'api.error.identity_not_found',
   token_not_found: 'api.error.token_not_found',
@@ -286,10 +294,19 @@ export function planApiError(error: PlanError): ApiError {
   return new ApiError(status, code, error.refusal ?? error.code, undefined, undefined, text);
 }
 
+/** Kill switch refusals (C11, ADR-M42 §2.6). */
+const KILL: Readonly<Record<KillErrorCode, [number, ApiErrorCode]>> = {
+  run_not_found: [404, 'run_not_found'],
+  forbidden: [403, 'forbidden'],
+  run_not_active: [409, 'run_not_active'],
+  no_active_run: [409, 'no_active_run'],
+};
+
 /** Maps any thrown value to an `ApiError`. Unknown errors become `internal` (500). */
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
+  if (error instanceof KillError) return new ApiError(...KILL[error.code]);
   if (error instanceof SpecError) return specApiError(error);
   if (error instanceof PlanError) return planApiError(error);
   if (error instanceof AgentRegisterError) return agentApiError(error, '-');

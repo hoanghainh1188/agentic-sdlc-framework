@@ -17,6 +17,8 @@ import type { TenantScope } from '../db/tenant-scope.js';
 import type { GitProvider } from '../db/vocabulary.js';
 import { acknowledgeEscalation, decideEscalation } from '../escalation/decide.js';
 import { EscalationError, type EscalationErrorCode } from '../escalation/errors.js';
+import { KillError, type KillErrorCode } from '../kill/errors.js';
+import { currentRunOf, requestRunKill } from '../kill/kill-run.js';
 import { RegistryError } from '../registry/errors.js';
 import type { Registry } from '../registry/registry.js';
 import {
@@ -35,6 +37,8 @@ export type GitEventOutcome =
   | 'acknowledged'
   /** `/decide`: the escalation decision was recorded, or it moved to governance (B11). No reply. */
   | 'escalation_decided'
+  /** `/kill`: the kill of the intent's current run was recorded (C11). No reply: notice `run_killed`. */
+  | 'killed'
   /** The command was understood but refused (permission, gate, input); a reply says why. */
   | 'refused'
   /** The command could not be read; a reply shows the syntax. */
@@ -88,6 +92,9 @@ export const COMMENT_REPLY_CODES = [
   'escalation_not_open',
   'escalation_already_acknowledged',
   'escalation_decision_not_allowed',
+  // C11: `/kill` refusals.
+  'kill_forbidden',
+  'kill_no_active_run',
   'failed',
 ] as const;
 export type CommentReplyCode = (typeof COMMENT_REPLY_CODES)[number];
@@ -113,6 +120,8 @@ export interface HandledGitEvent {
    * acknowledgement or decision was recorded. The caller wakes it after the commit.
    */
   readonly intentId?: string;
+  /** C11: a kill was recorded; the caller also sends the kill signal after the commit. */
+  readonly killed?: boolean;
 }
 
 const REASON_REF = /^https:\/\/[^\s]{1,504}$/;
@@ -145,7 +154,9 @@ export function commandReplyParams(command: ParsedComment): Record<string, strin
   if (command.kind === 'gate_decision') return { gate: command.gate };
   if (command.kind === 'none') return {};
   // `invalid` carries the verb too; a gate verb has no gate param when its gate could not be read.
-  return command.verb === 'ack' || command.verb === 'decide' ? { command: command.verb } : {};
+  return command.verb === 'ack' || command.verb === 'decide' || command.verb === 'kill'
+    ? { command: command.verb }
+    : {};
 }
 
 /**
@@ -250,6 +261,9 @@ export function handleGitEvent(
       return record(code, { reply: { code, params: gate } });
     }
 
+    if (command.kind === 'kill') {
+      return handleKillCommand(tx, deps, intents[0]!, actorId, gate, record);
+    }
     if (command.kind !== 'gate_decision') {
       return handleEscalationCommand(
         tx,
@@ -337,6 +351,51 @@ async function handleEscalationCommand(
     });
   }
 }
+
+/**
+ * `/kill` (C11, ADR-M42 §2.6): stops the intent's current run as the comment's author (config
+ * `access.kill_roles`). A refusal gets a reply; a kill is confirmed by the status notice.
+ */
+async function handleKillCommand(
+  tx: TenantScope,
+  deps: GitEventHandlerDeps,
+  intent: Intent,
+  actorId: string,
+  params: Readonly<Record<string, string>>,
+  record: Recorder,
+): Promise<HandledGitEvent> {
+  try {
+    const result = await tx.savepoint(async (sp) => {
+      const run = await currentRunOf(sp, intent.id);
+      return requestRunKill(sp, deps.now ? { now: deps.now } : {}, {
+        runId: run.id,
+        actor: { type: 'human', id: actorId },
+        source: 'github_comment',
+      });
+    });
+    const escalation = result.escalationId ? { escalationId: result.escalationId } : {};
+    return {
+      ...(await record('killed', escalation)),
+      intentId: intent.id,
+      killed: !result.already,
+    };
+  } catch (error) {
+    const reply =
+      error instanceof KillError
+        ? { code: KILL_REPLY[error.code], params }
+        : refusalReply(error, params);
+    if (reply === undefined) throw error;
+    return record(reply.code === 'failed' ? 'failed' : 'refused', { reply });
+  }
+}
+
+/** Reply of a kill refusal (C11). No role on the project: as for an unknown intent. */
+const KILL_REPLY: Readonly<Record<KillErrorCode, CommentReplyCode>> = {
+  run_not_found: 'intent_not_found',
+  forbidden: 'kill_forbidden',
+  run_not_active: 'kill_no_active_run',
+  no_active_run: 'kill_no_active_run',
+};
 
 /**
  * The escalation a command names: by code (it must belong to the intent), or the intent's only

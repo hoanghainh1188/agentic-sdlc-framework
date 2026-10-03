@@ -210,6 +210,11 @@ export const projectConfigSchema = z.strictObject({
       severity: z.enum(SEVERITIES),
       response_level: z.enum(RESPONSE_LEVELS),
     }),
+    // C11 (ADR-M42, QUESTIONS #181): the escalation a kill switch raises.
+    kill_escalation: z.strictObject({
+      severity: z.enum(SEVERITIES),
+      response_level: z.enum(RESPONSE_LEVELS),
+    }),
   }),
   budget: z.strictObject({
     warn_percent: positiveInt,
@@ -240,6 +245,8 @@ export const projectConfigSchema = z.strictObject({
     ai_record_read_roles: uniqueList(role).min(1),
     spec_link_roles: uniqueList(role).min(1),
     plan_submit_roles: uniqueList(role).min(1),
+    // C11 (ADR-M42, QUESTIONS #180): who may stop a run with the kill switch.
+    kill_roles: uniqueList(role).min(1),
     conflicting_roles: z.array(uniqueList(role).length(2)),
   }),
   agents: z.strictObject({ recertification_months: positiveInt }),

@@ -12,7 +12,12 @@
 import fs from 'node:fs';
 
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type { AgentAdapter, EvidenceStore, RunKeySpendReader } from '@sdlc/contracts';
+import type {
+  AgentAdapter,
+  EvidenceStore,
+  RedactedSecret,
+  RunKeySpendReader,
+} from '@sdlc/contracts';
 import { loadEffectiveConfig, parseTenantId } from '@sdlc/core';
 
 import {
@@ -60,6 +65,8 @@ export interface RunnerAgentOptions {
   readonly diffEvidence?: EvidenceStore;
   /** Reads the spend of a run's key with the key itself (C07, ADR-M34 §2.6). */
   readonly spendReader?: RunKeySpendReader;
+  /** True once the gateway refuses a run's key (C11): before a killed run's diff is stored. */
+  readonly keyRevoked?: (key: RedactedSecret) => Promise<boolean>;
 }
 
 export class Runner {
@@ -144,6 +151,7 @@ export class Runner {
           ...this.#proposalFor(contract.run_id),
           ...this.#changesFor(contract.run_id),
           ...(this.#agent.spendReader ? { spendReader: this.#agent.spendReader } : {}),
+          ...(this.#agent.keyRevoked ? { keyRevoked: this.#agent.keyRevoked } : {}),
         },
         request,
       );
@@ -152,7 +160,11 @@ export class Runner {
       await this.release(
         contract.tenant_id,
         contract.run_id,
-        result?.outcome === 'finished' ? 'finished' : 'failed',
+        result?.outcome === 'finished'
+          ? 'finished'
+          : result?.outcome === 'killed'
+            ? 'killed'
+            : 'failed',
       );
     }
   }

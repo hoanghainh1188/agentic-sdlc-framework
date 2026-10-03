@@ -22,6 +22,14 @@
 //    sandbox reported goes to the event only: `runs.head_sha` is the commit the runner pushes after
 //    G5, C08, ADR-M38 §2.2).
 //
+// The kill switch (C11, ADR-M42): while it polls the agent the driver also reads the run's status;
+// `stopping` (or the activity's cancel while the run is `stopping`) stops the agent like at the
+// time cap, ends the run `stopped_killed` / `killed` (`agent_stopped`, `agent_finished` with
+// outcome `killed`), and then, best-effort and bounded (`killEvidenceMs`, QUESTIONS #183), kills
+// the sandbox's processes, waits until the gateway refuses the run's key and stores the run's diff
+// as evidence. A failure there
+// is recorded (`kill_evidence_failed`) and never delays the kill.
+//
 // The run leaves `running` only with one conditional update: if the kill switch (C11) or the
 // sweep moved it first, this driver changes nothing. The caller removes the sandbox (`Runner`).
 // Paths, the log and texts are returned to the caller only; run events hold codes and counts.
@@ -37,6 +45,7 @@ import {
   type RunStatus,
 } from '@sdlc/contracts';
 import {
+  KILLED,
   loadEffectiveConfig,
   parseTenantId,
   recordBudgetWarning,
@@ -91,6 +100,11 @@ export interface AgentDriveDeps {
    * runner does not watch the budget; the gateway's cap still blocks calls.
    */
   readonly spendReader?: RunKeySpendReader;
+  /**
+   * True once the gateway refuses the run's key (C11): the worker revoked it. A killed run's diff
+   * is stored only after that. Without it no diff is stored for a killed run.
+   */
+  readonly keyRevoked?: (key: RedactedSecret) => Promise<boolean>;
 }
 
 export interface AgentRunRequest {
@@ -117,6 +131,7 @@ export type AgentOutcome =
   | 'max_budget'
   | 'stuck'
   | 'agent_error'
+  | 'killed'
   | 'failed';
 
 export interface AgentRunResult {
@@ -133,7 +148,9 @@ export function agentCommitAuthor(contract: RunContract): { name: string; email:
   return { name: 'sdlc-agent', email: `agent-${contract.agent_id}@agents.sdlc.invalid` };
 }
 
-const STATUS_OF: Readonly<Record<Exclude<AgentOutcome, 'failed'>, RunStatus>> = {
+type EndOutcome = Exclude<AgentOutcome, 'failed' | 'killed'>;
+
+const STATUS_OF: Readonly<Record<EndOutcome, RunStatus>> = {
   finished: 'succeeded',
   // An iteration cap is a budget of agent steps (D-07 §6: "token cap and a maximum number of
   // iterations"); the stop reason tells which cap (ADR-M29).
@@ -145,7 +162,7 @@ const STATUS_OF: Readonly<Record<Exclude<AgentOutcome, 'failed'>, RunStatus>> = 
   agent_error: 'failed',
 };
 
-const STOP_REASON_OF: Readonly<Record<Exclude<AgentOutcome, 'failed'>, string | undefined>> = {
+const STOP_REASON_OF: Readonly<Record<EndOutcome, string | undefined>> = {
   finished: undefined,
   max_iterations: 'max_iterations',
   max_duration: 'max_duration',
@@ -193,6 +210,8 @@ interface Polled {
   readonly cancelled?: boolean;
   /** The run's key reached the stop share of its cap (C07). */
   readonly overBudget?: boolean;
+  /** The run was moved to `stopping` by the kill switch (C11). */
+  readonly killed?: boolean;
 }
 
 async function pollUntilDone(
@@ -201,6 +220,7 @@ async function pollUntilDone(
   deadline: number,
   signal?: AbortSignal,
   watch?: SpendWatch,
+  killRequested: () => Promise<boolean> = () => Promise.resolve(false),
 ): Promise<Polled> {
   const clock = clockOf(deps);
   const sleep = sleepOf(deps);
@@ -209,6 +229,7 @@ async function pollUntilDone(
   let nextSpendCheck = clock() + deps.settings.agent.spendCheckMs;
   for (;;) {
     if (signal?.aborted) return { ...last, timedOut: false, cancelled: true };
+    if (await killRequested()) return { ...last, timedOut: false, killed: true };
     try {
       last = await deps.adapter.getStatus(handle);
       errors = 0;
@@ -267,7 +288,8 @@ async function endRun(
   },
 ): Promise<RunStatus | undefined> {
   const now = nowOf(deps);
-  const moved = await scope.runs.transition(contract.run_id, {
+  // A kill that landed after the last poll still wins: the run then ends `stopped_killed` (C11).
+  const ended = await scope.runs.end(contract.run_id, {
     from: ['running'],
     to: change.status,
     now,
@@ -285,7 +307,7 @@ async function endRun(
         : { changed_files: change.changedFiles }),
     ...(change.commit ? { commit: change.commit } : {}),
   });
-  return moved ? change.status : undefined;
+  return ended;
 }
 
 async function failRun(
@@ -297,19 +319,17 @@ async function failRun(
   await scope.runEvents.append(contract.run_id, 'agent_failed', { reason });
   const stopReason = reason.startsWith('agent_') ? reason : `agent_${reason}`;
   const now = nowOf(deps);
-  const moved = await scope.runs.transition(contract.run_id, {
+  const ended = await scope.runs.end(contract.run_id, {
     from: ['running'],
     to: 'failed',
     now,
     finishedAt: now,
     stopReason,
   });
-  return {
-    outcome: 'failed',
-    status: moved ? 'failed' : undefined,
-    stopReason,
-    outputs: undefined,
-  };
+  if (ended === 'stopped_killed') {
+    return { outcome: 'killed', status: ended, stopReason: KILLED, outputs: undefined };
+  }
+  return { outcome: 'failed', status: ended, stopReason, outputs: undefined };
 }
 
 /** Runs the agent of a provisioned run to its end. Never throws for agent or task failures. */
@@ -320,7 +340,10 @@ export async function driveAgent(
   const { contract, sandbox } = request;
   const scope = deps.db.forTenant(parseTenantId(contract.tenant_id));
   const run = await scope.runs.getById(contract.run_id);
+  // Killed between provisioning and the start (C11): no agent to stop.
+  if (run?.status === 'stopping') return endKilled(deps, scope, contract, undefined);
   if (run?.status !== 'running') throw new AgentRunError('run_not_running');
+  const killRequested = () => isStopping(scope, contract.run_id);
 
   let handle: AgentRunHandle;
   let watch: SpendWatch | undefined;
@@ -358,9 +381,20 @@ export async function driveAgent(
   const deadline = clockOf(deps)() + contract.max_duration_min * 60_000;
   let polled: Polled;
   try {
-    polled = await pollUntilDone(deps, handle, deadline, request.signal, watch);
+    polled = await pollUntilDone(deps, handle, deadline, request.signal, watch, killRequested);
   } catch (error) {
     return failRun(deps, scope, contract, failureCode(error));
+  }
+  // The activity's cancel of a run that is being killed is the kill (C11).
+  if (polled.killed || (polled.cancelled && (await killRequested()))) {
+    const stopped = await stopAtTimeCap(deps, handle);
+    await scope.runEvents.append(contract.run_id, 'agent_stopped', {
+      reason: 'killed',
+      method: stopped.method,
+    });
+    const result = await endKilled(deps, scope, contract, stopped.iterations ?? polled.iterations);
+    if (result.status === 'stopped_killed') await storeKilledEvidence(deps, scope, request);
+    return result;
   }
   if (polled.cancelled) {
     const stopped = await stopAtTimeCap(deps, handle);
@@ -426,10 +460,8 @@ export async function driveAgent(
     }
   }
 
-  const status: RunStatus = proposed
-    ? 'succeeded_proposal_only'
-    : STATUS_OF[outcome as Exclude<AgentOutcome, 'failed'>];
-  const stopReason = STOP_REASON_OF[outcome as Exclude<AgentOutcome, 'failed'>];
+  const status: RunStatus = proposed ? 'succeeded_proposal_only' : STATUS_OF[outcome as EndOutcome];
+  const stopReason = STOP_REASON_OF[outcome as EndOutcome];
   // C07: every run that goes to G5 has its changes checked outside the sandbox first.
   if (TO_G5.includes(status)) {
     if (!deps.changes) return failRun(deps, scope, contract, 'changes_unavailable');
@@ -449,7 +481,96 @@ export async function driveAgent(
     commit,
     ...(proposed ? { changedFiles: proposed.changedFiles } : {}),
   });
+  if (set === 'stopped_killed') {
+    return { outcome: 'killed', status: set, stopReason: KILLED, outputs: undefined };
+  }
   return { outcome, status: set, stopReason, outputs: proposalOnly ? undefined : outputs };
+}
+
+/** The run was moved to `stopping` (C11). A read error is not a kill: the next poll reads again. */
+async function isStopping(scope: TenantScope, runId: string): Promise<boolean> {
+  try {
+    return (await scope.runs.getById(runId))?.status === 'stopping';
+  } catch {
+    return false;
+  }
+}
+
+/** Ends a killed run: `stopping → stopped_killed` (C11, migration 0020). */
+async function endKilled(
+  deps: AgentDriveDeps,
+  scope: TenantScope,
+  contract: RunContract,
+  iterations: number | undefined,
+): Promise<AgentRunResult> {
+  const now = nowOf(deps);
+  const moved = await scope.runs.transition(contract.run_id, {
+    from: ['stopping'],
+    to: 'stopped_killed',
+    now,
+    finishedAt: now,
+    stopReason: KILLED,
+    ...(iterations === undefined ? {} : { iterations }),
+  });
+  await scope.runEvents.append(contract.run_id, 'agent_finished', {
+    outcome: 'killed',
+    iterations: iterations ?? 0,
+  });
+  return {
+    outcome: 'killed',
+    status: moved ? 'stopped_killed' : undefined,
+    stopReason: KILLED,
+    outputs: undefined,
+  };
+}
+
+/**
+ * The diff of a killed run, as evidence for the review (QUESTIONS #183): only after the run is
+ * `stopped_killed` and the gateway refuses its key, within `killEvidenceMs`. Best-effort: every
+ * failure is recorded (`kill_evidence_failed`) and the caller removes the sandbox anyway.
+ */
+async function storeKilledEvidence(
+  deps: AgentDriveDeps,
+  scope: TenantScope,
+  request: AgentRunRequest,
+): Promise<void> {
+  const { contract } = request;
+  const fail = async (reason: string): Promise<void> => {
+    await scope.runEvents
+      .append(contract.run_id, 'kill_evidence_failed', { reason })
+      .catch(() => undefined);
+  };
+  if (!deps.changes || !deps.keyRevoked) return fail('unavailable');
+  // Nothing in the sandbox may change the workspace while it is read, not even a process the
+  // agent left running: kill every process first (the volume stays). Security review of C11.
+  try {
+    await deps.docker.containerKill(request.sandbox.names.container);
+  } catch {
+    return fail('sandbox_not_stopped');
+  }
+  const clock = clockOf(deps);
+  const deadline = clock() + deps.settings.agent.killEvidenceMs;
+  for (;;) {
+    if (await deps.keyRevoked(request.virtualKey).catch(() => false)) break;
+    if (clock() >= deadline) return fail('key_not_revoked');
+    await sleepOf(deps)(Math.min(deps.settings.agent.pollMs, Math.max(0, deadline - clock())));
+  }
+  const changes = deps.changes;
+  const left = Math.max(0, deadline - clock());
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    const outcome = await Promise.race([
+      changes(contract, request.sandbox).then(() => 'stored' as const),
+      new Promise<'timeout'>((resolve) => {
+        timer = setTimeout(() => resolve('timeout'), left);
+      }),
+    ]);
+    if (outcome === 'timeout') await fail('timeout');
+  } catch {
+    await fail('failed');
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Run statuses that go to G5 (core `finishRun`): their changes are checked first (C07). */

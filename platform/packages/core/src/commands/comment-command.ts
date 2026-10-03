@@ -5,15 +5,18 @@
 //   /request-changes G<n> [<reason_code>] <reason>
 //   /ack [ESC-YYYY-NNNN]                                                  (B11, ADR-M28 §2.7)
 //   /decide [ESC-YYYY-NNNN] <resume|modify|roll-back|terminate|escalate> [<reason_code>] [<reason>]
+//   /kill [<reason>]                                                      (C11, ADR-M42 §2.6)
 //
 // The reason text may be left out when a reason code other than `other` is given. For `/ack` and
 // `/decide`, the escalation code may be left out when the intent has exactly one unresolved
-// escalation; a `/decide` reason is optional (the comment is linked as `ref` either way).
+// escalation; a `/decide` reason is optional (the comment is linked as `ref` either way). `/kill`
+// stops the current run of the intent of the issue or pull request; any text after it is the
+// reason and stays on the Git host (a kill must never fail on its wording).
 //
 // Only the first non-empty line of a comment is read; text quoted or written further down is
 // never taken as a command. The reason text stays in the comment on the Git host: the parser
 // returns codes only, and the decision stores the comment URL as `reason_ref` (ADR-M20).
-// Other slash words (`/label`, later `/kill`) are not ours and are ignored.
+// Other slash words (`/label`) are not ours and are ignored.
 import {
   GATE_CODES,
   GATE_REASON_CODES,
@@ -36,7 +39,9 @@ export type GateCommentVerb = keyof typeof COMMENT_VERBS;
 /** Escalation command words (B11). */
 export const ESCALATION_VERBS = ['ack', 'decide'] as const;
 export type EscalationCommentVerb = (typeof ESCALATION_VERBS)[number];
-export type CommentVerb = GateCommentVerb | EscalationCommentVerb;
+/** The kill switch (C11). */
+export const KILL_VERB = 'kill';
+export type CommentVerb = GateCommentVerb | EscalationCommentVerb | typeof KILL_VERB;
 
 /** Decision words of `/decide` and the decision each one records (template T16 §4). */
 export const DECISION_WORDS: Readonly<Record<string, EscalationDecision>> = {
@@ -84,6 +89,7 @@ export type ParsedComment =
       /** `ESC-YYYY-NNNN`, or null: the intent's only unresolved escalation. */
       readonly code: string | null;
     }
+  | { readonly kind: 'kill'; readonly verb: typeof KILL_VERB }
   | {
       readonly kind: 'escalation_decision';
       readonly verb: 'decide';
@@ -121,6 +127,7 @@ export function parseCommentCommand(body: string): ParsedComment {
   const verb = match[1]!.toLowerCase();
   const words = (match[2] ?? '').split(/[ \t]+/).filter((word) => word !== '');
   if (isEscalationVerb(verb)) return parseEscalationCommand(verb, words);
+  if (verb === KILL_VERB) return { kind: 'kill', verb: KILL_VERB };
   if (!isVerb(verb)) return { kind: 'none' };
 
   const [gateWord, ...rest] = words;

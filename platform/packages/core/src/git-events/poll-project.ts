@@ -44,6 +44,7 @@ export type PollLogEvent =
   | 'poll.event_attempt_failed'
   | 'worker.event_failed'
   | 'poll.wake_failed'
+  | 'poll.kill_signal_failed'
   | NoticeLogEvent
   | IntentNoticeLogEvent;
 
@@ -148,13 +149,18 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
 
   let outcomes: Partial<Record<GitEventOutcome, number>> = {};
   let woken: readonly string[] = [];
+  let killed: readonly string[] = [];
   let status: PollResult['status'] = 'polled';
   let givenUp = 0;
   // Each round either commits the batch, or gives one more event up and runs the batch again
   // without it; so at most one round per event, plus one.
   for (let round = 0; round <= events.length; round += 1) {
     try {
-      ({ counts: outcomes, intentIds: woken } = await runBatch(deps, scope, project.id, events, {
+      ({
+        counts: outcomes,
+        intentIds: woken,
+        killIntentIds: killed,
+      } = await runBatch(deps, scope, project.id, events, {
         expected,
         next,
         now,
@@ -178,7 +184,7 @@ export async function pollProject(deps: PollDeps, target: PollableProject): Prom
   }
 
   // The workflows see the decisions only after the commit (B07, ADR-M30 §2.3).
-  if (status === 'polled') await wakeIntents(deps, target, woken);
+  if (status === 'polled') await wakeIntents(deps, target, woken, killed);
 
   // The poller that lost the cursor race leaves the replies to the winner, which is flushing them.
   const replies =
@@ -245,8 +251,21 @@ async function wakeIntents(
   deps: PollDeps,
   target: PollableProject,
   intentIds: readonly string[],
+  killIntentIds: readonly string[],
 ): Promise<void> {
   if (!deps.intentSignals) return;
+  // C11: the kill signal first, so a run waiting in Temporal is cancelled before the wake.
+  for (const intentId of new Set(killIntentIds)) {
+    try {
+      await deps.intentSignals.kill({ tenantId: target.tenantId, intentId });
+    } catch {
+      deps.logger?.log('warn', 'poll.kill_signal_failed', {
+        tenant_id: target.tenantId,
+        project_id: target.projectId,
+        intent_id: intentId,
+      });
+    }
+  }
   for (const intentId of new Set(intentIds)) {
     try {
       await deps.intentSignals.wake({ tenantId: target.tenantId, intentId });
@@ -279,6 +298,7 @@ function runBatch(
   return scope.transaction(async (tx) => {
     const counts: Partial<Record<GitEventOutcome, number>> = {};
     const intentIds: string[] = [];
+    const killIntentIds: string[] = [];
     // First, so the cursor row stays locked for the whole batch.
     if (!(await tx.gitEventCursors.saveIfUnchanged(projectId, ctx.expected, ctx.next, ctx.now()))) {
       throw new CursorMoved();
@@ -286,8 +306,9 @@ function runBatch(
     for (const event of events) {
       let outcome: GitEventOutcome;
       let intentId: string | undefined;
+      let killed: boolean | undefined;
       try {
-        ({ outcome, intentId } = await handleGitEvent(
+        ({ outcome, intentId, killed } = await handleGitEvent(
           tx,
           { registry: deps.registry, now: ctx.now },
           { id: projectId, provider: 'github' },
@@ -298,11 +319,12 @@ function runBatch(
       }
       counts[outcome] = (counts[outcome] ?? 0) + 1;
       if (intentId !== undefined) intentIds.push(intentId);
+      if (intentId !== undefined && killed === true) killIntentIds.push(intentId);
       if (outcome !== 'not_a_command' && outcome !== 'not_handled') {
         log.log('info', 'poll.event_handled', { ...ctx.ids, event_id: event.id, outcome });
       }
     }
-    return { counts, intentIds };
+    return { counts, intentIds, killIntentIds };
   });
 }
 
@@ -310,6 +332,8 @@ interface BatchResult {
   readonly counts: Partial<Record<GitEventOutcome, number>>;
   /** Intents whose workflow must look again once the batch is committed. */
   readonly intentIds: readonly string[];
+  /** C11: intents whose run was killed; they get the kill signal before the wake. */
+  readonly killIntentIds: readonly string[];
 }
 
 /**

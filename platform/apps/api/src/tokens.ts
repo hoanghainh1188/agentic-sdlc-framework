@@ -9,4 +9,5 @@ export const ESCALATIONS = Symbol('EscalationsService');
 export const AI_RECORDS = Symbol('AiRecordsService');
 export const SPECS = Symbol('SpecsService');
 export const PLANS = Symbol('PlansService');
+export const RUNS = Symbol('RunsService');
 export const INTENT_SIGNALS = Symbol('IntentWorkflowSignals');

@@ -10,6 +10,7 @@ import {
   finishRun,
   parseTenantId,
   preparePublish,
+  revokeKilledRunKey,
   startRun,
   stepIntent,
   type G4Deps,
@@ -50,6 +51,8 @@ export interface IntentActivities {
   finishRun(ref: IntentWorkflowRef, runId: string): Promise<void>;
   /** C06: the runner's activity was lost; revoke the key at once, fail the run (core `abandonRun`). */
   abandonRun(ref: IntentWorkflowRef, runId: string): Promise<void>;
+  /** C11: the workflow got the kill signal; revoke the killed run's key at once. */
+  revokeKilledRunKey(ref: IntentWorkflowRef, runId: string): Promise<void>;
   /** C08: a push token for the run's push, wrapped (core `preparePublish`). */
   preparePublish(ref: IntentWorkflowRef, runId: string): Promise<PreparePublishActivityResult>;
   /** C08: find or open the pull request and link it (core `finishPublish`). */
@@ -125,6 +128,9 @@ export function createIntentActivities(deps: IntentActivityDeps): IntentActiviti
     },
     finishRun: (ref, runId) => finishRun(scope(ref), runs(), ref.intentId, runId),
     abandonRun: (ref, runId) => abandonRun(scope(ref), runs(), runId),
+    async revokeKilledRunKey(ref, runId) {
+      await revokeKilledRunKey(scope(ref), runs(), runId);
+    },
     async preparePublish(ref, runId) {
       const result = await preparePublish(scope(ref), publish(), ref.intentId, runId);
       return result.ok

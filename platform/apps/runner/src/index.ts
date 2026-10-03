@@ -37,6 +37,12 @@ export { assertSafeNetworkConnect } from './docker/guard.js';
 export { RunnerError, type RunnerErrorKey } from './errors.js';
 export { HeldRuns } from './held.js';
 export {
+  recordWrapTokenReused,
+  revokeAfterUse,
+  type GitTokenRevoker,
+  type RunToken,
+} from './tokens.js';
+export {
   isRunId,
   LABELS,
   MANAGED_BY,

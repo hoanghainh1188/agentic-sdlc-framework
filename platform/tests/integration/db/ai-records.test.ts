@@ -246,6 +246,7 @@ describeDb('B12: the project AI record on PostgreSQL', () => {
             woken.push(ref);
             return Promise.resolve();
           },
+          kill: () => Promise.resolve(),
         },
       });
     });

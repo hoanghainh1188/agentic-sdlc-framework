@@ -93,11 +93,10 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
     case 'g5_returned':
       return 'intent.status.g5_returned';
     case 'terminated':
-      return notice.gate === 'G7'
-        ? 'intent.status.g7_terminated'
-        : notice.gate === 'G6'
-          ? 'intent.status.g6_terminated'
-          : 'intent.status.terminated';
+      if (notice.gate === 'G7') return 'intent.status.g7_terminated';
+      if (notice.gate === 'G6') return 'intent.status.g6_terminated';
+      // C11: `terminate` on the escalation of a failed or killed run (paused at G4).
+      return notice.gate === 'G4' ? 'intent.status.run_terminated' : 'intent.status.terminated';
     case 'spec_changed':
       return 'intent.status.spec_changed';
     case 'spec_unavailable':
@@ -136,6 +135,8 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.g7_resumed';
     case 'merged':
       return 'intent.status.merged';
+    case 'run_killed':
+      return 'intent.status.run_killed';
     default:
       return notice.gate !== null && isCommandGate(notice.gate)
         ? 'intent.status.advanced'

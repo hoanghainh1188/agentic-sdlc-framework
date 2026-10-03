@@ -23,14 +23,17 @@
 // - `succeeded_proposal_only` (L1: the runner stored the proposal as evidence, session 2b) →
 //   `paused` with the notice `proposal_ready`; Person A takes the proposal forward (handbook
 //   Ch.13 §13.5 Step 4); the intent waits (`proposal_review`);
-// - `stopped_killed` → `paused`; the kill switch (C11) raises its own escalation;
+// - `stopped_killed` → `paused`; the kill switch raised its escalation at the kill (C11,
+//   `requestRunKill`, ADR-M42);
 // - `cancelled` for another reason (budget, the proposal changed) → back to `in_gate G4`, where
 //   G4 is decided again.
 // A paused intent goes back to G4 (`stepPaused`) once the run's escalation lets a run start: it
-// is closed, or a person decided `resume` for this run's contract (re-checked, FR-17).
+// is closed, or a person decided `resume` for this run's contract (re-checked, FR-17). A decision
+// `terminate` closes the intent (`cancelled`, C11).
 //
 // `abandonRun`: the runner's activity was lost (heartbeat timeout, the runner stopped). The key is
-// revoked at once and the run ends `failed` (`runner_lost`). The sandbox is removed by the runner:
+// revoked at once and the run ends `failed` (`runner_lost`), or `stopped_killed` when it was being
+// killed (`stopping`, C11). The sandbox is removed by the runner:
 // on the activity's cancel when it is still alive, otherwise by its clean-up at start or its sweep
 // (ADR-M25 §2.8).
 import {
@@ -42,7 +45,7 @@ import {
 
 import type { CostController } from '../cost/controller.js';
 import type { IntentNoticeKind } from '../db/repositories/intent-notices.js';
-import type { Intent, Run } from '../db/schema.js';
+import type { Escalation, Intent, Run } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import {
   closeEscalation,
@@ -50,6 +53,7 @@ import {
   revalidateEscalationDecision,
 } from '../escalation/decide.js';
 import { raiseEscalation } from '../escalation/raise.js';
+import { failedRunRoute } from '../kill/kill-run.js';
 import type { Registry } from '../registry/registry.js';
 import { G4_OPERATOR_ROLES } from './g4.js';
 import { prepareRun, type PrepareRunDeps, type PrepareRunResult } from './prepare-run.js';
@@ -139,6 +143,9 @@ export async function stepPaused(
     .filter((e) => e.run_id === latest.id)
     .at(-1);
   if (!escalation) return { outcome: 'waiting', reason: 'run_review' };
+  if (escalation.status !== 'closed' && String(escalation.decision?.decision) === 'terminate') {
+    return terminate(tx, registry, intent, escalation, latest.id, now);
+  }
   if (escalation.status !== 'closed') {
     if (!decisionAllows(escalation, 'run_start', now)) {
       return { outcome: 'waiting', reason: 'run_review' };
@@ -161,6 +168,56 @@ export async function stepPaused(
     );
   }
   return 'resume';
+}
+
+/**
+ * `terminate` on the escalation of a failed or killed run (C11): the decision binds the run's
+ * contract and has not expired (FR-17), then the intent is closed (`cancelled`).
+ */
+async function terminate(
+  tx: TenantScope,
+  registry: Registry,
+  intent: Intent,
+  escalation: Escalation,
+  runId: string,
+  now: Date,
+): Promise<IntentStepResult> {
+  const contract = await tx.runContracts.getByRunId(runId);
+  const check = await revalidateEscalationDecision(
+    tx,
+    {
+      escalationId: escalation.id,
+      subjectSha256: contract?.contract_sha256 ?? '',
+      action: 'gate_advance',
+    },
+    { now: () => now },
+  );
+  // `terminate` acts by ending the intent, which no protected action covers (as at G5).
+  if (!check.valid && check.reason !== 'scope_mismatch') {
+    return { outcome: 'waiting', reason: 'run_review' };
+  }
+  await closeEscalation(
+    tx,
+    { escalationId: escalation.id, closedBy: { type: 'system' } },
+    { now: () => now },
+  );
+  const moved = await tx.intents.moveState(intent.id, {
+    from: { status: intent.status, currentGate: intent.current_gate },
+    to: { status: 'cancelled', currentGate: 'G4' },
+    at: now,
+  });
+  if (moved) {
+    await tx.intentNotices.record({
+      intentId: intent.id,
+      kind: 'terminated',
+      status: 'cancelled',
+      gate: 'G4',
+      previousGate: intent.current_gate,
+      decisionId: null,
+      audienceRoles: [],
+    });
+  }
+  return { outcome: 'moved' };
 }
 
 export interface RunDeps extends PrepareRunDeps {
@@ -205,8 +262,10 @@ export async function abandonRun(
   if (isFinal(run.status)) return;
   const now = deps.registry.now();
   await scope.transaction(async (tx) => {
-    const moved = await tx.runs.transition(runId, {
-      from: ACTIVE,
+    // A run being killed ends as killed (C11, migration 0020); any other run fails. One update:
+    // a kill that lands in between never leaves the run in `stopping`.
+    const moved = await tx.runs.end(runId, {
+      from: ACTIVE.filter((status) => status !== 'stopping'),
       to: 'failed',
       now,
       stopReason: reason,
@@ -270,7 +329,8 @@ async function escalateFailedRun(
       intentId: intent.id,
       runId: run.id,
       trigger: 'unusual_behaviour',
-      route: 'technical',
+      // C11: a wrapping token someone else opened goes to security (ADR-M42 §2.5).
+      route: await failedRunRoute(tx, run.id),
       severity: escalation.severity,
       responseLevel: escalation.response_level,
       packet: {

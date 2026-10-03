@@ -2,6 +2,7 @@
 // (`RunContractRepository.store`); state changes belong to the runner and the worker (C04, C07,
 // C11). The database refuses any change once the status is final (ADR-M22).
 import type { RunStatus } from '@sdlc/contracts';
+import { sql } from 'kysely';
 
 import type { Run } from '../schema.js';
 import { isUuid } from '../tenant-id.js';
@@ -56,6 +57,8 @@ export class RunRepository extends TenantRepository {
       readonly finishedAt?: Date;
       /** Agent steps completed (C05). */
       readonly iterations?: number;
+      /** The person who used the kill switch (C11); only with `stopping` or `stopped_killed`. */
+      readonly killedBy?: string;
     },
   ): Promise<boolean> {
     if (!isUuid(id) || change.from.length === 0) return false;
@@ -69,6 +72,7 @@ export class RunRepository extends TenantRepository {
           ...(change.startedAt === undefined ? {} : { started_at: change.startedAt }),
           ...(change.finishedAt === undefined ? {} : { finished_at: change.finishedAt }),
           ...(change.iterations === undefined ? {} : { iterations: change.iterations }),
+          ...(change.killedBy === undefined ? {} : { killed_by: change.killedBy }),
         })
         .where('tenant_id', '=', this.tenantId)
         .where('id', '=', id)
@@ -76,6 +80,47 @@ export class RunRepository extends TenantRepository {
         .executeTakeFirst(),
     );
     return result.numUpdatedRows === 1n;
+  }
+
+  /**
+   * Ends a run (C11, ADR-M42 §2.2): from one of `from` to `to`, **or**, when the kill switch moved
+   * it to `stopping` meanwhile, to `stopped_killed` / `killed`, in **one** conditional update, so a
+   * kill that lands between a writer's read and its update never leaves the run in `stopping`.
+   * Returns the status the run now has, or undefined when it was in neither (another writer ended
+   * it first). `stopReason`, `startedAt` and `iterations` apply to the `to` case only.
+   */
+  async end(
+    id: string,
+    change: {
+      readonly from: readonly RunStatus[];
+      readonly to: RunStatus;
+      readonly now: Date;
+      readonly stopReason?: string;
+      readonly finishedAt?: Date;
+      readonly iterations?: number;
+    },
+  ): Promise<RunStatus | undefined> {
+    if (!isUuid(id) || change.from.includes('stopping')) return undefined;
+    const killed = sql<boolean>`status = 'stopping'`;
+    const row = await this.run(
+      this.db
+        .updateTable('runs')
+        .set({
+          status: sql`CASE WHEN ${killed} THEN 'stopped_killed'::run_status ELSE ${change.to}::run_status END`,
+          stop_reason: sql`CASE WHEN ${killed} THEN 'killed'
+            ELSE COALESCE(${change.stopReason ?? null}::text, stop_reason) END`,
+          finished_at: sql`CASE WHEN ${killed} THEN ${change.finishedAt ?? change.now}::timestamptz
+            ELSE COALESCE(${change.finishedAt ?? null}::timestamptz, finished_at) END`,
+          ...(change.iterations === undefined ? {} : { iterations: change.iterations }),
+          updated_at: change.now,
+        })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .where('status', 'in', [...change.from, 'stopping'])
+        .returning('status')
+        .executeTakeFirst(),
+    );
+    return row?.status;
   }
 
   /**

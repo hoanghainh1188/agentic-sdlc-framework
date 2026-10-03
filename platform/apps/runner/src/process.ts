@@ -18,6 +18,7 @@ export const PROCESS_ENV = {
   evidenceUrl: 'SDLC_RUNNER_EVIDENCE_URL',
   evidenceBucket: 'SDLC_RUNNER_EVIDENCE_BUCKET',
   evidenceSecretPath: 'SDLC_RUNNER_EVIDENCE_SECRET_PATH',
+  githubApiUrl: 'SDLC_RUNNER_GITHUB_API_URL',
 } as const;
 
 /** The database role of every platform process (ADR-M09 section 2.3). */
@@ -56,6 +57,12 @@ export interface ProcessSettings {
     readonly bucket: string;
     readonly secretPath: string;
   } | null;
+  /**
+   * The GitHub REST API where the runner revokes the run's clone and push tokens right after their
+   * use (C11, ADR-M42 §2.4). Null (`SDLC_RUNNER_GITHUB_API_URL=off`): the tokens expire by
+   * themselves (development without GitHub, tests).
+   */
+  readonly githubApiUrl: string | null;
 }
 
 const HOST = /^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$/;
@@ -91,6 +98,28 @@ function evidenceSettings(env: NodeJS.ProcessEnv): ProcessSettings['evidence'] {
   return { url: url.origin, bucket, secretPath };
 }
 
+function githubApiUrl(env: NodeJS.ProcessEnv): string | null {
+  const raw = env[PROCESS_ENV.githubApiUrl] || 'https://api.github.com';
+  if (raw === 'off') return null;
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw invalid(PROCESS_ENV.githubApiUrl);
+  }
+  // HTTPS only: the run's tokens go there (security review). Tests use `off`.
+  if (
+    url.protocol !== 'https:' ||
+    url.username !== '' ||
+    url.password !== '' ||
+    url.search !== '' ||
+    url.hash !== ''
+  ) {
+    throw invalid(PROCESS_ENV.githubApiUrl);
+  }
+  return url.toString();
+}
+
 function invalid(name: string): RunnerError {
   return new RunnerError('runner.config.invalid_setting', { name });
 }
@@ -119,5 +148,6 @@ export function processSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Pr
     heartbeatFile,
     temporal: address === 'off' ? null : { address, namespace },
     evidence: evidenceSettings(env),
+    githubApiUrl: githubApiUrl(env),
   };
 }

@@ -680,7 +680,10 @@ describeDb('B03: API app on PostgreSQL', () => {
         now: () => NOW,
         log,
         nestLogger: new NestJsonLogger(log),
-        intentSignals: { wake: () => Promise.reject(new Error('temporal down: token=secret')) },
+        intentSignals: {
+          wake: () => Promise.reject(new Error('temporal down: token=secret')),
+          kill: () => Promise.reject(new Error('temporal down: token=secret')),
+        },
       });
       try {
         const reply = await failing
