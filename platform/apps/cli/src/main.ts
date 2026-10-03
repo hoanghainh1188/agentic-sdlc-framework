@@ -3,6 +3,7 @@
 import { t } from '@sdlc/messages';
 
 import { EXIT, processContext, runCli } from './index.js';
+import { clean } from './output.js';
 
 runCli(process.argv.slice(2), processContext()).then(
   (code) => {
@@ -10,7 +11,7 @@ runCli(process.argv.slice(2), processContext()).then(
   },
   (error: unknown) => {
     process.stderr.write(
-      `${t('cli.failed', { reason: error instanceof Error ? error.message : String(error) })}\n`,
+      `${t('cli.failed', { reason: clean(error instanceof Error ? error.message : String(error)) })}\n`,
     );
     process.exitCode = EXIT.error;
   },

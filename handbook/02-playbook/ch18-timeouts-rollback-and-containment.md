@@ -174,7 +174,17 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 
 - After the decision you may add a reason code and a sentence, for example `/decide ESC-2026-0001 resume budget_exceeded The estimate was too low`.
 - The sentence stays in your comment. The platform stores only codes and a link to the comment, because escalations are kept for at least 2 years (Chapter 3 §3.9.3).
-- The same API is available for the CLI (`sdlc escalation …`, task B04): `GET /v1/escalations`, `POST /v1/escalations/<code>/ack`, `POST /v1/escalations/<code>/decisions`.
+- The CLI does the same through the API (log in first, Chapter 19 §19.8c):
+
+  | Command | Does |
+  |---|---|
+  | `sdlc escalation list [--intent INT-…] [--status open\|acknowledged\|resolved\|closed]` | Lists the escalations of the intents you can read |
+  | `sdlc escalation show ESC-2026-0001` | Shows one escalation: clocks, owners, decision |
+  | `sdlc escalation ack ESC-2026-0001` | Same as `/ack` |
+  | `sdlc escalation decide ESC-2026-0001 <resume\|modify\|roll-back\|terminate\|escalate> [--reason-code <code>] [--reason-ref <https://…>]` | Same as `/decide` |
+  | `… decide … resume --actions run_resume,budget_increase --budget-increase-usd 2.5` | Names the actions the decision allows; a budget increase only this way (comments never raise a budget) |
+
+  The API behind it: `GET /v1/escalations[/<code>]`, `POST /v1/escalations/<code>/ack`, `POST /v1/escalations/<code>/decisions`.
 
 **Who may act.**
 
@@ -275,3 +285,4 @@ Track:
 | 0.3 | 2026-09-27 | Claude (task B11) | §18.8b platform usage: escalations, `/ack`, `/decide`, freeze, clocks (ADR-M28) |
 | 0.4 | 2026-09-27 | Claude (task B07, session 2) | §18.8b: the escalation of an overdue gate, closed by the platform (ADR-M30 §2.9) |
 | 0.5 | 2026-09-30 | Claude (task A08) | §18.8c platform usage: logs and traces of a run (ADR-M35) |
+| 0.6 | 2026-10-03 | Claude (task B04) | §18.8b: the `sdlc escalation` commands (ADR-M36) |

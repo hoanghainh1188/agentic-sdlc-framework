@@ -13,7 +13,9 @@
     "dist"
   ],
   "dependencies": {
+    "@sdlc/contracts": "workspace:*",
     "@sdlc/core": "workspace:*",
-    "@sdlc/messages": "workspace:*"
+    "@sdlc/messages": "workspace:*",
+    "zod": "4.6.5"
   }
 }

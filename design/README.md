@@ -34,6 +34,7 @@
 | ADR-M33 | [Gate G4: the checks, the run proposal, and the handoff to the runner](ADR-M33-gate-g4.md) (task C06) | Proposed | |
 | ADR-M34 | [Gate G5: the run's changes, the budget during the run, and the G5 decision](ADR-M34-gate-g5.md) (task C07) | Proposed | |
 | ADR-M35 | [Observability: structured logs, OpenTelemetry traces, one OTLP pipeline to Langfuse](ADR-M35-observability.md) (task A08) | Proposed | |
+| ADR-M36 | [CLI: API client and credentials](ADR-M36-cli-api-client.md) (task B04) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

@@ -300,6 +300,12 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
    pnpm sdlc admin bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
    ```
 3. Check the token: `curl -s -H "Authorization: Bearer <token>" http://127.0.0.1:8090/v1/me`.
+4. Log in with the CLI (task B04, [ADR-M36](../design/ADR-M36-cli-api-client.md)) and paste the token at the hidden prompt. The login is saved in `~/.config/sdlc/credentials.json`, readable only by you:
+   ```bash
+   pnpm sdlc login --api-url http://127.0.0.1:8090
+   pnpm sdlc whoami
+   ```
+   Then `pnpm sdlc intent …`, `pnpm sdlc gate …`, `pnpm sdlc escalation …` and `pnpm sdlc ai-record …` work through the API (handbook Ch.19 §19.8c). `pnpm sdlc logout` deletes the saved login but does not revoke the token.
 
 Projects, roles and project configuration have no command yet: that is task B13 (`design/QUESTIONS.md` #58). Until then they are created in tests only.
 
