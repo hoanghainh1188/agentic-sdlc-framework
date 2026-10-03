@@ -64,6 +64,8 @@ export const ESCALATION_SUBJECT_KINDS = [
   'g5_input',
   // C08 PR 2 (ADR-M38 §2.7): the G6 input of a run (its push, pull request, checks, findings).
   'g6_input',
+  // E01 (ADR-M41): the G7 input of a run (its pushed head, pull request, approved plan's flags).
+  'g7_input',
 ] as const;
 export type EscalationSubjectKind = (typeof ESCALATION_SUBJECT_KINDS)[number];
 

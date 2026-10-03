@@ -184,6 +184,9 @@ export const GATE_REASON_CODES = [
   // (loop or no progress); the exact cause is in `gate.g5_check_failed`. A cost cap is
   // `budget_exceeded`, never this code.
   'run_cap_reached',
+  // G7 (task E01, QUESTIONS #177, ADR-M41): the pull request was merged before G7 passed (not
+  // enough valid approvals of the merged head), or by a bot or a producer of the change.
+  'merged_before_approval',
   'other',
 ] as const;
 export type GateReasonCode = (typeof GATE_REASON_CODES)[number];

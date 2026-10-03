@@ -74,6 +74,7 @@ function prInfo(number: number, headSha: string): PullRequestInfo {
     headRef: 'agent/INT-x',
     baseRef: 'main',
     author: { id: '1', login: 'sdlc[bot]', type: 'bot' },
+    mergedBy: null,
     changedFiles: 2,
     url: `https://github.com/acme/shop/pull/${String(number)}`,
   };

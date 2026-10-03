@@ -7,7 +7,9 @@
 //   replays on the current code;
 // - a lost runner during the push (the activity fails) counts as a failed attempt
 //   (`runner_lost`); the next attempt pushes;
-// - repeated failures stop the push: paused at G6 with a `technical` escalation (QUESTIONS #156).
+// - repeated failures stop the push: paused at G6 with a `technical` escalation (QUESTIONS #156);
+// - E01 (ADR-M41): CI passes → G7; Person B's review of the pushed commit and Person B's merge
+//   → G8; the history replays.
 // The runner here is a fake activity worker; the real push is tested in `publish-run.test.ts`.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,7 +24,7 @@ import {
   type IntentActivityDeps,
 } from '../../../apps/worker/src/activities/intent-activities.js';
 import { startIntentWorker, type IntentWorkerHandle } from '../../../apps/worker/src/temporal.js';
-import type { PullRequestInfo } from '../../../packages/contracts/src/git-host.js';
+import type { PullRequestInfo, ReviewDecision } from '../../../packages/contracts/src/git-host.js';
 import {
   intentWorkflowId,
   type IntentWorkflowRef,
@@ -39,6 +41,7 @@ import type { PublishDeps } from '../../../packages/core/src/workflow/publish.js
 import { TemporalIntentSignals } from '../../../packages/workflow-client/src/index.js';
 import { createTestDatabase, describeDb, type TestDatabase } from '../db/helpers.js';
 import { atG4, harness, Secret, T0, type Harness } from '../g4-harness.js';
+import { PEOPLE } from './fixture.js';
 
 const testServer = process.env.SDLC_TEMPORAL_TEST_SERVER;
 if (!testServer && process.env.SDLC_REQUIRE_DB === '1' && process.env.SDLC_WORKFLOW_TEST === '1') {
@@ -77,6 +80,12 @@ describeWorkflow(
     let pushMode: PushMode = 'push';
     let prCounter = 100;
     const pushTokens: string[] = [];
+    /** E01: what GitHub says about CI, the reviews and the merge (CI pending by default). */
+    const gh = {
+      ciPassed: false,
+      reviews: [] as ReviewDecision[],
+      merged: false,
+    };
 
     /** The fake runner's run: always succeeds in scope (C07 records). */
     async function executeRun(input: ExecuteRunInput): Promise<ExecuteRunResult> {
@@ -132,15 +141,16 @@ describeWorkflow(
 
     const pr = (number: number): PullRequestInfo => ({
       number,
-      state: 'open',
+      state: gh.merged ? 'closed' : 'open',
       draft: false,
-      merged: false,
-      mergedAt: null,
-      mergeCommitSha: null,
+      merged: gh.merged,
+      mergedAt: gh.merged ? new Date(Date.now() + 365 * DAY).toISOString() : null,
+      mergeCommitSha: gh.merged ? 'a'.repeat(40) : null,
       headSha: HEAD,
       headRef: 'agent/INT-x',
       baseRef: 'main',
       author: { id: '1', login: 'sdlc[bot]', type: 'bot' },
+      mergedBy: gh.merged ? { id: String(PEOPLE.b.gh), login: PEOPLE.b.login, type: 'user' } : null,
       changedFiles: 1,
       url: `https://github.com/acme/shop/pull/${String(number)}`,
     });
@@ -209,6 +219,37 @@ describeWorkflow(
           g4: t.g4,
           runs: t.runDeps as unknown as IntentActivityDeps['runs'],
           publish: publish() as unknown as IntentActivityDeps['publish'],
+          g6: {
+            gitHost: {
+              getPullRequest: (_ref, number) => Promise.resolve(pr(number)),
+              getCheckStatus: (_ref, sha) =>
+                Promise.resolve({
+                  sha,
+                  state: gh.ciPassed ? 'success' : 'pending',
+                  checks: [
+                    {
+                      source: 'check_run',
+                      id: '1',
+                      name: 'ci-ok',
+                      completed: gh.ciPassed,
+                      conclusion: gh.ciPassed ? 'success' : null,
+                    },
+                  ],
+                }),
+              getSecurityFindings: () =>
+                Promise.resolve({
+                  known: true,
+                  counts: { critical: 0, high: 0, medium: 0, low: 0 },
+                }),
+            },
+          },
+          g7: {
+            gitHost: {
+              getPullRequest: (_ref, number) => Promise.resolve(pr(number)),
+              getReviews: () => Promise.resolve([...gh.reviews]),
+              getCommitAuthors: () => Promise.resolve({ accounts: [], withoutAccount: 1 }),
+            },
+          },
         }),
       });
       runnerWorker = await Worker.create({
@@ -304,6 +345,46 @@ describeWorkflow(
         packet: { gate: 'G6', subject_kind: 'diff' },
       });
       pushMode = 'push';
+    });
+
+    it('E01: CI passes → G7; a review of the pushed commit and a merge by Person B → G8', async () => {
+      pushMode = 'push';
+      const intent = await atG6();
+      await signals.wake(ref(intent));
+      await until(intent, (i) => i.pr_number !== null);
+      gh.ciPassed = true;
+      await signals.wake(ref(intent));
+      await until(intent, (i) => i.current_gate === 'G7');
+      t.setClock(new Date(T0.getTime() + 6 * DAY)); // past the G6 block window
+      gh.reviews = [
+        {
+          eventId: 'github:review:9001',
+          reviewId: '9001',
+          reviewer: { id: String(PEOPLE.b.gh), login: PEOPLE.b.login, type: 'user' },
+          state: 'approved',
+          commitSha: HEAD,
+          submittedAt: new Date(Date.now() - DAY).toISOString(),
+          url: 'https://github.com/acme/shop/pull/1#pullrequestreview-9001',
+        },
+      ];
+      await signals.wake(ref(intent));
+      await waitFor(
+        async () => (await t.f.scope.intentNotices.listForIntent(intent.id)).map((n) => n.kind),
+        (kinds) => kinds.includes('g7_merge_ready'),
+      );
+      gh.merged = true;
+      await signals.wake(ref(intent));
+      const merged = await until(intent, (i) => i.current_gate === 'G8');
+      expect(merged).toMatchObject({ status: 'in_gate', current_gate: 'G8' });
+      const history = await env.client.workflow
+        .getHandle(intentWorkflowId(ref(intent)))
+        .fetchHistory();
+      await expect(
+        Worker.runReplayHistory({ workflowBundle: { codePath: bundlePath } }, history),
+      ).resolves.toBeUndefined();
+      gh.ciPassed = false;
+      gh.merged = false;
+      gh.reviews = [];
     });
   },
   120_000,

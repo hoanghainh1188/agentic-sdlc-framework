@@ -111,6 +111,7 @@ describeDb('C08 PR 2: G6 reads CI, on PostgreSQL', () => {
       headRef: 'agent/INT-x',
       baseRef: 'main',
       author: { id: '1', login: 'sdlc[bot]', type: 'bot' },
+      mergedBy: null,
       changedFiles: 1,
       url: `https://github.com/acme/shop/pull/${String(number)}`,
     });

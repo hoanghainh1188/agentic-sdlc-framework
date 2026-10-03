@@ -4,6 +4,7 @@
 // |----------|-----------------------------------------------------------------------------------|
 // | comments | GET /repos/{o}/{r}/issues/comments?since=…&sort=created (issues and pull requests) |
 // | reviews  | GET /repos/{o}/{r}/pulls?state=all&sort=updated → GET …/pulls/{n}/reviews         |
+// |          | the same list also gives the closed pull requests (E01: the merge event)          |
 // | checks   | GET /repos/{o}/{r}/pulls?state=open → GET …/commits/{sha}/check-runs and /status   |
 //
 // Only NEW comments are events: GitHub's `since` also returns edited comments, and those are
@@ -12,6 +13,7 @@ import type {
   CheckCompletedEvent,
   EventCursor,
   GitEvent,
+  PullRequestClosedEvent,
   RepoRef,
   ReviewSubmittedEvent,
 } from '@sdlc/contracts';
@@ -30,7 +32,13 @@ import {
 } from './cursor.js';
 import type { GitHubHttp } from './http.js';
 import { arr, int, obj, repoPath, sha, time } from './json.js';
-import { checkRunEvent, commentEvent, reviewEvent, statusEvent } from './mapping.js';
+import {
+  checkRunEvent,
+  commentEvent,
+  pullClosedEvent,
+  reviewEvent,
+  statusEvent,
+} from './mapping.js';
 import type { ResolvedOptions } from './options.js';
 import { listPages } from './pages.js';
 
@@ -118,7 +126,7 @@ export class Poller {
     base: string,
     stream: StreamState,
     auth: string,
-  ): Promise<StreamResult<ReviewSubmittedEvent>> {
+  ): Promise<StreamResult<ReviewSubmittedEvent | PullRequestClosedEvent>> {
     const updated = (pr: unknown) => toSeconds(time(obj(pr, 'pull').updated_at, 'pull.updated_at'));
     // Submitting a review updates the pull request, so recently updated pull requests are enough.
     const pulls = await listPages(this.#http, `${base}/pulls`, {
@@ -132,10 +140,20 @@ export class Poller {
       this.#truncated(repo, 'reviews');
       ceiling = updated(pulls.items[pulls.items.length - 1]);
     }
-    const events: ReviewSubmittedEvent[] = [];
+    const events: (ReviewSubmittedEvent | PullRequestClosedEvent)[] = [];
     const handled: Handled[] = [];
     for (const pr of pulls.items) {
       const number = int(obj(pr, 'pull').number, 'pull.number');
+      // E01: closing (or merging) updates the pull request; key `p<number>`.
+      const closed = pullClosedEvent(repo, pr, 'polling');
+      if (closed) {
+        const at = toSeconds(closed.occurredAt);
+        const key = `p${String(number)}`;
+        if (isNew(stream, key, at)) {
+          events.push(closed);
+          handled.push({ key, at });
+        }
+      }
       const reviews = await listPages(this.#http, `${base}/pulls/${number}/reviews`, {
         auth,
         maxPages: this.#options.maxPagesPerPoll,

@@ -75,6 +75,8 @@ import { stepG4 } from './g4.js';
 import { stepG5, stepPausedG5 } from './g5.js';
 import { stepG6, stepPausedG6 } from './g6.js';
 import { readCi, type CiReading, type G6Deps } from './g6-ci.js';
+import { stepG7, stepPausedG7 } from './g7.js';
+import { readG7, type G7Deps, type G7Reading } from './g7-facts.js';
 import { refusedPlanHashes, returnedFromG5 } from './g5-scope.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
 import { moveTo, moveToRunning, stepPaused, stepRunning } from './run-lifecycle.js';
@@ -124,6 +126,11 @@ export interface StepDeps {
    * findings). Without it a linked pull request waits for CI (`ci_pending`).
    */
   readonly g6?: G6Deps;
+  /**
+   * E01 (ADR-M41): what G7 reads from the Git host (the pull request, its reviews, its commit
+   * authors). Without it the intent waits at G7 (`g7_decision`).
+   */
+  readonly g7?: G7Deps;
 }
 
 export class WorkflowError extends Error {
@@ -213,6 +220,19 @@ export async function stepIntent(
       }
     }
   }
+  // E01: G7 reads the pull request and its reviews before the lock too.
+  let g7: G7Reading | 'unavailable' | null = null;
+  if (deps.g7) {
+    const peek = await scope.intents.getById(intentId);
+    if (peek?.status === 'in_gate' && peek.current_gate === 'G7' && peek.pr_number !== null) {
+      try {
+        g7 = await readG7(scope, deps.g7, peek);
+      } catch (error) {
+        if (!(error instanceof GitHostError)) throw error;
+        g7 = 'unavailable';
+      }
+    }
+  }
   return scope.transaction(async (tx) => {
     const intent = await tx.intents.lockAndGet(intentId);
     if (!intent) throw new WorkflowError('intent_not_found', `intent ${intentId} not found`);
@@ -254,6 +274,15 @@ export async function stepIntent(
         intent,
       );
     }
+    // E01: G7 stopped (a closed or changed pull request, an early merge); a person decides.
+    if (intent.status === 'paused' && intent.current_gate === 'G7') {
+      return stepPausedG7(
+        tx,
+        deps.registry,
+        await deps.registry.policyFor(tx, intent.project_id),
+        intent,
+      );
+    }
     if (intent.status !== 'in_gate' || intent.current_gate === null) return waiting('not_in_gate');
     const policy = await deps.registry.policyFor(tx, intent.project_id);
     const block = await earlierBlock(tx, intent, policy.config);
@@ -276,6 +305,8 @@ export async function stepIntent(
     if (gate === 'G5') return stepG5(tx, deps.registry, policy, intent);
     // C08: the push and the pull request (`publish`); without them G6 waits.
     if (gate === 'G6' && deps.publish) return stepG6(tx, deps.registry, policy, intent, ci);
+    // E01: review and merge.
+    if (gate === 'G7' && deps.g7) return stepG7(tx, deps.registry, policy, intent, g7);
     if (!isCommandGate(gate)) {
       if (hold) return waiting(hold.reason, hold.wakeInMs);
       // G4 onwards: C06 continues. Wake when the last HOTL block window closes (C06 waits for it).

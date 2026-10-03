@@ -167,5 +167,22 @@ export type IntentWaitReason =
    * threshold, or findings unknown): Person B approves (`/approve G6`).
    */
   | 'g6_decision'
+  /**
+   * E01 (ADR-M41): G7 waits for valid reviews of the pull request's head (Person B, and a second
+   * approver for dual approval), given as GitHub reviews (QUESTIONS #175).
+   */
+  | 'g7_decision'
+  /** E01: the approvals are complete; a person merges the pull request (never the platform). */
+  | 'g7_merge'
+  /**
+   * E01: a reviewer requested changes. PR 1 holds G7 here; PR 2 starts a new run after G4
+   * (QUESTIONS #179).
+   */
+  | 'g7_changes_requested'
+  /**
+   * E01: G7 stopped (the pull request was closed, changed by someone else, or merged before G7
+   * passed); the intent is paused at G7 until a person decides on the escalation.
+   */
+  | 'g7_review'
   /** A status that the workflow does not move (`paused`, `blocked`, `running`). */
   | 'not_in_gate';

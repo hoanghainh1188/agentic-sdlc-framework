@@ -152,6 +152,30 @@ export const RUN_EVENT_TYPES = {
     low: 'count',
   },
   /**
+   * What G7 read about the run's pull request (E01, ADR-M41 §2.3): its state and head, the merge
+   * commit and who merged it (`merger`: `person`, `producer`, `bot`, `unknown`; never the account),
+   * the SHA-256 of the latest review decisions (review IDs, states, commits; never a login or a
+   * text), the counts of approvals and requests for changes of the head, and of the commit authors
+   * with and without an account. Recorded when it changed; G7 decides from the latest one.
+   */
+  g7_checked: {
+    pr_number: 'count',
+    pr_state: 'code',
+    head_sha: 'code',
+    merge_commit_sha: 'code?',
+    merger: 'code?',
+    reviews_sha256: 'sha256',
+    approvals: 'count',
+    changes_requested: 'count',
+    commit_authors: 'count',
+    commits_without_account: 'count',
+  },
+  /**
+   * G7 passed: a person merged the run's pull request with the approved head (E01 AC5). The merge
+   * commit is the source commit of the release (E03).
+   */
+  pr_merged: { pr_number: 'count', head_sha: 'code', merge_commit_sha: 'code?' },
+  /**
    * A person (or an operator, actor `system`) used the kill switch (C11, ADR-M42): the run was
    * `previous_status`; `source` is `api`, `github_comment` or `ops`. Who killed is in
    * `runs.killed_by` and the audit event `run.kill_requested`.

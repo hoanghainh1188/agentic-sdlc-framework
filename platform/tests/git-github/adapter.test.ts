@@ -219,6 +219,7 @@ describe('getPullRequest and getChangedFiles', () => {
       headRef: 'agent/INT-2026-0007',
       baseRef: 'main',
       author: { id: '2002', login: 'agent-bot[bot]', type: 'bot' },
+      mergedBy: null,
       changedFiles: 2,
       url: 'https://github.com/acme/shop/pull/7',
     });
@@ -347,5 +348,63 @@ describe('getApprovals', () => {
     });
     const [approval] = await h.adapter().getApprovals(REPO, 7);
     expect(approval?.reviewer.type).toBe('bot');
+  });
+});
+
+describe('getReviews, getCommitAuthors, mergedBy (E01)', () => {
+  it("keeps each reviewer's latest decision, dismissed reviews included", async () => {
+    const b = user(3003, 'person-b');
+    const other = user(5005, 'other');
+    h.stub.on('GET', '/repos/acme/shop/pulls/7/reviews', {
+      body: [
+        review(1, b, 'APPROVED', '2026-09-26T06:00:00Z'),
+        review(2, b, 'CHANGES_REQUESTED', '2026-09-26T07:00:00Z'),
+        review(3, b, 'COMMENTED', '2026-09-26T07:30:00Z'), // keeps the request for changes
+        review(4, other, 'DISMISSED', '2026-09-26T06:00:00Z'),
+        review(5, other, 'PENDING', null),
+      ],
+    });
+    const reviews = await h.adapter().getReviews(REPO, 7);
+    expect(reviews.map((r) => [r.eventId, r.reviewer.id, r.state])).toEqual([
+      ['github:review:2', '3003', 'changes_requested'],
+      ['github:review:4', '5005', 'dismissed'],
+    ]);
+    expect(await h.adapter().getApprovals(REPO, 7)).toEqual([]);
+  });
+
+  it('commit authors: accounts by numeric ID, commits without an account counted', async () => {
+    h.stub.on('GET', '/repos/acme/shop/pulls/7/commits', {
+      body: [
+        { sha: 'a'.repeat(40), author: user(2002, 'agent-bot[bot]', 'Bot'), commit: {} },
+        { sha: 'b'.repeat(40), author: null, commit: { author: { email: 'x@example.com' } } },
+        { sha: 'c'.repeat(40), author: user(3003, 'person-b'), commit: {} },
+        { sha: 'd'.repeat(40), author: user(3003, 'person-b'), commit: {} },
+      ],
+    });
+    const authors = await h.adapter().getCommitAuthors(REPO, 7);
+    expect(authors).toEqual({
+      accounts: [
+        { id: '2002', login: 'agent-bot[bot]', type: 'bot' },
+        { id: '3003', login: 'person-b', type: 'user' },
+      ],
+      withoutAccount: 1,
+    });
+    expect(JSON.stringify(authors)).not.toContain('example.com');
+  });
+
+  it('a merged pull request names who merged it', async () => {
+    h.stub.on('GET', '/repos/acme/shop/pulls/7', {
+      body: {
+        ...pull(7, '2026-09-26T08:00:00Z', SHA_A, 'closed'),
+        merged_at: '2026-09-26T09:00:00Z',
+        merge_commit_sha: 'f'.repeat(40),
+        merged_by: user(3003, 'person-b'),
+      },
+    });
+    expect(await h.adapter().getPullRequest(REPO, 7)).toMatchObject({
+      merged: true,
+      mergeCommitSha: 'f'.repeat(40),
+      mergedBy: { id: '3003', login: 'person-b', type: 'user' },
+    });
   });
 });

@@ -37,6 +37,11 @@ export interface PullRequestInfo {
   readonly headRef: string;
   readonly baseRef: string;
   readonly author: GitActor;
+  /**
+   * Who merged the pull request; null when it is not merged (task E01, QUESTIONS #177: G7 checks
+   * that the merger is a person and not a producer of the change).
+   */
+  readonly mergedBy: GitActor | null;
   /** Number of changed files reported by the Git host. */
   readonly changedFiles: number;
   readonly url: string;
@@ -108,6 +113,34 @@ export interface Approval {
   readonly commitSha: string;
   readonly submittedAt: string;
   readonly url: string;
+}
+
+/**
+ * The latest review decision of one reviewer on a pull request (task E01, QUESTIONS #175): a later
+ * `approved` or `changes_requested` replaces an earlier one; a comment changes nothing; a dismissed
+ * review stays `dismissed` until the reviewer reviews again. G7 counts these, bound to the commit.
+ */
+export interface ReviewDecision {
+  /** The event ID of the review, as `ReviewSubmittedEvent.id` (for example `github:review:5`). */
+  readonly eventId: string;
+  readonly reviewId: string;
+  readonly reviewer: GitActor;
+  readonly state: 'approved' | 'changes_requested' | 'dismissed';
+  /** The commit the reviewer reviewed. */
+  readonly commitSha: string;
+  /** ISO 8601 UTC. */
+  readonly submittedAt: string;
+  readonly url: string;
+}
+
+/**
+ * The authors of a pull request's commits (task E01, AC2): Git host accounts by numeric ID, and
+ * how many commits have an author without an account (an e-mail address only). Never names or
+ * e-mail addresses.
+ */
+export interface CommitAuthors {
+  readonly accounts: readonly GitActor[];
+  readonly withoutAccount: number;
 }
 
 export const GIT_TOKEN_PERMISSIONS = [
@@ -187,10 +220,22 @@ export interface CheckCompletedEvent extends GitEventBase {
 }
 
 /**
- * Something that happened on the Git host. Events are triggers: gates read the current state
- * (`getApprovals`, `getCheckStatus`) before they decide.
+ * A pull request was closed, merged or not (task E01, D-03 §7.1: the merge event). A trigger only:
+ * G7 reads the pull request again (`getPullRequest`) before it decides.
  */
-export type GitEvent = CommentCreatedEvent | ReviewSubmittedEvent | CheckCompletedEvent;
+export interface PullRequestClosedEvent extends GitEventBase {
+  readonly kind: 'pull_request_closed';
+  readonly prNumber: number;
+  readonly merged: boolean;
+  readonly headSha: string;
+}
+
+/**
+ * Something that happened on the Git host. Events are triggers: gates read the current state
+ * (`getReviews`, `getCheckStatus`, `getPullRequest`) before they decide.
+ */
+export type GitEvent =
+  CommentCreatedEvent | ReviewSubmittedEvent | CheckCompletedEvent | PullRequestClosedEvent;
 
 /** The Git host adapter (design/D-03 section 7.1). */
 export interface GitHostAdapter {
@@ -200,6 +245,13 @@ export interface GitHostAdapter {
   getChangedFiles(ref: RepoRef, pr: number): Promise<string[]>;
   getCheckStatus(ref: RepoRef, sha: string): Promise<CheckSummary>;
   getApprovals(ref: RepoRef, pr: number): Promise<Approval[]>;
+  /**
+   * The latest review decision of each reviewer (task E01): approvals, requests for changes and
+   * dismissed reviews. Never a partial list.
+   */
+  getReviews(ref: RepoRef, pr: number): Promise<ReviewDecision[]>;
+  /** The accounts that authored the pull request's commits (task E01). Never a partial list. */
+  getCommitAuthors(ref: RepoRef, pr: number): Promise<CommitAuthors>;
   /** The file content as UTF-8 text, exactly as stored (no line-ending changes). */
   getFileAtCommit(ref: RepoRef, path: string, sha: string): Promise<string>;
   /** The commit a branch points to now (40 hex characters). G4 reads the run's base (C06). */
