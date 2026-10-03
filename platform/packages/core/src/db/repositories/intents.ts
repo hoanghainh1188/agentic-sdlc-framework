@@ -355,7 +355,7 @@ export class IntentRepository extends TenantRepository {
 
   /**
    * Raises the intent budget by `addUsd` and sets the run budget of its next runs (task C07, G5
-   * `resume` with `budget_increase_usd`, QUESTIONS #133). Both only go up (trigger SDA11). Appends
+   * `resume` with `budget_increase_usd`, QUESTIONS #133). Both only go up (trigger SDA12). Appends
    * `intent.budget_increased` with the amounts and the escalation that allowed it. Call under the
    * intent lock.
    */

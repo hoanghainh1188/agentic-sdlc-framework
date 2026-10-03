@@ -11,15 +11,17 @@
 //      → `fail out_of_scope`, back to `in_gate G3`: G3 is HITL from then on and needs a new plan;
 //      no escalation (the G3 approver decides);
 //   3. caps: the cost cap (`max_budget`, or a synced spend at the stop share, N3)
-//      → `fail budget_exceeded`; the iteration or time cap → `fail run_cap_reached`; a stalled run
-//      → `fail run_stalled`; each: paused at G5, `intent` escalation (QUESTIONS #21, #82);
+//      → `fail budget_exceeded`; the iteration cap, the time cap or a stalled run
+//      → `fail run_cap_reached` (the exact cause in `gate.g5_check_failed`); each: paused at G5,
+//      `intent` escalation (QUESTIONS #21, #82);
 //   no record of the changes (the runner never lets this happen) → `fail input_mismatch`, paused,
 //      `technical` escalation.
 // Otherwise, by the matrix: HOTL (and AUDIT) → a system `pass`, `in_gate G6` (the block window
 // applies: `/reject G5` or `/request-changes G5` within it; C08 waits for it before G6 acts);
 // HITL → Person A approves (`/approve G5`). A request for changes at G5 takes the intent back to
 // G4 (a new run on the approved plan); a rejection ends it.
-// The budget warning (FR-52) is posted with the G5 move when the run reached the warning share.
+// The budget warning (FR-52) is not G5's: the runner records its notice with the run event
+// `budget_warning`, so the comment appears while the agent works (Harry, C07 PR 2 decision C).
 //
 // `stepPausedG5`: the intent waits until a person decides on the escalation (handbook Ch.6 §6.6),
 // re-checked just before acting (FR-17):
@@ -30,16 +32,17 @@
 //   `terminate` → the intent ends as `cancelled`.
 // Every step writes in the step's transaction, under the intent lock. Paths never enter the
 // database: G5 reads counts and hashes.
-import type {
-  EscalationRoute,
-  EscalationTrigger,
-  GateReasonCode,
-  IntentStepResult,
-  IntentStatus,
-  OversightResolution,
-  PolicyEngine,
-  ProjectRole,
-  ValidatedProjectConfig,
+import {
+  GATE_REASON_CODES,
+  type EscalationRoute,
+  type EscalationTrigger,
+  type GateReasonCode,
+  type IntentStepResult,
+  type IntentStatus,
+  type OversightResolution,
+  type PolicyEngine,
+  type ProjectRole,
+  type ValidatedProjectConfig,
 } from '@sdlc/contracts';
 
 import { fromMicros, toMicros } from '../cost/money.js';
@@ -121,11 +124,7 @@ export function g5Breach(facts: G5Facts, config: ValidatedProjectConfig): G5Brea
     return { reason: 'run_cap_reached', check: 'max_duration', escalation: caps };
   }
   if (run.status === 'stopped_stalled') {
-    return {
-      reason: 'run_stalled',
-      check: 'stalled',
-      escalation: { route: 'intent', trigger: 'unusual_behaviour' },
-    };
+    return { reason: 'run_cap_reached', check: 'stalled', escalation: caps };
   }
   return null;
 }
@@ -173,7 +172,6 @@ export async function stepG5(
     const approvals = valid.filter((a) => history.countedApprovals.has(a.id));
     if (approvals.length < Math.max(1, oversight.approvalsNeeded)) return wait('g5_decision');
     if (!(await advanceAllowed(tx, intent, registry))) return wait('frozen');
-    await warnBudget(tx, policy, intent, facts);
     return move(tx, registry, intent, { status: 'in_gate', gate: 'G6' }, 'advanced', {
       decisionId: approvals.at(-1)!.id,
       audience: [],
@@ -191,7 +189,6 @@ export async function stepG5(
     waitedSeconds: waitedSeconds(intent, registry.now()),
     source: 'workflow',
   });
-  await warnBudget(tx, policy, intent, facts);
   return move(tx, registry, intent, { status: 'in_gate', gate: 'G6' }, 'hotl_passed', {
     decisionId: pass.id,
     audience: oversight.roles.filter((role) => role !== 'viewer'),
@@ -235,18 +232,17 @@ async function failG5(
     occurredAt: registry.now(),
     payload: { decision_id: decision.id, check: breach.check, run_id: facts.run.id },
   });
-  await warnBudget(tx, policy, intent, facts);
   if (breach.escalation === null) {
-    // N1, QUESTIONS #131: back to G3; the G3 approvers (HITL from now on) act next.
-    const g3 = policy.policy.oversightMode({
+    // N1, QUESTIONS #131: back to G3; the G3 approvers (HITL from now on) act next. The earlier
+    // round's G3 approval no longer counts.
+    await registry.voidApprovals(tx, {
+      intentId: intent.id,
       gate: 'G3',
-      riskTier: intent.risk_tier,
-      changeFlags: (await tx.plans.latest(intent.id))?.change_flags ?? [],
-      context: { scopeReturned: true },
+      reasonCode: 'out_of_scope',
     });
     return move(tx, registry, intent, { status: 'in_gate', gate: 'G3' }, 'scope_returned', {
       decisionId: decision.id,
-      audience: g3.roles.filter((role) => role !== 'viewer'),
+      audience: await g3Approvers(tx, policy, intent),
     });
   }
   const level = policy.config.run.g5_breach_escalation;
@@ -260,7 +256,7 @@ async function failG5(
       severity: level.severity,
       responseLevel: level.response_level,
       packet: {
-        subject_kind: 'diff',
+        subject_kind: 'g5_input',
         subject_sha256: facts.inputSha256,
         gate: 'G5',
         run_id: facts.run.id,
@@ -273,29 +269,9 @@ async function failG5(
     },
     { now: () => registry.now() },
   );
-  return move(tx, registry, intent, { status: 'paused', gate: 'G5' }, 'g5_paused', {
+  return move(tx, registry, intent, { status: 'paused', gate: 'G5' }, 'g5_breach', {
     decisionId: decision.id,
     audience: G4_OPERATOR_ROLES,
-  });
-}
-
-/** FR-52: the warning comment, once, with the G5 move, when the run reached the warning share. */
-async function warnBudget(
-  tx: TenantScope,
-  policy: G5Policy,
-  intent: Intent,
-  facts: G5Facts,
-): Promise<void> {
-  const percent = spentPercent(facts);
-  if (!facts.warned && (percent === null || percent < policy.config.budget.warn_percent)) return;
-  await tx.intentNotices.record({
-    intentId: intent.id,
-    kind: 'budget_warning',
-    status: intent.status,
-    gate: 'G5',
-    previousGate: null,
-    decisionId: null,
-    audienceRoles: G4_OPERATOR_ROLES,
   });
 }
 
@@ -303,6 +279,7 @@ async function warnBudget(
 export async function stepPausedG5(
   tx: TenantScope,
   registry: Registry,
+  policy: G5Policy,
   intent: Intent,
 ): Promise<IntentStepResult> {
   const run = (await tx.runs.listForIntent(intent.id)).at(-1);
@@ -311,14 +288,35 @@ export async function stepPausedG5(
         .filter((e) => e.run_id === run.id && e.packet.gate === 'G5')
         .at(-1)
     : undefined;
-  if (!run || !escalation || escalation.decision === null) return wait('g5_review');
+  if (!run || !escalation || escalation.status === 'closed') return wait('g5_review');
+  // FR-17: the escalation is bound to the G5 input it was raised for. A changed input (a late
+  // spend sync) voids its decision and closes it; G5 is evaluated again on the new result, which
+  // raises a new escalation bound to the new input.
+  const current = (await gatherG5Facts(tx, intent.id))?.inputSha256 ?? null;
+  if (current !== null && current !== escalation.packet.subject_sha256) {
+    if (escalation.decision !== null) {
+      await revalidateEscalationDecision(
+        tx,
+        { escalationId: escalation.id, subjectSha256: current, action: 'run_start' },
+        { now: () => registry.now() },
+      );
+    }
+    await close(tx, registry, escalation);
+    await tx.intents.moveState(intent.id, {
+      from: { status: 'paused', currentGate: 'G5' },
+      to: { status: 'in_gate', currentGate: 'G5' },
+      at: registry.now(),
+    });
+    return moved;
+  }
+  if (escalation.decision === null) return wait('g5_review');
   const now = registry.now();
   const decision = String(escalation.decision.decision);
   const subjectSha256 = String(escalation.packet.subject_sha256);
 
   switch (decision) {
     case 'resume': {
-      if (!decisionAllows(escalation, 'run_start', now)) return wait('g5_review');
+      // Re-checked every time: an expired or mismatched decision is voided (FR-17).
       if (!(await stillValid(tx, registry, escalation, subjectSha256, 'run_start'))) {
         return wait('g5_review');
       }
@@ -335,9 +333,16 @@ export async function stepPausedG5(
         return wait('g5_review');
       }
       await close(tx, registry, escalation);
+      // Decision A: G3 is HITL from now on (`returnedFromG5`); the same plan may be approved, by a
+      // new decision: the earlier round's G3 approval is voided with the breach's reason code.
+      await registry.voidApprovals(tx, {
+        intentId: intent.id,
+        gate: 'G3',
+        reasonCode: breachReason(escalation),
+      });
       return move(tx, registry, intent, { status: 'in_gate', gate: 'G3' }, 'g5_returned', {
         decisionId: null,
-        audience: G4_OPERATOR_ROLES,
+        audience: await g3Approvers(tx, policy, intent),
       });
     }
     case 'terminate': {
@@ -398,6 +403,29 @@ async function raiseBudgetIfDecided(
     runBudgetUsd: fromMicros(toMicros(previousCap) + toMicros(amount)),
     escalationId: escalation.id,
   });
+}
+
+/** The reason code of the G5 breach an escalation is about (its packet); `other` when missing. */
+function breachReason(escalation: Escalation): GateReasonCode {
+  const code = escalation.packet.reason_code;
+  return typeof code === 'string' && (GATE_REASON_CODES as readonly string[]).includes(code)
+    ? (code as GateReasonCode)
+    : 'other';
+}
+
+/** The roles that approve G3 after a return from G5 (HITL, `returnedFromG5`). */
+async function g3Approvers(
+  tx: TenantScope,
+  policy: G5Policy,
+  intent: Intent,
+): Promise<ProjectRole[]> {
+  const g3 = policy.policy.oversightMode({
+    gate: 'G3',
+    riskTier: intent.risk_tier,
+    changeFlags: (await tx.plans.latest(intent.id))?.change_flags ?? [],
+    context: { returnedFromG5: true },
+  });
+  return g3.roles.filter((role) => role !== 'viewer');
 }
 
 async function close(tx: TenantScope, registry: Registry, escalation: Escalation): Promise<void> {

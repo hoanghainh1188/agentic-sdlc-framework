@@ -268,33 +268,83 @@ export class GateDecisionRepository extends TenantRepository {
             continue;
           }
           voided.push(
-            await this.insert(
-              db,
-              {
-                intent_id: intent.id,
-                gate: approval.gate,
-                decision: 'void',
-                oversight_mode: approval.oversight_mode,
-                approver_role: null,
-                actor_type: 'system',
-                decided_by: null,
-                reason_code: status,
-                reason_ref: null,
-                input_sha256: approval.input_sha256,
-                scope: null,
-                expires_at: null,
-                config_hash: effective.configHash,
-                source: 'workflow',
-                event_source: null,
-                waited_seconds: null,
-                voids_decision_id: approval.id,
-              },
-              now,
-            ),
+            await this.insertVoid(db, intent.id, effective.configHash, approval, status, now),
           );
         }
         return { valid, voided };
       }),
+    );
+  }
+
+  /**
+   * Voids every current approval of a gate (system actor, `reasonCode`), whatever its binding: the
+   * gate must be decided again. C07: G5 sends the intent back to G3 (a run outside its plan, or a
+   * `modify` or `roll_back` decision on a G5 escalation); the G3 approval of the earlier round no
+   * longer counts, and its approver may approve again (ADR-M34 §2.8). Call under the intent lock.
+   */
+  async voidApprovals(
+    input: {
+      readonly intentId: string;
+      readonly gate: GateCode;
+      readonly reasonCode: GateReasonCode;
+    },
+    deps: RegistryDeps,
+  ): Promise<GateDecisionRow[]> {
+    if (!(GATE_REASON_CODES as readonly string[]).includes(input.reasonCode)) {
+      throw invalid('reasonCode must be a gate reason code');
+    }
+    const now = clock(deps);
+    return this.run(
+      this.transactional(async (db) => {
+        const { intent, effective } = await this.lockedIntent(db, input.intentId);
+        const voided: GateDecisionRow[] = [];
+        for (const approval of await this.currentApprovals(db, intent.id, input.gate)) {
+          voided.push(
+            await this.insertVoid(
+              db,
+              intent.id,
+              effective.configHash,
+              approval,
+              input.reasonCode,
+              now,
+            ),
+          );
+        }
+        return voided;
+      }),
+    );
+  }
+
+  private insertVoid(
+    db: Kysely<Database>,
+    intentId: string,
+    configHash: string,
+    approval: GateDecisionRow,
+    reasonCode: GateReasonCode,
+    now: Date,
+  ): Promise<GateDecisionRow> {
+    return this.insert(
+      db,
+      {
+        intent_id: intentId,
+        gate: approval.gate,
+        decision: 'void',
+        oversight_mode: approval.oversight_mode,
+        approver_role: null,
+        actor_type: 'system',
+        decided_by: null,
+        reason_code: reasonCode,
+        reason_ref: null,
+        input_sha256: approval.input_sha256,
+        scope: null,
+        expires_at: null,
+        config_hash: configHash,
+        source: 'workflow',
+        event_source: null,
+        waited_seconds: null,
+        voids_decision_id: approval.id,
+      },
+      now,
     );
   }
 

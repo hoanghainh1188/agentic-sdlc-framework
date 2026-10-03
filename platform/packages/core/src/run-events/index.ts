@@ -9,3 +9,4 @@ export {
   type RunEventPayload,
   type RunEventType,
 } from './types.js';
+export { recordBudgetWarning, type BudgetWarning } from './budget-warning.js';

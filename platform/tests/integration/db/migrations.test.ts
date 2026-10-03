@@ -54,7 +54,7 @@ const UPDATABLE: Record<string, readonly string[]> = {
   audit_log: [],
   // B02: only the current state of an intent changes; history is in gate_decisions and audit_log.
   // B07: when the intent entered its gate (waiting time, FR-12).
-  // C07 (migration 0014): the budgets, only up (trigger SDA11).
+  // C07 (migration 0015): the budgets, only up (trigger SDA12).
   intents: [
     'budget_usd',
     'current_gate',

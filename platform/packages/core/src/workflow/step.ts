@@ -63,7 +63,7 @@ import {
 import { gatherG4Facts, type G4Deps, type G4Facts } from './g4-proposal.js';
 import { stepG4 } from './g4.js';
 import { stepG5, stepPausedG5 } from './g5.js';
-import { refusedPlanHashes, scopeReturned } from './g5-scope.js';
+import { refusedPlanHashes, returnedFromG5 } from './g5-scope.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
 import { moveTo, moveToRunning, stepPaused, stepRunning } from './run-lifecycle.js';
 import { waitedSeconds } from './waited.js';
@@ -179,7 +179,12 @@ export async function stepIntent(
     }
     // C07: a G5 breach paused the intent; a person's decision on its escalation moves it on.
     if (intent.status === 'paused' && intent.current_gate === 'G5') {
-      return stepPausedG5(tx, deps.registry, intent);
+      return stepPausedG5(
+        tx,
+        deps.registry,
+        await deps.registry.policyFor(tx, intent.project_id),
+        intent,
+      );
     }
     if (intent.status !== 'in_gate' || intent.current_gate === null) return waiting('not_in_gate');
     const policy = await deps.registry.policyFor(tx, intent.project_id);
@@ -418,12 +423,12 @@ async function resolveOversight(
 ): Promise<OversightResolution> {
   const plan = await tx.plans.latest(intent.id);
   // C07 (QUESTIONS #131): G3 is HITL once G5 sent the intent back for scope.
-  const returned = gate === 'G3' && (await scopeReturned(tx, intent.id));
+  const returned = gate === 'G3' && (await returnedFromG5(tx, intent.id));
   return policy.policy.oversightMode({
     gate,
     riskTier: intent.risk_tier,
     changeFlags: plan?.change_flags ?? [],
-    ...(returned ? { context: { scopeReturned: true } } : {}),
+    ...(returned ? { context: { returnedFromG5: true } } : {}),
   });
 }
 

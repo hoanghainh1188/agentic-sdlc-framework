@@ -5,8 +5,9 @@
 // Controller set to the smallest of the run budget, what is left of the intent budget and what is
 // left of the tenant's month (ADR-M24): the contract's `max_budget_usd` only when the gateway does
 // not report a cap.
-// - At `budget.warn_percent`: the run event `budget_warning`, once per run (the comment on the
-//   issue comes with G5, PR 2).
+// - At `budget.warn_percent`: the run event `budget_warning` and the intent's status notice, in one
+//   transaction, once per run: the poller posts the warning comment while the agent works (FR-52,
+//   C07 PR 2 decision C).
 // - At `budget.stop_percent`: the runner stops the agent like at the time cap; the run ends
 //   `stopped_budget` with `stop_reason` `max_budget`.
 // LiteLLM itself refuses calls once the key's cap is reached; the agent then ends with an error.

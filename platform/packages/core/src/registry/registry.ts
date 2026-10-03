@@ -1,7 +1,7 @@
 // The registry facade (design/D-03 section 5.2 "Intent / Spec Registry" and "Gate Engine", D-08
 // B02). It holds the policy factory and the clock, so callers cannot write an intent or a gate
 // decision without the policy engine of the project configuration.
-import type { PolicyEngine } from '@sdlc/contracts';
+import type { GateCode, GateReasonCode, PolicyEngine } from '@sdlc/contracts';
 
 import type { GateDecisionRow, Intent, Plan, SpecRef } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
@@ -40,6 +40,18 @@ export class Registry {
 
   revalidateApprovals(scope: TenantScope, input: RevalidateInput): Promise<RevalidateResult> {
     return scope.gateDecisions.revalidateApprovals(input, this.deps);
+  }
+
+  /** Voids every current approval of a gate with `reasonCode` (C07: G5 sends the intent back). */
+  voidApprovals(
+    scope: TenantScope,
+    input: {
+      readonly intentId: string;
+      readonly gate: GateCode;
+      readonly reasonCode: GateReasonCode;
+    },
+  ): Promise<GateDecisionRow[]> {
+    return scope.gateDecisions.voidApprovals(input, this.deps);
   }
 
   /** The policy engine of the project configuration in force (the intent workflow, B07). */

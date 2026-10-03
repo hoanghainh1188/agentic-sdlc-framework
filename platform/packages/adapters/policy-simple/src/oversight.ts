@@ -2,7 +2,7 @@
 // Every value comes from the validated configuration; this file only applies the steps:
 //   mode = matrix[gate][risk_tier]          (G8: production or non-production table)
 //   G3 + a forced-HITL change flag          → HITL
-//   G3 after G5 sent the intent back (scope) → HITL (C07, QUESTIONS #131)
+//   G3 after G5 sent the intent back        → HITL (C07, QUESTIONS #131)
 //   G5 + a breached limit                   → the cell's `on_breach` mode
 //   G6 + a finding at or above min_severity → `g6_security_findings.mode`
 //   G7 + a dual-approval change flag        → the dual-approval roles, one approval each
@@ -70,7 +70,7 @@ function applyOverrides(
       if (hasAny(input.changeFlags, oversight.forced_hitl_g3.change_flags)) {
         overrides.push('forced_hitl_change_flag');
       }
-      if (input.context?.scopeReturned === true) overrides.push('scope_returned');
+      if (input.context?.returnedFromG5 === true) overrides.push('returned_from_g5');
       return overrides.length > 0 ? { ...base, mode: 'HITL', overrides } : base;
     }
     case 'G5':

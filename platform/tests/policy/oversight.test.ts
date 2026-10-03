@@ -123,20 +123,20 @@ describe('forced HITL at G3 (FR-15)', () => {
     expect(resolve('G2', 'low', ['migration']).mode).toBe('HOTL');
   });
 
-  it('C07 #131: after G5 sent the intent back for scope, G3 is HITL at every tier', () => {
+  it('C07 #131 and decision A: after G5 sent the intent back, G3 is HITL at every tier', () => {
     for (const tier of RISK_TIERS) {
-      expect(resolve('G3', tier, [], { scopeReturned: true })).toEqual({
+      expect(resolve('G3', tier, [], { returnedFromG5: true })).toEqual({
         mode: 'HITL',
         approvalsNeeded: 1,
         roles: B,
-        overrides: ['scope_returned'],
+        overrides: ['returned_from_g5'],
       });
     }
-    expect(resolve('G3', 'low', ['migration'], { scopeReturned: true }).overrides).toEqual([
+    expect(resolve('G3', 'low', ['migration'], { returnedFromG5: true }).overrides).toEqual([
       'forced_hitl_change_flag',
-      'scope_returned',
+      'returned_from_g5',
     ]);
-    expect(resolve('G4', 'low', [], { scopeReturned: true }).mode).toBe('POLICY');
+    expect(resolve('G4', 'low', [], { returnedFromG5: true }).mode).toBe('POLICY');
   });
 });
 

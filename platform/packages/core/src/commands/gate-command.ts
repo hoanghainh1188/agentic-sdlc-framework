@@ -9,7 +9,7 @@ import type { TenantScope } from '../db/tenant-scope.js';
 import { normalizeScope, type ApprovalScope } from '../registry/approval-binding.js';
 import type { HumanDecision } from '../registry/decision-rules.js';
 import type { Registry } from '../registry/registry.js';
-import { refusedPlanHashes, scopeReturned } from '../workflow/g5-scope.js';
+import { refusedPlanHashes, returnedFromG5 } from '../workflow/g5-scope.js';
 import { isPassableGate, openBlockWindow } from '../workflow/hotl.js';
 import { waitedSeconds } from '../workflow/waited.js';
 import { projectAccess } from './access.js';
@@ -41,6 +41,8 @@ export interface GateCommand {
  * outsider learns nothing), binds the decision to the gate's input and records it through the
  * registry, which resolves the oversight mode and checks the approver with the policy engine.
  * At G1–G3 there is no produced change yet, so the producer list is empty (QUESTIONS.md #64).
+ * At G4 the run does not exist yet. At G5 (C07) the person who allowed the run (`triggered_by`,
+ * the G4 approver) produced its changes with the agent and never decides them (FR-11).
  */
 export async function decideGate(
   registry: Registry,
@@ -79,7 +81,7 @@ export async function decideGate(
     }
     const inputSha256 = await gateInputSha256(tx, current, gate);
     // C07 (QUESTIONS #131): after a run went outside its plan, G3 is HITL and needs a new plan.
-    const returned = gate === 'G3' && (await scopeReturned(tx, current.id));
+    const returned = gate === 'G3' && (await returnedFromG5(tx, current.id));
     if (
       returned &&
       command.decision === 'approve' &&
@@ -92,7 +94,7 @@ export async function decideGate(
       gate: gate,
       decision: command.decision,
       actor: { type: 'human', id: command.actorId },
-      producers: [],
+      producers: gate === 'G5' ? await runProducers(tx, current.id) : [],
       inputSha256,
       reasonCode: command.reasonCode ?? null,
       reasonRef: command.reasonRef ?? null,
@@ -101,9 +103,15 @@ export async function decideGate(
       waitedSeconds: atGate ? waitedSeconds(current, now) : null,
       source: command.source,
       eventSource: command.eventSource ?? null,
-      ...(returned ? { context: { scopeReturned: true } } : {}),
+      ...(returned ? { context: { returnedFromG5: true } } : {}),
     });
   });
+}
+
+/** The producers of the intent's last run: the person who allowed it, when any (C07, FR-11). */
+async function runProducers(tx: TenantScope, intentId: string): Promise<string[]> {
+  const run = (await tx.runs.listForIntent(intentId)).at(-1);
+  return run?.triggered_by ? [run.triggered_by] : [];
 }
 
 /** A rejection or request for changes of a gate the platform passed, within its block window. */

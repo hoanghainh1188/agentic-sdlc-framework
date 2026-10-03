@@ -1,7 +1,7 @@
 // What G5 reads about the intent's last run (task C07 PR 2, design/ADR-M34 §2.8): the run's final
 // status and stop reason, the runner's records of its changes (`diff_stored`, `changes_checked`,
-// PR 1), the key's cap (`key_issued`), the budget warning, and the run's synced spend
-// (`cost_records`). The G5 input hash binds every G5 decision and the G5 escalation to exactly this
+// PR 1), the key's cap (`key_issued`), the run's synced spend
+// (`cost_records`), and the intent's synced spend. The G5 input hash binds every G5 decision and the G5 escalation to exactly this
 // result of exactly this run (FR-17). Codes, counts and hashes only: never a path.
 import { createHash } from 'node:crypto';
 
@@ -36,10 +36,10 @@ export interface G5Facts {
   readonly changes: G5Changes | null;
   /** The cap of the run's key (`key_issued`); null when unknown. */
   readonly keyCapUsd: string | null;
-  /** The runner recorded `budget_warning` during the run. */
-  readonly warned: boolean;
   /** The run's synced spend (`cost_records`), as a decimal string. */
   readonly spentUsd: string;
+  /** The intent's synced spend over all its runs, as a decimal string (bound in the input hash). */
+  readonly intentSpentUsd: string;
   /** The G5 input hash: the decisions and the escalation are bound to it. */
   readonly inputSha256: string;
 }
@@ -77,20 +77,27 @@ export async function gatherG5Facts(scope: TenantScope, intentId: string): Promi
   const records = await scope.costRecords.listForRun(run.id);
   const spent = records.reduce((sum, r) => sum + toMicros(String(r.cost_usd)), 0n);
   const diffSha256 = str(diff?.sha256);
+  const contract = await scope.runContracts.getByRunId(run.id);
+  const intentSpentUsd = fromMicros(toMicros(await scope.costRecords.totalForIntent(intentId)));
   return {
     run,
     diffSha256,
     changes,
     keyCapUsd: str(key?.max_budget_usd),
-    warned: events.some((e) => e.event_type === 'budget_warning'),
     spentUsd: fromMicros(spent),
+    intentSpentUsd,
+    // The approved plan (Harry, 2026-09-28): the run, its contract, its diff, its checked paths and
+    // the intent's spend after the sync. A later spend sync changes the hash: a G5 approval or an
+    // escalation decision bound to the earlier result is then voided (FR-17).
     inputSha256: sha256({
       v: 1,
       run_id: run.id,
+      contract_sha256: contract?.contract_sha256 ?? null,
       status: run.status,
       stop_reason: run.stop_reason,
       diff_sha256: diffSha256,
       paths_sha256: changes?.pathsSha256 ?? null,
+      intent_spent_usd: intentSpentUsd,
     }),
   };
 }

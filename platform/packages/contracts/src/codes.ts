@@ -181,9 +181,9 @@ export const GATE_REASON_CODES = [
   // pin exists at the base commit, or the commit's files cannot all be listed.
   'instructions_unpinned',
   // G5 (task C07 PR 2, ADR-M34 §2.8): the run stopped at its iteration or time cap, or stalled
-  // (loop or no progress). A cost cap is `budget_exceeded`; never one for the other.
+  // (loop or no progress); the exact cause is in `gate.g5_check_failed`. A cost cap is
+  // `budget_exceeded`, never this code.
   'run_cap_reached',
-  'run_stalled',
   'other',
 ] as const;
 export type GateReasonCode = (typeof GATE_REASON_CODES)[number];

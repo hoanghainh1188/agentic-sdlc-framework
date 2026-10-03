@@ -2,10 +2,10 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C07; PR 1 in review: the runner's part and the G4 instruction-file check; PR 2 follows: the G5 workflow step) |
+| Status | **Proposed** (task C07; PR 1 merged (#126): the runner's part and the G4 instruction-file check; PR 2 in review: the G5 workflow step) |
 | Date | 2026-10-03 |
-| Decided by | Harry (plan approved 2026-09-28: two PRs, QUESTIONS #130–#134 with conditions; the step-1 adjustments approved 2026-10-03, with two conditions: re-read the spend after an agent error before choosing `stopped_budget` or `failed`, and record the exact cause of a G4 refusal in the audit event) |
-| Related | D-02 FR-13, FR-32, FR-50…FR-52; D-03 sections 6, 7.1, 7.4 (version 1.15); D-05 sections 5, 6.4, 6.6 (version 1.18); D-08 tasks C07, C08, C09, E02, E05; D-09 N1, N3; handbook Ch.13, Ch.20 §20.9; ADR-M24, ADR-M25, ADR-M28, ADR-M29 §2.5, ADR-M31 §2.5, ADR-M33 §2.4, §2.6–§2.9; QUESTIONS #14, #21, #82, #126, #130–#134 |
+| Decided by | Harry (plan approved 2026-09-28: two PRs, QUESTIONS #130–#134 with conditions; the PR 1 step-1 adjustments approved 2026-10-03, with two conditions: re-read the spend after an agent error before choosing `stopped_budget` or `failed`, and record the exact cause of a G4 refusal in the audit event; the PR 2 adjustments and decisions A–C approved 2026-10-03) |
+| Related | D-02 FR-11, FR-13, FR-17, FR-18, FR-32, FR-50…FR-52; D-03 sections 6, 7.1, 7.4 (version 1.16); D-05 sections 5, 6.2, 6.4, 6.6 (version 1.19); handbook Ch.13 §13.10.5, Ch.18 §18.8b; D-08 tasks C07, C08, C09, E02, E05; D-09 N1, N3; handbook Ch.13, Ch.20 §20.9; ADR-M24, ADR-M25, ADR-M28, ADR-M29 §2.5, ADR-M31 §2.5, ADR-M33 §2.4, §2.6–§2.9; QUESTIONS #14, #21, #82, #126, #130–#134 |
 
 ## 1. Context
 
@@ -19,8 +19,8 @@ Three facts shape the design:
 
 C07 has two pull requests:
 
-- **PR 1** (this version): the runner keeps its clone for every run, stores the diff of every run that goes to G5, checks it against the plan and the agent instruction paths, and watches the budget during the run. G4 refuses a run when the base commit holds an unpinned instruction file. `GitHostAdapter.listPaths`, migration 0013.
-- **PR 2**: the G5 workflow step (`workflow/g5.ts`): oversight from the matrix, the outcome table, escalations, `resume` with a budget increase, migration 0014, handbook Ch.13 §13.10 and Ch.18.
+- **PR 1** (merged): the runner keeps its clone for every run, stores the diff of every run that goes to G5, checks it against the plan and the agent instruction paths, and watches the budget during the run. G4 refuses a run when the base commit holds an unpinned instruction file. `GitHostAdapter.listPaths`, migration 0013.
+- **PR 2** (version 0.2): the G5 workflow step (`workflow/g5.ts`, §2.8): oversight from the matrix, the outcome table, escalations, the decisions on them and `resume` with a budget increase (§2.9), the budget warning during the run, migration 0015, handbook Ch.13 §13.10.5 and Ch.18 §18.8b.
 
 ## 2. Decision
 
@@ -72,6 +72,39 @@ Blind spot: paths the ignore rules of `base_sha` ignore (`node_modules`, build o
 - The runner checks the spend only while the agent works and after an agent error. A run that ends by itself (finished, stuck, iteration cap) between two checks keeps that status even if its spend reached the stop share: **G5 (PR 2) must read the run's spend again** (synced `cost_records` and the key) and never rely on the runner's status alone.
 - Keys issued before this change have no `user_id` and can still read each other's info until they expire (at most the contract window plus the run's time cap); no rotation is needed beyond letting them expire.
 
+### 2.8. The G5 step (PR 2; QUESTIONS #131, #132)
+
+`stepG5` (core, `workflow/g5.ts`) runs when the intent waits `in_gate G5` after a run (`finishRun`, which revokes the key and syncs the spend first). It reads the run's result with `gatherG5Facts`: the run's status and stop reason, the runner's `diff_stored` and `changes_checked`, the key's cap (`key_issued`), the run's synced spend and the intent's synced spend.
+
+- **The G5 input hash** = SHA-256 of the RFC 8785 JSON of: the run ID, the contract's `contract_sha256`, the run's status and stop reason, `diff_sha256`, `paths_sha256` and the intent's spend after the sync. Every G5 decision and the G5 escalation are bound to it (FR-17).
+- **Oversight** from `policy.oversightMode(G5, risk)`: HOTL at Low and Medium, HOTL with `on_breach: HITL` at High (a breach goes to a person through the escalation), HITL at Critical (never reached: Critical never runs). A failed check is recorded with `context: { breached: true }`.
+- **The checks, in order** (the first failure wins; each is recorded once as a system `fail` with its reason code, and the audit event `gate.g5_check_failed` holds the exact cause and the run ID):
+
+| # | Check | Reason code (cause) | Next |
+|---|---|---|---|
+| 0 | The runner recorded the changes (never missing: the runner fails the run first, §2.2) | `input_mismatch` (`changes_missing`) | `paused`, `technical` escalation |
+| 1 | No agent instruction file added, changed or removed (`instruction_files` = 0) | `instructions_unpinned` (`instructions_changed`) | `paused`, `security` escalation, trigger `risky_action` |
+| 2 | No changed path outside the plan (`out_of_scope` = 0, and the run did not end `stopped_scope`) | `out_of_scope` (`out_of_scope`) | back to `in_gate G3`, no escalation |
+| 3 | The cost cap: not `stopped_budget` / `max_budget`, and the run's synced spend below `budget.stop_percent` of the key's cap (§2.6: the runner may have missed it) | `budget_exceeded` (`max_budget`, `spend_at_stop`) | `paused`, `intent` escalation, trigger `accumulated_risk` |
+| 4 | Not stopped at the iteration cap, the time cap, or as stalled | `run_cap_reached` (`max_iterations`, `max_duration`, `stalled`) | `paused`, `intent` escalation, trigger `accumulated_risk` |
+
+- **The escalation** of a breach: severity and response level from the new configuration `run.g5_breach_escalation` (default `high` / `pause`); the new mandatory rule **M22** keeps its level at `pause`, `contain` or `incident`, so a breach always freezes the intent (QUESTIONS #21). Packet: `subject_kind` `g5_input` (new), `subject_sha256` = the G5 input hash, `gate` G5, the run, the agent and the reason code. The run's `triggered_by` (the G4 approver) is a producer: never owner, backup or decider (FR-18).
+- **Back to G3** (N1, QUESTIONS #131): G3 is HITL at every tier from then on (`GateContext.returnedFromG5`, override `returned_from_g5` in `policy-simple`), the G3 approvals still in force are voided (`voidApprovals`, reason `out_of_scope`), and the plan the run went outside of is refused: `decideGate` answers `plan_refused` (409), and the step waits `new_plan_needed`. A new plan (another hash) is approved by a person.
+- **Pass:** HOTL → a system `pass` and `in_gate G6` (notice `hotl_passed`). The HOTL block window applies to G5 (`PASSABLE_GATES`): within it, `/reject G5` closes the intent and `/request-changes G5` takes it back to G4 for a new run; C08 waits for the window before it acts at G6. HITL (a configuration) → a person approves `/approve G5`; the producer of the run never counts (FR-11). G5 is now a gate a person may decide by command (`DECIDABLE_GATES`).
+- **The budget warning** (FR-52, decision C): the runner records the run event `budget_warning` and the intent's notice `budget_warning` in one transaction (`recordBudgetWarning`), so the comment appears while the agent works. The notice holds codes; the comment reads the percent from the run event when it is posted.
+
+### 2.9. The decision on a G5 escalation (QUESTIONS #133, #134; decisions A and B)
+
+`stepPausedG5` acts on the decision of the run's G5 escalation, under the intent lock:
+
+- **First, the binding:** when the current G5 input differs from the escalation's subject (for example a late spend sync), the decision is voided (`input_mismatch`), the escalation is closed, and the intent goes back to `in_gate G5`, where G5 is evaluated again and raises a new escalation bound to the new input. Without this, a decision could never match again.
+- `resume` → `revalidateEscalationDecision(…, action: run_start)` (an expired decision is voided). Then, when the decision names `budget_increase` with `budget_increase_usd` X (API or CLI only; a comment never names it, ADR-M28 §2.7): `intents.budget_usd += X` and `intents.run_budget_usd` = the stopped run's contract cap + X (`raiseBudget`, audit `intent.budget_increased`). The escalation is closed and the intent goes back to `in_gate G4` (notice `run_resumed`). Names in `actions` replace the defaults, so a decision with more budget names `run_start` and `budget_increase`; one that names only `budget_increase` allows no run (`scope_mismatch`) and the intent keeps waiting.
+- `modify` or `roll_back` (decision A) → back to `in_gate G3` (notice `g5_returned`): G3 is HITL from then on, the G3 approvals still in force are voided with the breach's reason code, and **the same plan may be approved** again by a person. The new-plan rule applies only after `out_of_scope`.
+- `terminate` (decision B) → the intent ends `cancelled`, the escalation is closed (notice `terminated`).
+- **The run cap:** G4 puts `run_budget_usd` (when set) into the run proposal, so a HITL G4 approves the new cap. The key's cap is still the smallest of the run budget, what is left of the intent budget and what is left of the tenant's month (ADR-M24); the Cost Controller is unchanged.
+- **Budgets only go up:** migration 0015 adds `intents.run_budget_usd` (null: `budget.default_run_usd`), grants `platform_app` UPDATE on `budget_usd` and `run_budget_usd`, and a trigger refuses a lower value or a run budget back to null (SQLSTATE `SDA12`).
+- **#134:** the new run starts after G4 from the head of the default branch, never from the stopped run's workspace; the stopped run's diff stays as evidence. Once C08 pushes `agent/INT-…`, the next run continues from that branch (D-08 C08 note).
+
 ### 2.7. Where the rules live
 
 | Rule | Where |
@@ -80,7 +113,9 @@ Blind spot: paths the ignore rules of `base_sha` ignore (`node_modules`, build o
 | Warning and stop shares | Project config `budget.warn_percent`, `budget.stop_percent` (existing) |
 | Spend check interval, re-read wait | Runner settings `SDLC_RUNNER_AGENT_SPEND_CHECK_SECONDS`, `SDLC_RUNNER_AGENT_SPEND_RECHECK_SECONDS` (technical) |
 | Fail closed (no diff → failed, truncated tree → refused) | Code (design) |
-| The G5 outcome table, escalations, resume | PR 2 |
+| The G5 check order, the outcome table, fail closed, budgets only up, the new-plan rule after `out_of_scope` | Code (design), §2.8–§2.9 |
+| The G5 oversight per risk tier | Project config `oversight.matrix.G5` (existing) |
+| The G5 escalation's severity and level (level ≥ `pause`, rule M22) | Project config `run.g5_breach_escalation` |
 
 ## 3. Alternatives considered
 
@@ -94,7 +129,9 @@ Blind spot: paths the ignore rules of `base_sha` ignore (`node_modules`, build o
 
 - Every run now pays the export of its workspace at the end (C06 2b measured an L1 proposal of the pilot repository with `node_modules`, `pnpm test:proposal-pilot`). The limits `SDLC_RUNNER_EXPORT_MAX_MB` and `SDLC_RUNNER_WORKSPACE_MAX_MB` apply; a run over them fails (`agent_changes_unavailable`).
 - The runner's disk holds one clone per active run until release.
-- Until PR 2, G5 still waits (`later_gate`); PR 1 only records `diff_stored`, `changes_checked`, `budget_warning` and `key_issued`.
+- With PR 2, every run that ends at G5 is decided by the platform or escalated; nothing waits at G5 for C08.
+- A late spend sync after G5 failed re-raises the G5 escalation (§2.9): people may see a second escalation for the same run. The sync in `finishRun` makes this rare.
+- G3 stays HITL for the rest of an intent's life once G5 sent it back; this is stricter than the matrix and needs no configuration.
 - The evidence identity can also delete under `diffs/` (SeaweedFS has no write-only action, ADR-M33 §2.9 gap 1); the bucket is versioned, and E02 re-checks the SHA-256 of each item.
 - C08 recomputes changed files and `head_sha` from the pushed branch with the same code (D-08 C08 note).
 - Very large repositories are refused at G4 (`tree_truncated`) until a paged tree walk exists.
@@ -106,3 +143,4 @@ Blind spot: paths the ignore rules of `base_sha` ignore (`node_modules`, build o
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task C07, PR 1), approved by Harry | First version: §2.1–§2.7 for PR 1; PR 2 adds the G5 step |
+| 0.2 | 2026-10-03 | Claude (task C07, PR 2), approved by Harry | §2.8 the G5 step, §2.9 the decision on a G5 escalation and the budget increase; §2.7, §4 updated (migration 0015, rule M22, SQLSTATE SDA12) |

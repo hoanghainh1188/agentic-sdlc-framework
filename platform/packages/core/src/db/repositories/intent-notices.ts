@@ -50,7 +50,7 @@ export const INTENT_NOTICE_KINDS = [
   // C07 PR 2 (ADR-M34 §2.8–§2.9): G5.
   'budget_warning',
   'scope_returned',
-  'g5_paused',
+  'g5_breach',
   'g5_returned',
   'terminated',
 ] as const;

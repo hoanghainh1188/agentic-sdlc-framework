@@ -61,7 +61,7 @@ const PG_ERROR_CODES: Record<string, DbErrorCode> = {
   SDA08: 'immutable', // a posted or abandoned escalation notice (migration 0007)
   SDA09: 'immutable', // an agent status move not allowed, a retired agent, or a config change (0008)
   SDA10: 'immutable', // a posted or abandoned intent status notice (migration 0009)
-  SDA11: 'immutable', // an intent budget that would go down (migration 0014)
+  SDA12: 'immutable', // an intent budget that would go down (migration 0015)
 };
 
 /** Maps a PostgreSQL error to a DbError; anything else is rethrown unchanged. */

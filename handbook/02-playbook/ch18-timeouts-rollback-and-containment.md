@@ -182,7 +182,7 @@ The platform raises an escalation when a run or a gate needs a decision from a p
   | `sdlc escalation show ESC-2026-0001` | Shows one escalation: clocks, owners, decision |
   | `sdlc escalation ack ESC-2026-0001` | Same as `/ack` |
   | `sdlc escalation decide ESC-2026-0001 <resume\|modify\|roll-back\|terminate\|escalate> [--reason-code <code>] [--reason-ref <https://…>]` | Same as `/decide` |
-  | `… decide … resume --actions run_resume,budget_increase --budget-increase-usd 2.5` | Names the actions the decision allows; a budget increase only this way (comments never raise a budget) |
+  | `… decide … resume --actions run_start,budget_increase --budget-increase-usd 2.5` | Names the actions the decision allows; a budget increase only this way (comments never raise a budget) |
 
   The API behind it: `GET /v1/escalations[/<code>]`, `POST /v1/escalations/<code>/ack`, `POST /v1/escalations/<code>/decisions`.
 
@@ -198,11 +198,30 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 
 - A decision is bound to the version that was reviewed, to the actions it allows, and to an expiry (project setting `oversight.approval_expiry`, 7 days by default).
   - `resume` allows the run to continue or start again, and the next gate.
-  - **More budget** is allowed only when the decision names it with an amount, through the API (`actions: ["budget_increase"]` with `budget_increase_usd`; the CLI comes later). The amount is recorded in the decision and in the audit log. A comment never raises a budget.
+  - **More budget** is allowed only when the decision names it with an amount, through the API or the CLI (`budget_increase` in `actions`, with `budget_increase_usd`). The amount is recorded in the decision and in the audit log. A comment never raises a budget.
   - `modify` allows moving through the gates again.
   - `roll-back` and `terminate` allow no protected action.
 - Just before acting, the platform checks the decision again. If the decision has expired, or the plan or input changed, the decision is voided and the escalation waits for a new decision.
 - The platform closes the escalation after it has acted on the decision.
+
+**A G5 breach: resume with more budget** (Chapter 13 §13.10.5). When a run stopped at its cost limit, Person A can let the next run spend more. Names in `actions` replace the defaults, so name **both** actions:
+
+```http
+POST /v1/escalations/ESC-2026-0001/decisions
+Content-Type: application/json
+
+{
+  "decision": "resume",
+  "actions": ["run_start", "budget_increase"],
+  "budget_increase_usd": "2.5",
+  "reason_code": "budget_exceeded"
+}
+```
+
+- The CLI does the same: `sdlc escalation decide ESC-2026-0001 resume --actions run_start,budget_increase --budget-increase-usd 2.5`.
+- The intent budget grows by the amount, and the run budget of the intent's next runs becomes the stopped run's limit plus the amount. Both only go up. The run's real limit is still the smallest of the run budget, what is left of the intent budget and what is left of the tenant's month.
+- The intent goes back to G4; the new run starts after G4. A G4 that needs Person A's approval (High risk) shows the new limit in its proposal.
+- A decision with `budget_increase` but without `run_start` allows no new run: the intent keeps waiting. Decide again with both actions.
 
 **Answers.** A successful command gets no reply. A command that the platform cannot read or refuses gets a reply that says why. Nothing is recorded in that case.
 
@@ -286,3 +305,4 @@ Track:
 | 0.4 | 2026-09-27 | Claude (task B07, session 2) | §18.8b: the escalation of an overdue gate, closed by the platform (ADR-M30 §2.9) |
 | 0.5 | 2026-09-30 | Claude (task A08) | §18.8c platform usage: logs and traces of a run (ADR-M35) |
 | 0.6 | 2026-10-03 | Claude (task B04) | §18.8b: the `sdlc escalation` commands (ADR-M36) |
+| 0.7 | 2026-10-03 | Claude (task C07, PR 2) | §18.8b: resume a G5 breach with more budget (the request body, `run_start` and `budget_increase`; ADR-M34 §2.9) |

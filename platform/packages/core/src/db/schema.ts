@@ -212,7 +212,7 @@ export interface IntentsTable {
   data_class: Immutable<DataClass>;
   /** Computed by the policy engine at creation (D-02 FR-03). */
   max_autonomy: Immutable<AutonomyLevel>;
-  /** Only goes up (migration 0014, trigger SDA11): `raiseBudget` after a G5 `resume` (C07). */
+  /** Only goes up (migration 0015, trigger SDA12): `raiseBudget` after a G5 `resume` (C07). */
   budget_usd: ColumnType<string, string, string>;
   current_gate: ColumnType<GateCode | null, never, GateCode | null>;
   status: ColumnType<IntentStatus, never, IntentStatus>;
@@ -226,7 +226,7 @@ export interface IntentsTable {
    */
   gate_entered_at: ColumnType<Date | null, never, Date | null>;
   /**
-   * The run budget of the intent's next runs (migration 0014, C07, QUESTIONS #133): set by a G5
+   * The run budget of the intent's next runs (migration 0015, C07, QUESTIONS #133): set by a G5
    * `resume` with a budget increase; null means the project's `budget.default_run_usd`. Only goes
    * up and never back to null.
    */
