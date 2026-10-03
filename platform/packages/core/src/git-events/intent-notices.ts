@@ -93,7 +93,11 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
     case 'g5_returned':
       return 'intent.status.g5_returned';
     case 'terminated':
-      return notice.gate === 'G6' ? 'intent.status.g6_terminated' : 'intent.status.terminated';
+      return notice.gate === 'G7'
+        ? 'intent.status.g7_terminated'
+        : notice.gate === 'G6'
+          ? 'intent.status.g6_terminated'
+          : 'intent.status.terminated';
     case 'spec_changed':
       return 'intent.status.spec_changed';
     case 'spec_unavailable':
@@ -118,6 +122,20 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.g6_escalated';
     case 'g6_resumed':
       return 'intent.status.g6_resumed';
+    case 'g7_review_needed':
+      return 'intent.status.g7_review_needed';
+    case 'g7_changes_requested':
+      return 'intent.status.g7_changes_requested';
+    case 'g7_merge_ready':
+      return 'intent.status.g7_merge_ready';
+    case 'g7_escalated':
+      return 'intent.status.g7_escalated';
+    case 'g7_returned':
+      return 'intent.status.g7_returned';
+    case 'g7_resumed':
+      return 'intent.status.g7_resumed';
+    case 'merged':
+      return 'intent.status.merged';
     default:
       return notice.gate !== null && isCommandGate(notice.gate)
         ? 'intent.status.advanced'

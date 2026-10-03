@@ -20,6 +20,12 @@ export type CommandErrorCode =
    * intent back to G3, and G3 needs a new plan (another plan hash).
    */
   | 'plan_refused'
+  /**
+   * An approval of G7 by a command (task E01, QUESTIONS #175): G7 approvals are GitHub reviews of
+   * the pull request's head, so GitHub's merge rules and the platform see the same approvals.
+   * `/reject G7` and `/request-changes G7` are accepted.
+   */
+  | 'g7_use_pr_review'
   /** Unknown intent, or an intent of a project the actor cannot read. */
   | 'intent_not_found'
   /** Unknown project, or a project the actor has no role on. */

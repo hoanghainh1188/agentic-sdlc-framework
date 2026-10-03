@@ -11,7 +11,13 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { GitHostError, type GitEvent, type RedactedSecret, type RepoRef } from '@sdlc/contracts';
 
 import { arr, checkRepo, int, obj, sha, str } from './json.js';
-import { checkRunEvent, commentEvent, reviewEvent, statusEvent } from './mapping.js';
+import {
+  checkRunEvent,
+  commentEvent,
+  pullClosedEvent,
+  reviewEvent,
+  statusEvent,
+} from './mapping.js';
 
 const SIGNATURE = /^sha256=([0-9a-f]{64})$/;
 
@@ -57,6 +63,9 @@ export function verifyWebhookRequest(
   ) {
     const pr = int(obj(body.pull_request, 'pull_request').number, 'pull_request.number');
     result = reviewEvent(repo, pr, body.review, 'webhook');
+  } else if (event === 'pull_request' && action === 'closed') {
+    // E01: the merge event (or a close without merge).
+    result = pullClosedEvent(repo, body.pull_request, 'webhook');
   } else if (event === 'check_run' && action === 'completed') {
     const run = obj(body.check_run, 'check_run');
     const prs = arr(run.pull_requests ?? [], 'check_run.pull_requests').map((p) =>

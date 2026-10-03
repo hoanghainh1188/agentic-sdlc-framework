@@ -274,6 +274,23 @@ export const AUDIT_ACTIONS = {
     entityType: 'intent',
     fields: { decision_id: 'uuid?', check: 'code', run_id: 'uuid' },
   },
+  /**
+   * A G7 check failed (E01, ADR-M41 §2.5): `pr_closed`, `head_changed` (the pull request shows
+   * another commit than the platform pushed), `merged_before_approval`, `merged_by_producer`
+   * (a bot, a producer of the change or an unknown account merged it).
+   */
+  'gate.g7_check_failed': {
+    entityType: 'intent',
+    fields: { decision_id: 'uuid?', check: 'code', run_id: 'uuid', escalation_id: 'uuid?' },
+  },
+  /**
+   * G7 passed (E01 AC5): a person merged the run's pull request with the approved head. The merge
+   * commit, never the merger's account.
+   */
+  'intent.pr_merged': {
+    entityType: 'intent',
+    fields: { run_id: 'uuid', pr_number: 'version', head_sha: 'code', merge_commit_sha: 'code?' },
+  },
   /** The runner refused the Run Contract of a known run; `reason` is a reject reason code. */
   'run.contract_rejected': { entityType: 'run', fields: { reason: 'code' } },
   /** An escalation was raised (FR-18, B11). Codes and IDs only, never the words of the package. */

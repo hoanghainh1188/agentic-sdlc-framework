@@ -3,11 +3,14 @@ import type {
   Approval,
   CheckItem,
   CheckSummary,
+  CommitAuthors,
   EventCursor,
+  GitActor,
   GitEvent,
   GitHostAdapter,
   NewPullRequest,
   PullRequestInfo,
+  ReviewDecision,
   SecurityFindings,
   Severity,
   RepoRef,
@@ -46,6 +49,8 @@ export const MAX_COMMENT_CHARS = 65_536;
 export const MAX_PULL_REQUEST_FILES = 3000;
 /** GitHub's limit of a pull request title (characters). */
 export const MAX_PULL_REQUEST_TITLE_CHARS = 256;
+/** GitHub lists at most 250 commits of a pull request. */
+export const MAX_PULL_REQUEST_COMMITS = 250;
 const FAILED: ReadonlySet<string> = new Set([
   'failure',
   'error',
@@ -222,6 +227,23 @@ export class GitHubAdapter implements GitHostAdapter {
   }
 
   async getApprovals(ref: RepoRef, pr: number): Promise<Approval[]> {
+    return (await this.getReviews(ref, pr))
+      .filter((r) => r.state === 'approved')
+      .map((r) => ({
+        reviewId: r.reviewId,
+        reviewer: r.reviewer,
+        commitSha: r.commitSha,
+        submittedAt: r.submittedAt,
+        url: r.url,
+      }));
+  }
+
+  /**
+   * The latest review decision of each reviewer (task E01). Reviews are sorted by submission time
+   * and ID; a comment never changes a decision (GitHub rule). A dismissed review keeps its ID and
+   * time with the state `dismissed`, so it replaces the approval it was.
+   */
+  async getReviews(ref: RepoRef, pr: number): Promise<ReviewDecision[]> {
     const base = repoPath(ref);
     checkNumber(pr, 'pr');
     const list = await this.#auth.withRepoAuth(ref, (auth) =>
@@ -235,20 +257,47 @@ export class GitHubAdapter implements GitHostAdapter {
         (a, b) =>
           a.occurredAt.localeCompare(b.occurredAt) || Number(a.reviewId) - Number(b.reviewId),
       );
-    // The latest decision of each reviewer counts; a comment does not change it (GitHub rule).
-    const latest = new Map<string, (typeof reviews)[number]>();
-    for (const review of reviews) {
-      if (review.state !== 'commented') latest.set(review.reviewer.id, review);
-    }
-    return [...latest.values()]
-      .filter((r) => r.state === 'approved')
-      .map((r) => ({
+    const latest = new Map<string, ReviewDecision>();
+    for (const r of reviews) {
+      if (r.state === 'commented') continue;
+      latest.set(r.reviewer.id, {
+        eventId: r.id,
         reviewId: r.reviewId,
         reviewer: r.reviewer,
+        state: r.state,
         commitSha: r.commitSha,
         submittedAt: r.occurredAt,
         url: r.url,
-      }));
+      });
+    }
+    return [...latest.values()];
+  }
+
+  /**
+   * The accounts that authored the pull request's commits (task E01). GitHub lists at most 250
+   * commits for a pull request; a longer list fails (never a partial list).
+   */
+  async getCommitAuthors(ref: RepoRef, pr: number): Promise<CommitAuthors> {
+    const base = repoPath(ref);
+    checkNumber(pr, 'pr');
+    const list = await this.#auth.withRepoAuth(ref, (auth) =>
+      listPages(this.#http, `${base}/pulls/${pr}/commits`, { auth, maxPages: 3 }),
+    );
+    if (list.truncated || list.items.length >= MAX_PULL_REQUEST_COMMITS) {
+      throw new GitHostError('invalid_response', { field: 'commits' });
+    }
+    const accounts = new Map<string, GitActor>();
+    let withoutAccount = 0;
+    for (const item of list.items) {
+      const commit = obj(item, 'commit');
+      if (commit.author === null || commit.author === undefined) {
+        withoutAccount += 1;
+        continue;
+      }
+      const author = actor(commit.author, 'commit.author');
+      accounts.set(author.id, author);
+    }
+    return { accounts: [...accounts.values()], withoutAccount };
   }
 
   async getFileAtCommit(ref: RepoRef, path: string, commitSha: string): Promise<string> {
@@ -410,6 +459,10 @@ function pullRequestInfo(body: unknown): PullRequestInfo {
     headRef: str(head.ref, 'pull.head.ref'),
     baseRef: str(baseRef.ref, 'pull.base.ref'),
     author: actor(p.user, 'pull.user'),
+    mergedBy:
+      mergedAt === null || p.merged_by === null || p.merged_by === undefined
+        ? null
+        : actor(p.merged_by, 'pull.merged_by'),
     changedFiles: int(p.changed_files, 'pull.changed_files'),
     url: url(p.html_url, 'pull.html_url'),
   };

@@ -57,7 +57,7 @@ export type GitEventOutcome =
   | 'duplicate'
   /** Not stored: a comment that is not a command of the platform. */
   | 'not_a_command'
-  /** Not stored: reviews and checks are read by later gates (E01, C08). */
+  /** Not stored: reviews, checks and closed pull requests are read by the gates (E01, C08). */
   | 'not_handled';
 
 /** Codes of the reply comments. Each has the catalog key `comment.reply.<code>` (ADR-M27). */
@@ -77,6 +77,7 @@ export const COMMENT_REPLY_CODES = [
   'gate_input_missing',
   'gate_not_current',
   'plan_refused',
+  'g7_use_pr_review',
   'approval_refused',
   'decision_not_allowed',
   'project_not_active',
@@ -116,7 +117,7 @@ export interface HandledGitEvent {
 
 const REASON_REF = /^https:\/\/[^\s]{1,504}$/;
 
-interface Reply {
+export interface Reply {
   readonly code: CommentReplyCode;
   readonly params: Readonly<Record<string, string>>;
 }
@@ -168,6 +169,24 @@ async function wakeForCheck(
 }
 
 /**
+ * E01 (ADR-M41 §2.2): a review was submitted on a pull request, or the pull request was closed
+ * (merged or not). The event is only a trigger: the intent of that pull request is woken, and G7
+ * reads the pull request and its reviews again from the Git host. Reviews get their receipts from
+ * G7, which records them as decisions; the poller stores nothing here.
+ */
+async function wakeForPullRequest(
+  scope: TenantScope,
+  project: GitEventProject,
+  prNumber: number,
+): Promise<HandledGitEvent> {
+  const [intent] = await scope.intents.findOpenByGitNumber(project.id, {
+    kind: 'pull_request',
+    number: prNumber,
+  });
+  return intent ? { outcome: 'not_handled', intentId: intent.id } : { outcome: 'not_handled' };
+}
+
+/**
  * Handles one event in the scope's transaction (one is opened when the scope has none). Throws
  * only for errors that should stop the whole poll (for example a lost database connection), so
  * the batch is rolled back and read again.
@@ -179,6 +198,9 @@ export function handleGitEvent(
   event: GitEvent,
 ): Promise<HandledGitEvent> {
   if (event.kind === 'check_completed') return wakeForCheck(scope, project, event);
+  if (event.kind === 'review_submitted' || event.kind === 'pull_request_closed') {
+    return wakeForPullRequest(scope, project, event.prNumber);
+  }
   if (event.kind !== 'comment_created') return Promise.resolve({ outcome: 'not_handled' });
   const command = parseCommentCommand(event.body);
   if (command.kind === 'none') return Promise.resolve({ outcome: 'not_a_command' });
@@ -342,14 +364,32 @@ async function linkedUser(
   provider: GitProvider,
   event: CommentCreatedEvent,
 ): Promise<string | undefined> {
-  const identity = await scope.userIdentities.findByExternalId(provider, event.author.id);
+  return userOfAccount(scope, provider, event.author.id);
+}
+
+/**
+ * The active platform user linked to a Git host account, by its numeric ID (QUESTIONS #45);
+ * unlinked identities never match (B13). Shared with the G7 reviews (E01).
+ */
+export async function userOfAccount(
+  scope: TenantScope,
+  provider: GitProvider,
+  accountId: string,
+): Promise<string | undefined> {
+  const identity = await scope.userIdentities.findByExternalId(provider, accountId);
   if (!identity) return undefined;
   const user = await scope.users.getById(identity.user_id);
   return user?.status === 'active' ? user.id : undefined;
 }
 
-/** The reply for an expected refusal; undefined for errors that must stop the poll. */
-function refusalReply(error: unknown, gate: Readonly<Record<string, string>>): Reply | undefined {
+/**
+ * The reply for an expected refusal; undefined for errors that must stop the poll. Shared with
+ * the G7 reviews (E01): the same codes, never text from the Git host.
+ */
+export function refusalReply(
+  error: unknown,
+  gate: Readonly<Record<string, string>>,
+): Reply | undefined {
   if (error instanceof CommandError) {
     // `project_not_found` cannot happen here (the project is the polled one); same text as no role.
     // `scope_not_allowed` cannot happen either: a comment never carries a scope.

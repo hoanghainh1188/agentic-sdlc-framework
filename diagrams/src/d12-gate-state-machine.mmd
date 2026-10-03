@@ -25,8 +25,11 @@ stateDiagram-v2
     G6 --> Escalated: critical security finding
     G6 --> Escalated: push or pull request refused, CI timeout
     G6 --> G7: pass
-    G7 --> Running: request changes
-    G7 --> G8: approved (+ 2nd approver if flagged) + merged
+    G7 --> G4: request changes (new run from the pushed commit)
+    G7 --> G3: reject (G3 HITL)
+    G7 --> Escalated: pull request closed or changed, merged before approval
+    Escalated --> G7: resume after a G7 stop
+    G7 --> G8: approved (+ 2nd approver if flagged) + merged by a person
     G8 --> Done: approve release (disclosure present)
     G1 --> Rejected: reject
     G2 --> Rejected: reject

@@ -10,7 +10,7 @@ const refused = (type: string, payload: Record<string, unknown>) => () =>
   checkRunEvent(type, payload);
 
 describe('run event payloads', () => {
-  it('declares the C02, C04, C05, C06, C07 and C08 event types', () => {
+  it('declares the C02, C04, C05, C06, C07, C08 and E01 event types', () => {
     expect(Object.keys(RUN_EVENT_TYPES)).toEqual([
       'contract_issued',
       'contract_accepted',
@@ -34,7 +34,39 @@ describe('run event payloads', () => {
       'publish_refused',
       'publish_failed',
       'ci_checked',
+      'g7_checked',
+      'pr_merged',
     ]);
+  });
+
+  it('E01: g7_checked and pr_merged hold codes, counts and a hash, never a login', () => {
+    const checked = {
+      pr_number: 7,
+      pr_state: 'merged',
+      head_sha: 'e'.repeat(40),
+      merge_commit_sha: 'f'.repeat(40),
+      merger: 'person',
+      reviews_sha256: 'a'.repeat(64),
+      approvals: 1,
+      changes_requested: 0,
+      commit_authors: 0,
+      commits_without_account: 1,
+    };
+    expect(checkRunEvent('g7_checked', checked)).toEqual(checked);
+    const open: Record<string, unknown> = { ...checked, pr_state: 'open' };
+    delete open.merge_commit_sha;
+    delete open.merger;
+    expect(checkRunEvent('g7_checked', open)).toMatchObject({
+      pr_state: 'open',
+    });
+    expect(() => checkRunEvent('g7_checked', { ...checked, merger: 'alice@example.com' })).toThrow(
+      /merger/,
+    );
+    expect(() => checkRunEvent('g7_checked', { ...checked, login: 'alice' })).toThrow(/undeclared/);
+    expect(checkRunEvent('pr_merged', { pr_number: 7, head_sha: 'e'.repeat(40) })).toEqual({
+      pr_number: 7,
+      head_sha: 'e'.repeat(40),
+    });
   });
 
   it('C08 PR 2: ci_checked holds codes, counts and a hash, never a check name', () => {

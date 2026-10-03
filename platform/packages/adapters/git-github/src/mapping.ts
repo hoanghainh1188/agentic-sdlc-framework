@@ -7,6 +7,7 @@ import type {
   CheckItem,
   CommentCreatedEvent,
   EventSource,
+  PullRequestClosedEvent,
   RepoRef,
   ReviewSubmittedEvent,
 } from '@sdlc/contracts';
@@ -19,6 +20,7 @@ export const eventId = {
   review: (reviewId: string) => `github:review:${reviewId}`,
   checkRun: (checkId: string) => `github:check_run:${checkId}`,
   status: (statusId: string) => `github:status:${statusId}`,
+  pullClosed: (prNumber: number) => `github:pull_closed:${String(prNumber)}`,
 };
 
 /** GitHub's comment body limit is 65 536 characters; anything longer is not a real comment. */
@@ -85,6 +87,38 @@ export function reviewEvent(
     reviewer: actor(r.user, 'review.user'),
     state,
     commitSha: sha(r.commit_id, 'review.commit_id'),
+  };
+}
+
+/**
+ * A closed pull request (task E01, the merge event), or null while it is open. The same object
+ * shape comes from the pull request list (polling) and the `pull_request` webhook. A pull request
+ * closes once; a reopened and closed again one keeps the same event ID (G7 reads it again anyway).
+ */
+export function pullClosedEvent(
+  repo: RepoRef,
+  value: unknown,
+  source: EventSource,
+): PullRequestClosedEvent | null {
+  const p = obj(value, 'pull');
+  if (
+    str(p.state, 'pull.state') !== 'closed' ||
+    p.closed_at === null ||
+    p.closed_at === undefined
+  ) {
+    return null;
+  }
+  const number = int(p.number, 'pull.number');
+  return {
+    kind: 'pull_request_closed',
+    id: eventId.pullClosed(number),
+    source,
+    repo,
+    occurredAt: time(p.closed_at, 'pull.closed_at'),
+    url: url(p.html_url, 'pull.html_url'),
+    prNumber: number,
+    merged: p.merged_at !== null && p.merged_at !== undefined,
+    headSha: sha(obj(p.head, 'pull.head').sha, 'pull.head.sha'),
   };
 }
 

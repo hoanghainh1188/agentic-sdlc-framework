@@ -149,7 +149,61 @@ Dual approval also applies at **any** tier for the change types listed in Step 2
 
 ## 15.10. Using the platform
 
-> To be written by Claude Code together with the platform code: G7 recording from PR reviews, G8 approval by CLI or comment, sealing the evidence pack, closing the intent.
+> Written by Claude Code together with the platform code (task E01, `design/ADR-M41-gate-g7.md`). G8 (approval by CLI or comment, sealing the evidence pack, closing the intent) comes with task E03.
+
+### 15.10.1. Gate G7: review and merge
+
+When CI passed at G6 (Chapter 14 §14.10.2), the intent waits at **G7**. The platform posts a comment on the intent's issue: **the pull request waits for review**. It mentions Person B (and the second approver when the plan needs two approvals).
+
+**How to approve.** Review the pull request on GitHub and submit a review:
+
+- **Approve**: an approval of G7.
+- **Request changes**: a request for changes at G7.
+- A review with comments only changes nothing.
+
+`/approve G7` in a comment or `sdlc gate approve G7` is refused: G7 approvals are GitHub reviews, so GitHub and the platform see the same approvals. `/reject G7 <reason>` and `/request-changes G7 <reason>` (comment or CLI) are accepted.
+
+**Which reviews count.** The platform reads the reviews itself; it does not rely on the repository's branch protection count.
+
+- Only a review of the **latest commit the platform pushed** counts. A review of an older commit never counts. A new run (after a request for changes) pushes a new commit, and earlier approvals no longer count (Principle 3).
+- The reviewer must be linked to a platform user by their GitHub account (Chapter 19) and hold the gate's role: Person B; for dual approval also the second approver (two different people).
+- **Never counted:** the author of the intent, the person who allowed a run (G4 at High risk), the people who submitted the plan, anyone who authored a commit of the pull request, and bots.
+- A dismissed review, or a later review of the same person, replaces the earlier decision.
+- A review that cannot count gets one reply on the pull request with the reason. Bots get no reply.
+
+**Two approvals** (dual approval, §15.5 Step 2) are needed when the plan G3 approved is flagged `migration`, `payment`, `personal_data`, `prod_infrastructure`, `breaking_contract` or `safety_function`, and at Critical risk.
+
+**Merging.** When the approvals are complete, the platform posts **ready to merge** and mentions Person B. **A person merges** the pull request on GitHub; the platform never merges. Then G7 passes: the platform posts **merged**, and the intent waits at **G8** (E03).
+
+Rules for the merge:
+
+- Merge only the commit that was approved. Do not push to `agent/INT-…` yourself.
+- The person who merges must be linked to a platform user, and must not be a producer of the change (the same list as above).
+- Merge only after the approvals are complete.
+
+**When G7 stops.** The intent is **paused** at G7, and an escalation is raised (Chapter 18):
+
+| Cause | Escalation |
+|---|---|
+| The pull request was closed without a merge | `technical` |
+| Someone else pushed to the branch: the pull request shows another commit | `technical` |
+| The pull request was merged before its approvals were complete, with another commit, or by a bot, a producer or an account not linked to a user | `security` |
+
+Acknowledge it, then decide:
+
+| Decision | What happens |
+|---|---|
+| `resume` | The intent goes back to **G7**, and the platform reads the pull request again. Reopen it or restore the branch first. After an early merge, `resume` accepts the merge: a later approval of the merged commit then counts |
+| `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on. Revert a merged change on the default branch yourself |
+| `terminate` | The intent is closed (`cancelled`). Close the pull request if it is open |
+
+**Rejecting.** `/reject G7 <reason>` takes the intent back to **G3**, HITL from now on; the G3 approvals in force no longer count. The pull request stays open, and the next run continues from its last commit.
+
+**Requesting changes.** For now the request holds G7, and the platform posts **changes requested**. A later update starts a new run from the pull request's last commit, with the reviewer's comments.
+
+**Deadline.** If G7 waits for a person longer than `oversight.hitl_gate_deadline`, an escalation is raised (Chapter 18), until the merge.
+
+**Platform operator:** no new GitHub App permission is needed (Pull requests and Contents: read).
 
 ---
 
@@ -189,3 +243,4 @@ Dual approval also applies at **any** tier for the change types listed in Step 2
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content; platform usage section reserved for Claude Code |
 | 0.2 | 2026-09-24 | Claude (draft) | Dual approval at G7 for migration, payment, personal data, production infrastructure, breaking change, safety function (Harry) |
+| 0.3 | 2026-10-03 | Claude (task E01) | §15.10.1: G7 with the platform (reviews, producers, dual approval, merge, escalations); ADR-M41 |
