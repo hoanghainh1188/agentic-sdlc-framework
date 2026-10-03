@@ -97,7 +97,12 @@ async function main(): Promise<void> {
         // B08 (ADR-M39 §2.4): the spec re-check at G2–G4, always on.
         specs: { gitHost },
         ...(workerRuns
-          ? { g4: workerRuns.g4, runs: workerRuns.runs, publish: workerRuns.publish }
+          ? {
+              g4: workerRuns.g4,
+              runs: workerRuns.runs,
+              publish: workerRuns.publish,
+              g6: workerRuns.g6,
+            }
           : {}),
       }),
       workflowBundlePath: settings.workflowBundle,

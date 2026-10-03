@@ -36,8 +36,13 @@ import { raiseEscalation } from '../escalation/raise.js';
 import type { Registry } from '../registry/registry.js';
 import { G4_OPERATOR_ROLES } from './g4.js';
 import { close, g3Approvers, stillValid, type G5Policy } from './g5.js';
+import { gatherG6Facts, type CiReading } from './g6-ci.js';
+import { stepCi } from './g6-verify.js';
 import { hotlBlockWindowOpenUntil } from './hotl.js';
 import { latestRun, MAX_PUBLISH_ATTEMPTS, publishState } from './publish-state.js';
+
+/** Packet reason codes of G6 escalations whose `resume` stays at G6 (C08 PR 2). */
+const CI_RESUMES_AT_G6: readonly string[] = ['ci_failed', 'security_finding'];
 
 /** Why G6 stopped before CI when the push failed too often (audit, escalation packet). */
 export const PUBLISH_ATTEMPTS = 'publish_attempts';
@@ -55,6 +60,8 @@ export async function stepG6(
   registry: Registry,
   policy: G5Policy,
   intent: Intent,
+  /** C08 PR 2: what the step read from CI before the lock (null: nothing read). */
+  ci: CiReading | null = null,
 ): Promise<IntentStepResult> {
   const run = await latestRun(tx, intent.id);
   // G5 passes only a run that succeeded (ADR-M29 §2.5); anything else is not for G6.
@@ -81,7 +88,8 @@ export async function stepG6(
     if (!(await allowed(tx, intent, 'open_pr', now))) return wait('frozen');
     return { outcome: 'publish', runId: run.id, step: 'open_pr' };
   }
-  return wait('ci_pending');
+  // C08 PR 2: the pull request is linked; G6 reads CI (`g6-verify.ts`).
+  return stepCi(tx, registry, policy, intent, ci);
 }
 
 /** Pauses the intent at G6 with a `technical` escalation (QUESTIONS #156). */
@@ -157,10 +165,20 @@ export async function stepPausedG6(
   const run = await latestRun(tx, intent.id);
   const escalation = run
     ? (await tx.escalations.listForIntent(intent.id))
-        .filter((e) => e.run_id === run.id && e.packet.gate === 'G6')
+        .filter((e) => e.run_id === run.id && e.packet.gate === 'G6' && e.trigger !== 'time')
         .at(-1)
     : undefined;
   if (!run || !escalation) return wait('publish_review');
+  // C08 PR 2: an escalation at CI (bound to the G6 input) is decided on what G6 read. A changed
+  // input voids its decision and closes it; an escalation closed without a decision acted on is
+  // evaluated again. Either way G6 reads CI again (FR-17, as at G5).
+  if (escalation.packet.subject_kind === 'g6_input') {
+    const current = (await gatherG6Facts(tx, intent.id))?.inputSha256 ?? null;
+    if (escalation.status === 'closed' || current !== escalation.packet.subject_sha256) {
+      if (escalation.status !== 'closed') await close(tx, registry, escalation);
+      return move(tx, registry, intent, { status: 'in_gate', gate: 'G6' }, 'g6_resumed', []);
+    }
+  }
   if (escalation.status === 'closed') {
     // Closed without a decision acted on: the refusal still holds, so a new escalation is raised.
     const state = await publishState(tx, run.id);
@@ -183,6 +201,13 @@ export async function stepPausedG6(
         return wait('publish_review');
       }
       await close(tx, registry, escalation);
+      // C08 PR 2: after a CI timeout or a critical finding, `resume` means "go on at G6" (CI is
+      // read again; a critical finding then waits for Person B's approval). Otherwise a new run.
+      if (CI_RESUMES_AT_G6.includes(String(escalation.packet.reason_code))) {
+        return move(tx, registry, intent, { status: 'in_gate', gate: 'G6' }, 'g6_resumed', [
+          'person_b',
+        ]);
+      }
       return move(tx, registry, intent, { status: 'in_gate', gate: 'G4' }, 'run_resumed', [
         ...G4_OPERATOR_ROLES,
       ]);

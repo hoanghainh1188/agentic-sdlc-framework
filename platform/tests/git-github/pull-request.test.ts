@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { startHarness, type Harness } from './helpers';
-import { pull, REPO } from './stub-github';
+import { INSTALLATION_ID, pull, REPO } from './stub-github';
 
 let h: Harness;
 
@@ -113,6 +113,67 @@ describe('findOpenPullRequest (C08 AC1)', () => {
       ],
     });
     await expect(h.adapter().findOpenPullRequest(REPO, HEAD, 'main')).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
+});
+
+describe('getSecurityFindings (C08 PR 2, QUESTIONS #157)', () => {
+  const alert = (level: string | null) => ({ number: 1, rule: { security_severity_level: level } });
+
+  it('counts open alerts per security severity, with a token of its own', async () => {
+    h.stub.on('GET', '/repos/acme/shop/code-scanning/alerts', (req) => {
+      expect(req.query.get('ref')).toBe('refs/pull/7/head');
+      expect(req.query.get('state')).toBe('open');
+      return { body: [alert('high'), alert('high'), alert('low'), alert(null)] };
+    });
+    expect(await h.adapter().getSecurityFindings(REPO, 7)).toEqual({
+      known: true,
+      counts: { critical: 0, high: 2, medium: 0, low: 1 },
+    });
+    const minted = h.stub.issuedTokens.find(
+      (t) => (t.body.permissions as Record<string, string>).security_events === 'read',
+    );
+    expect(minted?.body).toEqual({
+      repositories: ['shop'],
+      permissions: { security_events: 'read' },
+    });
+  });
+
+  it('code scanning not enabled (404) or not allowed (403): unknown', async () => {
+    h.stub.on('GET', '/repos/acme/shop/code-scanning/alerts', {
+      status: 404,
+      body: { message: 'no analysis found' },
+    });
+    expect(await h.adapter().getSecurityFindings(REPO, 7)).toEqual({
+      known: false,
+      reason: 'not_enabled',
+    });
+    h.stub.on('GET', '/repos/acme/shop/code-scanning/alerts', {
+      status: 403,
+      body: { message: 'Advanced Security must be enabled' },
+    });
+    expect(await h.adapter().getSecurityFindings(REPO, 7)).toEqual({
+      known: false,
+      reason: 'forbidden',
+    });
+  });
+
+  it('the App lacks the permission (token refused): unknown', async () => {
+    h.stub.on('POST', `/app/installations/${String(INSTALLATION_ID)}/access_tokens`, {
+      status: 422,
+      body: { message: 'permissions not granted' },
+    });
+    h.stub.on('GET', '/repos/acme/shop/code-scanning/alerts', { body: [] });
+    expect(await h.adapter().getSecurityFindings(REPO, 7)).toEqual({
+      known: false,
+      reason: 'forbidden',
+    });
+  });
+
+  it('refuses an unknown severity instead of counting it wrong', async () => {
+    h.stub.on('GET', '/repos/acme/shop/code-scanning/alerts', { body: [alert('severe')] });
+    await expect(h.adapter().getSecurityFindings(REPO, 7)).rejects.toMatchObject({
       code: 'invalid_response',
     });
   });

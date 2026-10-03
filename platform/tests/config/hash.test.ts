@@ -9,9 +9,9 @@ import { loadValid } from './helpers';
 
 /**
  * Pinned hash of the shipped default configuration. It changes only when a default value changes.
- * Update it in the same PR as the default change, after review (C06: `run.agent_key`; session 2: `run.contract_attempts_max`, `run.failed_run_escalation`; C07: `run.g5_breach_escalation`; B08: `access.spec_link_roles`).
+ * Update it in the same PR as the default change, after review (C06: `run.agent_key`; session 2: `run.contract_attempts_max`, `run.failed_run_escalation`; C07: `run.g5_breach_escalation`; B08: `access.spec_link_roles`; C08: `verification`).
  */
-const DEFAULT_CONFIG_HASH = 'a5012301b2ffc5dfbfa3eeb5d3095a9521ce84c6d106c65abdede13bc228d3ca';
+const DEFAULT_CONFIG_HASH = '6ca79cc3c911419035fa06c2e5bcdd77ecf220598f71342f3f10afe6c919cb08';
 
 describe('config_hash (AC3)', () => {
   it('is the pinned value for the default configuration', () => {

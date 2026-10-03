@@ -326,7 +326,8 @@ async function countFailure(
 ): Promise<boolean> {
   const log = deps.logger ?? { log: () => undefined };
   const { event } = failure;
-  // Only command comments can fail: other events are not handled yet.
+  // Only command comments are counted; a check event (C08 PR 2) only reads intents, so its error
+  // stops the poll and the next poll reads the batch again.
   if (event.kind !== 'comment_created') throw failure.cause;
   const command = parseCommentCommand(event.body);
   const replyParams = commandReplyParams(command);

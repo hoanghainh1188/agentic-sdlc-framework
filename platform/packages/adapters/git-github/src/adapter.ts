@@ -8,6 +8,8 @@ import type {
   GitHostAdapter,
   NewPullRequest,
   PullRequestInfo,
+  SecurityFindings,
+  Severity,
   RepoRef,
   ShortLivedToken,
   TokenScope,
@@ -53,6 +55,8 @@ const FAILED: ReadonlySet<string> = new Set([
   'stale',
 ]);
 const LIST_PAGES = 30;
+/** Errors that mean "findings unknown" for code scanning (not an outage). */
+const UNKNOWN_FINDINGS: ReadonlySet<string> = new Set(['forbidden', 'rejected']);
 
 export class GitHubAdapter implements GitHostAdapter {
   readonly #options: ResolvedOptions;
@@ -310,6 +314,57 @@ export class GitHubAdapter implements GitHostAdapter {
       paths.add(str(entry.path, 'tree.entry.path'));
     }
     return [...paths].sort();
+  }
+
+  /**
+   * The open code-scanning alerts of a pull request, counted per security severity (task C08 PR 2,
+   * QUESTIONS #157). Only alerts with a security severity count (`rule.security_severity_level`);
+   * other alerts (code quality) are not security findings. A token of its own with
+   * `security_events: read` for this call. Code scanning not enabled (404) or not allowed (403, or
+   * the App lacks the permission) → `known: false`, and G6 fails closed. Never a partial count.
+   */
+  async getSecurityFindings(ref: RepoRef, pr: number): Promise<SecurityFindings> {
+    const repo = checkRepo(ref);
+    const base = repoPath(repo);
+    checkNumber(pr, 'pr');
+    let token: string;
+    try {
+      token = (await this.#auth.mint(repo, { security_events: 'read' })).token;
+    } catch (error) {
+      if (error instanceof GitHostError && UNKNOWN_FINDINGS.has(error.code)) {
+        return { known: false, reason: 'forbidden' };
+      }
+      throw error;
+    }
+    let list;
+    try {
+      list = await listPages(this.#http, `${base}/code-scanning/alerts`, {
+        auth: `Bearer ${token}`,
+        maxPages: LIST_PAGES,
+        cache: false,
+        query: { ref: `refs/pull/${String(pr)}/head`, state: 'open' },
+      });
+    } catch (error) {
+      if (error instanceof GitHostError && error.code === 'not_found') {
+        return { known: false, reason: 'not_enabled' };
+      }
+      if (error instanceof GitHostError && UNKNOWN_FINDINGS.has(error.code)) {
+        return { known: false, reason: 'forbidden' };
+      }
+      throw error;
+    }
+    if (list.truncated) throw new GitHostError('invalid_response', { field: 'alerts' });
+    const counts: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
+    for (const item of list.items) {
+      const rule = obj(obj(item, 'alert').rule, 'alert.rule');
+      const level = rule.security_severity_level;
+      if (level === null || level === undefined) continue;
+      if (level !== 'critical' && level !== 'high' && level !== 'medium' && level !== 'low') {
+        throw new GitHostError('invalid_response', { field: 'alert.rule.security_severity_level' });
+      }
+      counts[level] += 1;
+    }
+    return { known: true, counts };
   }
 
   async issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken> {

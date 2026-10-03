@@ -78,8 +78,20 @@ function applyOverrides(
         ? { ...base, mode: cell.on_breach, overrides: ['limit_breached'] }
         : base;
     case 'G6':
-      return securityFindingAtThreshold(config, input)
-        ? { ...base, mode: oversight.g6_security_findings.mode, overrides: ['security_finding'] }
+      if (securityFindingAtThreshold(config, input)) {
+        return {
+          ...base,
+          mode: oversight.g6_security_findings.mode,
+          overrides: ['security_finding'],
+        };
+      }
+      // C08 PR 2 (QUESTIONS #157): findings the Git host cannot report fail closed.
+      return input.context?.securityFindingsUnknown === true
+        ? {
+            ...base,
+            mode: oversight.g6_security_findings.mode,
+            overrides: ['security_findings_unknown'],
+          }
         : base;
     case 'G7': {
       const dual = oversight.dual_approval_g7;

@@ -32,12 +32,20 @@ export interface GateContext {
   readonly environment?: ReleaseEnvironment;
   /** G6 only: number of security findings per severity. Findings without a severity: leave out. */
   readonly securityFindings?: Readonly<Partial<Record<Severity, number>>>;
+  /**
+   * G6 only (C08 PR 2, QUESTIONS #157): the Git host has no findings for the pull request (code
+   * scanning not enabled or not allowed). G6 then fails closed: HITL, like a finding at the
+   * threshold.
+   */
+  readonly securityFindingsUnknown?: boolean;
   /** G5 only: a limit (file scope, budget, loop) was breached. */
   readonly breached?: boolean;
   /**
    * G3 only (C07, QUESTIONS #131): G5 sent the intent back to G3, because a run changed files
    * outside its plan, or because a person decided `modify` or `roll_back` on a G5 escalation. G3 is
-   * then HITL at every tier, like a forced-HITL change flag.
+   * then HITL at every tier, like a forced-HITL change flag. C08 PR 2: also when G6 sent the
+   * intent back to G3 (CI failed with no retries left, or `modify` / `roll_back` on a G6
+   * escalation).
    */
   readonly returnedFromG5?: boolean;
 }
@@ -48,7 +56,8 @@ export type OversightOverride =
   | 'security_finding'
   | 'limit_breached'
   | 'dual_approval_change_flag'
-  | 'returned_from_g5';
+  | 'returned_from_g5'
+  | 'security_findings_unknown';
 
 export interface OversightResolution {
   readonly mode: GateCheckMode;

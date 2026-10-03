@@ -23,8 +23,12 @@ import { GATE_CODES, type GateCode, type ProjectConfig } from '@sdlc/contracts';
 
 import type { CommandGate } from '../commands/gate-input.js';
 
-/** Gates the platform may pass (HOTL) and a person may block within the block window. */
-export const PASSABLE_GATES = ['G1', 'G2', 'G3', 'G5'] as const satisfies readonly GateCode[];
+/**
+ * Gates the platform may pass (HOTL) and a person may block within the block window. C08 PR 2: G6
+ * (CI passed; a request for changes within the window means a new run after G4; E01 waits for the
+ * window before it acts at G7).
+ */
+export const PASSABLE_GATES = ['G1', 'G2', 'G3', 'G5', 'G6'] as const satisfies readonly GateCode[];
 export type PassableGate = (typeof PASSABLE_GATES)[number];
 
 export function isPassableGate(gate: string): gate is PassableGate {

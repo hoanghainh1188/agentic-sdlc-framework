@@ -380,7 +380,7 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       await newIntent(13, 'G2');
       const unlinked = post(99, '/approve G1');
       const onPull = post(11, '/approve G1', user(GH.a, 'harry'), { pull: true });
-      const unsupported = post(13, '/approve G6');
+      const unsupported = post(13, '/approve G7');
       const noSpec = post(13, '/approve G2');
       const notCurrent = post(13, '/approve G3');
       const chat = post(13, 'LGTM, will /approve G1 after lunch');
@@ -393,7 +393,7 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       expect(await receipt(notCurrent)).toMatchObject({ reply_code: 'gate_not_current' });
       expect(await receipt(chat)).toBeUndefined();
       expect(replies(13)).toEqual([
-        expect.stringContaining(t('comment.reply.gate_not_supported', { gate: 'G6' })),
+        expect.stringContaining(t('comment.reply.gate_not_supported', { gate: 'G7' })),
         expect.stringContaining(t('comment.reply.gate_input_missing', { gate: 'G2' })),
         expect.stringContaining(t('comment.reply.gate_not_current', { gate: 'G3' })),
       ]);

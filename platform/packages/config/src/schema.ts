@@ -125,6 +125,15 @@ const pinnedImage = z.string().superRefine((value, ctx) => {
   if (!PINNED_IMAGE.test(value)) addIssue(ctx, 'config.schema.image_not_pinned', { value });
 });
 
+/** A CI check name as GitHub shows it (check run or commit status context): no control characters. */
+const checkName = z
+  .string()
+  .min(1)
+  .max(200)
+  .refine((name) => [...name].every((ch) => ch.charCodeAt(0) > 31 && ch.charCodeAt(0) !== 127), {
+    message: 'control characters are not allowed',
+  });
+
 export const projectConfigSchema = z.strictObject({
   schema_version: z.literal(1),
   oversight: z.strictObject({
@@ -219,6 +228,11 @@ export const projectConfigSchema = z.strictObject({
   }),
   retention: z.strictObject({ evidence_retention_days: positiveInt }),
   github: z.strictObject({ poll_interval_seconds: positiveInt }),
+  // C08 PR 2 (QUESTIONS #159, ADR-M38 §2.7): what G6 reads from CI.
+  verification: z.strictObject({
+    required_checks: uniqueList(checkName).max(50),
+    ci_timeout_minutes: positiveInt.max(24 * 60),
+  }),
   access: z.strictObject({
     intent_create_roles: uniqueList(role).min(1),
     intent_read_roles: uniqueList(role).min(1),

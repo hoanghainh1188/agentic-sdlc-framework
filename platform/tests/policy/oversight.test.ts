@@ -194,6 +194,25 @@ describe('security findings at G6 (codes table §4, QUESTIONS.md #19)', () => {
     expect(resolve('G6', 'low', [], { securityFindings: { critical: 0 } }).mode).toBe('AUDIT');
   });
 
+  it.each(RISK_TIERS)(
+    'C08 PR 2 (QUESTIONS #157): G6 %s with findings unknown → HITL (fail closed)',
+    (tier) => {
+      expect(resolve('G6', tier, [], { securityFindingsUnknown: true })).toEqual({
+        mode: 'HITL',
+        approvalsNeeded: 1,
+        roles: B,
+        overrides: ['security_findings_unknown'],
+      });
+    },
+  );
+
+  it('a finding at the threshold wins over unknown findings in the override recorded', () => {
+    expect(
+      resolve('G6', 'low', [], { securityFindings: { high: 1 }, securityFindingsUnknown: true })
+        .overrides,
+    ).toEqual(['security_finding']);
+  });
+
   it('follows a stricter project threshold', () => {
     const strict = engineFor('oversight:\n  g6_security_findings: { min_severity: low }\n');
     expect(resolve('G6', 'low', [], { securityFindings: { low: 1 } }, strict).mode).toBe('HITL');

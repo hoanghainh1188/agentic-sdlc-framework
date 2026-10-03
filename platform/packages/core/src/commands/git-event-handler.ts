@@ -9,7 +9,7 @@
 //   (QUESTIONS.md #45).
 // - No text from the Git host is stored: the receipt and the decision hold codes, IDs and the
 //   comment URL (`reason_ref`) only.
-import type { CommentCreatedEvent, GitEvent } from '@sdlc/contracts';
+import type { CheckCompletedEvent, CommentCreatedEvent, GitEvent } from '@sdlc/contracts';
 
 import { DbError, TenantGuardError } from '../db/errors.js';
 import type { Escalation, GitEventReceipt, Intent } from '../db/schema.js';
@@ -148,6 +148,26 @@ export function commandReplyParams(command: ParsedComment): Record<string, strin
 }
 
 /**
+ * C08 PR 2 (ADR-M38 §2.7): a check finished on a pull request. The event is only a trigger: the
+ * intent of that pull request is woken when it waits at G6, and G6 reads the checks again from the
+ * Git host (never the event's content). No receipt and no reply.
+ */
+async function wakeForCheck(
+  scope: TenantScope,
+  project: GitEventProject,
+  event: CheckCompletedEvent,
+): Promise<HandledGitEvent> {
+  for (const number of event.prNumbers) {
+    const [intent] = await scope.intents.findOpenByGitNumber(project.id, {
+      kind: 'pull_request',
+      number,
+    });
+    if (intent?.current_gate === 'G6') return { outcome: 'not_handled', intentId: intent.id };
+  }
+  return { outcome: 'not_handled' };
+}
+
+/**
  * Handles one event in the scope's transaction (one is opened when the scope has none). Throws
  * only for errors that should stop the whole poll (for example a lost database connection), so
  * the batch is rolled back and read again.
@@ -158,6 +178,7 @@ export function handleGitEvent(
   project: GitEventProject,
   event: GitEvent,
 ): Promise<HandledGitEvent> {
+  if (event.kind === 'check_completed') return wakeForCheck(scope, project, event);
   if (event.kind !== 'comment_created') return Promise.resolve({ outcome: 'not_handled' });
   const command = parseCommentCommand(event.body);
   if (command.kind === 'none') return Promise.resolve({ outcome: 'not_a_command' });

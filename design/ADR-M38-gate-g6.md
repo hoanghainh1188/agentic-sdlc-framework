@@ -2,10 +2,10 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C08; PR 1 in review: the push and the pull request; PR 2 follows: G6 reads CI) |
+| Status | **Proposed** (task C08; PR 1 merged (#133): the push and the pull request; PR 2 in review: G6 reads CI) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03: two PRs; QUESTIONS #155 A, #156, #157 A with a known limit, #158, #159) |
-| Related | D-02 FR-13, FR-17, FR-18, FR-30, FR-33; D-02 §5 (version 1.2); D-03 sections 4, 6, 7.1, 8.2, 9, 10 (version 1.18); D-05 sections 6.2, 6.4 (version 1.23); D-08 C08 AC1–AC3; D-09 N2, N6; handbook Ch.14 §14.10, template T2; ADR-M23, ADR-M25 §2.1, ADR-M28, ADR-M29 §2.5, ADR-M30 §2.1, ADR-M33 §2.5, §2.9, ADR-M34 §2.8–§2.9; QUESTIONS #52, #57, #123, #124, #134, #155–#159 |
+| Related | D-02 FR-13, FR-17, FR-18, FR-30, FR-33; D-02 §5 (version 1.2); D-03 sections 4, 6, 6.1, 7.1, 8.2, 9, 10 (versions 1.18, 1.19); D-05 sections 6.2, 6.4 (versions 1.23, 1.24); D-08 C08 AC1–AC3; D-09 N2, N6; handbook Ch.14 §14.10, template T2; ADR-M23, ADR-M25 §2.1, ADR-M28, ADR-M29 §2.5, ADR-M30 §2.1, ADR-M33 §2.5, §2.9, ADR-M34 §2.8–§2.9; QUESTIONS #52, #57, #123, #124, #134, #155–#159 |
 
 ## 1. Context
 
@@ -22,7 +22,7 @@ Facts that shape the design:
 C08 has two pull requests:
 
 - **PR 1** (this version): the push and the pull request (§2.1–§2.6), AC1 and AC3.
-- **PR 2**: G6 reads CI (§2.7, planned): checks, retries, N2, security findings, the oversight matrix.
+- **PR 2**: G6 reads CI (§2.7): checks, retries, N2, security findings, the oversight matrix, handbook Ch.14 §14.10.2.
 
 ## 2. Decision
 
@@ -87,15 +87,29 @@ The database is the source of truth: the runner records the push as run events b
 
 Once a run of the intent was pushed, G4 takes as the next run's `base_sha` the commit the platform last pushed (`lastPushedHead`, from `branch_pushed`), not the head of the default branch. The run's diff is then the change on top of what is already in the pull request, G5 checks only that change, and its push is a fast-forward. The recorded commit, not the branch's live head: a commit someone else pushed is never built on (the next push is refused, `branch_moved`). Before any push, the default branch head is used, as before (QUESTIONS #109).
 
-### 2.7. G6 reads CI (PR 2, planned)
+### 2.7. G6 reads CI (PR 2)
 
-Decided in the plan, built in PR 2:
+When the pull request of the intent's last run is linked, the G6 step (`stepCi`, `workflow/g6-verify.ts`) decides from CI.
 
-- **Facts** read before the intent lock: `getPullRequest` and `getCheckStatus(head_sha)`. The step never trusts event content. The poller's `check_completed` events wake the intent of the pull request; the reconcile loop is the backstop; the only new timer is the CI timeout.
-- **Checks** (QUESTIONS #159): project config `verification.required_checks` (empty: every check on the commit; the pilot: `[ci-ok]`). `success`, `neutral`, `skipped` pass; `failure`, `timed_out`, `startup_failure`, `error` fail; `cancelled`, `stale`, `action_required`, a missing check or no check at all are pending. Pending after `verification.ci_timeout_minutes` (default 60) → `paused` and a `technical` escalation; a timeout uses no retry.
-- **Fail** with retries left (`run.g6_ci_retries`) → a new run after G4 from the pushed commit; the retry run gets a fixed instruction from the catalog, never CI logs (QUESTIONS #158). No retries left → back to G3, HITL (N2, FR-13).
-- **Pass** by the matrix: AUDIT and HOTL a system `pass` (HOTL with a block window), HITL Person B. The run's `triggered_by` never approves.
-- **Security findings** (QUESTIONS #157 A): GitHub code-scanning alerts on the pull request, counted per severity (counts only stored; App permission `security_events: read`). At or above `oversight.g6_security_findings.min_severity` → HITL; critical → a `security` escalation. Findings unknown → HITL (fail closed). **Known limit:** GitHub code scanning is free only for public repositories; on a private repository without GitHub Advanced Security the findings are unknown, so G6 is HITL every time. MVP+1 option: read the Semgrep and Trivy results (SARIF) from CI artifacts. The pilot repository gets a small CI change that uploads SARIF.
+- **Facts.** Before the intent lock, the step reads the run's pull request (`getPullRequest`), the checks of its head commit (`getCheckStatus`) and its open security findings (`getSecurityFindings`, new in `GitHostAdapter`, D-03 §7.1). Under the lock it records what it read as the run event `ci_checked` (pull request number, state and head; the checks' result; the SHA-256 of the sorted check names and outcomes, never a name; findings known or not, counts per severity), only when it changed. The step then decides from the database (`gatherG6Facts`), never from an event's content.
+- **The G6 input hash** = SHA-256 of the RFC 8785 JSON of: the run, the pushed commit, and the last reading. Every G6 decision and escalation is bound to it (FR-17).
+- **Waking.** The poller's `check_completed` events wake the intent of the pull request when it waits at G6 (`handleGitEvent`: no receipt, no reply). The reconcile loop is the backstop. The only timer is the CI timeout (`wakeInMs`).
+- **Checks** (QUESTIONS #159): project config `verification.required_checks` (empty: every check on the commit; the pilot: `[ci-ok]`). `success`, `neutral`, `skipped` pass; `failure`, `error`, `timed_out` fail; not finished, `cancelled`, `stale`, `action_required`, a missing required check, or no check at all are pending (a repository without CI never passes G6). With required names, a status and a check run of the same name both count; the worse one wins.
+- **The order of the step:**
+
+| # | Case | Next |
+|---|---|---|
+| 1 | A person's rejection at G6 / a request for changes (HITL, or within the block window of a passed G6) | `rejected` / back to G4, a new run |
+| 2 | The pull request is closed (`pr_closed`) or merged (`pr_merged`), or shows another commit (`branch_moved`) | `paused`, `technical` escalation (QUESTIONS #156) |
+| 3 | CI failed | system `fail ci_failed`. Retries left (`run.g6_ci_retries`, counted since the last G3 approval) → back to G4 (notice `ci_retry`); the next run starts from the pushed commit and gets a fixed instruction (QUESTIONS #158). None left → back to G3 (N2, FR-13; audit `ci_no_retries`, notice `ci_returned`): G3 is HITL from then on and its approvals in force are voided (the rule of QUESTIONS #131, `returnedFromG5`) |
+| 4 | CI pending | wait (`ci_pending`) until `verification.ci_timeout_minutes` (default 60) after the clock start: the latest of the entry into G6, the end of G5's block window, the recorded push and the close of the run's last G6 escalation. Then `paused`, `technical` escalation (`ci_timeout`); no retry used |
+| 5 | CI passed, a critical finding | `paused`, `security` escalation (`critical_finding`), once per input |
+| 6 | CI passed | oversight from the matrix with the findings: AUDIT and HOTL → a system `pass` and G7 (notice `hotl_passed`; G6 joins `PASSABLE_GATES`, so its block window applies and E01 waits for it); HITL → Person B approves (`/approve G6`; G6 joins `DECIDABLE_GATES`; notice `g6_decision`), never the run's producer (FR-11); the gate deadline applies (FR-12) |
+
+- **Security findings** (QUESTIONS #157 A): GitHub code-scanning alerts open on the pull request (`refs/pull/<n>/head`), counted per `rule.security_severity_level`; alerts without a security severity (code quality) are not security findings. The adapter mints a token with `security_events: read` for the call (new `GIT_TOKEN_PERMISSIONS` entry). At or above `oversight.g6_security_findings.min_severity` → HITL (`security_finding`, rule M6). Unknown (code scanning not enabled: 404; not allowed: 403 or a token the App cannot get) → HITL (`GateContext.securityFindingsUnknown`, override `security_findings_unknown`): fail closed.
+- **Known limit (#157):** GitHub code scanning is free only for public repositories. On a private repository without GitHub Advanced Security the findings are unknown, so G6 is HITL every time. MVP+1 option: read the Semgrep and Trivy results (SARIF) from CI artifacts. The pilot repository uploads SARIF from its Semgrep and Trivy jobs (a pilot-repository change, task C08).
+- **The escalations of G6 at CI** are bound to the G6 input (`subject_kind` `g6_input`), level `run.failed_run_escalation` (rule M20). The decision (`stepPausedG6`), re-checked just before acting: `resume` after a CI timeout or a critical finding → back to G6 (CI read again; after a critical finding Person B's approval is needed, and the same input never raises it again); after `pr_closed`, `pr_merged`, `branch_moved` → G4 (a new run; a person first restores the branch or reopens the pull request); `modify` / `roll_back` → G3 (HITL); `terminate` → `cancelled`. A changed input (CI finished meanwhile) voids the decision, closes the escalation and G6 reads CI again (notice `g6_resumed`).
+- **The retry run's instruction** (QUESTIONS #158) is agent-facing text in the OpenHands adapter (`CI_FAILED_INSTRUCTION`), next to the rest of the task message (ADR-M29: agent-facing text is not in the message catalog). It names no check and holds no log.
 
 ### 2.8. Where the rules live
 
@@ -105,6 +119,10 @@ Decided in the plan, built in PR 2:
 | Push attempts (3), the retry pause (1 minute), the wrap lifetime of the push token (10 minutes) | Code (design): `MAX_PUBLISH_ATTEMPTS`, `RUN_ACTIVITY_RETRY_MS`, `PUSH_TOKEN_WRAP_SECONDS` |
 | The escalation's severity and level when the push stops | Project config `run.failed_run_escalation` (rule M20) |
 | The PR title and body | Message catalog `pr.title`, `pr.body`, `pr.issue` |
+| The checks G6 waits for, the CI timeout | Project config `verification.required_checks`, `verification.ci_timeout_minutes` (QUESTIONS #159) |
+| CI retries | Project config `run.g6_ci_retries` (existing) |
+| G6 oversight per risk tier, the findings threshold | Project config `oversight.matrix.G6`, `oversight.g6_security_findings` (rule M6) |
+| Check mapping, fail closed on unknown findings, the step's order | Code (design), §2.7 |
 | The runner's evidence actions | `platform/deploy/openbao/bootstrap.sh` `runner-evidence-credentials` |
 
 ## 3. Alternatives considered
@@ -129,3 +147,4 @@ Decided in the plan, built in PR 2:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task C08, PR 1), approved by Harry | §2.1–§2.6 the push and the pull request; §2.7 PR 2 as planned; QUESTIONS #155–#159. After the code and security reviews: every failure is counted, a different PR head is a counted retry, the contract and the diff path are checked again, exact ref match |
+| 0.2 | 2026-10-03 | Claude (task C08, PR 2), approved by Harry | §2.7 as built: `ci_checked`, the step's order, the CI clock, findings from code scanning (fail closed), the G6 escalations and their decisions, the retry instruction; §2.8 rows |
