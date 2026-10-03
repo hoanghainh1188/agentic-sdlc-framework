@@ -17,6 +17,7 @@ export {
   type ConfigResult,
 } from './load.js';
 export {
+  ALWAYS_CONFLICTING_ROLES,
   ALWAYS_HITL_SECURITY_SEVERITY,
   checkMandatoryRules,
   DUAL_APPROVAL_G7_FLAGS,

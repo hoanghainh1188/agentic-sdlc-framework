@@ -97,7 +97,7 @@ The audit log is append-only and hash-chained per tenant (ADR-M09 section 2.8). 
 SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm sdlc audit verify
 ```
 
-Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. The command connects straight to the database until task B13 adds a tenant admin role (`design/QUESTIONS.md` #65).
+Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. The command connects straight to the database. Task B13 PR 2 adds the same check through the API for tenant admins (`design/ADR-M37-admin-onboarding.md`).
 
 ### First admin and API tokens (task B03)
 
@@ -113,7 +113,7 @@ pnpm sdlc admin token revoke --tenant internal --id <token-id>
 
 - The bootstrap runs once per tenant; a second run with the same slug is refused.
 - Tokens last 90 days by default, at most 365. Only the SHA-256 hash is stored. Every issue and revocation is written to the audit log (IDs only).
-- Projects, users, GitHub identities, roles and project configuration have no command yet (task B13, `design/QUESTIONS.md` #58).
+- The bootstrap makes the first user a **tenant admin** (task B13). Projects, users, GitHub identities, roles and project configuration are then set up through the API with `sdlc admin project|user|identity|role|config|tenant-admin …` (handbook Ch.19 §19.8d, [ADR-M37](../../design/ADR-M37-admin-onboarding.md)).
 
 ### Reset after a change to migration 0001 (development only)
 

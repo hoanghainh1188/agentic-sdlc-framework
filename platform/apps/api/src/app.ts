@@ -8,6 +8,9 @@ import type { IntentWorkflowSignals } from '@sdlc/contracts';
 import { Registry, type PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
+import { AdminProjectsController } from './admin/projects.controller.js';
+import { AdminTenantAdminsController } from './admin/tenant-admins.controller.js';
+import { AdminUsersController } from './admin/users.controller.js';
 import { AiRecordsController } from './ai-records/ai-records.controller.js';
 import { AiRecordsService } from './ai-records/ai-records.service.js';
 import { AuthGuard } from './auth/auth.guard.js';
@@ -59,6 +62,9 @@ class ApiModule {
         IntentsController,
         EscalationsController,
         AiRecordsController,
+        AdminProjectsController,
+        AdminUsersController,
+        AdminTenantAdminsController,
       ],
       providers: [
         { provide: DATABASE, useValue: deps.db },

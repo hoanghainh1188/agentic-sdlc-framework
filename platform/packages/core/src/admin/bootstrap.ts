@@ -1,9 +1,10 @@
 // One-time bootstrap of a tenant: the tenant, its first user and that user's first API token
 // (task B03, QUESTIONS.md #58 and #63, ADR-M26 section 2.2). Run by the operator on the server.
-// Everything else (projects, users, identities, roles, configuration) is onboarding, task B13.
+// Since B13 the first user is also the tenant's first tenant admin (QUESTIONS #150, ADR-M37), who
+// onboards everything else (projects, users, identities, roles, configuration) through the API.
 import { DbError } from '../db/errors.js';
 import type { PlatformDatabase } from '../db/platform-database.js';
-import type { Tenant, User } from '../db/schema.js';
+import type { Tenant, TenantRoleBinding, User } from '../db/schema.js';
 import { issueApiToken, type IssuedApiToken } from './tokens.js';
 
 export const TENANT_SLUG_PATTERN = /^[a-z][a-z0-9-]{1,62}$/;
@@ -24,12 +25,13 @@ export interface BootstrapInput {
 export interface BootstrapResult {
   readonly tenant: Tenant;
   readonly user: User;
+  readonly tenantAdmin: TenantRoleBinding;
   readonly token: IssuedApiToken;
 }
 
 /**
- * Creates the tenant, its first user and a token in one transaction, with the audit events
- * `tenant.created`, `user.created` and `api_token.issued`. Refuses an existing tenant slug
+ * Creates the tenant, its first user (a tenant admin) and a token in one transaction, with the
+ * audit events `tenant.created`, `user.created`, `tenant_role.granted` and `api_token.issued`. Refuses an existing tenant slug
  * (`DbError('conflict')`), so it can never add a second "first admin" to a running tenant.
  */
 export function bootstrapTenant(
@@ -59,13 +61,21 @@ export function bootstrapTenant(
         entityId: user.id,
         payload: {},
       });
+      const tenantAdmin = await scope.tenantRoles.grant({ user_id: user.id, role: 'tenant_admin' });
+      await scope.audit.append({
+        action: 'tenant_role.granted',
+        actorType: 'system',
+        actorId: null,
+        entityId: tenantAdmin.id,
+        payload: { user_id: user.id, role: tenantAdmin.role },
+      });
       const token = await issueApiToken(scope, {
         userId: user.id,
         name: input.tokenName ?? 'bootstrap',
         ...(input.lifetimeDays === undefined ? {} : { lifetimeDays: input.lifetimeDays }),
         ...(input.now === undefined ? {} : { now: input.now }),
       });
-      return { tenant, user, token };
+      return { tenant, user, tenantAdmin, token };
     },
   );
 }

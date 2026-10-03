@@ -8,6 +8,7 @@ import {
   type ExceptionFilter,
   type Logger,
 } from '@nestjs/common';
+import { formatIssue } from '@sdlc/config';
 import { refusalReasonMessage, withLogContext } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 
@@ -40,6 +41,14 @@ export class ErrorFilter implements ExceptionFilter {
       );
     }
     const locale = localeOf(request.headers['accept-language']);
+    const details =
+      error.configIssues === undefined
+        ? error.details
+        : error.configIssues.slice(0, 50).map((issue) => ({
+            path: issue.path === '' ? 'body.config_yaml' : `body.config_yaml.${issue.path}`,
+            issue: issue.key,
+            message: formatIssue(issue, locale),
+          }));
     http
       .getResponse<Reply>()
       .status(error.status)
@@ -50,7 +59,7 @@ export class ErrorFilter implements ExceptionFilter {
           ...(error.reason === undefined
             ? {}
             : { reason: error.reason, reason_message: reasonMessage(error.reason, locale) }),
-          ...(error.details === undefined ? {} : { details: error.details }),
+          ...(details === undefined ? {} : { details }),
         },
       });
   }

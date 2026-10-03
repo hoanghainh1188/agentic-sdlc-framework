@@ -24,6 +24,7 @@ import { RunContractRepository } from './repositories/run-contracts.js';
 import { RunEventRepository } from './repositories/run-events.js';
 import { RunRepository } from './repositories/runs.js';
 import { SpecRefRepository } from './repositories/spec-refs.js';
+import { TenantRoleBindingRepository } from './repositories/tenant-role-bindings.js';
 import { UserIdentityRepository } from './repositories/user-identities.js';
 import { UserRepository } from './repositories/users.js';
 
@@ -39,6 +40,7 @@ export class TenantScope {
   readonly users: UserRepository;
   readonly userIdentities: UserIdentityRepository;
   readonly roleBindings: RoleBindingRepository;
+  readonly tenantRoles: TenantRoleBindingRepository;
   readonly apiTokens: ApiTokenRepository;
   readonly gitEventCursors: GitEventCursorRepository;
   readonly gitEventReceipts: GitEventReceiptRepository;
@@ -71,6 +73,7 @@ export class TenantScope {
     this.users = new UserRepository(this.db, this.tenantId);
     this.userIdentities = new UserIdentityRepository(this.db, this.tenantId);
     this.roleBindings = new RoleBindingRepository(this.db, this.tenantId);
+    this.tenantRoles = new TenantRoleBindingRepository(this.db, this.tenantId);
     this.apiTokens = new ApiTokenRepository(this.db, this.tenantId);
     this.gitEventCursors = new GitEventCursorRepository(this.db, this.tenantId);
     this.gitEventReceipts = new GitEventReceiptRepository(this.db, this.tenantId);

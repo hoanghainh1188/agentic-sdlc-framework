@@ -342,7 +342,7 @@ function refusalReply(error: unknown, gate: Readonly<Record<string, string>>): R
   if (error instanceof RegistryError) {
     // `issue_already_linked` only comes from creating an intent, never from a decision.
     const code =
-      error.code === 'config_hash_mismatch'
+      error.code === 'config_hash_mismatch' || error.code === 'config_defaults_drift'
         ? 'config_invalid'
         : error.code === 'issue_already_linked'
           ? 'failed'

@@ -179,6 +179,12 @@ export interface ProjectConfig {
     readonly ai_record_write_roles: readonly ProjectRole[];
     /** Who may read the project AI record. Writers may always read. */
     readonly ai_record_read_roles: readonly ProjectRole[];
+    /**
+     * Pairs of roles one person may not hold together on the project (task B13, ADR-M37,
+     * QUESTIONS #154): a grant that would give someone both roles of a pair is refused. Person A
+     * and Person B always stay apart (mandatory rule M21).
+     */
+    readonly conflicting_roles: readonly (readonly ProjectRole[])[];
   };
   /** Agent register (task C10, ADR-M31). */
   readonly agents: {

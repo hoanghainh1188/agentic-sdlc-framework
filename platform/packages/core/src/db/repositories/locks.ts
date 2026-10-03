@@ -11,6 +11,7 @@ import type { TenantId } from '../tenant-id.js';
 const INTENT_CODE_LOCK_CLASS = 0x49_4e_54_01;
 const INTENT_LOCK_CLASS = 0x49_4e_54_02;
 const ESCALATION_CODE_LOCK_CLASS = 0x45_53_43_01;
+const PROJECT_ROLES_LOCK_CLASS = 0x52_4f_4c_01;
 
 async function lock(db: Kysely<Database>, lockClass: number, key: string): Promise<void> {
   await db
@@ -33,4 +34,12 @@ export function lockIntent(db: Kysely<Database>, intentId: string): Promise<void
 /** Serialises escalation code numbering within the tenant, until the transaction ends (B11). */
 export function lockEscalationCodes(db: Kysely<Database>, tenantId: TenantId): Promise<void> {
   return lock(db, ESCALATION_CODE_LOCK_CLASS, tenantId);
+}
+
+/**
+ * Serialises role grants of one project (B13): the conflicting-roles check reads the user's roles
+ * and then inserts, so two grants for the same person must not interleave.
+ */
+export function lockProjectRoles(db: Kysely<Database>, projectId: string): Promise<void> {
+  return lock(db, PROJECT_ROLES_LOCK_CLASS, projectId);
 }

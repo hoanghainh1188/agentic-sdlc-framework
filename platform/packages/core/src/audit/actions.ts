@@ -18,8 +18,9 @@ import { isUuid } from '../db/tenant-id.js';
  * - `sha256`: a lowercase hex SHA-256 digest
  * - `version`: a positive integer
  * - `code`: a short code such as `G3`, `INT-2026-0001` or an enum value (no spaces, max 64)
+ * - `codes`: a list of 1 to `MAX_AUDIT_CODES` codes (B13: the warning codes of `config.changed`)
  */
-export type AuditFieldKind = 'uuid' | 'sha256' | 'version' | 'code';
+export type AuditFieldKind = 'uuid' | 'sha256' | 'version' | 'code' | 'codes';
 
 /** A declared field: its kind, with a trailing `?` when the field is optional. */
 export type AuditFieldSpec = AuditFieldKind | `${AuditFieldKind}?`;
@@ -39,10 +40,60 @@ export const AUDIT_ACTIONS = {
   'api_token.issued': { entityType: 'api_token', fields: { user_id: 'uuid' } },
   /** A personal API token was revoked (B03). Written once, on the first revocation. */
   'api_token.revoked': { entityType: 'api_token', fields: { user_id: 'uuid' } },
-  /** A project configuration was created or replaced (FR-14, ADR-M13). Never the config text. */
+  /**
+   * A project configuration was created or replaced (FR-14, ADR-M13). Never the config text.
+   * B13 (ADR-M37): `override_sha256` (the stored YAML), the `cause` (`upload`, `defaults_changed`)
+   * and the loosening warnings as `<warning>:<path>` codes, with their count (D-08 B13 AC4).
+   */
   'config.changed': {
     entityType: 'project',
-    fields: { version: 'version', config_hash: 'sha256' },
+    fields: {
+      version: 'version',
+      config_hash: 'sha256',
+      override_sha256: 'sha256?',
+      cause: 'code?',
+      warning_count: 'version?',
+      warnings: 'codes?',
+    },
+  },
+  /** A project was created (B13). Never its slug, name or repository. */
+  'project.created': { entityType: 'project', fields: { git_provider: 'code' } },
+  /** A project's name, repository or default branch changed (B13). Never the values. */
+  'project.updated': { entityType: 'project', fields: {} },
+  /** A project was archived (B13). Purging its evidence and client data is E05 (FR-44). */
+  'project.archived': { entityType: 'project', fields: {} },
+  /** A user's name or e-mail address changed (B13). Never the values. */
+  'user.updated': { entityType: 'user', fields: {} },
+  /** A user was disabled: their tokens stop working at once (B13). */
+  'user.disabled': { entityType: 'user', fields: {} },
+  /** A disabled user was enabled again (B13). */
+  'user.enabled': { entityType: 'user', fields: {} },
+  /**
+   * A Git host account was linked to a user (B13 AC3, QUESTIONS #45). Never the account ID or
+   * login: the identity row is the entity.
+   */
+  'identity.linked': { entityType: 'identity', fields: { user_id: 'uuid', provider: 'code' } },
+  /** A Git host account was unlinked (B13). */
+  'identity.unlinked': { entityType: 'identity', fields: { user_id: 'uuid', provider: 'code' } },
+  /** A project role was granted (B13, FR-11). The binding is the entity. */
+  'role.granted': {
+    entityType: 'role_binding',
+    fields: { user_id: 'uuid', project_id: 'uuid', role: 'code' },
+  },
+  /** A project role was revoked (B13): `revoked_at` was set; the binding stays as history. */
+  'role.revoked': {
+    entityType: 'role_binding',
+    fields: { user_id: 'uuid', project_id: 'uuid', role: 'code' },
+  },
+  /** A tenant role was granted (B13, QUESTIONS #150). */
+  'tenant_role.granted': {
+    entityType: 'tenant_role_binding',
+    fields: { user_id: 'uuid', role: 'code' },
+  },
+  /** A tenant role was revoked (B13). */
+  'tenant_role.revoked': {
+    entityType: 'tenant_role_binding',
+    fields: { user_id: 'uuid', role: 'code' },
   },
   /**
    * A project AI record was created or replaced (FR-19, B12, ADR-M32 §2.2). Codes, the version and
@@ -234,7 +285,11 @@ export const AUDIT_ACTIONS = {
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;
 
-type FieldValue<K> = K extends 'version' | 'version?' ? number : string;
+type FieldValue<K> = K extends 'version' | 'version?'
+  ? number
+  : K extends 'codes' | 'codes?'
+    ? readonly string[]
+    : string;
 type Fields<A extends AuditAction> = (typeof AUDIT_ACTIONS)[A]['fields'];
 type OptionalKeys<A extends AuditAction> = {
   [F in keyof Fields<A>]: Fields<A>[F] extends `${string}?` ? F : never;
@@ -249,6 +304,9 @@ export type AuditPayload<A extends AuditAction> = {
 /** Upper bound of the canonical JSON payload, in UTF-8 bytes. */
 export const MAX_AUDIT_PAYLOAD_BYTES = 2048;
 
+/** Most codes in one `codes` field. */
+export const MAX_AUDIT_CODES = 16;
+
 const SHA256 = /^[0-9a-f]{64}$/;
 const CODE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
 
@@ -262,6 +320,13 @@ function isValidField(kind: AuditFieldKind, value: unknown): boolean {
       return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
     case 'code':
       return typeof value === 'string' && CODE.test(value);
+    case 'codes':
+      return (
+        Array.isArray(value) &&
+        value.length >= 1 &&
+        value.length <= MAX_AUDIT_CODES &&
+        value.every((item) => typeof item === 'string' && CODE.test(item))
+      );
   }
 }
 

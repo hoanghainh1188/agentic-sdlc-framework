@@ -6,6 +6,7 @@ import { SERVICE_NAME, tracing, tracingEndpointValid } from './telemetry.js';
 
 import 'reflect-metadata';
 
+import { checkStoredConfigsAtStart } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OTEL_ENDPOINT_ENV } from '@sdlc/telemetry';
 import { connectTemporal, TemporalIntentSignals } from '@sdlc/workflow-client';
@@ -24,6 +25,8 @@ async function main(): Promise<void> {
     log.log('warn', 'api.dev_mode', { message: t('api.start.dev_mode') });
   }
   const db = await connectDatabase(settings, process.env);
+  // Stored configurations after a change of platform defaults (B13 AC8, ADR-M37 §2.5).
+  await checkStoredConfigsAtStart(db, log);
   // Wakes the intent workflow after a change (B07, ADR-M30).
   const temporal = settings.temporal ? await connectTemporal(settings.temporal) : undefined;
   if (!temporal) log.log('warn', 'api.temporal_off', { message: t('api.start.temporal_off') });

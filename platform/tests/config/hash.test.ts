@@ -11,7 +11,7 @@ import { loadValid } from './helpers';
  * Pinned hash of the shipped default configuration. It changes only when a default value changes.
  * Update it in the same PR as the default change, after review (C06: `run.agent_key`; session 2: `run.contract_attempts_max`, `run.failed_run_escalation`).
  */
-const DEFAULT_CONFIG_HASH = 'eb83b6efbbd677661fe5e6b76ee05547f707b51d29e5c0aea0fb82eb5cd69a5a';
+const DEFAULT_CONFIG_HASH = '8eb92107d7064de5aa106ae1ee3ff10495d48932d2a82510404b845c4c534f62';
 
 describe('config_hash (AC3)', () => {
   it('is the pinned value for the default configuration', () => {

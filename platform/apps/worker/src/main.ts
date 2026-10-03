@@ -13,6 +13,7 @@ import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
 import { GitHostError, type IntentWorkflowSignals } from '@sdlc/contracts';
 import {
   advanceEscalation,
+  checkStoredConfigsAtStart,
   gitHostErrorMessage,
   loadEffectiveConfig,
   pollProject,
@@ -53,6 +54,8 @@ async function main(): Promise<void> {
   await openbao.assertReady();
   const secrets = openbao.kv();
   const db = await connectDatabase(settings, secrets);
+  // Stored configurations after a change of platform defaults (B13 AC8, ADR-M37 §2.5).
+  await checkStoredConfigsAtStart(db, logger);
   const gitHost = new GitHubAdapter({ secrets, apiUrl: settings.githubApiUrl, logger });
   const registry = new Registry({
     policyFactory: (config) => createSimplePolicyEngine({ config }),
