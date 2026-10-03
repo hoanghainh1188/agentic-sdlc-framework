@@ -1,4 +1,4 @@
-// Migration 0015: approvals of the agent register (design/D-05 section 6.1, version 1.20; D-08 B13
+// Migration 0016: approvals of the agent register (design/D-05 section 6.1, version 1.21; D-08 B13
 // AC7; handbook Ch.20 §20.7, §20.9, §20.11; design/ADR-M37 §2.8; QUESTIONS #153). Rules for every
 // migration: see the header of 0001-tenancy.ts and design/ADR-M09.
 //
@@ -11,7 +11,7 @@
 //   DELETE and TRUNCATE.
 import { defineMigration } from './define.js';
 
-export const migration0015AgentApprovals = defineMigration({
+export const migration0016AgentApprovals = defineMigration({
   up: [
     `CREATE TABLE agent_approvals (
        id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),

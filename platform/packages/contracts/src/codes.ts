@@ -180,6 +180,10 @@ export const GATE_REASON_CODES = [
   // G4 (task C07, QUESTIONS #126, ADR-M34 §2.4): an agent instruction file the register does not
   // pin exists at the base commit, or the commit's files cannot all be listed.
   'instructions_unpinned',
+  // G5 (task C07 PR 2, ADR-M34 §2.8): the run stopped at its iteration or time cap, or stalled
+  // (loop or no progress); the exact cause is in `gate.g5_check_failed`. A cost cap is
+  // `budget_exceeded`, never this code.
+  'run_cap_reached',
   'other',
 ] as const;
 export type GateReasonCode = (typeof GATE_REASON_CODES)[number];

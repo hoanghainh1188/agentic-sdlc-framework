@@ -9,7 +9,9 @@
 //   draft → G1 (the submit, after the project AI record check of B12) → G2 → G3 → G4 (C06 continues);
 //   a rejection at G1–G3 ends the intent as `rejected`; a request for changes keeps it at the gate;
 //   HOTL (session 2, QUESTIONS #88): the platform passes G2 or G3 when the policy conditions hold;
-//   a person's block within the block window takes the intent back to the passed gate, or ends it.
+//   a person's block within the block window takes the intent back to the passed gate, or ends it;
+//   G5 (C07, g5.ts): the run's changes and caps; a block of a passed G5 takes the intent back to
+//   G4 (a new run), a scope failure back to G3, where a new plan and a person's approval are needed.
 // A gate that waits for a person past its deadline raises one escalation (session 2, #90); the
 // step asks the workflow to wake it at the deadline (`wakeInMs`).
 //
@@ -60,6 +62,8 @@ import {
 } from './hotl.js';
 import { gatherG4Facts, type G4Deps, type G4Facts } from './g4-proposal.js';
 import { stepG4 } from './g4.js';
+import { stepG5, stepPausedG5 } from './g5.js';
+import { refusedPlanHashes, returnedFromG5 } from './g5-scope.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
 import { moveTo, moveToRunning, stepPaused, stepRunning } from './run-lifecycle.js';
 import { waitedSeconds } from './waited.js';
@@ -173,12 +177,22 @@ export async function stepIntent(
         return moved;
       }
     }
+    // C07: a G5 breach paused the intent; a person's decision on its escalation moves it on.
+    if (intent.status === 'paused' && intent.current_gate === 'G5') {
+      return stepPausedG5(
+        tx,
+        deps.registry,
+        await deps.registry.policyFor(tx, intent.project_id),
+        intent,
+      );
+    }
     if (intent.status !== 'in_gate' || intent.current_gate === null) return waiting('not_in_gate');
     const policy = await deps.registry.policyFor(tx, intent.project_id);
     const block = await earlierBlock(tx, intent, policy.config);
     if (block) return sendBack(tx, deps, policy, intent, block);
     const gate = intent.current_gate;
     if (gate === 'G4' && facts) return atG4(tx, deps, policy, intent, facts);
+    if (gate === 'G5') return stepG5(tx, deps.registry, policy, intent);
     if (!isCommandGate(gate)) {
       // G4 onwards: C06 continues. Wake when the last HOTL block window closes (C06 waits for it).
       const until = await hotlBlockWindowOpenUntil(tx, deps.registry, intent.id);
@@ -263,7 +277,8 @@ async function sendBack(
         deps,
         policy,
         intent,
-        { status: 'in_gate', gate: block.gate },
+        // C07: changes requested on a passed G5 mean a new run on the approved plan, after G4.
+        { status: 'in_gate', gate: block.gate === 'G5' ? 'G4' : block.gate },
         'returned',
         block.decisionId,
       );
@@ -330,6 +345,10 @@ async function stepGate(
       );
     }
     throw error;
+  }
+  // C07 (QUESTIONS #131): a plan that a run went outside of is never approved again.
+  if (gate === 'G3' && (await refusedPlanHashes(tx, intent.id)).has(inputSha256)) {
+    return waiting('new_plan_needed', await overdue({ kind: 'plan', sha256: inputSha256 }));
   }
   // FR-17: an approval that expired or no longer matches the input is voided before it counts.
   const { valid } = await registry.revalidateApprovals(tx, {
@@ -403,10 +422,13 @@ async function resolveOversight(
   gate: GateCode,
 ): Promise<OversightResolution> {
   const plan = await tx.plans.latest(intent.id);
+  // C07 (QUESTIONS #131): G3 is HITL once G5 sent the intent back for scope.
+  const returned = gate === 'G3' && (await returnedFromG5(tx, intent.id));
   return policy.policy.oversightMode({
     gate,
     riskTier: intent.risk_tier,
     changeFlags: plan?.change_flags ?? [],
+    ...(returned ? { context: { returnedFromG5: true } } : {}),
   });
 }
 

@@ -34,11 +34,21 @@ export interface GateContext {
   readonly securityFindings?: Readonly<Partial<Record<Severity, number>>>;
   /** G5 only: a limit (file scope, budget, loop) was breached. */
   readonly breached?: boolean;
+  /**
+   * G3 only (C07, QUESTIONS #131): G5 sent the intent back to G3, because a run changed files
+   * outside its plan, or because a person decided `modify` or `roll_back` on a G5 escalation. G3 is
+   * then HITL at every tier, like a forced-HITL change flag.
+   */
+  readonly returnedFromG5?: boolean;
 }
 
 /** Why the resolved oversight differs from the plain matrix cell (for the gate decision record). */
 export type OversightOverride =
-  'forced_hitl_change_flag' | 'security_finding' | 'limit_breached' | 'dual_approval_change_flag';
+  | 'forced_hitl_change_flag'
+  | 'security_finding'
+  | 'limit_breached'
+  | 'dual_approval_change_flag'
+  | 'returned_from_g5';
 
 export interface OversightResolution {
   readonly mode: GateCheckMode;

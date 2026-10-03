@@ -37,6 +37,7 @@ import {
 import {
   loadEffectiveConfig,
   parseTenantId,
+  recordBudgetWarning,
   type PlatformDatabase,
   type TenantScope,
 } from '@sdlc/core';
@@ -473,8 +474,13 @@ async function spendWatchFor(
     key,
     contractCapUsd: contract.max_budget_usd,
     limits: { warnPercent: config.budget.warn_percent, stopPercent: config.budget.stop_percent },
+    // C07 decision C: the run event and the intent's notice in one transaction (FR-52).
     onWarning: async (warning) => {
-      await scope.runEvents.append(contract.run_id, 'budget_warning', warning);
+      await recordBudgetWarning(
+        scope,
+        { runId: contract.run_id, intentId: contract.intent_id },
+        warning,
+      );
     },
   });
 }

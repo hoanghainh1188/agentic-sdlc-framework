@@ -195,7 +195,7 @@ Every handler works on the caller's tenant scope. Another tenant's objects give 
     | A change (`suspended` → `active`) | owner + Person B (§20.11) |
     | Retire | owner + leadership (`governance`) (§20.11) |
 
-  - Approvals are rows of the new append-only table `agent_approvals` (migration `0015`, D-05 1.20).
+  - Approvals are rows of the new append-only table `agent_approvals` (migration `0016`, D-05 1.21).
     - Each holds the agent's version and its `updated_at` (`round_at`). Any change of the agent starts a new round, and older approvals no longer count.
     - One approval per person and one per capacity in a round, so the approvers are always different people.
     - When the last needed approval arrives, the status changes in the same transaction, with that approver as actor.
@@ -238,7 +238,7 @@ Every handler works on the caller's tenant scope. Another tenant's objects give 
   - `config.changed` gains `override_sha256`, `cause`, `warning_count` and `warnings`.
   - They hold IDs and codes only: never a name, an e-mail address, a login, an account ID, a repository or YAML text.
 - The numbers of this PR (migration `0014`, `SDA11`, rule M21) were taken before C07 PR 2. Whichever of the two merges second renumbers its migration, SQLSTATE and rule (Harry, 2026-10-03).
-- PR 2: migration `0015-agent-approvals`, audit action `agent.approval_recorded`. The ADRs written before B13 (ADR-M26, ADR-M31, ADR-M36) name the operator commands `sdlc admin …`; since B13 they are `sdlc ops …`.
+- PR 2: migration `0016-agent-approvals`, audit action `agent.approval_recorded`. The ADRs written before B13 (ADR-M26, ADR-M31, ADR-M36) name the operator commands `sdlc admin …`; since B13 they are `sdlc ops …`.
 - Tests:
   - `pnpm test`: rules, warning codes, value checks, CLI commands against a mocked API (`admin-api`, `admin-agents`, `token-audit`), CLI schemas against the presenters, the `sdlc ops` argument handling.
   - `pnpm test:db` (`admin-onboarding.test.ts`): every endpoint, separation of duties, tenant isolation, the audit chain, no token in the logs.

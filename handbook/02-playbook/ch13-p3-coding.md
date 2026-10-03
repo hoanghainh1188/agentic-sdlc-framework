@@ -153,7 +153,7 @@ Apply the same rules manually:
 
 ## 13.10. Using the platform
 
-> Written by Claude Code together with the platform code. This version covers gate G4 and the start and end of a run (task C06). Reading G5 decisions, handling G5 escalations, adding budget, stopping a run and reading the run record come with the next tasks.
+> Written by Claude Code together with the platform code. This version covers gate G4, the start and end of a run (task C06) and gate G5 (task C07). Stopping a run and reading the run record come with the next tasks.
 
 ### 13.10.1. Which agent runs
 
@@ -194,7 +194,7 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 
 | The run… | What happens next |
 |---|---|
-| finished, or stopped at its budget, time or iteration limit | The intent waits at **G5**, where the platform checks the changed files and the budget. Before that, the platform reads the agent's work out of the sandbox, stores the full diff against the start commit as evidence, and counts the files outside the plan and the agent instruction files. If it cannot, the run counts as failed |
+| finished, or stopped at its budget, time or iteration limit | The intent moves to **G5**, where the platform checks the changed files and the budget (§13.10.5). Before that, the platform reads the agent's work out of the sandbox, stores the full diff against the start commit as evidence, and counts the files outside the plan and the agent instruction files. If it cannot, the run counts as failed |
 | failed, or the runner was lost | The intent is **paused**, and a technical escalation goes to Person B (Chapter 18). When a person decides `resume`, the intent goes back to G4 and a new run starts after G4 |
 | finished at High risk (L1, a proposal only) | The platform stores the proposal and **pauses** the intent. Person A takes the proposal forward (see below) |
 | could not start (for example the budget is used up, or the run proposal changed) | The intent is back at **G4**, where the platform decides again |
@@ -207,7 +207,32 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 - If the proposal cannot be stored, the run counts as failed: the intent is paused and escalated like any failed run.
 - **The budget during a run.** The platform reads what the run has spent, about every 30 seconds. At the warning share of the run's limit (80 % by default, `budget.warn_percent`) it records a warning; at the stop share (100 %, `budget.stop_percent`) it stops the agent, and the run ends as stopped at its budget. The limit is the smallest of the run budget, what is left of the intent budget and what is left of the tenant's month. When the agent ends with an error, the platform reads the spend once more after about 25 seconds (LiteLLM shows the spend about 10 seconds late), so a run that ran out of budget is not reported as a technical failure.
 
-### 13.10.5. Recertification warning
+### 13.10.5. Gate G5: scope and budget
+
+When the run ends at G5, the platform checks the run's result by itself, in this order. It uses what it computed outside the sandbox (the diff and the counts of §13.10.4) and the run's spend after the last cost check, never what the agent reports.
+
+| # | Check | When it fails | What happens next |
+|---|---|---|---|
+| 1 | The run added, changed or removed no file the agent reads as instructions (§13.10.2 check 6b, `AGENTS.md` included) | G5 fails: `instructions_unpinned` | The intent is **paused** at G5. A **security** escalation goes to Person B (Chapter 18) |
+| 2 | Every changed file is in the plan G3 approved | G5 fails: `out_of_scope` | The intent goes back to **G3**. No escalation: the G3 approver decides |
+| 3 | The run did not reach its cost limit (the runner's stop, or a spend at the stop share found after the run) | G5 fails: `budget_exceeded` | The intent is **paused** at G5. An **intent** escalation goes to Person A |
+| 4 | The run did not stop at its iteration limit, its time limit, or because it made no progress | G5 fails: `run_cap_reached` | The intent is **paused** at G5. An **intent** escalation goes to Person A |
+
+- The audit log keeps the exact cause next to the reason code (for example `max_iterations`, `max_duration` or `stalled` for `run_cap_reached`).
+- A G5 escalation freezes the intent: its response level is `pause` or higher (configuration `run.g5_breach_escalation`, mandatory rule M22). Its decision is bound to this exact result of this exact run (the run, its contract, its diff, its changed files and the intent's spend). If more spend of the run arrives later, the platform voids the decision, closes the escalation and checks G5 again, which raises a new escalation.
+- **When every check holds**, the platform passes G5 (HOTL) and the intent moves to **G6**. Person A is told and can still send the changes back within the block window (Chapter 19 §19.8b): `/request-changes G5 <reason>` starts a new run after G4; `/reject G5 <reason>` closes the intent. A project that makes G5 HITL in its configuration needs a person's `/approve G5`; the person who approved the run at G4 never approves its changes.
+
+**Back to G3 (files outside the plan).** G3 is **HITL at every risk tier** from now on for this intent, and the earlier G3 approval no longer counts. Submit a **new plan**: the plan the run went outside of can never be approved again (`plan_refused`). The run's diff stays as evidence.
+
+**Deciding a G5 escalation** (Chapter 18 §18.8b). Acknowledge it, then decide:
+
+| Decision | What happens |
+|---|---|
+| `resume` | The intent goes back to **G4**, and a new run starts after G4 **from the latest commit of the default branch**. The stopped run's diff stays as evidence. To give the next runs more budget, decide through the API with a budget increase (Chapter 18 §18.8b); a comment never raises a budget |
+| `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on. The earlier G3 approval no longer counts; the approver may approve the same plan again, or Person A submits a changed plan |
+| `terminate` | The intent is closed (`cancelled`). The run's diff stays as evidence |
+
+### 13.10.6. Recertification warning
 
 - When the agent's last recertification is older than the configured age (3 months, Chapter 20 §20.8), the run is **not** blocked. The platform posts a comment that mentions the agent's owner, and the audit log records the warning with the run.
 
@@ -253,3 +278,4 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 | 0.4 | 2026-09-27 | Claude (task C06, session 2a) | §13.10.4: the start and end of a run, failed and lost runs, the queue |
 | 0.5 | 2026-09-27 | Claude (task C06, session 2b) | §13.10.4: High-risk (L1) runs end with a stored proposal; the intent is paused for Person A; what the proposal leaves out; check `.gitignore`, `.gitattributes` and symbolic links first |
 | 0.6 | 2026-10-03 | Claude (task C07, PR 1) | §13.10.2: G4 check 6b (`instructions_unpinned`); §13.10.4: the diff stored at the end of every run, the budget watched during the run |
+| 0.7 | 2026-10-03 | Claude (task C07, PR 2) | §13.10.5 (new): gate G5 checks and outcomes, back to G3, deciding a G5 escalation; §13.10.4: the budget warning comment during the run |

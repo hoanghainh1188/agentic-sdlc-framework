@@ -3,6 +3,7 @@ import type { ActorType, DataClass, GateCode, IntentStatus, RiskTier } from '@sd
 import { INTENT_STATUSES, GATE_CODES } from '@sdlc/contracts';
 import { sql, type Kysely } from 'kysely';
 
+import { fromMicros, isUsd, toMicros } from '../../cost/money.js';
 import { clock, loadEffectiveConfig, type RegistryDeps } from '../../registry/effective-config.js';
 import { RegistryError } from '../../registry/errors.js';
 import { formatIntentCode, intentCodeYear } from '../../registry/intent-code.js';
@@ -345,6 +346,59 @@ export class IntentRepository extends TenantRepository {
           payload: {
             status: intent.status,
             ...(intent.current_gate === null ? {} : { current_gate: intent.current_gate }),
+          },
+        });
+        return intent;
+      }),
+    );
+  }
+
+  /**
+   * Raises the intent budget by `addUsd` and sets the run budget of its next runs (task C07, G5
+   * `resume` with `budget_increase_usd`, QUESTIONS #133). Both only go up (trigger SDA12). Appends
+   * `intent.budget_increased` with the amounts and the escalation that allowed it. Call under the
+   * intent lock.
+   */
+  async raiseBudget(
+    id: string,
+    raise: {
+      readonly addUsd: string;
+      readonly runBudgetUsd: string;
+      readonly escalationId: string;
+    },
+  ): Promise<Intent> {
+    for (const amount of [raise.addUsd, raise.runBudgetUsd]) {
+      if (!isUsd(amount) || toMicros(amount) <= 0n) {
+        throw new DbError('invalid_value', 'a budget amount must be a decimal above 0');
+      }
+    }
+    if (!isUuid(raise.escalationId)) throw new DbError('invalid_value', 'escalationId');
+    return this.run(
+      this.transactional(async (db) => {
+        const current = await new IntentRepository(db, this.tenantId).getById(id);
+        if (!current) throw new DbError('reference_not_found', `intent ${id} not found`);
+        const budgetUsd = fromMicros(toMicros(current.budget_usd) + toMicros(raise.addUsd));
+        const intent = await db
+          .updateTable('intents')
+          .set({
+            budget_usd: budgetUsd,
+            run_budget_usd: raise.runBudgetUsd,
+            updated_at: sql<Date>`now()`,
+          })
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', id)
+          .returningAll()
+          .executeTakeFirstOrThrow();
+        await new AuditLogRepository(db, this.tenantId).append({
+          action: 'intent.budget_increased',
+          actorType: 'system',
+          actorId: null,
+          entityId: intent.id,
+          payload: {
+            escalation_id: raise.escalationId,
+            added_usd: fromMicros(toMicros(raise.addUsd)),
+            budget_usd: budgetUsd,
+            run_budget_usd: fromMicros(toMicros(raise.runBudgetUsd)),
           },
         });
         return intent;

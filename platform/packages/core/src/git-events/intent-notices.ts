@@ -84,6 +84,16 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.run_resumed';
     case 'proposal_ready':
       return 'intent.status.proposal_ready';
+    case 'budget_warning':
+      return 'intent.status.budget_warning';
+    case 'scope_returned':
+      return 'intent.status.scope_returned';
+    case 'g5_breach':
+      return 'intent.status.g5_breach';
+    case 'g5_returned':
+      return 'intent.status.g5_returned';
+    case 'terminated':
+      return 'intent.status.terminated';
     default:
       return notice.gate !== null && isCommandGate(notice.gate)
         ? 'intent.status.advanced'
@@ -102,6 +112,8 @@ export interface IntentNoticeView {
   readonly agentKey?: string | null;
   /** C06: the base commit of the run proposal, short form. */
   readonly baseSha?: string | null;
+  /** C07: the budget warning's share of the run's cap, from the run event `budget_warning`. */
+  readonly percent?: number | null;
 }
 
 /** `YYYY-MM-DD HH:MM UTC`: the same text whatever the reader's locale. */
@@ -133,6 +145,7 @@ export function renderIntentNotice(
       window_end: view.windowEnd ? formatUtcMinute(view.windowEnd) : '—',
       agent: view.agentKey ?? '—',
       base_sha: view.baseSha ?? '—',
+      percent: view.percent ?? '—',
     },
     locale,
   );
@@ -166,6 +179,8 @@ async function viewOf(
   }
   const agent = notice.agent_id === null ? undefined : await scope.agents.getById(notice.agent_id);
   const proposal = notice.kind === 'run_proposed' ? await lastProposal(scope, intent.id) : null;
+  const percent =
+    notice.kind === 'budget_warning' ? await lastWarningPercent(scope, intent.id) : null;
   const mentions = await mentionsFor(scope, intent.project_id, notice.audience_roles, []);
   // The recertification warning goes to the agent's owner (ADR-M31 §2.7), read now.
   if (agent) mentions.push(...(await loginsOf(scope, agent.owner_id)));
@@ -177,7 +192,18 @@ async function viewOf(
     windowEnd,
     agentKey: agent?.agent_key ?? (proposal ? await agentKeyOf(scope, proposal.agentId) : null),
     baseSha: proposal ? proposal.baseSha.slice(0, 12) : null,
+    percent,
   };
+}
+
+/** The percent of the last `budget_warning` of the intent's last run (C07), or null. */
+async function lastWarningPercent(scope: TenantScope, intentId: string): Promise<number | null> {
+  const run = (await scope.runs.listForIntent(intentId)).at(-1);
+  if (!run) return null;
+  const payload = (await scope.runEvents.list(run.id))
+    .filter((e) => e.event_type === 'budget_warning')
+    .at(-1)?.payload;
+  return typeof payload?.percent === 'number' ? payload.percent : null;
 }
 
 /** The last run proposal of the intent (`run.proposed`): IDs and hashes only. */
