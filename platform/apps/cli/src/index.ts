@@ -1,7 +1,7 @@
 // The sdlc command-line tool. See design/D-03 section 5.1.
 // A07 adds `sdlc audit verify`, B03 the operator commands `sdlc admin …` (database, on the
 // server). B04 adds the user commands (through the API, design/ADR-M36): login, logout, whoami,
-// intent, gate, escalation, ai-record. B13 adds the admin commands, `sdlc token` and
+// intent, gate, escalation, ai-record. B08 adds `sdlc spec`. B13 adds the admin commands, `sdlc token` and
 // `sdlc audit verify` through the API, and moves the operator commands to `sdlc ops` (ADR-M37).
 import { t } from '@sdlc/messages';
 
@@ -13,6 +13,7 @@ import { runGate } from './commands/gate.js';
 import { runIntent } from './commands/intent.js';
 import { runLogin, runLogout, runWhoami } from './commands/login.js';
 import { runOps } from './commands/ops.js';
+import { runSpec } from './commands/spec.js';
 import { runToken } from './commands/token.js';
 import { EXIT, type CliContext } from './context.js';
 import { clean } from './output.js';
@@ -30,6 +31,7 @@ const USER_COMMANDS: Readonly<
   gate: runGate,
   escalation: runEscalation,
   'ai-record': runAiRecord,
+  spec: runSpec,
   token: runToken,
   admin: runAdminApi,
 };

@@ -90,12 +90,14 @@ export async function gatherG4Facts(
   scope: TenantScope,
   deps: G4Deps,
   intent: Pick<Intent, 'project_id' | 'data_class'>,
+  /** The head the step already read for the spec check (B08): one head for both. */
+  headSha?: string,
 ): Promise<G4Facts> {
   const project = await scope.projects.getById(intent.project_id);
   const ref = project ? projectRepoRef(project) : undefined;
   if (!project || !ref) throw new GitHostError('invalid_input', { field: 'repo' });
   const { config } = await loadEffectiveConfig(scope.projectConfigs, intent.project_id);
-  const baseSha = await deps.gitHost.getBranchHead(ref, project.default_branch);
+  const baseSha = headSha ?? (await deps.gitHost.getBranchHead(ref, project.default_branch));
   const key = config.run.agent_key;
   const agent = key === null ? undefined : await scope.agents.getByKey(key);
   let instructions: G4Facts['instructions'] = null;

@@ -94,6 +94,8 @@ async function main(): Promise<void> {
       activities: createIntentActivities({
         db,
         registry,
+        // B08 (ADR-M39 §2.4): the spec re-check at G2–G4, always on.
+        specs: { gitHost },
         ...(workerRuns ? { g4: workerRuns.g4, runs: workerRuns.runs } : {}),
       }),
       workflowBundlePath: settings.workflowBundle,

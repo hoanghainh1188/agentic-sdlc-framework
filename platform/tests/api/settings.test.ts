@@ -18,7 +18,14 @@ describe('api settings', () => {
       rateLimitPerMinute: 120,
       authFailuresPerMinute: 10,
       temporal: { address: 'temporal:7233', namespace: 'default' },
+      githubApiUrl: 'https://api.github.com',
     });
+  });
+
+  it('B08: the GitHub API URL of the spec endpoints is https only', () => {
+    expect(
+      loadSettings({ SDLC_API_GITHUB_API_URL: 'https://ghe.example.test/api/v3' }).githubApiUrl,
+    ).toBe('https://ghe.example.test/api/v3');
   });
 
   it('B07: the intent workflow signals can be turned off in development mode only', () => {
@@ -58,6 +65,7 @@ describe('api settings', () => {
     ['SDLC_API_DEV_MODE', 'yes'],
     ['SDLC_API_TEMPORAL_ADDRESS', 'http://temporal:7233'],
     ['SDLC_API_TEMPORAL_NAMESPACE', 'a b'],
+    ['SDLC_API_GITHUB_API_URL', 'http://api.github.com'],
   ])('refuses %s=%s', (name, value) => {
     expect(() => loadSettings({ [name]: value })).toThrowError(
       expect.objectContaining({ key: 'api.settings.invalid', setting: name }),

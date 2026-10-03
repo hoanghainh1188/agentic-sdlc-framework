@@ -54,3 +54,12 @@ export {
   type RunDeps,
 } from './run-lifecycle.js';
 export { isFinalRun, roundRuns } from './run-round.js';
+export {
+  checkSpec,
+  gatherSpecFacts,
+  isSpecCheckGate,
+  SPEC_CHECK_GATES,
+  type SpecCheckOutcome,
+  type SpecFacts,
+  type SpecHold,
+} from './spec-check.js';

@@ -6,8 +6,10 @@ import { SERVICE_NAME, tracing, tracingEndpointValid } from './telemetry.js';
 
 import 'reflect-metadata';
 
-import { checkStoredConfigsAtStart } from '@sdlc/core';
+import { GitHubAdapter } from '@sdlc/adapter-git-github';
+import { checkStoredConfigsAtStart, SPEC_MAX_BYTES } from '@sdlc/core';
 import { t } from '@sdlc/messages';
+import { OpenBaoClient } from '@sdlc/secrets';
 import { OTEL_ENDPOINT_ENV } from '@sdlc/telemetry';
 import { connectTemporal, TemporalIntentSignals } from '@sdlc/workflow-client';
 
@@ -24,7 +26,23 @@ async function main(): Promise<void> {
   if (settings.database.kind === 'dev_url') {
     log.log('warn', 'api.dev_mode', { message: t('api.start.dev_mode') });
   }
-  const db = await connectDatabase(settings, process.env);
+  // Outside dev mode OpenBao stays open: the GitHub adapter of the spec endpoints (B08) reads
+  // the App key again every 10 minutes (ADR-M23 §2.2).
+  const openbao =
+    settings.database.kind === 'openbao' ? OpenBaoClient.fromEnv(process.env, log) : undefined;
+  await openbao?.assertReady();
+  const secrets = openbao?.kv();
+  const db = await connectDatabase(settings, secrets);
+  const gitHost = secrets
+    ? new GitHubAdapter({
+        secrets,
+        apiUrl: settings.githubApiUrl,
+        logger: log,
+        // The api reads spec files only: never download more than a spec may be (ADR-M39 §2.3).
+        maxFileBytes: SPEC_MAX_BYTES,
+      })
+    : undefined;
+  if (!gitHost) log.log('warn', 'api.git_host_off', { message: t('api.start.git_host_off') });
   // Stored configurations after a change of platform defaults (B13 AC8, ADR-M37 §2.5).
   await checkStoredConfigsAtStart(db, log);
   // Wakes the intent workflow after a change (B07, ADR-M30).
@@ -35,6 +53,7 @@ async function main(): Promise<void> {
     settings,
     log,
     nestLogger: new NestJsonLogger(log),
+    ...(gitHost ? { gitHost } : {}),
     ...(temporal ? { intentSignals: new TemporalIntentSignals(temporal.client) } : {}),
   });
   app
@@ -43,6 +62,7 @@ async function main(): Promise<void> {
     .addHook('onClose', async () => {
       await temporal?.close();
       await db.close();
+      await openbao?.close();
       await tracing?.shutdown();
     });
   await app.listen({ host: settings.host, port: settings.port });

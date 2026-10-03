@@ -52,6 +52,7 @@ import type { TenantScope } from '../db/tenant-scope.js';
 import { EscalationError } from '../escalation/errors.js';
 import { assertActionAllowed } from '../escalation/freeze.js';
 import type { Registry } from '../registry/registry.js';
+import type { SpecGitHost } from '../specs/link.js';
 import { gateHistory, type GateHistory } from './gate-history.js';
 import {
   earlierBlock,
@@ -61,6 +62,13 @@ import {
   type EarlierBlock,
 } from './hotl.js';
 import { gatherG4Facts, type G4Deps, type G4Facts } from './g4-proposal.js';
+import {
+  checkSpec,
+  gatherSpecFacts,
+  isSpecCheckGate,
+  type SpecFacts,
+  type SpecHold,
+} from './spec-check.js';
 import { stepG4 } from './g4.js';
 import { stepG5, stepPausedG5 } from './g5.js';
 import { refusedPlanHashes, returnedFromG5 } from './g5-scope.js';
@@ -90,6 +98,12 @@ export interface StepDeps {
    * Without it the step does not evaluate G4 and the intent waits there (`later_gate`).
    */
   readonly g4?: G4Deps;
+  /**
+   * The Git host for the spec re-check at G2, G3 and G4 (B08, ADR-M39 §2.4): the spec must be the
+   * file at the head of the default branch. The worker always wires it; without it (tests of
+   * other gates) the step does not re-check the spec.
+   */
+  readonly specs?: SpecGitHost;
   /**
    * C06 session 2 (ADR-M33 §2.6): the workflow can hand runs to the runner. A decided G4 then
    * moves the intent to `running`, and the step drives the run's round (`run_prepare`,
@@ -135,22 +149,32 @@ export async function stepIntent(
   deps: StepDeps,
   intentId: string,
 ): Promise<IntentStepResult> {
-  // G4 reads the Git host and the gateway first: no HTTP call while the intent lock is held.
+  // The spec check (B08) and G4 read the Git host and the gateway first: no HTTP call while the
+  // intent lock is held. One head read serves both: the spec checked is the one the run starts
+  // from (QUESTIONS #160).
   let facts: G4Facts | undefined;
-  if (deps.g4) {
+  let specFacts: SpecFacts | 'git_host_unavailable' | undefined;
+  if (deps.g4 || deps.specs) {
     const peek = await scope.intents.getById(intentId);
-    if (peek?.status === 'in_gate' && peek.current_gate === 'G4') {
+    if (peek?.status === 'in_gate' && isSpecCheckGate(peek.current_gate)) {
       try {
-        facts = await gatherG4Facts(scope, deps.g4, peek);
+        const read = deps.specs ? await gatherSpecFacts(scope, deps.specs, peek) : undefined;
+        specFacts = read;
+        if (deps.g4 && peek.current_gate === 'G4') {
+          facts = await gatherG4Facts(scope, deps.g4, peek, read?.headSha);
+        }
       } catch (error) {
-        if (error instanceof GitHostError) {
+        if (!(error instanceof GitHostError)) throw error;
+        // G4 needs its facts. At G2 and G3 the gate is held, but people's rejections, requests
+        // for changes and the overdue escalation are still handled (`SpecHold`).
+        if (deps.g4 && peek.current_gate === 'G4') {
           return {
             outcome: 'waiting',
             reason: 'git_host_unavailable',
             wakeInMs: GIT_HOST_RETRY_MS,
           };
         }
-        throw error;
+        specFacts = 'git_host_unavailable';
       }
     }
   }
@@ -190,15 +214,23 @@ export async function stepIntent(
     const policy = await deps.registry.policyFor(tx, intent.project_id);
     const block = await earlierBlock(tx, intent, policy.config);
     if (block) return sendBack(tx, deps, policy, intent, block);
+    // B08: the spec must still be the file at the head of the default branch (N4).
+    let hold: SpecHold | null = null;
+    if (specFacts) {
+      const spec = await checkSpec(tx, deps.registry, policy.policy, intent, specFacts);
+      if (spec?.kind === 'result') return spec.result;
+      if (spec?.kind === 'hold') hold = spec.hold;
+    }
     const gate = intent.current_gate;
     if (gate === 'G4' && facts) return atG4(tx, deps, policy, intent, facts);
     if (gate === 'G5') return stepG5(tx, deps.registry, policy, intent);
     if (!isCommandGate(gate)) {
+      if (hold) return waiting(hold.reason, hold.wakeInMs);
       // G4 onwards: C06 continues. Wake when the last HOTL block window closes (C06 waits for it).
       const until = await hotlBlockWindowOpenUntil(tx, deps.registry, intent.id);
       return waiting('later_gate', untilMs(deps, until));
     }
-    return stepGate(tx, deps, policy, intent, gate);
+    return stepGate(tx, deps, policy, intent, gate, hold);
   });
 }
 
@@ -290,6 +322,8 @@ async function stepGate(
   policy: StepPolicy,
   intent: Intent,
   gate: CommandGate,
+  /** B08: the spec check holds the gate: no advance, everything else as usual. */
+  hold: SpecHold | null = null,
 ): Promise<IntentStepResult> {
   const { registry } = deps;
   const history = await gateHistory(tx, intent.id, gate);
@@ -345,6 +379,12 @@ async function stepGate(
       );
     }
     throw error;
+  }
+  // B08: the spec cannot be checked now; the gate does not advance, but its deadline still runs.
+  if (hold) {
+    const subject = gate === 'G1' ? 'intent' : gate === 'G2' ? 'spec' : 'plan';
+    const wake = await overdue({ kind: subject, sha256: inputSha256 });
+    return waiting(hold.reason, earliest(wake, hold.wakeInMs));
   }
   // C07 (QUESTIONS #131): a plan that a run went outside of is never approved again.
   if (gate === 'G3' && (await refusedPlanHashes(tx, intent.id)).has(inputSha256)) {
@@ -458,6 +498,13 @@ async function gateAdvanceAllowed(tx: TenantScope, intent: Intent, at: Date): Pr
     if (error instanceof EscalationError && error.code === 'frozen') return false;
     throw error;
   }
+}
+
+/** The earlier of two optional delays. */
+function earliest(a: number | undefined, b: number | undefined): number | undefined {
+  if (a === undefined) return b;
+  if (b === undefined) return a;
+  return Math.min(a, b);
 }
 
 function untilMs(deps: StepDeps, until: Date | null): number | undefined {

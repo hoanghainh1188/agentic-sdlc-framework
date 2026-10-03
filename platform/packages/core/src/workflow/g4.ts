@@ -122,7 +122,7 @@ export function effectiveAutonomy(
 }
 
 /** The input of the last approval or pass at `gate` that no `void` cancelled, or null. */
-async function passedInput(scope: TenantScope, intentId: string, gate: GateCode) {
+export async function passedInput(scope: TenantScope, intentId: string, gate: GateCode) {
   const decisions = await scope.gateDecisions.listForIntent(intentId, gate);
   const voided = new Set(decisions.map((d) => d.voids_decision_id).filter((id) => id !== null));
   const last = decisions

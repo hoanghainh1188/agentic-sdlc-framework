@@ -226,6 +226,10 @@ access:
   # Writers may always read. The viewer role never writes it (mandatory rule M19).
   ai_record_write_roles: [person_a, pm_brse]
   ai_record_read_roles: [person_a, person_b, second_approver, pm_brse, governance, admin, viewer]
+  # Task B08, ADR-M39, QUESTIONS #162. Who links an intent's spec (path in the repository, D-02
+  # FR-02): Person A owns the intent, PM / BrSE writes the specs (D-09 §9). The viewer role never
+  # links a spec (mandatory rule M23). Reading the linked specs follows `intent_read_roles`.
+  spec_link_roles: [person_a, pm_brse]
   # Task B13, ADR-M37, QUESTIONS #154. Separation of duties (handbook Ch.5, codes table §5): one
   # person never holds both roles of a pair on the same project. Person A (owner) and Person B
   # (independent reviewer) always stay apart (mandatory rule M21): G1–G3 have no producers

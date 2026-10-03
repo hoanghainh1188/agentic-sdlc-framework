@@ -216,11 +216,23 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc gate reject <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Rejects the gate |
 | `sdlc gate request-changes <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Requests changes |
 | `sdlc escalation list\|show\|ack\|decide …` | Chapter 18 §18.8b |
+| `sdlc spec link <INT-…> --path <path/to/spec.md> [--commit <SHA>] [--tool spec-kit\|bmad\|manual]` | Links the intent's spec (below) |
+| `sdlc spec list <INT-…>` | Lists the linked spec versions: path, commit and SHA-256 |
 | `sdlc ai-record show --project <slug>` | Shows the project AI record |
 | `sdlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
 
 - Gate decisions take **codes only**: a reason code (§19.8b) and, if you want, `--reason-ref` with an `https://` link to a comment that explains it. The platform never stores your words, because its records are kept for years.
 - The rules are the same as for comments (§19.8b): you need the gate's role, you can decide only the gate the intent waits at, and a producer never approves.
+
+**Linking a spec (G2 input).** G2 checks the intent's spec. Link it with `sdlc spec link` (task B08, `design/ADR-M39-spec-linking.md`):
+
+- Who: Person A and PM / BrSE by default (project setting `access.spec_link_roles`; the viewer role never may).
+- When: while the intent is a draft or waits at G1, G2, G3 or G4.
+- What: a Markdown file (`.md` or `.markdown`) in the repository, at most 256 KiB, UTF-8 text. The platform reads it from GitHub and keeps only its SHA-256, never the content.
+- **The spec is the file on the default branch** (`main`): the agent run starts from there. Leave out `--commit`, or give a commit that holds the same content as the default branch; otherwise the platform refuses (`spec_not_on_default_branch`).
+- **If someone edits the spec on the default branch after G2**, the platform notices it at the next step: it links the new version, takes the intent back to G2 and posts a comment (`spec_changed`). Approvals of the old spec no longer count. At Low risk G2 is HOTL, so the platform may pass the new spec again, with its block window; at other tiers a person approves it again.
+- If the file is removed, renamed or cannot be read, the intent goes back to G2 and waits (`spec_unavailable`) until you restore it or link another spec.
+- If GitHub cannot be reached, the intent waits; it never passes a gate without the check.
 
 **When a command fails.** The message says why. The exit code tells scripts what happened:
 
@@ -319,3 +331,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.3 | 2026-10-03 | Claude (task B04) | §19.8c platform usage: the `sdlc` command (login, intents, gates, AI record, exit codes); §19.8b points to it (ADR-M36) |
 | 0.4 | 2026-10-03 | Claude (task B13, PR 1) | §19.8d platform usage: setting up a team (tenant admins, projects, people, GitHub accounts, roles, configuration; ADR-M37) |
 | 0.5 | 2026-10-03 | Claude (task B13, PR 2) | §19.8c: `sdlc logout` revokes the token; `sdlc token`; first token from a tenant admin. §19.8d: tokens of other people, the agent register, `sdlc audit verify`, the operator commands `sdlc ops` (ADR-M37 §2.8) |
+| 0.6 | 2026-10-03 | Claude (task B08) | §19.8c: `sdlc spec link|list`; the spec is the file on the default branch and is checked again at G2–G4 (ADR-M39) |

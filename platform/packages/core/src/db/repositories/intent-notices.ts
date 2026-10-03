@@ -53,6 +53,9 @@ export const INTENT_NOTICE_KINDS = [
   'g5_breach',
   'g5_returned',
   'terminated',
+  // B08 (ADR-M39 §2.4): the spec changed at the head of the default branch, or cannot be read.
+  'spec_changed',
+  'spec_unavailable',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

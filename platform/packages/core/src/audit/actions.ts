@@ -144,10 +144,29 @@ export const AUDIT_ACTIONS = {
       run_budget_usd: 'decimal',
     },
   },
-  /** A spec was linked to an intent (FR-02). Never the path or the content. */
+  /**
+   * A spec was linked to an intent (FR-02). Never the path or the content. B08 (ADR-M39): the
+   * linked commit and the `cause`: `linked` (a person) or `head_changed` (the platform linked the
+   * spec at the head of the default branch because its content changed there).
+   */
   'spec.linked': {
     entityType: 'intent',
-    fields: { spec_ref_id: 'uuid', version: 'version', content_sha256: 'sha256' },
+    fields: {
+      spec_ref_id: 'uuid',
+      version: 'version',
+      content_sha256: 'sha256',
+      commit_sha: 'code?',
+      cause: 'code?',
+    },
+  },
+  /**
+   * The linked spec cannot be read at the head of the default branch (B08, ADR-M39 §2.4): `cause`
+   * is `missing`, `not_a_file`, `too_large` or `not_utf8`. Written once per spec version and cause;
+   * the intent waits at G2 until a person links a spec that can be read. Never the path.
+   */
+  'spec.unavailable': {
+    entityType: 'intent',
+    fields: { spec_ref_id: 'uuid', cause: 'code', head_sha: 'code' },
   },
   /** A plan was submitted for an intent. Never the file list or the summary. */
   'plan.submitted': {
