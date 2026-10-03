@@ -7,7 +7,7 @@
 //   event, the audit event (IDs only) and the status notice; the intent is then paused at G4,
 //   `resume` starts a new round, `terminate` closes it;
 // - a lost runner ends a `stopping` run `stopped_killed`; the worker revokes the key of a killed
-//   run at once; the database keeps a kill a kill (migration 0019);
+//   run at once; the database keeps a kill a kill (migration 0020);
 // - `/kill` on the issue: a person with a kill role stops the run; an account that is not linked
 //   (the pilot repository is public) or a role without the kill switch is answered, and nothing
 //   is stopped;
@@ -258,7 +258,7 @@ describeDb('C11: the kill switch on PostgreSQL', () => {
       expect(await scope().runs.getById(other.runId)).toMatchObject({ stop_reason: 'agent_error' });
     });
 
-    it('the database keeps a kill a kill (migration 0019)', async () => {
+    it('the database keeps a kill a kill (migration 0020)', async () => {
       const { runId } = await runningRun();
       await kill(runId);
       const now = new Date();

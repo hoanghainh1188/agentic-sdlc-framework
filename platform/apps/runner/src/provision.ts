@@ -277,7 +277,7 @@ async function failRun(
       : teardownSandbox(deps.docker, runId)
   ).catch(() => undefined);
   const now = clock(deps);
-  // Killed meanwhile (C11): one update ends the run killed, never `failed` (migration 0019).
+  // Killed meanwhile (C11): one update ends the run killed, never `failed` (migration 0020).
   await scope.runs.end(runId, {
     from: ['provisioning'],
     to: 'failed',

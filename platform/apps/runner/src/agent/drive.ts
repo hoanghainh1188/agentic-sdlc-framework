@@ -496,7 +496,7 @@ async function isStopping(scope: TenantScope, runId: string): Promise<boolean> {
   }
 }
 
-/** Ends a killed run: `stopping → stopped_killed` (C11, migration 0019). */
+/** Ends a killed run: `stopping → stopped_killed` (C11, migration 0020). */
 async function endKilled(
   deps: AgentDriveDeps,
   scope: TenantScope,

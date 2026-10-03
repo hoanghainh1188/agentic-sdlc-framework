@@ -18,7 +18,7 @@ import { migration0015GateG5 } from './0015-gate-g5.js';
 import { migration0016AgentApprovals } from './0016-agent-approvals.js';
 import { migration0017PushedHead } from './0017-pushed-head.js';
 import { migration0018PlanFiles } from './0018-plan-files.js';
-import { migration0019KillSwitch } from './0019-kill-switch.js';
+import { migration0020KillSwitch } from './0020-kill-switch.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -40,5 +40,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0016-agent-approvals': migration0016AgentApprovals,
   '0017-pushed-head': migration0017PushedHead,
   '0018-plan-files': migration0018PlanFiles,
-  '0019-kill-switch': migration0019KillSwitch,
+  '0020-kill-switch': migration0020KillSwitch,
 };

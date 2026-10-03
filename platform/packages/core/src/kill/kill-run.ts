@@ -34,7 +34,7 @@ export type KillActor =
 
 export type KillSource = 'api' | 'github_comment' | 'ops';
 
-/** The stop reason of every killed run (migration 0019). */
+/** The stop reason of every killed run (migration 0020). */
 export const KILLED = 'killed';
 
 /** A run a runner holds: it goes to `stopping` and the runner ends it. */

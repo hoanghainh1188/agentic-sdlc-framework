@@ -117,7 +117,7 @@ async function cleanUpRun(
   let failed = false;
   if (ACTIVE.includes(run.status)) {
     const now = deps.now ? deps.now() : new Date();
-    // A run being killed ends as killed (C11, migration 0019); any other run fails. One update.
+    // A run being killed ends as killed (C11, migration 0020); any other run fails. One update.
     failed =
       (await scope.runs.end(run.id, {
         from: ACTIVE.filter((status) => status !== 'stopping'),

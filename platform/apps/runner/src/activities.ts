@@ -145,7 +145,7 @@ async function execute(
   if (!virtualKey || ctx.cancellationSignal.aborted || killed) {
     await deps.runner.release(input.tenantId, input.runId, virtualKey ? 'killed' : 'failed');
     const now = new Date();
-    // A run being killed ends as killed (C11, migration 0019); otherwise it fails. One update.
+    // A run being killed ends as killed (C11, migration 0020); otherwise it fails. One update.
     await scope.runs.end(input.runId, {
       from: ['provisioning', 'running'],
       to: 'failed',

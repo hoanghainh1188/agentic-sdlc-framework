@@ -5,7 +5,7 @@
 | Status | **Proposed** (task C11, for review) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #180–#184) |
-| Related | D-08 task C11 (AC1–AC3); D-02 FR-11, FR-18, FR-34, FR-35, §10 item 5d; D-03 §6, §6.5, §7.1, §8.2, §9 (version 1.21); D-05 §5, §6.2, §6.4 (version 1.26); handbook Ch.3 §3.6, Ch.6 §6.7, Ch.18; ADR-M10 §4.1, ADR-M22, ADR-M23, ADR-M25, ADR-M27, ADR-M28, ADR-M29, ADR-M33 §2.6–§2.7, ADR-M34 §2.2, §2.6, ADR-M38 §2.3; QUESTIONS #44, #52, #180–#184 |
+| Related | D-08 task C11 (AC1–AC3); D-02 FR-11, FR-18, FR-34, FR-35, §10 item 5d; D-03 §6, §6.5, §7.1, §8.2, §9 (version 1.22); D-05 §5, §6.2, §6.4 (version 1.27); handbook Ch.3 §3.6, Ch.6 §6.7, Ch.18; ADR-M10 §4.1, ADR-M22, ADR-M23, ADR-M25, ADR-M27, ADR-M28, ADR-M29, ADR-M33 §2.6–§2.7, ADR-M34 §2.2, §2.6, ADR-M38 §2.3; QUESTIONS #44, #52, #180–#184 |
 
 ## 1. Context
 
@@ -95,7 +95,7 @@ runner lost              ──► heartbeat timeout (2 min) ──► abandonRu
 | Loop threshold | FR-35; Ch.3 §3.6 | Config `run.loop_detection.identical_tool_calls_max` → contract `loop_threshold`; rule M10 |
 | No-progress window | FR-35; QUESTIONS #184 | Config `run.loop_detection.no_progress_window_minutes`; new rule (PR 2) |
 | Time for a killed run's evidence | QUESTIONS #183 | Runner setting `SDLC_RUNNER_KILL_EVIDENCE_SECONDS` (technical) |
-| A kill stays a kill: `stopping` ends `stopped_killed` only; `killed_by` set once; stop reason `killed` | D-05 §6.4 | Database (migration 0019, `SDA13`) |
+| A kill stays a kill: `stopping` ends `stopped_killed` only; `killed_by` set once; stop reason `killed` | D-05 §6.4 | Database (migration 0020, `SDA13`) |
 | Tokens revoked after use; a reused wrapping token goes to security | ADR-M38 §2.3; QUESTIONS #182 | Code (`apps/runner/src/tokens.ts`, `kill/kill-run.ts`) |
 
 ## 3. Interfaces

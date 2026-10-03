@@ -1,4 +1,4 @@
-// Migration 0019: the kill switch (design/D-05 section 6.4, version 1.26; D-08 C11 AC2; D-02
+// Migration 0020: the kill switch (design/D-05 section 6.4, version 1.27; D-08 C11 AC2; D-02
 // FR-34; design/ADR-M42; QUESTIONS #180–#183). Rules for every migration: see the header of
 // 0001-tenancy.ts and design/ADR-M09.
 //
@@ -12,7 +12,7 @@
 //   (trigger, `SDA13`), so no later writer can turn a kill into another outcome.
 import { defineMigration } from './define.js';
 
-export const migration0019KillSwitch = defineMigration({
+export const migration0020KillSwitch = defineMigration({
   up: [
     `ALTER TABLE runs
        DROP CONSTRAINT runs_killed_status,

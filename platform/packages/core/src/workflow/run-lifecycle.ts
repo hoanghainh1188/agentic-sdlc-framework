@@ -262,7 +262,7 @@ export async function abandonRun(
   if (isFinal(run.status)) return;
   const now = deps.registry.now();
   await scope.transaction(async (tx) => {
-    // A run being killed ends as killed (C11, migration 0019); any other run fails. One update:
+    // A run being killed ends as killed (C11, migration 0020); any other run fails. One update:
     // a kill that lands in between never leaves the run in `stopping`.
     const moved = await tx.runs.end(runId, {
       from: ACTIVE.filter((status) => status !== 'stopping'),
