@@ -169,7 +169,7 @@ When CI passed at G6 (Chapter 14 §14.10.2), the intent waits at **G7**. The pla
 - The reviewer must be linked to a platform user by their GitHub account (Chapter 19) and hold the gate's role: Person B; for dual approval also the second approver (two different people).
 - **Never counted:** the author of the intent, the person who allowed a run (G4 at High risk), the people who submitted the plan, anyone who authored a commit of the pull request, and bots.
 - A dismissed review, or a later review of the same person, replaces the earlier decision.
-- A review that cannot count gets one reply on the pull request with the reason. Bots get no reply.
+- A review by a linked user that cannot count (no role, a producer) gets one reply on the pull request with the reason. Bots and accounts not linked to a platform user get no reply.
 
 **Two approvals** (dual approval, §15.5 Step 2) are needed when the plan G3 approved is flagged `migration`, `payment`, `personal_data`, `prod_infrastructure`, `breaking_contract` or `safety_function`, and at Critical risk.
 

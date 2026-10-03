@@ -313,7 +313,7 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | reply_attempts | smallint | Failed and successful posts |
 | reply_posted_at, reply_abandoned_at | timestamptz null | Delivery; final once set (trigger, `SDA06`) |
 
-- Version 1.26 (E01, ADR-M41 §2.4, QUESTIONS #176): G7 writes a receipt for each GitHub review of the pushed commit it reads (`github:review:<id>`): `decided` (the `approve` or `request_changes` decision), `refused`, `user_not_linked` or `ignored_bot`; `issue_number` is the pull request. A refusal's reply carries catalog codes only.
+- Version 1.26 (E01, ADR-M41 §2.4, QUESTIONS #176): G7 writes a receipt for each GitHub review of the pushed commit it reads (`github:review:<id>`): `decided` (the `approve` or `request_changes` decision), `refused`, `user_not_linked` or `ignored_bot`; `issue_number` is the pull request. Only a linked user's refusal gets a reply, with catalog codes only; bots and unlinked accounts get none.
 - No text from the Git host: the comment text stays on GitHub. A decision links to it with `gate_decisions.reason_ref`.
 - A `failing` receipt holds no decision and no reply; it gets its result once (a retry succeeds or is refused, or it becomes `failed_internal`, which never holds a gate decision). After that, a trigger fixes the result, and only the reply delivery moves forward (`SDA06`). `platform_app` may update the result columns, `event_attempts` and the delivery columns only. No DELETE.
 

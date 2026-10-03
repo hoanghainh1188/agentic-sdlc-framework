@@ -8,9 +8,10 @@
 //   - `changes_requested` → a `request_changes` (reason `other`, the review's URL as
 //     `reason_ref`), only from a holder of the gate's role who is not a producer (#179: the review
 //     whose text the next run reads is identified by this decision);
-//   - a bot never decides; an account not linked to an active user gets a reply.
+//   - a bot never decides; neither does an account not linked to an active user; neither gets a
+//     reply (Harry, review of PR #138: no spam through a public repository).
 // Each review gets a `git_event_receipts` row with its event ID (#176): it is recorded once, and a
-// refusal gets one reply comment on the pull request with catalog codes only (a public repository).
+// refusal of a linked user gets one reply comment on the pull request with catalog codes only.
 // An approval whose review was dismissed or replaced since, or that reviewed another commit, is
 // voided (`input_mismatch`, FR-17).
 import type { ReviewDecision } from '@sdlc/contracts';
@@ -73,9 +74,9 @@ async function receiptOf(
   // Bots never decide, and get no reply, so replies never loop (QUESTIONS #45).
   if (review.reviewer.type === 'bot') return { ...base, outcome: 'ignored_bot' };
   const actorId = await userOfAccount(tx, ctx.provider, review.reviewer.id);
-  if (actorId === undefined) {
-    return { ...base, outcome: 'user_not_linked', reply: reply('user_not_linked') };
-  }
+  // Harry, review of PR #138: anyone can review a public repository; an account not linked to a
+  // user gets no reply, so nobody can make the platform spam a pull request or burn API quota.
+  if (actorId === undefined) return { ...base, outcome: 'user_not_linked' };
   if (review.state === 'changes_requested' && ctx.producers.includes(actorId)) {
     return {
       ...base,

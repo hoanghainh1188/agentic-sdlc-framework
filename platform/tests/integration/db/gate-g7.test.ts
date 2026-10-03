@@ -453,7 +453,7 @@ describeDb('E01: gate G7, review and merge, on PostgreSQL', () => {
       });
       expect(await receipt(byStranger)).toMatchObject({
         outcome: 'user_not_linked',
-        reply_code: 'user_not_linked',
+        reply_code: null, // no reply: anyone can review a public repository
         issue_number: (await reload(intent)).pr_number,
       });
       await step(intent); // once per review: no second decision, no second receipt
