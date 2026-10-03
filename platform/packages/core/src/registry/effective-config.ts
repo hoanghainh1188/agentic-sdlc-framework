@@ -3,7 +3,10 @@
 import { loadProjectConfig } from '@sdlc/config';
 import type { PolicyEngine, ValidatedProjectConfig } from '@sdlc/contracts';
 
-import type { ProjectConfigRepository } from '../db/repositories/project-configs.js';
+import {
+  overrideSha256,
+  type ProjectConfigRepository,
+} from '../db/repositories/project-configs.js';
 import { RegistryError } from './errors.js';
 
 /**
@@ -36,9 +39,13 @@ export async function loadEffectiveConfig(
     );
   }
   if (stored && stored.config_hash !== result.configHash) {
+    // Fails closed either way. Only the start-up check (B13 AC8) re-hashes a drifted config.
+    const yamlUnchanged = overrideSha256(stored.config_yaml) === stored.override_sha256;
     throw new RegistryError(
-      'config_hash_mismatch',
-      `project ${projectId}: stored config_hash does not match the stored configuration`,
+      yamlUnchanged ? 'config_defaults_drift' : 'config_hash_mismatch',
+      yamlUnchanged
+        ? `project ${projectId}: the platform defaults changed since the configuration was saved`
+        : `project ${projectId}: stored config_hash does not match the stored configuration`,
     );
   }
   return { config: result.config, configHash: result.configHash };

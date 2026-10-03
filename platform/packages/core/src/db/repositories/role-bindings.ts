@@ -2,6 +2,7 @@ import { sql } from 'kysely';
 
 import type { RoleBinding, TenantInsert } from '../schema.js';
 import { TenantRepository } from './base.js';
+import { lockProjectRoles } from './locks.js';
 
 export interface RoleBindingQuery {
   /** Also return revoked bindings (history). Default: active bindings only. */
@@ -23,6 +24,15 @@ export class RoleBindingRepository extends TenantRepository {
         .returningAll()
         .executeTakeFirstOrThrow(),
     );
+  }
+
+  /**
+   * Holds the project's role-grant lock until the transaction ends (B13). Only inside a
+   * transaction; grants that check other roles first take it before they read.
+   */
+  async lockForGrant(projectId: string): Promise<void> {
+    if (!this.db.isTransaction) throw new Error('lockForGrant must run inside a transaction');
+    await this.run(lockProjectRoles(this.db, projectId));
   }
 
   getById(id: string, query: RoleBindingQuery = {}): Promise<RoleBinding | undefined> {

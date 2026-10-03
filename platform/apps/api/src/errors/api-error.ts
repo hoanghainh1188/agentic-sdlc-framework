@@ -1,12 +1,15 @@
 // Every error the API returns has a stable code, an HTTP status and a message from the catalog
 // (D-08 B03 AC4, NFR-08). Nothing else reaches the client: no stack trace, no SQL, no library text.
+import type { ConfigIssue } from '@sdlc/config';
 import {
+  AdminError,
   AiRecordError,
   CommandError,
   DbError,
   EscalationError,
   RegistryError,
   TenantGuardError,
+  type AdminErrorCode,
   type CommandErrorCode,
   type DbErrorCode,
   type EscalationErrorCode,
@@ -40,6 +43,17 @@ export const API_ERROR_CODES = [
   'ai_record_not_found',
   'ai_record_invalid',
   'ai_record_version_conflict',
+  'user_not_found',
+  'identity_not_found',
+  'role_binding_not_found',
+  'project_archived',
+  'user_not_active',
+  'self_action',
+  'conflicting_role',
+  'last_tenant_admin',
+  'already_exists',
+  'config_rejected',
+  'config_version_conflict',
   'conflict',
   'not_ready',
   'internal',
@@ -71,6 +85,17 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   ai_record_not_found: 'api.error.ai_record_not_found',
   ai_record_invalid: 'api.error.ai_record_invalid',
   ai_record_version_conflict: 'api.error.ai_record_version_conflict',
+  user_not_found: 'api.error.user_not_found',
+  identity_not_found: 'api.error.identity_not_found',
+  role_binding_not_found: 'api.error.role_binding_not_found',
+  project_archived: 'api.error.project_archived',
+  user_not_active: 'api.error.user_not_active',
+  self_action: 'api.error.self_action',
+  conflicting_role: 'api.error.conflicting_role',
+  last_tenant_admin: 'api.error.last_tenant_admin',
+  already_exists: 'api.error.already_exists',
+  config_rejected: 'api.error.config_rejected',
+  config_version_conflict: 'api.error.config_version_conflict',
   conflict: 'api.error.conflict',
   not_ready: 'api.error.not_ready',
   internal: 'api.error.internal',
@@ -80,10 +105,14 @@ export function errorMessageKey(code: ApiErrorCode): MessageKey {
   return ERROR_MESSAGE_KEYS[code];
 }
 
-/** One problem in a request: where (`body.title`) and what (a zod issue code). Never free text. */
+/**
+ * One problem in a request: where (`body.title`) and what (a zod issue code, or a configuration
+ * message key). Never free text from the request: `message` is catalog text only (B13).
+ */
 export interface ErrorDetail {
   readonly path: string;
   readonly issue: string;
+  readonly message?: string;
 }
 
 export class ApiError extends Error {
@@ -95,6 +124,8 @@ export class ApiError extends Error {
     /** A refusal reason code from the registry or policy engine, for example `role_missing`. */
     readonly reason?: string,
     readonly details?: readonly ErrorDetail[],
+    /** Configuration issues (B13 `config_rejected`); the filter renders them in the locale. */
+    readonly configIssues?: readonly ConfigIssue[],
   ) {
     super(code);
   }
@@ -105,6 +136,7 @@ const REGISTRY: Readonly<Record<RegistryErrorCode, [number, ApiErrorCode]>> = {
   project_not_active: [409, 'project_not_active'],
   config_invalid: [409, 'config_invalid'],
   config_hash_mismatch: [409, 'config_invalid'],
+  config_defaults_drift: [409, 'config_invalid'],
   decision_not_allowed: [422, 'decision_not_allowed'],
   approval_refused: [403, 'approval_refused'],
   issue_already_linked: [409, 'issue_already_linked'],
@@ -134,6 +166,24 @@ const ESCALATION: Readonly<Record<EscalationErrorCode, [number, ApiErrorCode]>> 
   frozen: [409, 'conflict'],
 };
 
+/** Admin refusals (B13, ADR-M37 §2.6). */
+const ADMIN: Readonly<Record<AdminErrorCode, [number, ApiErrorCode]>> = {
+  forbidden: [403, 'forbidden'],
+  project_not_found: [404, 'project_not_found'],
+  user_not_found: [404, 'user_not_found'],
+  identity_not_found: [404, 'identity_not_found'],
+  role_binding_not_found: [404, 'role_binding_not_found'],
+  project_archived: [409, 'project_archived'],
+  user_not_active: [409, 'user_not_active'],
+  self_action: [403, 'self_action'],
+  conflicting_role: [409, 'conflicting_role'],
+  last_tenant_admin: [409, 'last_tenant_admin'],
+  already_exists: [409, 'already_exists'],
+  invalid_value: [400, 'invalid_request'],
+  config_rejected: [422, 'config_rejected'],
+  config_version_conflict: [409, 'config_version_conflict'],
+};
+
 const DB: Partial<Readonly<Record<DbErrorCode, [number, ApiErrorCode]>>> = {
   invalid_value: [400, 'invalid_request'],
   conflict: [409, 'conflict'],
@@ -144,6 +194,14 @@ const DB: Partial<Readonly<Record<DbErrorCode, [number, ApiErrorCode]>>> = {
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
+  if (error instanceof AdminError) {
+    const [status, code] = ADMIN[error.code];
+    const details =
+      error.extra.field === undefined
+        ? undefined
+        : [{ path: `body.${error.extra.field}`, issue: 'invalid' }];
+    return new ApiError(status, code, error.extra.reason, details, error.extra.issues);
+  }
   if (error instanceof EscalationError) return new ApiError(...ESCALATION[error.code]);
   if (error instanceof AiRecordError) {
     if (error.code === 'version_conflict') return new ApiError(409, 'ai_record_version_conflict');

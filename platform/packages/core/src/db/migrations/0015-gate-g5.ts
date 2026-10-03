@@ -1,4 +1,4 @@
-// Migration 0015: gate G5 in the workflow (design/D-05 sections 5 and 6.2, version 1.19; D-08 C07
+// Migration 0015: gate G5 in the workflow (design/D-05 sections 5 and 6.2, version 1.20; D-08 C07
 // PR 2; design/ADR-M34 §2.8–§2.9; QUESTIONS #21, #131–#134). Rules for every migration: see the
 // header of 0001-tenancy.ts and design/ADR-M09.
 //

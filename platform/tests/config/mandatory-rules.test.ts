@@ -404,6 +404,21 @@ const CASES: Case[] = [
     key: 'config.rule.failed_run_escalation_freezes',
     path: 'run.failed_run_escalation.response_level',
   },
+  // M21: Person A and Person B stay a conflicting pair (B13, ADR-M37, QUESTIONS #154).
+  {
+    name: 'conflicting roles without Person A and Person B',
+    rule: 'M21',
+    yaml: 'access:\n  conflicting_roles: [[person_b, second_approver]]\n',
+    key: 'config.rule.person_a_person_b_conflict',
+    path: 'access.conflicting_roles',
+  },
+  {
+    name: 'no conflicting roles at all',
+    rule: 'M21',
+    yaml: 'access:\n  conflicting_roles: []\n',
+    key: 'config.rule.person_a_person_b_conflict',
+    path: 'access.conflicting_roles',
+  },
   // M22: a G5 breach freezes the intent (C07, QUESTIONS #21, ADR-M34 §2.8).
   {
     name: 'a G5 breach only observes',

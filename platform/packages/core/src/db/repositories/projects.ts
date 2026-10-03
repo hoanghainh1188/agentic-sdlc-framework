@@ -1,5 +1,13 @@
 import type { Project, TenantInsert } from '../schema.js';
+import type { ProjectStatus } from '../vocabulary.js';
 import { TenantRepository } from './base.js';
+
+/** Fields an admin may change (B13). The slug, Git host and tenant never change. */
+export interface ProjectUpdate {
+  readonly name?: string;
+  readonly repo_full_name?: string;
+  readonly default_branch?: string;
+}
 
 export class ProjectRepository extends TenantRepository {
   create(input: TenantInsert<'projects'>): Promise<Project> {
@@ -42,6 +50,32 @@ export class ProjectRepository extends TenantRepository {
         .where('tenant_id', '=', this.tenantId)
         .orderBy('slug')
         .execute(),
+    );
+  }
+
+  /** Returns the updated project, or undefined when the project is not in this tenant. */
+  update(id: string, changes: ProjectUpdate): Promise<Project | undefined> {
+    return this.run(
+      this.db
+        .updateTable('projects')
+        .set({ ...changes })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .returningAll()
+        .executeTakeFirst(),
+    );
+  }
+
+  /** Returns the updated project, or undefined when the project is not in this tenant. */
+  setStatus(id: string, status: ProjectStatus): Promise<Project | undefined> {
+    return this.run(
+      this.db
+        .updateTable('projects')
+        .set({ status })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .returningAll()
+        .executeTakeFirst(),
     );
   }
 }

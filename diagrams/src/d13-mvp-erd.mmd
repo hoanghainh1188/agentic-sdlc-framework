@@ -3,6 +3,7 @@ erDiagram
     tenants ||--o{ users : "has"
     users ||--o{ user_identities : "links"
     users ||--o{ role_bindings : "is assigned"
+    users ||--o{ tenant_role_bindings : "is tenant admin"
     users ||--o{ api_tokens : "owns"
     projects ||--o{ role_bindings : "within"
     projects ||--|| project_configs : "configured by"

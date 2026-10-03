@@ -231,6 +231,50 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | 3 | The platform could not be reached or answered something unexpected |
 | 4 | Your token is missing, expired or revoked: get a new one and run `sdlc login` |
 
+## 19.8d. Using the platform: setting up a team (admins)
+
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B13, 2026-10-03, and kept in line with the platform code (`design/ADR-M37-admin-onboarding.md`).
+
+Before anyone can approve a gate, an admin sets up the project and the team: the project, the people, their GitHub accounts and their roles.
+
+**Who is an admin.**
+
+- A **tenant admin** manages the whole tenant: projects, people, GitHub accounts, roles, project configuration, and other tenant admins. The first person of a tenant becomes tenant admin when the platform operator creates the tenant on the server.
+- A person with the project role **`admin`** manages the roles and the configuration of that project only.
+- Being an admin does not let you approve anything. Gate approvals still need the gate's role (§19.8b).
+
+**The rules the platform enforces.**
+
+- **Nobody gives a role to themselves**, and nobody disables themselves. Ask another admin. A team with only one admin asks the platform operator, who does it on the server.
+- **Person A and Person B are never the same person on a project.** Some other pairs of roles are kept apart too; the project configuration lists them (`access.conflicting_roles`, by default also Person B and the second approver). A role that would break a pair is refused.
+- **The tenant always keeps one tenant admin.** The last one cannot be removed or disabled: make someone else a tenant admin first.
+- A role is never deleted: it is revoked, and the history stays. A GitHub account is unlinked, not deleted.
+- A GitHub account is linked by its **numeric account ID**, never by its login, because a login can change. Find the ID with `gh api users/<login> --jq .id`.
+- Every change is recorded in the audit log with IDs and codes only: never a name, an e-mail address or a login.
+
+**Set up a new project, step by step** (all commands take `--json`):
+
+1. Create the project: `sdlc admin project create --slug <slug> --name <name> --repo <owner/name> [--default-branch <branch>]`.
+2. Add each person: `sdlc admin user create --email <email> --name <name>`.
+3. Link each person's GitHub account: `sdlc admin identity link --user <email> --github-id <numeric ID> --github-login <login>`. Without it, the person's `/approve` comments are refused.
+4. Give the roles: `sdlc admin role grant --project <slug> --user <email> --role <role>`, for example `person_a`, `person_b`, `second_approver`, `pm_brse`, `governance`, `admin` or `viewer` (Chapter 5).
+5. If the project needs settings other than the defaults, upload its configuration: `sdlc admin config show --project <slug>` shows the version in force (0 = the defaults), then `sdlc admin config set --project <slug> --file <config.yaml> --expected-version <version>`.
+   - The platform refuses a configuration that loosens a mandatory rule, and says which line and which rule.
+   - It accepts other loosening (for example HOTL instead of HITL at G2 for Medium risk), shows a warning for each, and records the warnings in the audit log.
+6. Ask the PM / BrSE or Person A to save the project AI record (`sdlc ai-record set`, §19.8b). Intents wait before G1 until it exists.
+
+**Other admin commands.**
+
+| Command | Does |
+|---|---|
+| `sdlc admin project list`, `show`, `update`, `archive` | An archived project takes no new roles or configuration |
+| `sdlc admin user list`, `show`, `update`, `disable`, `enable --user <id or email>` | A disabled person's tokens stop working at once |
+| `sdlc admin identity list [--all]`, `unlink --user <id or email> --id <identity ID>` | `--all` also shows unlinked accounts |
+| `sdlc admin role list --project <slug> [--all]`, `revoke --project <slug> --id <role ID>` | `--all` also shows revoked roles |
+| `sdlc admin tenant-admin grant --user <id or email>`, `list [--all]`, `revoke --id <ID>` | Tenant admins only |
+
+- When the platform is upgraded and its default settings change, it checks every stored project configuration when it starts. A configuration nobody changed is saved again with the new defaults, and the audit log shows it as a change by the platform. A configuration that was changed outside the platform, or that the new defaults make invalid, is not used: the project stops until an admin saves a configuration again.
+
 ## 19.9. Roles and approval points
 
 | What | Who |
@@ -266,3 +310,4 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | 0.1 | 2026-09-24 | Claude (draft) | First content |
 | 0.2 | 2026-09-27 | Claude (task B07, session 2) | §19.8b platform usage: HOTL gates and the block window, gate deadlines and their escalation, no scope at G1–G3 (ADR-M30 §2.4b, §2.9) |
 | 0.3 | 2026-10-03 | Claude (task B04) | §19.8c platform usage: the `sdlc` command (login, intents, gates, AI record, exit codes); §19.8b points to it (ADR-M36) |
+| 0.4 | 2026-10-03 | Claude (task B13, PR 1) | §19.8d platform usage: setting up a team (tenant admins, projects, people, GitHub accounts, roles, configuration; ADR-M37) |

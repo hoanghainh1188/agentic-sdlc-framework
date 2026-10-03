@@ -28,6 +28,10 @@ import {
   SEVERITIES,
 } from '@sdlc/contracts';
 
+/** Tenant-level roles (task B13, QUESTIONS #150, ADR-M37). Project roles are in `@sdlc/contracts`. */
+export const TENANT_ROLES = ['tenant_admin'] as const;
+export type TenantRole = (typeof TENANT_ROLES)[number];
+
 export const GIT_PROVIDERS = ['github', 'gitlab'] as const;
 export type GitProvider = (typeof GIT_PROVIDERS)[number];
 
@@ -54,6 +58,7 @@ export const DB_ENUMS = {
   escalation_route: ESCALATION_ROUTES,
   escalation_step: ESCALATION_STEPS,
   agent_status: AGENT_STATUSES,
+  tenant_role: TENANT_ROLES,
 } as const;
 
 // Text columns with a CHECK constraint (D-05 section 6.1).

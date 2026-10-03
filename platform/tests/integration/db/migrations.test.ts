@@ -33,7 +33,8 @@ const TABLES = Object.keys(TABLE_COLUMNS).sort();
 const UPDATABLE: Record<string, readonly string[]> = {
   tenants: ['name', 'monthly_budget_usd', 'status'],
   projects: ['name', 'repo_full_name', 'default_branch', 'status'],
-  project_configs: ['version', 'config_yaml', 'config_hash', 'updated_by'],
+  // B13: the hash of the stored YAML (QUESTIONS #95).
+  project_configs: ['version', 'config_yaml', 'config_hash', 'updated_by', 'override_sha256'],
   project_ai_records: [
     'version',
     'ai_allowed',
@@ -46,7 +47,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
     'record_sha256',
   ],
   users: ['display_name', 'email', 'status'],
-  user_identities: ['external_login'],
+  // B13: an identity is unlinked, never deleted.
+  user_identities: ['external_login', 'unlinked_at'],
   role_bindings: ['revoked_at'],
   api_tokens: ['last_used_at', 'revoked_at'],
   git_event_cursors: ['cursor', 'last_polled_at'],
@@ -142,6 +144,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
   project_ai_record_versions: [],
   // C06 session 2b: written once; the purge (E05) will get UPDATE on `purged_at` only.
   evidence_items: [],
+  // B13: a tenant role is withdrawn by `revoked_at`, never deleted (trigger: final once set).
+  tenant_role_bindings: ['revoked_at'],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -270,7 +274,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // B07: intent_notices → intents, gate_decisions.
     // B12: project_ai_record_versions → project_ai_records, users.
     // C06: intent_notices → agents; evidence_items → intents, runs (session 2b).
-    expect(fks).toHaveLength(47);
+    // B13: tenant_role_bindings → tenants, users.
+    expect(fks).toHaveLength(49);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {
@@ -293,7 +298,7 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       }
     }
     // Every tenant table that has no composite parent references tenants directly.
-    for (const table of ['projects', 'users', 'audit_log']) {
+    for (const table of ['projects', 'users', 'audit_log', 'tenant_role_bindings']) {
       expect(
         fks.some((fk) => fk.child === table && fk.parent === 'tenants'),
         table,
@@ -311,7 +316,9 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       'public.tenants (slug)',
       'public.projects (tenant_id, slug)',
       'public.users (tenant_id, lower(email))',
-      'public.user_identities (tenant_id, provider, external_id)',
+      // B13: only linked identities are unique, so an account can be linked again.
+      'public.user_identities (tenant_id, provider, external_id) WHERE (unlinked_at IS NULL)',
+      'public.tenant_role_bindings (tenant_id, user_id, role) WHERE (revoked_at IS NULL)',
       'public.role_bindings (tenant_id, user_id, project_id, role) WHERE (revoked_at IS NULL)',
       'public.api_tokens (token_hash)',
       'public.intents (tenant_id, code)',

@@ -37,6 +37,7 @@ import type {
   ProdLogsAllowed,
   ProjectStatus,
   SpecSourceTool,
+  TenantRole,
   TenantStatus,
   UserStatus,
 } from './vocabulary.js';
@@ -83,6 +84,11 @@ export interface ProjectConfigsTable {
   /** Null when the platform itself wrote the config (for example a default config). */
   updated_by: string | null;
   created_at: CreatedAt;
+  /**
+   * SHA-256 of `config_yaml` (B13, QUESTIONS #95): tells a change of the platform defaults (this
+   * hash still matches) from a change of the stored YAML itself. Written by the repository.
+   */
+  override_sha256: string;
 }
 
 export interface ProjectAiRecordsTable {
@@ -137,6 +143,8 @@ export interface UserIdentitiesTable {
   external_id: Immutable<string>;
   external_login: string;
   created_at: CreatedAt;
+  /** Set once when the identity is unlinked (B13); never set on insert. Null = linked. */
+  unlinked_at: ColumnType<Date | null, never, Date>;
 }
 
 export interface RoleBindingsTable {
@@ -145,6 +153,17 @@ export interface RoleBindingsTable {
   user_id: Immutable<string>;
   project_id: Immutable<string>;
   role: Immutable<ProjectRole>;
+  /** Set once when the role is withdrawn; never set on insert. Null = active. */
+  revoked_at: ColumnType<Date | null, never, Date>;
+  created_at: CreatedAt;
+}
+
+/** Tenant-level roles (task B13, QUESTIONS #150, ADR-M37). Withdrawn by `revoked_at`, never deleted. */
+export interface TenantRoleBindingsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  user_id: Immutable<string>;
+  role: Immutable<TenantRole>;
   /** Set once when the role is withdrawn; never set on insert. Null = active. */
   revoked_at: ColumnType<Date | null, never, Date>;
   created_at: CreatedAt;
@@ -545,6 +564,7 @@ export interface Database {
   agents: AgentsTable;
   intent_notices: IntentNoticesTable;
   project_ai_record_versions: ProjectAiRecordVersionsTable;
+  tenant_role_bindings: TenantRoleBindingsTable;
 }
 
 export type TableName = keyof Database;
@@ -586,6 +606,7 @@ export const TABLE_COLUMNS = {
     'config_hash',
     'updated_by',
     'created_at',
+    'override_sha256',
   ]),
   project_ai_records: columns<ProjectAiRecordsTable>()([
     'project_id',
@@ -617,6 +638,7 @@ export const TABLE_COLUMNS = {
     'external_id',
     'external_login',
     'created_at',
+    'unlinked_at',
   ]),
   role_bindings: columns<RoleBindingsTable>()([
     'id',
@@ -908,6 +930,14 @@ export const TABLE_COLUMNS = {
     'purged_at',
     'created_at',
   ]),
+  tenant_role_bindings: columns<TenantRoleBindingsTable>()([
+    'id',
+    'tenant_id',
+    'user_id',
+    'role',
+    'revoked_at',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -940,6 +970,7 @@ export const TENANT_COLUMN = {
   intent_notices: 'tenant_id',
   project_ai_record_versions: 'tenant_id',
   evidence_items: 'tenant_id',
+  tenant_role_bindings: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -967,6 +998,7 @@ export type Agent = Selectable<AgentsTable>;
 export type IntentNotice = Selectable<IntentNoticesTable>;
 export type ProjectAiRecordVersion = Selectable<ProjectAiRecordVersionsTable>;
 export type EvidenceItem = Selectable<EvidenceItemsTable>;
+export type TenantRoleBinding = Selectable<TenantRoleBindingsTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

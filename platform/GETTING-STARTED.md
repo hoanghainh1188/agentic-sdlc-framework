@@ -307,7 +307,15 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
    ```
    Then `pnpm sdlc intent …`, `pnpm sdlc gate …`, `pnpm sdlc escalation …` and `pnpm sdlc ai-record …` work through the API (handbook Ch.19 §19.8c). `pnpm sdlc logout` deletes the saved login but does not revoke the token.
 
-Projects, roles and project configuration have no command yet: that is task B13 (`design/QUESTIONS.md` #58). Until then they are created in tests only.
+5. Set up a project and its team through the API (task B13, [ADR-M37](../design/ADR-M37-admin-onboarding.md), handbook Ch.19 §19.8d). The bootstrap made you a tenant admin. Nobody gives a role to themselves, so add a second person for each role you need; Person A and Person B are always different people:
+   ```bash
+   pnpm sdlc admin project create --slug pilot --name "Pilot" --repo harryforge/pilot-order-inventory
+   pnpm sdlc admin user create --email colleague@example.com --name "Colleague"
+   pnpm sdlc admin identity link --user colleague@example.com --github-id <numeric ID> --github-login <login>
+   pnpm sdlc admin role grant --project pilot --user colleague@example.com --role person_b
+   pnpm sdlc admin config show --project pilot
+   ```
+   The numeric GitHub ID comes from `gh api users/<login> --jq .id`. Until B13 PR 2 adds `sdlc ops role grant`, a role for yourself needs a second tenant admin (`pnpm sdlc admin tenant-admin grant --user <email>`), who then grants it.
 
 ## Sending handbook comments
 

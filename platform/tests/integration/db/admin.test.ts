@@ -71,6 +71,7 @@ describeDb('B03: sdlc admin on PostgreSQL', () => {
     expect(audit.rows.map((r) => r.action)).toEqual([
       'tenant.created',
       'user.created',
+      'tenant_role.granted',
       'api_token.issued',
     ]);
     const dump = JSON.stringify(audit.rows);

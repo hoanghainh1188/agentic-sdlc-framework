@@ -26,6 +26,8 @@
 //   M18 agent recertification at least every 3 months ............... Ch.20 §20.8, ADR-M31
 //   M19 the viewer role never writes the project AI record ........... ADR-M32, QUESTIONS.md #103
 //   M20 a failed or lost run freezes the intent (pause or higher) .... D-03 §6, ADR-M33 §2.7
+//   M21 Person A and Person B are never the same person on a project . codes table §5, ADR-M37,
+//                                                                      QUESTIONS #154
 //   M22 a G5 breach freezes the intent (pause or higher) ............. QUESTIONS.md #21, ADR-M34 §2.8
 import type {
   AutonomyLevel,
@@ -498,6 +500,18 @@ const m20: Rule = (c) =>
         ),
       ];
 
+/** The pair that `access.conflicting_roles` must always hold (rule M21). */
+export const ALWAYS_CONFLICTING_ROLES: readonly ProjectRole[] = ['person_a', 'person_b'];
+
+const m21: Rule = (c) =>
+  c.access.conflicting_roles.some(
+    (pair) =>
+      pair.length === ALWAYS_CONFLICTING_ROLES.length &&
+      ALWAYS_CONFLICTING_ROLES.every((role) => pair.includes(role)),
+  )
+    ? []
+    : [issue('config.rule.person_a_person_b_conflict', 'access.conflicting_roles')];
+
 const m22: Rule = (c) =>
   FREEZING_LEVELS.includes(c.run.g5_breach_escalation.response_level)
     ? []
@@ -532,6 +546,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M18: m18,
   M19: m19,
   M20: m20,
+  M21: m21,
   M22: m22,
 };
 
