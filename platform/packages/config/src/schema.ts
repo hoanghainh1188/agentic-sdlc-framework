@@ -197,6 +197,10 @@ export const projectConfigSchema = z.strictObject({
       severity: z.enum(SEVERITIES),
       response_level: z.enum(RESPONSE_LEVELS),
     }),
+    g5_breach_escalation: z.strictObject({
+      severity: z.enum(SEVERITIES),
+      response_level: z.enum(RESPONSE_LEVELS),
+    }),
   }),
   budget: z.strictObject({
     warn_percent: positiveInt,

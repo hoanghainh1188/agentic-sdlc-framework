@@ -1,4 +1,6 @@
-// HOTL at the human gates G2 and G3 (task B07 session 2, QUESTIONS #88 option A, ADR-M30 §2.4b).
+// HOTL at the human gates G2 and G3 (task B07 session 2, QUESTIONS #88 option A, ADR-M30 §2.4b),
+// and at G5 (task C07, ADR-M34 §2.8: the platform passes a run whose changes are in scope and
+// within its caps; the block window applies, and C08 waits for it before G6 acts).
 //
 // When the policy conditions hold, the platform records a system `pass` at once and tells the
 // people of the gate's matrix cell. Within `oversight.hotl_block_window` (working calendar), a
@@ -19,7 +21,15 @@
 import { deadlineFrom } from '@sdlc/config';
 import { GATE_CODES, type GateCode, type ProjectConfig } from '@sdlc/contracts';
 
-import { isCommandGate, type CommandGate } from '../commands/gate-input.js';
+import type { CommandGate } from '../commands/gate-input.js';
+
+/** Gates the platform may pass (HOTL) and a person may block within the block window. */
+export const PASSABLE_GATES = ['G1', 'G2', 'G3', 'G5'] as const satisfies readonly GateCode[];
+export type PassableGate = (typeof PASSABLE_GATES)[number];
+
+export function isPassableGate(gate: string): gate is PassableGate {
+  return (PASSABLE_GATES as readonly string[]).includes(gate);
+}
 import type { Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import type { Registry } from '../registry/registry.js';
@@ -68,7 +78,7 @@ export async function sentBackForInput(
 }
 
 export interface PassedGate {
-  readonly gate: CommandGate;
+  readonly gate: PassableGate;
   /** The `pass` decision. */
   readonly passId: string;
   readonly passAt: Date;
@@ -85,7 +95,7 @@ async function passedGates(
   const current = intent.current_gate;
   if (intent.status !== 'in_gate' || current === null) return { passed, block: null };
   for (const gate of GATE_CODES) {
-    if (!isCommandGate(gate) || !gateBefore(gate, current)) continue;
+    if (!isPassableGate(gate) || !gateBefore(gate, current)) continue;
     const history = await gateHistory(scope, intent.id, gate);
     if (history.pass === null || history.passAt === null) continue;
     if (history.blockAfterPass !== null) {
@@ -102,7 +112,7 @@ async function passedGates(
 }
 
 export interface EarlierBlock {
-  readonly gate: CommandGate;
+  readonly gate: PassableGate;
   readonly decisionId: string;
   readonly decision: 'reject' | 'request_changes';
 }

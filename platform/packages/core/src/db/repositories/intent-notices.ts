@@ -47,6 +47,12 @@ export const INTENT_NOTICE_KINDS = [
   'run_not_started',
   'run_resumed',
   'proposal_ready',
+  // C07 PR 2 (ADR-M34 §2.8–§2.9): G5.
+  'budget_warning',
+  'scope_returned',
+  'g5_paused',
+  'g5_returned',
+  'terminated',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

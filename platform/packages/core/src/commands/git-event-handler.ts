@@ -76,6 +76,7 @@ export const COMMENT_REPLY_CODES = [
   'gate_not_supported',
   'gate_input_missing',
   'gate_not_current',
+  'plan_refused',
   'approval_refused',
   'decision_not_allowed',
   'project_not_active',

@@ -153,6 +153,15 @@ export interface ProjectConfig {
       readonly severity: Severity;
       readonly response_level: ResponseLevel;
     };
+    /**
+     * The escalation of a G5 breach (task C07, ADR-M34 §2.8): instruction files changed (route
+     * `security`), the cost cap, the iteration or time cap, or a stalled run (route `intent`).
+     * Mandatory rule M21: the response level freezes the intent (`pause` or higher; QUESTIONS #21).
+     */
+    readonly g5_breach_escalation: {
+      readonly severity: Severity;
+      readonly response_level: ResponseLevel;
+    };
   };
   readonly budget: {
     readonly warn_percent: number;
