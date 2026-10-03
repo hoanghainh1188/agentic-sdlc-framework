@@ -165,6 +165,8 @@ export interface G6Facts {
   readonly pushedHead: string;
   /** The last reading of the pull request and CI; null before the first one. */
   readonly ci: Omit<CiReading, 'runId'> | null;
+  /** When the last reading was recorded (database clock); null before the first one. */
+  readonly ciReadAt: Date | null;
   /** The G6 input hash: the decisions and escalations are bound to it. */
   readonly inputSha256: string;
 }
@@ -185,7 +187,8 @@ export async function gatherG6Facts(scope: TenantScope, intentId: string): Promi
   const pushedEvent = events.filter((e) => e.event_type === 'branch_pushed').at(-1);
   if (!pushedEvent) return null;
   const pushedHead = str(pushedEvent.payload.head_sha);
-  const checked = events.filter((e) => e.event_type === 'ci_checked').at(-1)?.payload;
+  const checkedEvent = events.filter((e) => e.event_type === 'ci_checked').at(-1);
+  const checked = checkedEvent?.payload;
   const ci: G6Facts['ci'] = checked
     ? {
         prNumber: num(checked.pr_number),
@@ -206,6 +209,7 @@ export async function gatherG6Facts(scope: TenantScope, intentId: string): Promi
     run,
     pushedHead,
     ci,
+    ciReadAt: checkedEvent ? new Date(checkedEvent.created_at) : null,
     inputSha256: sha256({ v: 1, run_id: run.id, pushed_head: pushedHead, ci }),
   };
 }

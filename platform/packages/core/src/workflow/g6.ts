@@ -61,7 +61,7 @@ export async function stepG6(
   policy: G5Policy,
   intent: Intent,
   /** C08 PR 2: what the step read from CI before the lock (null: nothing read). */
-  ci: CiReading | null = null,
+  ci: CiReading | 'unavailable' | null = null,
 ): Promise<IntentStepResult> {
   const run = await latestRun(tx, intent.id);
   // G5 passes only a run that succeeded (ADR-M29 §2.5); anything else is not for G6.

@@ -318,8 +318,9 @@ export class GitHubAdapter implements GitHostAdapter {
 
   /**
    * The open code-scanning alerts of a pull request, counted per security severity (task C08 PR 2,
-   * QUESTIONS #157). Only alerts with a security severity count (`rule.security_severity_level`);
-   * other alerts (code quality) are not security findings. A token of its own with
+   * QUESTIONS #157; `alertSeverity`): the alert's security severity, or for a rule tagged
+   * `security` without one its severity (error → high, warning → medium, note → low). Other alerts
+   * (code quality) are not security findings. A token of its own with
    * `security_events: read` for this call. Code scanning not enabled (404) or not allowed (403, or
    * the App lacks the permission) → `known: false`, and G6 fails closed. Never a partial count.
    */
@@ -342,7 +343,8 @@ export class GitHubAdapter implements GitHostAdapter {
         auth: `Bearer ${token}`,
         maxPages: LIST_PAGES,
         cache: false,
-        query: { ref: `refs/pull/${String(pr)}/head`, state: 'open' },
+        // GitHub keeps a pull request's analyses under its merge ref (`pull_request` CI runs).
+        query: { ref: `refs/pull/${String(pr)}/merge`, state: 'open' },
       });
     } catch (error) {
       if (error instanceof GitHostError && error.code === 'not_found') {
@@ -356,13 +358,8 @@ export class GitHubAdapter implements GitHostAdapter {
     if (list.truncated) throw new GitHostError('invalid_response', { field: 'alerts' });
     const counts: Record<Severity, number> = { critical: 0, high: 0, medium: 0, low: 0 };
     for (const item of list.items) {
-      const rule = obj(obj(item, 'alert').rule, 'alert.rule');
-      const level = rule.security_severity_level;
-      if (level === null || level === undefined) continue;
-      if (level !== 'critical' && level !== 'high' && level !== 'medium' && level !== 'low') {
-        throw new GitHostError('invalid_response', { field: 'alert.rule.security_severity_level' });
-      }
-      counts[level] += 1;
+      const level = alertSeverity(obj(obj(item, 'alert').rule, 'alert.rule'));
+      if (level !== null) counts[level] += 1;
     }
     return { known: true, counts };
   }
@@ -416,6 +413,30 @@ function pullRequestInfo(body: unknown): PullRequestInfo {
     changedFiles: int(p.changed_files, 'pull.changed_files'),
     url: url(p.html_url, 'pull.html_url'),
   };
+}
+
+const RULE_SEVERITY: Readonly<Record<string, Severity>> = {
+  error: 'high',
+  warning: 'medium',
+  note: 'low',
+};
+
+/**
+ * The security severity of a code-scanning alert's rule, or null when it is not a security
+ * finding. A SARIF tool that marks a rule `security` without a `security-severity` must not hide
+ * it (fail closed, code review of C08 PR 2): its rule severity counts. An unknown value is refused.
+ */
+function alertSeverity(rule: Record<string, unknown>): Severity | null {
+  const level = rule.security_severity_level;
+  if (level !== null && level !== undefined) {
+    if (level !== 'critical' && level !== 'high' && level !== 'medium' && level !== 'low') {
+      throw new GitHostError('invalid_response', { field: 'alert.rule.security_severity_level' });
+    }
+    return level;
+  }
+  const tags = Array.isArray(rule.tags) ? rule.tags : [];
+  if (!tags.includes('security')) return null;
+  return RULE_SEVERITY[String(rule.severity)] ?? 'high';
 }
 
 function toCheckItem(item: CheckItem): CheckItem {

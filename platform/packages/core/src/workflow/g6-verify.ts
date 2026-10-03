@@ -74,6 +74,9 @@ const STOPS: Readonly<
 
 const MINUTE = 60_000;
 
+/** Delay before the step reads the Git host again after an outage (as at G4). */
+const GIT_HOST_RETRY_MS = 60_000;
+
 type Waiting = Extract<IntentStepResult, { outcome: 'waiting' }>;
 const moved: IntentStepResult = { outcome: 'moved' };
 const wait = (reason: Waiting['reason'], wakeInMs?: number): IntentStepResult =>
@@ -87,9 +90,11 @@ export async function stepCi(
   registry: Registry,
   policy: G5Policy,
   intent: Intent,
-  reading: CiReading | null,
+  /** `unavailable`: the Git host could not be read (people's decisions are still handled). */
+  reading: CiReading | 'unavailable' | null,
 ): Promise<IntentStepResult> {
-  const changed = reading ? await recordCiReading(tx, reading) : false;
+  const changed =
+    reading !== null && reading !== 'unavailable' ? await recordCiReading(tx, reading) : false;
   const facts = await gatherG6Facts(tx, intent.id);
   if (!facts?.ci) return wait('ci_pending');
   const { ci, run } = facts;
@@ -108,6 +113,10 @@ export async function stepCi(
     });
   }
 
+  // Without a fresh reading the step never decides on CI (no timeout, no pass): it waits.
+  if (reading === 'unavailable') {
+    return wait('git_host_unavailable', GIT_HOST_RETRY_MS);
+  }
   if (ci.prState !== 'open') {
     return stop(
       tx,
@@ -150,7 +159,12 @@ export async function stepCi(
         gate: 'G6',
         config: policy.config,
         oversight,
-        clockStart: gateClockStart(intent, history.latestChangesRequestAt),
+        // Person B's time starts when CI passed, not at the entry into G6 (code review).
+        clockStart: laterOf(
+          gateClockStart(intent, history.latestChangesRequestAt),
+          facts.ciReadAt,
+          registry.now(),
+        ),
         subject: { kind: 'g6_input', sha256: facts.inputSha256 },
         producers: run.triggered_by === null ? [] : [run.triggered_by],
       });
@@ -182,6 +196,12 @@ export async function stepCi(
     decisionId: pass.id,
     audience: oversight.roles.filter((role) => role !== 'viewer'),
   });
+}
+
+/** The later of two times, never after `now` (`b` may come from the database clock). */
+function laterOf(a: Date, b: Date | null, now: Date): Date {
+  if (b === null) return a;
+  return new Date(Math.max(a.getTime(), Math.min(b.getTime(), now.getTime())));
 }
 
 /** The policy context of G6: the findings counts, and whether they are known (QUESTIONS #157). */

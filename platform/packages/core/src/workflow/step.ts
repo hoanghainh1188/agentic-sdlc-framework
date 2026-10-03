@@ -192,7 +192,8 @@ export async function stepIntent(
     }
   }
   // C08 PR 2: G6 reads CI before the lock too.
-  let ci: CiReading | null = null;
+  // An outage does not block people: the step still handles their decisions, then waits.
+  let ci: CiReading | 'unavailable' | null = null;
   if (deps.g6 && deps.publish) {
     const peek = await scope.intents.getById(intentId);
     if (peek?.status === 'in_gate' && peek.current_gate === 'G6' && peek.pr_number !== null) {
@@ -201,7 +202,7 @@ export async function stepIntent(
         ci = await readCi(scope, deps.g6, peek, config);
       } catch (error) {
         if (!(error instanceof GitHostError)) throw error;
-        return { outcome: 'waiting', reason: 'git_host_unavailable', wakeInMs: GIT_HOST_RETRY_MS };
+        ci = 'unavailable';
       }
     }
   }

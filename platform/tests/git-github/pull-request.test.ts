@@ -119,11 +119,14 @@ describe('findOpenPullRequest (C08 AC1)', () => {
 });
 
 describe('getSecurityFindings (C08 PR 2, QUESTIONS #157)', () => {
-  const alert = (level: string | null) => ({ number: 1, rule: { security_severity_level: level } });
+  const alert = (level: string | null, extra: Record<string, unknown> = {}) => ({
+    number: 1,
+    rule: { security_severity_level: level, ...extra },
+  });
 
   it('counts open alerts per security severity, with a token of its own', async () => {
     h.stub.on('GET', '/repos/acme/shop/code-scanning/alerts', (req) => {
-      expect(req.query.get('ref')).toBe('refs/pull/7/head');
+      expect(req.query.get('ref')).toBe('refs/pull/7/merge');
       expect(req.query.get('state')).toBe('open');
       return { body: [alert('high'), alert('high'), alert('low'), alert(null)] };
     });
@@ -137,6 +140,20 @@ describe('getSecurityFindings (C08 PR 2, QUESTIONS #157)', () => {
     expect(minted?.body).toEqual({
       repositories: ['shop'],
       permissions: { security_events: 'read' },
+    });
+  });
+
+  it('a rule tagged security without a security severity counts by its rule severity (fail closed)', async () => {
+    h.stub.on('GET', '/repos/acme/shop/code-scanning/alerts', {
+      body: [
+        alert(null, { tags: ['security'], severity: 'error' }),
+        alert(null, { tags: ['security', 'cwe-79'], severity: 'note' }),
+        alert(null, { tags: ['correctness'], severity: 'error' }),
+      ],
+    });
+    expect(await h.adapter().getSecurityFindings(REPO, 7)).toEqual({
+      known: true,
+      counts: { critical: 0, high: 1, medium: 0, low: 1 },
     });
   });
 

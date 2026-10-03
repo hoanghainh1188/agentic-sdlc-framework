@@ -14,11 +14,12 @@
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 
 import { loadAgentTask } from '../../../apps/runner/src/agent/task.js';
-import type {
-  CheckItem,
-  PullRequestInfo,
-  RunContract,
-  SecurityFindings,
+import {
+  GitHostError,
+  type CheckItem,
+  type PullRequestInfo,
+  type RunContract,
+  type SecurityFindings,
 } from '../../../packages/contracts/src/index.js';
 import { decideGate } from '../../../packages/core/src/commands/gate-command.js';
 import { handleGitEvent } from '../../../packages/core/src/commands/git-event-handler.js';
@@ -387,6 +388,34 @@ describeDb('C08 PR 2: G6 reads CI, on PostgreSQL', () => {
     expect((await t.f.scope.escalations.listForIntent(intent.id)).at(-1)).toMatchObject({
       route: 'technical',
     });
+  });
+
+  it("a Git host outage: no CI decision (no timeout); a person's rejection is still handled", async () => {
+    const intent = await atG4(t, 'medium');
+    await runToCi(intent);
+    await step(intent); // a first reading (pending) is recorded
+    const read = g6.gitHost.getPullRequest;
+    g6.gitHost.getPullRequest = () => Promise.reject(new GitHostError('server_error'));
+    try {
+      at(clock.getTime() - T0.getTime() + 2 * DAY); // past the CI timeout, but CI cannot be read
+      expect(await step(intent)).toEqual({
+        outcome: 'waiting',
+        reason: 'git_host_unavailable',
+        wakeInMs: 60_000,
+      });
+      expect(await t.f.scope.escalations.listForIntent(intent.id)).toEqual([]);
+      await decideGate(t.f.registry, t.f.scope, {
+        intent: await reload(intent),
+        gate: 'G6',
+        decision: 'reject',
+        actorId: t.f.users.b,
+        reasonCode: 'tests_insufficient',
+        source: 'cli',
+      });
+      expect(await step(intent)).toEqual({ outcome: 'finished', status: 'rejected' });
+    } finally {
+      g6.gitHost.getPullRequest = read;
+    }
   });
 
   it('the poller: a finished check wakes the intent of the pull request at G6', async () => {
