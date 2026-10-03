@@ -235,7 +235,9 @@ describe('sdlc-runner service', () => {
     );
     const evidence =
       /^cmd_runner_evidence_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
-    expect(evidence).toContain('-actions Write:evidence/proposals/*,Write:evidence/diffs/* -apply');
+    expect(evidence).toContain(
+      '-actions Write:evidence/proposals/*,Write:evidence/diffs/*,Read:evidence/diffs/* -apply',
+    );
     expect(evidence).toContain('echo "s3.configure -user runner-evidence -delete -apply" |');
     expect(evidence).toMatch(/compose exec -T seaweedfs \$weed >\/dev\/null 2>&1/);
     expect(evidence).toContain('bao kv put -mount=kv runner/evidence - >/dev/null');

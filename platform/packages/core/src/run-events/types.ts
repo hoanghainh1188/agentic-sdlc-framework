@@ -112,6 +112,26 @@ export const RUN_EVENT_TYPES = {
     instruction_files: 'count',
     paths_sha256: 'sha256',
   },
+  /**
+   * The runner pushed the run's checked changes as one commit on `agent/INT-…` (C08, ADR-M38
+   * §2.2): `head_sha` is the commit the runner made from the stored diff (never what the sandbox
+   * reported) and that the Git host now shows for the branch; `diff_sha256` and `paths_sha256` are
+   * the values G5 checked. `parent_sha` is the commit it was made on (the run's base).
+   */
+  branch_pushed: {
+    head_sha: 'code',
+    parent_sha: 'code',
+    diff_sha256: 'sha256',
+    paths_sha256: 'sha256',
+  },
+  /**
+   * The runner will not push this run (C08, QUESTIONS #156): a final cause a person decides on,
+   * such as `empty_diff`, `diff_mismatch` (the stored diff is not the one G5 checked) or
+   * `branch_moved` (someone else changed `agent/INT-…`).
+   */
+  publish_refused: { reason: 'code' },
+  /** A push attempt failed for a cause that may pass (Git host, network, token); C08. */
+  publish_failed: { reason: 'code' },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;

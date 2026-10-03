@@ -216,6 +216,23 @@ export const AUDIT_ACTIONS = {
     entityType: 'intent',
     fields: { decision_id: 'uuid', check: 'code', run_id: 'uuid' },
   },
+  /**
+   * The pull request of the intent's agent branch was linked to the intent (C08, ADR-M38 §2.4):
+   * the run whose push it shows, its number and the pushed head. Never its title, body or URL.
+   */
+  'intent.pr_linked': {
+    entityType: 'intent',
+    fields: { run_id: 'uuid', pr_number: 'version', head_sha: 'code' },
+  },
+  /**
+   * G6 stopped before CI: the run's changes could not be pushed or the pull request not opened
+   * (C08, QUESTIONS #156). `reason`: the runner's refusal code (`empty_diff`, `diff_mismatch`,
+   * `branch_moved`…) or `publish_attempts` (too many failed attempts).
+   */
+  'gate.g6_publish_stopped': {
+    entityType: 'intent',
+    fields: { run_id: 'uuid', reason: 'code', escalation_id: 'uuid' },
+  },
   /** The runner refused the Run Contract of a known run; `reason` is a reject reason code. */
   'run.contract_rejected': { entityType: 'run', fields: { reason: 'code' } },
   /** An escalation was raised (FR-18, B11). Codes and IDs only, never the words of the package. */

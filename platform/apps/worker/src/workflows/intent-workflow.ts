@@ -13,6 +13,12 @@
 // timeout, activity failure) → `abandonRun`: the run's key is revoked at once and the run fails.
 // Old histories never saw the run outcomes, so the new branches replay them unchanged (no patch).
 //
+// C08 (ADR-M38 §2.1): when G5 passed a run and its block window closed, the step says `publish`.
+// `push`: `preparePublish` (worker: a single-repository `contents: write` token, wrapped), then
+// `publishRun` on the runner's queue (one attempt, heartbeats), then `finishPublish` (worker: the
+// pull request). `open_pr`: `finishPublish` only. A lost runner counts as a failed attempt
+// (`abandonPublish`); a failed push waits `RUN_ACTIVITY_RETRY_MS` before the step is asked again.
+//
 // Deterministic code only: this file is bundled for the Temporal workflow sandbox and may import
 // `@temporalio/workflow`, `@sdlc/contracts` and types (lint rule in eslint.config.mjs).
 // The escalation clocks are not timers here (ADR-M28): the workflow asks the database. The only
@@ -62,10 +68,11 @@ const { stepIntent } = proxyActivities<IntentActivities>({
 
 // The run activities are not retried by Temporal: a retry could issue a second contract or finish
 // twice. The database says what to do next, so the workflow simply asks the step again.
-const { prepareRun, finishRun, abandonRun } = proxyActivities<IntentActivities>({
-  startToCloseTimeout: '5 minutes',
-  retry: { maximumAttempts: 1 },
-});
+const { prepareRun, finishRun, abandonRun, preparePublish, finishPublish, abandonPublish } =
+  proxyActivities<IntentActivities>({
+    startToCloseTimeout: '5 minutes',
+    retry: { maximumAttempts: 1 },
+  });
 
 // One run = one attempt. The runner sends a heartbeat at least every 30 seconds; a lost heartbeat
 // means the runner is gone (ADR-M33 §2.7). The run itself is capped by its contract
@@ -73,6 +80,14 @@ const { prepareRun, finishRun, abandonRun } = proxyActivities<IntentActivities>(
 const { executeRun } = proxyActivities<RunnerActivities>({
   taskQueue: RUNNER_TASK_QUEUE,
   startToCloseTimeout: '12 hours',
+  heartbeatTimeout: '2 minutes',
+  retry: { maximumAttempts: 1 },
+});
+
+// C08: one push = one attempt (clone, apply, push; minutes, not hours).
+const { publishRun } = proxyActivities<RunnerActivities>({
+  taskQueue: RUNNER_TASK_QUEUE,
+  startToCloseTimeout: '15 minutes',
   heartbeatTimeout: '2 minutes',
   retry: { maximumAttempts: 1 },
 });
@@ -95,6 +110,11 @@ export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
       if (result.outcome === 'run_prepare' || result.outcome === 'run_ended') {
         moves += 1;
         if (!(await driveRun(ref, result))) await sleep(RUN_ACTIVITY_RETRY_MS);
+        continue;
+      }
+      if (result.outcome === 'publish') {
+        moves += 1;
+        if (!(await drivePublish(ref, result))) await sleep(RUN_ACTIVITY_RETRY_MS);
         continue;
       }
     }
@@ -142,6 +162,46 @@ async function driveRun(
     }
     return true;
   } catch {
+    return false;
+  }
+}
+
+/**
+ * The push and the pull request at G6 (C08). Returns false when an activity failed or the push
+ * failed for a cause that may pass: the workflow waits a little and asks the step again, which
+ * stops after `MAX_PUBLISH_ATTEMPTS` (core).
+ */
+async function drivePublish(
+  ref: IntentWorkflowRef,
+  result: Extract<IntentStepResult, { outcome: 'publish' }>,
+): Promise<boolean> {
+  try {
+    if (result.step === 'push') {
+      const prepared = await preparePublish(ref, result.runId);
+      if (!prepared.ok) return prepared.reason !== 'token_failed';
+      let pushed;
+      try {
+        pushed = await publishRun({
+          tenantId: ref.tenantId,
+          runId: result.runId,
+          wrappedPushToken: prepared.wrappedPushToken,
+        });
+      } catch {
+        await abandonPublish(ref, result.runId, 'runner_lost');
+        return false;
+      }
+      if (pushed.outcome === 'failed') return false;
+      if (pushed.outcome === 'refused') return true;
+    }
+    const finished = await finishPublish(ref, result.runId);
+    return finished.ok || finished.reason !== 'pr_failed';
+  } catch {
+    // A worker activity failed unexpectedly: count it, so the round never retries for ever.
+    try {
+      await abandonPublish(ref, result.runId, 'worker_failed');
+    } catch {
+      // The database is down too: the pause below and the next step try again.
+    }
     return false;
   }
 }

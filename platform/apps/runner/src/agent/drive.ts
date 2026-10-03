@@ -18,7 +18,9 @@
 //    its changes from the workspace in its own clone, stores the diff and checks it against the
 //    plan and the agent instruction paths      → `diff_stored`, `changes_checked`; when that
 //    fails the run fails (`agent_changes_unavailable`): no run reaches G5 unchecked;
-// 8. end the run with its status, `stop_reason`, `head_sha` and `iterations` → `agent_finished`.
+// 8. end the run with its status, `stop_reason` and `iterations` → `agent_finished` (the HEAD the
+//    sandbox reported goes to the event only: `runs.head_sha` is the commit the runner pushes after
+//    G5, C08, ADR-M38 §2.2).
 //
 // The run leaves `running` only with one conditional update: if the kill switch (C11) or the
 // sweep moved it first, this driver changes nothing. The caller removes the sandbox (`Runner`).
@@ -271,7 +273,6 @@ async function endRun(
     now,
     finishedAt: now,
     ...(change.stopReason ? { stopReason: change.stopReason } : {}),
-    ...(change.outputs ? { headSha: change.outputs.headSha } : {}),
     ...(change.iterations === undefined ? {} : { iterations: change.iterations }),
   });
   await scope.runEvents.append(contract.run_id, 'agent_finished', {

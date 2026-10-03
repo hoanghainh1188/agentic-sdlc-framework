@@ -94,7 +94,9 @@ async function main(): Promise<void> {
       activities: createIntentActivities({
         db,
         registry,
-        ...(workerRuns ? { g4: workerRuns.g4, runs: workerRuns.runs } : {}),
+        ...(workerRuns
+          ? { g4: workerRuns.g4, runs: workerRuns.runs, publish: workerRuns.publish }
+          : {}),
       }),
       workflowBundlePath: settings.workflowBundle,
     });

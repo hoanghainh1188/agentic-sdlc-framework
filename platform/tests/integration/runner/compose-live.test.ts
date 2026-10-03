@@ -8,8 +8,8 @@
 // only, cleans up at start (a leftover object of its instance is removed, one of another instance
 // stays) and turns healthy through its heartbeat file. C06 session 2b: `bootstrap.sh
 // runner-evidence-credentials` gives the runner a SeaweedFS identity that may only write under
-// `evidence/proposals/` and, since C07, `evidence/diffs/` (no read, no overwrite, versions kept
-// after a delete; a rotation disables the old key). Key shares, tokens and passwords are
+// `evidence/proposals/` and, since C07, `evidence/diffs/` (no overwrite, versions kept after a
+// delete; a rotation disables the old key); it reads `evidence/diffs/` only (C08, QUESTIONS #155). Key shares, tokens and passwords are
 // THROW-AWAY TEST KEYS: kept in variables, never printed, never in an assertion message.
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -309,7 +309,7 @@ describe.skipIf(!enabled)(
       expect(logs.stdout + logs.stderr).not.toContain('runner.evidence_off');
     });
 
-    it('C07: the evidence identity also writes run diffs under diffs/; no read, no overwrite', async () => {
+    it('C07, C08: the evidence identity writes and reads run diffs under diffs/; no overwrite', async () => {
       const keys = evidenceKeys();
       const tenant = crypto.randomUUID();
       const store = runnerStore(keys, 'diffs/');
@@ -319,13 +319,14 @@ describe.skipIf(!enabled)(
         await expect(
           store.put(tenant, 'i/r.patch', Buffer.from('other\n'), 'text/x-diff'),
         ).rejects.toMatchObject({ code: 'exists' });
-        await expect(store.get(stored.uri)).rejects.toMatchObject({ code: 'forbidden' });
+        // C08 (QUESTIONS #155 A): the push reads the checked diff back.
+        expect((await store.get(stored.uri)).toString()).toBe('diff\n');
       } finally {
         store.destroy();
       }
     });
 
-    it('C06 2b: the evidence identity writes under proposals/ (and diffs/) only; no read, no overwrite; versions kept', async () => {
+    it('C06 2b: the evidence identity writes under proposals/ (and diffs/) only; no read of proposals, no overwrite; versions kept', async () => {
       const keys = evidenceKeys();
       const tenant = crypto.randomUUID();
       const store = runnerStore(keys, 'proposals/');

@@ -17,9 +17,14 @@
 // teardown while the agent is being driven. After a runner restart, the clean-up at start and the
 // sweep remove what is left (ADR-M25 §2.8).
 // The result holds codes only; paths, logs and texts never go to Temporal.
+//
+// `publishRun` (C08, ADR-M38 §2.2): after G5 passed, the push of the run's checked changes
+// (`workspace/publish.ts`). One attempt; it takes an activity slot like a run, for a short time.
 import type {
   ExecuteRunInput,
   ExecuteRunResult,
+  PublishRunInput,
+  PublishRunResult,
   RunnerActivities,
   SecretUnwrapper,
 } from '@sdlc/contracts';
@@ -28,6 +33,7 @@ import { Redacted } from '@sdlc/secrets';
 import { Context } from '@temporalio/activity';
 
 import type { Runner } from './runner.js';
+import { publishRun, type PublishDeps } from './workspace/publish.js';
 
 /** Heartbeat interval; the workflow's heartbeat timeout is 2 minutes. */
 export const HEARTBEAT_MS = 30_000;
@@ -47,6 +53,8 @@ export interface RunnerActivityDeps {
   readonly heartbeatMs?: number;
   /** Start and end of each run (codes only); the activity's log context adds tenant and run. */
   readonly logger?: PlatformLogger;
+  /** C08: what the push needs besides the database and the unwrapper. */
+  readonly publish?: Omit<PublishDeps, 'db' | 'unwrapper'>;
 }
 
 export function createRunnerActivities(deps: RunnerActivityDeps): RunnerActivities {
@@ -70,7 +78,38 @@ export function createRunnerActivities(deps: RunnerActivityDeps): RunnerActiviti
         clearInterval(beat);
       }
     },
+    async publishRun(input: PublishRunInput): Promise<PublishRunResult> {
+      const ctx = (deps.context ?? (() => Context.current()))();
+      ctx.heartbeat();
+      const beat = setInterval(() => ctx.heartbeat(), deps.heartbeatMs ?? HEARTBEAT_MS);
+      try {
+        const result = deps.publish
+          ? await publishRun({ ...deps.publish, db: deps.db, unwrapper: deps.unwrapper }, input)
+          : await publishOff(deps, input);
+        deps.logger?.log(
+          result.outcome === 'pushed' ? 'info' : 'warn',
+          'runner.publish_ended',
+          result.outcome === 'pushed'
+            ? { outcome: 'pushed' }
+            : { outcome: result.outcome, reason: result.reason },
+        );
+        return result;
+      } finally {
+        clearInterval(beat);
+      }
+    },
   };
+}
+
+/** A runner without publish settings: counted as a failed attempt, so G6 stops (code review). */
+async function publishOff(
+  deps: RunnerActivityDeps,
+  input: PublishRunInput,
+): Promise<PublishRunResult> {
+  await deps.db
+    .forTenant(parseTenantId(input.tenantId))
+    .runEvents.append(input.runId, 'publish_failed', { reason: 'publish_off' });
+  return { outcome: 'failed', reason: 'publish_off' };
 }
 
 async function execute(

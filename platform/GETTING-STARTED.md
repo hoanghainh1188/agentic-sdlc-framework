@@ -238,14 +238,14 @@ Done once by the repo owner in the browser. Claude must never read or handle the
 
 | Permission | Level |
 |---|---|
-| Contents | Read-only |
+| Contents | Read and write (C08: the runner pushes `agent/*`) |
 | Issues | Read and write |
-| Pull requests | Read-only |
+| Pull requests | Read and write (C08: the platform opens the pull request) |
 | Checks | Read-only |
 | Commit statuses | Read-only |
 | Metadata | Read-only (automatic) |
 
-   Later tasks add only what they need: C04 Contents read and write (push `agent/*` branches), C08 Pull requests read and write.
+   Later tasks add only what they need: C08 PR 2 Code scanning alerts read-only (security findings at G6, QUESTIONS #157). After a permission change, accept it on the installation (GitHub asks the account owner), or tokens keep the old permissions.
 
 4. **Note the Client ID** (`Iv…`). It is not a secret; the adapter uses it as the JWT issuer (the numeric App ID also works).
 5. **Private key:** "Generate a private key", then move it out of Downloads, outside the repository:

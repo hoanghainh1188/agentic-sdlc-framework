@@ -53,6 +53,10 @@ export const INTENT_NOTICE_KINDS = [
   'g5_breach',
   'g5_returned',
   'terminated',
+  // C08 PR 1 (ADR-M38 §2.4–§2.5): the push and the pull request.
+  'pr_opened',
+  'g6_publish_stopped',
+  'g6_returned',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

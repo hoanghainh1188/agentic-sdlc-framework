@@ -54,8 +54,6 @@ export class RunRepository extends TenantRepository {
       readonly stopReason?: string;
       readonly startedAt?: Date;
       readonly finishedAt?: Date;
-      /** Last commit of the run's branch (C05). */
-      readonly headSha?: string;
       /** Agent steps completed (C05). */
       readonly iterations?: number;
     },
@@ -70,7 +68,6 @@ export class RunRepository extends TenantRepository {
           ...(change.stopReason === undefined ? {} : { stop_reason: change.stopReason }),
           ...(change.startedAt === undefined ? {} : { started_at: change.startedAt }),
           ...(change.finishedAt === undefined ? {} : { finished_at: change.finishedAt }),
-          ...(change.headSha === undefined ? {} : { head_sha: change.headSha }),
           ...(change.iterations === undefined ? {} : { iterations: change.iterations }),
         })
         .where('tenant_id', '=', this.tenantId)
@@ -79,6 +76,27 @@ export class RunRepository extends TenantRepository {
         .executeTakeFirst(),
     );
     return result.numUpdatedRows === 1n;
+  }
+
+  /**
+   * Records the commit the runner pushed for a `succeeded` run (C08, ADR-M38 §2.2): `head_sha`
+   * goes from null to `headSha` once (migration 0017). Returns false when the run is not
+   * `succeeded` or already has another head; true when it holds `headSha` (also a repeat).
+   */
+  async recordPushedHead(id: string, headSha: string, now: Date): Promise<boolean> {
+    if (!isUuid(id) || !/^[0-9a-f]{40}$/.test(headSha)) return false;
+    const result = await this.run(
+      this.db
+        .updateTable('runs')
+        .set({ head_sha: headSha, updated_at: now })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .where('status', '=', 'succeeded')
+        .where('head_sha', 'is', null)
+        .executeTakeFirst(),
+    );
+    if (result.numUpdatedRows === 1n) return true;
+    return (await this.getById(id))?.head_sha === headSha;
   }
 
   /** Runs of one intent, by attempt. */

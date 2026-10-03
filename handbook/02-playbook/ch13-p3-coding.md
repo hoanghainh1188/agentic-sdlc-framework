@@ -228,7 +228,7 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 
 | Decision | What happens |
 |---|---|
-| `resume` | The intent goes back to **G4**, and a new run starts after G4 **from the latest commit of the default branch**. The stopped run's diff stays as evidence. To give the next runs more budget, decide through the API with a budget increase (Chapter 18 §18.8b); a comment never raises a budget |
+| `resume` | The intent goes back to **G4**, and a new run starts after G4 **from the latest commit of the default branch**, or, once a run of the intent was pushed (Chapter 14 §14.10.1), from the commit the platform pushed. The stopped run's diff stays as evidence. To give the next runs more budget, decide through the API with a budget increase (Chapter 18 §18.8b); a comment never raises a budget |
 | `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on. The earlier G3 approval no longer counts; the approver may approve the same plan again, or Person A submits a changed plan |
 | `terminate` | The intent is closed (`cancelled`). The run's diff stays as evidence |
 
@@ -279,3 +279,4 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 | 0.5 | 2026-09-27 | Claude (task C06, session 2b) | §13.10.4: High-risk (L1) runs end with a stored proposal; the intent is paused for Person A; what the proposal leaves out; check `.gitignore`, `.gitattributes` and symbolic links first |
 | 0.6 | 2026-10-03 | Claude (task C07, PR 1) | §13.10.2: G4 check 6b (`instructions_unpinned`); §13.10.4: the diff stored at the end of every run, the budget watched during the run |
 | 0.7 | 2026-10-03 | Claude (task C07, PR 2) | §13.10.5 (new): gate G5 checks and outcomes, back to G3, deciding a G5 escalation; §13.10.4: the budget warning comment during the run |
+| 0.8 | 2026-10-03 | Claude (task C08, PR 1) | §13.10.5: after a push, `resume` starts the new run from the pushed commit (QUESTIONS #134, ADR-M38 §2.6) |

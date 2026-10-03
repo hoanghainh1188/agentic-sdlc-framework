@@ -387,7 +387,7 @@ export async function stepPausedG5(
  * one is voided and the escalation waits for a new decision. `anyScope`: the decision acts by
  * ending or sending back, which no protected action covers (`roll_back`, `terminate`).
  */
-async function stillValid(
+export async function stillValid(
   tx: TenantScope,
   registry: Registry,
   escalation: Escalation,
@@ -431,7 +431,7 @@ async function raiseBudgetIfDecided(
 }
 
 /** The reason code of the G5 breach an escalation is about (its packet); `other` when missing. */
-function breachReason(escalation: Escalation): GateReasonCode {
+export function breachReason(escalation: Escalation): GateReasonCode {
   const code = escalation.packet.reason_code;
   return typeof code === 'string' && (GATE_REASON_CODES as readonly string[]).includes(code)
     ? (code as GateReasonCode)
@@ -439,7 +439,7 @@ function breachReason(escalation: Escalation): GateReasonCode {
 }
 
 /** The roles that approve G3 after a return from G5 (HITL, `returnedFromG5`). */
-async function g3Approvers(
+export async function g3Approvers(
   tx: TenantScope,
   policy: G5Policy,
   intent: Intent,
@@ -453,7 +453,11 @@ async function g3Approvers(
   return g3.roles.filter((role) => role !== 'viewer');
 }
 
-async function close(tx: TenantScope, registry: Registry, escalation: Escalation): Promise<void> {
+export async function close(
+  tx: TenantScope,
+  registry: Registry,
+  escalation: Escalation,
+): Promise<void> {
   await closeEscalation(
     tx,
     { escalationId: escalation.id, closedBy: { type: 'system' } },

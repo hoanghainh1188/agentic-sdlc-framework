@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.1 |
+| Version | 1.2 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52) |
 | Readers | Leadership (sections 1–4, 10–12), tech lead / developers (all), Claude Code (sections 5–9, 13) |
 | Related documents | D-01 (build vs buy), D-07 (models and tokens), handbook codes table and Chapters 2–6, 10–20 |
 
@@ -112,12 +112,13 @@ sequenceDiagram
     P-->>B: Request plan approval (G3, oversight from matrix)
     B->>P: /approve G3 (bound to plan hash, expiry)
     P->>R: G4: registered agent, autonomy, contract, limits
-    R->>AG: Run the agent on its own branch
+    R->>AG: Run the agent in its sandbox (no Git host access)
     AG->>GW: Call the model (labelled tenant/intent/run)
     GW-->>R: Tokens used
     R->>P: G5: file scope, budget, loop detection
     Note over P,A: Breach → escalation (SLA clocks, backup owner, freeze)
-    AG->>G: Push branch, open PR
+    R->>G: Push the checked changes to agent/INT-… (after G5)
+    P->>G: Open the PR (template T2, codes only)
     G-->>P: G6: CI, test, scan results
     P-->>B: Request review (G7) + evidence pack
     B->>G: Approve PR (+ second approver for sensitive changes)
@@ -398,4 +399,5 @@ The MVP is done when **all** of the following are true:
 | 0.4 | 2026-09-24 | Claude (draft) | After review: SeaweedFS, Valkey, GitHub polling, FR-11 (G7 ≠ intent creator), MVP vs M-F criteria separated |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Aligned with the handbook: 2+N roles, L0–L4, gate × risk oversight matrix, forced HITL (G3), dual approval (G7), approval binding, escalation with SLA, project AI record, agent register, kill switch, retention. New FR-14…19, FR-34…36, FR-43…44 |
 | 1.1 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §4.2 and §12: a local Ollama model on developer machines for the C05 proof only, not a deployment target; API-model run before M-E (QUESTIONS #78, #81) |
+| 1.2 | 2026-10-03 | Claude (task C08, PR 1), approved by Harry | §5 flow and diagram D10: the runner, not the agent in the sandbox, pushes the checked changes after G5; the platform opens the pull request (QUESTIONS #52, ADR-M38) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. NFR-08 and Q5 updated for the English decision (message catalog). Section 11.1 fixed: step C belongs to M-F |

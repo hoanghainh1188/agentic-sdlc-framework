@@ -3,7 +3,8 @@
 // - AC1/AC2: the agent starts with the contract, the model and the task (plan + spec, AGENTS.md);
 // - AC3: iteration cap (the agent stops itself) and time cap (interrupt, then kill) end the run
 //   with the right status and `stop_reason`;
-// - AC4: changed files, last commit and log collected; `head_sha` and `iterations` stored;
+// - AC4: changed files, last commit and log collected; `iterations` stored (`head_sha` in the
+//   event `agent_finished` only: C08 records the pushed head);
 // - QUESTIONS #80: the runner commits what the agent left, with the agent author;
 // - failures before the start (LiteLLM not on the egress list, no spec) and a run killed meanwhile;
 // - `Runner.runAgent` removes the sandbox and leaves the run network afterwards.
@@ -313,9 +314,10 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     expect([...(stub.networks.get(s.sandbox.names.network)?.attached ?? [])]).toContain(SELF);
 
     const run = await s.scope.runs.getById(s.envelope.contract.run_id);
+    // C08 (ADR-M38 §2.2): the sandbox's HEAD goes to the event only; the push sets head_sha.
     expect(run).toMatchObject({
       status: 'succeeded',
-      head_sha: HEAD,
+      head_sha: null,
       iterations: 3,
       stop_reason: null,
     });
@@ -404,7 +406,7 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
       status: 'stopped_budget',
       stop_reason: 'max_iterations',
-      head_sha: HEAD,
+      head_sha: null,
     });
   });
 
