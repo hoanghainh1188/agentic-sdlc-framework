@@ -15,6 +15,7 @@ import { migration0012EvidenceItems } from './0012-evidence-items.js';
 import { migration0013GateG5Runner } from './0013-gate-g5-runner.js';
 import { migration0014AdminOnboarding } from './0014-admin-onboarding.js';
 import { migration0015GateG5 } from './0015-gate-g5.js';
+import { migration0016AgentApprovals } from './0016-agent-approvals.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -33,4 +34,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0013-gate-g5-runner': migration0013GateG5Runner,
   '0014-admin-onboarding': migration0014AdminOnboarding,
   '0015-gate-g5': migration0015GateG5,
+  '0016-agent-approvals': migration0016AgentApprovals,
 };

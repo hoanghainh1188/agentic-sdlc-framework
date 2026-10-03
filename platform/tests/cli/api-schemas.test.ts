@@ -4,12 +4,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   adminConfigSchema,
+  agentRoundSchema,
+  agentSchema,
   adminIdentitySchema,
   adminProjectSchema,
   adminRoleSchema,
   adminTenantRoleSchema,
   adminUserSchema,
   aiRecordSchema,
+  chainSchema,
+  issuedTokenSchema,
+  tokenSchema,
   decisionSchema,
   escalationSchema,
   intentDetailSchema,
@@ -17,7 +22,12 @@ import {
   meSchema,
 } from '../../apps/cli/src/api/schemas.js';
 import {
+  agentBody,
+  roundBody,
   aiRecordBody,
+  chainBody,
+  issuedTokenBody,
+  tokenBody,
   configBody,
   identityBody,
   projectBody,
@@ -55,6 +65,13 @@ describe('CLI response schemas match the API presenters', () => {
     ['admin tenant role', adminTenantRoleSchema, tenantRoleBody()],
     ['admin config', adminConfigSchema, configBody()],
     ['admin config (defaults only)', adminConfigSchema, configBody(0)],
+    ['token', tokenSchema, tokenBody({ revoked_at: new Date(), last_used_at: new Date() })],
+    ['issued token', issuedTokenSchema, issuedTokenBody(`sdlc_pat_${'k'.repeat(43)}`, true)],
+    ['audit chain', chainSchema, chainBody()],
+    ['broken audit chain', chainSchema, chainBody(true)],
+    ['agent', agentSchema, agentBody({ status: 'active', last_recertified_at: '2026-01-05' })],
+    ['agent round', agentRoundSchema, roundBody()],
+    ['completed agent round', agentRoundSchema, roundBody(true)],
   ] as const)('%s', (_name, schema, body) => {
     const parsed = schema.safeParse(body);
     expect(parsed.error?.issues).toBeUndefined();

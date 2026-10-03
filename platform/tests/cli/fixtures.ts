@@ -2,6 +2,9 @@
 // mocked API cannot drift from the real one: a presenter change that breaks the CLI's response
 // schemas fails these tests.
 import type {
+  Agent,
+  AgentApproval,
+  ApiToken,
   Escalation,
   GateDecisionRow,
   Intent,
@@ -15,9 +18,13 @@ import type {
   UserIdentity,
 } from '../../packages/core/src/index.js';
 
+import { presentAgent, presentRound } from '../../apps/api/src/admin/agents.present.js';
 import {
+  presentChain,
   presentConfig,
   presentIdentity,
+  presentIssuedToken,
+  presentToken,
   presentProject,
   presentRoleBinding,
   presentTenantRole,
@@ -282,5 +289,98 @@ export function configBody(version = 1): Record<string, unknown> {
       ],
     },
     'en',
+  );
+}
+
+// Tokens and the audit check (B13 PR 2).
+export const TOKEN_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+function tokenRow(overrides: Partial<ApiToken> = {}): ApiToken {
+  return {
+    id: TOKEN_ID,
+    tenant_id: TENANT,
+    user_id: USER,
+    name: 'laptop',
+    token_hash: 'f'.repeat(64),
+    last_used_at: null,
+    expires_at: new Date('2027-01-01T00:00:00.000Z'),
+    revoked_at: null,
+    created_at: AT,
+    ...overrides,
+  };
+}
+
+export function tokenBody(overrides: Partial<ApiToken> = {}): Record<string, unknown> {
+  return presentToken(tokenRow(overrides));
+}
+
+/** A new token as the API returns it: the raw token is built at run time (Gitleaks). */
+export function issuedTokenBody(
+  token: string,
+  forOtherUser = false,
+  overrides: Partial<ApiToken> = {},
+): Record<string, unknown> {
+  return presentIssuedToken({ token, record: tokenRow(overrides), forOtherUser });
+}
+
+export function chainBody(broken = false): Record<string, unknown> {
+  return presentChain(TENANT, {
+    checked: 41,
+    lastSeq: 41,
+    lastHash: 'e'.repeat(64),
+    ...(broken ? { broken: { seq: 42, reason: 'hash_mismatch' as const } } : {}),
+  });
+}
+
+// The agent register (B13 AC7).
+export const AGENT_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+function agentRow(overrides: Partial<Agent> = {}): Agent {
+  return {
+    id: AGENT_ID,
+    tenant_id: TENANT,
+    agent_key: 'coder',
+    version: '1.0.0',
+    status: 'proposed',
+    owner_id: USER,
+    model_ref: 'claude-haiku-4-5-20251001',
+    instructions_ref: 'AGENTS.md@v1',
+    instructions_sha256: HASH,
+    allowed_tools: ['file_editor', 'terminal'],
+    max_autonomy: 'L2',
+    approved_environments: ['sandbox'],
+    last_recertified_at: null,
+    created_at: AT,
+    updated_at: AT,
+    ...overrides,
+  };
+}
+
+export function agentBody(overrides: Partial<Agent> = {}): Record<string, unknown> {
+  return presentAgent(agentRow(overrides), 3, AT);
+}
+
+export function roundBody(completed = false): Record<string, unknown> {
+  const approval: AgentApproval = {
+    id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    tenant_id: TENANT,
+    agent_id: AGENT_ID,
+    agent_version: '1.0.0',
+    purpose: 'activate',
+    capacity: 'owner',
+    approver_id: USER,
+    round_at: AT,
+    created_at: AT,
+  };
+  return presentRound(
+    {
+      agent: agentRow(completed ? { status: 'active', last_recertified_at: '2026-10-03' } : {}),
+      purpose: 'activate',
+      required: ['owner', 'person_b'],
+      approvals: completed ? [approval, { ...approval, capacity: 'person_b' }] : [approval],
+      completed,
+    },
+    3,
+    AT,
   );
 }

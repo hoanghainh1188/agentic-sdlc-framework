@@ -1,10 +1,14 @@
-// `sdlc admin bootstrap` and `sdlc admin token issue|list|revoke` (task B03, QUESTIONS.md #58 and
-// #63, ADR-M26 section 2.2). Operator commands, run on the server: they connect straight to the
-// platform database as `platform_app` (SDLC_DB_URL), like `sdlc audit verify`. Task B13 moves
-// token issuing behind the API once a tenant admin role exists (QUESTIONS.md #65).
+// `sdlc ops …`: operator commands, run on the server (task B03, ADR-M26 §2.2; renamed from
+// `sdlc admin …` in task B13, ADR-M37 §2.8). They connect straight to the platform database as
+// `platform_app` (SDLC_DB_URL) and are audited as actor `system`. People use the API instead
+// (`sdlc admin …`, `sdlc token …`, `sdlc audit verify`); these stay for the first tenant, for a
+// one-admin tenant (QUESTIONS #151) and for when the API is down.
+// - `sdlc ops bootstrap`, `sdlc ops token issue|list|revoke` (here);
+// - `sdlc ops audit verify` (audit-verify.ts);
+// - `sdlc ops tenant-admin …`, `sdlc ops role …` (ops-roles.ts);
+// - `sdlc ops agent show|list|suspend|quarantine` (ops-agent.ts);
+// - `sdlc ops ai-record set|show` (ops-ai-record.ts).
 // A token is printed once, to stdout, and never logged. Run these in a terminal, not in a chat.
-// `sdlc admin agent …` (task C10, the agent register) lives in admin-agent.ts;
-// `sdlc admin ai-record …` (task B12, the project AI record) in admin-ai-record.ts.
 import { parseArgs } from 'node:util';
 
 import {
@@ -20,8 +24,10 @@ import {
 import { t, type MessageKey } from '@sdlc/messages';
 
 import { EXIT, type CliContext } from '../context.js';
-import { parseAgentCommand, runAgentCommand } from './admin-agent.js';
-import { parseAiRecordCommand, runAiRecordCommand } from './admin-ai-record.js';
+import { auditVerify, parseAuditVerifyOptions } from './audit-verify.js';
+import { parseAgentCommand, runAgentCommand } from './ops-agent.js';
+import { parseAiRecordCommand, runAiRecordCommand } from './ops-ai-record.js';
+import { parseRoleCommand, runRoleCommand } from './ops-roles.js';
 
 type Values = Record<string, string | boolean | undefined>;
 
@@ -55,9 +61,17 @@ const REQUIRED: Readonly<Record<keyof typeof SPECS, readonly string[]>> = {
   'token revoke': ['tenant', 'id'],
 };
 
-/** `args` starts after `admin`. Returns the exit code. */
-export async function runAdmin(args: readonly string[], ctx: CliContext): Promise<number> {
+/** `args` starts after `ops`. Returns the exit code. */
+export async function runOps(args: readonly string[], ctx: CliContext): Promise<number> {
   const [first, second, ...rest] = args;
+  if (first === 'audit' && second === 'verify') {
+    const options = parseAuditVerifyOptions(rest);
+    if (!options) return usage(ctx);
+    return auditVerify(options, ctx);
+  }
+  if (first === 'tenant-admin' || first === 'role') {
+    return runScoped(parseRoleCommand(args), runRoleCommand, 'cli.ops.usage', ctx);
+  }
   if (first === 'agent') {
     return runScoped(
       parseAgentCommand(args.slice(1)),
@@ -115,8 +129,8 @@ export async function runAdmin(args: readonly string[], ctx: CliContext): Promis
 }
 
 /**
- * `sdlc admin agent …` and `sdlc admin ai-record …`: same connection and tenant lookup as the
- * token commands.
+ * `sdlc ops agent|ai-record|tenant-admin|role …`: same connection and tenant lookup as the token
+ * commands.
  */
 async function runScoped<C extends string>(
   parsed: { command: C; values: Values } | undefined,
@@ -166,7 +180,7 @@ function parse(
 }
 
 function usage(ctx: CliContext): number {
-  ctx.stderr(t('cli.admin.usage'));
+  ctx.stderr(t('cli.ops.usage'));
   return EXIT.usage;
 }
 

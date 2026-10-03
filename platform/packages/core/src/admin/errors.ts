@@ -11,6 +11,8 @@ export type AdminErrorCode =
   | 'user_not_found'
   /** No linked identity with this ID for the user. */
   | 'identity_not_found'
+  /** No token with this ID for the user (B13 PR 2). */
+  | 'token_not_found'
   /** No active role binding with this ID on the project, or no active tenant role with this ID. */
   | 'role_binding_not_found'
   /** The project is archived: no new roles or configuration. */

@@ -105,3 +105,4 @@ Points to settle:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task B04) | First version |
+| 0.2 | 2026-10-03 | Claude (task B13, PR 2) | Note: since B13, `sdlc logout` revokes the token through the API before it deletes the saved login (§4 follow-up done), and the operator commands are `sdlc ops …` (ADR-M37 §2.8) |

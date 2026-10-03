@@ -2,7 +2,9 @@
 // (D-08 B03 AC4, NFR-08). Nothing else reaches the client: no stack trace, no SQL, no library text.
 import type { ConfigIssue } from '@sdlc/config';
 import {
+  AGENT_REGISTER_ERROR_MESSAGES,
   AdminError,
+  AgentRegisterError,
   AiRecordError,
   CommandError,
   DbError,
@@ -15,7 +17,7 @@ import {
   type EscalationErrorCode,
   type RegistryErrorCode,
 } from '@sdlc/core';
-import type { MessageKey } from '@sdlc/messages';
+import { t, type MessageKey } from '@sdlc/messages';
 
 /** Codes of the error envelope. Each has the catalog key `api.error.<code>` (tested). */
 export const API_ERROR_CODES = [
@@ -45,6 +47,9 @@ export const API_ERROR_CODES = [
   'ai_record_version_conflict',
   'user_not_found',
   'identity_not_found',
+  'token_not_found',
+  'agent_not_found',
+  'agent_refused',
   'role_binding_not_found',
   'project_archived',
   'user_not_active',
@@ -87,6 +92,9 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   ai_record_version_conflict: 'api.error.ai_record_version_conflict',
   user_not_found: 'api.error.user_not_found',
   identity_not_found: 'api.error.identity_not_found',
+  token_not_found: 'api.error.token_not_found',
+  agent_not_found: 'api.error.agent_not_found',
+  agent_refused: 'api.error.agent_refused',
   role_binding_not_found: 'api.error.role_binding_not_found',
   project_archived: 'api.error.project_archived',
   user_not_active: 'api.error.user_not_active',
@@ -126,6 +134,8 @@ export class ApiError extends Error {
     readonly details?: readonly ErrorDetail[],
     /** Configuration issues (B13 `config_rejected`); the filter renders them in the locale. */
     readonly configIssues?: readonly ConfigIssue[],
+    /** Catalog text of `reason`, when it is not a gate refusal reason (B13 agent register). */
+    readonly reasonText?: (locale: string) => string,
   ) {
     super(code);
   }
@@ -172,6 +182,7 @@ const ADMIN: Readonly<Record<AdminErrorCode, [number, ApiErrorCode]>> = {
   project_not_found: [404, 'project_not_found'],
   user_not_found: [404, 'user_not_found'],
   identity_not_found: [404, 'identity_not_found'],
+  token_not_found: [404, 'token_not_found'],
   role_binding_not_found: [404, 'role_binding_not_found'],
   project_archived: [409, 'project_archived'],
   user_not_active: [409, 'user_not_active'],
@@ -190,10 +201,38 @@ const DB: Partial<Readonly<Record<DbErrorCode, [number, ApiErrorCode]>>> = {
   reference_not_found: [400, 'invalid_request'],
 };
 
+/**
+ * An agent register refusal (B13 AC7): the code is the `reason`, its text names the agent.
+ * `not_permitted` and `not_an_approver` are 403; an unknown agent is 404; a bad value 400.
+ */
+export function agentApiError(error: AgentRegisterError, agentKey: string): ApiError {
+  const text = (locale: string) =>
+    t(
+      AGENT_REGISTER_ERROR_MESSAGES[error.code],
+      { key: agentKey, field: error.field ?? '-' },
+      locale,
+    );
+  if (error.code === 'agent_not_found') return new ApiError(404, 'agent_not_found');
+  if (error.code === 'invalid_input') {
+    const details = [{ path: `body.${error.field ?? 'body'}`, issue: 'invalid' }];
+    return new ApiError(400, 'invalid_request', undefined, details);
+  }
+  const forbidden = error.code === 'not_permitted' || error.code === 'not_an_approver';
+  return new ApiError(
+    forbidden ? 403 : 409,
+    forbidden ? 'forbidden' : 'agent_refused',
+    error.code,
+    undefined,
+    undefined,
+    text,
+  );
+}
+
 /** Maps any thrown value to an `ApiError`. Unknown errors become `internal` (500). */
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
+  if (error instanceof AgentRegisterError) return agentApiError(error, '-');
   if (error instanceof AdminError) {
     const [status, code] = ADMIN[error.code];
     const details =

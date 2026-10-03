@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B13, PR 1 for review) |
+| Status | **Proposed** (task B13, PR 1 merged or in review, PR 2 for review) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #150–#154) |
 | Related | D-08 task B13 (AC1–AC8); D-02 FR-11, FR-14, FR-19; D-05 sections 5, 6.1 (version 1.19); handbook codes table §5, Ch.5, Ch.19, Ch.20 §20.7, §20.9, §20.11; ADR-M09, ADR-M18, ADR-M26, ADR-M31 §2.2, ADR-M36; QUESTIONS #45, #63, #65, #95, #150–#154 |
@@ -155,31 +155,55 @@ Every handler works on the caller's tenant scope. Another tenant's objects give 
   - `sdlc admin config set --file <yaml> --expected-version <n>` reads a regular file of at most 32 KiB.
 - In PR 1, the other `sdlc admin …` commands (`bootstrap`, `token`, `agent`, `ai-record`) stay operator commands with direct database access. PR 2 moves them to `sdlc ops …` (§2.8).
 
-### 2.8. PR 2 (decided, not built yet)
+### 2.8. PR 2: tokens, audit check, operator commands, agent register
 
 - **Tokens through the API (AC5, QUESTIONS #152).**
-  - People issue, list and revoke their own tokens (`/v1/me/tokens`). `sdlc logout` revokes the current token before it deletes the saved login (the ADR-M36 §4 follow-up).
-  - A tenant admin may issue a first token for another user, valid **at most 7 days**. The audit event records who issued it, and the user is told to create their own token and revoke that one.
-  - The raw token appears once, in the response body. It is never logged.
-- **`sdlc audit verify` through the API** for tenant admins.
-- **Operator commands move to `sdlc ops …`.**
-  - `bootstrap`, `token`, `ai-record`, `audit verify`, `tenant-admin` and `role grant` keep their direct database access.
-  - The `sdlc ops agent` write commands are removed, except `suspend` and `quarantine`. They stay as safety moves for when the API is down. `activate` never goes through ops.
-  - Runbook T11 is updated for the rename.
-- **Agent register endpoints (AC7)** enforce handbook Ch.20:
 
-  | Action | Approvers |
+  | Method and path | Who |
   |---|---|
-  | Use approval, L0 | Person A + technical owner |
-  | Use approval, L1–L2 | Technical owner + Person B |
-  | Change approval | Technical owner + Person B |
-  | Retire | Owner + leadership (`governance`) |
-  | Suspend or quarantine | One person: Person B or `governance`, at any time |
+  | `GET`, `POST /v1/me/tokens`; `DELETE /v1/me/tokens/:id`; `DELETE /v1/me/tokens/current` | any person, for their own tokens |
+  | `GET`, `POST /v1/admin/users/:user/tokens`; `DELETE /v1/admin/users/:user/tokens/:id` | tenant admin |
 
-  - Approvers are always two different people.
-  - "Holds the role" means: holds it on any active project of the tenant (MVP).
-  - Approvals are bound to the agent version.
-- **Time-limited exception.** The approver table of the agent register lives in code (`agents/approval-rules.ts`, with sources) and not in configuration. This breaks the rule that handbook rules belong in configuration. The reason: agents belong to the tenant, and no tenant-level configuration exists yet. The table moves into a tenant configuration once one exists.
+  - A token a tenant admin issues for someone else lives **at most 7 days** (`TOKEN_FOR_OTHER_MAX_DAYS`). The audit event `api_token.issued` names the issuer as its actor, and the CLI tells the admin that the user must create their own token and revoke that one.
+  - The raw token appears once, in the response body of the issue, and is never logged (tested).
+  - `sdlc logout` calls `DELETE /v1/me/tokens/current` before it deletes the saved login (the ADR-M36 §4 follow-up). A token the server already refuses (401) counts as revoked. When the server cannot be reached, the saved login is still deleted and the message says the token stays valid.
+  - CLI: `sdlc token create|list|revoke` (own tokens) and `sdlc admin token issue|list|revoke --user` (tenant admins).
+- **`sdlc audit verify` through the API:** `GET /v1/admin/audit/verify` for tenant admins. A broken chain is a result (200, `ok: false`, exit code 1), not an error.
+- **Operator commands are `sdlc ops …`.** `sdlc admin …` is now only the API.
+  - `bootstrap`, `token`, `ai-record` and `audit verify` keep their direct database access.
+  - New: `tenant-admin grant|revoke|list` and `role grant|revoke`, for a one-admin tenant and for recovery (QUESTIONS #151). The other rules still hold: conflicting roles, active users, the last tenant admin.
+  - `sdlc ops agent` keeps `show`, `list`, `suspend` and `quarantine` only. They are safety moves for when the API is down. `activate` never goes through ops (QUESTIONS #153).
+  - Runbook T11 §5e and handbook Ch.19 §19.8d describe them.
+- **The agent register through the API (AC7, handbook Ch.20)**, `/v1/admin/agents` and `sdlc admin agent …`:
+
+  | Step | Endpoint | Who |
+  |---|---|---|
+  | Register | `POST /v1/admin/agents` | tenant admin (names the technical owner) |
+  | A new version | `PATCH /v1/admin/agents/:key` | the owner or a tenant admin; only while `proposed` or `suspended` (ADR-M31 §2.3) |
+  | Approve activation or retirement | `POST /v1/admin/agents/:key/approvals` (`purpose`, `as`, `reason_code` to retire) | the capacities below |
+  | Suspend, quarantine | `POST /v1/admin/agents/:key/suspend`, `/quarantine` (`reason_code`) | Person B or leadership, at any time (§20.9) |
+  | New owner | `PUT /v1/admin/agents/:key/owner` | tenant admin |
+  | Recertify | `POST /v1/admin/agents/:key/recertify` | the owner |
+  | Read | `GET /v1/admin/agents`, `GET /v1/admin/agents/:key` (with the approvals still missing) | anyone in the tenant |
+
+  - Required approvers:
+
+    | Step | Approvers |
+    |---|---|
+    | First use (`proposed` → `active`), L0 | Person A + owner (§20.7) |
+    | First use, L1–L2 | owner + Person B (§20.7) |
+    | A change (`suspended` → `active`) | owner + Person B (§20.11) |
+    | Retire | owner + leadership (`governance`) (§20.11) |
+
+  - Approvals are rows of the new append-only table `agent_approvals` (migration `0016`, D-05 1.21).
+    - Each holds the agent's version and its `updated_at` (`round_at`). Any change of the agent starts a new round, and older approvals no longer count.
+    - One approval per person and one per capacity in a round, so the approvers are always different people.
+    - When the last needed approval arrives, the status changes in the same transaction, with that approver as actor.
+    - Audit event `agent.approval_recorded` (key, version, purpose, capacity).
+  - "Holds the role" means: holds it on any active project of the tenant (MVP, QUESTIONS #153). The owner capacity is `agents.owner_id`.
+  - Refusals: `forbidden` with the reason `not_permitted` or `not_an_approver` (403); otherwise `agent_refused` (409) with the register code as reason and its catalog text naming the agent.
+  - Every register function takes an actor, so audit events name the person who acted (the operator stays `system`).
+- **Time-limited exception.** The approver table lives in code (`agents/approval-rules.ts`, with sources) and not in configuration. This breaks the rule that handbook rules belong in configuration. The reason: agents belong to the tenant, and no tenant-level configuration exists yet. The table moves into a tenant configuration once one exists, and a change to it needs an approved handbook change first.
 
 ### 2.9. Follow-up: configuration history (accepted by Harry, 2026-10-03)
 
@@ -214,10 +238,11 @@ Every handler works on the caller's tenant scope. Another tenant's objects give 
   - `config.changed` gains `override_sha256`, `cause`, `warning_count` and `warnings`.
   - They hold IDs and codes only: never a name, an e-mail address, a login, an account ID, a repository or YAML text.
 - The numbers of this PR (migration `0014`, `SDA11`, rule M21) were taken before C07 PR 2. Whichever of the two merges second renumbers its migration, SQLSTATE and rule (Harry, 2026-10-03).
+- PR 2: migration `0016-agent-approvals`, audit action `agent.approval_recorded`. The ADRs written before B13 (ADR-M26, ADR-M31, ADR-M36) name the operator commands `sdlc admin …`; since B13 they are `sdlc ops …`.
 - Tests:
-  - `pnpm test`: rules, warning codes, value checks, CLI commands against a mocked API, CLI schemas against the presenters.
+  - `pnpm test`: rules, warning codes, value checks, CLI commands against a mocked API (`admin-api`, `admin-agents`, `token-audit`), CLI schemas against the presenters, the `sdlc ops` argument handling.
   - `pnpm test:db` (`admin-onboarding.test.ts`): every endpoint, separation of duties, tenant isolation, the audit chain, no token in the logs.
-  - `pnpm test:db` (`config-reconcile.test.ts`): AC8.
+  - `pnpm test:db` (`admin-tokens.test.ts`): AC5. (`admin-agents.test.ts`): AC7. (`config-reconcile.test.ts`): AC8.
 
 ## Version history
 
@@ -225,3 +250,4 @@ Every handler works on the caller's tenant scope. Another tenant's objects give 
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task B13, PR 1) | First version |
 | 0.2 | 2026-10-03 | Claude (task B13, PR 1), Harry's review | §2.9: follow-up for the configuration history (effective configuration as canonical JSON in an append-only versions table) |
+| 0.3 | 2026-10-03 | Claude (task B13, PR 2) | §2.8 as built: tokens, the audit check, `sdlc ops`, the agent register with `agent_approvals` |

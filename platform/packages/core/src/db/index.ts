@@ -62,6 +62,7 @@ export type { RoleBindingQuery } from './repositories/role-bindings.js';
 export type { SaveProjectAiRecord } from './repositories/project-ai-records.js';
 export type {
   Agent,
+  AgentApproval,
   ApiToken,
   AuditLogRow,
   CostRecordRow,

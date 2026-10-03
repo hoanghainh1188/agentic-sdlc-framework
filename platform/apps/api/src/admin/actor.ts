@@ -4,6 +4,6 @@ import type { AdminActor } from '@sdlc/core';
 
 import type { Principal } from '../auth/principal.js';
 
-export function actorOf(p: Principal): AdminActor {
+export function actorOf(p: Principal): AdminActor & { readonly type: 'human' } {
   return { type: 'human', userId: p.userId };
 }

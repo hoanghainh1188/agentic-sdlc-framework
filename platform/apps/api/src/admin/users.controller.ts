@@ -1,7 +1,21 @@
 // Admin endpoints for users and their Git host identities (task B13 AC2, AC3; ADR-M37 §2.6).
 // Tenant admins only. Users are addressed by ID: an e-mail address never goes into a URL.
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import {
+  issueTokenFor,
+  listTokensOf,
+  revokeTokenOf,
   createUser,
   isTenantAdmin,
   linkIdentity,
@@ -16,13 +30,15 @@ import {
 } from '@sdlc/core';
 
 import { CurrentPrincipal, type Principal } from '../auth/principal.js';
+import { CLOCK } from '../tokens.js';
 import { parseRequest } from '../validation.js';
 import { actorOf } from './actor.js';
-import { presentIdentity, presentUser } from './present.js';
+import { presentIdentity, presentIssuedToken, presentToken, presentUser } from './present.js';
 import {
   createUserSchema,
   historyQuerySchema,
   idSchema,
+  issueTokenSchema,
   linkIdentitySchema,
   updateUserSchema,
 } from './schemas.js';
@@ -31,6 +47,8 @@ type Body = Record<string, unknown>;
 
 @Controller('v1/admin/users')
 export class AdminUsersController {
+  constructor(@Inject(CLOCK) private readonly now: () => Date) {}
+
   @Get()
   async list(@CurrentPrincipal() p: Principal): Promise<Body> {
     const users = await listUsers(p.scope, actorOf(p));
@@ -134,6 +152,46 @@ export class AdminUsersController {
       parseRequest(idSchema, identityId, 'path'),
     );
     return presentIdentity(identity);
+  }
+
+  // Other users' tokens (B13 AC5, QUESTIONS #152): a token issued for someone else lives at most
+  // 7 days; the user creates their own and revokes it.
+  @Get(':user/tokens')
+  async tokens(@CurrentPrincipal() p: Principal, @Param('user') id: string): Promise<Body> {
+    const tokens = await listTokensOf(p.scope, actorOf(p), parseRequest(idSchema, id, 'path'));
+    return { items: tokens.map(presentToken) };
+  }
+
+  @Post(':user/tokens')
+  @HttpCode(201)
+  async issueToken(
+    @CurrentPrincipal() p: Principal,
+    @Param('user') id: string,
+    @Body() body: unknown,
+  ): Promise<Body> {
+    const input = parseRequest(issueTokenSchema, body, 'body');
+    const issued = await issueTokenFor(p.scope, actorOf(p), parseRequest(idSchema, id, 'path'), {
+      name: input.name,
+      now: this.now(),
+      ...(input.days === undefined ? {} : { lifetimeDays: input.days }),
+    });
+    return presentIssuedToken(issued);
+  }
+
+  @Delete(':user/tokens/:token')
+  async revokeToken(
+    @CurrentPrincipal() p: Principal,
+    @Param('user') id: string,
+    @Param('token') tokenId: string,
+  ): Promise<Body> {
+    const revoked = await revokeTokenOf(
+      p.scope,
+      actorOf(p),
+      parseRequest(idSchema, id, 'path'),
+      parseRequest(idSchema, tokenId, 'path'),
+      this.now(),
+    );
+    return presentToken(revoked);
   }
 
   private async present(p: Principal, user: User): Promise<Body> {

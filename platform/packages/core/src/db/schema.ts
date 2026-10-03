@@ -158,6 +158,20 @@ export interface RoleBindingsTable {
   created_at: CreatedAt;
 }
 
+/** Approvals of the agent register (task B13 AC7, migration 0015). Append-only. */
+export interface AgentApprovalsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  agent_id: Immutable<string>;
+  agent_version: Immutable<string>;
+  purpose: Immutable<'activate' | 'retire'>;
+  capacity: Immutable<'owner' | 'person_a' | 'person_b' | 'governance'>;
+  approver_id: Immutable<string>;
+  /** The agent's `updated_at` when the approval was given: its round. */
+  round_at: Immutable<Date>;
+  created_at: CreatedAt;
+}
+
 /** Tenant-level roles (task B13, QUESTIONS #150, ADR-M37). Withdrawn by `revoked_at`, never deleted. */
 export interface TenantRoleBindingsTable {
   id: GeneratedId;
@@ -565,6 +579,7 @@ export interface Database {
   intent_notices: IntentNoticesTable;
   project_ai_record_versions: ProjectAiRecordVersionsTable;
   tenant_role_bindings: TenantRoleBindingsTable;
+  agent_approvals: AgentApprovalsTable;
 }
 
 export type TableName = keyof Database;
@@ -938,6 +953,17 @@ export const TABLE_COLUMNS = {
     'revoked_at',
     'created_at',
   ]),
+  agent_approvals: columns<AgentApprovalsTable>()([
+    'id',
+    'tenant_id',
+    'agent_id',
+    'agent_version',
+    'purpose',
+    'capacity',
+    'approver_id',
+    'round_at',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -971,6 +997,7 @@ export const TENANT_COLUMN = {
   project_ai_record_versions: 'tenant_id',
   evidence_items: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
+  agent_approvals: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -999,6 +1026,7 @@ export type IntentNotice = Selectable<IntentNoticesTable>;
 export type ProjectAiRecordVersion = Selectable<ProjectAiRecordVersionsTable>;
 export type EvidenceItem = Selectable<EvidenceItemsTable>;
 export type TenantRoleBinding = Selectable<TenantRoleBindingsTable>;
+export type AgentApproval = Selectable<AgentApprovalsTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

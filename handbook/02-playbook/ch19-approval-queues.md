@@ -180,7 +180,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - Who may write the record: Person A and PM / BrSE by default (project setting `access.ai_record_write_roles`; the viewer role never may). Every change is a new version; the platform keeps every version and records who made it.
 - How to write it:
   - through the API: `GET` and `PUT /v1/projects/<project>/ai-record` with your personal token. `PUT` needs `expected_version` (the version you read; `0` for the first version). The CLI does the same: `sdlc ai-record show|set` (§19.8c).
-  - the platform operator, on the server, for a new project: `sdlc admin ai-record set --tenant <slug> --project <slug> --on-behalf-of <email> --expected-version <n> --ai-allowed <…> --classes <a,b | none> --prod-logs <…> --disclosure <…> [--confirmed-at YYYY-MM-DD] [--record-ref https://…]` and `sdlc admin ai-record show --tenant <slug> --project <slug>`. The person named with `--on-behalf-of` must hold a write role on the project: they are accountable for the content.
+  - the platform operator, on the server, for a new project: `sdlc ops ai-record set --tenant <slug> --project <slug> --on-behalf-of <email> --expected-version <n> --ai-allowed <…> --classes <a,b | none> --prod-logs <…> --disclosure <…> [--confirmed-at YYYY-MM-DD] [--record-ref https://…]` and `sdlc ops ai-record show --tenant <slug> --project <slug>`. The person named with `--on-behalf-of` must hold a write role on the project: they are accountable for the content.
 
 ---
 
@@ -192,7 +192,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 
 **Log in once.**
 
-1. Get a personal API token (`sdlc_pat_…`) from the platform operator. Keep it in your password manager.
+1. Get your first personal API token (`sdlc_pat_…`) from a tenant admin (it lasts at most 7 days) or, for the first person of a tenant, from the platform operator. Keep it in your password manager. After you log in, create your own token (`sdlc token create`), log in again with it, and revoke the first one.
 2. Run `sdlc login --api-url https://<platform address>` and paste the token at the prompt. The prompt does not show what you type.
    - The platform checks the token first. Only a valid token is saved.
    - The address must use `https://`. `http://` works only for a platform on your own machine (`http://127.0.0.1:8090`).
@@ -201,7 +201,8 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 
 - The token is saved in `~/.config/sdlc/credentials.json` (or under `$XDG_CONFIG_HOME`), readable only by you. It is stored as plain text, so protect your account and your disk. If the file can be read by others, the command stops until you fix it (`chmod 600`) and log in again.
 - **Never put the token on the command line**, in a script, in a chat or in a ticket. There is no `--token` option. To pipe a token in (for example from a password manager), use `--token-stdin`.
-- `sdlc logout` deletes the saved login on your machine. **It does not revoke the token**: it stays valid until it expires. If the token may be lost or seen by someone else, ask the platform operator to revoke it (`sdlc admin token revoke`).
+- `sdlc logout` revokes the token on the server, then deletes the saved login on your machine. If the server cannot be reached, it still deletes the login and says the token is still valid: revoke it later with `sdlc token revoke` from another login.
+- Your own tokens: `sdlc token create --name <name> [--days <n>]` (the new token is shown once), `sdlc token list`, `sdlc token revoke --id <ID>`. Use one token per machine.
 - In CI only, set `SDLC_API_URL` and `SDLC_API_TOKEN` (as CI secrets) instead of logging in. Do not use them on your own machine: environment variables can leak into process lists and logs.
 
 **Commands.** Add `--json` to any command for machine-readable output.
@@ -245,7 +246,7 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 
 **The rules the platform enforces.**
 
-- **Nobody gives a role to themselves**, and nobody disables themselves. Ask another admin. A team with only one admin asks the platform operator, who does it on the server.
+- **Nobody gives a role to themselves**, and nobody disables themselves. Ask another admin. A team with only one admin asks the platform operator, who does it on the server (`sdlc ops role grant`).
 - **Person A and Person B are never the same person on a project.** Some other pairs of roles are kept apart too; the project configuration lists them (`access.conflicting_roles`, by default also Person B and the second approver). A role that would break a pair is refused.
 - **The tenant always keeps one tenant admin.** The last one cannot be removed or disabled: make someone else a tenant admin first.
 - A role is never deleted: it is revoked, and the history stays. A GitHub account is unlinked, not deleted.
@@ -272,6 +273,12 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | `sdlc admin identity list [--all]`, `unlink --user <id or email> --id <identity ID>` | `--all` also shows unlinked accounts |
 | `sdlc admin role list --project <slug> [--all]`, `revoke --project <slug> --id <role ID>` | `--all` also shows revoked roles |
 | `sdlc admin tenant-admin grant --user <id or email>`, `list [--all]`, `revoke --id <ID>` | Tenant admins only |
+| `sdlc admin token issue --user <id or email> --name <name> [--days <1-7>]` | A first token for a new person, shown once. It lasts at most 7 days: the person creates their own token and revokes this one |
+| `sdlc admin token list\|revoke --user <id or email> …` | Anyone's tokens, for example after a laptop was lost |
+| `sdlc admin agent …` | The agent register, Chapter 20 §20.5b |
+| `sdlc audit verify` | Checks your tenant's audit log (exit code 1 when a record was changed) |
+
+**Operator commands on the server.** The platform operator keeps a few commands that work straight on the database, for the first person of a tenant and for when the API is down: `sdlc ops bootstrap`, `sdlc ops token …`, `sdlc ops audit verify`, `sdlc ops tenant-admin …`, `sdlc ops role grant|revoke` (for a team with only one admin), `sdlc ops ai-record …`, and `sdlc ops agent show|list|suspend|quarantine`. They are recorded in the audit log as done by the platform.
 
 - When the platform is upgraded and its default settings change, it checks every stored project configuration when it starts. A configuration nobody changed is saved again with the new defaults, and the audit log shows it as a change by the platform. A configuration that was changed outside the platform, or that the new defaults make invalid, is not used: the project stops until an admin saves a configuration again.
 
@@ -311,3 +318,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.2 | 2026-09-27 | Claude (task B07, session 2) | §19.8b platform usage: HOTL gates and the block window, gate deadlines and their escalation, no scope at G1–G3 (ADR-M30 §2.4b, §2.9) |
 | 0.3 | 2026-10-03 | Claude (task B04) | §19.8c platform usage: the `sdlc` command (login, intents, gates, AI record, exit codes); §19.8b points to it (ADR-M36) |
 | 0.4 | 2026-10-03 | Claude (task B13, PR 1) | §19.8d platform usage: setting up a team (tenant admins, projects, people, GitHub accounts, roles, configuration; ADR-M37) |
+| 0.5 | 2026-10-03 | Claude (task B13, PR 2) | §19.8c: `sdlc logout` revokes the token; `sdlc token`; first token from a tenant admin. §19.8d: tokens of other people, the agent register, `sdlc audit verify`, the operator commands `sdlc ops` (ADR-M37 §2.8) |

@@ -1,13 +1,13 @@
-// `sdlc admin project|user|identity|role|config|tenant-admin …` through the API (task B13 AC2,
-// ADR-M37 §2.7). These are user commands: they use the login of `sdlc login` (or SDLC_API_URL and
-// SDLC_API_TOKEN in CI) and the B04 client (ADR-M36). The caller needs the tenant role
-// `tenant_admin`, or the project role `admin` for a project's roles and configuration.
-// The other `sdlc admin …` commands (bootstrap, token, agent, ai-record) are operator commands on
-// the server (admin.ts) until PR 2 of B13 moves them to `sdlc ops …`.
+// `sdlc admin …` through the API (task B13, ADR-M37 §2.7–§2.8). These are user commands: they use
+// the login of `sdlc login` (or SDLC_API_URL and SDLC_API_TOKEN in CI) and the B04 client
+// (ADR-M36). The caller needs the tenant role `tenant_admin`, or the project role `admin` for a
+// project's roles and configuration; the agent register follows handbook Ch.20. The operator's
+// commands on the server are `sdlc ops …` (ops.ts).
 import { t } from '@sdlc/messages';
 
 import { parseCommand, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
+import { AGENT_COMMANDS } from './admin-agents.js';
 import type { AdminApiCommand } from './admin-call.js';
 import { PROJECT_COMMANDS } from './admin-projects.js';
 import { USER_COMMANDS } from './admin-users.js';
@@ -20,11 +20,14 @@ export const ADMIN_API_GROUPS = [
   'role',
   'config',
   'tenant-admin',
+  'token',
+  'agent',
 ] as const;
 
 const COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
   ...PROJECT_COMMANDS,
   ...USER_COMMANDS,
+  ...AGENT_COMMANDS,
 };
 
 export function isAdminApiGroup(group: string | undefined): boolean {

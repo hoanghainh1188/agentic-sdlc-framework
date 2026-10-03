@@ -1,14 +1,15 @@
 // Changing the agent register (task C10, D-08 C10 AC1, handbook Ch.20, design/ADR-M31).
 //
-// In the MVP these run as operator commands on the server (`sdlc admin agent …`, ADR-M31 §2.2):
-// there is no user login, so audit events use `actor_type = system`. The handbook's approval rules
-// (who approves an agent, who may suspend it) are not checked here yet; B13 moves this behind the
-// API with a tenant admin (QUESTIONS #65).
+// The functions take an optional `actor` (B13): the person who acts through the API, or the
+// operator on the server (`system`, the default). Who may do what (handbook Ch.20 §20.7, §20.9,
+// §20.11) is checked by the callers: the API through `approvals.ts`, the operator only for the
+// safety moves (`sdlc ops agent suspend|quarantine`, ADR-M37 §2.8).
 //
 // Every change and its audit event are one transaction. Audit payloads hold keys, versions,
 // status codes and hashes only: never the model name or the owner.
 import type { AgentStatus } from '@sdlc/contracts';
 
+import { auditActor, SYSTEM_ACTOR, type AdminActor } from '../admin/actor.js';
 import { DbError } from '../db/errors.js';
 import type { Agent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
@@ -41,7 +42,8 @@ export interface RegisterAgent {
   readonly allowedTools: readonly string[];
   readonly maxAutonomy: string;
   readonly approvedEnvironments: readonly string[];
-  readonly now?: Date;
+  readonly now?: Date; /** Who acts (B13). Default: the operator (`system`). */
+  readonly actor?: AdminActor;
 }
 
 /** A new version of the configuration (Ch.20 §20.9). Left out: unchanged. */
@@ -53,14 +55,16 @@ export interface UpdateAgent {
   readonly allowedTools?: readonly string[];
   readonly maxAutonomy?: string;
   readonly approvedEnvironments?: readonly string[];
-  readonly now?: Date;
+  readonly now?: Date; /** Who acts (B13). Default: the operator (`system`). */
+  readonly actor?: AdminActor;
 }
 
 export interface ChangeAgentStatus {
   readonly to: AgentStatus;
   /** Required for `suspended`, `quarantined` and `retired`. */
   readonly reason?: string;
-  readonly now?: Date;
+  readonly now?: Date; /** Who acts (B13). Default: the operator (`system`). */
+  readonly actor?: AdminActor;
 }
 
 const NEEDS_REASON: readonly AgentStatus[] = ['suspended', 'quarantined', 'retired'];
@@ -119,8 +123,7 @@ export async function registerAgent(scope: TenantScope, input: RegisterAgent): P
       });
     await tx.audit.append({
       action: 'agent.registered',
-      actorType: 'system',
-      actorId: null,
+      ...auditActor(input.actor ?? SYSTEM_ACTOR),
       entityId: agent.id,
       payload: {
         agent_key: agent.agent_key,
@@ -174,8 +177,7 @@ export async function updateAgent(
     const updated = await tx.agents.update(agent.id, update, input.now ?? new Date());
     await tx.audit.append({
       action: 'agent.updated',
-      actorType: 'system',
-      actorId: null,
+      ...auditActor(input.actor ?? SYSTEM_ACTOR),
       entityId: updated.id,
       payload: {
         agent_key: updated.agent_key,
@@ -224,8 +226,7 @@ export async function changeAgentStatus(
     );
     await tx.audit.append({
       action: 'agent.status_changed',
-      actorType: 'system',
-      actorId: null,
+      ...auditActor(input.actor ?? SYSTEM_ACTOR),
       entityId: updated.id,
       payload: {
         agent_key: updated.agent_key,
@@ -234,7 +235,7 @@ export async function changeAgentStatus(
         ...(reason === undefined ? {} : { reason_code: reason }),
       },
     });
-    if (certify) await appendRecertified(tx, updated);
+    if (certify) await appendRecertified(tx, updated, input.actor ?? SYSTEM_ACTOR);
     return updated;
   });
 }
@@ -245,6 +246,7 @@ export async function changeAgentOwner(
   agentKey: string,
   ownerId: string,
   now: Date = new Date(),
+  actor: AdminActor = SYSTEM_ACTOR,
 ): Promise<Agent> {
   return scope.transaction(async (tx) => {
     const agent = await lockAgent(tx, agentKey);
@@ -253,8 +255,7 @@ export async function changeAgentOwner(
     const updated = await tx.agents.update(agent.id, { ownerId: owner }, now);
     await tx.audit.append({
       action: 'agent.owner_changed',
-      actorType: 'system',
-      actorId: null,
+      ...auditActor(actor),
       entityId: updated.id,
       payload: { agent_key: updated.agent_key },
     });
@@ -269,7 +270,7 @@ export async function changeAgentOwner(
 export async function recertifyAgent(
   scope: TenantScope,
   agentKey: string,
-  input: { readonly day?: string; readonly now?: Date } = {},
+  input: { readonly day?: string; readonly now?: Date; readonly actor?: AdminActor } = {},
 ): Promise<Agent> {
   const now = input.now ?? new Date();
   const day = input.day ?? utcDay(now);
@@ -285,16 +286,19 @@ export async function recertifyAgent(
       );
     }
     const updated = await tx.agents.update(agent.id, { lastRecertifiedAt: day }, now);
-    await appendRecertified(tx, updated);
+    await appendRecertified(tx, updated, input.actor ?? SYSTEM_ACTOR);
     return updated;
   });
 }
 
-async function appendRecertified(scope: TenantScope, agent: Agent): Promise<void> {
+async function appendRecertified(
+  scope: TenantScope,
+  agent: Agent,
+  actor: AdminActor,
+): Promise<void> {
   await scope.audit.append({
     action: 'agent.recertified',
-    actorType: 'system',
-    actorId: null,
+    ...auditActor(actor),
     entityId: agent.id,
     payload: { agent_key: agent.agent_key },
   });

@@ -223,3 +223,81 @@ export const adminConfigSchema = z.object({
   warnings: z.array(configIssueSchema).max(1000),
 });
 export type AdminConfigView = z.infer<typeof adminConfigSchema>;
+
+// Personal API tokens and the audit check (task B13 PR 2, ADR-M37 §2.8). A token record never
+// holds the token; only the answer to an issue does, once.
+export const tokenSchema = z.object({
+  id,
+  user_id: id,
+  name: code,
+  expires_at: time,
+  revoked_at: time.nullable(),
+  last_used_at: time.nullable(),
+  created_at: time,
+});
+export type TokenView = z.infer<typeof tokenSchema>;
+export const tokenListSchema = z.object({ items: z.array(tokenSchema).max(10_000) });
+
+export const issuedTokenSchema = tokenSchema.extend({
+  token: z.string().regex(/^sdlc_pat_[A-Za-z0-9_-]{43}$/),
+  for_other_user: z.boolean(),
+});
+export type IssuedTokenView = z.infer<typeof issuedTokenSchema>;
+
+export const chainSchema = z.object({
+  tenant_id: id,
+  ok: z.boolean(),
+  checked: z.number().int().min(0),
+  last_seq: z.number().int().min(0),
+  broken: z
+    .object({
+      seq: z.number().int(),
+      reason: z.enum(['seq_gap', 'prev_hash_mismatch', 'hash_mismatch', 'unknown_hash_version']),
+    })
+    .nullable(),
+});
+
+// The agent register (task B13 AC7, ADR-M37 §2.8).
+export const agentSchema = z.object({
+  id,
+  key: code,
+  version: code,
+  status: code,
+  owner_id: id,
+  model_ref: z.string().max(128).nullable(),
+  instructions_ref: z.string().max(300),
+  instructions_sha256: code,
+  allowed_tools: z.array(code).max(32),
+  max_autonomy: code,
+  approved_environments: z.array(code).max(3),
+  last_recertified_at: z.string().max(10).nullable(),
+  recertification_due_on: z.string().max(10).nullable(),
+  overdue: z.boolean(),
+  updated_at: time,
+});
+export type AgentView = z.infer<typeof agentSchema>;
+export const agentListSchema = z.object({ items: z.array(agentSchema).max(10_000) });
+
+export const agentRoundSchema = z.object({
+  agent: agentSchema,
+  purpose: code,
+  required: z.array(code).max(4),
+  missing: z.array(code).max(4),
+  approvals: z
+    .array(
+      z.object({
+        id,
+        agent_version: code,
+        purpose: code,
+        capacity: code,
+        approver_id: id,
+        created_at: time,
+      }),
+    )
+    .max(4),
+  completed: z.boolean(),
+});
+export type AgentRoundView = z.infer<typeof agentRoundSchema>;
+export const agentDetailSchema = agentSchema.extend({
+  rounds: z.array(agentRoundSchema).max(2),
+});

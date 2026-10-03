@@ -146,6 +146,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
   evidence_items: [],
   // B13: a tenant role is withdrawn by `revoked_at`, never deleted (trigger: final once set).
   tenant_role_bindings: ['revoked_at'],
+  // Append-only (B13 AC7): approvals of the agent register.
+  agent_approvals: [],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -274,8 +276,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // B07: intent_notices → intents, gate_decisions.
     // B12: project_ai_record_versions → project_ai_records, users.
     // C06: intent_notices → agents; evidence_items → intents, runs (session 2b).
-    // B13: tenant_role_bindings → tenants, users.
-    expect(fks).toHaveLength(49);
+    // B13: tenant_role_bindings → tenants, users; agent_approvals → agents, users.
+    expect(fks).toHaveLength(51);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

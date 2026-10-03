@@ -14,6 +14,7 @@ erDiagram
     project_ai_records ||--o{ project_ai_record_versions : "keeps versions"
     tenants ||--o{ agents : "registers"
     agents ||--o{ runs : "executes"
+    agents ||--o{ agent_approvals : "is approved by"
     intents ||--o{ escalations : "escalates"
     runs ||--o{ escalations : "escalates"
     escalations ||--o{ escalation_notices : "notifies"

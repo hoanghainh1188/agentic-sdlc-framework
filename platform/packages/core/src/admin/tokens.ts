@@ -7,6 +7,7 @@ import { hashApiToken } from '../db/repositories/api-tokens.js';
 import type { ApiToken } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { isUuid } from '../db/tenant-id.js';
+import { auditActor, SYSTEM_ACTOR, type AdminActor } from './actor.js';
 
 /** Prefix of every platform token, so secret scanners (Gitleaks rule `sdlc-api-token`) find leaks. */
 export const API_TOKEN_PREFIX = 'sdlc_pat_';
@@ -38,6 +39,10 @@ export interface IssueApiToken {
   /** Default `API_TOKEN_DEFAULT_LIFETIME_DAYS`; at most `API_TOKEN_MAX_LIFETIME_DAYS`. */
   readonly lifetimeDays?: number;
   readonly now?: Date;
+  /** Who issues it (B13): the person through the API, or the operator (default). */
+  readonly actor?: AdminActor;
+  /** Most days allowed for this token (B13: 7 for a token issued for someone else). */
+  readonly maxLifetimeDays?: number;
 }
 
 export interface IssuedApiToken {
@@ -57,13 +62,15 @@ export async function issueApiToken(
   if (!API_TOKEN_NAME_PATTERN.test(input.name)) {
     throw new DbError('invalid_value', 'token name must be a short code (letters, digits, _ . -)');
   }
-  const days = input.lifetimeDays ?? API_TOKEN_DEFAULT_LIFETIME_DAYS;
-  if (!Number.isSafeInteger(days) || days < 1 || days > API_TOKEN_MAX_LIFETIME_DAYS) {
-    throw new DbError(
-      'invalid_value',
-      `token lifetime must be 1 to ${String(API_TOKEN_MAX_LIFETIME_DAYS)} days`,
-    );
+  const max = Math.min(
+    input.maxLifetimeDays ?? API_TOKEN_MAX_LIFETIME_DAYS,
+    API_TOKEN_MAX_LIFETIME_DAYS,
+  );
+  const days = input.lifetimeDays ?? Math.min(API_TOKEN_DEFAULT_LIFETIME_DAYS, max);
+  if (!Number.isSafeInteger(days) || days < 1 || days > max) {
+    throw new DbError('invalid_value', `token lifetime must be 1 to ${String(max)} days`);
   }
+  const actor = input.actor ?? SYSTEM_ACTOR;
   const now = input.now ?? new Date();
   const token = generateApiToken();
   const record = await scope.transaction(async (tx) => {
@@ -79,8 +86,7 @@ export async function issueApiToken(
     });
     await tx.audit.append({
       action: 'api_token.issued',
-      actorType: 'system',
-      actorId: null,
+      ...auditActor(actor),
       entityId: created.id,
       payload: { user_id: created.user_id },
     });
@@ -97,6 +103,7 @@ export function revokeApiToken(
   scope: TenantScope,
   tokenId: string,
   now: Date = new Date(),
+  actor: AdminActor = SYSTEM_ACTOR,
 ): Promise<ApiToken | undefined> {
   if (!isUuid(tokenId)) return Promise.resolve(undefined);
   return scope.transaction(async (tx) => {
@@ -106,8 +113,7 @@ export function revokeApiToken(
     const revoked = await tx.apiTokens.revoke(tokenId, now);
     await tx.audit.append({
       action: 'api_token.revoked',
-      actorType: 'system',
-      actorId: null,
+      ...auditActor(actor),
       entityId: before.id,
       payload: { user_id: before.user_id },
     });

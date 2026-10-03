@@ -3,7 +3,8 @@
 // is checked with `GET /v1/me` before it is saved. It is never printed.
 import { t } from '@sdlc/messages';
 
-import { meSchema, type Me } from '../api/schemas.js';
+import { ApiCallError } from '../api/client.js';
+import { meSchema, tokenSchema, type Me } from '../api/schemas.js';
 import {
   apiIo,
   assertTlsVerified,
@@ -67,11 +68,31 @@ export async function runLogout(args: readonly string[], ctx: CliContext): Promi
   }
   const json = parsed.values.json === true;
   return guarded(ctx, json, async () => {
+    // B13 (ADR-M36 §4, ADR-M37 §2.8): revoke the saved token on the server first. The saved login
+    // is deleted whatever happens; a token the server could not revoke stays valid until it expires.
+    const saved = await readSavedLogin(ctx.env).catch(() => undefined);
+    const revoked = saved ? await revokeCurrent(ctx, saved) : false;
     const deleted = await deleteSavedLogin(ctx.env);
-    if (json) ctx.stdout(toJson({ deleted, token_revoked: false }));
-    else say(ctx, deleted ? 'cli.logout.done' : 'cli.logout.none');
+    if (json) ctx.stdout(toJson({ deleted, token_revoked: revoked }));
+    else if (!deleted) say(ctx, 'cli.logout.none');
+    else say(ctx, revoked ? 'cli.logout.done' : 'cli.logout.not_revoked');
     return EXIT.ok;
   });
+}
+
+/** `DELETE /v1/me/tokens/current`. True when revoked, or when the server already refuses it. */
+async function revokeCurrent(
+  ctx: CliContext,
+  saved: { readonly apiUrl: string; readonly token: string },
+): Promise<boolean> {
+  if (ctx.env.NODE_TLS_REJECT_UNAUTHORIZED === '0') return false;
+  try {
+    await clientFor(ctx, saved).delete('/v1/me/tokens/current', tokenSchema);
+    return true;
+  } catch (error) {
+    // 401: the token is expired or revoked already; it no longer opens anything.
+    return error instanceof ApiCallError && error.kind === 'http' && error.status === 401;
+  }
 }
 
 export async function runWhoami(args: readonly string[], ctx: CliContext): Promise<number> {

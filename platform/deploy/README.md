@@ -94,10 +94,10 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 The audit log is append-only and hash-chained per tenant (ADR-M09 section 2.8). Check every tenant's chain (exit code 1 when a record was changed or removed):
 
 ```bash
-SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm sdlc audit verify
+SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm sdlc ops audit verify
 ```
 
-Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. The command connects straight to the database. Task B13 PR 2 adds the same check through the API for tenant admins (`design/ADR-M37-admin-onboarding.md`).
+Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. The command connects straight to the database. Tenant admins run the same check through the API with `sdlc audit verify` (task B13, `design/ADR-M37-admin-onboarding.md`).
 
 ### First admin and API tokens (task B03)
 
@@ -105,14 +105,15 @@ The API authenticates people with personal API tokens (`sdlc_pat_…`). The firs
 
 ```bash
 export SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform"
-pnpm sdlc admin bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
-pnpm sdlc admin token issue --tenant internal --email you@example.com --name laptop-you --days 90
-pnpm sdlc admin token list --tenant internal --email you@example.com
-pnpm sdlc admin token revoke --tenant internal --id <token-id>
+pnpm sdlc ops bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
+pnpm sdlc ops token issue --tenant internal --email you@example.com --name laptop-you --days 90
+pnpm sdlc ops token list --tenant internal --email you@example.com
+pnpm sdlc ops token revoke --tenant internal --id <token-id>
 ```
 
 - The bootstrap runs once per tenant; a second run with the same slug is refused.
 - Tokens last 90 days by default, at most 365. Only the SHA-256 hash is stored. Every issue and revocation is written to the audit log (IDs only).
+- Operator commands are `sdlc ops …` (renamed from `sdlc admin …` in task B13). They also include `sdlc ops tenant-admin grant|revoke|list` and `sdlc ops role grant|revoke` (for a tenant with one admin, or to recover one that lost its admins) and `sdlc ops agent show|list|suspend|quarantine` (safety moves when the API is down). People use the API: `sdlc admin …`, `sdlc token …`.
 - The bootstrap makes the first user a **tenant admin** (task B13). Projects, users, GitHub identities, roles and project configuration are then set up through the API with `sdlc admin project|user|identity|role|config|tenant-admin …` (handbook Ch.19 §19.8d, [ADR-M37](../../design/ADR-M37-admin-onboarding.md)).
 
 ### Reset after a change to migration 0001 (development only)

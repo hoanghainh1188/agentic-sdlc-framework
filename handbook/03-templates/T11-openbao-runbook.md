@@ -295,6 +295,7 @@ The API (service `sdlc-api`, task B03) logs in with the AppRole `api` and reads 
    Record it in the operations log (role `api`, date, reason; not the secret ID).
 3. Start: `pnpm compose:platform` (profiles `core` and `platform`). The API listens on `127.0.0.1:8090`.
 4. Check: `curl -s http://127.0.0.1:8090/health/ready` answers `{"status":"ok"}`.
+5. Create the tenant and its first tenant admin, once, on the server (`SDLC_DB_URL` is the `platform_app` URL; the token is printed once, so run it in a terminal): `pnpm sdlc ops bootstrap --tenant <slug> --tenant-name <name> --email <email> --name <name>`. Operator commands on the database are `sdlc ops …` (task B13, `design/ADR-M37-admin-onboarding.md`); everything else is done through the API (handbook Ch.19 §19.8d).
 
 ### Rotation
 
@@ -525,3 +526,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.14 | 2026-09-30 | Claude Code (test maintenance) | Section 8.1: the credentials commands destroy every other secret ID of the AppRole after the delivery; one process per AppRole; new section 8.3: tokens of an old secret ID stay valid until their TTL, how to revoke the tokens of one AppRole after a leak (`design/QUESTIONS.md` #140). Tested with throw-away keys (`pnpm test:openbao`) |
 | 0.15 | 2026-09-27 | Claude Code (task C06, session 2b) | Section 5g step 3b: `runner-evidence-credentials` (write-only SeaweedFS identity `runner-evidence` at `kv/runner/evidence`); rotation and troubleshooting rows (ADR-M33 §2.9). Tested with throw-away keys (`pnpm test:runner-compose`) |
 | 0.16 | 2026-10-03 | Claude Code (task C07, PR 1) | Section 5g step 3b: the identity `runner-evidence` also writes run diffs under `evidence/diffs/` (run the command again once after the update); troubleshooting row `agent_changes_unavailable` (ADR-M34 §2.2). Tested with throw-away keys (`pnpm test:runner-compose`) |
+| 0.17 | 2026-10-03 | Claude Code (task B13, PR 2) | Section 5e step 5: the first tenant admin with `sdlc ops bootstrap`; the operator commands are `sdlc ops …` (renamed from `sdlc admin …`, ADR-M37 §2.8) |

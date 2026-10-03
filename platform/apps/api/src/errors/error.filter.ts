@@ -58,7 +58,10 @@ export class ErrorFilter implements ExceptionFilter {
           message: t(errorMessageKey(error.code), {}, locale),
           ...(error.reason === undefined
             ? {}
-            : { reason: error.reason, reason_message: reasonMessage(error.reason, locale) }),
+            : {
+                reason: error.reason,
+                reason_message: error.reasonText?.(locale) ?? reasonMessage(error.reason, locale),
+              }),
           ...(details === undefined ? {} : { details }),
         },
       });

@@ -43,7 +43,16 @@ export {
   type ReconcileResult,
   type SaveConfigInput,
 } from './config.js';
+export { verifyTenantAudit } from './audit-check.js';
 export { AdminError, type AdminErrorCode } from './errors.js';
+export {
+  issueTokenFor,
+  listTokensOf,
+  revokeTokenOf,
+  TOKEN_FOR_OTHER_MAX_DAYS,
+  type IssuedTokenView,
+  type IssueTokenRequest,
+} from './token-access.js';
 export {
   activeProject,
   archiveProject,

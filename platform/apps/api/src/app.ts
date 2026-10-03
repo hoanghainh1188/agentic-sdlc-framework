@@ -8,6 +8,8 @@ import type { IntentWorkflowSignals } from '@sdlc/contracts';
 import { Registry, type PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
+import { AdminAgentsController } from './admin/agents.controller.js';
+import { AdminAuditController } from './admin/audit.controller.js';
 import { AdminProjectsController } from './admin/projects.controller.js';
 import { AdminTenantAdminsController } from './admin/tenant-admins.controller.js';
 import { AdminUsersController } from './admin/users.controller.js';
@@ -22,6 +24,7 @@ import { HealthController } from './health/health.controller.js';
 import { IntentsController } from './intents/intents.controller.js';
 import { IntentsService } from './intents/intents.service.js';
 import { MeController } from './me/me.controller.js';
+import { MeTokensController } from './me/tokens.controller.js';
 import { LogContextInterceptor } from './observability/log-context.interceptor.js';
 import { createApiLogger } from './observability/logging.js';
 import type { ApiSettings } from './settings.js';
@@ -65,6 +68,9 @@ class ApiModule {
         AdminProjectsController,
         AdminUsersController,
         AdminTenantAdminsController,
+        AdminAuditController,
+        AdminAgentsController,
+        MeTokensController,
       ],
       providers: [
         { provide: DATABASE, useValue: deps.db },
