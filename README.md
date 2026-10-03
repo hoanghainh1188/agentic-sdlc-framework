@@ -94,7 +94,7 @@ All 44 tasks: [design/D-08-mvp-backlog.md](design/D-08-mvp-backlog.md).
 ├── CHANGELOG.md                  # Version history
 ├── .github/
 │   ├── pull_request_template.md  # PR template with AI disclosure (T2)
-│   └── workflows/                # CI (currently: render SVG from Mermaid)
+│   └── workflows/                # CI (ci.yml: checks, scans, integration jobs)
 ├── handbook/                     # HANDBOOK: policies, process, templates (in progress)
 │   ├── 00-introduction/          # Contents, glossary, principles, codes, writing style
 │   ├── 01-policy/                # Part I: policy and governance (leadership)
