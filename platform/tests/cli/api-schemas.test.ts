@@ -3,6 +3,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  adminConfigSchema,
+  adminIdentitySchema,
+  adminProjectSchema,
+  adminRoleSchema,
+  adminTenantRoleSchema,
+  adminUserSchema,
   aiRecordSchema,
   decisionSchema,
   escalationSchema,
@@ -12,6 +18,12 @@ import {
 } from '../../apps/cli/src/api/schemas.js';
 import {
   aiRecordBody,
+  configBody,
+  identityBody,
+  projectBody,
+  roleBody,
+  tenantRoleBody,
+  userBody,
   decisionBody,
   escalationBody,
   intentBody,
@@ -36,6 +48,13 @@ describe('CLI response schemas match the API presenters', () => {
     ],
     ['AI record', aiRecordSchema, aiRecordBody({ confirmed_at: '2026-10-01' })],
     ['me', meSchema, meBody()],
+    ['admin project', adminProjectSchema, projectBody()],
+    ['admin user', adminUserSchema, userBody({}, true)],
+    ['admin identity', adminIdentitySchema, identityBody({ unlinked_at: new Date() })],
+    ['admin role', adminRoleSchema, roleBody()],
+    ['admin tenant role', adminTenantRoleSchema, tenantRoleBody()],
+    ['admin config', adminConfigSchema, configBody()],
+    ['admin config (defaults only)', adminConfigSchema, configBody(0)],
   ] as const)('%s', (_name, schema, body) => {
     const parsed = schema.safeParse(body);
     expect(parsed.error?.issues).toBeUndefined();

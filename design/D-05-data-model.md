@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.18 |
+| Version | 1.19 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the C10 plan (agent register; ADR-M31); 1.12 approved by Harry on 2026-09-27 in the B07 plan (intent workflow: `gate_entered_at`, one open intent per issue, status notices; ADR-M30, QUESTIONS #68, #91); 1.13 approved by Harry on 2026-09-27 in the B07 session 2 plan (notice kinds `hotl_passed` and `returned`, `waited_seconds`, clocks of `escalations.created_at` and gate decision events; ADR-M30 §2.4b, §2.9); 1.14 approved by Harry on 2026-09-27 in the B12 plan (project AI record: codes only, version history; ADR-M32, QUESTIONS #103–#106); 1.15 approved by Harry on 2026-09-27 in the C06 plan (G4 reason codes, notice kinds and `intent_notices.agent_id`, a blocked intent is finished; ADR-M33, QUESTIONS #110); 1.16 approved by Harry on 2026-09-27 in the C06 session 2 plan (run notice kinds and stop reasons; ADR-M33 §2.6–§2.7); 1.17 approved by Harry on 2026-09-27 in the C06 session 2 plan, PR 2b (`evidence_items` as built, notice kind `proposal_ready`, run event `proposal_stored`; ADR-M33 §2.9); 1.18 approved by Harry on 2026-09-28 in the C07 plan and 2026-10-03 (G4 reason code `instructions_unpinned`, run events `key_issued`, `budget_warning`, `diff_stored`, `changes_checked`, the `decimal` value kind, stop reasons `max_budget` and `agent_changes_unavailable`, evidence `diff`; ADR-M34, QUESTIONS #126, #130) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 (`config_hash` definition); 1.2 approved by Harry on 2026-09-25 in the A07 plan (audit log details); 1.3 approved by Harry on 2026-09-25 in the B01 plan (`intents.created_by` note); 1.4 approved by Harry on 2026-09-25 in the B02 plan (gate decisions: `gate_check_mode`, `voids_decision_id`, reason codes; ADR-M20); 1.5 approved by Harry on 2026-09-26 in the C02 plan (runs, run events; ADR-M22); 1.6 approved by Harry on 2026-09-26 in the C03 plan (cost records; ADR-M24); 1.7 approved by Harry on 2026-09-27 in the B03 plan (API token format; ADR-M26); 1.8 approved by Harry on 2026-09-27 in the B06 plan (Git event receipts; ADR-M27); 1.9 approved by Harry on 2026-09-27 in the B11 plan (escalations, notices; ADR-M28); 1.10 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent run events and stop reasons; ADR-M29, QUESTIONS #82); 1.11 approved by Harry on 2026-09-27 in the C10 plan (agent register; ADR-M31); 1.12 approved by Harry on 2026-09-27 in the B07 plan (intent workflow: `gate_entered_at`, one open intent per issue, status notices; ADR-M30, QUESTIONS #68, #91); 1.13 approved by Harry on 2026-09-27 in the B07 session 2 plan (notice kinds `hotl_passed` and `returned`, `waited_seconds`, clocks of `escalations.created_at` and gate decision events; ADR-M30 §2.4b, §2.9); 1.14 approved by Harry on 2026-09-27 in the B12 plan (project AI record: codes only, version history; ADR-M32, QUESTIONS #103–#106); 1.15 approved by Harry on 2026-09-27 in the C06 plan (G4 reason codes, notice kinds and `intent_notices.agent_id`, a blocked intent is finished; ADR-M33, QUESTIONS #110); 1.16 approved by Harry on 2026-09-27 in the C06 session 2 plan (run notice kinds and stop reasons; ADR-M33 §2.6–§2.7); 1.17 approved by Harry on 2026-09-27 in the C06 session 2 plan, PR 2b (`evidence_items` as built, notice kind `proposal_ready`, run event `proposal_stored`; ADR-M33 §2.9); 1.18 approved by Harry on 2026-09-28 in the C07 plan and 2026-10-03 (G4 reason code `instructions_unpinned`, run events `key_issued`, `budget_warning`, `diff_stored`, `changes_checked`, the `decimal` value kind, stop reasons `max_budget` and `agent_changes_unavailable`, evidence `diff`; ADR-M34, QUESTIONS #126, #130); 1.19 approved by Harry on 2026-10-03 in the B13 plan (tenant admins, unlinked identities, the hash of the stored configuration YAML; ADR-M37, QUESTIONS #95, #150) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-07 (tokens), handbook/00-introduction/05-codes.md |
 | Main sources | Draft v1.0: 4.11 (artifacts, evidence), 4.15 (logical data model), 5.5 (physical data), 5.7 (audit trail) |
@@ -48,6 +48,7 @@ erDiagram
     tenants ||--o{ users : "has"
     users ||--o{ user_identities : "links"
     users ||--o{ role_bindings : "is assigned"
+    users ||--o{ tenant_role_bindings : "is tenant admin"
     users ||--o{ api_tokens : "owns"
     projects ||--o{ role_bindings : "within"
     projects ||--|| project_configs : "configured by"
@@ -104,6 +105,7 @@ Use the canonical codes (handbook/00-introduction/05-codes.md).
 | `escalation_status` | `open`, `acknowledged`, `resolved`, `closed` |
 | `escalation_route` | `intent`, `technical`, `security`, `policy`: who receives an escalation first (handbook Ch.6 §6.4; ADR-M28) |
 | `escalation_step` | `owner`, `backup`, `governance`: the chain when nobody acknowledges (handbook Ch.6 §6.5; ADR-M28) |
+| `tenant_role` | `tenant_admin`: tenant-level roles, not tied to a project (QUESTIONS #150; ADR-M37) |
 | `git_provider` | `github` (MVP), `gitlab` (MVP+1) |
 | `event_source` | `polling`, `webhook` |
 | `gate_reason_code` | `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `agent_not_runnable`, `instructions_mismatch`, `autonomy_not_allowed` (G4, ADR-M33), `instructions_unpinned` (G4 and G5: an agent instruction file the register does not pin, or a commit the Git host lists only in part; ADR-M34 §2.4), `other` (ADR-M20) |
@@ -150,6 +152,7 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | version | int | Incremented on every change |
 | config_yaml | text | Gates: deadlines, retry counts, warning thresholds. Default budgets. Policy rules |
 | config_hash | char(64) | SHA-256 of the RFC 8785 canonical JSON of the **effective** configuration (defaults merged with `config_yaml`, validated). Comments, whitespace, key order and values that only repeat a default do not change it (ADR-M18) |
+| override_sha256 | char(64) | SHA-256 of `config_yaml` as stored (UTF-8 text), written by the repository (B13, QUESTIONS #95). When `config_hash` no longer matches but this hash does, only the platform defaults changed: the start-up check re-hashes the configuration and saves a new version (actor `system`, ADR-M37 §2.5); otherwise the YAML was changed outside the platform and the project fails closed |
 | updated_by | uuid FK users | |
 
 - [Proposal] Every gate decision records the `config_hash` in force, so we know which configuration the gate ran under (supports tuning in M-F).
@@ -172,8 +175,11 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | provider | git_provider | |
 | external_id | text | Numeric GitHub account ID (not the username, which can change) |
 | external_login | text | Current username, display only |
+| unlinked_at | timestamptz null | Set once when the identity is unlinked (B13); never set on insert. Null = linked |
 
-- Unique: (`tenant_id`, `provider`, `external_id`).
+- Unique: (`tenant_id`, `provider`, `external_id`) for **linked** identities only (B13), so an account can be linked again after it was unlinked.
+- `external_id` is the numeric account ID (CHECK: digits, no leading zero); a login can never be stored there (QUESTIONS #45, ADR-M37 §2.3). `external_login` is 1–100 characters.
+- An identity is unlinked, never deleted; an unlinked identity never changes again (trigger, `SDA11`). Unlinked identities never decide and are never mentioned.
 - Comment commands and reviews are mapped to users by `external_id` only, never by `external_login`; bots never decide (QUESTIONS #45, ADR-M27).
 
 **`role_bindings`**
@@ -184,6 +190,20 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | user_id | uuid FK | |
 | project_id | uuid FK | |
 | role | project_role | One person may have several rows. The platform never lets the same person act as producer and approver of one change |
+
+- Granted and revoked by a tenant admin or the project's `admin` (B13, ADR-M37 §2.2): nobody grants a role to themselves, and one person never holds both roles of a pair in config `access.conflicting_roles` (always Person A and Person B, rule M21).
+
+**`tenant_role_bindings`** (task B13, QUESTIONS #150, ADR-M37 §2.1): tenant-level roles.
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid FK | |
+| role | tenant_role | `tenant_admin`: projects, users, identities, tokens, the agent register, `audit verify`, and the roles and configuration of every project. Never a gate approver |
+| revoked_at | timestamptz null | Set once when the role is withdrawn (trigger, `SDA11`). Null = active |
+
+- One active row per person and role (partial unique index). `platform_app` may update `revoked_at` only; no DELETE.
+- The tenant always keeps one active tenant admin whose user is active: the last one cannot be revoked or disabled. `sdlc admin bootstrap` makes the first user a tenant admin.
 
 **`api_tokens`** (personal tokens for the CLI / API)
 
@@ -707,3 +727,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.16 | 2026-09-27 | Claude (task C06, session 2a), approved by Harry | §6.2 `intent_notices.kind`: `run_started`, `run_finished`, `run_failed`, `run_not_started`, `run_resumed`; §6.4 `runs.stop_reason` codes of C06. No migration (ADR-M33 §2.6–§2.7) |
 | 1.17 | 2026-09-27 | Claude (task C06, session 2b), approved by Harry | §6.6 `evidence_items` as built (migration `0012-evidence-items`, written once, never overwritten); §6.2 notice kind `proposal_ready`; §6.4 run event `proposal_stored`, stop reasons `agent_proposal_unavailable`, `agent_proposal_failed` (ADR-M33 §2.9) |
 | 1.18 | 2026-10-03 | Claude (task C07, PR 1), approved by Harry | §5 `gate_reason_code`: `instructions_unpinned`; §6.4 run events `key_issued`, `budget_warning`, `diff_stored`, `changes_checked`, the `decimal` value kind, stop reasons `max_budget`, `agent_changes_unavailable`; §6.6 diff URIs (migration `0013-gate-g5-runner`, ADR-M34, QUESTIONS #126, #130) |
+| 1.19 | 2026-10-03 | Claude (task B13, PR 1), approved by Harry | §4 ERD (D13): `tenant_role_bindings`; §5 enum `tenant_role`; §6.1 `tenant_role_bindings`, `user_identities.unlinked_at` (numeric `external_id`, unique while linked), `project_configs.override_sha256`, the role-grant rules (migration `0014-admin-onboarding`, ADR-M37, QUESTIONS #95, #150, #151, #154) |

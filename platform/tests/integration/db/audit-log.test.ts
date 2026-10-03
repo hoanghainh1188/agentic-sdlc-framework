@@ -1,6 +1,8 @@
 // D-08 A07 on a live PostgreSQL: append-only audit log (AC1), per-tenant hash chain (AC2),
 // concurrent writers (AC3), `sdlc audit verify` detects a modified record (AC4), audited config
 // and AI record saves, and QUESTIONS #12 (a revoked role binding never changes again).
+import { createHash } from 'node:crypto';
+
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -20,6 +22,8 @@ interface Seeded {
   readonly projectId: string;
   readonly userId: string;
 }
+
+const sha256 = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
 
 describeDb('A07: audit log on PostgreSQL', () => {
   let t: TestDatabase;
@@ -307,7 +311,7 @@ describeDb('A07: audit log on PostgreSQL', () => {
   });
 
   describe('audited saves (ADR-M09 section 2.7)', () => {
-    it('project config save appends config.changed with version and config_hash only', async () => {
+    it('project config save appends config.changed with version, config_hash and the YAML hash only', async () => {
       const s = await seed();
       await s.scope.projectConfigs.save(s.projectId, {
         configYaml: 'secret: text that must not reach the audit log',
@@ -346,7 +350,11 @@ describeDb('A07: audit log on PostgreSQL', () => {
           null,
           'project',
           s.projectId,
-          { version: 1, config_hash: HASH('1') },
+          {
+            version: 1,
+            config_hash: HASH('1'),
+            override_sha256: sha256('secret: text that must not reach the audit log'),
+          },
         ],
         [
           'config.changed',
@@ -354,7 +362,7 @@ describeDb('A07: audit log on PostgreSQL', () => {
           s.userId,
           'project',
           s.projectId,
-          { version: 2, config_hash: HASH('2') },
+          { version: 2, config_hash: HASH('2'), override_sha256: sha256('v2') },
         ],
       ]);
       expect(await s.scope.audit.verify()).toMatchObject({ checked: 2 });

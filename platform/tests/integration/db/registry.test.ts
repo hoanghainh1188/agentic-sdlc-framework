@@ -232,14 +232,26 @@ describeDb('B02: registry on PostgreSQL', () => {
       ).toBe('12.250000');
     });
 
-    it('refuses a stored configuration whose hash does not match', async () => {
+    it('refuses a stored configuration whose YAML was changed outside the platform', async () => {
+      const s = await seed('budget:\n  default_intent_usd: 7.5\n');
+      await tamper(t.name, `UPDATE project_configs SET config_yaml = $1 WHERE project_id = $2`, [
+        'budget:\n  default_intent_usd: 70\n',
+        s.projectId,
+      ]);
+      expect(await rejection(registry.createIntent(s.scope, newIntent(s)))).toBe(
+        'config_hash_mismatch:',
+      );
+    });
+
+    it('refuses a stored configuration whose hash no longer matches its unchanged YAML (B13 AC8)', async () => {
+      // What a release that changes a default looks like: the start-up check re-hashes it.
       const s = await seed('budget:\n  default_intent_usd: 7.5\n');
       await tamper(t.name, `UPDATE project_configs SET config_hash = $1 WHERE project_id = $2`, [
         HASH('9'),
         s.projectId,
       ]);
       expect(await rejection(registry.createIntent(s.scope, newIntent(s)))).toBe(
-        'config_hash_mismatch:',
+        'config_defaults_drift:',
       );
     });
 

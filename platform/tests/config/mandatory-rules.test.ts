@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M20: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M21: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -403,6 +403,21 @@ const CASES: Case[] = [
     yaml: 'run:\n  failed_run_escalation: { severity: high, response_level: notify }\n',
     key: 'config.rule.failed_run_escalation_freezes',
     path: 'run.failed_run_escalation.response_level',
+  },
+  // M21: Person A and Person B stay a conflicting pair (B13, ADR-M37, QUESTIONS #154).
+  {
+    name: 'conflicting roles without Person A and Person B',
+    rule: 'M21',
+    yaml: 'access:\n  conflicting_roles: [[person_b, second_approver]]\n',
+    key: 'config.rule.person_a_person_b_conflict',
+    path: 'access.conflicting_roles',
+  },
+  {
+    name: 'no conflicting roles at all',
+    rule: 'M21',
+    yaml: 'access:\n  conflicting_roles: []\n',
+    key: 'config.rule.person_a_person_b_conflict',
+    path: 'access.conflicting_roles',
   },
 ];
 

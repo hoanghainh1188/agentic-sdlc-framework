@@ -6,10 +6,23 @@ import type {
   GateDecisionRow,
   Intent,
   Plan,
+  Project,
   ProjectAiRecord,
+  RoleBinding,
   SpecRef,
+  TenantRoleBinding,
+  User,
+  UserIdentity,
 } from '../../packages/core/src/index.js';
 
+import {
+  presentConfig,
+  presentIdentity,
+  presentProject,
+  presentRoleBinding,
+  presentTenantRole,
+  presentUser,
+} from '../../apps/api/src/admin/present.js';
 import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
 import { presentEscalation } from '../../apps/api/src/escalations/present.js';
 import {
@@ -164,6 +177,109 @@ export function meBody(): Record<string, unknown> {
     user: { id: USER, display_name: 'Harry', email: 'harry@example.test' },
     tenant_id: TENANT,
     token_id: '77777777-7777-4777-8777-777777777777',
+    tenant_admin: false,
     roles: [{ project: PROJECT, role: 'person_a' }],
   };
+}
+
+// Admin endpoints (B13, ADR-M37).
+export const OTHER_USER = '88888888-8888-4888-8888-888888888888';
+
+export function projectBody(overrides: Partial<Project> = {}): Record<string, unknown> {
+  return presentProject({
+    id: PROJECT.id,
+    tenant_id: TENANT,
+    slug: PROJECT.slug,
+    name: 'Pilot',
+    git_provider: 'github',
+    repo_full_name: 'harryforge/pilot-order-inventory',
+    default_branch: 'main',
+    status: 'active',
+    created_at: AT,
+    ...overrides,
+  });
+}
+
+export function userBody(
+  overrides: Partial<User> = {},
+  tenantAdmin = false,
+): Record<string, unknown> {
+  return presentUser(
+    {
+      id: OTHER_USER,
+      tenant_id: TENANT,
+      display_name: 'Bao',
+      email: 'bao@example.test',
+      status: 'active',
+      created_at: AT,
+      ...overrides,
+    },
+    tenantAdmin,
+  );
+}
+
+export function identityBody(overrides: Partial<UserIdentity> = {}): Record<string, unknown> {
+  return presentIdentity({
+    id: '99999999-9999-4999-8999-999999999999',
+    tenant_id: TENANT,
+    user_id: OTHER_USER,
+    provider: 'github',
+    external_id: '583231',
+    external_login: 'octocat',
+    unlinked_at: null,
+    created_at: AT,
+    ...overrides,
+  });
+}
+
+export function roleBody(overrides: Partial<RoleBinding> = {}): Record<string, unknown> {
+  return presentRoleBinding(
+    {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      tenant_id: TENANT,
+      user_id: OTHER_USER,
+      project_id: PROJECT.id,
+      role: 'person_b',
+      revoked_at: null,
+      created_at: AT,
+      ...overrides,
+    },
+    PROJECT,
+  );
+}
+
+export function tenantRoleBody(
+  overrides: Partial<TenantRoleBinding> = {},
+): Record<string, unknown> {
+  return presentTenantRole({
+    id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    tenant_id: TENANT,
+    user_id: OTHER_USER,
+    role: 'tenant_admin',
+    revoked_at: null,
+    created_at: AT,
+    ...overrides,
+  });
+}
+
+export function configBody(version = 1): Record<string, unknown> {
+  return presentConfig(
+    {
+      project: PROJECT,
+      version,
+      configYaml: version === 0 ? '' : 'budget:\n  warn_percent: 70\n',
+      configHash: HASH,
+      overrideSha256: version === 0 ? null : 'b'.repeat(64),
+      updatedBy: version === 0 ? null : USER,
+      updatedAt: version === 0 ? null : AT,
+      warnings: [
+        {
+          key: 'config.warning.mode_loosened',
+          path: 'oversight.matrix.G2.medium.mode',
+          params: { from: 'HITL', to: 'HOTL' },
+        },
+      ],
+    },
+    'en',
+  );
 }

@@ -11,8 +11,16 @@ export type RegistryErrorCode =
   | 'project_not_active'
   /** The stored project configuration no longer validates. */
   | 'config_invalid'
-  /** The stored `config_hash` differs from the hash of the stored configuration. */
+  /**
+   * The stored YAML is not the YAML the configuration was saved with (its `override_sha256`
+   * differs): it was changed outside the platform. Refused until someone saves it again.
+   */
   | 'config_hash_mismatch'
+  /**
+   * The stored YAML is unchanged but its effective hash differs: the platform defaults changed
+   * (a new release). The start-up check re-hashes it (B13 AC8, QUESTIONS #95); until then refused.
+   */
+  | 'config_defaults_drift'
   /** The decision breaks a registry rule; `reason` says which. */
   | 'decision_not_allowed'
   /** The policy engine refused the approval (D-02 FR-11, FR-16); `reason` says why. */

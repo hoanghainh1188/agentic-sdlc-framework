@@ -1,12 +1,14 @@
 // The sdlc command-line tool. See design/D-03 section 5.1.
 // A07 adds `sdlc audit verify`, B03 the operator commands `sdlc admin …` (database, on the
 // server). B04 adds the user commands (through the API, design/ADR-M36): login, logout, whoami,
-// intent, gate, escalation, ai-record.
+// intent, gate, escalation, ai-record. B13 adds the admin commands through the API (ADR-M37):
+// sdlc admin project|user|identity|role|config|tenant-admin.
 import { parseArgs } from 'node:util';
 
 import { t } from '@sdlc/messages';
 
 import { runAdmin } from './commands/admin.js';
+import { isAdminApiGroup, runAdminApi } from './commands/admin-api.js';
 import { runAiRecord } from './commands/ai-record.js';
 import { auditVerify } from './commands/audit-verify.js';
 import { runEscalation } from './commands/escalation.js';
@@ -48,7 +50,10 @@ export async function runCli(argv: readonly string[], ctx: CliContext): Promise<
   }
   if (group === 'admin') {
     try {
-      return await runAdmin(argv.slice(1), ctx);
+      // B13: project, user, identity, role, config, tenant-admin go through the API (ADR-M37).
+      return isAdminApiGroup(command)
+        ? await runAdminApi(argv.slice(1), ctx)
+        : await runAdmin(argv.slice(1), ctx);
     } catch (error) {
       ctx.stderr(
         t('cli.failed', { reason: clean(error instanceof Error ? error.message : String(error)) }),

@@ -55,7 +55,10 @@ export function reportApiFailure(ctx: CliContext, error: ApiCallError, json: boo
         : (reason_message ?? reason);
       sayError(ctx, 'cli.api.reason', { reason, message: text });
     }
-    for (const detail of details ?? []) sayError(ctx, 'cli.api.detail', detail);
+    // A configuration issue (B13) carries its catalog text; other details carry a zod code.
+    for (const detail of details ?? []) {
+      sayError(ctx, 'cli.api.detail', { path: detail.path, issue: detail.message ?? detail.issue });
+    }
   }
   if (exit === EXIT.auth) sayError(ctx, 'cli.api.login_again');
   return exit;

@@ -16,7 +16,13 @@ export const errorEnvelopeSchema = z.object({
     reason: code.optional(),
     reason_message: z.string().max(2000).optional(),
     details: z
-      .array(z.object({ path: z.string().max(200), issue: z.string().max(200) }))
+      .array(
+        z.object({
+          path: z.string().max(200),
+          issue: z.string().max(200),
+          message: z.string().max(2000).optional(),
+        }),
+      )
       .max(100)
       .optional(),
   }),
@@ -27,6 +33,7 @@ export const meSchema = z.object({
   user: z.object({ id, display_name: z.string().max(200), email: z.string().max(320) }),
   tenant_id: id,
   token_id: id,
+  tenant_admin: z.boolean().optional(),
   roles: z
     .array(z.object({ project: z.object({ id, slug: code.nullable() }), role: code }))
     .max(10_000),
@@ -138,3 +145,81 @@ export const aiRecordSchema = z.object({
   created_at: time,
 });
 export type AiRecordView = z.infer<typeof aiRecordSchema>;
+
+// Admin endpoints (task B13, ADR-M37 §2.6).
+export const adminProjectSchema = z.object({
+  id,
+  slug: code,
+  name: z.string().max(200),
+  git_provider: code,
+  repo_full_name: z.string().max(200),
+  default_branch: z.string().max(100),
+  status: code,
+  created_at: time,
+});
+export type AdminProjectView = z.infer<typeof adminProjectSchema>;
+export const adminProjectListSchema = z.object({ items: z.array(adminProjectSchema).max(10_000) });
+
+export const adminUserSchema = z.object({
+  id,
+  display_name: z.string().max(200),
+  email: z.string().max(320),
+  status: code,
+  tenant_admin: z.boolean(),
+  created_at: time,
+});
+export type AdminUserView = z.infer<typeof adminUserSchema>;
+export const adminUserListSchema = z.object({ items: z.array(adminUserSchema).max(100_000) });
+
+export const adminIdentitySchema = z.object({
+  id,
+  user_id: id,
+  provider: code,
+  external_id: code,
+  external_login: code,
+  unlinked_at: time.nullable(),
+  created_at: time,
+});
+export type AdminIdentityView = z.infer<typeof adminIdentitySchema>;
+export const adminIdentityListSchema = z.object({ items: z.array(adminIdentitySchema).max(1000) });
+
+export const adminRoleSchema = z.object({
+  id,
+  user_id: id,
+  project: z.object({ id, slug: code }),
+  role: code,
+  revoked_at: time.nullable(),
+  created_at: time,
+});
+export type AdminRoleView = z.infer<typeof adminRoleSchema>;
+export const adminRoleListSchema = z.object({ items: z.array(adminRoleSchema).max(100_000) });
+
+export const adminTenantRoleSchema = z.object({
+  id,
+  user_id: id,
+  role: code,
+  revoked_at: time.nullable(),
+  created_at: time,
+});
+export type AdminTenantRoleView = z.infer<typeof adminTenantRoleSchema>;
+export const adminTenantRoleListSchema = z.object({
+  items: z.array(adminTenantRoleSchema).max(10_000),
+});
+
+const configIssueSchema = z.object({
+  key: z.string().max(200),
+  path: z.string().max(200),
+  message: z.string().max(2000),
+});
+
+export const adminConfigSchema = z.object({
+  project: z.object({ id, slug: code }),
+  version: z.number().int().min(0),
+  config_yaml: z.string().max(64 * 1024),
+  config_hash: z.string().max(64),
+  override_sha256: z.string().max(64).nullable(),
+  updated_by: id.nullable(),
+  updated_at: time.nullable(),
+  warnings: z.array(configIssueSchema).max(1000),
+});
+export type AdminConfigView = z.infer<typeof adminConfigSchema>;

@@ -49,7 +49,15 @@ export type { SubmitPlan } from './repositories/plans.js';
 export type { RegistryActor } from './repositories/registry-actor.js';
 export type { StoreRunContract, StoredRunContract } from './repositories/run-contracts.js';
 export { isSafeRepoPath, type LinkSpec } from './repositories/spec-refs.js';
-export type { SaveProjectConfig } from './repositories/project-configs.js';
+export {
+  MAX_WARNING_CODES,
+  overrideSha256,
+  type ConfigChangeCause,
+  type SaveProjectConfig,
+} from './repositories/project-configs.js';
+export type { UserIdentityQuery } from './repositories/user-identities.js';
+export type { ProjectUpdate } from './repositories/projects.js';
+export type { UserUpdate } from './repositories/users.js';
 export type { RoleBindingQuery } from './repositories/role-bindings.js';
 export type { SaveProjectAiRecord } from './repositories/project-ai-records.js';
 export type {
@@ -76,6 +84,7 @@ export type {
   SpecRef,
   Tenant,
   TenantInsert,
+  TenantRoleBinding,
   User,
   UserIdentity,
 } from './schema.js';

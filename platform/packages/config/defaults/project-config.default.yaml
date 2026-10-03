@@ -221,6 +221,15 @@ access:
   # Writers may always read. The viewer role never writes it (mandatory rule M19).
   ai_record_write_roles: [person_a, pm_brse]
   ai_record_read_roles: [person_a, person_b, second_approver, pm_brse, governance, admin, viewer]
+  # Task B13, ADR-M37, QUESTIONS #154. Separation of duties (handbook Ch.5, codes table §5): one
+  # person never holds both roles of a pair on the same project. Person A (owner) and Person B
+  # (independent reviewer) always stay apart (mandatory rule M21): G1–G3 have no producers
+  # (QUESTIONS #64), so one person holding both could approve every gate of their own intent.
+  # Person B and the second approver are the two people of a dual approval (FR-16).
+  # [Proposal] pilot default for the second pair, review after 2–4 weeks of data (handbook Ch.8).
+  conflicting_roles:
+    - [person_a, person_b]
+    - [person_b, second_approver]
 
 agents:
   # Handbook Ch.20 §20.8 (decision: Harry, 2026-09-24): recertify every agent every 3 months. The
