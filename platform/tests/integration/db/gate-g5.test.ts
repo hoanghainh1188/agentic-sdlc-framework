@@ -20,6 +20,7 @@ import { DbError } from '../../../packages/core/src/db/errors.js';
 import type { Intent } from '../../../packages/core/src/db/schema.js';
 import {
   acknowledgeEscalation,
+  closeEscalation,
   decideEscalation,
 } from '../../../packages/core/src/escalation/decide.js';
 import { recordBudgetWarning } from '../../../packages/core/src/run-events/budget-warning.js';
@@ -448,6 +449,23 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
       expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G3' });
     });
 
+    it('an escalation closed without a decision acted on: G5 raises a new one', async () => {
+      const intent = await atG4(t, 'medium');
+      await runToG5(intent, { status: 'stopped_budget', reason: 'max_iterations' });
+      await t.settleRuns(intent);
+      const first = await g5Escalation(intent);
+      await closeEscalation(
+        t.f.scope,
+        { escalationId: first.id, closedBy: { type: 'human', id: t.f.users.gov } },
+        clockDeps,
+      );
+      expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'g5_review' });
+      const second = await g5Escalation(intent);
+      expect(second.id).not.toBe(first.id);
+      expect(second.status).toBe('open');
+      expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G5' });
+    });
+
     it('decision B: terminate → cancelled, the escalation closed, notice terminated', async () => {
       const intent = await atG4(t, 'medium');
       await runToG5(intent, { status: 'stopped_budget', reason: 'max_budget' });
@@ -532,7 +550,10 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
       await t.settle(intent);
       await t.decide(await reload(intent), 'approve', 'a'); // Person A allows the run
       await runToG5(intent, { status: 'succeeded' });
-      expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'g5_decision' });
+      expect(await t.settleRuns(intent)).toMatchObject({
+        outcome: 'waiting',
+        reason: 'g5_decision',
+      });
       const approveG5 = async (who: 'a' | 'b') =>
         decideGate(t.f.registry, t.f.scope, {
           intent: await reload(intent),
@@ -542,10 +563,26 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
           source: 'cli',
         });
       await expect(approveG5('a')).rejects.toMatchObject({ code: 'approval_refused' });
+
+      // FR-12: past the gate deadline (1 working day), one overdue escalation; the run's
+      // producer is never its owner or decider.
+      t.setClock(new Date(T0.getTime() + 3 * DAY));
+      expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'g5_decision' });
+      await t.settleRuns(intent);
+      const overdue = (await t.f.scope.escalations.listForIntent(intent.id)).filter(
+        (e) => e.trigger === 'time',
+      );
+      expect(overdue).toHaveLength(1);
+      expect(overdue[0]).toMatchObject({
+        packet: { gate: 'G5', subject_kind: 'g5_input' },
+        producer_ids: [t.f.users.a],
+      });
+
       await approveG5('b');
       await t.settleRuns(intent);
       expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G6' });
       expect(await g5(intent)).toEqual([['approve', null, 'HITL']]);
+      expect((await t.f.scope.escalations.getById(overdue[0]!.id))?.status).toBe('closed');
     });
   });
 });

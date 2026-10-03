@@ -28,6 +28,7 @@ export async function returnedFromG5(scope: TenantScope, intentId: string): Prom
   return (await scope.escalations.listForIntent(intentId)).some(
     (e) =>
       e.status === 'closed' &&
+      e.trigger !== 'time' &&
       e.packet.gate === 'G5' &&
       G5_RETURN_DECISIONS.includes(String(e.decision?.decision)),
   );

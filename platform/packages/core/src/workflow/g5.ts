@@ -45,7 +45,7 @@ import {
   type ValidatedProjectConfig,
 } from '@sdlc/contracts';
 
-import { fromMicros, toMicros } from '../cost/money.js';
+import { fromMicros, isUsd, toMicros } from '../cost/money.js';
 import type { IntentNoticeKind } from '../db/repositories/intent-notices.js';
 import type { Escalation, Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
@@ -61,6 +61,7 @@ import type { Registry } from '../registry/registry.js';
 import { G4_OPERATOR_ROLES } from './g4.js';
 import { gatherG5Facts, spentPercent, type G5Facts } from './g5-facts.js';
 import { gateHistory } from './gate-history.js';
+import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
 import { sentBackForInput } from './hotl.js';
 import { waitedSeconds } from './waited.js';
 
@@ -170,7 +171,23 @@ export async function stepG5(
       inputSha256: facts.inputSha256,
     });
     const approvals = valid.filter((a) => history.countedApprovals.has(a.id));
-    if (approvals.length < Math.max(1, oversight.approvalsNeeded)) return wait('g5_decision');
+    if (approvals.length < Math.max(1, oversight.approvalsNeeded)) {
+      // FR-12 (ADR-M30 §2.9): the gate deadline and its overdue escalation, as at G1–G4.
+      const wakeInMs = await checkGateOverdue(tx, registry, {
+        intent,
+        gate: 'G5',
+        config: policy.config,
+        oversight,
+        clockStart: gateClockStart(intent, history.latestChangesRequestAt),
+        subject: { kind: 'g5_input', sha256: facts.inputSha256 },
+        producers: facts.run.triggered_by === null ? [] : [facts.run.triggered_by],
+      });
+      return wakeInMs === undefined
+        ? wait('g5_decision')
+        : { outcome: 'waiting', reason: 'g5_decision', wakeInMs };
+    }
+    // A person decided: the overdue escalation closes before the freeze check (as at G1–G4).
+    await closeGateOverdue(tx, registry, intent.id, 'G5');
     if (!(await advanceAllowed(tx, intent, registry))) return wait('frozen');
     return move(tx, registry, intent, { status: 'in_gate', gate: 'G6' }, 'advanced', {
       decisionId: approvals.at(-1)!.id,
@@ -288,13 +305,18 @@ export async function stepPausedG5(
         .filter((e) => e.run_id === run.id && e.packet.gate === 'G5')
         .at(-1)
     : undefined;
-  if (!run || !escalation || escalation.status === 'closed') return wait('g5_review');
+  if (!run || !escalation) return wait('g5_review');
   // FR-17: the escalation is bound to the G5 input it was raised for. A changed input (a late
   // spend sync) voids its decision and closes it; G5 is evaluated again on the new result, which
   // raises a new escalation bound to the new input.
+  // An escalation closed outside this step (no decision acted on) is re-evaluated the same way:
+  // G5 raises a new escalation, so the intent never stays paused without one.
   const current = (await gatherG5Facts(tx, intent.id))?.inputSha256 ?? null;
-  if (current !== null && current !== escalation.packet.subject_sha256) {
-    if (escalation.decision !== null) {
+  if (
+    escalation.status === 'closed' ||
+    (current !== null && current !== escalation.packet.subject_sha256)
+  ) {
+    if (escalation.status !== 'closed' && escalation.decision !== null && current !== null) {
       await revalidateEscalationDecision(
         tx,
         { escalationId: escalation.id, subjectSha256: current, action: 'run_start' },
@@ -394,10 +416,13 @@ async function raiseBudgetIfDecided(
   now: Date,
 ): Promise<void> {
   const amount = escalation.decision?.budget_increase_usd;
-  if (typeof amount !== 'string' || !decisionAllows(escalation, 'budget_increase', now)) return;
+  // The decision API checks the amount; the step checks again so that a bad value can never
+  // block it: no valid amount, no increase.
+  if (!isUsd(amount) || toMicros(amount) <= 0n) return;
+  if (!decisionAllows(escalation, 'budget_increase', now)) return;
   const contract = await tx.runContracts.getByRunId(runId);
   const cap = contract?.contract_json.max_budget_usd;
-  const previousCap = typeof cap === 'string' ? cap : '0';
+  const previousCap = isUsd(cap) ? cap : '0';
   await tx.intents.raiseBudget(escalation.intent_id, {
     addUsd: amount,
     runBudgetUsd: fromMicros(toMicros(previousCap) + toMicros(amount)),
@@ -459,12 +484,18 @@ async function move(
   kind: IntentNoticeKind,
   notice: { readonly decisionId: string | null; readonly audience: readonly ProjectRole[] },
 ): Promise<IntentStepResult> {
+  // The gate was decided: its overdue escalation (HITL only) closes before the move.
+  if (intent.status === 'in_gate' && intent.current_gate === 'G5') {
+    await closeGateOverdue(tx, registry, intent.id, 'G5');
+  }
   const updated = await tx.intents.moveState(intent.id, {
     from: { status: intent.status, currentGate: intent.current_gate },
     to: { status: to.status, currentGate: to.gate },
     at: registry.now(),
   });
-  if (!updated) return moved;
+  // Under the intent lock the compare-and-set cannot miss. If it does, roll back the decisions
+  // and escalations this step wrote, so that a retry does not write them twice.
+  if (!updated) throw new Error(`G5: intent ${intent.id} moved under its lock`);
   await tx.intentNotices.record({
     intentId: intent.id,
     kind,
