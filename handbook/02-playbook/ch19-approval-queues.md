@@ -120,6 +120,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - The reason text stays in your comment. The platform stores only the reason code and a link to the comment, because its records are kept for years and can never be edited. Write the reason so that it can stay on GitHub, and do not put personal or client data in it.
 - Only new comments count. **Editing a comment never changes a decision.** To change your mind, write a new comment.
 - Text on later lines, quoted text (`> /approve G3`) and commands inside code blocks are not read.
+- `/kill` stops the intent's agent run with the kill switch: Chapter 18 §18.8d.
 
 **Who may decide.**
 
@@ -216,6 +217,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc gate reject <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Rejects the gate |
 | `sdlc gate request-changes <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Requests changes |
 | `sdlc escalation list\|show\|ack\|decide …` | Chapter 18 §18.8b |
+| `sdlc run list <INT-…>` / `sdlc run kill <run ID\|INT-…>` | Lists the intent's agent runs / stops a run with the kill switch: Chapter 18 §18.8d |
 | `sdlc spec link <INT-…> --path <path/to/spec.md> [--commit <SHA>] [--tool spec-kit\|bmad\|manual]` | Links the intent's spec (below) |
 | `sdlc spec list <INT-…>` | Lists the linked spec versions: path, commit and SHA-256 |
 | `sdlc plan submit <INT-…> [--commit <SHA>]` | Submits the intent's plan file (below) |
@@ -362,3 +364,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.6 | 2026-10-03 | Claude (task B08) | §19.8c: `sdlc spec link|list`; the spec is the file on the default branch and is checked again at G2–G4 (ADR-M39) |
 | 0.7 | 2026-10-03 | Claude (task C08, PR 2) | §19.8: which gates can be decided by comment, G6 included (ADR-M38 §2.7) |
 | 0.8 | 2026-10-03 | Claude (task B09, PR 1) | §19.8c: `sdlc plan submit|list|show`; the plan file, its rules, who submits, the re-check at G3–G4 (ADR-M40) |
+| 0.9 | 2026-10-03 | Claude (task C11, PR 1) | §19.8b, §19.8c: `/kill` and `sdlc run list|kill` point to Chapter 18 §18.8d (ADR-M42) |

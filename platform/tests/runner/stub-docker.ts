@@ -226,6 +226,14 @@ export class StubDocker {
       x.running = true;
       return [204, ''];
     }
+    // C11: kill a sandbox's processes; the container stays.
+    if (m === 'POST' && (match = /^\/containers\/([^/]+)\/kill$/.exec(p))) {
+      const x = container(match[1]!);
+      if (!x) return [404, {}];
+      if (!x.running) return [409, {}];
+      x.running = false;
+      return [204, ''];
+    }
     if (m === 'DELETE' && (match = /^\/containers\/([^/]+)$/.exec(p))) {
       const x = container(match[1]!);
       if (!x) return [404, {}];

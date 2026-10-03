@@ -64,6 +64,7 @@ describeDb('B07: the intent workflow step on PostgreSQL', () => {
           woken.push(ref);
           return Promise.resolve();
         },
+        kill: () => Promise.resolve(),
       };
       f.comment(intent, '/approve G1', 'a');
       await f.poll(signals);
@@ -322,7 +323,10 @@ describeDb('B07: the intent workflow step on PostgreSQL', () => {
       const intent = await f.newIntent();
       await settle(intent);
       f.comment(intent, '/approve G1', 'a');
-      const result = await f.poll({ wake: () => Promise.reject(new Error('down')) });
+      const result = await f.poll({
+        wake: () => Promise.reject(new Error('down')),
+        kill: () => Promise.resolve(),
+      });
       expect(result.status).toBe('polled');
       expect(result.outcomes.decided).toBe(1);
     });

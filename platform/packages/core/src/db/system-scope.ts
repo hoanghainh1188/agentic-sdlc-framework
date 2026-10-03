@@ -187,6 +187,45 @@ export class SystemScope {
     return rows.map((row) => ({ tenantId: parseTenantId(row.tenant_id), intentId: row.id }));
   }
 
+  /**
+   * Kill signals to send again (task C11, ADR-M42 §2.2): `running` intents of active tenants whose
+   * latest run of the current round (created since the intent became `running`) is being killed
+   * or was killed. A kill recorded without a signal (the operator command, a lost signal) still
+   * cancels a run activity that waits in Temporal. IDs only; at most `limit`.
+   */
+  async listKillingIntents(limit: number): Promise<OpenIntent[]> {
+    const rows = await run(
+      this.db
+        .selectFrom('intents as i')
+        .innerJoin('tenants as tn', 'tn.id', 'i.tenant_id')
+        .innerJoin('runs as r', (join) =>
+          join.onRef('r.tenant_id', '=', 'i.tenant_id').onRef('r.intent_id', '=', 'i.id'),
+        )
+        .select(['i.tenant_id', 'i.id'])
+        .where('i.status', '=', 'running')
+        .where('tn.status', '=', 'active')
+        .where('r.status', 'in', ['stopping', 'stopped_killed'])
+        .whereRef('r.created_at', '>=', 'i.updated_at')
+        .where((eb) =>
+          eb.not(
+            eb.exists(
+              eb
+                .selectFrom('runs as later')
+                .select('later.id')
+                .whereRef('later.tenant_id', '=', 'r.tenant_id')
+                .whereRef('later.intent_id', '=', 'r.intent_id')
+                .whereRef('later.attempt', '>', 'r.attempt'),
+            ),
+          ),
+        )
+        .orderBy('i.tenant_id')
+        .orderBy('i.id')
+        .limit(limit)
+        .execute(),
+    );
+    return rows.map((row) => ({ tenantId: parseTenantId(row.tenant_id), intentId: row.id }));
+  }
+
   /** Health check (task B03): true when the database answers. Reads no table. */
   async ping(): Promise<true> {
     await run(sql`SELECT 1`.execute(this.db));

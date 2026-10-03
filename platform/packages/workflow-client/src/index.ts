@@ -1,8 +1,14 @@
 // Temporal client for the intent workflow (task B07, design/ADR-M30). The api and the worker use
 // it to wake an intent's workflow after they record something the workflow must see (an intent
 // created, a gate decision, an escalation acknowledged or decided). Core never imports Temporal.
-import { Client, Connection, WorkflowExecutionAlreadyStartedError } from '@temporalio/client';
 import {
+  Client,
+  Connection,
+  WorkflowExecutionAlreadyStartedError,
+  WorkflowNotFoundError,
+} from '@temporalio/client';
+import {
+  INTENT_KILL_SIGNAL,
   INTENT_TASK_QUEUE,
   INTENT_WAKE_SIGNAL,
   INTENT_WORKFLOW_TYPE,
@@ -63,9 +69,22 @@ export class TemporalIntentSignals implements IntentWorkflowSignals {
       await this.client.workflow.getHandle(workflowId).signal(INTENT_WAKE_SIGNAL);
     }
   }
+
+  /**
+   * The kill signal (C11, ADR-M42 §2.2). A plain signal: an intent without a running workflow has
+   * no run activity to cancel. A workflow that is not found is not an error.
+   */
+  async kill(ref: IntentWorkflowRef): Promise<void> {
+    try {
+      await this.client.workflow.getHandle(intentWorkflowId(ref)).signal(INTENT_KILL_SIGNAL);
+    } catch (error) {
+      if (!(error instanceof WorkflowNotFoundError)) throw error;
+    }
+  }
 }
 
 /** Signals that do nothing: a process running without Temporal (dev mode, tests). */
 export const NO_INTENT_SIGNALS: IntentWorkflowSignals = {
   wake: () => Promise.resolve(),
+  kill: () => Promise.resolve(),
 };

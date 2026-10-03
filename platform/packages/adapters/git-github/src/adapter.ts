@@ -10,6 +10,7 @@ import type {
   GitHostAdapter,
   NewPullRequest,
   PullRequestInfo,
+  RedactedSecret,
   ReviewDecision,
   SecurityFindings,
   Severity,
@@ -422,6 +423,24 @@ export class GitHubAdapter implements GitHostAdapter {
       repo,
       permissions: minted.permissions,
     };
+  }
+
+  /**
+   * Revokes an installation token the platform issued (task C11, ADR-M42 §2.4): GitHub revokes a
+   * token only with the token itself (`DELETE /installation/token`). An already revoked or expired
+   * token (401) counts as revoked. Needs no App key, so the runner can call it.
+   */
+  async revokeShortLivedToken(token: RedactedSecret): Promise<void> {
+    const value = token?.reveal();
+    if (typeof value !== 'string' || value.length === 0) {
+      throw new GitHostError('invalid_input', { field: 'token' });
+    }
+    try {
+      await this.#http.json('DELETE', 'installation/token', { auth: `Bearer ${value}` });
+    } catch (error) {
+      if (error instanceof GitHostError && error.code === 'auth_failed') return;
+      throw error;
+    }
   }
 
   async listEventsSince(

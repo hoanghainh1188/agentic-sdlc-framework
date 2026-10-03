@@ -41,6 +41,8 @@ export const ALLOWED_ENDPOINTS: readonly (readonly [Method, RegExp])[] = [
   // C06 session 2b (ADR-M33 §2.9): read the workspace out of a run sandbox only;
   // `exportWorkspace` also checks the container's name and this runner's labels first.
   ['GET', new RegExp(`^/containers/${SANDBOX}/archive$`)],
+  // C11 (ADR-M42 §2.6): kill a run sandbox's processes before its workspace is read after a kill.
+  ['POST', new RegExp(`^/containers/${SANDBOX}/kill$`)],
   ['DELETE', new RegExp(`^/containers/${NAME}$`)],
   ['GET', /^\/networks$/],
   ['POST', /^\/networks\/create$/],
@@ -247,6 +249,16 @@ export class DockerClient {
     if (res.status === 404) return undefined;
     this.#check(res, [200], 'GET');
     return JSON.parse(res.body.toString('utf8')) as ContainerInfo;
+  }
+
+  /**
+   * Kills every process of a run sandbox (SIGKILL); the container and its volume stay, so the
+   * workspace can still be read (C11). A container that is gone or not running is not an error.
+   */
+  async containerKill(name: string): Promise<void> {
+    const res = await this.request('POST', `/containers/${name}/kill`);
+    if (res.status === 404 || res.status === 409) return;
+    this.#check(res, [204], 'POST');
   }
 
   /** Waits until the container exits; returns its exit code. */

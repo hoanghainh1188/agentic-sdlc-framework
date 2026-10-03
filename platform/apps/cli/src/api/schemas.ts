@@ -124,6 +124,36 @@ export const planListSchema = z.object({
   items: z.array(planVersionSchema).max(10_000),
 });
 
+/** A run of an intent (C11, ADR-M42 §2.6): IDs, codes, counts and times. */
+const runSchema = z.object({
+  id,
+  attempt: z.number().int(),
+  status: code,
+  stop_reason: code.nullable(),
+  agent_version: code,
+  iterations: z.number().int(),
+  killed_by: id.nullable(),
+  created_at: time,
+  started_at: time.nullable(),
+  finished_at: time.nullable(),
+});
+export type RunView = z.infer<typeof runSchema>;
+
+/** `GET /v1/intents/:intent/runs` (C11). */
+export const runListSchema = z.object({
+  intent: code,
+  items: z.array(runSchema).max(10_000),
+});
+
+/** `POST /v1/runs/:run/kill` (C11). */
+export const killResultSchema = z.object({
+  run: id,
+  intent: code,
+  status: code,
+  already: z.boolean(),
+  escalation: id.nullable(),
+});
+
 /** `GET /v1/intents/:intent/specs` (B08). */
 export const specListSchema = z.object({
   intent: code,

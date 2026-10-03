@@ -10,6 +10,7 @@ import fs from 'node:fs';
 
 import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { S3EvidenceStore } from '@sdlc/adapter-evidence-s3';
+import { GitHubAdapter } from '@sdlc/adapter-git-github';
 import { LiteLLMKeySpendReader } from '@sdlc/adapter-model-litellm';
 import { createJsonLogger, PlatformDatabase, withLogContext } from '@sdlc/core';
 import { t } from '@sdlc/messages';
@@ -118,11 +119,28 @@ async function main(): Promise<void> {
   const evidence = await evidenceStores(openbao, proc.evidence);
   // The runner reads its runs' spend with each run's own key (C07, ADR-M34 §2.6).
   const spendReader = new LiteLLMKeySpendReader({ baseUrl: settings.agent.llmBaseUrl });
+  // Revokes the run's GitHub tokens right after their use (C11, ADR-M42 §2.4). Token-only: the
+  // runner never reads the GitHub App key (QUESTIONS #44), so every App call is refused.
+  const tokenRevoker = proc.githubApiUrl
+    ? new GitHubAdapter({
+        apiUrl: proc.githubApiUrl,
+        secrets: {
+          read: () => Promise.reject(new Error('the runner holds no GitHub App key')),
+        },
+      })
+    : undefined;
 
   const beat = () =>
     fs.writeFileSync(proc.heartbeatFile, new Date().toISOString(), { mode: 0o600 });
   const runner = new Runner(
-    { db, docker, settings, verifier: openbao.transit(), unwrapper: openbao.wrapping() },
+    {
+      db,
+      docker,
+      settings,
+      verifier: openbao.transit(),
+      unwrapper: openbao.wrapping(),
+      ...(tokenRevoker ? { tokenRevoker } : {}),
+    },
     {
       onCleanUp: (kind, result) => {
         beat();
@@ -151,6 +169,7 @@ async function main(): Promise<void> {
     {
       adapter: new OpenHandsAdapter(),
       spendReader,
+      keyRevoked: (key) => spendReader.keyRevoked(key),
       ...(evidence ? { evidence: evidence.proposals, diffEvidence: evidence.diffs } : {}),
     },
   );
@@ -172,7 +191,11 @@ async function main(): Promise<void> {
           unwrapper: openbao.wrapping(),
           logger,
           // C08 (ADR-M38 §2.2): the push reads the run's diff back (`Read:evidence/diffs/*`).
-          publish: { settings, ...(evidence ? { diffEvidence: evidence.diffs } : {}) },
+          publish: {
+            settings,
+            ...(evidence ? { diffEvidence: evidence.diffs } : {}),
+            ...(tokenRevoker ? { tokenRevoker } : {}),
+          },
         }),
       },
       // The log context (tenant, run) of each activity (A08, ADR-M35 §2.6). No runner traces yet.

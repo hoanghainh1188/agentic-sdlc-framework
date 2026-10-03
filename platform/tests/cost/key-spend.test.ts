@@ -64,6 +64,22 @@ describe('LiteLLMKeySpendReader (C07)', () => {
     expect(error).toMatchObject({ code: 'http_error', status: 401 });
   });
 
+  // C11 (ADR-M42 §2.6): before it reads a killed run's workspace, the runner waits until the
+  // gateway refuses the run's key (the worker revoked it).
+  it('keyRevoked: true only when LiteLLM refuses the key as unknown (401)', async () => {
+    const key = new Redacted(RUN_KEY);
+    stub.on('GET', '/key/info', () => ({ body: { info: { spend: 0 } } }));
+    expect(await reader.keyRevoked(key)).toBe(false);
+    stub.on('GET', '/key/info', () => ({ status: 401, body: { error: ECHO_MARKER } }));
+    expect(await reader.keyRevoked(key)).toBe(true);
+    for (const status of [400, 403, 404, 500]) {
+      stub.on('GET', '/key/info', () => ({ status, body: { error: ECHO_MARKER } }));
+      expect(await reader.keyRevoked(key)).toBe(false);
+    }
+    const closed = new LiteLLMKeySpendReader({ baseUrl: 'http://127.0.0.1:1', timeoutMs: 500 });
+    expect(await closed.keyRevoked(key)).toBe(false);
+  });
+
   it('refuses an answer without info', async () => {
     stub.on('GET', '/key/info', () => ({ body: { detail: ECHO_MARKER } }));
     const error = await failure(() => reader.readOwnSpend(new Redacted(RUN_KEY)));

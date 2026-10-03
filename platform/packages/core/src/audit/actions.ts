@@ -212,6 +212,20 @@ export const AUDIT_ACTIONS = {
     },
   },
   /**
+   * The kill switch was used on a run (C11, D-02 FR-34, ADR-M42). The actor is the person (or
+   * `system` for an operator). `previous_status` is the run status before; `source` is `api`,
+   * `github_comment` or `ops`; `escalation_id` the escalation raised for the review.
+   */
+  'run.kill_requested': {
+    entityType: 'run',
+    fields: {
+      intent_id: 'uuid',
+      previous_status: 'code',
+      source: 'code',
+      escalation_id: 'uuid?',
+    },
+  },
+  /**
    * G4 computed a new run proposal for the intent (task C06, ADR-M33 §2.3): the terms a G4
    * approval or pass is bound to. `input_sha256` is the G4 input hash; `base_sha` the commit of the
    * default branch the run would start from. Hashes, IDs and codes only; never the model name (it

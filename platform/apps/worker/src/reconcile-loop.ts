@@ -4,6 +4,10 @@
 // every `SDLC_WORKER_RECONCILE_MS`. Waking is harmless: the workflow only reads the database again,
 // and signal-with-start starts a workflow that does not run yet (an intent created while Temporal
 // was down).
+//
+// C11 (ADR-M42 §2.2): each pass also sends the kill signal again to the intents whose current run
+// is being killed (`listKilling`): a kill recorded by the operator command, or a lost signal, still
+// cancels a run activity that waits in Temporal for a runner slot.
 import type { IntentWorkflowRef, IntentWorkflowSignals } from '@sdlc/contracts';
 
 import type { WorkerLogger } from './logger.js';
@@ -11,6 +15,8 @@ import type { WorkerLogger } from './logger.js';
 export interface ReconcileLoopDeps {
   /** Open intents after the keyset position `after` (`SystemScope.listOpenIntents`). */
   listOpen(limit: number, after?: IntentWorkflowRef): Promise<readonly IntentWorkflowRef[]>;
+  /** C11: intents whose current run is being killed (`SystemScope.listKillingIntents`). */
+  listKilling?(limit: number): Promise<readonly IntentWorkflowRef[]>;
   readonly signals: IntentWorkflowSignals;
   readonly logger: WorkerLogger;
   /** Intents read per page. */
@@ -50,8 +56,28 @@ export class ReconcileLoop {
       if (page.length < this.#deps.batchSize) break;
       after = page.at(-1);
     }
+    failed += await this.#killAgain();
     this.#deps.logger.log('info', 'worker.reconciled', { woken, failed });
     return { woken, failed };
+  }
+
+  /** Sends the kill signal again (C11). Returns the number of failed signals. */
+  async #killAgain(): Promise<number> {
+    if (!this.#deps.listKilling) return 0;
+    let failed = 0;
+    for (const intent of await this.#deps.listKilling(this.#deps.batchSize)) {
+      if (this.#stopped) break;
+      try {
+        await this.#deps.signals.kill(intent);
+      } catch {
+        failed += 1;
+        this.#deps.logger.log('warn', 'worker.kill_signal_failed', {
+          tenant_id: intent.tenantId,
+          intent_id: intent.intentId,
+        });
+      }
+    }
+    return failed;
   }
 
   start(intervalMs: number): void {

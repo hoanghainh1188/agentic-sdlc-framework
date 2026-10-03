@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M24 and their sources:
+// Rule ids M1–M26 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -31,6 +31,10 @@
 //   M22 a G5 breach freezes the intent (pause or higher) ............. QUESTIONS.md #21, ADR-M34 §2.8
 //   M23 the viewer role never links a spec ........................... ADR-M39, QUESTIONS.md #162
 //   M24 the viewer role never submits a plan ......................... ADR-M40, QUESTIONS.md #168
+//   M25 Person A, Person B and governance may kill a run; viewer never D-02 FR-34, ADR-M42,
+//                                                                      QUESTIONS.md #180
+//   M26 a kill freezes the intent (pause or higher) .................. D-03 §6.5, ADR-M42,
+//                                                                      QUESTIONS.md #181
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -535,6 +539,27 @@ const m24: Rule = (c) =>
     ? [issue('config.rule.viewer_never_submits_plan', 'access.plan_submit_roles')]
     : [];
 
+/** The roles that may always use the kill switch (D-02 FR-34, rule M25). */
+export const ALWAYS_KILL_ROLES: readonly ProjectRole[] = ['person_a', 'person_b', 'governance'];
+
+const m25: Rule = (c) => [
+  ...(ALWAYS_KILL_ROLES.every((r) => c.access.kill_roles.includes(r))
+    ? []
+    : [issue('config.rule.kill_roles_contain_fr34', 'access.kill_roles')]),
+  ...(c.access.kill_roles.includes('viewer')
+    ? [issue('config.rule.viewer_never_kills', 'access.kill_roles')]
+    : []),
+];
+
+const m26: Rule = (c) =>
+  FREEZING_LEVELS.includes(c.run.kill_escalation.response_level)
+    ? []
+    : [
+        issue('config.rule.kill_escalation_freezes', 'run.kill_escalation.response_level', {
+          found: c.run.kill_escalation.response_level,
+        }),
+      ];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -562,6 +587,8 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M22: m22,
   M23: m23,
   M24: m24,
+  M25: m25,
+  M26: m26,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

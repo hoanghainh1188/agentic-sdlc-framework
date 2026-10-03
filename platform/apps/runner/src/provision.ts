@@ -7,12 +7,15 @@
 // 4. unwrap the GitHub token the worker handed over (QUESTIONS #44);
 // 5. check that the contract's egress list can be enforced;
 // 6. clone at `base_sha`, create `agent/INT-…`, pack the workspace          → `workspace_prepared`;
+//    the GitHub token is revoked as soon as the clone ended (C11)           → `token_revoked`;
+//    a run killed meanwhile (`stopping`) stops here, before any sandbox;
 // 7. create the sandbox (network, services, container, archive)             → `sandbox_created`;
 // 8. wait for the sandbox health check, then `provisioning → running`       → `sandbox_ready`.
 //
 // A failure after the claim removes everything created (the reserved volume included), records
 // `provisioning_failed` (and `sandbox_removed` when a sandbox was created), and ends the run as
-// `failed` with the reason as `stop_reason`; the clone on the runner's disk is removed then. A run
+// `failed` with the reason as `stop_reason` (`stopped_killed` / `killed` when it was killed,
+// C11); the clone on the runner's disk is removed then. A run
 // that starts keeps its clone until the caller releases it: the proposal of an L1 run (C06 2b)
 // and the diff of every run (C07, ADR-M34 §2.2) are computed there. The token lives only in
 // memory, and in git's environment for the clone.
@@ -49,6 +52,12 @@ import {
 } from './sandbox/lifecycle.js';
 import { planEgress } from './sandbox/network.js';
 import type { RunnerSettings } from './settings.js';
+import {
+  isRefusedWrapToken,
+  recordWrapTokenReused,
+  revokeAfterUse,
+  type GitTokenRevoker,
+} from './tokens.js';
 import { CloneError, cloneForRun } from './workspace/git.js';
 import { packDirectory } from './workspace/tar.js';
 
@@ -66,6 +75,11 @@ export interface RunnerDeps {
   readonly held: HeldRuns;
   /** Default: `new Date()`. */
   readonly now?: () => Date;
+  /**
+   * Revokes the clone token right after the clone (C11, ADR-M42 §2.4). Without it the token
+   * expires by itself (development, tests).
+   */
+  readonly tokenRevoker?: GitTokenRevoker;
 }
 
 export interface ProvisionRequest {
@@ -150,20 +164,34 @@ export async function provisionRun(
   let kept = false;
   let sandboxCreated = false;
   try {
-    const token = await unwrapToken(deps.unwrapper, request.wrappedGitToken);
-    if (!planEgress(contract.egress_allowlist, deps.settings.egressServices).ok) {
-      throw new ProvisioningError('egress_not_enforceable');
+    const token = await unwrapToken(deps.unwrapper, request.wrappedGitToken, () =>
+      // The contract is valid, so the wrapping token should be too: someone else opened it.
+      recordWrapTokenReused(scope, runId, 'clone'),
+    );
+    let repoDir: string;
+    let image: string;
+    let cloneStarted: number;
+    try {
+      if (!planEgress(contract.egress_allowlist, deps.settings.egressServices).ok) {
+        throw new ProvisioningError('egress_not_enforceable');
+      }
+      image = await projectImage(scope, contract.project_id);
+      cloneStarted = Date.now();
+      repoDir = await cloneForRun(deps.settings.git, {
+        repo: contract.repo,
+        baseSha: contract.base_sha,
+        branch: contract.branch,
+        token,
+        dir: workDir,
+      });
+    } finally {
+      // The run needs GitHub only for the clone (C11): the token ends here, whatever happened.
+      await revokeAfterUse(deps.tokenRevoker, scope, runId, token, 'clone');
     }
-    const image = await projectImage(scope, contract.project_id);
-
-    const cloneStarted = Date.now();
-    const repoDir = await cloneForRun(deps.settings.git, {
-      repo: contract.repo,
-      baseSha: contract.base_sha,
-      branch: contract.branch,
-      token,
-      dir: workDir,
-    });
+    // Killed during the clone (C11): stop before a sandbox exists.
+    if ((await scope.runs.getById(runId))?.status === 'stopping') {
+      throw new ProvisioningError('run_stopped');
+    }
     const workspaceTar = packDirectory(repoDir, deps.settings.workspaceMaxBytes);
     await scope.runEvents.append(runId, 'workspace_prepared', {
       base_sha: contract.base_sha,
@@ -249,7 +277,8 @@ async function failRun(
       : teardownSandbox(deps.docker, runId)
   ).catch(() => undefined);
   const now = clock(deps);
-  await scope.runs.transition(runId, {
+  // Killed meanwhile (C11): one update ends the run killed, never `failed` (migration 0020).
+  await scope.runs.end(runId, {
     from: ['provisioning'],
     to: 'failed',
     now,
@@ -261,13 +290,15 @@ async function failRun(
 async function unwrapToken(
   unwrapper: SecretUnwrapper,
   wrapped: RedactedSecret,
+  onRefused: () => Promise<void>,
 ): Promise<RedactedSecret> {
   try {
     const fields = await unwrapper.unwrap(wrapped);
     const token = fields.token;
     if (!token) throw new ProvisioningError('token_unavailable');
     return token;
-  } catch {
+  } catch (error) {
+    if (isRefusedWrapToken(error)) await onRefused();
     // Unknown, expired or already used: maybe someone else unwrapped it (ADR-M25 §2.11).
     throw new ProvisioningError('token_unavailable');
   }

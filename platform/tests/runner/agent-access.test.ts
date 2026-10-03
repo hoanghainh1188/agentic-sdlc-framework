@@ -42,7 +42,14 @@ describe('agent settings', () => {
       stopGraceMs: 30_000,
       spendCheckMs: 30_000,
       spendRecheckMs: 25_000,
+      killEvidenceMs: 60_000,
     });
+  });
+
+  it("C11: reads the bounded time for a killed run's evidence (5 s to 300 s)", () => {
+    expect(settings({ SDLC_RUNNER_KILL_EVIDENCE_SECONDS: '30' }).agent.killEvidenceMs).toBe(30_000);
+    expect(() => settings({ SDLC_RUNNER_KILL_EVIDENCE_SECONDS: '4' })).toThrow();
+    expect(() => settings({ SDLC_RUNNER_KILL_EVIDENCE_SECONDS: '301' })).toThrow();
   });
 
   it('C07: reads the spend check and the bounded re-read wait', () => {

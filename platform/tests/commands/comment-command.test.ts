@@ -74,6 +74,24 @@ describe('comment command grammar', () => {
     expect(parseCommentCommand(body)).toEqual({ kind: 'none' });
   });
 
+  // C11 (ADR-M42 §2.6): `/kill` stops the intent's current run; any text after it is the reason.
+  it.each([
+    ['/kill'],
+    ['/KILL'],
+    ['  \n/kill\n'],
+    ['/kill the agent loops on npm install'],
+    ['/kill INT-2026-0001'],
+  ])('%j is the kill switch', (body) => {
+    expect(parseCommentCommand(body)).toEqual({ kind: 'kill', verb: 'kill' });
+  });
+
+  it.each([['Please /kill it'], ['> /kill\nquoted'], ['/killall'], ['/kill-run']])(
+    '%j is not the kill switch',
+    (body) => {
+      expect(parseCommentCommand(body)).toEqual({ kind: 'none' });
+    },
+  );
+
   it('never returns text from the comment, only codes', () => {
     const parsed = parseCommentCommand('/reject G3 other secret-looking text alice@example.com');
     expect(JSON.stringify(parsed)).not.toMatch(/secret|alice|example/);

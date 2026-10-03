@@ -77,7 +77,14 @@ describeDb('C06 session 2: the run after G4 on PostgreSQL', () => {
       now,
       ...(to === 'succeeded' || to === 'succeeded_proposal_only'
         ? {}
-        : { stopReason: to === 'failed' ? 'agent_error' : 'max_iterations' }),
+        : {
+            stopReason:
+              to === 'failed'
+                ? 'agent_error'
+                : to === 'stopped_killed'
+                  ? 'killed'
+                  : 'max_iterations',
+          }),
       finishedAt: now,
     });
   }
@@ -174,7 +181,7 @@ describeDb('C06 session 2: the run after G4 on PostgreSQL', () => {
     expect(again.ok).toBe(true);
   });
 
-  it('a run killed (C11) pauses the intent without an escalation of its own', async () => {
+  it('a killed run pauses the intent; finishRun raises no escalation (the kill raised one, C11)', async () => {
     const intent = await running();
     const started = await startRun(t.f.scope, t.runDeps, intent.id);
     if (!started.ok) throw new Error('not started');
