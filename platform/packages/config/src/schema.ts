@@ -239,6 +239,7 @@ export const projectConfigSchema = z.strictObject({
     ai_record_write_roles: uniqueList(role).min(1),
     ai_record_read_roles: uniqueList(role).min(1),
     spec_link_roles: uniqueList(role).min(1),
+    plan_submit_roles: uniqueList(role).min(1),
     conflicting_roles: z.array(uniqueList(role).length(2)),
   }),
   agents: z.strictObject({ recertification_months: positiveInt }),

@@ -7,6 +7,9 @@ import {
   AgentRegisterError,
   AiRecordError,
   CommandError,
+  PLAN_ERROR_MESSAGES,
+  PLAN_REFUSAL_MESSAGES,
+  PlanError,
   SPEC_ERROR_MESSAGES,
   SpecError,
   DbError,
@@ -50,6 +53,9 @@ export const API_ERROR_CODES = [
   'spec_invalid',
   'spec_not_on_default_branch',
   'spec_link_not_allowed',
+  'plan_invalid',
+  'plan_not_on_default_branch',
+  'plan_submit_not_allowed',
   'git_host_unavailable',
   'user_not_found',
   'identity_not_found',
@@ -99,6 +105,9 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   spec_invalid: 'api.error.spec_invalid',
   spec_not_on_default_branch: 'api.error.spec_not_on_default_branch',
   spec_link_not_allowed: 'api.error.spec_link_not_allowed',
+  plan_invalid: 'api.error.plan_invalid',
+  plan_not_on_default_branch: 'api.error.plan_not_on_default_branch',
+  plan_submit_not_allowed: 'api.error.plan_submit_not_allowed',
   git_host_unavailable: 'api.error.git_host_unavailable',
   user_not_found: 'api.error.user_not_found',
   identity_not_found: 'api.error.identity_not_found',
@@ -255,11 +264,31 @@ export function specApiError(error: SpecError): ApiError {
   return new ApiError(status, code, error.cause_ ?? error.code, undefined, undefined, text);
 }
 
+/** Plan refusals (B09, ADR-M40 §2.3). The reason is the refusal (why the file was refused) or the code. */
+const PLAN: Readonly<Record<PlanError['code'], [number, ApiErrorCode]>> = {
+  plan_invalid: [422, 'plan_invalid'],
+  invalid_commit: [422, 'plan_invalid'],
+  not_on_default_branch: [409, 'plan_not_on_default_branch'],
+  submit_not_allowed: [409, 'plan_submit_not_allowed'],
+  repository_invalid: [409, 'plan_submit_not_allowed'],
+  git_host_unavailable: [503, 'git_host_unavailable'],
+};
+
+export function planApiError(error: PlanError): ApiError {
+  const [status, code] = PLAN[error.code];
+  const text = (locale: string) => {
+    const refusal = error.refusal ? t(PLAN_REFUSAL_MESSAGES[error.refusal], {}, locale) : '-';
+    return t(PLAN_ERROR_MESSAGES[error.code], { refusal }, locale);
+  };
+  return new ApiError(status, code, error.refusal ?? error.code, undefined, undefined, text);
+}
+
 /** Maps any thrown value to an `ApiError`. Unknown errors become `internal` (500). */
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
   if (error instanceof SpecError) return specApiError(error);
+  if (error instanceof PlanError) return planApiError(error);
   if (error instanceof AgentRegisterError) return agentApiError(error, '-');
   if (error instanceof AdminError) {
     const [status, code] = ADMIN[error.code];

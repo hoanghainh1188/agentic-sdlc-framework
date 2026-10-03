@@ -277,7 +277,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // B12: project_ai_record_versions → project_ai_records, users.
     // C06: intent_notices → agents; evidence_items → intents, runs (session 2b).
     // B13: tenant_role_bindings → tenants, users; agent_approvals → agents, users.
-    expect(fks).toHaveLength(51);
+    // B09: plans → users (submitted_by).
+    expect(fks).toHaveLength(52);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

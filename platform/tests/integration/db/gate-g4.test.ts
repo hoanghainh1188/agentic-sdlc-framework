@@ -11,6 +11,7 @@
 //   Git host lists only in part, fails G4 (`instructions_unpinned`); the run event `key_issued`.
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import type { Intent } from '../../../packages/core/src/db/schema.js';
 import { changeAgentStatus } from '../../../packages/core/src/agents/register.js';
 import { CostError } from '../../../packages/core/src/cost/errors.js';
 import { raiseEscalation } from '../../../packages/core/src/escalation/raise.js';
@@ -21,6 +22,7 @@ import {
 import { seedAgent } from '../agent-seed.js';
 import {
   AGENTS_MD,
+  approve,
   atG4,
   BASE_1,
   BASE_2,
@@ -598,6 +600,45 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       // The owner (Gina) is mentioned, read when the comment is posted.
       expect(posted).toContain('@gina');
       expect(posted).toContain(`\`${stale.key}\``);
+    });
+
+    // B09 (ADR-M40 §2.5, QUESTIONS #34, #108): the run's tools are the agent's registered tools
+    // that the plan's tasks list; none in common → G4 fails, the intent waits at G4.
+    async function atG4WithPlanTools(tools: readonly string[]): Promise<Intent> {
+      const intent = await t.f.newIntent({ riskTier: 'medium' });
+      await t.settle(intent);
+      await decideAt(t, intent, 'G1', 'a');
+      await t.f.addInputs(intent);
+      await t.f.scope.plans.submit(intent.id, {
+        plannedFiles: ['apps/api/src/orders/**'],
+        planSha256: '7'.repeat(64),
+        actorType: 'human',
+        actorId: t.f.users.a,
+        file: { commitSha: BASE_1, allowedTools: tools },
+      });
+      await t.settle(intent);
+      await decideAt(t, intent, 'G2', 'a');
+      await approve(t, intent, 'G3', 'b');
+      return intent;
+    }
+
+    it('B09: the contract gets the agent tools that the plan lists', async () => {
+      const intent = await atG4WithPlanTools(['file_editor', 'task_tracker']);
+      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'run_pending' });
+      const result = await prepareRun(t.f.scope, deps(), intent.id);
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) return;
+      const contract = (await t.f.scope.runContracts.getByRunId(result.run.runId))!.contract_json;
+      expect(contract).toMatchObject({ allowed_tools: ['file_editor'] });
+    });
+
+    it('B09: no agent tool in the plan → G4 fails plan_tools_not_registered, once', async () => {
+      const intent = await atG4WithPlanTools(['task_tracker']);
+      expect(await t.settle(intent)).toMatchObject({ outcome: 'waiting' });
+      expect(await t.settle(intent)).toMatchObject({ outcome: 'waiting' });
+      expect(await t.reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G4' });
+      expect(await checksFailed(t, intent)).toEqual(['plan_tools_not_registered']);
+      expect(await t.g4Decisions(intent)).toEqual([['fail', 'agent_not_runnable', 'POLICY']]);
     });
   });
 });

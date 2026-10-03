@@ -31,6 +31,7 @@ import {
   presentUser,
 } from '../../apps/api/src/admin/present.js';
 import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
+import { presentPlanList, presentSubmittedPlan } from '../../apps/api/src/plans/present.js';
 import { presentLinkedSpec, presentSpecList } from '../../apps/api/src/specs/present.js';
 import { presentEscalation } from '../../apps/api/src/escalations/present.js';
 import {
@@ -132,6 +133,29 @@ const SPEC_ROW = {
 /** B08: `POST /v1/intents/:intent/specs`. */
 export function linkedSpecBody(): Record<string, unknown> {
   return presentLinkedSpec('INT-2026-0007', SPEC_ROW);
+}
+
+const PLAN_ROW = {
+  version: 2,
+  commit_sha: 'e'.repeat(40),
+  plan_sha256: HASH,
+  planned_files: ['apps/api/src/orders/**', 'apps/api/test/orders/**'],
+  allowed_tools: ['file_editor', 'terminal'],
+  change_flags: ['migration'],
+  created_at: new Date('2026-10-03T01:00:00.000Z'),
+} as Plan;
+
+/** B09: `POST /v1/intents/:intent/plans`. */
+export function submittedPlanBody(): Record<string, unknown> {
+  return presentSubmittedPlan('INT-2026-0007', PLAN_ROW);
+}
+
+/** B09: `GET /v1/intents/:intent/plans`. */
+export function planListBody(empty = false): Record<string, unknown> {
+  return presentPlanList(
+    'INT-2026-0007',
+    empty ? [] : [{ ...PLAN_ROW, version: 1, change_flags: [] }, PLAN_ROW],
+  );
 }
 
 /** B08: `GET /v1/intents/:intent/specs`. */

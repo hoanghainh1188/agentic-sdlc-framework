@@ -348,6 +348,8 @@ flowchart LR
 - [ ] AC2: The platform reads it, hashes it, stores `plans`; the tech lead approves G3
 - [ ] AC3: Plan changed after approval → G3 must be approved again
 
+> Note: Two PRs (ADR-M40, QUESTIONS #165–#169): PR 1 = plan file schema, submission (API, `sdlc plan`, config `access.plan_submit_roles`, rule M24), the re-check at G3 and G4 (a changed file holds the gate until a person submits it again), the submitter never approves G3, the run's tools from the plan; PR 2 (after C08) = the runner reads the plan file at the plan's commit for the agent's prompt and checks its hash
+
 #### B11. Escalation module
 
 | Size | Depends on | Requirements | Code area |
@@ -634,6 +636,8 @@ flowchart LR
 - [ ] AC4: `request changes` → back to running the agent
 - [ ] AC5: A person merges the PR (MVP: a human, not the platform); the platform records the merge event
 
+> Note: Change flags (B09, ADR-M40 §2.2, QUESTIONS #166): read them from the plan G3 approved or passed (`plans.change_flags` of the plan whose hash G3 passed), never from a later plan; they are declared in the plan file and approved with it at G3
+
 #### E02. Evidence Builder + Markdown export
 
 | Size | Depends on | Requirements | Code area |
@@ -772,4 +776,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.11 | 2026-09-27 | Claude (task C06, session 2b), approved by Harry | C07, C08 notes: reuse the runner's workspace export and hardened git; E02 note: builds on `EvidenceStore` and `evidence_items`, re-checks hashes, own identity for packs; E05 note: object lock (per-bucket lock vs per-project retention and `retention_hold`) (ADR-M33 §2.9) |
 | 1.12 | 2026-09-30 | Claude (task A08), approved by Harry | E05 note: project archive and retention also purge the project's Langfuse data (prompts and responses are client data; ADR-M35) |
 | 1.13 | 2026-10-03 | Claude (task C07, PR 2), approved by Harry | C08 note: after a G5 `resume` the next run continues from the pushed `agent/INT-...` branch; wait for the G5 block window (QUESTIONS #134, ADR-M34 §2.9) |
+| 1.14 | 2026-10-03 | Claude (task B09, PR 1), approved by Harry | B09 note: two PRs; E01 note: the change flags of the plan G3 approved (ADR-M40, QUESTIONS #165–#169) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

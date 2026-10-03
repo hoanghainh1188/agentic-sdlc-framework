@@ -404,6 +404,14 @@ const CASES: Case[] = [
     key: 'config.rule.viewer_never_links_spec',
     path: 'access.spec_link_roles',
   },
+  // M24: the viewer role never submits a plan (B09, ADR-M40, QUESTIONS.md #168).
+  {
+    name: 'viewer may submit a plan',
+    rule: 'M24',
+    yaml: 'access:\n  plan_submit_roles: [person_a, viewer]\n',
+    key: 'config.rule.viewer_never_submits_plan',
+    path: 'access.plan_submit_roles',
+  },
   // M20: a failed or lost run freezes the intent (C06 session 2, ADR-M33 §2.7).
   {
     name: 'a failed run only notifies',

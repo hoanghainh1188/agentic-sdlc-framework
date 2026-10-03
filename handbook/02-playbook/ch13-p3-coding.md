@@ -158,7 +158,7 @@ Apply the same rules manually:
 ### 13.10.1. Which agent runs
 
 - Each project names **one registered agent** in its configuration: `run.agent_key` (the key of `sdlc admin agent register`). Without it, G4 fails with reason code `agent_not_runnable`.
-- The run uses the agent's pinned model, its registered tools and the caps of the configuration (`budget.default_run_usd`, `run.default_max_iterations`, `run.default_max_duration_minutes`).
+- The run uses the agent's pinned model, the agent's registered tools that the approved plan lists (task B09: `tools` of the plan's tasks; none in common → G4 fails with check `plan_tools_not_registered`), and the caps of the configuration (`budget.default_run_usd`, `run.default_max_iterations`, `run.default_max_duration_minutes`).
 
 ### 13.10.2. What the platform checks at G4
 
@@ -280,3 +280,4 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 | 0.6 | 2026-10-03 | Claude (task C07, PR 1) | §13.10.2: G4 check 6b (`instructions_unpinned`); §13.10.4: the diff stored at the end of every run, the budget watched during the run |
 | 0.7 | 2026-10-03 | Claude (task C07, PR 2) | §13.10.5 (new): gate G5 checks and outcomes, back to G3, deciding a G5 escalation; §13.10.4: the budget warning comment during the run |
 | 0.8 | 2026-10-03 | Claude (task C08, PR 1) | §13.10.5: after a push, `resume` starts the new run from the pushed commit (QUESTIONS #134, ADR-M38 §2.6) |
+| 0.9 | 2026-10-03 | Claude (task B09, PR 1) | §13.10.1: the run's tools come from the approved plan (ADR-M40 §2.5) |

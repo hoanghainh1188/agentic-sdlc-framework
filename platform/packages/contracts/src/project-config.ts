@@ -201,6 +201,12 @@ export interface ProjectConfig {
      */
     readonly spec_link_roles: readonly ProjectRole[];
     /**
+     * Who may submit an intent's plan file (task B09, ADR-M40, QUESTIONS #168; D-08 B09). The
+     * submitter is a producer of the plan and never approves G3 (FR-11). The viewer role never
+     * submits a plan (mandatory rule M24).
+     */
+    readonly plan_submit_roles: readonly ProjectRole[];
+    /**
      * Pairs of roles one person may not hold together on the project (task B13, ADR-M37,
      * QUESTIONS #154): a grant that would give someone both roles of a pair is refused. Person A
      * and Person B always stay apart (mandatory rule M21).

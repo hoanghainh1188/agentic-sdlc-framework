@@ -25,6 +25,8 @@ import { IntentsController } from './intents/intents.controller.js';
 import { IntentsService } from './intents/intents.service.js';
 import { MeController } from './me/me.controller.js';
 import { MeTokensController } from './me/tokens.controller.js';
+import { PlansController } from './plans/plans.controller.js';
+import { PlansService } from './plans/plans.service.js';
 import { SpecsController } from './specs/specs.controller.js';
 import { SpecsService } from './specs/specs.service.js';
 import { LogContextInterceptor } from './observability/log-context.interceptor.js';
@@ -36,6 +38,7 @@ import {
   DATABASE,
   ESCALATIONS,
   INTENTS,
+  PLANS,
   REGISTRY,
   SETTINGS,
   SPECS,
@@ -61,8 +64,9 @@ export interface ApiDeps {
    */
   readonly intentSignals?: IntentWorkflowSignals;
   /**
-   * The Git host the spec endpoints read (B08, ADR-M39 §2.2). Undefined (dev mode without
-   * OpenBao): linking a spec answers `git_host_unavailable`.
+   * The Git host the spec and plan endpoints read (B08, ADR-M39 §2.2; B09, ADR-M40 §2.3).
+   * Undefined (dev mode without OpenBao): linking a spec or submitting a plan answers
+   * `git_host_unavailable`.
    */
   readonly gitHost?: Pick<GitHostAdapter, 'getBranchHead' | 'getFileAtCommit'>;
 }
@@ -80,6 +84,7 @@ class ApiModule {
         MeController,
         IntentsController,
         SpecsController,
+        PlansController,
         EscalationsController,
         AiRecordsController,
         AdminProjectsController,
@@ -109,6 +114,14 @@ class ApiModule {
         {
           provide: SPECS,
           useValue: new SpecsService(
+            deps.gitHost ? { gitHost: deps.gitHost } : undefined,
+            signals,
+            wakeLogger,
+          ),
+        },
+        {
+          provide: PLANS,
+          useValue: new PlansService(
             deps.gitHost ? { gitHost: deps.gitHost } : undefined,
             signals,
             wakeLogger,

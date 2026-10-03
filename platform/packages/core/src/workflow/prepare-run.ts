@@ -135,7 +135,7 @@ export async function prepareRun(
         instructionsSha256: proposal.instructionsSha256,
         tools: checked.agent.tools,
       },
-      // QUESTIONS #108: until B09 stores the plan task's tools, the agent's registered tools.
+      // B09: the proposal's tools are already the agent's tools that the plan lists.
       planTools: proposal.allowedTools,
       autonomyLevel: proposal.autonomyLevel,
       maxBudgetUsd: proposal.maxBudgetUsd,

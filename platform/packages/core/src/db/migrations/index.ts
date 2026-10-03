@@ -17,6 +17,7 @@ import { migration0014AdminOnboarding } from './0014-admin-onboarding.js';
 import { migration0015GateG5 } from './0015-gate-g5.js';
 import { migration0016AgentApprovals } from './0016-agent-approvals.js';
 import { migration0017PushedHead } from './0017-pushed-head.js';
+import { migration0018PlanFiles } from './0018-plan-files.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -37,4 +38,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0015-gate-g5': migration0015GateG5,
   '0016-agent-approvals': migration0016AgentApprovals,
   '0017-pushed-head': migration0017PushedHead,
+  '0018-plan-files': migration0018PlanFiles,
 };

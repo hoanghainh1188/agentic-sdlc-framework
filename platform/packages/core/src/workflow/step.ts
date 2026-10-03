@@ -70,6 +70,7 @@ import {
   type SpecFacts,
   type SpecHold,
 } from './spec-check.js';
+import { checkPlan, gatherPlanFacts, heldAtG4, type PlanFacts } from './plan-check.js';
 import { stepG4 } from './g4.js';
 import { stepG5, stepPausedG5 } from './g5.js';
 import { stepG6, stepPausedG6 } from './g6.js';
@@ -167,12 +168,17 @@ export async function stepIntent(
   // from (QUESTIONS #160).
   let facts: G4Facts | undefined;
   let specFacts: SpecFacts | 'git_host_unavailable' | undefined;
+  // B09: the plan file at the same head (G3, G4), read in the same way.
+  let planFacts: PlanFacts | null | 'git_host_unavailable' = null;
   if (deps.g4 || deps.specs) {
     const peek = await scope.intents.getById(intentId);
     if (peek?.status === 'in_gate' && isSpecCheckGate(peek.current_gate)) {
       try {
         const read = deps.specs ? await gatherSpecFacts(scope, deps.specs, peek) : undefined;
         specFacts = read;
+        if (deps.specs && read && peek.current_gate !== 'G2') {
+          planFacts = await gatherPlanFacts(scope, deps.specs, peek, read.headSha);
+        }
         if (deps.g4 && peek.current_gate === 'G4') {
           facts = await gatherG4Facts(scope, deps.g4, peek, read?.headSha);
         }
@@ -188,6 +194,7 @@ export async function stepIntent(
           };
         }
         specFacts = 'git_host_unavailable';
+        planFacts = 'git_host_unavailable';
       }
     }
   }
@@ -257,8 +264,14 @@ export async function stepIntent(
       const spec = await checkSpec(tx, deps.registry, policy.policy, intent, specFacts);
       if (spec?.kind === 'result') return spec.result;
       if (spec?.kind === 'hold') hold = spec.hold;
+      // B09: the plan must still be the submitted file at that head; at G4, the plan G3 approved.
+      const plan = await checkPlan(tx, deps.registry, policy, intent, planFacts);
+      if (plan?.kind === 'result') return plan.result;
+      if (plan?.kind === 'hold') hold ??= plan.hold;
     }
     const gate = intent.current_gate;
+    // B09 (ADR-M40 §2.4): a plan to submit again holds G4: no run starts.
+    if (gate === 'G4' && hold) return heldAtG4(hold);
     if (gate === 'G4' && facts) return atG4(tx, deps, policy, intent, facts);
     if (gate === 'G5') return stepG5(tx, deps.registry, policy, intent);
     // C08: the push and the pull request (`publish`); without them G6 waits.

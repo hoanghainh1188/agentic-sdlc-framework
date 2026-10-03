@@ -173,7 +173,7 @@ export interface RunProposal {
   /** The agent's pinned gateway model: the run's model (QUESTIONS #79). */
   readonly modelRef: string;
   readonly autonomyLevel: RunContractAutonomy;
-  /** Sorted, unique. Until B09 stores plan tools: the agent's registered tools (QUESTIONS #108). */
+  /** Sorted, unique: the agent's registered tools that the plan lists (B09, QUESTIONS #108). */
   readonly allowedTools: readonly string[];
   /** Sorted, unique. */
   readonly allowedModels: readonly string[];
