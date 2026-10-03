@@ -60,6 +60,8 @@ export const ESCALATION_SUBJECT_KINDS = [
   'run_contract',
   'diff',
   'config',
+  // C07 (ADR-M34 §2.8): the G5 input of a run (run, contract, diff, checked paths, spend).
+  'g5_input',
 ] as const;
 export type EscalationSubjectKind = (typeof ESCALATION_SUBJECT_KINDS)[number];
 

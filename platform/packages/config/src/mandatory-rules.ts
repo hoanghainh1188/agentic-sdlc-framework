@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M21 and their sources:
+// Rule ids M1–M22 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -28,6 +28,7 @@
 //   M20 a failed or lost run freezes the intent (pause or higher) .... D-03 §6, ADR-M33 §2.7
 //   M21 Person A and Person B are never the same person on a project . codes table §5, ADR-M37,
 //                                                                      QUESTIONS #154
+//   M22 a G5 breach freezes the intent (pause or higher) ............. QUESTIONS.md #21, ADR-M34 §2.8
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -511,6 +512,17 @@ const m21: Rule = (c) =>
     ? []
     : [issue('config.rule.person_a_person_b_conflict', 'access.conflicting_roles')];
 
+const m22: Rule = (c) =>
+  FREEZING_LEVELS.includes(c.run.g5_breach_escalation.response_level)
+    ? []
+    : [
+        issue(
+          'config.rule.g5_breach_escalation_freezes',
+          'run.g5_breach_escalation.response_level',
+          { found: c.run.g5_breach_escalation.response_level },
+        ),
+      ];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -535,6 +547,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M19: m19,
   M20: m20,
   M21: m21,
+  M22: m22,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

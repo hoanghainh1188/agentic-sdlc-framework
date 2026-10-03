@@ -1,7 +1,7 @@
 // `sdlc gate approve|reject|request-changes <G> <INT>` over the API (D-08 B04 AC1, FR-20;
 // ADR-M26 §2.4). Codes and one https link only: the explanation in words stays where it can be
 // edited or deleted (a GitHub comment), and `--reason-ref` links to it (ADR-M20). No scope:
-// G1–G4 approvals take none (`scope_not_allowed`); E01 and E03 add it for G7 and G8.
+// G1–G5 approvals take none (`scope_not_allowed`); E01 and E03 add it for G7 and G8.
 import { GATE_CODES, GATE_REASON_CODES } from '@sdlc/contracts';
 import { t } from '@sdlc/messages';
 

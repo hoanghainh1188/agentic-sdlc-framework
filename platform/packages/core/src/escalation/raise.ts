@@ -52,7 +52,7 @@ export interface EscalationDeps {
  * Raises an escalation on an open intent: checks the packet, routes it from the project
  * configuration and role bindings, starts both clocks, and records `escalation.created` and the
  * first notices. A G5 breach must use at least `pause` (QUESTIONS #21): the run stops, and only a
- * person's decision resumes it.
+ * person's decision resumes it. The overdue escalation of a HITL G5 (trigger `time`) is not a breach.
  */
 // async: a refused input rejects the promise instead of throwing synchronously.
 export async function raiseEscalation(
@@ -61,7 +61,9 @@ export async function raiseEscalation(
   deps: EscalationDeps = {},
 ): Promise<Escalation> {
   const packet = checkPacket(input.packet);
-  if (packet.gate === 'G5' && !isFreezingLevel(input.responseLevel)) {
+  // A breach, not the overdue clock of a G5 that waits for a person (C07: `time` follows
+  // `oversight.gate_overdue`, as at G1–G4; ADR-M34 §2.8).
+  if (packet.gate === 'G5' && input.trigger !== 'time' && !isFreezingLevel(input.responseLevel)) {
     throw new EscalationError(
       'response_level_too_low',
       `a G5 escalation needs at least pause, got ${input.responseLevel}`,

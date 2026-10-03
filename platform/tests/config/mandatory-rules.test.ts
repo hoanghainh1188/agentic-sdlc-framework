@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M21: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M22: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -418,6 +418,14 @@ const CASES: Case[] = [
     yaml: 'access:\n  conflicting_roles: []\n',
     key: 'config.rule.person_a_person_b_conflict',
     path: 'access.conflicting_roles',
+  },
+  // M22: a G5 breach freezes the intent (C07, QUESTIONS #21, ADR-M34 §2.8).
+  {
+    name: 'a G5 breach only observes',
+    rule: 'M22',
+    yaml: 'run:\n  g5_breach_escalation: { severity: medium, response_level: observe }\n',
+    key: 'config.rule.g5_breach_escalation_freezes',
+    path: 'run.g5_breach_escalation.response_level',
   },
 ];
 

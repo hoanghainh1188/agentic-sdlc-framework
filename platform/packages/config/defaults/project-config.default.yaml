@@ -184,6 +184,11 @@ run:
   # that fails or is lost raises a technical escalation. [Proposal] pilot severity; mandatory rule
   # M20: the response level is pause or higher, so the intent stays frozen until a person decides.
   failed_run_escalation: { severity: high, response_level: pause }
+  # Task C07 (ADR-M34 §2.8; QUESTIONS.md #21, #132): a G5 breach (agent instruction files changed,
+  # the cost cap, the iteration or time cap, a stalled run) pauses the intent and raises an
+  # escalation (route security or intent, by cause). [Proposal] pilot severity; mandatory rule M22:
+  # the response level is pause or higher, so the intent stays frozen until a person decides.
+  g5_breach_escalation: { severity: high, response_level: pause }
 
 budget:
   # D-07 §6; D-02 FR-52; handbook Ch.3 §3.6: warning at 80 %, stop at 100 %.

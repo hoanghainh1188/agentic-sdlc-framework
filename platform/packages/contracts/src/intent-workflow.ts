@@ -101,5 +101,20 @@ export type IntentWaitReason =
    * intent is paused at G4 while Person A takes the proposal forward (no new run starts).
    */
   | 'proposal_review'
+  /**
+   * C07 (ADR-M34 §2.8): G5 found a breach (instruction files, cost cap, iteration or time cap, a
+   * stalled run); the intent is paused at G5 until a person decides on the escalation.
+   */
+  | 'g5_review'
+  /**
+   * C07: G5 is HITL for this intent (the matrix) and waits for a person's approval of the run's
+   * changes (`/approve G5`).
+   */
+  | 'g5_decision'
+  /**
+   * C07 (QUESTIONS #131): the intent went back to G3 because a run changed files outside its
+   * plan; G3 waits for a new plan (a plan hash G5 has not refused).
+   */
+  | 'new_plan_needed'
   /** A status that the workflow does not move (`paused`, `blocked`, `running`). */
   | 'not_in_gate';

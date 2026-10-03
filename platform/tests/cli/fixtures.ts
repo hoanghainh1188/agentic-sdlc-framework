@@ -54,6 +54,7 @@ export function intentRow(overrides: Partial<Intent> = {}): Intent {
     budget_usd: '2.500000',
     current_gate: 'G2',
     gate_entered_at: AT,
+    run_budget_usd: null,
     status: 'in_gate',
     issue_number: 12,
     pr_number: null,

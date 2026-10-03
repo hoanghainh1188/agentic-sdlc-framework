@@ -31,7 +31,8 @@
 // registered agents run, nothing above L2 in the MVP, the pinned model and the instructions hash
 // must match, no run while a block window is open or the intent is frozen. Tunable values come
 // from the project configuration: the G4 matrix row, `autonomy.max_by_risk`, `model_routing`,
-// `run.agent_key`, `run.default_max_*`, `budget.default_run_usd`, the approval expiry, the block
+// `run.agent_key`, `run.default_max_*`, `budget.default_run_usd` (or the intent's own
+// `run_budget_usd` after a G5 budget increase, C07), the approval expiry, the block
 // window, the gate deadline and `agents.recertification_months`.
 import { createHash } from 'node:crypto';
 
@@ -285,7 +286,11 @@ export async function evaluateG4(
     // QUESTIONS #108: until B09 stores the plan task's tools, the agent's registered tools.
     allowedTools: [...new Set(agent.agent.tools)].sort(),
     allowedModels: facts.allowedModels,
-    maxBudgetUsd: usd(config.budget.default_run_usd),
+    // C07 (QUESTIONS #133): after a G5 `resume` with a budget increase, the intent's run budget.
+    maxBudgetUsd:
+      intent.run_budget_usd === null
+        ? usd(config.budget.default_run_usd)
+        : fromMicros(toMicros(intent.run_budget_usd)),
     maxIterations: config.run.default_max_iterations,
     maxDurationMin: config.run.default_max_duration_minutes,
     baseSha: facts.baseSha,

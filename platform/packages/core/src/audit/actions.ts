@@ -10,6 +10,7 @@
 // traceable, and a test. Reviewers check that no field can carry personal or client data.
 // A field whose kind ends with `?` is optional (ADR-M20): it may be left out, never set to null;
 // when present it follows the same format rule.
+import { isUsd } from '../cost/money.js';
 import { DbError } from '../db/errors.js';
 import { isUuid } from '../db/tenant-id.js';
 
@@ -19,8 +20,9 @@ import { isUuid } from '../db/tenant-id.js';
  * - `version`: a positive integer
  * - `code`: a short code such as `G3`, `INT-2026-0001` or an enum value (no spaces, max 64)
  * - `codes`: a list of 1 to `MAX_AUDIT_CODES` codes (B13: the warning codes of `config.changed`)
+ * - `decimal`: an amount of money in USD as a decimal string with at most 6 decimals (C07)
  */
-export type AuditFieldKind = 'uuid' | 'sha256' | 'version' | 'code' | 'codes';
+export type AuditFieldKind = 'uuid' | 'sha256' | 'version' | 'code' | 'codes' | 'decimal';
 
 /** A declared field: its kind, with a trailing `?` when the field is optional. */
 export type AuditFieldSpec = AuditFieldKind | `${AuditFieldKind}?`;
@@ -128,6 +130,20 @@ export const AUDIT_ACTIONS = {
     entityType: 'intent',
     fields: { status: 'code', current_gate: 'code?' },
   },
+  /**
+   * A G5 `resume` decision with a budget increase raised the intent budget (task C07, QUESTIONS
+   * #133): the amount added, the new intent budget, the run budget of the next runs and the
+   * escalation whose decision allowed it.
+   */
+  'intent.budget_increased': {
+    entityType: 'intent',
+    fields: {
+      escalation_id: 'uuid',
+      added_usd: 'decimal',
+      budget_usd: 'decimal',
+      run_budget_usd: 'decimal',
+    },
+  },
   /** A spec was linked to an intent (FR-02). Never the path or the content. */
   'spec.linked': {
     entityType: 'intent',
@@ -189,6 +205,16 @@ export const AUDIT_ACTIONS = {
   'gate.g4_check_failed': {
     entityType: 'intent',
     fields: { decision_id: 'uuid', check: 'code' },
+  },
+  /**
+   * G5 failed for a run (task C07, ADR-M34 §2.8): the exact cause next to the gate decision's
+   * reason code: `instructions_changed`, `out_of_scope`, `max_budget`, `spend_at_stop`,
+   * `max_iterations`, `max_duration`, `stalled` or `changes_missing`. The run's plan is refused at G3
+   * after `out_of_scope` (QUESTIONS #131). Never a path.
+   */
+  'gate.g5_check_failed': {
+    entityType: 'intent',
+    fields: { decision_id: 'uuid', check: 'code', run_id: 'uuid' },
   },
   /** The runner refused the Run Contract of a known run; `reason` is a reject reason code. */
   'run.contract_rejected': { entityType: 'run', fields: { reason: 'code' } },
@@ -327,6 +353,8 @@ function isValidField(kind: AuditFieldKind, value: unknown): boolean {
         value.length <= MAX_AUDIT_CODES &&
         value.every((item) => typeof item === 'string' && CODE.test(item))
       );
+    case 'decimal':
+      return isUsd(value);
   }
 }
 

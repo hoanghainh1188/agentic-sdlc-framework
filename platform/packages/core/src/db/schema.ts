@@ -231,7 +231,8 @@ export interface IntentsTable {
   data_class: Immutable<DataClass>;
   /** Computed by the policy engine at creation (D-02 FR-03). */
   max_autonomy: Immutable<AutonomyLevel>;
-  budget_usd: ColumnType<string, string, never>;
+  /** Only goes up (migration 0015, trigger SDA12): `raiseBudget` after a G5 `resume` (C07). */
+  budget_usd: ColumnType<string, string, string>;
   current_gate: ColumnType<GateCode | null, never, GateCode | null>;
   status: ColumnType<IntentStatus, never, IntentStatus>;
   issue_number: ColumnType<number | null, number | null, number | null>;
@@ -243,6 +244,12 @@ export interface IntentsTable {
    * recorded after it; it also gives the gate's waiting time (FR-12).
    */
   gate_entered_at: ColumnType<Date | null, never, Date | null>;
+  /**
+   * The run budget of the intent's next runs (migration 0015, C07, QUESTIONS #133): set by a G5
+   * `resume` with a budget increase; null means the project's `budget.default_run_usd`. Only goes
+   * up and never back to null.
+   */
+  run_budget_usd: ColumnType<string | null, never, string | null>;
 }
 
 /** A spec linked to an intent: path, commit and content hash, one row per version (FR-02). */
@@ -695,6 +702,7 @@ export const TABLE_COLUMNS = {
     'updated_at',
     'created_at',
     'gate_entered_at',
+    'run_budget_usd',
   ]),
   spec_refs: columns<SpecRefsTable>()([
     'id',

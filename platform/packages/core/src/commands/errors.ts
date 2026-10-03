@@ -15,6 +15,11 @@ export type CommandErrorCode =
    * environment, resources or actions, so a scoped approval could never count.
    */
   | 'scope_not_allowed'
+  /**
+   * An approval at G3 of a plan that a run went outside of (task C07, QUESTIONS #131): G5 sent the
+   * intent back to G3, and G3 needs a new plan (another plan hash).
+   */
+  | 'plan_refused'
   /** Unknown intent, or an intent of a project the actor cannot read. */
   | 'intent_not_found'
   /** Unknown project, or a project the actor has no role on. */

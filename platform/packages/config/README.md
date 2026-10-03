@@ -42,7 +42,7 @@ escalation:
 | `oversight` | `forced_hitl_g3.change_flags`, `dual_approval_g7.change_flags` and `.roles`, `g6_security_findings.mode` and `.min_severity`, `hitl_gate_deadline`, `hotl_block_window`, `approval_expiry`, `gate_overdue.severity` and `.response_level` |
 | `autonomy.max_by_risk` | Maximum autonomy per risk tier |
 | `escalation` | `sla.<severity>.acknowledge` and `.resolve`; `calendar` (`time_zone`, `working_days`, `working_hours`, `holidays`) |
-| `run` | `g6_ci_retries`, `loop_detection.identical_tool_calls_max`, `loop_detection.no_progress_window_minutes` |
+| `run` | `g6_ci_retries`, `loop_detection.identical_tool_calls_max`, `loop_detection.no_progress_window_minutes`, `failed_run_escalation` and `g5_breach_escalation` (`severity`, `response_level` of the escalation a failed run or a G5 breach raises) |
 | `budget` | `warn_percent`, `stop_percent`, `default_intent_usd`, `default_run_usd` |
 | `model_routing.allowed_provider_types` | `api` / `self_hosted` per data class |
 | `retention.evidence_retention_days` | Default 180 |
@@ -76,6 +76,8 @@ A project may tighten anything. It may **not** loosen these (rules M1–M19, sou
 | M17 | Escalation routing: `policy` goes to governance, no `viewer`, backup ≠ owner; notify lists keep the handbook's roles |
 | M18 | Agent recertification at least every 3 months (`agents.recertification_months` ≤ 3, handbook Ch.20 §20.8) |
 | M19 | `viewer` never writes the project AI record (`access.ai_record_write_roles`) |
+| M20 | A failed or lost run freezes the intent: `run.failed_run_escalation.response_level` is `pause`, `contain` or `incident` |
+| M22 | A G5 breach freezes the intent: `run.g5_breach_escalation.response_level` is `pause`, `contain` or `incident` (C07, ADR-M34 §2.8) |
 
 Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 

@@ -122,6 +122,22 @@ describe('forced HITL at G3 (FR-15)', () => {
   it('does not change other gates', () => {
     expect(resolve('G2', 'low', ['migration']).mode).toBe('HOTL');
   });
+
+  it('C07 #131 and decision A: after G5 sent the intent back, G3 is HITL at every tier', () => {
+    for (const tier of RISK_TIERS) {
+      expect(resolve('G3', tier, [], { returnedFromG5: true })).toEqual({
+        mode: 'HITL',
+        approvalsNeeded: 1,
+        roles: B,
+        overrides: ['returned_from_g5'],
+      });
+    }
+    expect(resolve('G3', 'low', ['migration'], { returnedFromG5: true }).overrides).toEqual([
+      'forced_hitl_change_flag',
+      'returned_from_g5',
+    ]);
+    expect(resolve('G4', 'low', [], { returnedFromG5: true }).mode).toBe('POLICY');
+  });
 });
 
 describe('dual approval at G7 (FR-16)', () => {
