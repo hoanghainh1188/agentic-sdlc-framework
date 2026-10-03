@@ -121,21 +121,22 @@ describe('workflow hardening (all workflows)', () => {
     },
   );
 
-  // Every change to main goes through a reviewed pull request (CLAUDE.md "Current constraints").
-  it.each(workflows)('$file has no push trigger when it can write contents', ({ wf }) => {
-    if (wf.permissions?.contents === 'write') {
-      expect(Object.keys(wf.on)).not.toContain('push');
+  // Every change to main goes through a reviewed pull request (CLAUDE.md "Current constraints"),
+  // and no workflow commits to a pull request branch either: a commit pushed by a workflow waits
+  // for approval and leaves the PR head without ci-ok (the render-diagrams bot, removed).
+  it.each(workflows)('$file never writes contents and never pushes', ({ wf }) => {
+    const grants = [wf.permissions, ...Object.values(wf.jobs).map((job) => job.permissions)];
+    for (const grant of grants) {
+      if (grant && typeof grant === 'object') {
+        expect((grant as Record<string, string>).contents).not.toBe('write');
+      } else if (grant !== undefined) {
+        expect(grant).not.toBe('write-all');
+      }
     }
-  });
-
-  it.each(workflows)('$file only pushes to a pull request branch, never to main', ({ wf }) => {
-    const pushScripts = Object.values(wf.jobs).flatMap((job) =>
-      job.steps.flatMap((step) => (step.run?.includes('git push') ? [step.run] : [])),
+    const runsGitPush = Object.values(wf.jobs).some((job) =>
+      job.steps.some((step) => step.run?.includes('git push')),
     );
-    for (const script of pushScripts) {
-      expect(script).toContain('git push origin "HEAD:refs/heads/${HEAD_REF}"');
-      expect(script).toContain('[ "$HEAD_REF" = "main" ]');
-    }
+    expect(runsGitPush).toBe(false);
   });
 
   it.each(workflows)('$file pins the version of every global npm install', ({ wf }) => {
@@ -183,6 +184,20 @@ describe('workflow hardening (all workflows)', () => {
       });
       expect(info.ignored).toBe(false);
     }
+  });
+});
+
+describe('diagrams: CI checks the committed SVG, it never renders or commits', () => {
+  it('the scan job runs the diagram check on every run', () => {
+    const step = job('scan').steps.find((s) => s.run === 'python3 scripts/diagrams.py check');
+    expect(step?.if).toBe('${{ !cancelled() }}');
+    expect(workflowFiles).not.toContain('.github/workflows/render-diagrams.yml');
+  });
+
+  it('pnpm diagrams:render uses mermaid-cli pinned by version and digest, offline', () => {
+    const script = fs.readFileSync(path.join(root, 'scripts/diagrams.py'), 'utf8');
+    expect(script).toMatch(/"minlag\/mermaid-cli:\d+\.\d+\.\d+"\s*"@sha256:[0-9a-f]{64}"/);
+    expect(script).toContain('"--network", "none"');
   });
 });
 

@@ -62,7 +62,7 @@ Handbook and platform must stay consistent: same codes, same names for gates, au
 ## Documentation rules
 - Design docs in `design/` are APPROVED. Do not change their meaning silently. If code must differ from a design doc: stop, add the question to `design/QUESTIONS.md`, and wait. Approved changes go in a separate PR with a short ADR.
 - D-08 and its CSV are generated: edit `scripts/generate-backlog.py`, then run it. Never edit the generated files by hand. Then sync the open GitHub issues: `python3 scripts/create-issues.py --repo harryforge/agentic-sdlc-framework --update` (try `--dry-run` first).
-- Diagrams D9–D13 mirror Mermaid blocks in design docs: if you change one, update the other.
+- Diagrams D9–D13 mirror Mermaid blocks in design docs: if you change one, update the other. After editing a `.mmd`, run `pnpm diagrams:render` and commit the SVG in the same PR (CI only checks it; `diagrams/README.md`).
 - Handbook split: policies and generic process chapters are written outside Claude Code. **You own** the handbook parts that describe platform behaviour: Ch.13–16 and Ch.18–20 usage sections (CLI, `/approve` commands, config, troubleshooting) and runbooks (e.g. T11 OpenBao). When a task changes user-visible behaviour, update the matching handbook chapter in the same PR.
 - Keep `CHANGELOG.md` updated for notable changes. Fill the `## Commands` section below once commands exist (A01, A02).
 
@@ -85,6 +85,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - `pnpm test` — Vitest (all `platform/**/*.test.ts` except integration tests). One file: `pnpm test platform/tests/workspace/boundaries.test.ts`.
 - `pnpm test:integration` — Vitest for `platform/tests/integration/**` only; needs the Compose `core` profile running (CI job `compose`).
 - `pnpm clean` — remove build output.
+- `pnpm diagrams:render [name …]` — render `diagrams/src/*.mmd` to `diagrams/svg/` with mermaid-cli pinned by digest (needs Docker); each SVG starts with the SHA-256 of its source. `pnpm diagrams:check` — the CI check (stamp matches the source, one SVG per source, well-formed XML; no Docker). No workflow commits to a branch.
 - Before a PR: `pnpm build && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`.
 - New package: put it under `platform/apps/`, `platform/packages/` or `platform/packages/adapters/` with the `@sdlc/` scope, and add it to the root `tsconfig.json` references.
 - Docker Compose (infrastructure, `platform/deploy/`, ADR-M17). Profiles: `core` (PostgreSQL, Temporal + UI, LiteLLM, Valkey, SeaweedFS, OpenBao) and `observability` (Langfuse, ClickHouse):
