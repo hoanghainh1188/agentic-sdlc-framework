@@ -17,6 +17,7 @@ export const API_ENV = {
   devDbUrl: 'SDLC_API_DEV_DB_URL',
   temporalAddress: 'SDLC_API_TEMPORAL_ADDRESS',
   temporalNamespace: 'SDLC_API_TEMPORAL_NAMESPACE',
+  githubApiUrl: 'SDLC_API_GITHUB_API_URL',
 } as const;
 
 /** The database role of every platform process (ADR-M09 section 2.3). */
@@ -49,6 +50,11 @@ const schema = z.object({
     .refine((v) => v === 'off' || TEMPORAL_ADDRESS.test(v))
     .default('temporal:7233'),
   [API_ENV.temporalNamespace]: z.string().regex(TEMPORAL_NAMESPACE).default('default'),
+  // The Git host the spec endpoints read (B08, ADR-M39 §2.2); the App key comes from OpenBao.
+  [API_ENV.githubApiUrl]: z
+    .string()
+    .regex(/^https:\/\/[^\s]+$/)
+    .default('https://api.github.com'),
   NODE_ENV: z.string().optional(),
 });
 
@@ -70,6 +76,8 @@ export interface ApiSettings {
   readonly authFailuresPerMinute: number;
   /** Where to wake intent workflows (B07); null: no signals (development only). */
   readonly temporal: TemporalSettings | null;
+  /** GitHub API base URL for the spec endpoints (B08). */
+  readonly githubApiUrl: string;
 }
 
 /** A setting is missing or wrong. `key` is a message catalog key; `name` the variable. */
@@ -122,6 +130,7 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     database,
     rateLimitPerMinute: v[API_ENV.rateLimitPerMinute],
     authFailuresPerMinute: v[API_ENV.authFailuresPerMinute],
+    githubApiUrl: v[API_ENV.githubApiUrl],
     temporal: temporalOff
       ? null
       : { address: v[API_ENV.temporalAddress], namespace: v[API_ENV.temporalNamespace] },

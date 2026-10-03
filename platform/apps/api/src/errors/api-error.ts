@@ -7,6 +7,8 @@ import {
   AgentRegisterError,
   AiRecordError,
   CommandError,
+  SPEC_ERROR_MESSAGES,
+  SpecError,
   DbError,
   EscalationError,
   RegistryError,
@@ -45,6 +47,10 @@ export const API_ERROR_CODES = [
   'ai_record_not_found',
   'ai_record_invalid',
   'ai_record_version_conflict',
+  'spec_invalid',
+  'spec_not_on_default_branch',
+  'spec_link_not_allowed',
+  'git_host_unavailable',
   'user_not_found',
   'identity_not_found',
   'token_not_found',
@@ -90,6 +96,10 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   ai_record_not_found: 'api.error.ai_record_not_found',
   ai_record_invalid: 'api.error.ai_record_invalid',
   ai_record_version_conflict: 'api.error.ai_record_version_conflict',
+  spec_invalid: 'api.error.spec_invalid',
+  spec_not_on_default_branch: 'api.error.spec_not_on_default_branch',
+  spec_link_not_allowed: 'api.error.spec_link_not_allowed',
+  git_host_unavailable: 'api.error.git_host_unavailable',
   user_not_found: 'api.error.user_not_found',
   identity_not_found: 'api.error.identity_not_found',
   token_not_found: 'api.error.token_not_found',
@@ -228,10 +238,28 @@ export function agentApiError(error: AgentRegisterError, agentKey: string): ApiE
   );
 }
 
+/** Spec refusals (B08, ADR-M39 §2.2). The reason is the spec error code, or the unreadable cause. */
+const SPEC: Readonly<Record<SpecError['code'], [number, ApiErrorCode]>> = {
+  invalid_path: [422, 'spec_invalid'],
+  spec_unreadable: [422, 'spec_invalid'],
+  not_on_default_branch: [409, 'spec_not_on_default_branch'],
+  link_not_allowed: [409, 'spec_link_not_allowed'],
+  repository_invalid: [409, 'spec_link_not_allowed'],
+  git_host_unavailable: [503, 'git_host_unavailable'],
+};
+
+export function specApiError(error: SpecError): ApiError {
+  const [status, code] = SPEC[error.code];
+  const text = (locale: string) =>
+    t(SPEC_ERROR_MESSAGES[error.code], { cause: error.cause_ ?? '-' }, locale);
+  return new ApiError(status, code, error.cause_ ?? error.code, undefined, undefined, text);
+}
+
 /** Maps any thrown value to an `ApiError`. Unknown errors become `internal` (500). */
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
+  if (error instanceof SpecError) return specApiError(error);
   if (error instanceof AgentRegisterError) return agentApiError(error, '-');
   if (error instanceof AdminError) {
     const [status, code] = ADMIN[error.code];

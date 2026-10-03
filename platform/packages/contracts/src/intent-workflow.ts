@@ -87,8 +87,16 @@ export type IntentWaitReason =
   | 'g4_check'
   /** G4 passed or was approved; the run starts (C06 session 2 hands it to the runner). */
   | 'run_pending'
-  /** The Git host could not be read for the G4 facts (base commit, instructions file). */
+  /**
+   * The Git host could not be read for the G4 facts (base commit, instructions file) or for the
+   * spec check at G2–G4 (B08).
+   */
   | 'git_host_unavailable'
+  /**
+   * B08 (ADR-M39 §2.4): the linked spec cannot be read at the head of the default branch; the
+   * intent waits at G2 until a person links a spec that can be read.
+   */
+  | 'spec_unavailable'
   /** C06 session 2: the intent's run is under way (the workflow that drives it waits for it). */
   | 'run_in_progress'
   /**

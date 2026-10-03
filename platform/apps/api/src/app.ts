@@ -4,7 +4,7 @@ import { Logger, Module, type DynamicModule, type LoggerService } from '@nestjs/
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, NestFactory, Reflector } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type { IntentWorkflowSignals } from '@sdlc/contracts';
+import type { GitHostAdapter, IntentWorkflowSignals } from '@sdlc/contracts';
 import { Registry, type PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
@@ -25,10 +25,21 @@ import { IntentsController } from './intents/intents.controller.js';
 import { IntentsService } from './intents/intents.service.js';
 import { MeController } from './me/me.controller.js';
 import { MeTokensController } from './me/tokens.controller.js';
+import { SpecsController } from './specs/specs.controller.js';
+import { SpecsService } from './specs/specs.service.js';
 import { LogContextInterceptor } from './observability/log-context.interceptor.js';
 import { createApiLogger } from './observability/logging.js';
 import type { ApiSettings } from './settings.js';
-import { AI_RECORDS, CLOCK, DATABASE, ESCALATIONS, INTENTS, REGISTRY, SETTINGS } from './tokens.js';
+import {
+  AI_RECORDS,
+  CLOCK,
+  DATABASE,
+  ESCALATIONS,
+  INTENTS,
+  REGISTRY,
+  SETTINGS,
+  SPECS,
+} from './tokens.js';
 
 /** Largest accepted request body. Intents carry at most ~10 kB of text. */
 const BODY_LIMIT_BYTES = 64 * 1024;
@@ -49,6 +60,11 @@ export interface ApiDeps {
    * reconcile loop then catches up.
    */
   readonly intentSignals?: IntentWorkflowSignals;
+  /**
+   * The Git host the spec endpoints read (B08, ADR-M39 §2.2). Undefined (dev mode without
+   * OpenBao): linking a spec answers `git_host_unavailable`.
+   */
+  readonly gitHost?: Pick<GitHostAdapter, 'getBranchHead' | 'getFileAtCommit'>;
 }
 
 @Module({})
@@ -63,6 +79,7 @@ class ApiModule {
         HealthController,
         MeController,
         IntentsController,
+        SpecsController,
         EscalationsController,
         AiRecordsController,
         AdminProjectsController,
@@ -89,6 +106,14 @@ class ApiModule {
           inject: [REGISTRY],
         },
         { provide: ESCALATIONS, useValue: new EscalationsService(now, signals, wakeLogger) },
+        {
+          provide: SPECS,
+          useValue: new SpecsService(
+            deps.gitHost ? { gitHost: deps.gitHost } : undefined,
+            signals,
+            wakeLogger,
+          ),
+        },
         { provide: AI_RECORDS, useValue: new AiRecordsService(signals, wakeLogger, now) },
         {
           provide: APP_GUARD,

@@ -1,5 +1,5 @@
 // Specs linked to an intent (design/D-05 section 6.2, D-02 FR-02). One row per version; rows never
-// change. Fetching the content from the Git host and re-checking the hash belong to B08.
+// change. Fetching the content from the Git host and re-checking the hash: `specs/` (B08, ADR-M39).
 import { sql } from 'kysely';
 
 import { RegistryError } from '../../registry/errors.js';
@@ -17,6 +17,11 @@ export interface LinkSpec extends RegistryActor {
   readonly commitSha: string;
   readonly contentSha256: string;
   readonly sourceTool?: SpecSourceTool | null;
+  /**
+   * Why the spec is linked (B08, ADR-M39): `linked` (a person, the default) or `head_changed`
+   * (the workflow follows a change of the file at the head of the default branch).
+   */
+  readonly cause?: 'linked' | 'head_changed';
 }
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
@@ -83,6 +88,8 @@ export class SpecRefRepository extends TenantRepository {
             spec_ref_id: spec.id,
             version: spec.version,
             content_sha256: spec.content_sha256,
+            commit_sha: spec.commit_sha,
+            cause: input.cause ?? 'linked',
           },
         });
         return spec;

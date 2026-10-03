@@ -80,10 +80,15 @@ export const decisionSchema = z.object({
 });
 export type DecisionView = z.infer<typeof decisionSchema>;
 
+const specRefSchema = z.object({
+  version: z.number().int(),
+  path: z.string().max(1024),
+  commit_sha: code,
+  content_sha256: code,
+});
+
 export const intentDetailSchema = intentSchema.extend({
-  spec: z
-    .object({ version: z.number().int(), path: ref, commit_sha: code, content_sha256: code })
-    .nullable(),
+  spec: specRefSchema.nullable(),
   plan: z
     .object({
       version: z.number().int(),
@@ -94,6 +99,16 @@ export const intentDetailSchema = intentSchema.extend({
   decisions: z.array(decisionSchema).max(10_000),
 });
 export type IntentDetail = z.infer<typeof intentDetailSchema>;
+
+/** `POST /v1/intents/:intent/specs` (B08, ADR-M39 §2.2). */
+export const linkedSpecSchema = specRefSchema.extend({ intent: code });
+export type LinkedSpecView = z.infer<typeof linkedSpecSchema>;
+
+/** `GET /v1/intents/:intent/specs` (B08). */
+export const specListSchema = z.object({
+  intent: code,
+  items: z.array(specRefSchema).max(10_000),
+});
 
 export const intentPageSchema = z.object({
   items: z.array(intentSchema).max(1000),

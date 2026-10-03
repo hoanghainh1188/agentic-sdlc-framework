@@ -396,6 +396,14 @@ const CASES: Case[] = [
     key: 'config.rule.viewer_never_writes_ai_record',
     path: 'access.ai_record_write_roles',
   },
+  // M23: the viewer role never links a spec (B08, ADR-M39, QUESTIONS.md #162).
+  {
+    name: 'viewer may link a spec',
+    rule: 'M23',
+    yaml: 'access:\n  spec_link_roles: [person_a, viewer]\n',
+    key: 'config.rule.viewer_never_links_spec',
+    path: 'access.spec_link_roles',
+  },
   // M20: a failed or lost run freezes the intent (C06 session 2, ADR-M33 §2.7).
   {
     name: 'a failed run only notifies',

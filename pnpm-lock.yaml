@@ -116,6 +116,9 @@ importers:
       '@opentelemetry/api':
         specifier: 1.9.1
         version: 1.9.1
+      '@sdlc/adapter-git-github':
+        specifier: workspace:*
+        version: link:../../packages/adapters/git-github
       '@sdlc/adapter-policy-simple':
         specifier: workspace:*
         version: link:../../packages/adapters/policy-simple
