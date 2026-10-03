@@ -181,6 +181,15 @@ Every handler works on the caller's tenant scope. Another tenant's objects give 
   - Approvals are bound to the agent version.
 - **Time-limited exception.** The approver table of the agent register lives in code (`agents/approval-rules.ts`, with sources) and not in configuration. This breaks the rule that handbook rules belong in configuration. The reason: agents belong to the tenant, and no tenant-level configuration exists yet. The table moves into a tenant configuration once one exists.
 
+### 2.9. Follow-up: configuration history (accepted by Harry, 2026-10-03)
+
+- **Gap:** without `project_config_versions` (§2.4), the content of an older configuration is lost. Only its hashes remain, in its `config.changed` event. A gate decision records the `config_hash` it ran under, but nobody can see later which settings that hash stood for.
+- **Follow-up:** store the **effective** configuration of every version as canonical JSON (RFC 8785, the input of `config_hash`) in an append-only versions table.
+  - It holds keys and values only: no comments, no free text. Every value of the configuration is a validated code, number, date, duration or pinned reference.
+  - `config_hash` is the SHA-256 of that JSON, so every stored version can be checked against the gate decisions that name it.
+- **Why:** M-F tuning (D-02 §13.3) must see which configuration each gate ran under.
+- **When:** a separate backlog task (through `scripts/generate-backlog.py`), before M-E produces trial data. It is not in B13.
+
 ## 3. Alternatives considered
 
 | Alternative | Why not |
@@ -215,3 +224,4 @@ Every handler works on the caller's tenant scope. Another tenant's objects give 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task B13, PR 1) | First version |
+| 0.2 | 2026-10-03 | Claude (task B13, PR 1), Harry's review | §2.9: follow-up for the configuration history (effective configuration as canonical JSON in an append-only versions table) |
