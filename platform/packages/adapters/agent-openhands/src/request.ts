@@ -80,6 +80,12 @@ export function checkTask(contract: RunContract, task: AgentTask): void {
  * agent reads it from the workspace, which the runner cloned at `base_sha`. Agent-facing text,
  * not a user-facing message, so it is not in the message catalog (ADR-M29).
  */
+/** The instruction of a retry run after CI failed at G6 (agent-facing, fixed text). */
+export const CI_FAILED_INSTRUCTION =
+  'The previous attempt was pushed and CI failed on it. Your workspace starts from that commit. ' +
+  `Run the checks that ${INSTRUCTIONS_FILE} names (lint, type check, tests, build), find what ` +
+  'fails, and fix it within the files you may change.';
+
 export function buildTaskMessage(
   contract: RunContract,
   task: AgentTask,
@@ -102,6 +108,8 @@ export function buildTaskMessage(
     'Files and path patterns you may change (the platform stops the run if other files change):',
     files,
     '',
+    // C08 PR 2 (QUESTIONS #158): a fixed instruction, never CI logs or check names.
+    ...(task.ciFailed === true ? [CI_FAILED_INSTRUCTION, ''] : []),
     'Rules:',
     `- Stay on the branch ${contract.branch}. Do not create or switch branches.`,
     '- Do not push, and do not change Git remotes or Git configuration.',

@@ -33,7 +33,26 @@ describe('run event payloads', () => {
       'branch_pushed',
       'publish_refused',
       'publish_failed',
+      'ci_checked',
     ]);
+  });
+
+  it('C08 PR 2: ci_checked holds codes, counts and a hash, never a check name', () => {
+    const checked = {
+      pr_number: 7,
+      pr_state: 'open',
+      head_sha: 'a'.repeat(40),
+      state: 'passed',
+      checks_sha256: 'b'.repeat(64),
+      findings: 'known',
+      critical: 0,
+      high: 1,
+      medium: 0,
+      low: 3,
+    };
+    expect(checkRunEvent('ci_checked', checked)).toEqual(checked);
+    expect(refused('ci_checked', { ...checked, state: 'lint, type check' })).toThrow(DbError);
+    expect(refused('ci_checked', { ...checked, name: 'ci-ok' })).toThrow(DbError);
   });
 
   it('C08: branch_pushed holds commits and hashes; publish_refused and publish_failed a code', () => {

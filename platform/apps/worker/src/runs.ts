@@ -10,6 +10,7 @@ import {
   CostController,
   parseTenantId,
   type G4Deps,
+  type G6Deps,
   type PlatformDatabase,
   type PublishDeps,
   type Registry,
@@ -27,6 +28,8 @@ export interface WorkerRuns {
   readonly runs: RunDeps;
   /** C08: the push token and the pull request at G6. */
   readonly publish: PublishDeps;
+  /** C08 PR 2: what G6 reads from CI. */
+  readonly g6: G6Deps;
   close(): Promise<void>;
 }
 
@@ -77,6 +80,7 @@ export async function createWorkerRuns(options: {
         egressAllowlist: settings.egressAllowlist,
       },
       publish: { registry: options.registry, gitHost: options.gitHost, wrapper: options.wrapper },
+      g6: { gitHost: options.gitHost },
       close: () => cost.close(),
     };
   } catch (error) {

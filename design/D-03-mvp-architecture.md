@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.18 |
+| Version | 1.19 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29); 1.9 approved by Harry on 2026-09-27 in the B07 session 2 plan (HOTL block window, C06 waits for it, the gate deadline timer; ADR-M30); 1.10 approved by Harry on 2026-09-27 in the B12 plan (project AI record module: codes only, write roles, G1 check at the submit; ADR-M32); 1.11 approved by Harry on 2026-09-27 in the C06 plan (G4 checks and decisions, `getBranchHead`, the worker holds the Cost Controller AppRole; QUESTIONS #108–#112; ADR-M33); 1.12 approved by Harry on 2026-09-27 in the C06 session 2 plan (the run's round after G4, the task queue `sdlc-runner`, a failed or lost run is escalated, `revokeRunKey`; ADR-M33 §2.6–§2.7); 1.13 approved by Harry on 2026-09-27 in the C06 session 2 plan, PR 2b (the L1 proposal as evidence, `EvidenceStore` as built, the runner reads a sandbox's workspace; ADR-M33 §2.9); 1.14 approved by Harry on 2026-09-30 in the A08 plan (OpenTelemetry Collector in the profile `observability`, one OTLP pipeline to Langfuse v4; QUESTIONS #4; ADR-M35); 1.15 approved by Harry on 2026-09-28 in the C07 plan (`listPaths`, the run's changes checked and stored by the runner, the in-run spend check; QUESTIONS #126, #130; ADR-M34); 1.16 approved by Harry on 2026-09-28 in the C07 plan and on 2026-10-03 (decisions A–C) (the G5 step, the G5 escalation and its decisions, the budget warning during the run; QUESTIONS #131–#134; ADR-M34 §2.8–§2.9); 1.17 approved by Harry on 2026-10-03 in the B08 plan (the spec is the file on the default branch, checked again at G2–G4; QUESTIONS #160–#164; ADR-M39); 1.18 approved by Harry on 2026-10-03 in the C08 plan (the push after G5, the pull request, `openPullRequest` and `findOpenPullRequest`, the push token, the runner reads run diffs; QUESTIONS #155, #156; ADR-M38 §2.1–§2.6) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29); 1.9 approved by Harry on 2026-09-27 in the B07 session 2 plan (HOTL block window, C06 waits for it, the gate deadline timer; ADR-M30); 1.10 approved by Harry on 2026-09-27 in the B12 plan (project AI record module: codes only, write roles, G1 check at the submit; ADR-M32); 1.11 approved by Harry on 2026-09-27 in the C06 plan (G4 checks and decisions, `getBranchHead`, the worker holds the Cost Controller AppRole; QUESTIONS #108–#112; ADR-M33); 1.12 approved by Harry on 2026-09-27 in the C06 session 2 plan (the run's round after G4, the task queue `sdlc-runner`, a failed or lost run is escalated, `revokeRunKey`; ADR-M33 §2.6–§2.7); 1.13 approved by Harry on 2026-09-27 in the C06 session 2 plan, PR 2b (the L1 proposal as evidence, `EvidenceStore` as built, the runner reads a sandbox's workspace; ADR-M33 §2.9); 1.14 approved by Harry on 2026-09-30 in the A08 plan (OpenTelemetry Collector in the profile `observability`, one OTLP pipeline to Langfuse v4; QUESTIONS #4; ADR-M35); 1.15 approved by Harry on 2026-09-28 in the C07 plan (`listPaths`, the run's changes checked and stored by the runner, the in-run spend check; QUESTIONS #126, #130; ADR-M34); 1.16 approved by Harry on 2026-09-28 in the C07 plan and on 2026-10-03 (decisions A–C) (the G5 step, the G5 escalation and its decisions, the budget warning during the run; QUESTIONS #131–#134; ADR-M34 §2.8–§2.9); 1.17 approved by Harry on 2026-10-03 in the B08 plan (the spec is the file on the default branch, checked again at G2–G4; QUESTIONS #160–#164; ADR-M39); 1.18 approved by Harry on 2026-10-03 in the C08 plan (the push after G5, the pull request, `openPullRequest` and `findOpenPullRequest`, the push token, the runner reads run diffs; QUESTIONS #155, #156; ADR-M38 §2.1–§2.6); 1.19 approved by Harry on 2026-10-03 in the C08 plan (G6 reads CI: checks, retries, the CI timeout, security findings and their fail-closed rule, `getSecurityFindings`; QUESTIONS #157–#159; ADR-M38 §2.7) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -176,10 +176,10 @@ stateDiagram-v2
     Escalated --> Frozen: no acknowledgement within SLA
     Frozen --> Escalated: backup / governance acknowledges
     G5 --> G6: pass
-    G6 --> Running: CI fail (retries left)
+    G6 --> G4: CI fail (retries left)
     G6 --> G3: CI fail (no retries left)
     G6 --> Escalated: critical security finding
-    G6 --> Escalated: push or pull request refused
+    G6 --> Escalated: push or pull request refused, CI timeout
     G6 --> G7: pass
     G7 --> Running: request changes
     G7 --> G8: approved (+ 2nd approver if flagged) + merged
@@ -222,6 +222,11 @@ General rules:
   - the worker finds the open pull request from the branch, or opens it (template T2, filled from codes only), checks that it shows the pushed commit, and links it to the intent (`intents.pr_number`). The intent then waits for CI (C08 PR 2).
   - The runner's refusal (`empty_diff`, `diff_mismatch`, `branch_moved`…) or three failed attempts (a lost runner counts) → `paused` at G6 and a `technical` escalation at `run.failed_run_escalation`; `resume` → G4 (a new run), `modify` or `roll_back` → G3 (HITL), `terminate` → `cancelled`.
   - Once a run of the intent was pushed, the next run starts from the pushed commit, so its changes go on top of the pull request (QUESTIONS #134).
+- **G6 reads CI** (version 1.19, ADR-M38 §2.7, QUESTIONS #157–#159): once the pull request is linked, the step reads the pull request, the checks of its head and its open security findings before the intent lock, records them as the run event `ci_checked` (codes, counts, hashes) and decides from the database. The checks it waits for are `verification.required_checks` (empty: every check); success, neutral and skipped pass; failure, error and timed out fail; everything else, a missing check or no check is pending.
+  - The pull request closed, merged or showing another commit → `paused`, `technical` escalation.
+  - CI failed → `fail ci_failed`: back to **G4** for a new run from the pushed commit while `run.g6_ci_retries` lasts (the agent is told CI failed); then back to **G3**, HITL from then on (N2, FR-13).
+  - CI pending past `verification.ci_timeout_minutes` → `paused`, `technical` escalation, no retry used.
+  - CI passed: a critical finding → `paused`, `security` escalation; otherwise the matrix with the findings (§6.1): AUDIT and HOTL a system `pass` → G7 (block window); HITL Person B approves. Findings the Git host cannot report → HITL.
 - Retry counts, thresholds, the oversight matrix and SLAs **come from per-project configuration**.
 
 ### 6.1. Resolving the oversight mode
@@ -231,6 +236,7 @@ mode = matrix[gate][risk_tier]                     # project config (handbook co
 if gate == G3 and plan.change_flags ∩ FORCED_HITL_G3: mode = HITL
 if gate == G6 and findings at or above g6_security_findings.min_severity > 0:
                                                    mode = HITL   # default threshold: high
+if gate == G6 and findings unknown (code scanning off or not allowed): mode = HITL   # version 1.19
 if gate == G5 and limit breached:                   mode = matrix[G5][risk_tier].on_breach (if set)
 if gate == G7: mode = HITL; approvals_needed = 2 if plan.change_flags ∩ DUAL_APPROVAL_G7 or risk == critical else 1
 if gate == G8 and environment == production:        mode = HITL
@@ -294,6 +300,7 @@ interface GitHostAdapter {
   issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken>;
   openPullRequest(ref: RepoRef, input: NewPullRequest): Promise<PullRequestInfo>;
   findOpenPullRequest(ref: RepoRef, head: string, base: string): Promise<PullRequestInfo | null>;
+  getSecurityFindings(ref: RepoRef, pr: number): Promise<SecurityFindings>;
   listEventsSince(ref: RepoRef, cursor: EventCursor): Promise<{ events: GitEvent[]; next: EventCursor }>; // MVP: polling
   verifyWebhook(headers: Record<string, string>, rawBody: Buffer): GitEvent; // enabled later
 }
@@ -302,7 +309,7 @@ MVP: `GitHubAdapter` through a **GitHub App** (short-lived per-repo tokens), rea
 
 - Polling and webhooks return the same `GitEvent` type → one handler for `/approve` commands, reviews and CI.
 - The `EventCursor` is stored per project in the database, so events are not processed twice after a restart.
-- The exact TypeScript interface is `GitHostAdapter` in `@sdlc/contracts` (`platform/packages/contracts/src/git-host.ts`, task B05, ADR-M23). Same thirteen methods and parameters as above (version 1.18). Notes:
+- The exact TypeScript interface is `GitHostAdapter` in `@sdlc/contracts` (`platform/packages/contracts/src/git-host.ts`, task B05, ADR-M23). Same fourteen methods and parameters as above (version 1.19). Notes:
   - `GitEvent` has three kinds: `comment_created`, `review_submitted`, `check_completed`. Each has a stable `id` (the same for polling and webhooks) and a `url` to store as a reference. Only a comment's `body` is free text; it is never stored in an append-only table.
   - Only **new** comments are events; an edited comment never is (QUESTIONS #43).
   - Actors carry the numeric account ID and `type: user | bot`. Users are mapped by the numeric ID only; bots never count as approvers (QUESTIONS #45).
@@ -310,6 +317,7 @@ MVP: `GitHubAdapter` through a **GitHub App** (short-lived per-repo tokens), rea
   - `getChangedFiles` returns both paths of a renamed file and fails instead of returning a partial list. `getApprovals` returns each reviewer's latest decision, bound to the reviewed commit.
   - `getBranchHead` (version 1.11, task C06, QUESTIONS #109): the commit a branch points to now. G4 reads the head of the default branch as the run's `base_sha`.
   - `listPaths` (version 1.15, task C07, QUESTIONS #126): every path of a commit's tree that is not a directory, sorted. G4 reads it at `base_sha` and refuses a run when an agent instruction file other than the pinned one exists (`instructions_unpinned`, ADR-M34 §2.4). A tree the host lists only in part fails (`tree_truncated`) and G4 refuses the run: very large repositories cannot run an agent for now.
+  - `getSecurityFindings` (version 1.19, task C08 PR 2, ADR-M38 §2.7, QUESTIONS #157): the open security findings of a pull request, counted per severity (GitHub: code-scanning alerts with a security severity), or unknown (`not_enabled`, `forbidden`). A token of its own with `security_events: read`; never a finding's text or path.
   - `openPullRequest` and `findOpenPullRequest` (version 1.18, task C08, ADR-M38 §2.4): open the pull request of an agent branch into the default branch, never as a draft, with a token of its own that may write pull requests (the adapter's cached token stays read-only); find an open one first, so a repeated call never opens a second. More than one match fails.
   - Later tasks add what they need, with a D-03 update: revoking a short-lived token (C11), the merge event (E01).
 
@@ -670,4 +678,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.16 | 2026-10-03 | Claude (task C07, PR 2), approved by Harry | §6: the G5 step, its outcomes and the escalation's decisions; state machine and diagram D12: G5 → Escalated causes, Escalated → G4 / G3 / Cancelled (ADR-M34 §2.8–§2.9, QUESTIONS #131–#134) |
 | 1.17 | 2026-10-03 | Claude (task B08), approved by Harry | §6: the spec is the file on the default branch, checked again at G2–G4 before the transaction; changed or unreadable → back to G2; state machine and diagram D12: G3 → G2, G4 → G2 (ADR-M39, QUESTIONS #160–#164) |
 | 1.18 | 2026-10-03 | Claude (task C08, PR 1), approved by Harry | §4: diagram D11, the runner pushes after G5 and the worker opens the pull request; §6: G6, the push and the pull request, state machine and D12 (push or pull request refused → Escalated); §7.1: `openPullRequest`, `findOpenPullRequest` (thirteen methods); §8.2, §9: the push token; §10: the runner reads run diffs (ADR-M38, QUESTIONS #134, #155, #156) |
+| 1.19 | 2026-10-03 | Claude (task C08, PR 2), approved by Harry | §6: G6 reads CI (outcomes, retries, N2, timeout, findings), state machine and D12 (G6 → G4 on a CI failure with retries left; CI timeout → Escalated); §6.1: unknown findings → HITL; §7.1: `getSecurityFindings` (fourteen methods) (ADR-M38 §2.7, QUESTIONS #157–#159) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |

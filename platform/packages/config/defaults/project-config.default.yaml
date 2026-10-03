@@ -216,6 +216,15 @@ github:
   # D-02 §6.3; ADR-M11.
   poll_interval_seconds: 30
 
+verification:
+  # C08 PR 2, design/QUESTIONS.md #159, ADR-M38 §2.7. The CI checks G6 waits for, by name: empty =
+  # every check on the pushed commit. A project with a single summary check names it (the pilot
+  # repository: [ci-ok]). A required check that is missing counts as pending.
+  required_checks: []
+  # Still pending this long after the push → paused at G6 with a technical escalation (no retry
+  # used). Restarts when that escalation is closed.
+  ci_timeout_minutes: 60
+
 access:
   # Task B03, ADR-M26, QUESTIONS.md #66. D-02 §3: Person A creates intents. Creators may always read.
   # The viewer role never creates intents (mandatory rule M16).

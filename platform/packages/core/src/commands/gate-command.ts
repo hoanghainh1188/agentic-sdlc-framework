@@ -10,6 +10,8 @@ import { normalizeScope, type ApprovalScope } from '../registry/approval-binding
 import type { HumanDecision } from '../registry/decision-rules.js';
 import type { Registry } from '../registry/registry.js';
 import { refusedPlanHashes, returnedFromG5 } from '../workflow/g5-scope.js';
+import { gatherG6Facts } from '../workflow/g6-ci.js';
+import { contextOf } from '../workflow/g6-verify.js';
 import { isPassableGate, openBlockWindow } from '../workflow/hotl.js';
 import { waitedSeconds } from '../workflow/waited.js';
 import { projectAccess } from './access.js';
@@ -94,7 +96,7 @@ export async function decideGate(
       gate: gate,
       decision: command.decision,
       actor: { type: 'human', id: command.actorId },
-      producers: gate === 'G5' ? await runProducers(tx, current.id) : [],
+      producers: gate === 'G5' || gate === 'G6' ? await runProducers(tx, current.id) : [],
       inputSha256,
       reasonCode: command.reasonCode ?? null,
       reasonRef: command.reasonRef ?? null,
@@ -104,8 +106,16 @@ export async function decideGate(
       source: command.source,
       eventSource: command.eventSource ?? null,
       ...(returned ? { context: { returnedFromG5: true } } : {}),
+      // C08 PR 2: G6's oversight depends on the findings G6 read (QUESTIONS #157).
+      ...(gate === 'G6' ? { context: await g6Context(tx, current.id) } : {}),
     });
   });
+}
+
+/** The policy context of G6 from the last reading (`ci_checked`). */
+async function g6Context(tx: TenantScope, intentId: string) {
+  const facts = await gatherG6Facts(tx, intentId);
+  return facts ? contextOf(facts) : { securityFindingsUnknown: true };
 }
 
 /** The producers of the intent's last run: the person who allowed it, when any (C07, FR-11). */

@@ -55,6 +55,11 @@ export interface AgentTask {
     readonly summary: string;
     readonly plannedFiles: readonly string[];
   };
+  /**
+   * C08 PR 2 (QUESTIONS #158): this run follows a CI failure at G6 (a retry). The agent gets a
+   * fixed instruction to run the project's checks and fix them; never CI logs or check names.
+   */
+  readonly ciFailed?: boolean;
 }
 
 export interface StartAgentRun {

@@ -104,6 +104,16 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.g6_publish_stopped';
     case 'g6_returned':
       return 'intent.status.g6_returned';
+    case 'ci_retry':
+      return 'intent.status.ci_retry';
+    case 'ci_returned':
+      return 'intent.status.ci_returned';
+    case 'g6_decision':
+      return 'intent.status.g6_decision';
+    case 'g6_escalated':
+      return 'intent.status.g6_escalated';
+    case 'g6_resumed':
+      return 'intent.status.g6_resumed';
     default:
       return notice.gate !== null && isCommandGate(notice.gate)
         ? 'intent.status.advanced'

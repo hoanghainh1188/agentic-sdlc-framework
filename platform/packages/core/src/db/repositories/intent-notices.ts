@@ -60,6 +60,12 @@ export const INTENT_NOTICE_KINDS = [
   'pr_opened',
   'g6_publish_stopped',
   'g6_returned',
+  // C08 PR 2 (ADR-M38 §2.7): G6 reads CI.
+  'ci_retry',
+  'ci_returned',
+  'g6_decision',
+  'g6_escalated',
+  'g6_resumed',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

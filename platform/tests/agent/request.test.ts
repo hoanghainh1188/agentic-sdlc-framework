@@ -1,6 +1,11 @@
 // D-08 C05 AC1, AC2, AC3 (iteration cap): what the runner sends to the Agent Server to start a run
 // (ADR-M10 §2.2, ADR-M29). Pure builders, so the exact body is checked.
-import { buildConversationRequest, buildTaskMessage, toolsOf } from '@sdlc/adapter-agent-openhands';
+import {
+  buildConversationRequest,
+  buildTaskMessage,
+  CI_FAILED_INSTRUCTION,
+  toolsOf,
+} from '@sdlc/adapter-agent-openhands';
 import { AgentError, type AgentTask } from '@sdlc/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -117,6 +122,13 @@ describe('buildConversationRequest', () => {
 
 describe('buildTaskMessage (AC2)', () => {
   const message = buildTaskMessage(CONTRACT, TASK, '/workspace');
+
+  it('C08 PR 2 (QUESTIONS #158): a retry after CI failed gets one fixed instruction, no logs', () => {
+    expect(message).not.toContain(CI_FAILED_INSTRUCTION);
+    const retry = buildTaskMessage(CONTRACT, { ...TASK, ciFailed: true }, '/workspace');
+    expect(retry).toContain(CI_FAILED_INSTRUCTION);
+    expect(retry.length - message.length).toBe(CI_FAILED_INSTRUCTION.length + 2);
+  });
 
   it('names the spec file, its commit and hash', () => {
     expect(message).toContain('file: docs/specs/T01-japanese-labels.md');

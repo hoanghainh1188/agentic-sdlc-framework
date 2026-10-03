@@ -252,6 +252,15 @@ export const AUDIT_ACTIONS = {
     entityType: 'intent',
     fields: { run_id: 'uuid', reason: 'code', escalation_id: 'uuid' },
   },
+  /**
+   * A G6 check failed (C08 PR 2, ADR-M38 §2.7): the exact cause next to the decision's reason
+   * code: `ci_failed` (a retry), `ci_no_retries` (back to G3), `ci_timeout`, `pr_closed`,
+   * `pr_merged`, `branch_moved`, `critical_finding`.
+   */
+  'gate.g6_check_failed': {
+    entityType: 'intent',
+    fields: { decision_id: 'uuid?', check: 'code', run_id: 'uuid' },
+  },
   /** The runner refused the Run Contract of a known run; `reason` is a reject reason code. */
   'run.contract_rejected': { entityType: 'run', fields: { reason: 'code' } },
   /** An escalation was raised (FR-18, B11). Codes and IDs only, never the words of the package. */

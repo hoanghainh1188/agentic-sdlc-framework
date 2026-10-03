@@ -9,6 +9,7 @@ import type { Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { latestRunProposalSha256 } from '../workflow/g4-proposal.js';
 import { gatherG5Facts } from '../workflow/g5-facts.js';
+import { gatherG6Facts } from '../workflow/g6-ci.js';
 import { CommandError } from './errors.js';
 
 /**
@@ -25,13 +26,15 @@ export function isCommandGate(gate: string): gate is CommandGate {
 /**
  * Gates a person may decide by a command: G1–G3, G4 (C06: Person A approves the run proposal at
  * High risk, ADR-M33 §2.4) and G5 (C07, ADR-M34 §2.8: Person A approves the run's changes where
- * G5 is HITL, or blocks a G5 the platform passed within its block window). G6 is a system gate;
- * E01 and E03 add G7 and G8.
+ * G5 is HITL, or blocks a G5 the platform passed within its block window) and G6 (C08 PR 2,
+ * ADR-M38 §2.7: Person B approves where G6 is HITL, or blocks a G6 the platform passed). E01 and
+ * E03 add G7 and G8.
  */
 export const DECIDABLE_GATES = [
   ...COMMAND_GATES,
   'G4',
   'G5',
+  'G6',
 ] as const satisfies readonly GateCode[];
 export type DecidableGate = (typeof DECIDABLE_GATES)[number];
 
@@ -74,6 +77,13 @@ export async function gateInputSha256(
   gate: DecidableGate,
 ): Promise<string> {
   switch (gate) {
+    case 'G6': {
+      const facts = await gatherG6Facts(scope, intent.id);
+      if (!facts?.ci) {
+        throw new CommandError('gate_input_missing', `${intent.code}: no CI result to check`);
+      }
+      return facts.inputSha256;
+    }
     case 'G5': {
       const facts = await gatherG5Facts(scope, intent.id);
       if (!facts) throw new CommandError('gate_input_missing', `${intent.code}: no run to check`);
