@@ -22,6 +22,7 @@ export const GIT_HOST_ERROR_MESSAGES = {
   file_not_utf8: 'git_host.error.file_not_utf8',
   not_a_file: 'git_host.error.not_a_file',
   too_many_files: 'git_host.error.too_many_files',
+  tree_truncated: 'git_host.error.tree_truncated',
   webhook_disabled: 'git_host.error.webhook_disabled',
   webhook_bad_signature: 'git_host.error.webhook_bad_signature',
   unsupported_event: 'git_host.error.unsupported_event',

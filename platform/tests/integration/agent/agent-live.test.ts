@@ -9,6 +9,7 @@
 // for the runner's own container (the runner code attaches it to the run's network, and the test
 // process on the host reaches the Agent Server through its port on 127.0.0.1). The sandboxes, the
 // network attachment, the agent calls and the clean-up are the runner code under test.
+// C07: every run that goes to G5 has its changes computed from the real sandbox (`changesStep`).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -27,7 +28,14 @@ import {
 import { createTestDatabase, type TestDatabase } from '../db/helpers.js';
 import { docker, dockerSocket, quietly } from '../runner/live-helpers';
 import { buildSandboxImage } from '../sandbox-image/helpers';
-import { here, NODE_IMAGE, secret, startAgentRun, type AgentRunFixture } from './helpers';
+import {
+  changesStep,
+  here,
+  NODE_IMAGE,
+  secret,
+  startAgentRun,
+  type AgentRunFixture,
+} from './helpers';
 
 const enabled = process.env.SDLC_AGENT_TEST === '1' && !!process.env.SDLC_TEST_DATABASE_URL;
 const suffix = crypto.randomBytes(4).toString('hex');
@@ -151,7 +159,20 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
           {},
           { adapter: new OpenHandsAdapter(), agentUrl: () => r.relayUrl },
         );
-        const result = await runner.runAgent(request(r));
+        // The runner did not provision this fixture run, so it holds no clone: drive the agent
+        // with the fixture's clone (C07), then release the run through the runner as runAgent does.
+        const puts: { path: string; content: Buffer }[] = [];
+        const result = await driveAgent(
+          {
+            db: t.app as unknown as AgentDriveDeps['db'],
+            docker: client,
+            settings: r.settings,
+            adapter: new OpenHandsAdapter(),
+            agentUrl: () => r.relayUrl,
+            ...changesStep(t, client, r, puts),
+          },
+          request(r),
+        ).finally(() => runner.release(r.envelope.contract.tenant_id, runId, 'finished'));
 
         expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
         expect(result.outputs?.changedFiles).toEqual([{ path: 'hello.txt', status: 'added' }]);
@@ -169,6 +190,13 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
           commit: 'committed',
           changed_files: 1,
         });
+        // C07: the diff computed from the sandbox's workspace, stored and checked (ADR-M34).
+        expect(puts).toHaveLength(1);
+        expect(puts[0]!.content.toString()).toContain('hello.txt');
+        const checked = (await r.scope.runEvents.list(runId)).find(
+          (e) => e.event_type === 'changes_checked',
+        );
+        expect(checked?.payload).toMatchObject({ changed_files: 1, instruction_files: 0 });
 
         // AC2: the model saw the spec path, the planned file, the AGENTS.md rule, and the AGENTS.md
         // content (loaded by the agent from the workspace); only the granted tools.
@@ -211,6 +239,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
             settings: r.settings,
             adapter: new OpenHandsAdapter(),
             agentUrl: () => r.relayUrl,
+            ...changesStep(t, client, r, []),
           },
           request(r),
         );
@@ -241,6 +270,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
             adapter: new OpenHandsAdapter(),
             agentUrl: () => r.relayUrl,
             clock: () => started + (Date.now() - started) * 60,
+            ...changesStep(t, client, r, []),
           },
           request(r),
         );

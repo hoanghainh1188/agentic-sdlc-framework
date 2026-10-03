@@ -10,7 +10,7 @@ const refused = (type: string, payload: Record<string, unknown>) => () =>
   checkRunEvent(type, payload);
 
 describe('run event payloads', () => {
-  it('declares the C02, C04, C05 and C06 event types', () => {
+  it('declares the C02, C04, C05, C06 and C07 event types', () => {
     expect(Object.keys(RUN_EVENT_TYPES)).toEqual([
       'contract_issued',
       'contract_accepted',
@@ -26,7 +26,48 @@ describe('run event payloads', () => {
       'agent_finished',
       'agent_failed',
       'proposal_stored',
+      'key_issued',
+      'budget_warning',
+      'diff_stored',
+      'changes_checked',
     ]);
+  });
+
+  it('C07: key_issued holds the cap as a decimal string and which budget set it', () => {
+    expect(checkRunEvent('key_issued', { max_budget_usd: '0.5', limited_by: 'intent' })).toEqual({
+      max_budget_usd: '0.5',
+      limited_by: 'intent',
+    });
+    for (const amount of [0.5, '-1', '1e3', '0.1234567', '01.5', '']) {
+      expect(refused('key_issued', { max_budget_usd: amount, limited_by: 'run' })).toThrow(DbError);
+    }
+    expect(refused('key_issued', { max_budget_usd: '1', limited_by: 'run', key: 'sk-x' })).toThrow(
+      DbError,
+    );
+  });
+
+  it('C07: budget_warning holds two decimals and a percent', () => {
+    expect(
+      checkRunEvent('budget_warning', { spend_usd: '0.41', max_budget_usd: '0.5', percent: 82 }),
+    ).toEqual({ spend_usd: '0.41', max_budget_usd: '0.5', percent: 82 });
+    expect(refused('budget_warning', { spend_usd: '0.41', max_budget_usd: '0.5' })).toThrow(
+      DbError,
+    );
+  });
+
+  it('C07: diff_stored and changes_checked hold hashes and counts only, never paths', () => {
+    expect(checkRunEvent('diff_stored', { sha256: SHA, size_bytes: 10, changed_files: 2 })).toEqual(
+      { sha256: SHA, size_bytes: 10, changed_files: 2 },
+    );
+    const checked = {
+      changed_files: 4,
+      out_of_scope: 1,
+      instruction_files: 0,
+      paths_sha256: SHA,
+    };
+    expect(checkRunEvent('changes_checked', checked)).toEqual(checked);
+    expect(refused('changes_checked', { ...checked, out_of_scope_paths: 'a.ts' })).toThrow(DbError);
+    expect(refused('changes_checked', { ...checked, paths_sha256: 'src/a.ts' })).toThrow(DbError);
   });
 
   it('C06 2b: proposal_stored holds a hash and counts only, never paths', () => {

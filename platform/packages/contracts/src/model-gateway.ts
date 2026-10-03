@@ -109,5 +109,14 @@ export interface ModelGateway {
   listSpend(range: { readonly from: Date; readonly to: Date }): Promise<SpendPage>;
 }
 
+/**
+ * Reads the spend of a run's key with that key itself (task C07, design/ADR-M34 §2.6): the runner
+ * holds the run's virtual key, never the gateway's master key. The gateway answers only for the
+ * calling key; a run key can never read another key.
+ */
+export interface RunKeySpendReader {
+  readOwnSpend(key: RedactedSecret): Promise<SpendInfo>;
+}
+
 /** Labels are codes (see `CostLabels`). */
 export const COST_LABEL_VALUE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;

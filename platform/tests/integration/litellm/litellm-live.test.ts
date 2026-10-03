@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { LiteLLMGateway } from '@sdlc/adapter-model-litellm';
+import { LiteLLMGateway, LiteLLMKeySpendReader } from '@sdlc/adapter-model-litellm';
 import { COST_LABEL_NAMES } from '@sdlc/contracts';
 import { Redacted } from '@sdlc/secrets';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -517,6 +517,81 @@ describe.skipIf(!enabled)(
         // the pinned version must refuse it, so the ID may appear in logs without being a key.
         expect(await chat(issued.key.keyId)).toBe(401);
         expect(await chat(`sk-${issued.key.keyId}`)).toBe(401);
+      });
+    });
+
+    describe('C07: the runner reads the spend of a run with the run key itself (ADR-M34 §2.6)', () => {
+      /** A call with a run key as the bearer; returns the status and the raw body text. */
+      async function asRunKey(key: string, pathAndQuery: string) {
+        const response = await fetch(`${litellmUrl}${pathAndQuery}`, {
+          headers: { authorization: `Bearer ${key}` },
+        });
+        return { status: response.status, text: await response.text() };
+      }
+
+      it('reads its own spend and cap; never the info of another key', async () => {
+        const own = await seed();
+        const other = await seed();
+        const ownKey = await issue(own);
+        const otherKey = await issue(other);
+        const reader = new LiteLLMKeySpendReader({ baseUrl: litellmUrl });
+
+        expect(await chat(ownKey.key.key.reveal())).toBe(200);
+        let info = await reader.readOwnSpend(ownKey.key.key);
+        for (let i = 0; i < 30 && info.spendUsd === '0'; i++) {
+          await sleep(1000); // LiteLLM records spend in batches
+          info = await reader.readOwnSpend(ownKey.key.key);
+        }
+        expect(info).toEqual({ spendUsd: String(COST_PER_CALL), maxBudgetUsd: '2' });
+
+        // Asking about the other key, by its hash or by the key itself, with the run key: LiteLLM
+        // refuses, or answers only about the calling key. Never about the other one.
+        const otherAlias = `run-${other.runId}`;
+        const leaking: string[] = [];
+        for (const [name, query] of [
+          ['info_by_hash', `/key/info?key=${otherKey.key.keyId}`],
+          ['info_by_key', `/key/info?key=${otherKey.key.key.reveal()}`],
+          ['list_full', '/key/list?return_full_object=true'],
+          ['list_by_alias', `/key/list?key_alias=${otherAlias}`],
+        ] as const) {
+          const { status, text } = await asRunKey(ownKey.key.key.reveal(), query);
+          const found = [
+            text.includes(otherKey.key.keyId) ? 'hash' : '',
+            text.includes(otherAlias) ? 'alias' : '',
+            text.includes(otherKey.key.key.reveal()) ? 'key' : '',
+            text.includes(other.slug) ? 'tenant' : '',
+          ].filter(Boolean);
+          if (found.length > 0) leaking.push(`${name}:${String(status)}:${found.join('+')}`);
+        }
+        expect(leaking).toEqual([]);
+
+        // A revoked key reads nothing.
+        await controller.endRunKey({ runId: own.runId, syncFrom: now });
+        await expect(reader.readOwnSpend(ownKey.key.key)).rejects.toMatchObject({
+          code: 'http_error',
+        });
+      });
+
+      it('a key over its cap still reads its own spend, within the re-read wait (the runner sees the budget stop)', async () => {
+        const s = await seed({ runBudget: '0.002' });
+        const issued = await issue(s);
+        const statuses = await callUntilBlocked(issued.key.key.reveal(), 8);
+        expect(statuses.at(-1)).toBe(429);
+        const reader = new LiteLLMKeySpendReader({ baseUrl: litellmUrl });
+        const blockedAt = Date.now();
+        let info = await reader.readOwnSpend(issued.key.key);
+        while (Number(info.spendUsd) < 0.002 && Date.now() - blockedAt < 90_000) {
+          await sleep(1000);
+          info = await reader.readOwnSpend(issued.key.key);
+        }
+        process.stderr.write(
+          `C07 over-cap read after ${String(Date.now() - blockedAt)} ms: ${JSON.stringify(info)}\n`,
+        );
+        expect(Number(info.spendUsd)).toBeGreaterThanOrEqual(0.002);
+        // LiteLLM blocks at once but writes the spend /key/info shows in batches (10 s by
+        // default): the runner's re-read wait (SDLC_RUNNER_AGENT_SPEND_RECHECK_SECONDS, 25 s by
+        // default) must be longer than this lag (ADR-M34 §2.6).
+        expect(Date.now() - blockedAt).toBeLessThan(25_000);
       });
     });
 

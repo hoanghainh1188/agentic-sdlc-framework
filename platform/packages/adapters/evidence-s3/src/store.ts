@@ -2,7 +2,8 @@
 // design/ADR-M33 §2.9). `@aws-sdk/client-s3` 3.1141.0, pinned exactly (no install scripts).
 //
 // - Keys: `<keyPrefix><tenant>/<path>`. The runner's identity may write only under its prefix
-//   (`proposals/`, SeaweedFS action `Write:evidence/proposals/*`), and may not read or list.
+//   (`proposals/`, `diffs/`; SeaweedFS actions `Write:evidence/proposals/*`,
+//   `Write:evidence/diffs/*`), and may not read or list.
 // - Never overwritten: every put sends `If-None-Match: *`; SeaweedFS answers 412 when the key
 //   exists, which becomes `EvidenceError('exists')`.
 // - Errors are codes; no text from the service leaves this module.

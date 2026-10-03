@@ -7,8 +7,17 @@
 // 5. poll the agent. The iteration cap is the agent's own (`max_iterations`); the time cap is the
 //    runner's: at `max_duration_min` it interrupts the agent, waits the grace period, and otherwise
 //    leaves the sandbox to be removed (interrupt, then kill; AC3)          → `agent_stopped`;
+//    the budget cap too (C07, `spend.ts`): the spend of the run's key is read every
+//    `spendCheckMs`; a warning once at `budget.warn_percent`               → `budget_warning`;
+//    a stop at `budget.stop_percent`, like at the time cap                 → `agent_stopped`;
+//    an agent that ends with an error is checked once more against the budget (LiteLLM records
+//    spend late): a budget stop is `stopped_budget`, never `failed`;
 // 6. when the agent finished: commit what it left, with the fixed agent author (QUESTIONS #80);
 // 7. collect the changed files since `base_sha`, the last commit and the log (AC4);
+// 7b. (C07, ADR-M34 §2.2) a run that goes to G5 (succeeded or stopped at a cap): the runner computes
+//    its changes from the workspace in its own clone, stores the diff and checks it against the
+//    plan and the agent instruction paths      → `diff_stored`, `changes_checked`; when that
+//    fails the run fails (`agent_changes_unavailable`): no run reaches G5 unchecked;
 // 8. end the run with its status, `stop_reason`, `head_sha` and `iterations` → `agent_finished`.
 //
 // The run leaves `running` only with one conditional update: if the kill switch (C11) or the
@@ -22,15 +31,22 @@ import {
   type AgentRunState,
   type RedactedSecret,
   type RunContract,
+  type RunKeySpendReader,
   type RunStatus,
 } from '@sdlc/contracts';
-import { parseTenantId, type PlatformDatabase, type TenantScope } from '@sdlc/core';
+import {
+  loadEffectiveConfig,
+  parseTenantId,
+  type PlatformDatabase,
+  type TenantScope,
+} from '@sdlc/core';
 
 import type { DockerClient } from '../docker/client.js';
 import type { Sandbox } from '../sandbox/lifecycle.js';
 import type { RunnerSettings } from '../settings.js';
 import { attachRunner } from './access.js';
 import { AgentRunError } from './errors.js';
+import { SpendWatch } from './spend.js';
 import { loadAgentTask } from './task.js';
 
 /** The repository inside the sandbox (ADR-M25 §2.3). */
@@ -61,6 +77,17 @@ export interface AgentDriveDeps {
     contract: RunContract,
     sandbox: Sandbox,
   ) => Promise<{ changedFiles: number }>;
+  /**
+   * Runs that go to G5 (C07, ADR-M34 §2.2): computes the run's changes in the runner's clone,
+   * stores the diff as evidence and records `changes_checked`; returns the number of changed
+   * paths. Without it such a run fails (`changes_unavailable`).
+   */
+  readonly changes?: (contract: RunContract, sandbox: Sandbox) => Promise<{ changedFiles: number }>;
+  /**
+   * Reads the spend of the run's key with the key itself (C07, ADR-M34 §2.6). Without it the
+   * runner does not watch the budget; the gateway's cap still blocks calls.
+   */
+  readonly spendReader?: RunKeySpendReader;
 }
 
 export interface AgentRunRequest {
@@ -81,7 +108,13 @@ export interface AgentRunRequest {
 
 /** How the agent run ended (run event `agent_finished`). */
 export type AgentOutcome =
-  'finished' | 'max_iterations' | 'max_duration' | 'stuck' | 'agent_error' | 'failed';
+  | 'finished'
+  | 'max_iterations'
+  | 'max_duration'
+  | 'max_budget'
+  | 'stuck'
+  | 'agent_error'
+  | 'failed';
 
 export interface AgentRunResult {
   readonly outcome: AgentOutcome;
@@ -103,6 +136,8 @@ const STATUS_OF: Readonly<Record<Exclude<AgentOutcome, 'failed'>, RunStatus>> = 
   // iterations"); the stop reason tells which cap (ADR-M29).
   max_iterations: 'stopped_budget',
   max_duration: 'stopped_timeout',
+  // The run's key reached `budget.stop_percent` of its cap (C07, FR-52).
+  max_budget: 'stopped_budget',
   stuck: 'stopped_stalled',
   agent_error: 'failed',
 };
@@ -111,6 +146,7 @@ const STOP_REASON_OF: Readonly<Record<Exclude<AgentOutcome, 'failed'>, string | 
   finished: undefined,
   max_iterations: 'max_iterations',
   max_duration: 'max_duration',
+  max_budget: 'max_budget',
   stuck: 'agent_stuck',
   agent_error: 'agent_error',
 };
@@ -152,6 +188,8 @@ interface Polled {
   readonly iterations: number;
   readonly timedOut: boolean;
   readonly cancelled?: boolean;
+  /** The run's key reached the stop share of its cap (C07). */
+  readonly overBudget?: boolean;
 }
 
 async function pollUntilDone(
@@ -159,11 +197,13 @@ async function pollUntilDone(
   handle: AgentRunHandle,
   deadline: number,
   signal?: AbortSignal,
+  watch?: SpendWatch,
 ): Promise<Polled> {
   const clock = clockOf(deps);
   const sleep = sleepOf(deps);
   let errors = 0;
   let last = { state: 'running' as AgentRunState, iterations: 0 };
+  let nextSpendCheck = clock() + deps.settings.agent.spendCheckMs;
   for (;;) {
     if (signal?.aborted) return { ...last, timedOut: false, cancelled: true };
     try {
@@ -175,6 +215,10 @@ async function pollUntilDone(
     }
     if (last.state !== 'running') return { ...last, timedOut: false };
     if (clock() >= deadline) return { ...last, timedOut: true };
+    if (watch && clock() >= nextSpendCheck) {
+      if ((await watch.check()) === 'stop') return { ...last, timedOut: false, overBudget: true };
+      nextSpendCheck = clock() + deps.settings.agent.spendCheckMs;
+    }
     await sleep(Math.min(deps.settings.agent.pollMs, Math.max(0, deadline - clock())));
   }
 }
@@ -277,10 +321,12 @@ export async function driveAgent(
   if (run?.status !== 'running') throw new AgentRunError('run_not_running');
 
   let handle: AgentRunHandle;
+  let watch: SpendWatch | undefined;
   try {
     if (!llmReachable(contract, deps.settings.agent.llmBaseUrl)) {
       throw new AgentRunError('model_unreachable');
     }
+    watch = await spendWatchFor(deps, scope, contract, request.virtualKey);
     const task = await loadAgentTask(scope, contract);
     const endpoint = await attachRunner(
       deps.docker,
@@ -310,7 +356,7 @@ export async function driveAgent(
   const deadline = clockOf(deps)() + contract.max_duration_min * 60_000;
   let polled: Polled;
   try {
-    polled = await pollUntilDone(deps, handle, deadline, request.signal);
+    polled = await pollUntilDone(deps, handle, deadline, request.signal, watch);
   } catch (error) {
     return failRun(deps, scope, contract, failureCode(error));
   }
@@ -326,17 +372,26 @@ export async function driveAgent(
   let outcome: AgentOutcome;
   let iterations: number | undefined = polled.iterations;
   let reachable = true;
-  if (polled.timedOut) {
+  if (polled.timedOut || polled.overBudget) {
+    const reason = polled.overBudget ? 'max_budget' : 'max_duration';
     const stopped = await stopAtTimeCap(deps, handle);
     await scope.runEvents.append(contract.run_id, 'agent_stopped', {
-      reason: 'max_duration',
+      reason,
       method: stopped.method,
     });
-    outcome = 'max_duration';
+    outcome = reason;
     iterations = stopped.iterations ?? iterations;
     reachable = stopped.method === 'interrupt';
   } else {
     outcome = outcomeOf(polled.state, polled.iterations, contract.max_iterations);
+    // The gateway refuses calls past the key's cap and records spend late (ADR-M34 §2.6).
+    if (
+      outcome === 'agent_error' &&
+      watch &&
+      (await watch.settleAfterError(sleepOf(deps), deps.settings.agent.spendRecheckMs))
+    ) {
+      outcome = 'max_budget';
+    }
   }
 
   let commit: 'committed' | 'nothing' | undefined;
@@ -373,6 +428,15 @@ export async function driveAgent(
     ? 'succeeded_proposal_only'
     : STATUS_OF[outcome as Exclude<AgentOutcome, 'failed'>];
   const stopReason = STOP_REASON_OF[outcome as Exclude<AgentOutcome, 'failed'>];
+  // C07: every run that goes to G5 has its changes checked outside the sandbox first.
+  if (TO_G5.includes(status)) {
+    if (!deps.changes) return failRun(deps, scope, contract, 'changes_unavailable');
+    try {
+      await deps.changes(contract, sandbox);
+    } catch {
+      return failRun(deps, scope, contract, 'changes_unavailable');
+    }
+  }
   const set = await endRun(deps, scope, contract, {
     outcome,
     status,
@@ -384,6 +448,35 @@ export async function driveAgent(
     ...(proposed ? { changedFiles: proposed.changedFiles } : {}),
   });
   return { outcome, status: set, stopReason, outputs: proposalOnly ? undefined : outputs };
+}
+
+/** Run statuses that go to G5 (core `finishRun`): their changes are checked first (C07). */
+const TO_G5: readonly RunStatus[] = [
+  'succeeded',
+  'stopped_budget',
+  'stopped_scope',
+  'stopped_timeout',
+  'stopped_stalled',
+];
+
+/** The run's spend watch, with the project's warning and stop shares; none without a reader. */
+async function spendWatchFor(
+  deps: AgentDriveDeps,
+  scope: TenantScope,
+  contract: RunContract,
+  key: RedactedSecret,
+): Promise<SpendWatch | undefined> {
+  if (!deps.spendReader) return undefined;
+  const { config } = await loadEffectiveConfig(scope.projectConfigs, contract.project_id);
+  return new SpendWatch({
+    reader: deps.spendReader,
+    key,
+    contractCapUsd: contract.max_budget_usd,
+    limits: { warnPercent: config.budget.warn_percent, stopPercent: config.budget.stop_percent },
+    onWarning: async (warning) => {
+      await scope.runEvents.append(contract.run_id, 'budget_warning', warning);
+    },
+  });
 }
 
 function failureCode(error: unknown): string {

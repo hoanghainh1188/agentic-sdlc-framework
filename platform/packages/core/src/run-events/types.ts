@@ -9,6 +9,7 @@
 // Adding an event type (C04, C07, C11…): add it below with the smallest set of fields that makes
 // the event traceable, and a test. Reviewers check that no field can carry personal or client data.
 // A field whose kind ends with `?` is optional: it may be left out, never set to null.
+import { isUsd } from '../cost/money.js';
 import { DbError } from '../db/errors.js';
 import { isUuid } from '../db/tenant-id.js';
 
@@ -18,8 +19,10 @@ import { isUuid } from '../db/tenant-id.js';
  * - `version`: a positive integer
  * - `count`: a non-negative integer (iterations, tokens, percent)
  * - `code`: a short code such as `expired` or `G5` (letters, digits, `_ . : -`; max 64)
+ * - `decimal`: an amount of money in USD as a decimal string with at most 6 decimals, never a
+ *   float (D-05 D6; C07)
  */
-export type RunEventFieldKind = 'uuid' | 'sha256' | 'version' | 'count' | 'code';
+export type RunEventFieldKind = 'uuid' | 'sha256' | 'version' | 'count' | 'code' | 'decimal';
 export type RunEventFieldSpec = RunEventFieldKind | `${RunEventFieldKind}?`;
 
 export const RUN_EVENT_TYPES = {
@@ -81,11 +84,40 @@ export const RUN_EVENT_TYPES = {
    * session 2b, ADR-M33 §2.9). The URI and the paths stay in `evidence_items` and the file.
    */
   proposal_stored: { sha256: 'sha256', size_bytes: 'count', changed_files: 'count' },
+  /**
+   * The worker issued the run's capped virtual key (C07, ADR-M34 §2.6). `limited_by`: which budget
+   * set the cap, `run`, `intent` or `tenant` (the smallest remainder). Never the key or its ID.
+   */
+  key_issued: { max_budget_usd: 'decimal', limited_by: 'code' },
+  /**
+   * The runner's spend check reached the warning share of the key's cap (C07): once per run.
+   * `percent` is the share used when it was read.
+   */
+  budget_warning: { spend_usd: 'decimal', max_budget_usd: 'decimal', percent: 'count' },
+  /**
+   * The full diff of the run against `base_sha`, computed in the runner's clone from the sandbox's
+   * workspace, stored as evidence `diff` (C07, ADR-M34 §2.2). The URI and the paths stay in
+   * `evidence_items` and the file.
+   */
+  diff_stored: { sha256: 'sha256', size_bytes: 'count', changed_files: 'count' },
+  /**
+   * The runner's check of the run's changes, at the end of the run (C07, QUESTIONS #130, ADR-M34
+   * §2.3): counts only. `paths_sha256` is the SHA-256 of the sorted changed paths (G5 binds to it);
+   * `out_of_scope` counts paths outside the plan, `instruction_files` paths the agent reads as
+   * instructions (QUESTIONS #126). The paths themselves are client data and never stored here.
+   */
+  changes_checked: {
+    changed_files: 'count',
+    out_of_scope: 'count',
+    instruction_files: 'count',
+    paths_sha256: 'sha256',
+  },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;
 
-type FieldValue<K> = K extends 'uuid' | 'uuid?' | 'sha256' | 'sha256?' | 'code' | 'code?'
+type FieldValue<K> = K extends
+  'uuid' | 'uuid?' | 'sha256' | 'sha256?' | 'code' | 'code?' | 'decimal' | 'decimal?'
   ? string
   : number;
 type Fields<T extends RunEventType> = (typeof RUN_EVENT_TYPES)[T];
@@ -118,6 +150,8 @@ function isValidField(kind: RunEventFieldKind, value: unknown): boolean {
       return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
     case 'code':
       return typeof value === 'string' && CODE.test(value);
+    case 'decimal':
+      return isUsd(value);
   }
 }
 

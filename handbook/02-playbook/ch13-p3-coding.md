@@ -172,6 +172,7 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 | 4 | The spec and the plan are the versions G2 and G3 approved | G4 fails: `input_mismatch` |
 | 5 | The project AI record allows the intent's data class (Chapter 2 §2.5) | G4 fails: `ai_record_missing` or `data_class_not_allowed` |
 | 6 | The agent is registered and active, approved for the sandbox, its model is allowed for the data class, and `AGENTS.md` at the start commit equals the registered version (Chapter 20) | G4 fails: `agent_not_runnable`, `instructions_mismatch` or `autonomy_not_allowed` |
+| 6b | The start commit has no other file the agent reads as instructions: `CLAUDE.md`, `GEMINI.md`, `agent.md`, `.cursorrules` at the root, `AGENTS.md` in any folder, or files under `.agents/skills/`, `.openhands/skills/`, `.openhands/microagents/` (names compared without case) | G4 fails: `instructions_unpinned`. Remove the file, or make it part of a new agent version (Chapter 20). A repository too large for the Git host to list in one answer fails the same way for now |
 | 7 | The intent budget is not used up | G4 fails: `budget_exceeded` |
 
 - When G4 fails, the platform posts one comment on the intent's issue with the reason code and mentions Person A. **The intent stays at G4.** Fix the cause (for example register a new agent version after an edit of `AGENTS.md`, or update the AI record); the platform checks G4 again on its own.
@@ -193,7 +194,7 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 
 | The run… | What happens next |
 |---|---|
-| finished, or stopped at its budget, time or iteration limit | The intent waits at **G5**, where the platform checks the changed files and the budget |
+| finished, or stopped at its budget, time or iteration limit | The intent waits at **G5**, where the platform checks the changed files and the budget. Before that, the platform reads the agent's work out of the sandbox, stores the full diff against the start commit as evidence, and counts the files outside the plan and the agent instruction files. If it cannot, the run counts as failed |
 | failed, or the runner was lost | The intent is **paused**, and a technical escalation goes to Person B (Chapter 18). When a person decides `resume`, the intent goes back to G4 and a new run starts after G4 |
 | finished at High risk (L1, a proposal only) | The platform stores the proposal and **pauses** the intent. Person A takes the proposal forward (see below) |
 | could not start (for example the budget is used up, or the run proposal changed) | The intent is back at **G4**, where the platform decides again |
@@ -204,6 +205,7 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 - **Check changes to `.gitignore` and `.gitattributes` in a proposal first.** They can hide files or change how files are compared, for example when the proposal is applied to a branch later, or in tools that respect them. Do not take such a change forward without a reason you understand.
 - The proposal can contain symbolic links, and they can point anywhere. Look at every link before you apply the proposal.
 - If the proposal cannot be stored, the run counts as failed: the intent is paused and escalated like any failed run.
+- **The budget during a run.** The platform reads what the run has spent, about every 30 seconds. At the warning share of the run's limit (80 % by default, `budget.warn_percent`) it records a warning; at the stop share (100 %, `budget.stop_percent`) it stops the agent, and the run ends as stopped at its budget. The limit is the smallest of the run budget, what is left of the intent budget and what is left of the tenant's month. When the agent ends with an error, the platform reads the spend once more after about 25 seconds (LiteLLM shows the spend about 10 seconds late), so a run that ran out of budget is not reported as a technical failure.
 
 ### 13.10.5. Recertification warning
 
@@ -250,3 +252,4 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 | 0.3 | 2026-09-27 | Claude (task C06, session 1) | §13.10 platform usage for G4: the configured agent, the checks, `/approve G4`, the recertification warning |
 | 0.4 | 2026-09-27 | Claude (task C06, session 2a) | §13.10.4: the start and end of a run, failed and lost runs, the queue |
 | 0.5 | 2026-09-27 | Claude (task C06, session 2b) | §13.10.4: High-risk (L1) runs end with a stored proposal; the intent is paused for Person A; what the proposal leaves out; check `.gitignore`, `.gitattributes` and symbolic links first |
+| 0.6 | 2026-10-03 | Claude (task C07, PR 1) | §13.10.2: G4 check 6b (`instructions_unpinned`); §13.10.4: the diff stored at the end of every run, the budget watched during the run |

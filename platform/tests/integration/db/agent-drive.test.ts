@@ -7,6 +7,10 @@
 // - QUESTIONS #80: the runner commits what the agent left, with the agent author;
 // - failures before the start (LiteLLM not on the egress list, no spec) and a run killed meanwhile;
 // - `Runner.runAgent` removes the sandbox and leaves the run network afterwards.
+// - C07 (ADR-M34 §2.2, §2.6): every run that goes to G5 has its changes checked by the runner, or
+//   it fails (`agent_changes_unavailable`); the spend of the run's key is watched: one warning, a
+//   stop at the stop share (`stopped_budget`, `max_budget`), and an agent error is checked once
+//   more after a bounded wait, because LiteLLM records spend late.
 // Run events hold codes and counts only: no path, no key, no text.
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
 import {
@@ -18,6 +22,8 @@ import {
   type AgentRunStatus,
   type RedactedSecret,
   type RunContractEnvelope,
+  type RunKeySpendReader,
+  type SpendInfo,
   type StartAgentRun,
 } from '@sdlc/contracts';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
@@ -139,6 +145,7 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
   });
 
   beforeEach(() => {
+    changed = [];
     stub.calls.length = 0;
     stub.containers.clear();
     stub.networks.clear();
@@ -223,6 +230,9 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     return { scope, envelope, sandbox };
   }
 
+  /** Runs whose changes step was called (C07). */
+  let changed: string[] = [];
+
   function deps(
     agent: FakeAgent,
     clock?: () => number,
@@ -235,8 +245,26 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
       adapter: agent,
       ...(clock ? { clock, sleep: () => Promise.resolve() } : {}),
       ...(proposal ? { proposal } : {}),
+      changes: (contract) => {
+        changed.push(contract.run_id);
+        return Promise.resolve({ changedFiles: 2 });
+      },
     };
   }
+
+  /** A run key's spend as LiteLLM reports it: one answer per read, the last one repeats. */
+  class FakeSpend implements RunKeySpendReader {
+    reads = 0;
+    keys: string[] = [];
+    constructor(private readonly answers: (SpendInfo | Error)[]) {}
+    readOwnSpend(key: RedactedSecret): Promise<SpendInfo> {
+      this.keys.push(key.reveal());
+      const answer = this.answers[Math.min(this.reads, this.answers.length - 1)]!;
+      this.reads += 1;
+      return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
+    }
+  }
+  const spent = (spendUsd: string): SpendInfo => ({ spendUsd, maxBudgetUsd: '0.5' });
 
   const request = (s: Seeded) => ({
     contract: s.envelope.contract,
@@ -532,7 +560,7 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     });
   });
 
-  it('Runner.runAgent removes the sandbox and leaves the run network afterwards', async () => {
+  it('Runner.runAgent removes the sandbox and leaves the run network afterwards (C07: no clone, no diff → failed)', async () => {
     const s = await seed();
     const agent = new FakeAgent();
     const runner = new Runner(
@@ -550,7 +578,8 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
       { adapter: agent },
     );
     const result = await runner.runAgent(request(s));
-    expect(result.status).toBe('succeeded');
+    // This runner did not provision the run, so it holds no clone: no run reaches G5 unchecked.
+    expect(result).toMatchObject({ status: 'failed', stopReason: 'agent_changes_unavailable' });
     expect([stub.containers.size, stub.networks.size, stub.volumes.size]).toEqual([0, 0, 0]);
     const disconnected = stub.calls
       .filter((c) => c.path.endsWith('/disconnect'))
@@ -558,6 +587,157 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     expect(disconnected).toContain(SELF);
     const last = (await s.scope.runEvents.list(s.envelope.contract.run_id)).at(-1);
     expect(last?.event_type).toBe('sandbox_removed');
-    expect(last?.payload).toMatchObject({ reason: 'finished' });
+    expect(last?.payload).toMatchObject({ reason: 'failed' });
+  });
+
+  it('C07: the changes step runs for every run that goes to G5, never for L1 proposals or failures', async () => {
+    const finished = await seed();
+    await driveAgent(deps(new FakeAgent()), request(finished));
+    const capped = await seed();
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'stopped', iterations: 30 }];
+    await driveAgent(deps(agent), request(capped));
+    const stuck = await seed();
+    const stuckAgent = new FakeAgent();
+    stuckAgent.states = [{ state: 'stuck', iterations: 8 }];
+    await driveAgent(deps(stuckAgent), request(stuck));
+    const l1 = await seed({ extra: { autonomyLevel: 'L1' } });
+    await driveAgent(
+      deps(new FakeAgent(), undefined, () => Promise.resolve({ changedFiles: 1 })),
+      request(l1),
+    );
+    const broken = await seed();
+    const errorAgent = new FakeAgent();
+    errorAgent.states = [{ state: 'error', iterations: 1 }];
+    await driveAgent(deps(errorAgent), request(broken));
+    expect(changed).toEqual([
+      finished.envelope.contract.run_id,
+      capped.envelope.contract.run_id,
+      stuck.envelope.contract.run_id,
+    ]);
+  });
+
+  it('C07: without the changes step a finished run fails (agent_changes_unavailable)', async () => {
+    const s = await seed();
+    const result = await driveAgent({ ...deps(new FakeAgent()), changes: undefined }, request(s));
+    expect(result).toMatchObject({ status: 'failed', stopReason: 'agent_changes_unavailable' });
+    expect(await events(s)).toContainEqual(['agent_failed', { reason: 'changes_unavailable' }]);
+  });
+
+  it('C07: a changes step that fails fails the run, with nothing of the error stored', async () => {
+    const s = await seed({ extra: { maxDurationMin: 1 } });
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'running', iterations: 2 }];
+    let now = 0;
+    const result = await driveAgent(
+      {
+        ...deps(agent, () => (now += 20_000)),
+        changes: () => Promise.reject(new Error(SECRET_PATH)),
+      },
+      request(s),
+    );
+    expect(result).toMatchObject({ status: 'failed', stopReason: 'agent_changes_unavailable' });
+    expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
+      status: 'failed',
+      stop_reason: 'agent_changes_unavailable',
+    });
+    await noClientData(s);
+  });
+
+  const spendEvents = async (s: Seeded) =>
+    (await s.scope.runEvents.list(s.envelope.contract.run_id))
+      .map((e) => [e.event_type, e.payload] as const)
+      .filter(([type]) => type === 'budget_warning' || type === 'agent_stopped');
+
+  it('C07: one warning at 80 %, a stop at 100 % of the cap: stopped_budget, max_budget', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'running', iterations: 2 }];
+    const spend = new FakeSpend([spent('0.1'), spent('0.41'), spent('0.45'), spent('0.5')]);
+    let now = 0;
+    const result = await driveAgent(
+      // Each poll moves the clock past the spend check interval (30 s).
+      { ...deps(agent, () => (now += 31_000)), spendReader: spend },
+      request(s),
+    );
+    expect(result).toMatchObject({
+      outcome: 'max_budget',
+      status: 'stopped_budget',
+      stopReason: 'max_budget',
+    });
+    expect(agent.stopped).toBe(1);
+    expect(spend.keys.every((k) => k === VIRTUAL_KEY)).toBe(true);
+    expect(await spendEvents(s)).toEqual([
+      ['budget_warning', { spend_usd: '0.41', max_budget_usd: '0.5', percent: 82 }],
+      ['agent_stopped', { reason: 'max_budget', method: 'interrupt' }],
+    ]);
+    expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
+      status: 'stopped_budget',
+      stop_reason: 'max_budget',
+    });
+    // A budget stop goes to G5: its changes are checked.
+    expect(changed).toEqual([s.envelope.contract.run_id]);
+    await noClientData(s);
+  });
+
+  it('C07: an agent error with late spend is a budget stop after the bounded re-read, not failed', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'error', iterations: 4 }];
+    // LiteLLM has not recorded the last calls yet; after the wait it reports the full cap.
+    const spend = new FakeSpend([spent('0.3'), spent('0.5')]);
+    const waits: number[] = [];
+    const result = await driveAgent(
+      {
+        ...deps(agent),
+        spendReader: spend,
+        sleep: (ms) => {
+          waits.push(ms);
+          return Promise.resolve();
+        },
+      },
+      request(s),
+    );
+    expect(result).toMatchObject({ status: 'stopped_budget', stopReason: 'max_budget' });
+    expect(spend.reads).toBe(2);
+    expect(waits).toContain(settings.agent.spendRecheckMs);
+    expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
+      status: 'stopped_budget',
+      stop_reason: 'max_budget',
+    });
+  });
+
+  it('C07: an agent error below the cap after the re-read stays failed (agent_error)', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'error', iterations: 4 }];
+    const spend = new FakeSpend([spent('0.1'), spent('0.12')]);
+    const result = await driveAgent(
+      { ...deps(agent), spendReader: spend, sleep: () => Promise.resolve() },
+      request(s),
+    );
+    expect(result).toMatchObject({ status: 'failed', stopReason: 'agent_error' });
+    expect(spend.reads).toBe(2);
+    expect(changed).toEqual([]);
+  });
+
+  it('C07: a spend read that fails is unknown: the run goes on and finishes', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    agent.states = [
+      { state: 'running', iterations: 1 },
+      { state: 'running', iterations: 2 },
+      { state: 'finished', iterations: 3 },
+    ];
+    const spend = new FakeSpend([new Error(VIRTUAL_KEY)]);
+    let now = 0;
+    const result = await driveAgent(
+      { ...deps(agent, () => (now += 31_000)), spendReader: spend },
+      request(s),
+    );
+    expect(result).toMatchObject({ status: 'succeeded' });
+    expect(spend.reads).toBeGreaterThan(0);
+    expect(await spendEvents(s)).toEqual([]);
+    await noClientData(s);
   });
 });

@@ -117,6 +117,10 @@ export function keyGenerateBody(input: CreateRunKey): Record<string, unknown> {
   }
   return {
     key_alias: runKeyAlias(input.runId),
+    // C07 (ADR-M34 §2.6): LiteLLM lets a key read another key's info when both have the same
+    // `user_id`, and two keys without one compare equal. Each run key gets its own owner, so a
+    // run key reads only its own info.
+    user_id: runKeyAlias(input.runId),
     team_id: input.tenantGroupId,
     models: [...input.models],
     max_budget: budget,

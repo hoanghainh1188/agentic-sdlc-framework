@@ -42,6 +42,8 @@ export interface World {
   gitDown: boolean;
   /** The tenant's monthly budget; null: none. */
   tenantBudget: string | null;
+  /** The paths at the base commit (C07, `listPaths`); `truncated`: the host lists them in part. */
+  paths: string[] | 'truncated';
 }
 
 export interface Harness {
@@ -76,6 +78,7 @@ export async function harness(db: TestDatabase): Promise<Harness> {
     models: [MODEL],
     gitDown: false,
     tenantBudget: null,
+    paths: ['AGENTS.md', 'src/main.ts'],
   };
   const g4: G4Deps = {
     gitHost: {
@@ -87,6 +90,10 @@ export async function harness(db: TestDatabase): Promise<Harness> {
         world.instructions === null
           ? Promise.reject(new GitHostError('not_found'))
           : Promise.resolve(world.instructions),
+      listPaths: () =>
+        world.paths === 'truncated'
+          ? Promise.reject(new GitHostError('tree_truncated'))
+          : Promise.resolve([...world.paths]),
     },
     allowedModels: () => Promise.resolve([...world.models]),
     tenantMonthlyBudget: () => Promise.resolve(world.tenantBudget),

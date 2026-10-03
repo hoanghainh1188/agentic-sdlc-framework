@@ -8,8 +8,8 @@
 // only, cleans up at start (a leftover object of its instance is removed, one of another instance
 // stays) and turns healthy through its heartbeat file. C06 session 2b: `bootstrap.sh
 // runner-evidence-credentials` gives the runner a SeaweedFS identity that may only write under
-// `evidence/proposals/` (no read, no overwrite, versions kept after a delete; a rotation
-// disables the old key). Key shares, tokens and passwords are
+// `evidence/proposals/` and, since C07, `evidence/diffs/` (no read, no overwrite, versions kept
+// after a delete; a rotation disables the old key). Key shares, tokens and passwords are
 // THROW-AWAY TEST KEYS: kept in variables, never printed, never in an assertion message.
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -309,7 +309,23 @@ describe.skipIf(!enabled)(
       expect(logs.stdout + logs.stderr).not.toContain('runner.evidence_off');
     });
 
-    it('C06 2b: the evidence identity writes under proposals/ only; no read, no overwrite; versions kept', async () => {
+    it('C07: the evidence identity also writes run diffs under diffs/; no read, no overwrite', async () => {
+      const keys = evidenceKeys();
+      const tenant = crypto.randomUUID();
+      const store = runnerStore(keys, 'diffs/');
+      try {
+        const stored = await store.put(tenant, 'i/r.patch', Buffer.from('diff\n'), 'text/x-diff');
+        expect(stored.uri).toBe(`s3://evidence/diffs/${tenant}/i/r.patch`);
+        await expect(
+          store.put(tenant, 'i/r.patch', Buffer.from('other\n'), 'text/x-diff'),
+        ).rejects.toMatchObject({ code: 'exists' });
+        await expect(store.get(stored.uri)).rejects.toMatchObject({ code: 'forbidden' });
+      } finally {
+        store.destroy();
+      }
+    });
+
+    it('C06 2b: the evidence identity writes under proposals/ (and diffs/) only; no read, no overwrite; versions kept', async () => {
       const keys = evidenceKeys();
       const tenant = crypto.randomUUID();
       const store = runnerStore(keys, 'proposals/');
@@ -361,14 +377,22 @@ describe.skipIf(!enabled)(
       const tenant = crypto.randomUUID();
       const oldStore = runnerStore(old, 'proposals/');
       const newStore = runnerStore(fresh, 'proposals/');
+      const oldDiffs = runnerStore(old, 'diffs/');
+      const newDiffs = runnerStore(fresh, 'diffs/');
       try {
         await expect(
           oldStore.put(tenant, 'i/a.patch', Buffer.from('x'), 'text/x-diff'),
         ).rejects.toMatchObject({ code: 'forbidden' });
+        await expect(
+          oldDiffs.put(tenant, 'i/a.patch', Buffer.from('x'), 'text/x-diff'),
+        ).rejects.toMatchObject({ code: 'forbidden' });
         await newStore.put(tenant, 'i/b.patch', Buffer.from('x'), 'text/x-diff');
+        await newDiffs.put(tenant, 'i/b.patch', Buffer.from('x'), 'text/x-diff');
       } finally {
         oldStore.destroy();
         newStore.destroy();
+        oldDiffs.destroy();
+        newDiffs.destroy();
       }
     });
 

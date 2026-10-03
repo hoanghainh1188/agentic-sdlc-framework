@@ -6,8 +6,8 @@
 // labels. The archive is untrusted (`untar.ts`) and streamed: paths the ignore rules of
 // `base_sha` ignore (`ignore.ts`, `node_modules`) are read past, never kept.
 //
-// `storeProposal` mirrors it onto the runner's clone, computes the patch with hardened git
-// (`proposal.ts`), stores it through the evidence store at `<intent>/<run>.patch` (the store adds
+// `computeRunPatch` mirrors it onto the runner's clone and computes the patch with hardened git
+// (`proposal.ts`). `storeProposal` stores it through the evidence store at `<intent>/<run>.patch` (the store adds
 // its key prefix and the tenant; never overwritten), records the evidence item and the run event
 // `proposal_stored` (hash and counts only).
 import path from 'node:path';
@@ -20,7 +20,12 @@ import { RunnerError } from '../errors.js';
 import { runNames, runOfLabels } from '../names.js';
 import type { RunnerSettings } from '../settings.js';
 import { IgnoreChecker } from './ignore.js';
-import { computeProposal, mirrorWorkspace, neutraliseAttributes } from './proposal.js';
+import {
+  computeProposal,
+  mirrorWorkspace,
+  neutraliseAttributes,
+  type Proposal,
+} from './proposal.js';
 import { untarWorkspace, type EntryFilter, type WorkspaceEntry } from './untar.js';
 
 /** Upper bound of the entries kept from a workspace archive. */
@@ -98,7 +103,26 @@ export interface StoredProposal {
 }
 
 /**
- * `cloneDir` is the folder of the runner's clone (with `repo` and `home`), kept for the L1 run by
+ * Mirrors the sandbox's workspace onto the runner's clone and computes the patch against
+ * `base_sha` with hardened git. Nothing the sandbox reports is used. Shared by the L1 proposal
+ * (C06 2b) and the diff of every run (C07, ADR-M34 §2.2).
+ */
+export async function computeRunPatch(
+  deps: Pick<ProposalDeps, 'docker' | 'settings'>,
+  contract: RunContract,
+  cloneDir: string,
+): Promise<Proposal> {
+  const repoDir = path.join(cloneDir, 'repo');
+  const home = path.join(cloneDir, 'home');
+  await exportAndMirror(deps, contract.run_id, repoDir, home);
+  return computeProposal(repoDir, home, contract.base_sha, {
+    timeoutMs: deps.settings.git.timeoutMs,
+    maxPatchBytes: deps.settings.workspaceMaxBytes,
+  });
+}
+
+/**
+ * `cloneDir` is the folder of the runner's clone (with `repo` and `home`), kept for the run by
  * `provisionRun`. Throws a `RunnerError` or `EvidenceError`; the caller fails the run.
  */
 export async function storeProposal(
@@ -106,13 +130,7 @@ export async function storeProposal(
   contract: RunContract,
   cloneDir: string,
 ): Promise<StoredProposal> {
-  const repoDir = path.join(cloneDir, 'repo');
-  const home = path.join(cloneDir, 'home');
-  await exportAndMirror(deps, contract.run_id, repoDir, home);
-  const proposal = await computeProposal(repoDir, home, contract.base_sha, {
-    timeoutMs: deps.settings.git.timeoutMs,
-    maxPatchBytes: deps.settings.workspaceMaxBytes,
-  });
+  const proposal = await computeRunPatch(deps, contract, cloneDir);
   const stored = await deps.evidence.put(
     contract.tenant_id,
     `${contract.intent_id}/${contract.run_id}.patch`,

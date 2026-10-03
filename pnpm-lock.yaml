@@ -177,6 +177,12 @@ importers:
       '@sdlc/adapter-evidence-s3':
         specifier: workspace:*
         version: link:../../packages/adapters/evidence-s3
+      '@sdlc/adapter-model-litellm':
+        specifier: workspace:*
+        version: link:../../packages/adapters/model-litellm
+      '@sdlc/adapter-policy-simple':
+        specifier: workspace:*
+        version: link:../../packages/adapters/policy-simple
       '@sdlc/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

@@ -127,6 +127,10 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
   });
 
   beforeEach(() => {
+    // A provisioned run keeps its clone until the runner releases it (C07); start empty.
+    for (const entry of fs.readdirSync(workDir)) {
+      fs.rmSync(path.join(workDir, entry), { recursive: true, force: true });
+    }
     docker.calls.length = 0;
     docker.failures.clear();
     docker.health = 'healthy';
@@ -223,7 +227,8 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
     expect(recorded[3]?.[1]).toEqual({ image_sha256: DEFAULT_IMAGE.split('@sha256:')[1] });
     expect(JSON.stringify(recorded)).not.toContain(TOKEN);
 
-    // The workspace went into the container before the start; the clone on disk is gone.
+    // The workspace went into the container before the start. The runner's clone stays for the
+    // run's changes (C07), without the token; the caller removes it.
     const [container] = [...docker.containers.values()];
     expect(container?.archives).toEqual(['/workspace']);
     const upload = docker.calls.find((c) => c.method === 'PUT');
@@ -231,6 +236,11 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
     const tar = upload!.body as Buffer;
     expect(tar.includes(Buffer.from('refs/heads/agent/INT-'))).toBe(true);
     expect(tar.includes(Buffer.from(TOKEN))).toBe(false);
+    if (!result.ok) return;
+    expect(fs.readdirSync(workDir)).toEqual([path.basename(result.cloneDir)]);
+    const gitConfig = fs.readFileSync(path.join(result.cloneDir, 'repo', '.git', 'config'), 'utf8');
+    expect(gitConfig).not.toContain(TOKEN);
+    fs.rmSync(result.cloneDir, { recursive: true, force: true });
     expect(workDirEmpty()).toBe(true);
     expect(git.requests.every((r) => r.authorized && !r.url.includes(TOKEN))).toBe(true);
 

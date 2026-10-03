@@ -205,7 +205,7 @@ describe.skipIf(!enabled)(
       if (!result.ok) throw new Error(`provisioning failed: ${result.reason}`);
       const runId = envelope.contract.run_id;
       const container = result.sandbox.names.container;
-      const cloneDir = result.cloneDir!;
+      const cloneDir = result.cloneDir;
       try {
         const install = sh(container, 'cd /workspace && pnpm install --frozen-lockfile');
         expect(install.code).toBe(0);

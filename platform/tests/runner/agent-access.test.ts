@@ -40,7 +40,19 @@ describe('agent settings', () => {
       llmBaseUrl: 'http://litellm:4000',
       pollMs: 1000,
       stopGraceMs: 30_000,
+      spendCheckMs: 30_000,
+      spendRecheckMs: 25_000,
     });
+  });
+
+  it('C07: reads the spend check and the bounded re-read wait', () => {
+    const agent = settings({
+      SDLC_RUNNER_AGENT_SPEND_CHECK_SECONDS: '10',
+      SDLC_RUNNER_AGENT_SPEND_RECHECK_SECONDS: '2',
+    }).agent;
+    expect(agent).toMatchObject({ spendCheckMs: 10_000, spendRecheckMs: 2000 });
+    expect(() => settings({ SDLC_RUNNER_AGENT_SPEND_CHECK_SECONDS: '1' })).toThrow();
+    expect(() => settings({ SDLC_RUNNER_AGENT_SPEND_RECHECK_SECONDS: '61' })).toThrow();
   });
 
   it('reads the runner container and the agent timings', () => {

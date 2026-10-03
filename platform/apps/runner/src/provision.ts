@@ -11,8 +11,11 @@
 // 8. wait for the sandbox health check, then `provisioning → running`       → `sandbox_ready`.
 //
 // A failure after the claim removes everything created (the reserved volume included), records
-// `provisioning_failed` (and `sandbox_removed` when a sandbox was created), and ends the run as `failed` with the reason as `stop_reason`. The clone on
-// the runner's disk is always removed; the token lives only in memory for the clone.
+// `provisioning_failed` (and `sandbox_removed` when a sandbox was created), and ends the run as
+// `failed` with the reason as `stop_reason`; the clone on the runner's disk is removed then. A run
+// that starts keeps its clone until the caller releases it: the proposal of an L1 run (C06 2b)
+// and the diff of every run (C07, ADR-M34 §2.2) are computed there. The token lives only in
+// memory, and in git's environment for the clone.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -78,11 +81,11 @@ export type ProvisionResult =
       readonly contract: RunContract;
       readonly sandbox: Sandbox;
       /**
-       * The runner's own clone of an L1 run (`<workDir>/run-…` with `repo` and `home`), kept until
-       * the run ends to compute the proposal outside the sandbox (C06 session 2b, ADR-M33 §2.9);
-       * the caller removes it. Null for other runs: their clone is removed at once.
+       * The runner's own clone of the run (`<workDir>/run-…` with `repo` and `home`), kept until
+       * the run ends to compute its changes outside the sandbox: the L1 proposal (C06 session 2b,
+       * ADR-M33 §2.9) and the diff of every run (C07, ADR-M34 §2.2). The caller removes it.
        */
-      readonly cloneDir: string | null;
+      readonly cloneDir: string;
     }
   | {
       readonly ok: false;
@@ -143,8 +146,7 @@ export async function provisionRun(
   }
 
   const workDir = fs.mkdtempSync(path.join(ensureDir(deps.settings.workDir), 'run-'));
-  // L1: the clone stays for the proposal (C06 session 2b); the token was only in git's environment.
-  const keepClone = contract.autonomy_level === 'L1';
+  // The clone stays for the run's changes (C06 2b, C07); the token was only in git's environment.
   let kept = false;
   let sandboxCreated = false;
   try {
@@ -167,7 +169,6 @@ export async function provisionRun(
       base_sha: contract.base_sha,
       duration_ms: Date.now() - cloneStarted,
     });
-    if (!keepClone) fs.rmSync(workDir, { recursive: true, force: true });
 
     const startStarted = Date.now();
     sandboxCreated = true;
@@ -198,8 +199,8 @@ export async function provisionRun(
     await scope.runEvents.append(runId, 'sandbox_ready', {
       duration_ms: Date.now() - startStarted,
     });
-    kept = keepClone;
-    return { ok: true, contract, sandbox, cloneDir: keepClone ? workDir : null };
+    kept = true;
+    return { ok: true, contract, sandbox, cloneDir: workDir };
   } catch (error) {
     const reason = failureOf(error);
     try {

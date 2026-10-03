@@ -27,8 +27,10 @@ export const DB_PASSWORD_FIELD = 'password';
 /** Fields of the KV entry written by `openbao:bootstrap runner-evidence-credentials`. */
 export const EVIDENCE_ACCESS_KEY_FIELD = 'access_key';
 export const EVIDENCE_SECRET_KEY_FIELD = 'secret_key';
-/** Every key the runner writes starts with this prefix (SeaweedFS `Write:evidence/proposals/*`). */
+/** L1 proposals start with this prefix (SeaweedFS `Write:evidence/proposals/*`, C06 2b). */
 export const EVIDENCE_KEY_PREFIX = 'proposals/';
+/** Run diffs start with this prefix (SeaweedFS `Write:evidence/diffs/*`, C07, ADR-M34 §2.2). */
+export const EVIDENCE_DIFF_KEY_PREFIX = 'diffs/';
 
 export interface ProcessSettings {
   readonly db: {
