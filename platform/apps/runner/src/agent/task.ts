@@ -7,6 +7,15 @@ import type { TenantScope } from '@sdlc/core';
 
 import { AgentRunError } from './errors.js';
 
+/**
+ * C08 PR 2 (QUESTIONS #158): the intent's last G6 decision is a `fail ci_failed`, so this run is a
+ * retry after CI failed on the pushed commit.
+ */
+async function followsCiFailure(scope: TenantScope, intentId: string): Promise<boolean> {
+  const last = (await scope.gateDecisions.listForIntent(intentId, 'G6')).at(-1);
+  return last?.decision === 'fail' && last.reason_code === 'ci_failed';
+}
+
 export async function loadAgentTask(scope: TenantScope, contract: RunContract): Promise<AgentTask> {
   try {
     const plan = (await scope.plans.list(contract.intent_id)).find(
@@ -30,6 +39,7 @@ export async function loadAgentTask(scope: TenantScope, contract: RunContract): 
         contentSha256: spec.content_sha256,
       },
       plan: { summary: plan.summary, plannedFiles: [...planned] },
+      ...((await followsCiFailure(scope, contract.intent_id)) ? { ciFailed: true } : {}),
     };
   } catch (error) {
     if (error instanceof AgentRunError) throw error;

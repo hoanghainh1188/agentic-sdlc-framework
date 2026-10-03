@@ -115,7 +115,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 | `/reject G3 <reason>` | A rejection. The reason is required |
 | `/request-changes G3 <reason>` | A request for changes. The reason is required |
 
-- Gates G1, G2 and G3 can be decided by comment today; G7 and G8 come later.
+- Gates G1, G2 and G3 can be decided by comment; G4 and G5 when they wait for a person (Chapter 13 §13.10); G6 when CI passed and it waits for Person B, or within its block window (Chapter 14 §14.10.2). G7 and G8 come later.
 - The reason may start with a reason code: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other`. A code other than `other` may stand alone: `/reject G2 spec_unclear` is accepted. `other` alone is not a reason: `/reject G2 other` without text is refused. Without a code, the platform records `other`, and you must write a sentence. Example: `/reject G2 spec_unclear AC2 does not say which warehouse`.
 - The reason text stays in your comment. The platform stores only the reason code and a link to the comment, because its records are kept for years and can never be edited. Write the reason so that it can stay on GitHub, and do not put personal or client data in it.
 - Only new comments count. **Editing a comment never changes a decision.** To change your mind, write a new comment.
@@ -360,4 +360,5 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.4 | 2026-10-03 | Claude (task B13, PR 1) | §19.8d platform usage: setting up a team (tenant admins, projects, people, GitHub accounts, roles, configuration; ADR-M37) |
 | 0.5 | 2026-10-03 | Claude (task B13, PR 2) | §19.8c: `sdlc logout` revokes the token; `sdlc token`; first token from a tenant admin. §19.8d: tokens of other people, the agent register, `sdlc audit verify`, the operator commands `sdlc ops` (ADR-M37 §2.8) |
 | 0.6 | 2026-10-03 | Claude (task B08) | §19.8c: `sdlc spec link|list`; the spec is the file on the default branch and is checked again at G2–G4 (ADR-M39) |
-| 0.7 | 2026-10-03 | Claude (task B09, PR 1) | §19.8c: `sdlc plan submit|list|show`; the plan file, its rules, who submits, the re-check at G3–G4 (ADR-M40) |
+| 0.7 | 2026-10-03 | Claude (task C08, PR 2) | §19.8: which gates can be decided by comment, G6 included (ADR-M38 §2.7) |
+| 0.8 | 2026-10-03 | Claude (task B09, PR 1) | §19.8c: `sdlc plan submit|list|show`; the plan file, its rules, who submits, the re-check at G3–G4 (ADR-M40) |

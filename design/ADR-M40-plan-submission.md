@@ -5,7 +5,7 @@
 | Status | **Proposed** (task B09, for review) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #165–#169) |
-| Related | D-08 task B09 (AC1–AC3); D-02 FR-11, FR-15, FR-16, FR-17; D-03 §6 (version 1.19); D-05 §6.2 (version 1.24); handbook Ch.12 §12.4, template T13; ADR-M20, ADR-M30, ADR-M33 §2.1, ADR-M34 §2.8, ADR-M39; QUESTIONS #34, #108, #131, #165–#169 |
+| Related | D-08 task B09 (AC1–AC3); D-02 FR-11, FR-15, FR-16, FR-17; D-03 §6 (version 1.20); D-05 §6.2 (version 1.25); handbook Ch.12 §12.4, template T13; ADR-M20, ADR-M30, ADR-M33 §2.1, ADR-M34 §2.8, ADR-M39; QUESTIONS #34, #108, #131, #165–#169 |
 
 ## 1. Context
 

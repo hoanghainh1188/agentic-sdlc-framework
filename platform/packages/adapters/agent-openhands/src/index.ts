@@ -28,6 +28,7 @@ export {
 export {
   buildConversationRequest,
   buildTaskMessage,
+  CI_FAILED_INSTRUCTION,
   checkTask,
   INSTRUCTIONS_FILE,
   toolsOf,

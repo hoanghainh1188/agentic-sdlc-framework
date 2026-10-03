@@ -1,4 +1,4 @@
-// Migration 0018: plans read from the repository (design/D-05 section 6.2, version 1.24; D-08 B09;
+// Migration 0018: plans read from the repository (design/D-05 section 6.2, version 1.25; D-08 B09;
 // design/ADR-M40; QUESTIONS #165–#169). Rules for every migration: see the header of
 // 0001-tenancy.ts and design/ADR-M09.
 //

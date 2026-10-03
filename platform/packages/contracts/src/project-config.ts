@@ -174,6 +174,13 @@ export interface ProjectConfig {
   };
   readonly retention: { readonly evidence_retention_days: number };
   readonly github: { readonly poll_interval_seconds: number };
+  /** What G6 reads from CI (task C08 PR 2, QUESTIONS #159, ADR-M38 §2.7). */
+  readonly verification: {
+    /** Check names G6 waits for; empty: every check on the pushed commit. */
+    readonly required_checks: readonly string[];
+    /** Pending this long after the push → paused at G6, `technical` escalation. */
+    readonly ci_timeout_minutes: number;
+  };
   /**
    * Who may create and read intents through the API (task B03, ADR-M26, QUESTIONS.md #66).
    * Creators may always read. The viewer role never creates (mandatory rule M16).

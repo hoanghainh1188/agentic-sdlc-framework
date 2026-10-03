@@ -123,7 +123,7 @@ Security findings at or above the configured severity (default **HIGH**; **CRITI
 
 ## 14.10. Using the platform
 
-> Written by Claude Code together with the platform code (task C08, `design/ADR-M38-gate-g6.md`). §14.10.2 (how G6 reads CI) comes with the second part of C08.
+> Written by Claude Code together with the platform code (task C08, `design/ADR-M38-gate-g6.md`).
 
 ### 14.10.1. The push and the pull request
 
@@ -160,6 +160,41 @@ The intent is then **paused** at G6, and a **technical** escalation goes to Pers
 | `terminate` | The intent is closed (`cancelled`). Close the pull request if one is open |
 
 **Platform operator:** the GitHub App needs Contents and Pull requests "Read and write" (`platform/GETTING-STARTED.md` Step 11), and the runner's evidence identity must be created again once after this update (runbook T11 §5g step 3b).
+
+### 14.10.2. How G6 reads CI
+
+When the pull request is open, the platform reads its CI by itself. It reads the checks again whenever a check finishes (GitHub is read about every 30 seconds), and at least every 10 minutes.
+
+**Which checks count.** The project setting `verification.required_checks` names the checks G6 waits for. Empty (the default) means every check on the pushed commit. A project with one summary check names it; the pilot repository uses `[ci-ok]`.
+
+| Check result | Counts as |
+|---|---|
+| success, neutral, skipped | passed |
+| failure, error, timed out | failed |
+| still running, cancelled, stale, action required, a required check that is missing, no check at all | pending (a person can run a check again) |
+
+A project without CI never passes G6.
+
+**What happens next:**
+
+| CI… | What the platform does |
+|---|---|
+| failed, retries left | G6 fails (`ci_failed`). The intent goes back to **G4**; a new run starts **on top of the pushed commit**, and the agent is told that CI failed and to fix the checks. The same pull request gets the new commit. Retries: `run.g6_ci_retries` (2 by default), counted since the last G3 approval |
+| failed, no retry left | G6 fails. The intent goes back to **G3**, which is HITL at every risk tier from now on. Check the plan and the spec: the problem is probably not the code |
+| still pending after `verification.ci_timeout_minutes` (60 by default) | The intent is **paused** at G6, and a **technical** escalation goes to Person B. No retry is used. `resume` lets G6 read CI again, with a new timeout |
+| passed | The platform checks the security findings (below), then decides G6 by the risk tier: Low (AUDIT) and Medium (HOTL) the platform passes G6 and the intent moves to **G7**; Person B is told and can still send it back with `/request-changes G6 <reason>` within the block window (a new run after G4). High and Critical (HITL): Person B approves with `/approve G6` |
+
+**Security findings.** The platform reads the open GitHub code-scanning alerts of the pull request, counts them per severity, and stores only the counts.
+
+- A finding at or above the configured severity (`oversight.g6_security_findings.min_severity`, HIGH by default; CRITICAL always) makes G6 **HITL** at every risk tier: Person B approves with `/approve G6` (§14.8).
+- A **critical** finding pauses the intent with a **security** escalation to Person B. `resume` takes the intent back to G6, where Person B still has to approve.
+- If GitHub cannot report findings (code scanning is not enabled, or the App may not read it), G6 is **HITL** every time. GitHub code scanning is free for public repositories only; on a private repository without GitHub Advanced Security, plan for Person B to approve every G6. The project's CI must upload its scanner results (SARIF) for the counts to exist.
+
+**The pull request changes.** If someone closes or merges the pull request, or pushes another commit to the agent branch, G6 stops: the intent is **paused** with a **technical** escalation (§14.10.1 shows the decisions).
+
+**Who approves.** Person B, never the person who allowed the run at G4 (the producer). Decide with `/approve G6`, `/reject G6 <reason>` or `/request-changes G6 <reason>` on the intent's issue (Chapter 19 §19.8).
+
+**Platform operator:** for the security counts the GitHub App needs "Code scanning alerts: Read-only" (`platform/GETTING-STARTED.md` Step 11).
 
 ---
 
@@ -200,3 +235,4 @@ The intent is then **paused** at G6, and a **technical** escalation goes to Pers
 | 0.1 | 2026-09-24 | Claude (draft) | First content; platform usage section reserved for Claude Code |
 | 0.2 | 2026-09-25 | Claude (draft) | G6 security findings: configurable severity threshold, default HIGH, CRITICAL always (QUESTIONS #19) |
 | 0.3 | 2026-10-03 | Claude Code (task C08, PR 1) | §14.10.1: the push and the pull request (ADR-M38 §2.1–§2.6, QUESTIONS #155, #156) |
+| 0.4 | 2026-10-03 | Claude Code (task C08, PR 2) | §14.10.2: how G6 reads CI, retries, the timeout, security findings (ADR-M38 §2.7, QUESTIONS #157–#159) |

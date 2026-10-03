@@ -81,3 +81,14 @@ export {
   publishState,
   type PublishState,
 } from './publish-state.js';
+export {
+  evaluateChecks,
+  gatherG6Facts,
+  readCi,
+  recordCiReading,
+  type CiReading,
+  type CiState,
+  type G6Deps,
+  type G6Facts,
+} from './g6-ci.js';
+export { contextOf, stepCi, type G6Check } from './g6-verify.js';

@@ -47,6 +47,8 @@ escalation:
 | `model_routing.allowed_provider_types` | `api` / `self_hosted` per data class |
 | `retention.evidence_retention_days` | Default 180 |
 | `github.poll_interval_seconds` | Default 30 |
+| `verification.required_checks` | C08: the CI checks G6 waits for, by name; default `[]` (every check). The pilot: `[ci-ok]` |
+| `verification.ci_timeout_minutes` | C08: CI still pending after this → paused at G6, technical escalation; default 60, at most 1440 |
 | `access.intent_create_roles`, `access.intent_read_roles` | Who may create and read intents through the API (B03, ADR-M26). Default: `person_a` creates; every role reads; creators always read |
 | `access.ai_record_write_roles`, `access.ai_record_read_roles` | Who may write and read the project AI record through the API (B12, ADR-M32). Default: `person_a` and `pm_brse` write; every role reads; writers always read |
 | `access.spec_link_roles` | Who may link an intent's spec through the API (B08, ADR-M39). Default: `person_a` and `pm_brse` |

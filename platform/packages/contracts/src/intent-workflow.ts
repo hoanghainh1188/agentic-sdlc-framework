@@ -140,7 +140,8 @@ export type IntentWaitReason =
   /**
    * C08 (ADR-M38 §2.5): the push or the pull request could not be done (an empty diff, a branch
    * someone else changed, repeated failures); the intent is paused at G6 until a person decides on
-   * the `technical` escalation (QUESTIONS #156).
+   * the `technical` escalation (QUESTIONS #156). C08 PR 2: also a CI timeout, a pull request closed
+   * or changed by someone else (`technical`), or a critical security finding (`security`).
    */
   | 'publish_review'
   /**
@@ -148,7 +149,12 @@ export type IntentWaitReason =
    * again after a delay, a few times.
    */
   | 'publish_retry'
-  /** C08: the pull request is open; G6 waits for CI (C08 PR 2 reads the checks). */
+  /** C08: the pull request is open; G6 waits for CI (the checks are not all finished). */
   | 'ci_pending'
+  /**
+   * C08 PR 2 (ADR-M38 §2.7): CI passed and G6 is HITL (the matrix, a security finding at the
+   * threshold, or findings unknown): Person B approves (`/approve G6`).
+   */
+  | 'g6_decision'
   /** A status that the workflow does not move (`paused`, `blocked`, `running`). */
   | 'not_in_gate';

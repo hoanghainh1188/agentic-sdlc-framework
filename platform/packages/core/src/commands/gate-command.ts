@@ -10,6 +10,8 @@ import { normalizeScope, type ApprovalScope } from '../registry/approval-binding
 import type { HumanDecision } from '../registry/decision-rules.js';
 import type { Registry } from '../registry/registry.js';
 import { refusedPlanHashes, returnedFromG5 } from '../workflow/g5-scope.js';
+import { gatherG6Facts } from '../workflow/g6-ci.js';
+import { contextOf } from '../workflow/g6-verify.js';
 import { isPassableGate, openBlockWindow } from '../workflow/hotl.js';
 import { waitedSeconds } from '../workflow/waited.js';
 import { projectAccess } from './access.js';
@@ -105,14 +107,19 @@ export async function decideGate(
       source: command.source,
       eventSource: command.eventSource ?? null,
       ...(returned ? { context: { returnedFromG5: true } } : {}),
+      // C08 PR 2: G6's oversight depends on the findings G6 read (QUESTIONS #157).
+      ...(gate === 'G6' ? { context: await g6Context(tx, current.id) } : {}),
     });
   });
 }
 
-/** The producers of what a person decides at `gate` (FR-11): the plan at G3, the run at G5. */
+/**
+ * The producers of what a person decides at `gate` (FR-11): the plan at G3 (B09), the run at G5
+ * and G6 (C07, C08).
+ */
 async function producersOf(tx: TenantScope, intentId: string, gate: string): Promise<string[]> {
   if (gate === 'G3') return planSubmitters(tx, intentId);
-  if (gate === 'G5') return runProducers(tx, intentId);
+  if (gate === 'G5' || gate === 'G6') return runProducers(tx, intentId);
   return [];
 }
 
@@ -120,6 +127,12 @@ async function producersOf(tx: TenantScope, intentId: string, gate: string): Pro
 async function planSubmitters(tx: TenantScope, intentId: string): Promise<string[]> {
   const plans = await tx.plans.list(intentId);
   return [...new Set(plans.map((p) => p.submitted_by).filter((id): id is string => id !== null))];
+}
+
+/** The policy context of G6 from the last reading (`ci_checked`). */
+async function g6Context(tx: TenantScope, intentId: string) {
+  const facts = await gatherG6Facts(tx, intentId);
+  return facts ? contextOf(facts) : { securityFindingsUnknown: true };
 }
 
 /** The producers of the intent's last run: the person who allowed it, when any (C07, FR-11). */

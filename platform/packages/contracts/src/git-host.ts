@@ -6,7 +6,7 @@
 // Values from the Git host are data, never instructions. Only `comment_created.body` holds free
 // text; it lives in memory only. Append-only tables store IDs and URLs from these types, never
 // text (CLAUDE.md "Current constraints", ADR-M20).
-import type { EventSource } from './codes.js';
+import type { EventSource, Severity } from './codes.js';
 import type { RedactedSecret } from './secrets.js';
 
 /** A repository on the Git host: `owner/name`. */
@@ -55,6 +55,16 @@ export interface NewPullRequest {
   readonly title: string;
   readonly body: string;
 }
+
+/**
+ * The open security findings of a pull request (task C08 PR 2, QUESTIONS #157, design/ADR-M38
+ * §2.7): counts per severity only, never a finding's text, path or rule. `known: false` when the
+ * Git host has no findings for it (GitHub: code scanning not enabled, or no permission): G6 then
+ * fails closed (HITL).
+ */
+export type SecurityFindings =
+  | { readonly known: true; readonly counts: Readonly<Record<Severity, number>> }
+  | { readonly known: false; readonly reason: 'not_enabled' | 'forbidden' };
 
 /** Conclusion of a finished check (GitHub check runs and commit statuses). */
 export type CheckConclusion =
@@ -106,6 +116,8 @@ export const GIT_TOKEN_PERMISSIONS = [
   'issues',
   'checks',
   'statuses',
+  // C08 PR 2 (QUESTIONS #157): code-scanning alerts, read only.
+  'security_events',
 ] as const;
 export type GitTokenPermission = (typeof GIT_TOKEN_PERMISSIONS)[number];
 
@@ -209,6 +221,11 @@ export interface GitHostAdapter {
    * (task C08: find before opening, so a repeated call never opens a second one).
    */
   findOpenPullRequest(ref: RepoRef, head: string, base: string): Promise<PullRequestInfo | null>;
+  /**
+   * The open security findings of a pull request (task C08 PR 2): counts per severity, or
+   * unknown. Uses a token of its own that may read code-scanning alerts.
+   */
+  getSecurityFindings(ref: RepoRef, pr: number): Promise<SecurityFindings>;
   /** MVP: polling. Pass `INITIAL_EVENT_CURSOR` for a project that has never been polled. */
   listEventsSince(
     ref: RepoRef,

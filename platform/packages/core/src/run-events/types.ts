@@ -132,6 +132,25 @@ export const RUN_EVENT_TYPES = {
   publish_refused: { reason: 'code' },
   /** A push attempt failed for a cause that may pass (Git host, network, token); C08. */
   publish_failed: { reason: 'code' },
+  /**
+   * What G6 read from the Git host about the run's pull request (C08 PR 2, ADR-M38 §2.7): the
+   * pull request's state and head, the result of the checks G6 waits for (`state`: `passed`,
+   * `failed`, `pending`), the SHA-256 of their sorted names and conclusions (the names stay on the
+   * Git host), and the open security findings per severity (`findings`: `known`, `not_enabled`,
+   * `forbidden`). Recorded when it changed; G6 decides from the latest one.
+   */
+  ci_checked: {
+    pr_number: 'count',
+    pr_state: 'code',
+    head_sha: 'code',
+    state: 'code',
+    checks_sha256: 'sha256',
+    findings: 'code',
+    critical: 'count',
+    high: 'count',
+    medium: 'count',
+    low: 'count',
+  },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;

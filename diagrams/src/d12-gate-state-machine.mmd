@@ -20,10 +20,10 @@ stateDiagram-v2
     Escalated --> Frozen: no acknowledgement within SLA
     Frozen --> Escalated: backup / governance acknowledges
     G5 --> G6: pass
-    G6 --> Running: CI fail (retries left)
+    G6 --> G4: CI fail (retries left)
     G6 --> G3: CI fail (no retries left)
     G6 --> Escalated: critical security finding
-    G6 --> Escalated: push or pull request refused
+    G6 --> Escalated: push or pull request refused, CI timeout
     G6 --> G7: pass
     G7 --> Running: request changes
     G7 --> G8: approved (+ 2nd approver if flagged) + merged

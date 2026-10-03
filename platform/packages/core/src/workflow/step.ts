@@ -51,6 +51,7 @@ import type { Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { EscalationError } from '../escalation/errors.js';
 import { assertActionAllowed } from '../escalation/freeze.js';
+import { loadEffectiveConfig } from '../registry/effective-config.js';
 import type { Registry } from '../registry/registry.js';
 import type { SpecGitHost } from '../specs/link.js';
 import { gateHistory, type GateHistory } from './gate-history.js';
@@ -73,6 +74,7 @@ import { checkPlan, gatherPlanFacts, heldAtG4, type PlanFacts } from './plan-che
 import { stepG4 } from './g4.js';
 import { stepG5, stepPausedG5 } from './g5.js';
 import { stepG6, stepPausedG6 } from './g6.js';
+import { readCi, type CiReading, type G6Deps } from './g6-ci.js';
 import { refusedPlanHashes, returnedFromG5 } from './g5-scope.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
 import { moveTo, moveToRunning, stepPaused, stepRunning } from './run-lifecycle.js';
@@ -117,6 +119,11 @@ export interface StepDeps {
    * (`publish`). Without it the intent waits at G6 (`later_gate`).
    */
   readonly publish?: boolean;
+  /**
+   * C08 PR 2 (ADR-M38 §2.7): what G6 reads from CI (the pull request, its checks, its security
+   * findings). Without it a linked pull request waits for CI (`ci_pending`).
+   */
+  readonly g6?: G6Deps;
 }
 
 export class WorkflowError extends Error {
@@ -191,6 +198,21 @@ export async function stepIntent(
       }
     }
   }
+  // C08 PR 2: G6 reads CI before the lock too.
+  // An outage does not block people: the step still handles their decisions, then waits.
+  let ci: CiReading | 'unavailable' | null = null;
+  if (deps.g6 && deps.publish) {
+    const peek = await scope.intents.getById(intentId);
+    if (peek?.status === 'in_gate' && peek.current_gate === 'G6' && peek.pr_number !== null) {
+      try {
+        const { config } = await loadEffectiveConfig(scope.projectConfigs, peek.project_id);
+        ci = await readCi(scope, deps.g6, peek, config);
+      } catch (error) {
+        if (!(error instanceof GitHostError)) throw error;
+        ci = 'unavailable';
+      }
+    }
+  }
   return scope.transaction(async (tx) => {
     const intent = await tx.intents.lockAndGet(intentId);
     if (!intent) throw new WorkflowError('intent_not_found', `intent ${intentId} not found`);
@@ -253,7 +275,7 @@ export async function stepIntent(
     if (gate === 'G4' && facts) return atG4(tx, deps, policy, intent, facts);
     if (gate === 'G5') return stepG5(tx, deps.registry, policy, intent);
     // C08: the push and the pull request (`publish`); without them G6 waits.
-    if (gate === 'G6' && deps.publish) return stepG6(tx, deps.registry, policy, intent);
+    if (gate === 'G6' && deps.publish) return stepG6(tx, deps.registry, policy, intent, ci);
     if (!isCommandGate(gate)) {
       if (hold) return waiting(hold.reason, hold.wakeInMs);
       // G4 onwards: C06 continues. Wake when the last HOTL block window closes (C06 waits for it).
@@ -339,8 +361,12 @@ async function sendBack(
         deps,
         policy,
         intent,
-        // C07: changes requested on a passed G5 mean a new run on the approved plan, after G4.
-        { status: 'in_gate', gate: block.gate === 'G5' ? 'G4' : block.gate },
+        // C07: changes requested on a passed G5 mean a new run on the approved plan, after G4;
+        // C08 PR 2: the same for a passed G6.
+        {
+          status: 'in_gate',
+          gate: block.gate === 'G5' || block.gate === 'G6' ? 'G4' : block.gate,
+        },
         'returned',
         block.decisionId,
       );

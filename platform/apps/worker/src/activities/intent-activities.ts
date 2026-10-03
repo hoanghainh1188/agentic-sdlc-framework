@@ -13,6 +13,7 @@ import {
   startRun,
   stepIntent,
   type G4Deps,
+  type G6Deps,
   type SpecGitHost,
   type PlatformDatabase,
   type PublishDeps,
@@ -74,6 +75,8 @@ export interface IntentActivityDeps {
   readonly runs?: RunDeps;
   /** The push and the pull request at G6 (C08). Wired with `runs`. */
   readonly publish?: PublishDeps;
+  /** What G6 reads from CI (C08 PR 2). Without it a linked pull request waits (`ci_pending`). */
+  readonly g6?: G6Deps;
 }
 
 /** Thrown by a run activity when the worker was started without run support. */
@@ -101,6 +104,7 @@ export function createIntentActivities(deps: IntentActivityDeps): IntentActiviti
           ...(deps.specs ? { specs: deps.specs } : {}),
           ...(deps.g4 && deps.runs ? { startRuns: true } : {}),
           ...(deps.publish ? { publish: true } : {}),
+          ...(deps.g6 ? { g6: deps.g6 } : {}),
         },
         ref.intentId,
       ),
