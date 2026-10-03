@@ -1,24 +1,19 @@
-// `sdlc admin agent …`: the agent register (task C10, handbook Ch.20, design/ADR-M31 §2.2).
-// Operator commands, run on the server with SDLC_DB_URL (`platform_app`), like `sdlc admin token`.
-// There is no user login, so the audit events use actor `system`. Task B13 moves this behind the API
-// once a tenant admin exists (QUESTIONS.md #65).
-import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+// `sdlc ops agent show|list|suspend|quarantine`: the agent register on the server (task C10,
+// ADR-M31 §2.2; task B13, QUESTIONS #153, ADR-M37 §2.8). Operator commands with SDLC_DB_URL
+// (`platform_app`), audited as actor `system`. Registering, changing, approving, activating and
+// retiring an agent go through the API (`sdlc admin agent …`), where handbook Ch.20's approval
+// rules are enforced. Only the two safety moves stay here, for when the API is down; an agent is
+// never activated through ops.
 import { parseArgs } from 'node:util';
 
 import {
   AgentRegisterError,
   agentRegisterErrorMessage,
-  changeAgentOwner,
   changeAgentStatus,
   recertificationMonths,
   recertificationStatus,
-  recertifyAgent,
-  registerAgent,
-  updateAgent,
   type Agent,
   type TenantScope,
-  type UpdateAgent,
 } from '@sdlc/core';
 import { t, type MessageKey } from '@sdlc/messages';
 
@@ -32,25 +27,10 @@ const BASE = {
   key: { type: 'string' },
   json: { type: 'boolean', default: false },
 } as const;
-const CONFIG = {
-  model: { type: 'string' },
-  instructions: { type: 'string' },
-  'instructions-sha256': { type: 'string' },
-  'instructions-file': { type: 'string' },
-  tools: { type: 'string' },
-  'max-autonomy': { type: 'string' },
-  environments: { type: 'string' },
-} as const;
 
 const SPECS = {
-  register: { ...BASE, ...CONFIG, version: { type: 'string' }, owner: { type: 'string' } },
-  update: { ...BASE, ...CONFIG, version: { type: 'string' } },
-  activate: BASE,
   suspend: { ...BASE, reason: { type: 'string' } },
   quarantine: { ...BASE, reason: { type: 'string' } },
-  retire: { ...BASE, reason: { type: 'string' } },
-  owner: { ...BASE, owner: { type: 'string' } },
-  recertify: { ...BASE, date: { type: 'string' } },
   show: { ...BASE, project: { type: 'string' } },
   list: {
     tenant: { type: 'string' },
@@ -63,19 +43,13 @@ type Command = keyof typeof SPECS;
 type AgentStatus = Agent['status'];
 
 const REQUIRED: Readonly<Record<Command, readonly string[]>> = {
-  register: ['tenant', 'key', 'version', 'owner', 'instructions', 'max-autonomy'],
-  update: ['tenant', 'key', 'version'],
-  activate: ['tenant', 'key'],
   suspend: ['tenant', 'key', 'reason'],
   quarantine: ['tenant', 'key', 'reason'],
-  retire: ['tenant', 'key', 'reason'],
-  owner: ['tenant', 'key', 'owner'],
-  recertify: ['tenant', 'key'],
   show: ['tenant', 'key'],
   list: ['tenant'],
 };
 
-/** Parses `args` (after `admin agent`). Undefined: print the usage. */
+/** Parses `args` (after `ops agent`). Undefined: print the usage. */
 export function parseAgentCommand(
   args: readonly string[],
 ): { command: Command; values: Values } | undefined {
@@ -91,10 +65,6 @@ export function parseAgentCommand(
     });
     const found = values as Values;
     if (!REQUIRED[command].every((key) => typeof found[key] === 'string')) return undefined;
-    // The instructions hash comes from exactly one source: the hash, or the file to hash.
-    const sources = ['instructions-sha256', 'instructions-file'].filter((k) => k in found).length;
-    if (command === 'register' && sources !== 1) return undefined;
-    if (sources > 1) return undefined;
     return { command, values: found };
   } catch {
     return undefined;
@@ -122,89 +92,16 @@ export async function runAgentCommand(
 const str = (values: Values, key: string): string => String(values[key]);
 const opt = (values: Values, key: string): string | undefined =>
   typeof values[key] === 'string' ? values[key] : undefined;
-const list = (value: string | undefined): string[] | undefined =>
-  value === undefined
-    ? undefined
-    : value
-        .split(',')
-        .map((item) => item.trim())
-        .filter((item) => item !== '');
 
-async function instructionsHash(values: Values): Promise<string | undefined> {
-  const file = opt(values, 'instructions-file');
-  if (file === undefined) return opt(values, 'instructions-sha256');
-  return createHash('sha256')
-    .update(await readFile(file))
-    .digest('hex');
-}
-
-async function ownerId(scope: TenantScope, email: string, ctx: CliContext) {
-  const user = await scope.users.getByEmail(email);
-  if (!user) ctx.stderr(t('cli.admin.user_not_found'));
-  return user?.id;
-}
-
-const register: Scoped = async (scope, values, ctx) => {
-  const owner = await ownerId(scope, str(values, 'owner'), ctx);
-  if (owner === undefined) return EXIT.usage;
-  const agent = await registerAgent(scope, {
-    agentKey: str(values, 'key'),
-    version: str(values, 'version'),
-    ownerId: owner,
-    modelRef: opt(values, 'model') ?? null,
-    instructionsRef: str(values, 'instructions'),
-    instructionsSha256: (await instructionsHash(values)) ?? '',
-    allowedTools: list(opt(values, 'tools')) ?? [],
-    maxAutonomy: str(values, 'max-autonomy'),
-    approvedEnvironments: list(opt(values, 'environments')) ?? ['sandbox'],
-  });
-  return print(scope, agent, values, ctx, 'cli.admin.agent.registered');
-};
-
-const update: Scoped = async (scope, values, ctx) => {
-  const hash = await instructionsHash(values);
-  const tools = list(opt(values, 'tools'));
-  const environments = list(opt(values, 'environments'));
-  const input: UpdateAgent = {
-    version: str(values, 'version'),
-    ...(opt(values, 'model') === undefined ? {} : { modelRef: str(values, 'model') }),
-    ...(opt(values, 'instructions') === undefined
-      ? {}
-      : { instructionsRef: str(values, 'instructions') }),
-    ...(hash === undefined ? {} : { instructionsSha256: hash }),
-    ...(tools === undefined ? {} : { allowedTools: tools }),
-    ...(opt(values, 'max-autonomy') === undefined
-      ? {}
-      : { maxAutonomy: str(values, 'max-autonomy') }),
-    ...(environments === undefined ? {} : { approvedEnvironments: environments }),
-  };
-  const agent = await updateAgent(scope, str(values, 'key'), input);
-  return print(scope, agent, values, ctx, 'cli.admin.agent.updated');
-};
-
-function statusHandler(to: AgentStatus): Scoped {
+function statusHandler(to: 'suspended' | 'quarantined'): Scoped {
   return async (scope, values, ctx) => {
-    const reason = opt(values, 'reason');
     const agent = await changeAgentStatus(scope, str(values, 'key'), {
       to,
-      ...(reason === undefined ? {} : { reason }),
+      reason: str(values, 'reason'),
     });
     return print(scope, agent, values, ctx, 'cli.admin.agent.status_changed');
   };
 }
-
-const owner: Scoped = async (scope, values, ctx) => {
-  const id = await ownerId(scope, str(values, 'owner'), ctx);
-  if (id === undefined) return EXIT.usage;
-  const agent = await changeAgentOwner(scope, str(values, 'key'), id);
-  return print(scope, agent, values, ctx, 'cli.admin.agent.owner_changed');
-};
-
-const recertify: Scoped = async (scope, values, ctx) => {
-  const day = opt(values, 'date');
-  const agent = await recertifyAgent(scope, str(values, 'key'), day === undefined ? {} : { day });
-  return print(scope, agent, values, ctx, 'cli.admin.agent.recertified');
-};
 
 const show: Scoped = async (scope, values, ctx) => {
   const agent = await scope.agents.getByKey(str(values, 'key'));
@@ -236,14 +133,8 @@ const listAgents: Scoped = async (scope, values, ctx) => {
 };
 
 const HANDLERS: Readonly<Record<Command, Scoped>> = {
-  register,
-  update,
-  activate: statusHandler('active'),
   suspend: statusHandler('suspended'),
   quarantine: statusHandler('quarantined'),
-  retire: statusHandler('retired'),
-  owner,
-  recertify,
   show,
   list: listAgents,
 };

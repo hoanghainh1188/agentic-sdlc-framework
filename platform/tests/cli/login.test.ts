@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { EXIT } from '../../apps/cli/src/index.js';
 import { credentialsPath, readSavedLogin } from '../../apps/cli/src/credentials/store.js';
-import { meBody, PROJECT, TENANT } from './fixtures.js';
+import { meBody, PROJECT, TENANT, tokenBody } from './fixtures.js';
 import { API_URL, apiError, TOKEN, useHarness } from './harness.js';
 
 const harness = useHarness();
@@ -145,12 +145,34 @@ describe('sdlc login', () => {
 });
 
 describe('sdlc logout', () => {
-  it('deletes the saved login and says the token is still valid on the server', async () => {
-    const h = await harness();
+  // B13 (ADR-M36 §4, ADR-M37 §2.8): the token is revoked on the server first.
+  it('revokes the token on the server, then deletes the saved login', async () => {
+    const h = await harness({
+      routes: { 'DELETE /v1/me/tokens/current': { status: 200, body: tokenBody() } },
+    });
     expect(await h.run(['logout'])).toBe(EXIT.ok);
+    expect(h.requests.map((r) => [r.method, r.url.pathname, r.headers.authorization])).toEqual([
+      ['DELETE', '/v1/me/tokens/current', `Bearer ${TOKEN}`],
+    ]);
     expect(h.out).toEqual([t('cli.logout.done')]);
     expect(await readSavedLogin(h.ctx.env)).toBeUndefined();
-    expect(h.requests).toEqual([]);
+  });
+
+  it('treats a token the server already refuses (401) as revoked', async () => {
+    const h = await harness({
+      routes: { 'DELETE /v1/me/tokens/current': apiError(401, 'unauthorized') },
+    });
+    expect(await h.run(['logout', '--json'])).toBe(EXIT.ok);
+    expect(JSON.parse(h.out.join('\n'))).toEqual({ deleted: true, token_revoked: true });
+  });
+
+  it('still deletes the saved login when the server cannot revoke, and says so', async () => {
+    const h = await harness({
+      routes: { 'DELETE /v1/me/tokens/current': apiError(500, 'internal') },
+    });
+    expect(await h.run(['logout'])).toBe(EXIT.ok);
+    expect(h.out).toEqual([t('cli.logout.not_revoked')]);
+    expect(await readSavedLogin(h.ctx.env)).toBeUndefined();
   });
 
   it('says when there is nothing to delete', async () => {

@@ -38,7 +38,7 @@ describeDb('B03: sdlc admin on PostgreSQL', () => {
   }
 
   const bootstrapArgs = (slug: string) => [
-    'admin',
+    'ops',
     'bootstrap',
     '--tenant',
     slug,
@@ -95,7 +95,7 @@ describeDb('B03: sdlc admin on PostgreSQL', () => {
   it('issues, lists and revokes tokens', async () => {
     await cli(bootstrapArgs('tokens'));
     const issued = await cli([
-      'admin',
+      'ops',
       'token',
       'issue',
       '--tenant',
@@ -113,7 +113,7 @@ describeDb('B03: sdlc admin on PostgreSQL', () => {
     expect(body.token).toMatch(/^sdlc_pat_/);
 
     const listed = await cli([
-      'admin',
+      'ops',
       'token',
       'list',
       '--tenant',
@@ -126,11 +126,11 @@ describeDb('B03: sdlc admin on PostgreSQL', () => {
     expect(rows.map((r) => r.name).sort()).toEqual(['bootstrap', 'laptop']);
     expect(listed.out).not.toMatch(TOKEN);
 
-    const revoke = ['admin', 'token', 'revoke', '--tenant', 'tokens', '--id', body.token_id];
+    const revoke = ['ops', 'token', 'revoke', '--tenant', 'tokens', '--id', body.token_id];
     expect((await cli(revoke)).code).toBe(EXIT.ok);
     expect((await cli(revoke)).code).toBe(EXIT.ok);
     const unknown = await cli([
-      'admin',
+      'ops',
       'token',
       'revoke',
       '--tenant',
@@ -143,7 +143,7 @@ describeDb('B03: sdlc admin on PostgreSQL', () => {
 
   it('refuses bad input with catalog messages', async () => {
     const tooLong = await cli([
-      'admin',
+      'ops',
       'token',
       'issue',
       '--tenant',
@@ -157,7 +157,7 @@ describeDb('B03: sdlc admin on PostgreSQL', () => {
     ]);
     expect(tooLong.code).toBe(EXIT.usage);
     const noTenant = await cli([
-      'admin',
+      'ops',
       'token',
       'list',
       '--tenant',

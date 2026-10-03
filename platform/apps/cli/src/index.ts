@@ -1,20 +1,19 @@
 // The sdlc command-line tool. See design/D-03 section 5.1.
 // A07 adds `sdlc audit verify`, B03 the operator commands `sdlc admin …` (database, on the
 // server). B04 adds the user commands (through the API, design/ADR-M36): login, logout, whoami,
-// intent, gate, escalation, ai-record. B13 adds the admin commands through the API (ADR-M37):
-// sdlc admin project|user|identity|role|config|tenant-admin.
-import { parseArgs } from 'node:util';
-
+// intent, gate, escalation, ai-record. B13 adds the admin commands, `sdlc token` and
+// `sdlc audit verify` through the API, and moves the operator commands to `sdlc ops` (ADR-M37).
 import { t } from '@sdlc/messages';
 
-import { runAdmin } from './commands/admin.js';
-import { isAdminApiGroup, runAdminApi } from './commands/admin-api.js';
+import { runAdminApi } from './commands/admin-api.js';
 import { runAiRecord } from './commands/ai-record.js';
-import { auditVerify } from './commands/audit-verify.js';
+import { runAuditVerify } from './commands/audit-verify-api.js';
 import { runEscalation } from './commands/escalation.js';
 import { runGate } from './commands/gate.js';
 import { runIntent } from './commands/intent.js';
 import { runLogin, runLogout, runWhoami } from './commands/login.js';
+import { runOps } from './commands/ops.js';
+import { runToken } from './commands/token.js';
 import { EXIT, type CliContext } from './context.js';
 import { clean } from './output.js';
 
@@ -31,6 +30,8 @@ const USER_COMMANDS: Readonly<
   gate: runGate,
   escalation: runEscalation,
   'ai-record': runAiRecord,
+  token: runToken,
+  admin: runAdminApi,
 };
 
 /** Runs one `sdlc` command and returns its exit code. */
@@ -48,48 +49,22 @@ export async function runCli(argv: readonly string[], ctx: CliContext): Promise<
       return EXIT.error;
     }
   }
-  if (group === 'admin') {
-    try {
-      // B13: project, user, identity, role, config, tenant-admin go through the API (ADR-M37).
-      return isAdminApiGroup(command)
-        ? await runAdminApi(argv.slice(1), ctx)
-        : await runAdmin(argv.slice(1), ctx);
-    } catch (error) {
-      ctx.stderr(
-        t('cli.failed', { reason: clean(error instanceof Error ? error.message : String(error)) }),
-      );
-      return EXIT.error;
-    }
-  }
   if (group === 'audit' && command === 'verify') {
-    const parsed = parseOptions(rest);
-    if (!parsed) {
-      ctx.stderr(t('cli.usage'));
-      return EXIT.usage;
-    }
-    try {
-      return await auditVerify(parsed, ctx);
-    } catch (error) {
-      ctx.stderr(
-        t('cli.failed', { reason: clean(error instanceof Error ? error.message : String(error)) }),
-      );
-      return EXIT.error;
-    }
+    return guardedRun(() => runAuditVerify(rest, ctx), ctx);
   }
+  // Operator commands on the server (B13 PR 2: renamed from `sdlc admin`, ADR-M37 §2.8).
+  if (group === 'ops') return guardedRun(() => runOps(argv.slice(1), ctx), ctx);
   ctx.stderr(t('cli.usage'));
   return EXIT.usage;
 }
 
-function parseOptions(args: string[]): { tenant?: string; json: boolean } | undefined {
+async function guardedRun(run: () => Promise<number>, ctx: CliContext): Promise<number> {
   try {
-    const { values } = parseArgs({
-      args,
-      options: { tenant: { type: 'string' }, json: { type: 'boolean', default: false } },
-      strict: true,
-      allowPositionals: false,
-    });
-    return { json: values.json, ...(values.tenant === undefined ? {} : { tenant: values.tenant }) };
-  } catch {
-    return undefined;
+    return await run();
+  } catch (error) {
+    ctx.stderr(
+      t('cli.failed', { reason: clean(error instanceof Error ? error.message : String(error)) }),
+    );
+    return EXIT.error;
   }
 }

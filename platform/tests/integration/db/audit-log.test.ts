@@ -240,7 +240,7 @@ describeDb('A07: audit log on PostgreSQL', () => {
       const s = await seed();
       await appendMany(s, 3);
       const { ctx, out } = cli();
-      expect(await runCli(['audit', 'verify', '--tenant', s.slug], ctx)).toBe(EXIT.ok);
+      expect(await runCli(['ops', 'audit', 'verify', '--tenant', s.slug], ctx)).toBe(EXIT.ok);
       expect(out).toEqual([`${s.slug}: audit chain intact, 3 records checked.`]);
     });
 
@@ -276,7 +276,7 @@ describeDb('A07: audit log on PostgreSQL', () => {
       await tamper(t.name, statement, [s.scope.tenantId]);
       expect((await s.scope.audit.verify()).broken).toEqual(broken);
       const { ctx, out } = cli();
-      expect(await runCli(['audit', 'verify', '--tenant', s.slug, '--json'], ctx)).toBe(
+      expect(await runCli(['ops', 'audit', 'verify', '--tenant', s.slug, '--json'], ctx)).toBe(
         EXIT.failed,
       );
       expect(JSON.parse(out.join('\n'))).toEqual([
@@ -293,7 +293,7 @@ describeDb('A07: audit log on PostgreSQL', () => {
         [s.scope.tenantId],
       );
       const { ctx, out } = cli();
-      expect(await runCli(['audit', 'verify', '--tenant', s.slug], ctx)).toBe(EXIT.failed);
+      expect(await runCli(['ops', 'audit', 'verify', '--tenant', s.slug], ctx)).toBe(EXIT.failed);
       expect(out).toEqual([
         `${s.slug}: audit chain broken at seq 2: the record was changed after it was written (hash mismatch). 1 records before it are intact.`,
       ]);
@@ -302,10 +302,12 @@ describeDb('A07: audit log on PostgreSQL', () => {
     it('checks every tenant without --tenant, and refuses an unknown slug', async () => {
       const { ctx, out } = cli();
       // Earlier tests left broken chains in some tenants.
-      expect(await runCli(['audit', 'verify'], ctx)).toBe(EXIT.failed);
+      expect(await runCli(['ops', 'audit', 'verify'], ctx)).toBe(EXIT.failed);
       expect(out.length).toBe(tenantCount);
       const unknown = cli();
-      expect(await runCli(['audit', 'verify', '--tenant', 'nope'], unknown.ctx)).toBe(EXIT.usage);
+      expect(await runCli(['ops', 'audit', 'verify', '--tenant', 'nope'], unknown.ctx)).toBe(
+        EXIT.usage,
+      );
       expect(unknown.err).toEqual(['No tenant with the slug nope.']);
     });
   });

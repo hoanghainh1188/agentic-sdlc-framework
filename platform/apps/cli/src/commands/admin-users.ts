@@ -3,6 +3,8 @@
 import { t } from '@sdlc/messages';
 
 import {
+  tokenListSchema,
+  tokenSchema,
   adminIdentityListSchema,
   adminIdentitySchema,
   adminTenantRoleListSchema,
@@ -14,7 +16,9 @@ import {
   type AdminUserView,
 } from '../api/schemas.js';
 import { segment } from '../api/session.js';
-import { say, show } from '../output.js';
+import { EXIT } from '../context.js';
+import { say, sayError, show } from '../output.js';
+import { daysOk, issueToken, printIssued, printList, printRevoked } from './token.js';
 import {
   opt,
   output,
@@ -134,6 +138,48 @@ export const USER_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
       return output(call, unlinked, () =>
         say(call.ctx, 'cli.admin.identity.saved', identityParams(unlinked)),
       );
+    },
+  },
+  // Tokens of another user (B13 AC5, QUESTIONS #152): a token issued for someone else lives at
+  // most 7 days; the user creates their own with `sdlc token create` and revokes that one.
+  'token issue': {
+    options: { ...user, name: { type: 'string' }, days: { type: 'string' } },
+    required: ['user', 'name'],
+    run: async (call) => {
+      if (!daysOk(call.values.days)) {
+        sayError(call.ctx, 'cli.admin.api.usage');
+        return EXIT.usage;
+      }
+      const path = `${await userPath(call)}/tokens`;
+      const issued = await issueToken(
+        call.client,
+        path,
+        str(call.values, 'name'),
+        call.values.days,
+      );
+      printIssued(call.ctx, issued, call.json);
+      return EXIT.ok;
+    },
+  },
+  'token list': {
+    options: user,
+    required: ['user'],
+    run: async (call) => {
+      printList(
+        call.ctx,
+        await call.client.get(`${await userPath(call)}/tokens`, tokenListSchema),
+        call.json,
+      );
+      return EXIT.ok;
+    },
+  },
+  'token revoke': {
+    options: { ...user, id: { type: 'string' } },
+    required: ['user', 'id'],
+    run: async (call) => {
+      const path = `${await userPath(call)}/tokens/${segment(str(call.values, 'id'))}`;
+      printRevoked(call.ctx, await call.client.delete(path, tokenSchema), call.json);
+      return EXIT.ok;
     },
   },
   'tenant-admin grant': {

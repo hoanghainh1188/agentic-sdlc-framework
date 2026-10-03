@@ -2,6 +2,8 @@
 // services check the values again, so the operator commands follow the same rules.
 import { PROJECT_ROLES } from '@sdlc/contracts';
 import {
+  API_TOKEN_MAX_LIFETIME_DAYS,
+  API_TOKEN_NAME_PATTERN,
   EXTERNAL_ID_PATTERN,
   EXTERNAL_LOGIN_PATTERN,
   MAX_CONFIG_YAML_BYTES,
@@ -66,4 +68,10 @@ export const saveConfigSchema = z.strictObject({
 export const historyQuerySchema = z.strictObject({
   include_revoked: z.enum(['true', 'false']).optional(),
   include_unlinked: z.enum(['true', 'false']).optional(),
+});
+
+/** A new personal token (B13 AC5): a short name code and an optional lifetime in days. */
+export const issueTokenSchema = z.strictObject({
+  name: z.string().regex(API_TOKEN_NAME_PATTERN),
+  days: z.number().int().min(1).max(API_TOKEN_MAX_LIFETIME_DAYS).optional(),
 });

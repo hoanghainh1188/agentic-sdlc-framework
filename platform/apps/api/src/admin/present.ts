@@ -2,6 +2,9 @@
 // column never leaks into the API by accident (ADR-M26). Never the stored token hash.
 import { formatIssue, type ConfigIssue } from '@sdlc/config';
 import type {
+  ApiToken,
+  ChainState,
+  IssuedTokenView,
   Project,
   ProjectConfigView,
   RoleBinding,
@@ -87,5 +90,37 @@ export function presentConfig(view: ProjectConfigView, locale: string): Record<s
     updated_by: view.updatedBy,
     updated_at: iso(view.updatedAt),
     warnings: view.warnings.map((warning) => presentIssue(warning, locale)),
+  };
+}
+
+/** A token's record: never the token or its hash. */
+export function presentToken(token: ApiToken): Record<string, unknown> {
+  return {
+    id: token.id,
+    user_id: token.user_id,
+    name: token.name,
+    expires_at: token.expires_at.toISOString(),
+    revoked_at: iso(token.revoked_at),
+    last_used_at: iso(token.last_used_at),
+    created_at: token.created_at.toISOString(),
+  };
+}
+
+/** A new token: the only response that holds the raw token (shown once, never stored). */
+export function presentIssuedToken(issued: IssuedTokenView): Record<string, unknown> {
+  return {
+    ...presentToken(issued.record),
+    token: issued.token,
+    for_other_user: issued.forOtherUser,
+  };
+}
+
+export function presentChain(tenantId: string, state: ChainState): Record<string, unknown> {
+  return {
+    tenant_id: tenantId,
+    ok: state.broken === undefined,
+    checked: state.checked,
+    last_seq: state.lastSeq,
+    broken: state.broken ? { seq: state.broken.seq, reason: state.broken.reason } : null,
   };
 }

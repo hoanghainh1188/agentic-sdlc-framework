@@ -192,7 +192,7 @@ describe.skipIf(!enabled)('sdlc-api container (live)', { timeout: 120_000 }, () 
     upApi();
 
     const boot = await cli([
-      'admin',
+      'ops',
       'bootstrap',
       '--tenant',
       'internal',

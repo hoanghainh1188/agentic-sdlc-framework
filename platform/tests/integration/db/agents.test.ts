@@ -6,9 +6,6 @@
 // AC3: the instructions hash is stored and checked before each run.
 // AC4: an overdue recertification is a warning (months from project configuration), not a block.
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
 import { loadProjectConfig } from '@sdlc/config';
 import { t } from '@sdlc/messages';
@@ -471,7 +468,7 @@ describeDb('C10: the agent register on PostgreSQL', () => {
     });
   });
 
-  describe('AC1: sdlc admin agent (operator CLI)', () => {
+  describe('AC1: sdlc ops agent (operator CLI)', () => {
     async function cli(argv: string[]) {
       const out: string[] = [];
       const err: string[] = [];
@@ -485,75 +482,21 @@ describeDb('C10: the agent register on PostgreSQL', () => {
       return { code, out: out.join('\n'), err: err.join('\n') };
     }
 
-    it('registers from a local instructions file, activates, lists, shows and suspends', async () => {
+    // B13 (QUESTIONS #153, ADR-M37 §2.8): registering and activating go through the API; the
+    // operator keeps show, list, suspend and quarantine (`sdlc ops agent …`).
+    it('lists, shows and suspends on the server', async () => {
       const s = await seed();
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-agent-'));
-      const file = path.join(dir, 'AGENTS.md');
-      fs.writeFileSync(file, '# AGENTS\nRun pnpm test.\n');
-      try {
-        const reg = await cli([
-          'admin',
-          'agent',
-          'register',
-          '--tenant',
-          s.slug,
-          '--key',
-          'coder-openhands',
-          '--version',
-          '1.0.0',
-          '--owner',
-          'OWNER@example.com',
-          '--model',
-          MODEL,
-          '--instructions',
-          'AGENTS.md@v5',
-          '--instructions-file',
-          file,
-          '--tools',
-          'terminal, file_editor',
-          '--max-autonomy',
-          'L2',
-          '--json',
-        ]);
-        expect(reg.code, reg.err).toBe(EXIT.ok);
-        expect(JSON.parse(reg.out)).toMatchObject({
-          key: 'coder-openhands',
-          status: 'proposed',
-          instructions_sha256: instructionsSha256(fs.readFileSync(file)),
-          allowed_tools: ['file_editor', 'terminal'],
-          approved_environments: ['sandbox'],
-        });
-      } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
-      }
+      await active(s);
 
-      const act = await cli([
-        'admin',
-        'agent',
-        'activate',
-        '--tenant',
-        s.slug,
-        '--key',
-        'coder-openhands',
-      ]);
-      expect(act).toMatchObject({ code: EXIT.ok });
-      expect(act.out).toBe(
-        t('cli.admin.agent.status_changed', {
-          key: 'coder-openhands',
-          version: '1.0.0',
-          status: 'active',
-        }),
-      );
-
-      const listed = await cli(['admin', 'agent', 'list', '--tenant', s.slug, '--json']);
+      const listed = await cli(['ops', 'agent', 'list', '--tenant', s.slug, '--json']);
       const [row] = JSON.parse(listed.out) as Record<string, unknown>[];
       expect(row).toMatchObject({ key: 'coder-openhands', status: 'active', overdue: false });
-      expect((await cli(['admin', 'agent', 'list', '--tenant', s.slug, '--overdue'])).out).toBe(
+      expect((await cli(['ops', 'agent', 'list', '--tenant', s.slug, '--overdue'])).out).toBe(
         t('cli.admin.agent.none'),
       );
 
       const shown = await cli([
-        'admin',
+        'ops',
         'agent',
         'show',
         '--tenant',
@@ -566,7 +509,7 @@ describeDb('C10: the agent register on PostgreSQL', () => {
       expect(shown.out).not.toMatch(/\{[a-z_]+\}/);
 
       const noReason = await cli([
-        'admin',
+        'ops',
         'agent',
         'suspend',
         '--tenant',
@@ -576,7 +519,7 @@ describeDb('C10: the agent register on PostgreSQL', () => {
       ]);
       expect(noReason).toMatchObject({ code: EXIT.usage, err: t('cli.admin.agent.usage') });
       const suspended = await cli([
-        'admin',
+        'ops',
         'agent',
         'suspend',
         '--tenant',
@@ -593,13 +536,15 @@ describeDb('C10: the agent register on PostgreSQL', () => {
     it('renders refusals from the catalog and lists overdue agents', async () => {
       const s = await seed();
       const refused = await cli([
-        'admin',
+        'ops',
         'agent',
-        'activate',
+        'suspend',
         '--tenant',
         s.slug,
         '--key',
         'nobody',
+        '--reason',
+        'incident',
       ]);
       expect(refused).toMatchObject({
         code: EXIT.failed,
@@ -611,11 +556,11 @@ describeDb('C10: the agent register on PostgreSQL', () => {
         to: 'active',
         now: new Date('2026-01-05T00:00:00.000Z'),
       });
-      const overdue = await cli(['admin', 'agent', 'list', '--tenant', s.slug, '--overdue']);
+      const overdue = await cli(['ops', 'agent', 'list', '--tenant', s.slug, '--overdue']);
       expect(overdue.out).toContain('coder-openhands');
       expect(overdue.out).toContain(t('cli.admin.agent.overdue_flag'));
       const [row] = JSON.parse(
-        (await cli(['admin', 'agent', 'list', '--tenant', s.slug, '--json'])).out,
+        (await cli(['ops', 'agent', 'list', '--tenant', s.slug, '--json'])).out,
       ) as Record<string, unknown>[];
       expect(row).toMatchObject({
         overdue: true,
@@ -623,7 +568,7 @@ describeDb('C10: the agent register on PostgreSQL', () => {
         recertification_due_on: '2026-04-05',
       });
       const unknownProject = await cli([
-        'admin',
+        'ops',
         'agent',
         'list',
         '--tenant',
@@ -637,11 +582,11 @@ describeDb('C10: the agent register on PostgreSQL', () => {
       });
     });
 
-    it('keeps the audit chain intact (sdlc audit verify)', async () => {
+    it('keeps the audit chain intact (sdlc ops audit verify)', async () => {
       const s = await seed();
       await active(s);
       await changeAgentStatus(s.scope, 'coder-openhands', { to: 'retired', reason: 'unused' });
-      const verified = await cli(['audit', 'verify', '--tenant', s.slug]);
+      const verified = await cli(['ops', 'audit', 'verify', '--tenant', s.slug]);
       expect(verified.code, verified.err).toBe(EXIT.ok);
       // No e-mail address or model name in any agent audit payload.
       for (const event of await auditOf(s)) {

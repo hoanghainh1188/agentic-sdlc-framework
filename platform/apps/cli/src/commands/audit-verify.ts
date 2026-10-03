@@ -1,13 +1,15 @@
-// `sdlc audit verify` (D-02 FR-41, D-08 A07 AC4, design/D-05 section 7.3).
-// Temporary: connects straight to the platform database as `platform_app` (SDLC_DB_URL), because
-// the API has no tenant admin role yet. Task B13 moves this command behind the API once a tenant
-// admin role exists (QUESTIONS.md #65, ADR-M26; ADR-M09 section 2.8).
+// `sdlc ops audit verify` (D-02 FR-41, D-08 A07 AC4, design/D-05 section 7.3): the operator's
+// check on the server, straight on the platform database as `platform_app` (SDLC_DB_URL), for
+// every tenant or one. Tenant admins use `sdlc audit verify` through the API (B13, ADR-M37 §2.8;
+// audit-verify-api.ts); this stays for when the API is down.
+import { parseArgs } from 'node:util';
+
 import { PlatformDatabase, parseTenantId, type ChainBreakReason, type Tenant } from '@sdlc/core';
 import { t, type MessageKey } from '@sdlc/messages';
 
 import { EXIT, type CliContext } from '../context.js';
 
-const REASON_KEYS: Readonly<Record<ChainBreakReason, MessageKey>> = {
+export const REASON_KEYS: Readonly<Record<ChainBreakReason, MessageKey>> = {
   seq_gap: 'audit.verify.reason.seq_gap',
   prev_hash_mismatch: 'audit.verify.reason.prev_hash_mismatch',
   hash_mismatch: 'audit.verify.reason.hash_mismatch',
@@ -26,6 +28,21 @@ interface TenantResult {
   readonly checked: number;
   readonly last_seq: number;
   readonly broken: { readonly seq: number; readonly reason: ChainBreakReason } | null;
+}
+
+/** `[--tenant <slug>] [--json]`. Undefined: print the usage. */
+export function parseAuditVerifyOptions(args: readonly string[]): AuditVerifyOptions | undefined {
+  try {
+    const { values } = parseArgs({
+      args: [...args],
+      options: { tenant: { type: 'string' }, json: { type: 'boolean', default: false } },
+      strict: true,
+      allowPositionals: false,
+    });
+    return { json: values.json, ...(values.tenant === undefined ? {} : { tenant: values.tenant }) };
+  } catch {
+    return undefined;
+  }
 }
 
 export async function auditVerify(options: AuditVerifyOptions, ctx: CliContext): Promise<number> {

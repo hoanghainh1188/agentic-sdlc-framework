@@ -2,6 +2,7 @@
 // mocked API cannot drift from the real one: a presenter change that breaks the CLI's response
 // schemas fails these tests.
 import type {
+  ApiToken,
   Escalation,
   GateDecisionRow,
   Intent,
@@ -16,8 +17,11 @@ import type {
 } from '../../packages/core/src/index.js';
 
 import {
+  presentChain,
   presentConfig,
   presentIdentity,
+  presentIssuedToken,
+  presentToken,
   presentProject,
   presentRoleBinding,
   presentTenantRole,
@@ -282,4 +286,44 @@ export function configBody(version = 1): Record<string, unknown> {
     },
     'en',
   );
+}
+
+// Tokens and the audit check (B13 PR 2).
+export const TOKEN_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+function tokenRow(overrides: Partial<ApiToken> = {}): ApiToken {
+  return {
+    id: TOKEN_ID,
+    tenant_id: TENANT,
+    user_id: USER,
+    name: 'laptop',
+    token_hash: 'f'.repeat(64),
+    last_used_at: null,
+    expires_at: new Date('2027-01-01T00:00:00.000Z'),
+    revoked_at: null,
+    created_at: AT,
+    ...overrides,
+  };
+}
+
+export function tokenBody(overrides: Partial<ApiToken> = {}): Record<string, unknown> {
+  return presentToken(tokenRow(overrides));
+}
+
+/** A new token as the API returns it: the raw token is built at run time (Gitleaks). */
+export function issuedTokenBody(
+  token: string,
+  forOtherUser = false,
+  overrides: Partial<ApiToken> = {},
+): Record<string, unknown> {
+  return presentIssuedToken({ token, record: tokenRow(overrides), forOtherUser });
+}
+
+export function chainBody(broken = false): Record<string, unknown> {
+  return presentChain(TENANT, {
+    checked: 41,
+    lastSeq: 41,
+    lastHash: 'e'.repeat(64),
+    ...(broken ? { broken: { seq: 42, reason: 'hash_mismatch' as const } } : {}),
+  });
 }
