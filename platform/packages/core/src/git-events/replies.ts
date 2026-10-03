@@ -34,6 +34,8 @@ export const COMMENT_REPLY_KEYS: Readonly<Record<CommentReplyCode, MessageKey>> 
   escalation_not_open: 'comment.reply.escalation_not_open',
   escalation_already_acknowledged: 'comment.reply.escalation_already_acknowledged',
   escalation_decision_not_allowed: 'comment.reply.escalation_decision_not_allowed',
+  kill_forbidden: 'comment.reply.kill_forbidden',
+  kill_no_active_run: 'comment.reply.kill_no_active_run',
   failed: 'comment.reply.failed',
 };
 

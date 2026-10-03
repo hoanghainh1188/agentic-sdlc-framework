@@ -27,6 +27,8 @@ import { MeController } from './me/me.controller.js';
 import { MeTokensController } from './me/tokens.controller.js';
 import { PlansController } from './plans/plans.controller.js';
 import { PlansService } from './plans/plans.service.js';
+import { RunsController } from './runs/runs.controller.js';
+import { RunsService } from './runs/runs.service.js';
 import { SpecsController } from './specs/specs.controller.js';
 import { SpecsService } from './specs/specs.service.js';
 import { LogContextInterceptor } from './observability/log-context.interceptor.js';
@@ -39,6 +41,7 @@ import {
   ESCALATIONS,
   INTENTS,
   PLANS,
+  RUNS,
   REGISTRY,
   SETTINGS,
   SPECS,
@@ -85,6 +88,7 @@ class ApiModule {
         IntentsController,
         SpecsController,
         PlansController,
+        RunsController,
         EscalationsController,
         AiRecordsController,
         AdminProjectsController,
@@ -126,6 +130,11 @@ class ApiModule {
             signals,
             wakeLogger,
           ),
+        },
+        {
+          provide: RUNS,
+          useFactory: (registry: Registry) => new RunsService(registry, signals, wakeLogger),
+          inject: [REGISTRY],
         },
         { provide: AI_RECORDS, useValue: new AiRecordsService(signals, wakeLogger, now) },
         {

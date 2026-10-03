@@ -70,6 +70,8 @@ export const INTENT_NOTICE_KINDS = [
   'g6_decision',
   'g6_escalated',
   'g6_resumed',
+  // C11 (ADR-M42): a person used the kill switch on the intent's run; an escalation was raised.
+  'run_killed',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

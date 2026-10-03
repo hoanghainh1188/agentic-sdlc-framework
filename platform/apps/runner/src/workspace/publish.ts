@@ -20,7 +20,9 @@
 //  6. the branch must be absent, at `base_sha` (the next run of the intent, QUESTIONS #134) or
 //     already at the commit; anything else → `branch_moved` (someone else changed it). Push with an
 //     explicit refspec, no force; read the branch again: it must show the commit;
-//  7. records `branch_pushed` and sets `runs.head_sha` once (migration 0017), in one transaction.
+//  7. records `branch_pushed` and sets `runs.head_sha` once (migration 0017), in one transaction;
+//  8. (C11, ADR-M42 §2.4) revokes the push token, whatever the outcome (`token_revoked`). A
+//     wrapping token that cannot be opened is recorded as `wrap_token_reused`.
 // Final refusals are recorded as `publish_refused` (a person decides, QUESTIONS #156); causes that
 // may pass (the token, the Git host, the evidence store) as `publish_failed`. Codes only: never a
 // path, git's text or the token.
@@ -41,6 +43,12 @@ import { Redacted } from '@sdlc/secrets';
 
 import { RunnerError } from '../errors.js';
 import type { RunnerSettings } from '../settings.js';
+import {
+  isRefusedWrapToken,
+  recordWrapTokenReused,
+  revokeAfterUse,
+  type GitTokenRevoker,
+} from '../tokens.js';
 import { cloneForPush, PushError, pushCommit, remoteBranchHead } from './git.js';
 import { gitArgs, gitEnv } from './proposal.js';
 
@@ -50,6 +58,8 @@ export interface PublishDeps {
   /** The diffs store (key prefix `diffs/`) with a credential that may read. */
   readonly diffEvidence?: Pick<EvidenceStore, 'get'>;
   readonly unwrapper: SecretUnwrapper;
+  /** Revokes the push token right after the push (C11, ADR-M42 §2.4; ADR-M38 §2.3). */
+  readonly tokenRevoker?: GitTokenRevoker;
 }
 
 /** Final causes: the runner never pushes this run (QUESTIONS #156). */
@@ -117,14 +127,19 @@ export async function publishRun(
   try {
     const facts = await readFacts(scope, input.runId);
     if (!deps.diffEvidence) throw new Failed('evidence_unavailable');
-    const token = await unwrapToken(deps.unwrapper, input.wrappedPushToken);
-    const patch = await readPatch(deps.diffEvidence, facts);
+    const token = await unwrapToken(deps.unwrapper, input.wrappedPushToken, () =>
+      // Opened by someone else, or expired before this attempt (C11, ADR-M42 §2.5).
+      recordWrapTokenReused(scope, input.runId, 'push'),
+    );
     const dir = fs.mkdtempSync(path.join(deps.settings.workDir, 'publish-'));
     try {
+      const patch = await readPatch(deps.diffEvidence, facts);
       const head = await pushChanges(deps, facts, patch, token, dir);
       await record(scope, input.runId, facts, head);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
+      // The push token ends with the push, whatever the outcome (C11).
+      await revokeAfterUse(deps.tokenRevoker, scope, input.runId, token, 'push');
     }
     return { outcome: 'pushed' };
   } catch (error) {
@@ -209,12 +224,17 @@ async function readFacts(scope: TenantScope, runId: string): Promise<Facts> {
   };
 }
 
-async function unwrapToken(unwrapper: SecretUnwrapper, wrapped: string): Promise<RedactedSecret> {
+async function unwrapToken(
+  unwrapper: SecretUnwrapper,
+  wrapped: string,
+  onRefused: () => Promise<void>,
+): Promise<RedactedSecret> {
   try {
     const token = (await unwrapper.unwrap(new Redacted(wrapped))).token;
     if (!token) throw new Error('no token field');
     return token;
-  } catch {
+  } catch (error) {
+    if (isRefusedWrapToken(error)) await onRefused();
     throw new Failed('token_unavailable');
   }
 }

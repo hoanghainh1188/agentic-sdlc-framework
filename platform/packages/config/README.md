@@ -42,7 +42,7 @@ escalation:
 | `oversight` | `forced_hitl_g3.change_flags`, `dual_approval_g7.change_flags` and `.roles`, `g6_security_findings.mode` and `.min_severity`, `hitl_gate_deadline`, `hotl_block_window`, `approval_expiry`, `gate_overdue.severity` and `.response_level` |
 | `autonomy.max_by_risk` | Maximum autonomy per risk tier |
 | `escalation` | `sla.<severity>.acknowledge` and `.resolve`; `calendar` (`time_zone`, `working_days`, `working_hours`, `holidays`) |
-| `run` | `g6_ci_retries`, `loop_detection.identical_tool_calls_max`, `loop_detection.no_progress_window_minutes`, `failed_run_escalation` and `g5_breach_escalation` (`severity`, `response_level` of the escalation a failed run or a G5 breach raises) |
+| `run` | `g6_ci_retries`, `loop_detection.identical_tool_calls_max`, `loop_detection.no_progress_window_minutes`, `failed_run_escalation`, `g5_breach_escalation` and `kill_escalation` (`severity`, `response_level` of the escalation a failed run, a G5 breach or a kill raises) |
 | `budget` | `warn_percent`, `stop_percent`, `default_intent_usd`, `default_run_usd` |
 | `model_routing.allowed_provider_types` | `api` / `self_hosted` per data class |
 | `retention.evidence_retention_days` | Default 180 |
@@ -53,12 +53,13 @@ escalation:
 | `access.ai_record_write_roles`, `access.ai_record_read_roles` | Who may write and read the project AI record through the API (B12, ADR-M32). Default: `person_a` and `pm_brse` write; every role reads; writers always read |
 | `access.spec_link_roles` | Who may link an intent's spec through the API (B08, ADR-M39). Default: `person_a` and `pm_brse` |
 | `access.plan_submit_roles` | Who may submit an intent's plan file through the API (B09, ADR-M40). The submitter never approves G3. Default: `person_a` |
+| `access.kill_roles` | Who may stop a run with the kill switch (C11, ADR-M42). Default and minimum: `person_a`, `person_b`, `governance` |
 
 Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `working_hours`, `working_days` (working calendar; one working day = the working hours). Deadlines may also be `{ kind: end_of_working_day }` or `{ kind: next_planned_work }` (no clock).
 
 ## Mandatory rules
 
-A project may tighten anything. It may **not** loosen these (rules M1–M24, sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
+A project may tighten anything. It may **not** loosen these (rules M1–M26, sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
 
 | Rule | What |
 |---|---|
@@ -84,6 +85,8 @@ A project may tighten anything. It may **not** loosen these (rules M1–M24, sou
 | M22 | A G5 breach freezes the intent: `run.g5_breach_escalation.response_level` is `pause`, `contain` or `incident` (C07, ADR-M34 §2.8) |
 | M23 | `viewer` never links a spec (`access.spec_link_roles`; B08, ADR-M39) |
 | M24 | `viewer` never submits a plan (`access.plan_submit_roles`; B09, ADR-M40) |
+| M25 | `access.kill_roles` always holds `person_a`, `person_b`, `governance`, never `viewer` (C11, D-02 FR-34, ADR-M42) |
+| M26 | `run.kill_escalation.response_level` is `pause`, `contain` or `incident` (C11, ADR-M42) |
 
 Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 

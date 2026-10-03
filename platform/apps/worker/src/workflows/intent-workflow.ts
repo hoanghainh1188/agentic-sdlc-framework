@@ -19,11 +19,20 @@
 // pull request). `open_pr`: `finishPublish` only. A lost runner counts as a failed attempt
 // (`abandonPublish`); a failed push waits `RUN_ACTIVITY_RETRY_MS` before the step is asked again.
 //
+// C11 (ADR-M42 §2.2): the kill switch records the kill in the database first, then sends the
+// `kill` signal. While `executeRun` is pending (waiting for a runner slot, or running), the signal
+// cancels it: an activity that has not started never starts, and a running one gets the cancel on
+// its next heartbeat (the runner also sees `stopping` in the database within a poll). The workflow
+// first asks the worker to revoke the run's key (`revokeKilledRunKey`), then waits until the
+// runner has stopped the agent and cleaned up (`WAIT_CANCELLATION_COMPLETED`). A kill signal at
+// any other time changes nothing. Old histories never saw the signal and replay unchanged.
+//
 // Deterministic code only: this file is bundled for the Temporal workflow sandbox and may import
 // `@temporalio/workflow`, `@sdlc/contracts` and types (lint rule in eslint.config.mjs).
 // The escalation clocks are not timers here (ADR-M28): the workflow asks the database. The only
 // timers are the one a step asks for (`wakeInMs`) and the pause after a failed activity.
 import {
+  INTENT_KILL_SIGNAL,
   INTENT_WAKE_SIGNAL,
   RUNNER_TASK_QUEUE,
   type IntentStepResult,
@@ -31,6 +40,8 @@ import {
   type RunnerActivities,
 } from '@sdlc/contracts';
 import {
+  ActivityCancellationType,
+  CancellationScope,
   condition,
   continueAsNew,
   defineSignal,
@@ -43,6 +54,7 @@ import {
 import type { IntentActivities } from '../activities/intent-activities.js';
 
 export const wakeSignal = defineSignal(INTENT_WAKE_SIGNAL);
+export const killSignal = defineSignal(INTENT_KILL_SIGNAL);
 
 /**
  * Moves in a row before the workflow waits for a signal anyway. G1–G3 need at most 4 moves on one
@@ -68,11 +80,18 @@ const { stepIntent } = proxyActivities<IntentActivities>({
 
 // The run activities are not retried by Temporal: a retry could issue a second contract or finish
 // twice. The database says what to do next, so the workflow simply asks the step again.
-const { prepareRun, finishRun, abandonRun, preparePublish, finishPublish, abandonPublish } =
-  proxyActivities<IntentActivities>({
-    startToCloseTimeout: '5 minutes',
-    retry: { maximumAttempts: 1 },
-  });
+const {
+  prepareRun,
+  finishRun,
+  abandonRun,
+  revokeKilledRunKey,
+  preparePublish,
+  finishPublish,
+  abandonPublish,
+} = proxyActivities<IntentActivities>({
+  startToCloseTimeout: '5 minutes',
+  retry: { maximumAttempts: 1 },
+});
 
 // One run = one attempt. The runner sends a heartbeat at least every 30 seconds; a lost heartbeat
 // means the runner is gone (ADR-M33 §2.7). The run itself is capped by its contract
@@ -82,6 +101,8 @@ const { executeRun } = proxyActivities<RunnerActivities>({
   startToCloseTimeout: '12 hours',
   heartbeatTimeout: '2 minutes',
   retry: { maximumAttempts: 1 },
+  // C11: a kill cancels the activity and waits until the runner stopped the agent and cleaned up.
+  cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
 });
 
 // C08: one push = one attempt (clone, apply, push; minutes, not hours).
@@ -97,6 +118,11 @@ export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
   setHandler(wakeSignal, () => {
     wakes += 1;
   });
+  let kills = 0;
+  setHandler(killSignal, () => {
+    kills += 1;
+  });
+  const killCount = () => kills;
   let moves = 0;
   for (;;) {
     const seen = wakes;
@@ -109,7 +135,7 @@ export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
       }
       if (result.outcome === 'run_prepare' || result.outcome === 'run_ended') {
         moves += 1;
-        if (!(await driveRun(ref, result))) await sleep(RUN_ACTIVITY_RETRY_MS);
+        if (!(await driveRun(ref, result, killCount))) await sleep(RUN_ACTIVITY_RETRY_MS);
         continue;
       }
       if (result.outcome === 'publish') {
@@ -140,30 +166,61 @@ export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
 async function driveRun(
   ref: IntentWorkflowRef,
   result: Extract<IntentStepResult, { outcome: 'run_prepare' | 'run_ended' }>,
+  killCount: () => number,
 ): Promise<boolean> {
   try {
     if (result.outcome === 'run_ended') {
       await finishRun(ref, result.runId);
       return true;
     }
+    // A kill signal from now on is about the run prepared here (C11).
+    const seenKills = killCount();
     const prepared = await prepareRun(ref);
     if (!prepared.ok) return true;
     try {
-      await executeRun({
-        tenantId: ref.tenantId,
-        runId: prepared.runId,
-        modelRef: prepared.modelRef,
-        wrappedGitToken: prepared.wrappedGitToken,
-        wrappedVirtualKey: prepared.wrappedVirtualKey,
-      });
+      await executeKillable(ref, prepared, () => killCount() !== seenKills);
     } catch {
-      // Heartbeat timeout, the runner stopped, or the activity failed: the run is lost.
+      // Heartbeat timeout, the runner stopped, the activity failed, or the kill cancelled it: the
+      // run is lost or killed (core `abandonRun` ends it accordingly and revokes the key).
       await abandonRun(ref, prepared.runId);
     }
     return true;
   } catch {
     return false;
   }
+}
+
+/** `executeRun`, cancelled when a kill signal arrives while it is pending (C11, see the header). */
+async function executeKillable(
+  ref: IntentWorkflowRef,
+  prepared: Extract<Awaited<ReturnType<typeof prepareRun>>, { ok: true }>,
+  killed: () => boolean,
+): Promise<void> {
+  const scope = new CancellationScope();
+  let settled = false;
+  const execution = scope.run(() =>
+    executeRun({
+      tenantId: ref.tenantId,
+      runId: prepared.runId,
+      modelRef: prepared.modelRef,
+      wrappedGitToken: prepared.wrappedGitToken,
+      wrappedVirtualKey: prepared.wrappedVirtualKey,
+    }),
+  );
+  const markSettled = () => {
+    settled = true;
+  };
+  execution.then(markSettled, markSettled);
+  await condition(() => settled || killed());
+  if (!settled) {
+    scope.cancel();
+    try {
+      await revokeKilledRunKey(ref, prepared.runId);
+    } catch {
+      // `finishRun` or `abandonRun` revokes it when the run ends.
+    }
+  }
+  await execution;
 }
 
 /**

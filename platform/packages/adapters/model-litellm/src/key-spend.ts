@@ -28,6 +28,20 @@ export class LiteLLMKeySpendReader implements RunKeySpendReader {
     this.#fetch = options.fetch ?? fetch;
   }
 
+  /**
+   * True when LiteLLM refuses the key as unknown (401): it was revoked (task C11, ADR-M42 §2.6).
+   * The runner waits for this before it reads a killed run's workspace. Any other answer or error,
+   * a 403 from a proxy included: false (not confirmed; security review).
+   */
+  async keyRevoked(key: RedactedSecret): Promise<boolean> {
+    try {
+      await this.readOwnSpend(key);
+      return false;
+    } catch (error) {
+      return error instanceof GatewayError && error.code === 'http_error' && error.status === 401;
+    }
+  }
+
   async readOwnSpend(key: RedactedSecret): Promise<SpendInfo> {
     let response: Response;
     try {

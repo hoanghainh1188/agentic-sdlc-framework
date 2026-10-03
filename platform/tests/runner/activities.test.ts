@@ -1,5 +1,6 @@
 // C06 session 2 (D-08 C06 AC4, ADR-M33 §2.6): the runner's Temporal activity `executeRun` and the
 // process settings of its task queue, without Docker or Temporal. Live: `pnpm test:workflow`.
+import { SecretsError } from '@sdlc/secrets';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -17,13 +18,23 @@ function harness(
   options: {
     provisionOk?: boolean;
     unwrapFails?: boolean;
+    /** The unwrap fails because OpenBao is down, not because the token was refused. */
+    unwrapDown?: boolean;
     runStatus?: string;
     agentWaitsForCancel?: boolean;
   } = {},
 ) {
   const calls: string[] = [];
-  let status = options.runStatus ?? 'succeeded';
+  // The run is provisioned (`running`); the fake agent ends it with `runStatus` (C11: the
+  // transitions are conditional, so the fake checks `from`).
+  let status = 'running';
   const scope = {
+    runEvents: {
+      append: (_id: string, type: string) => {
+        calls.push(`event:${type}`);
+        return Promise.resolve(undefined);
+      },
+    },
     runContracts: {
       getByRunId: (id: string) =>
         Promise.resolve(
@@ -33,10 +44,26 @@ function harness(
     runs: {
       getById: () =>
         Promise.resolve({ status, stop_reason: status === 'failed' ? 'key_unavailable' : null }),
-      transition: (_id: string, change: { to: string }) => {
+      transition: (_id: string, change: { from: readonly string[]; to: string }) => {
+        if (!change.from.includes(status)) return Promise.resolve(false);
         calls.push(`transition:${change.to}`);
         status = change.to;
         return Promise.resolve(true);
+      },
+      end: (_id: string, change: { from: readonly string[]; to: string }) => {
+        const to =
+          status === 'stopping'
+            ? 'stopped_killed'
+            : change.from.includes(status)
+              ? change.to
+              : undefined;
+        if (to === undefined) return Promise.resolve(undefined);
+        calls.push(`transition:${to}`);
+        status = to;
+        return Promise.resolve(to);
+      },
+      kill: () => {
+        status = 'stopping';
       },
     },
   };
@@ -62,6 +89,7 @@ function harness(
       },
       runAgent: (request) => {
         calls.push(`runAgent:${request.model}:${request.virtualKey.reveal()}`);
+        status = options.runStatus ?? 'succeeded';
         if (!options.agentWaitsForCancel) return Promise.resolve({} as never);
         // The driver stops the agent when the signal is aborted, then the sandbox is removed.
         return new Promise((resolve) =>
@@ -80,8 +108,10 @@ function harness(
     unwrapper: {
       unwrap: (token) =>
         options.unwrapFails
-          ? Promise.reject(new Error('used'))
-          : Promise.resolve({ key: { reveal: () => `key-of-${token.reveal()}` } }),
+          ? Promise.reject(new SecretsError('secrets.wrapping.invalid_token'))
+          : options.unwrapDown
+            ? Promise.reject(new SecretsError('secrets.openbao.unreachable'))
+            : Promise.resolve({ key: { reveal: () => `key-of-${token.reveal()}` } }),
     },
     context: () => ctx,
     heartbeatMs: 5,
@@ -94,7 +124,7 @@ function harness(
     wrappedGitToken: 'wrap-git',
     wrappedVirtualKey: 'wrap-key',
   };
-  return { activities, calls, input, abort, lines, beats: () => beats };
+  return { activities, calls, input, abort, lines, beats: () => beats, kill: scope.runs.kill };
 }
 
 describe('executeRun', () => {
@@ -152,7 +182,31 @@ describe('executeRun', () => {
     const h = harness({ unwrapFails: true });
     const result = await h.activities.executeRun(h.input);
     expect(result).toEqual({ outcome: 'ended', status: 'failed', stopReason: 'key_unavailable' });
+    // C11: the contract is valid, so its wrapping token was opened by someone else.
+    expect(h.calls).toEqual([
+      'provision:vault:v1:x',
+      'event:wrap_token_reused',
+      'release:failed',
+      'transition:failed',
+    ]);
+  });
+
+  it('C11: an OpenBao outage fails the run without a security signal', async () => {
+    const h = harness({ unwrapDown: true });
+    await h.activities.executeRun(h.input);
     expect(h.calls).toEqual(['provision:vault:v1:x', 'release:failed', 'transition:failed']);
+  });
+
+  it('C11: a run killed before the agent starts ends stopped_killed without driving it', async () => {
+    const h = harness();
+    h.kill();
+    const result = await h.activities.executeRun(h.input);
+    expect(h.calls).toEqual([
+      'provision:vault:v1:x',
+      'release:killed',
+      'transition:stopped_killed',
+    ]);
+    expect(result).toMatchObject({ outcome: 'ended', status: 'stopped_killed' });
   });
 
   it('a cancel stops the agent through the driver, then the sandbox is removed (no race)', async () => {

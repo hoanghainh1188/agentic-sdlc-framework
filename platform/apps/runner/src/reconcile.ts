@@ -101,7 +101,7 @@ async function cleanUp(
   return { runs: runs.length, failedRuns, errors };
 }
 
-/** Returns true when the run was not final and is now `failed`. */
+/** Returns true when the run was not final and is now `failed` (`stopped_killed` when killed, C11). */
 async function cleanUpRun(
   deps: ReconcileDeps,
   labelled: LabelledRun,
@@ -117,13 +117,15 @@ async function cleanUpRun(
   let failed = false;
   if (ACTIVE.includes(run.status)) {
     const now = deps.now ? deps.now() : new Date();
-    failed = await scope.runs.transition(run.id, {
-      from: ACTIVE,
-      to: 'failed',
-      now,
-      stopReason: why.stopReason,
-      finishedAt: now,
-    });
+    // A run being killed ends as killed (C11, migration 0019); any other run fails. One update.
+    failed =
+      (await scope.runs.end(run.id, {
+        from: ACTIVE.filter((status) => status !== 'stopping'),
+        to: 'failed',
+        now,
+        stopReason: why.stopReason,
+        finishedAt: now,
+      })) !== undefined;
     if (failed) {
       await scope.runEvents.append(run.id, 'run_abandoned', { previous_status: run.status });
     }

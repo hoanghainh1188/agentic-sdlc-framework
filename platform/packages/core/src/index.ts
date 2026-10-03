@@ -16,3 +16,4 @@ export * from './workflow/index.js';
 export * from './observability/index.js';
 export * from './specs/index.js';
 export * from './plans/index.js';
+export * from './kill/index.js';

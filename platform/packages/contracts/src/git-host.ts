@@ -212,6 +212,12 @@ export interface GitHostAdapter {
   listPaths(ref: RepoRef, sha: string): Promise<string[]>;
   issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken>;
   /**
+   * Revokes a token of `issueShortLivedToken` at once (task C11, ADR-M42 §2.4). Needs only the
+   * token itself: the runner revokes the clone and push tokens right after their use. A token that
+   * is already revoked or expired counts as revoked.
+   */
+  revokeShortLivedToken(token: RedactedSecret): Promise<void>;
+  /**
    * Opens a pull request (task C08, ADR-M38 §2.4). Never a draft. The adapter uses a token that
    * may write pull requests for this call only; its own token stays read-only.
    */

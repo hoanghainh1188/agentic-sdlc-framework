@@ -66,7 +66,7 @@ export class GitHubHttp {
 
   /** A JSON call. `pathOrUrl` is an API path or a `next` URL returned earlier. */
   async json(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     pathOrUrl: string | URL,
     input: RequestInput,
   ): Promise<GitHubResponse> {
@@ -154,7 +154,7 @@ export class GitHubHttp {
     }
   }
 
-  async #withRetries<T>(method: 'GET' | 'POST', attempt: () => Promise<T>): Promise<T> {
+  async #withRetries<T>(method: 'GET' | 'POST' | 'DELETE', attempt: () => Promise<T>): Promise<T> {
     for (let i = 0; ; i += 1) {
       try {
         return await attempt();

@@ -29,6 +29,7 @@ function harness(count: number, failing: ReadonlySet<number> = new Set()) {
         woken.push(ref.intentId);
         return Promise.resolve();
       },
+      kill: () => Promise.resolve(),
     },
     logger: { log: (_level, event, fields) => logs.push({ event, fields: { ...fields } }) },
     batchSize: 2,
@@ -74,5 +75,40 @@ describe('B07: reconcile loop', () => {
     h.loop.start(60_000);
     await h.loop.stop();
     expect(h.woken).toEqual([]);
+  });
+});
+
+describe('C11: the reconcile loop sends the kill signal again', () => {
+  it('signals the intents whose current run is being killed, after the wakes', async () => {
+    const order: string[] = [];
+    const logs: { event: string; fields: Record<string, unknown> }[] = [];
+    const killing = [intent(1), intent(2)];
+    const loop = new ReconcileLoop({
+      listOpen: () => Promise.resolve([intent(1)]),
+      listKilling: (limit) => {
+        expect(limit).toBe(10);
+        return Promise.resolve(killing);
+      },
+      signals: {
+        wake: (ref) => {
+          order.push(`wake:${ref.intentId.slice(-1)}`);
+          return Promise.resolve();
+        },
+        kill: (ref) => {
+          if (ref.intentId === killing[1]!.intentId) return Promise.reject(new Error('down'));
+          order.push(`kill:${ref.intentId.slice(-1)}`);
+          return Promise.resolve();
+        },
+      },
+      logger: { log: (_level, event, fields) => logs.push({ event, fields: { ...fields } }) },
+      batchSize: 10,
+    });
+    expect(await loop.pass()).toEqual({ woken: 1, failed: 1 });
+    expect(order).toEqual(['wake:1', 'kill:1']);
+    expect(logs).toContainEqual({
+      event: 'worker.kill_signal_failed',
+      fields: { tenant_id: TENANT, intent_id: killing[1]!.intentId },
+    });
+    expect(JSON.stringify(logs)).not.toContain('down');
   });
 });

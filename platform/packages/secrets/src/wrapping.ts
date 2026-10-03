@@ -61,7 +61,14 @@ export class Wrapping implements SecretWrapper, SecretUnwrapper {
     const lookup = await this.raw('POST', 'sys/wrapping/lookup', { body: { token } });
     const creationPath = (lookup.body as { data?: { creation_path?: unknown } } | undefined)?.data
       ?.creation_path;
-    if (lookup.status !== 200) throw new SecretsError('secrets.wrapping.invalid_token');
+    // Unknown, expired or used: refused. Anything else (a sealed or failing OpenBao) is not the
+    // token's fault (C11: only a refused token is a security signal, ADR-M42 §2.5).
+    if ([400, 403, 404].includes(lookup.status)) {
+      throw new SecretsError('secrets.wrapping.invalid_token');
+    }
+    if (lookup.status !== 200) {
+      throw new SecretsError('secrets.openbao.invalid_response', { operation: 'unwrap' });
+    }
     if (creationPath !== WRAP_PATH) throw new SecretsError('secrets.wrapping.wrong_origin');
     // 2. Unwrap, authenticated by the wrapping token itself. It works once.
     const res = await this.raw('POST', 'sys/wrapping/unwrap', { token });

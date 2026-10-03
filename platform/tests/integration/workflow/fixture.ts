@@ -37,8 +37,11 @@ export interface WorkflowFixture {
   newIntent(extra?: { riskTier?: 'low' | 'medium' | 'high' | 'critical' }): Promise<Intent>;
   /** Links a spec (G2 input) and submits a plan (G3 input). */
   addInputs(intent: Intent, plan?: { changeFlags?: readonly 'migration'[] }): Promise<void>;
-  /** A comment on the intent's issue, read by the next poll. */
-  comment(intent: Intent, body: string, who: Person): void;
+  /**
+   * A comment on the intent's issue, read by the next poll. `who` is one of the fixture's people,
+   * or any GitHub account (C11: an account that is not linked to a platform user).
+   */
+  comment(intent: Intent, body: string, who: Person | { gh: number; login: string }): void;
   /** One poll of the project (comment commands, replies, notices, status comments). */
   poll(signals?: IntentWorkflowSignals): ReturnType<typeof pollProject>;
   /** Bodies of the comments the platform posted on an issue. */
@@ -150,7 +153,10 @@ export async function createWorkflowFixture(
         .replace(/\.\d{3}Z$/, 'Z');
       comments.push(
         comment(nextComment, intent.issue_number!, at, body, {
-          author: user(PEOPLE[who].gh, PEOPLE[who].login),
+          author:
+            typeof who === 'string'
+              ? user(PEOPLE[who].gh, PEOPLE[who].login)
+              : user(who.gh, who.login),
         }),
       );
     },

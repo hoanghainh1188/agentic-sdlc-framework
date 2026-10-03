@@ -32,6 +32,7 @@ import type { Escalation, Intent, Run } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { EscalationError } from '../escalation/errors.js';
 import { assertActionAllowed } from '../escalation/freeze.js';
+import { failedRunRoute } from '../kill/kill-run.js';
 import { raiseEscalation } from '../escalation/raise.js';
 import type { Registry } from '../registry/registry.js';
 import { G4_OPERATOR_ROLES } from './g4.js';
@@ -135,7 +136,8 @@ async function raisePublishEscalation(
       intentId: intent.id,
       runId: run.id,
       trigger: 'unusual_behaviour',
-      route: 'technical',
+      // C11: a push token someone else opened goes to security (ADR-M42 §2.5).
+      route: await failedRunRoute(tx, run.id),
       severity: level.severity,
       responseLevel: level.response_level,
       packet: {

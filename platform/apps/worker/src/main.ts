@@ -155,6 +155,7 @@ async function main(): Promise<void> {
   const reconcile = settings.temporal
     ? new ReconcileLoop({
         listOpen: (limit, after) => db.system.listOpenIntents(limit, after),
+        listKilling: (limit) => db.system.listKillingIntents(limit),
         signals,
         logger,
         batchSize: settings.reconcileBatch,

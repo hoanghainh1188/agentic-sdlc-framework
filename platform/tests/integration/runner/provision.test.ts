@@ -8,6 +8,8 @@
 // with Docker's archive endpoint and computed with hardened git (ADR-M33 §2.9).
 // C07: every run keeps its clone; an L2 run's changes are stored as a diff and checked against the
 // plan and the agent instruction paths (ADR-M34 §2.2–§2.4).
+// C11 (D-08 C11 AC2, D-02 FR-34, §10 item 5d, ADR-M42): the clone token is revoked right after the
+// clone; the kill switch stops a running run and everything is gone in under 5 minutes (measured).
 //
 // `pnpm test:runner` (SDLC_RUNNER_TEST=1, throw-away PostgreSQL from test-db.sh; CI job `compose`).
 // OpenBao is the in-process stub (Transit and response wrapping); `pnpm test:openbao` checks
@@ -22,10 +24,11 @@ import { loadProjectConfig } from '@sdlc/config';
 import { OpenBaoClient, Redacted } from '@sdlc/secrets';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import type { EvidenceStore, StoredEvidence } from '@sdlc/contracts';
+import type { AgentAdapter, AgentRunStatus, EvidenceStore, StoredEvidence } from '@sdlc/contracts';
 
 import {
   DockerClient,
+  driveAgent,
   HeldRuns,
   LABELS,
   provisionRun,
@@ -38,6 +41,7 @@ import {
   type RunnerDeps,
 } from '../../../apps/runner/src/index.js';
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
+import { requestRunKill } from '../../../packages/core/src/kill/index.js';
 import { Registry } from '../../../packages/core/src/registry/registry.js';
 import { issueRunContract } from '../../../packages/core/src/run-contract/index.js';
 import { StubGitHost } from '../../runner/stub-git.js';
@@ -61,6 +65,8 @@ const suffix = crypto.randomBytes(4).toString('hex');
 const instance = `c04-flow-${suffix}`;
 const platformNet = `sdlc-c04-flow-platform-${suffix}`;
 const litellm = `sdlc-c04-flow-litellm-${suffix}`;
+/** C11: stands in for the runner's own container, which joins the run's network. */
+const self = `sdlc-c04-flow-self-${suffix}`;
 
 describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
   'C04 live: provisioning flow end to end',
@@ -92,6 +98,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
       fixture = await buildFixtureImage(suffix);
       docker('network', 'create', platformNet);
       startStub(litellm, platformNet, 4000);
+      startStub(self, platformNet, 8080);
       workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-runner-live-'));
       const runnerKey = runner.transit();
       deps = {
@@ -118,6 +125,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
 
     afterAll(async () => {
       quietly('rm', '-f', '-v', litellm);
+      quietly('rm', '-f', '-v', self);
       quietly('network', 'rm', platformNet);
       fixture?.cleanup();
       await worker?.close();
@@ -170,6 +178,14 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
       const plan = await registry.submitPlan(scope, intent.id, {
         plannedFiles: ['README.md'],
         planSha256: 'b'.repeat(64),
+        actorType: 'human',
+        actorId: personA,
+      });
+      // C11: the driver reads the task (spec and plan) before it starts the agent.
+      await registry.linkSpec(scope, intent.id, {
+        path: 'docs/specs/t01.md',
+        commitSha: baseSha,
+        contentSha256: 'd'.repeat(64),
         actorType: 'human',
         actorId: personA,
       });
@@ -385,6 +401,168 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
         expect(JSON.stringify(events)).not.toMatch(/new\.txt|AGENTS|README/);
       } finally {
         await releaseSandbox(deps, tenant.id, runId, 'finished');
+        fs.rmSync(result.cloneDir, { recursive: true, force: true });
+      }
+    }, 300_000);
+
+    it('C11 AC2: the kill switch stops a running run; sandbox, network, volume, key and tokens gone in under 5 minutes', async () => {
+      const { tenant, scope, envelope, wrapped } = await prepareRun('kill');
+      const runId = envelope.contract.run_id;
+      const revokedTokens: string[] = [];
+      const tokenRevoker = {
+        revokeShortLivedToken: (token: { reveal(): string }) => {
+          revokedTokens.push(token.reveal());
+          return Promise.resolve();
+        },
+      };
+      const result = await provisionRun(
+        { ...deps, tokenRevoker },
+        { envelope, wrappedGitToken: wrapped },
+      );
+      if (!result.ok) throw new Error(`provisioning failed: ${result.reason}`);
+      // The clone token ends with the clone (ADR-M42 §2.4): none is left for a kill to revoke.
+      expect(revokedTokens).toEqual([TOKEN]);
+      expect(
+        (await scope.runEvents.list(runId)).map((e) => [e.event_type, e.payload]),
+      ).toContainEqual(['token_revoked', { token: 'clone' }]);
+
+      // An agent that works until it is stopped (the real Agent Server: `pnpm test:agent`).
+      let stopped = false;
+      let started = false;
+      const agent: AgentAdapter = {
+        startRun: (input) => {
+          started = true;
+          return Promise.resolve({
+            runId,
+            conversationId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+            endpoint: input.endpoint,
+            workingDir: input.workingDir,
+          });
+        },
+        getStatus: (): Promise<AgentRunStatus> =>
+          Promise.resolve({ state: stopped ? 'stopped' : 'running', iterations: 3 }),
+        stop: () => {
+          stopped = true;
+          return Promise.resolve();
+        },
+        commitWork: () => Promise.reject(new Error('never at a kill')),
+        collectOutputs: () => Promise.reject(new Error('never at a kill')),
+      };
+      // The worker revokes the virtual key when the workflow gets the kill signal.
+      let keyRevoked = false;
+      const puts: Buffer[] = [];
+      const evidence: EvidenceStore = {
+        put: (tenantId, p, content): Promise<StoredEvidence> => {
+          puts.push(content);
+          return Promise.resolve({
+            uri: `s3://evidence/diffs/${tenantId}/${p}`,
+            sha256: crypto.createHash('sha256').update(content).digest('hex'),
+            sizeBytes: content.length,
+          });
+        },
+        get: () => Promise.reject(new Error('not used')),
+      };
+      const loaded = loadProjectConfig('');
+      if (!loaded.ok) throw new Error('default configuration refused');
+      const policy = createSimplePolicyEngine({ config: loaded.config });
+      const settings = {
+        ...deps.settings,
+        agent: { ...deps.settings.agent, selfContainer: self },
+      };
+      const driving = driveAgent(
+        {
+          db: deps.db,
+          docker: deps.docker,
+          settings,
+          adapter: agent,
+          keyRevoked: () => Promise.resolve(keyRevoked),
+          changes: async (contract) => {
+            const checked = await storeChanges(
+              { ...deps, evidence, policy },
+              contract,
+              result.cloneDir,
+            );
+            return { changedFiles: checked.changedFiles };
+          },
+        },
+        {
+          contract: envelope.contract,
+          sandbox: result.sandbox,
+          model: 'stub',
+          virtualKey: new Redacted('sk-virtual-c11-live'),
+        },
+      );
+      try {
+        const deadline = Date.now() + 60_000;
+        let early: unknown;
+        void driving.then((r) => {
+          early = r;
+        });
+        while (!started && early === undefined && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        expect(early).toBeUndefined();
+        expect(started).toBe(true);
+        // The agent writes something before the kill: the diff is the evidence for the review.
+        docker(
+          'exec',
+          '-u',
+          '10001',
+          result.sandbox.containerId,
+          'sh',
+          '-c',
+          'echo suspicious >> /workspace/README.md',
+        );
+
+        // The kill, as the operator command records it (actor system).
+        const killedAt = Date.now();
+        const kill = await requestRunKill(
+          scope,
+          {},
+          { runId, actor: { type: 'system' }, source: 'ops' },
+        );
+        expect(kill.status).toBe('stopping');
+        keyRevoked = true;
+        const ended = await driving;
+        const stoppedAt = Date.now();
+        await releaseSandbox(deps, tenant.id, runId, 'killed');
+        const elapsedMs = Date.now() - killedAt;
+        // The number the ADR reports (ADR-M42 §4).
+        process.stdout.write(
+          `C11 kill switch: run stopped after ${String(stoppedAt - killedAt)} ms, everything ` +
+            `removed after ${String(elapsedMs)} ms\n`,
+        );
+        expect(elapsedMs).toBeLessThan(5 * 60_000);
+
+        expect(ended).toMatchObject({ outcome: 'killed', status: 'stopped_killed' });
+        expect(stopped).toBe(true);
+        expect(await scope.runs.getById(runId)).toMatchObject({
+          status: 'stopped_killed',
+          stop_reason: 'killed',
+        });
+        const labels = { [LABELS.instance]: instance };
+        expect(await deps.docker.containerList(labels)).toEqual([]);
+        expect(await deps.docker.networkList(labels)).toEqual([]);
+        expect(await deps.docker.volumeList(labels)).toEqual([]);
+        const events = (await scope.runEvents.list(runId)).map((e) => e.event_type);
+        expect(events).toEqual(
+          expect.arrayContaining([
+            'kill_requested',
+            'agent_stopped',
+            'agent_finished',
+            'diff_stored',
+            'sandbox_removed',
+          ]),
+        );
+        // The killed run's diff was stored after the key was refused (QUESTIONS #183).
+        expect(puts).toHaveLength(1);
+        expect(puts[0]!.toString()).toContain('+suspicious');
+        expect(events).not.toContain('kill_evidence_failed');
+        expect(JSON.stringify(await scope.runEvents.list(runId))).not.toContain(TOKEN);
+      } finally {
+        stopped = true;
+        await driving.catch(() => undefined);
+        await releaseSandbox(deps, tenant.id, runId, 'killed').catch(() => undefined);
         fs.rmSync(result.cloneDir, { recursive: true, force: true });
       }
     }, 300_000);

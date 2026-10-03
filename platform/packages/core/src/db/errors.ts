@@ -50,7 +50,7 @@ const PG_ERROR_CODES: Record<string, DbErrorCode> = {
   '23502': 'invalid_value', // not_null_violation
   '22P02': 'invalid_value', // invalid_text_representation (bad UUID, bad enum value)
   '42501': 'permission_denied', // insufficient_privilege
-  // Our own codes, raised by triggers (migrations 0002 to 0015).
+  // Our own codes, raised by triggers (migrations 0002 to 0019).
   SDA01: 'immutable', // append-only table: UPDATE, DELETE or TRUNCATE
   SDA02: 'conflict', // audit chain link broken: the row does not follow the tenant's last row
   SDA03: 'immutable', // role binding already revoked
@@ -63,6 +63,7 @@ const PG_ERROR_CODES: Record<string, DbErrorCode> = {
   SDA10: 'immutable', // a posted or abandoned intent status notice (migration 0009)
   SDA11: 'immutable', // a revoked tenant role or an unlinked identity (migration 0014)
   SDA12: 'immutable', // an intent budget that would go down (migration 0015)
+  SDA13: 'immutable', // a stopping run that would not end stopped_killed, or killed_by changed (0019)
 };
 
 /** Maps a PostgreSQL error to a DbError; anything else is rethrown unchanged. */

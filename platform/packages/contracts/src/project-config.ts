@@ -162,6 +162,14 @@ export interface ProjectConfig {
       readonly severity: Severity;
       readonly response_level: ResponseLevel;
     };
+    /**
+     * The escalation a kill raises at once (task C11, ADR-M42, QUESTIONS #181): route `technical`.
+     * Mandatory rule M26: the response level freezes the intent (`pause` or higher).
+     */
+    readonly kill_escalation: {
+      readonly severity: Severity;
+      readonly response_level: ResponseLevel;
+    };
   };
   readonly budget: {
     readonly warn_percent: number;
@@ -206,6 +214,11 @@ export interface ProjectConfig {
      * submits a plan (mandatory rule M24).
      */
     readonly plan_submit_roles: readonly ProjectRole[];
+    /**
+     * Who may stop a run with the kill switch (task C11, ADR-M42, QUESTIONS #180; D-02 FR-34).
+     * Person A, Person B and governance always may; the viewer never (mandatory rule M25).
+     */
+    readonly kill_roles: readonly ProjectRole[];
     /**
      * Pairs of roles one person may not hold together on the project (task B13, ADR-M37,
      * QUESTIONS #154): a grant that would give someone both roles of a pair is refused. Person A

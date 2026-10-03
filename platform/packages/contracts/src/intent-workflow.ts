@@ -14,6 +14,15 @@ export const INTENT_WORKFLOW_TYPE = 'intentWorkflow';
  */
 export const INTENT_WAKE_SIGNAL = 'wake';
 
+/**
+ * Signal that tells the workflow a run of the intent is being killed (task C11, ADR-M42 §2.2). No
+ * data: the database says which run (`stopping` or `stopped_killed`). The workflow cancels the
+ * run's activity when the signal arrives while that activity is pending, so a run waiting for a
+ * runner slot never starts and a running one stops on its next heartbeat. A signal at any other
+ * time changes nothing.
+ */
+export const INTENT_KILL_SIGNAL = 'kill';
+
 /** Input of the workflow and of its activities: IDs only, never client data (ADR-M30). */
 export interface IntentWorkflowRef {
   readonly tenantId: string;
@@ -36,6 +45,8 @@ export function intentWorkflowId(ref: IntentWorkflowRef): string {
  */
 export interface IntentWorkflowSignals {
   wake(ref: IntentWorkflowRef): Promise<void>;
+  /** C11: the kill signal, to a workflow that runs (never starts one). */
+  kill(ref: IntentWorkflowRef): Promise<void>;
 }
 
 /** What one step of the workflow did (the `stepIntent` activity). Codes only. */

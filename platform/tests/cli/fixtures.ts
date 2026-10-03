@@ -11,6 +11,7 @@ import type {
   Plan,
   Project,
   ProjectAiRecord,
+  Run,
   RoleBinding,
   SpecRef,
   TenantRoleBinding,
@@ -32,6 +33,7 @@ import {
 } from '../../apps/api/src/admin/present.js';
 import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
 import { presentPlanList, presentSubmittedPlan } from '../../apps/api/src/plans/present.js';
+import { presentKill, presentRunList } from '../../apps/api/src/runs/present.js';
 import { presentLinkedSpec, presentSpecList } from '../../apps/api/src/specs/present.js';
 import { presentEscalation } from '../../apps/api/src/escalations/present.js';
 import {
@@ -156,6 +158,64 @@ export function planListBody(empty = false): Record<string, unknown> {
     'INT-2026-0007',
     empty ? [] : [{ ...PLAN_ROW, version: 1, change_flags: [] }, PLAN_ROW],
   );
+}
+
+export const RUN_ID = '77777777-7777-4777-8777-777777777777';
+
+function runRow(overrides: Partial<Run> = {}): Run {
+  return {
+    id: RUN_ID,
+    tenant_id: TENANT,
+    intent_id: INTENT_ID,
+    plan_id: '88888888-8888-4888-8888-888888888888',
+    attempt: 2,
+    agent_id: '99999999-9999-4999-8999-999999999999',
+    agent_version: 'v3',
+    branch: 'agent/INT-2026-0007',
+    base_sha: 'b'.repeat(40),
+    head_sha: null,
+    status: 'running',
+    stop_reason: null,
+    triggered_by: USER,
+    started_at: AT,
+    finished_at: null,
+    iterations: 4,
+    killed_by: null,
+    updated_at: AT,
+    created_at: AT,
+    ...overrides,
+  };
+}
+
+/** C11: `GET /v1/intents/:intent/runs`. */
+export function runListBody(last: Partial<Run> = {}, empty = false): Record<string, unknown> {
+  return presentRunList(
+    'INT-2026-0007',
+    empty
+      ? []
+      : [
+          runRow({
+            id: '77777777-7777-4777-8777-000000000001',
+            attempt: 1,
+            status: 'stopped_killed',
+            stop_reason: 'killed',
+            killed_by: USER,
+            finished_at: AT,
+          }),
+          runRow(last),
+        ],
+  );
+}
+
+/** C11: `POST /v1/runs/:run/kill`. */
+export function killBody(already = false): Record<string, unknown> {
+  return presentKill('INT-2026-0007', {
+    runId: RUN_ID,
+    intentId: INTENT_ID,
+    status: 'stopping',
+    already,
+    ...(already ? {} : { escalationId: '66666666-6666-4666-8666-666666666666' }),
+  });
 }
 
 /** B08: `GET /v1/intents/:intent/specs`. */

@@ -35,6 +35,7 @@ export const RUNNER_ENV = {
   agentStopGraceSeconds: 'SDLC_RUNNER_AGENT_STOP_GRACE_SECONDS',
   agentSpendCheckSeconds: 'SDLC_RUNNER_AGENT_SPEND_CHECK_SECONDS',
   agentSpendRecheckSeconds: 'SDLC_RUNNER_AGENT_SPEND_RECHECK_SECONDS',
+  killEvidenceSeconds: 'SDLC_RUNNER_KILL_EVIDENCE_SECONDS',
 } as const;
 
 /**
@@ -81,6 +82,12 @@ export interface AgentSettings {
    * as a technical failure (ADR-M34 §2.6).
    */
   readonly spendRecheckMs: number;
+  /**
+   * C11 (QUESTIONS #183): the longest the runner spends on a killed run's evidence, after the run
+   * is recorded `stopped_killed`: waiting for its key to be revoked, then storing its diff. Outside
+   * the 5-minute kill clock; when the time is up, the diff is skipped and the sandbox removed.
+   */
+  readonly killEvidenceMs: number;
 }
 
 export interface RunnerSettings {
@@ -135,6 +142,7 @@ export const DEFAULTS = {
   // Above LiteLLM's spend write interval (`proxy_batch_write_at`, 10 s by default, measured in
   // `pnpm test:litellm`): the re-read must see the spend that blocked the agent.
   agentSpendRecheckSeconds: 25,
+  killEvidenceSeconds: 60,
 } as const;
 /** More than this on one host is a mistake, not a setting (each sandbox reserves ~2 GiB). */
 export const MAX_SANDBOXES_LIMIT = 16;
@@ -282,6 +290,8 @@ function agentSettings(env: NodeJS.ProcessEnv): AgentSettings {
         1,
         60,
       ) * 1000,
+    killEvidenceMs:
+      intSetting(env, RUNNER_ENV.killEvidenceSeconds, DEFAULTS.killEvidenceSeconds, 5, 300) * 1000,
   };
 }
 

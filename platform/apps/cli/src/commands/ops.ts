@@ -7,7 +7,8 @@
 // - `sdlc ops audit verify` (audit-verify.ts);
 // - `sdlc ops tenant-admin …`, `sdlc ops role …` (ops-roles.ts);
 // - `sdlc ops agent show|list|suspend|quarantine` (ops-agent.ts);
-// - `sdlc ops ai-record set|show` (ops-ai-record.ts).
+// - `sdlc ops ai-record set|show` (ops-ai-record.ts);
+// - `sdlc ops run kill` (ops-run.ts, C11).
 // A token is printed once, to stdout, and never logged. Run these in a terminal, not in a chat.
 import { parseArgs } from 'node:util';
 
@@ -28,6 +29,7 @@ import { auditVerify, parseAuditVerifyOptions } from './audit-verify.js';
 import { parseAgentCommand, runAgentCommand } from './ops-agent.js';
 import { parseAiRecordCommand, runAiRecordCommand } from './ops-ai-record.js';
 import { parseRoleCommand, runRoleCommand } from './ops-roles.js';
+import { parseRunCommand, runRunCommand } from './ops-run.js';
 
 type Values = Record<string, string | boolean | undefined>;
 
@@ -79,6 +81,9 @@ export async function runOps(args: readonly string[], ctx: CliContext): Promise<
       'cli.admin.agent.usage',
       ctx,
     );
+  }
+  if (first === 'run') {
+    return runScoped(parseRunCommand(args.slice(1)), runRunCommand, 'cli.ops.run.usage', ctx);
   }
   if (first === 'ai-record') {
     const parsed = parseAiRecordCommand(args.slice(1));

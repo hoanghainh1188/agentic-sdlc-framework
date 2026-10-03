@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M22: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M26: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -442,6 +442,29 @@ const CASES: Case[] = [
     yaml: 'run:\n  g5_breach_escalation: { severity: medium, response_level: observe }\n',
     key: 'config.rule.g5_breach_escalation_freezes',
     path: 'run.g5_breach_escalation.response_level',
+  },
+  // M25: FR-34's roles may always kill; the viewer never (C11, ADR-M42, QUESTIONS #180).
+  {
+    name: 'governance may not kill',
+    rule: 'M25',
+    yaml: 'access:\n  kill_roles: [person_a, person_b]\n',
+    key: 'config.rule.kill_roles_contain_fr34',
+    path: 'access.kill_roles',
+  },
+  {
+    name: 'viewer may kill',
+    rule: 'M25',
+    yaml: 'access:\n  kill_roles: [person_a, person_b, governance, viewer]\n',
+    key: 'config.rule.viewer_never_kills',
+    path: 'access.kill_roles',
+  },
+  // M26: a kill freezes the intent (C11, QUESTIONS #181).
+  {
+    name: 'a kill only notifies',
+    rule: 'M26',
+    yaml: 'run:\n  kill_escalation: { severity: high, response_level: notify }\n',
+    key: 'config.rule.kill_escalation_freezes',
+    path: 'run.kill_escalation.response_level',
   },
 ];
 

@@ -151,6 +151,30 @@ export const RUN_EVENT_TYPES = {
     medium: 'count',
     low: 'count',
   },
+  /**
+   * A person (or an operator, actor `system`) used the kill switch (C11, ADR-M42): the run was
+   * `previous_status`; `source` is `api`, `github_comment` or `ops`. Who killed is in
+   * `runs.killed_by` and the audit event `run.kill_requested`.
+   */
+  kill_requested: { previous_status: 'code', source: 'code' },
+  /**
+   * The runner revoked a short-lived GitHub token right after its use (C11, ADR-M42 §2.4): `token`
+   * is `clone` or `push`. `token_revoke_failed` gives a `GitHostErrorCode`; the token then expires
+   * by itself within the hour.
+   */
+  token_revoked: { token: 'code' },
+  token_revoke_failed: { token: 'code', reason: 'code' },
+  /**
+   * A single-use wrapping token of the run was already used when the runner opened it (C11,
+   * ADR-M38 §2.3, ADR-M42 §2.5): `token` is `clone`, `push` or `virtual_key`. Someone else may
+   * hold the secret: the run fails and its escalation goes to the security route.
+   */
+  wrap_token_reused: { token: 'code' },
+  /**
+   * The diff of a killed run could not be stored as evidence (C11, QUESTIONS #183): the store is
+   * best-effort and never delays the kill. `reason` is a code (`timeout`, `unavailable`, …).
+   */
+  kill_evidence_failed: { reason: 'code' },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;
