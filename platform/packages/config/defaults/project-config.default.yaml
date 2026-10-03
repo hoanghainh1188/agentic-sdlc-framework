@@ -230,6 +230,11 @@ access:
   # FR-02): Person A owns the intent, PM / BrSE writes the specs (D-09 §9). The viewer role never
   # links a spec (mandatory rule M23). Reading the linked specs follows `intent_read_roles`.
   spec_link_roles: [person_a, pm_brse]
+  # Task B09, ADR-M40, QUESTIONS #168. Who submits an intent's plan (`.sdlc/plans/<INT>.yaml`,
+  # template T13): Person A writes or accepts the plan (handbook Ch.12), Person B approves it at
+  # G3. The submitter is a producer of the plan and never approves G3 (FR-11). The viewer role
+  # never submits a plan (mandatory rule M24). Reading the plans follows `intent_read_roles`.
+  plan_submit_roles: [person_a]
   # Task B13, ADR-M37, QUESTIONS #154. Separation of duties (handbook Ch.5, codes table §5): one
   # person never holds both roles of a pair on the same project. Person A (owner) and Person B
   # (independent reviewer) always stay apart (mandatory rule M21): G1–G3 have no producers

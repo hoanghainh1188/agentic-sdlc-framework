@@ -104,6 +104,26 @@ export type IntentDetail = z.infer<typeof intentDetailSchema>;
 export const linkedSpecSchema = specRefSchema.extend({ intent: code });
 export type LinkedSpecView = z.infer<typeof linkedSpecSchema>;
 
+const planVersionSchema = z.object({
+  version: z.number().int(),
+  commit_sha: code.nullable(),
+  plan_sha256: code,
+  planned_files: z.array(z.string().max(1024)).max(1000),
+  allowed_tools: z.array(code).max(10).nullable(),
+  change_flags: z.array(code).max(50),
+  created_at: time,
+});
+export type PlanVersionView = z.infer<typeof planVersionSchema>;
+
+/** `POST /v1/intents/:intent/plans` (B09, ADR-M40 §2.3). */
+export const submittedPlanSchema = planVersionSchema.extend({ intent: code });
+
+/** `GET /v1/intents/:intent/plans` (B09). */
+export const planListSchema = z.object({
+  intent: code,
+  items: z.array(planVersionSchema).max(10_000),
+});
+
 /** `GET /v1/intents/:intent/specs` (B08). */
 export const specListSchema = z.object({
   intent: code,

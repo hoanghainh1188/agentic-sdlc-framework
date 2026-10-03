@@ -1,7 +1,7 @@
 // Plans of an intent (design/D-05 section 6.2). One row per version; rows never change. Reading
-// the plan file from the repo belongs to B09. `change_flags` drive forced HITL at G3 and dual
-// approval at G7 through the policy engine.
-import { CHANGE_FLAGS, type ChangeFlag } from '@sdlc/contracts';
+// the plan file from the repository: `plans/` (B09, ADR-M40). `change_flags` drive forced HITL at
+// G3 and dual approval at G7 through the policy engine.
+import { AGENT_TOOLS, CHANGE_FLAGS, type ChangeFlag } from '@sdlc/contracts';
 import { sql, type Kysely } from 'kysely';
 
 import { RegistryError } from '../../registry/errors.js';
@@ -18,9 +18,18 @@ export interface SubmitPlan extends RegistryActor {
   readonly summary?: string;
   readonly planSha256: string;
   readonly changeFlags?: readonly ChangeFlag[];
+  /**
+   * B09 (ADR-M40): a plan read from its file in the repository. All three come together, from a
+   * person (`actorType: 'human'`, `submittedBy` = `actorId`), and the plan has no summary.
+   */
+  readonly file?: {
+    readonly commitSha: string;
+    readonly allowedTools: readonly string[];
+  };
 }
 
 const SHA256 = /^[0-9a-f]{64}$/;
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
 const MAX_PLANNED_FILES = 1000;
 
 const SCALAR_COLUMNS = [
@@ -32,6 +41,9 @@ const SCALAR_COLUMNS = [
   'summary',
   'plan_sha256',
   'proposed_by_type',
+  'commit_sha',
+  'allowed_tools',
+  'submitted_by',
   'created_at',
 ] as const;
 // `pg` does not parse arrays of custom enum types; read them as text[].
@@ -57,6 +69,21 @@ export class PlanRepository extends TenantRepository {
     if (!SHA256.test(input.planSha256)) throw invalid('planSha256 must be a SHA-256 digest');
     const flags = [...new Set(input.changeFlags ?? [])];
     if (flags.some((flag) => !CHANGE_FLAGS.includes(flag))) throw invalid('unknown change flag');
+    const file = input.file;
+    if (file) {
+      const tools: readonly unknown[] = file.allowedTools;
+      if (!COMMIT_SHA.test(file.commitSha)) throw invalid('commitSha must be a 40-hex commit SHA');
+      if (
+        tools.length === 0 ||
+        tools.some((tool) => !(AGENT_TOOLS as readonly unknown[]).includes(tool)) ||
+        new Set(tools).size !== tools.length
+      ) {
+        throw invalid('allowedTools must hold unique agent tools');
+      }
+      if (input.actorType !== 'human' || input.actorId === null || (input.summary ?? '') !== '') {
+        throw invalid('a plan file is submitted by a person and has no summary');
+      }
+    }
     return this.run(
       this.transactional(async (db) => {
         await lockIntent(db, intentId);
@@ -84,6 +111,9 @@ export class PlanRepository extends TenantRepository {
             plan_sha256: input.planSha256,
             proposed_by_type: input.actorType,
             change_flags: flags,
+            commit_sha: file?.commitSha ?? null,
+            allowed_tools: file ? [...file.allowedTools] : null,
+            submitted_by: file ? input.actorId : null,
           })
           .returning([...SCALAR_COLUMNS, changeFlags])
           .executeTakeFirstOrThrow();
@@ -92,7 +122,12 @@ export class PlanRepository extends TenantRepository {
           actorType: input.actorType,
           actorId: input.actorId,
           entityId: intentId,
-          payload: { plan_id: plan.id, version: plan.version, plan_sha256: plan.plan_sha256 },
+          payload: {
+            plan_id: plan.id,
+            version: plan.version,
+            plan_sha256: plan.plan_sha256,
+            ...(plan.commit_sha === null ? {} : { commit_sha: plan.commit_sha }),
+          },
         });
         return plan;
       }),

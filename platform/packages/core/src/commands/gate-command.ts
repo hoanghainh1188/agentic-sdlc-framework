@@ -40,8 +40,9 @@ export interface GateCommand {
  * Checks that the actor can see the intent's project (no role → `intent_not_found`, so an
  * outsider learns nothing), binds the decision to the gate's input and records it through the
  * registry, which resolves the oversight mode and checks the approver with the policy engine.
- * At G1–G3 there is no produced change yet, so the producer list is empty (QUESTIONS.md #64).
- * At G4 the run does not exist yet. At G5 (C07) the person who allowed the run (`triggered_by`,
+ * At G1 and G2 there is no produced change yet, so the producer list is empty (QUESTIONS.md #64).
+ * At G3 (B09, ADR-M40 §2.3) the people who submitted the intent's plan files produced the plan:
+ * they never approve it (FR-11). At G4 the run does not exist yet. At G5 (C07) the person who allowed the run (`triggered_by`,
  * the G4 approver) produced its changes with the agent and never decides them (FR-11).
  */
 export async function decideGate(
@@ -94,7 +95,7 @@ export async function decideGate(
       gate: gate,
       decision: command.decision,
       actor: { type: 'human', id: command.actorId },
-      producers: gate === 'G5' ? await runProducers(tx, current.id) : [],
+      producers: await producersOf(tx, current.id, gate),
       inputSha256,
       reasonCode: command.reasonCode ?? null,
       reasonRef: command.reasonRef ?? null,
@@ -106,6 +107,19 @@ export async function decideGate(
       ...(returned ? { context: { returnedFromG5: true } } : {}),
     });
   });
+}
+
+/** The producers of what a person decides at `gate` (FR-11): the plan at G3, the run at G5. */
+async function producersOf(tx: TenantScope, intentId: string, gate: string): Promise<string[]> {
+  if (gate === 'G3') return planSubmitters(tx, intentId);
+  if (gate === 'G5') return runProducers(tx, intentId);
+  return [];
+}
+
+/** The people who submitted a plan file of the intent (B09, ADR-M40 §2.3). */
+async function planSubmitters(tx: TenantScope, intentId: string): Promise<string[]> {
+  const plans = await tx.plans.list(intentId);
+  return [...new Set(plans.map((p) => p.submitted_by).filter((id): id is string => id !== null))];
 }
 
 /** The producers of the intent's last run: the person who allowed it, when any (C07, FR-11). */

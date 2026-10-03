@@ -37,3 +37,5 @@ export {
   severityAtOrAbove,
 } from './mandatory-rules.js';
 export { MAX_HOLIDAYS_PER_YEAR } from './warnings.js';
+// B09 (ADR-M40 §2.2): core reads plan files with the same safe YAML reader.
+export { readYamlMapping, type YamlResult } from './yaml.js';

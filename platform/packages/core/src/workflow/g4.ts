@@ -271,6 +271,23 @@ export async function evaluateG4(
     }
   }
 
+  // B09 (ADR-M40 §2.5, QUESTIONS #34, #108): the run's tools are the agent's registered tools
+  // that the plan's tasks also list. A plan stored without a file (before B09) lists none: the
+  // agent's registered tools.
+  const agentTools = [...new Set(agent.agent.tools)].sort();
+  const allowedTools =
+    plan.allowed_tools === null
+      ? agentTools
+      : agentTools.filter((tool) => plan.allowed_tools!.includes(tool));
+  if (allowedTools.length === 0) {
+    return {
+      kind: 'fail',
+      reason: 'agent_not_runnable',
+      check: 'plan_tools_not_registered',
+      subject: `${agent.agent.id}@${agent.agent.version}`,
+    };
+  }
+
   const proposal: RunProposal = {
     intentId: intent.id,
     planId: plan.id,
@@ -283,8 +300,7 @@ export async function evaluateG4(
     modelRef: agent.agent.modelRef,
     // effectiveAutonomy is at most L2 and not L0 here.
     autonomyLevel: autonomy as RunContractAutonomy,
-    // QUESTIONS #108: until B09 stores the plan task's tools, the agent's registered tools.
-    allowedTools: [...new Set(agent.agent.tools)].sort(),
+    allowedTools,
     allowedModels: facts.allowedModels,
     // C07 (QUESTIONS #133): after a G5 `resume` with a budget increase, the intent's run budget.
     maxBudgetUsd:

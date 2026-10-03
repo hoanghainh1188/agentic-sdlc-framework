@@ -50,12 +50,13 @@ escalation:
 | `access.intent_create_roles`, `access.intent_read_roles` | Who may create and read intents through the API (B03, ADR-M26). Default: `person_a` creates; every role reads; creators always read |
 | `access.ai_record_write_roles`, `access.ai_record_read_roles` | Who may write and read the project AI record through the API (B12, ADR-M32). Default: `person_a` and `pm_brse` write; every role reads; writers always read |
 | `access.spec_link_roles` | Who may link an intent's spec through the API (B08, ADR-M39). Default: `person_a` and `pm_brse` |
+| `access.plan_submit_roles` | Who may submit an intent's plan file through the API (B09, ADR-M40). The submitter never approves G3. Default: `person_a` |
 
 Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `working_hours`, `working_days` (working calendar; one working day = the working hours). Deadlines may also be `{ kind: end_of_working_day }` or `{ kind: next_planned_work }` (no clock).
 
 ## Mandatory rules
 
-A project may tighten anything. It may **not** loosen these (rules M1–M23, sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
+A project may tighten anything. It may **not** loosen these (rules M1–M24, sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
 
 | Rule | What |
 |---|---|
@@ -80,6 +81,7 @@ A project may tighten anything. It may **not** loosen these (rules M1–M23, sou
 | M20 | A failed or lost run freezes the intent: `run.failed_run_escalation.response_level` is `pause`, `contain` or `incident` |
 | M22 | A G5 breach freezes the intent: `run.g5_breach_escalation.response_level` is `pause`, `contain` or `incident` (C07, ADR-M34 §2.8) |
 | M23 | `viewer` never links a spec (`access.spec_link_roles`; B08, ADR-M39) |
+| M24 | `viewer` never submits a plan (`access.plan_submit_roles`; B09, ADR-M40) |
 
 Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 

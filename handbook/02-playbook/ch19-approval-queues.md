@@ -218,6 +218,8 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc escalation list\|show\|ack\|decide …` | Chapter 18 §18.8b |
 | `sdlc spec link <INT-…> --path <path/to/spec.md> [--commit <SHA>] [--tool spec-kit\|bmad\|manual]` | Links the intent's spec (below) |
 | `sdlc spec list <INT-…>` | Lists the linked spec versions: path, commit and SHA-256 |
+| `sdlc plan submit <INT-…> [--commit <SHA>]` | Submits the intent's plan file (below) |
+| `sdlc plan list <INT-…>` / `sdlc plan show <INT-…>` | Lists the submitted plan versions / shows the latest one with its path patterns, tools and change flags |
 | `sdlc ai-record show --project <slug>` | Shows the project AI record |
 | `sdlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
 
@@ -233,6 +235,32 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **If someone edits the spec on the default branch after G2**, the platform notices it at the next step: it links the new version, takes the intent back to G2 and posts a comment (`spec_changed`). Approvals of the old spec no longer count. At Low risk G2 is HOTL, so the platform may pass the new spec again, with its block window; at other tiers a person approves it again.
 - If the file is removed, renamed or cannot be read, the intent goes back to G2 and waits (`spec_unavailable`) until you restore it or link another spec.
 - If GitHub cannot be reached, the intent waits; it never passes a gate without the check.
+
+**Submitting a plan (G3 input).** G3 checks the intent's task plan (template T13). Submit it with `sdlc plan submit` (task B09, `design/ADR-M40-plan-submission.md`):
+
+- Where: the file `.sdlc/plans/<intent code>.yaml`, for example `.sdlc/plans/INT-2026-0007.yaml`, **merged into the default branch** first. The platform reads it from GitHub and keeps its SHA-256, path patterns, tools and change flags; summaries and other text stay in the repository.
+- Who: Person A by default (project setting `access.plan_submit_roles`; the viewer role never may). **Whoever submits a plan never approves it at G3**: Person B does.
+- When: while the intent is a draft or waits at G1, G2, G3 or G4.
+- What the file holds (schema version 1):
+
+  ```yaml
+  plan:
+    intent_id: INT-2026-0007
+    change_flags: [migration]          # optional: the change types that force G3 HITL and dual approval at G7
+  tasks:
+    - id: T1
+      summary: Cancel an order and return the stock
+      allowed_paths: [apps/api/src/orders/**, apps/api/test/orders/**]
+      tools: [file_editor, terminal]   # file_editor, task_tracker, terminal
+  ```
+
+  Tasks may also hold `owner_agent`, `depends_on`, `input`, `output`, `definition_of_done`, `required_evidence`, `escalate_when`, `checkpoint` and `environments: [sandbox]`. The platform refuses `approved_by`, `approved_at`, `risk_tier`, `data_class`, `autonomy_level`, `plan_version`, `spec_version` and `limits`: approvals, the intent's risk and data class, versions and run limits come from the platform.
+- **Path patterns**: relative paths with `*`, `**`, `?` and `{a,b}`, as G5 reads them. The platform refuses a pattern that matches every file (`**`, `*/**`), or anything under `.github/` or `.sdlc/`, or the files the agent reads as instructions (`AGENTS.md`, `CLAUDE.md` and the like). The agent never changes these files.
+- **Change flags** are part of the file Person B approves. Check them at G3; if one is missing, request changes.
+- The run gets the agent's registered tools that the plan lists. If none is in common, G4 fails (`plan_tools_not_registered`).
+- Leave out `--commit`, or give a commit that holds the same file as the default branch; otherwise the platform refuses (`plan_not_on_default_branch`). A refused file answers `plan_invalid` with the reason, for example `pattern_too_broad` or `platform_field`.
+- **If someone edits the plan file on the default branch after you submitted it**, G3 or G4 waits (`plan_resubmit_needed`) and the platform posts a comment. It never takes the new file by itself: submit it again with `sdlc plan submit`. At G4 a new plan takes the intent back to G3, where Person B approves it again; earlier approvals no longer count.
+- If GitHub cannot be reached, the intent waits; it never passes G3 or starts a run without the check.
 
 **When a command fails.** The message says why. The exit code tells scripts what happened:
 
@@ -332,3 +360,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.4 | 2026-10-03 | Claude (task B13, PR 1) | §19.8d platform usage: setting up a team (tenant admins, projects, people, GitHub accounts, roles, configuration; ADR-M37) |
 | 0.5 | 2026-10-03 | Claude (task B13, PR 2) | §19.8c: `sdlc logout` revokes the token; `sdlc token`; first token from a tenant admin. §19.8d: tokens of other people, the agent register, `sdlc audit verify`, the operator commands `sdlc ops` (ADR-M37 §2.8) |
 | 0.6 | 2026-10-03 | Claude (task B08) | §19.8c: `sdlc spec link|list`; the spec is the file on the default branch and is checked again at G2–G4 (ADR-M39) |
+| 0.7 | 2026-10-03 | Claude (task B09, PR 1) | §19.8c: `sdlc plan submit|list|show`; the plan file, its rules, who submits, the re-check at G3–G4 (ADR-M40) |

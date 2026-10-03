@@ -104,6 +104,12 @@ export type IntentWaitReason =
    * intent waits at G2 until a person links a spec that can be read.
    */
   | 'spec_unavailable'
+  /**
+   * B09 (ADR-M40 §2.4, QUESTIONS #167): the plan file at the head of the default branch is not
+   * the submitted plan (changed, removed or not readable); G3 or G4 waits until a person with a
+   * submit role submits the plan again.
+   */
+  | 'plan_resubmit_needed'
   /** C06 session 2: the intent's run is under way (the workflow that drives it waits for it). */
   | 'run_in_progress'
   /**

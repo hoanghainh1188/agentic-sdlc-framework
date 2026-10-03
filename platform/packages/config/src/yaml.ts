@@ -22,8 +22,15 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Parses a YAML text into a mapping. An empty text is an empty mapping. */
-export function readYamlMapping(text: string): YamlResult {
+/**
+ * Parses a YAML text into a mapping. An empty text is an empty mapping. `maxAliasCount: 0`
+ * refuses every alias (B09: plan files, ADR-M40 §2.2).
+ */
+export function readYamlMapping(
+  text: string,
+  options: { readonly maxAliasCount?: number } = {},
+): YamlResult {
+  const maxAliasCount = options.maxAliasCount ?? MAX_ALIAS_COUNT;
   const document = parseDocument(text, {
     schema: 'core',
     strict: true,
@@ -38,11 +45,11 @@ export function readYamlMapping(text: string): YamlResult {
 
   let value: unknown;
   try {
-    value = document.toJS({ maxAliasCount: MAX_ALIAS_COUNT });
+    value = document.toJS({ maxAliasCount });
   } catch {
     return {
       ok: false,
-      errors: [issue('config.yaml.too_many_aliases', '', { maximum: MAX_ALIAS_COUNT })],
+      errors: [issue('config.yaml.too_many_aliases', '', { maximum: maxAliasCount })],
     };
   }
   if (value === null || value === undefined) return { ok: true, value: {} };

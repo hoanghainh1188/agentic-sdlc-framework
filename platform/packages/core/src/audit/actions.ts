@@ -168,10 +168,23 @@ export const AUDIT_ACTIONS = {
     entityType: 'intent',
     fields: { spec_ref_id: 'uuid', cause: 'code', head_sha: 'code' },
   },
-  /** A plan was submitted for an intent. Never the file list or the summary. */
+  /**
+   * A plan was submitted for an intent. Never the file list or the summary. B09 (ADR-M40): the
+   * commit the plan file was read at.
+   */
   'plan.submitted': {
     entityType: 'intent',
-    fields: { plan_id: 'uuid', version: 'version', plan_sha256: 'sha256' },
+    fields: { plan_id: 'uuid', version: 'version', plan_sha256: 'sha256', commit_sha: 'code?' },
+  },
+  /**
+   * The plan file at the head of the default branch is no longer the submitted plan (B09,
+   * ADR-M40 §2.4, QUESTIONS #167): `cause` is `changed` or why the file cannot be read (`missing`,
+   * `not_a_file`, `too_large`, `not_utf8`). Written once per plan version and cause; G3 or G4 is
+   * held until a person submits the plan again. Never the path or the content.
+   */
+  'plan.resubmit_needed': {
+    entityType: 'intent',
+    fields: { plan_id: 'uuid', cause: 'code', head_sha: 'code' },
   },
   /** A gate decision was recorded (FR-10, FR-17). Never a free-text reason (ADR-M20). */
   'gate.decided': {

@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M23 and their sources:
+// Rule ids M1–M24 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -30,6 +30,7 @@
 //                                                                      QUESTIONS #154
 //   M22 a G5 breach freezes the intent (pause or higher) ............. QUESTIONS.md #21, ADR-M34 §2.8
 //   M23 the viewer role never links a spec ........................... ADR-M39, QUESTIONS.md #162
+//   M24 the viewer role never submits a plan ......................... ADR-M40, QUESTIONS.md #168
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -529,6 +530,11 @@ const m23: Rule = (c) =>
     ? [issue('config.rule.viewer_never_links_spec', 'access.spec_link_roles')]
     : [];
 
+const m24: Rule = (c) =>
+  c.access.plan_submit_roles.includes('viewer')
+    ? [issue('config.rule.viewer_never_submits_plan', 'access.plan_submit_roles')]
+    : [];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -555,6 +561,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M21: m21,
   M22: m22,
   M23: m23,
+  M24: m24,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

@@ -15,3 +15,4 @@ export * from './ai-record/index.js';
 export * from './workflow/index.js';
 export * from './observability/index.js';
 export * from './specs/index.js';
+export * from './plans/index.js';

@@ -78,9 +78,12 @@ export async function gatherSpecFacts(
 /** Delay before the step reads the Git host again after it could not. */
 const GIT_HOST_RETRY_MS = 60_000;
 
-/** The gate may not advance; the step still handles everything that does not advance it. */
+/**
+ * The gate may not advance; the step still handles everything that does not advance it. B09
+ * (ADR-M40 §2.4): the plan check holds G3 and G4 with `plan_resubmit_needed` the same way.
+ */
 export interface SpecHold {
-  readonly reason: 'spec_unavailable' | 'git_host_unavailable';
+  readonly reason: 'spec_unavailable' | 'git_host_unavailable' | 'plan_resubmit_needed';
   readonly wakeInMs?: number;
 }
 
