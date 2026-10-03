@@ -28,6 +28,21 @@ export class GitEventReceiptRepository extends TenantRepository {
     );
   }
 
+  /**
+   * The receipt that recorded a gate decision (E01: the GitHub review behind a G7 approval or
+   * request for changes), or undefined.
+   */
+  findByDecision(decisionId: string): Promise<GitEventReceipt | undefined> {
+    return this.run(
+      this.db
+        .selectFrom('git_event_receipts')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('gate_decision_id', '=', decisionId)
+        .executeTakeFirst(),
+    );
+  }
+
   /** Fails with `DbError('conflict')` when the event already has a receipt. */
   record(input: NewGitEventReceipt): Promise<GitEventReceipt> {
     return this.run(

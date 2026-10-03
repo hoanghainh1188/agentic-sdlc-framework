@@ -221,6 +221,29 @@ describe('reviews', () => {
     expect((await poll(next)).events).toEqual([]);
   });
 
+  it('E01: a pull request closed since the cursor is a pull_request_closed event, once', async () => {
+    const cursor = await start();
+    data.pulls = [
+      { ...pull(7, at(3), SHA_A, 'closed'), merged_at: at(3) },
+      pull(8, at(-30), SHA_A, 'closed'),
+    ];
+    const { events, next } = await poll(cursor);
+    expect(events).toEqual([
+      {
+        kind: 'pull_request_closed',
+        id: 'github:pull_closed:7',
+        source: 'polling',
+        repo: REPO,
+        occurredAt: new Date(at(3)).toISOString(),
+        url: 'https://github.com/acme/shop/pull/7',
+        prNumber: 7,
+        merged: true,
+        headSha: SHA_A,
+      },
+    ]);
+    expect((await poll(next)).events).toEqual([]);
+  });
+
   it('keeps the lower bound below pull requests it could not reach (page limit)', async () => {
     let cursor = await start();
     const b = user(3003, 'person-b');

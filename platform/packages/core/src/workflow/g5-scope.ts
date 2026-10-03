@@ -7,7 +7,8 @@
 // Both read stored facts: the audit events `gate.g5_check_failed` with the check `out_of_scope`,
 // and the closed G5 escalations with their decision. C08 PR 2: G6 sends the intent back to G3 the
 // same way (`gate.g6_check_failed` with `ci_no_retries`, or `modify` / `roll_back` on a G6
-// escalation); the new-plan rule stays for `out_of_scope` only.
+// escalation); the new-plan rule stays for `out_of_scope` only. E01: G7 too (a rejection, or
+// `modify` / `roll_back` on a G7 escalation; QUESTIONS #178).
 import type { TenantScope } from '../db/tenant-scope.js';
 
 /** Decisions on a G5 escalation that send the intent back to G3. */
@@ -31,11 +32,17 @@ export async function returnedFromG5(scope: TenantScope, intentId: string): Prom
   // (N2, FR-13). The same rule holds: G3 is HITL from then on.
   const g6 = await scope.audit.listForEntity(intentId, ['gate.g6_check_failed']);
   if (g6.some((e) => (e.payload as { check?: unknown }).check === 'ci_no_retries')) return true;
+  // E01 (QUESTIONS #178): a rejection at G7 sends the intent back to G3 the same way.
+  if (
+    (await scope.gateDecisions.listForIntent(intentId, 'G7')).some((d) => d.decision === 'reject')
+  ) {
+    return true;
+  }
   return (await scope.escalations.listForIntent(intentId)).some(
     (e) =>
       e.status === 'closed' &&
       e.trigger !== 'time' &&
-      (e.packet.gate === 'G5' || e.packet.gate === 'G6') &&
+      (e.packet.gate === 'G5' || e.packet.gate === 'G6' || e.packet.gate === 'G7') &&
       G5_RETURN_DECISIONS.includes(String(e.decision?.decision)),
   );
 }

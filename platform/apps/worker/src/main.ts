@@ -96,6 +96,8 @@ async function main(): Promise<void> {
         registry,
         // B08 (ADR-M39 §2.4): the spec re-check at G2–G4, always on.
         specs: { gitHost },
+        // E01 (ADR-M41): G7 reads the pull request and its reviews; it needs no run capability.
+        g7: { gitHost },
         ...(workerRuns
           ? {
               g4: workerRuns.g4,

@@ -30,7 +30,8 @@ const VERSION = 1;
 /** Items remembered per stream. Above this, the lower bound moves up (ADR-M23 §2.3). */
 export const MAX_SEEN = 500;
 const MAX_CURSOR_CHARS = 64 * 1024;
-const KEY = /^[rs]?[0-9]{1,20}$/;
+// `r`/`s`: check runs and statuses; `p`: closed pull requests (E01).
+const KEY = /^[prs]?[0-9]{1,20}$/;
 
 export const toSeconds = (iso: string): number => Math.floor(new Date(iso).getTime() / 1000);
 

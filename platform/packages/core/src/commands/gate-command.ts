@@ -10,7 +10,9 @@ import { normalizeScope, type ApprovalScope } from '../registry/approval-binding
 import type { HumanDecision } from '../registry/decision-rules.js';
 import type { Registry } from '../registry/registry.js';
 import { refusedPlanHashes, returnedFromG5 } from '../workflow/g5-scope.js';
+import { RegistryError } from '../registry/errors.js';
 import { gatherG6Facts } from '../workflow/g6-ci.js';
+import { g7Producers } from '../workflow/g7-facts.js';
 import { contextOf } from '../workflow/g6-verify.js';
 import { isPassableGate, openBlockWindow } from '../workflow/hotl.js';
 import { waitedSeconds } from '../workflow/waited.js';
@@ -61,6 +63,10 @@ export async function decideGate(
     throw new CommandError('gate_not_supported', `${command.gate} cannot be decided by a command`);
   }
   const gate = command.gate;
+  // E01 (QUESTIONS #175): G7 approvals are GitHub reviews of the pull request's head.
+  if (gate === 'G7' && command.decision === 'approve') {
+    throw new CommandError('g7_use_pr_review', `${intent.code}: approve G7 with a PR review`);
+  }
   // D3 (B07 session 2): the gate advance at G1–G3 has no scope, nor the run start at G4 (C06), so an approval with one is refused
   // here instead of being recorded and then voided (`scope_mismatch`, which stays as a safeguard).
   if (command.decision === 'approve' && normalizeScope(command.scope) !== null) {
@@ -83,6 +89,15 @@ export async function decideGate(
       );
     }
     const inputSha256 = await gateInputSha256(tx, current, gate);
+    const producers = await producersOf(tx, current, gate);
+    // E01 (QUESTIONS #179): a producer never decides G7, a request for changes included.
+    if (gate === 'G7' && producers.includes(command.actorId)) {
+      throw new RegistryError(
+        'decision_not_allowed',
+        `${gate} ${command.decision}: producer`,
+        'producer',
+      );
+    }
     // C07 (QUESTIONS #131): after a run went outside its plan, G3 is HITL and needs a new plan.
     const returned = gate === 'G3' && (await returnedFromG5(tx, current.id));
     if (
@@ -97,7 +112,7 @@ export async function decideGate(
       gate: gate,
       decision: command.decision,
       actor: { type: 'human', id: command.actorId },
-      producers: await producersOf(tx, current.id, gate),
+      producers,
       inputSha256,
       reasonCode: command.reasonCode ?? null,
       reasonRef: command.reasonRef ?? null,
@@ -115,11 +130,13 @@ export async function decideGate(
 
 /**
  * The producers of what a person decides at `gate` (FR-11): the plan at G3 (B09), the run at G5
- * and G6 (C07, C08).
+ * and G6 (C07, C08), the change under review at G7 (E01).
  */
-async function producersOf(tx: TenantScope, intentId: string, gate: string): Promise<string[]> {
-  if (gate === 'G3') return planSubmitters(tx, intentId);
-  if (gate === 'G5' || gate === 'G6') return runProducers(tx, intentId);
+async function producersOf(tx: TenantScope, intent: Intent, gate: string): Promise<string[]> {
+  if (gate === 'G3') return planSubmitters(tx, intent.id);
+  if (gate === 'G5' || gate === 'G6') return runProducers(tx, intent.id);
+  // E01: the creator, every run's starter, the plan submitters (QUESTIONS #16, AC2).
+  if (gate === 'G7') return g7Producers(tx, intent);
   return [];
 }
 

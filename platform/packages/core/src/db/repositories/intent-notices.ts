@@ -70,6 +70,14 @@ export const INTENT_NOTICE_KINDS = [
   'g6_decision',
   'g6_escalated',
   'g6_resumed',
+  // E01 (ADR-M41): G7, review and merge.
+  'g7_review_needed',
+  'g7_changes_requested',
+  'g7_merge_ready',
+  'g7_escalated',
+  'g7_returned',
+  'g7_resumed',
+  'merged',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

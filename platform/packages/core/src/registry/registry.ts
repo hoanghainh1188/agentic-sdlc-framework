@@ -54,6 +54,18 @@ export class Registry {
     return scope.gateDecisions.voidApprovals(input, this.deps);
   }
 
+  /** Voids one current approval with `reasonCode` (E01: its GitHub review no longer holds). */
+  voidApproval(
+    scope: TenantScope,
+    input: {
+      readonly intentId: string;
+      readonly decisionId: string;
+      readonly reasonCode: GateReasonCode;
+    },
+  ): Promise<GateDecisionRow | null> {
+    return scope.gateDecisions.voidApproval(input, this.deps);
+  }
+
   /** The policy engine of the project configuration in force (the intent workflow, B07). */
   async policyFor(
     scope: TenantScope,

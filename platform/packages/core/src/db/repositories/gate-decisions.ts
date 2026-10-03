@@ -315,6 +315,50 @@ export class GateDecisionRepository extends TenantRepository {
     );
   }
 
+  /**
+   * Voids one current approval (system actor, `reasonCode`). E01: the GitHub review behind a G7
+   * approval was dismissed or replaced, so the approval no longer holds (FR-17). Returns null when
+   * the decision is not a current approval of the intent. Call under the intent lock.
+   */
+  async voidApproval(
+    input: {
+      readonly intentId: string;
+      readonly decisionId: string;
+      readonly reasonCode: GateReasonCode;
+    },
+    deps: RegistryDeps,
+  ): Promise<GateDecisionRow | null> {
+    if (!(GATE_REASON_CODES as readonly string[]).includes(input.reasonCode)) {
+      throw invalid('reasonCode must be a gate reason code');
+    }
+    const now = clock(deps);
+    return this.run(
+      this.transactional(async (db) => {
+        const { intent, effective } = await this.lockedIntent(db, input.intentId);
+        const target = await db
+          .selectFrom('gate_decisions')
+          .select('gate')
+          .where('tenant_id', '=', this.tenantId)
+          .where('intent_id', '=', intent.id)
+          .where('id', '=', input.decisionId)
+          .executeTakeFirst();
+        if (!target) return null;
+        const approval = (await this.currentApprovals(db, intent.id, target.gate)).find(
+          (a) => a.id === input.decisionId,
+        );
+        if (!approval) return null;
+        return this.insertVoid(
+          db,
+          intent.id,
+          effective.configHash,
+          approval,
+          input.reasonCode,
+          now,
+        );
+      }),
+    );
+  }
+
   private insertVoid(
     db: Kysely<Database>,
     intentId: string,

@@ -89,6 +89,29 @@ describe('events: same shape and IDs as polling', () => {
     });
   });
 
+  it('E01: pull_request closed is the merge event; opened is not supported', () => {
+    const closed = signed('pull_request', {
+      action: 'closed',
+      repository,
+      pull_request: {
+        ...pull(7, '2026-09-26T08:00:00Z', SHA_A, 'closed'),
+        merged_at: '2026-09-26T08:00:00Z',
+      },
+    });
+    expect(adapter.verifyWebhook(closed.headers, closed.body)).toMatchObject({
+      kind: 'pull_request_closed',
+      id: 'github:pull_closed:7',
+      merged: true,
+      headSha: SHA_A,
+    });
+    const opened = signed('pull_request', {
+      action: 'opened',
+      repository,
+      pull_request: pull(7, '2026-09-26T08:00:00Z'),
+    });
+    expect(() => adapter.verifyWebhook(opened.headers, opened.body)).toThrow(/unsupported_event/);
+  });
+
   it('check_run completed', () => {
     const r = signed('check_run', {
       action: 'completed',
