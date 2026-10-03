@@ -6,6 +6,7 @@ import type {
   EventCursor,
   GitEvent,
   GitHostAdapter,
+  NewPullRequest,
   PullRequestInfo,
   RepoRef,
   ShortLivedToken,
@@ -41,6 +42,8 @@ import { verifyWebhookRequest } from './webhook.js';
 /** GitHub limits: comment bodies (characters) and files listed for one pull request. */
 export const MAX_COMMENT_CHARS = 65_536;
 export const MAX_PULL_REQUEST_FILES = 3000;
+/** GitHub's limit of a pull request title (characters). */
+export const MAX_PULL_REQUEST_TITLE_CHARS = 256;
 const FAILED: ReadonlySet<string> = new Set([
   'failure',
   'error',
@@ -84,29 +87,84 @@ export class GitHubAdapter implements GitHostAdapter {
     const res = await this.#auth.withRepoAuth(ref, (auth) =>
       this.#http.json('GET', `${base}/pulls/${pr}`, { auth }),
     );
-    const p = obj(res.body, 'pull');
-    const head = obj(p.head, 'pull.head');
-    const baseRef = obj(p.base, 'pull.base');
-    const state = str(p.state, 'pull.state');
-    if (state !== 'open' && state !== 'closed') {
-      throw new GitHostError('invalid_response', { field: 'pull.state' });
+    return pullRequestInfo(res.body);
+  }
+
+  /**
+   * Opens a pull request from a branch of the same repository (task C08, ADR-M38 §2.4). The call
+   * uses its own token with `pull_requests: write`; the adapter's cached token stays read-only.
+   * Never a draft; maintainers of forks cannot push to it (`maintainer_can_modify: false`).
+   */
+  async openPullRequest(ref: RepoRef, input: NewPullRequest): Promise<PullRequestInfo> {
+    const repo = checkRepo(ref);
+    const base = repoPath(repo);
+    encodeBranch(input?.head);
+    encodeBranch(input?.base);
+    for (const field of ['title', 'body'] as const) {
+      const value = input[field];
+      if (typeof value !== 'string' || value.trim() === '') {
+        throw new GitHostError('invalid_input', { field });
+      }
     }
-    const mergedAt = p.merged_at === null ? null : time(p.merged_at, 'pull.merged_at');
-    const mergeSha = optStr(p.merge_commit_sha, 'pull.merge_commit_sha');
-    return {
-      number: int(p.number, 'pull.number'),
-      state,
-      draft: bool(p.draft ?? false, 'pull.draft'),
-      merged: mergedAt !== null,
-      mergedAt,
-      mergeCommitSha: mergeSha && isSha(mergeSha) ? mergeSha : null,
-      headSha: sha(head.sha, 'pull.head.sha'),
-      headRef: str(head.ref, 'pull.head.ref'),
-      baseRef: str(baseRef.ref, 'pull.base.ref'),
-      author: actor(p.user, 'pull.user'),
-      changedFiles: int(p.changed_files, 'pull.changed_files'),
-      url: url(p.html_url, 'pull.html_url'),
-    };
+    if (input.title.length > MAX_PULL_REQUEST_TITLE_CHARS) {
+      throw new GitHostError('invalid_input', { field: 'title' });
+    }
+    if (input.body.length > MAX_COMMENT_CHARS) {
+      throw new GitHostError('body_too_large', { max_chars: MAX_COMMENT_CHARS });
+    }
+    const minted = await this.#auth.mint(repo, { pull_requests: 'write' });
+    const res = await this.#http.json('POST', `${base}/pulls`, {
+      auth: `Bearer ${minted.token}`,
+      body: {
+        title: input.title,
+        body: input.body,
+        head: input.head,
+        base: input.base,
+        draft: false,
+        maintainer_can_modify: false,
+      },
+    });
+    const info = pullRequestInfo(res.body);
+    if (info.headRef !== input.head || info.baseRef !== input.base) {
+      throw new GitHostError('invalid_response', { field: 'pull.head' });
+    }
+    return info;
+  }
+
+  /**
+   * The open pull request from `head` into `base`, or null. GitHub's list holds no file count,
+   * so the match is read again by number. More than one match is refused (fail closed).
+   */
+  async findOpenPullRequest(
+    ref: RepoRef,
+    head: string,
+    baseBranch: string,
+  ): Promise<PullRequestInfo | null> {
+    const repo = checkRepo(ref);
+    const base = repoPath(repo);
+    encodeBranch(head);
+    encodeBranch(baseBranch);
+    const list = await this.#auth.withRepoAuth(repo, (auth) =>
+      listPages(this.#http, `${base}/pulls`, {
+        auth,
+        maxPages: 1,
+        query: { state: 'open', head: `${repo.owner}:${head}`, base: baseBranch },
+      }),
+    );
+    const matches = list.items.filter((item) => {
+      const p = obj(item, 'pull');
+      return str(obj(p.head, 'pull.head').ref, 'pull.head.ref') === head;
+    });
+    if (list.truncated || matches.length > 1) {
+      throw new GitHostError('invalid_response', { field: 'pulls' });
+    }
+    if (matches.length === 0) return null;
+    const info = await this.getPullRequest(
+      repo,
+      int(obj(matches[0], 'pull').number, 'pull.number'),
+    );
+    if (info.state !== 'open' || info.headRef !== head || info.baseRef !== baseBranch) return null;
+    return info;
   }
 
   async getChangedFiles(ref: RepoRef, pr: number): Promise<string[]> {
@@ -276,6 +334,33 @@ export class GitHubAdapter implements GitHostAdapter {
   verifyWebhook(headers: Record<string, string>, rawBody: Buffer): GitEvent {
     return verifyWebhookRequest(this.#options.webhookSecret, headers, rawBody);
   }
+}
+
+/** A pull request of the REST API (single read or create answer). */
+function pullRequestInfo(body: unknown): PullRequestInfo {
+  const p = obj(body, 'pull');
+  const head = obj(p.head, 'pull.head');
+  const baseRef = obj(p.base, 'pull.base');
+  const state = str(p.state, 'pull.state');
+  if (state !== 'open' && state !== 'closed') {
+    throw new GitHostError('invalid_response', { field: 'pull.state' });
+  }
+  const mergedAt = p.merged_at === null ? null : time(p.merged_at, 'pull.merged_at');
+  const mergeSha = optStr(p.merge_commit_sha, 'pull.merge_commit_sha');
+  return {
+    number: int(p.number, 'pull.number'),
+    state,
+    draft: bool(p.draft ?? false, 'pull.draft'),
+    merged: mergedAt !== null,
+    mergedAt,
+    mergeCommitSha: mergeSha && isSha(mergeSha) ? mergeSha : null,
+    headSha: sha(head.sha, 'pull.head.sha'),
+    headRef: str(head.ref, 'pull.head.ref'),
+    baseRef: str(baseRef.ref, 'pull.base.ref'),
+    author: actor(p.user, 'pull.user'),
+    changedFiles: int(p.changed_files, 'pull.changed_files'),
+    url: url(p.html_url, 'pull.html_url'),
+  };
 }
 
 function toCheckItem(item: CheckItem): CheckItem {

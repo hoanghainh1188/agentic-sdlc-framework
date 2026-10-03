@@ -86,9 +86,14 @@ export {
 export {
   authEnv,
   CloneError,
+  cloneForPush,
   cloneForRun,
   cloneUrl,
+  PushError,
+  pushCommit,
+  remoteBranchHead,
   type CloneFailure,
+  type PushFailure,
   type CloneInput,
   type GitSettings,
 } from './workspace/git.js';
@@ -108,6 +113,12 @@ export {
   type CheckedChanges,
 } from './workspace/changes.js';
 export { IgnoreChecker } from './workspace/ignore.js';
+export {
+  publishRun,
+  type PublishDeps,
+  type PublishFailure,
+  type PublishRefusal,
+} from './workspace/publish.js';
 export {
   computeProposal,
   mirrorWorkspace,

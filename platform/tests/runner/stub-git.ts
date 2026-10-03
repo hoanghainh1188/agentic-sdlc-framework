@@ -107,6 +107,50 @@ export class StubGitHost {
     return git(bare, 'rev-parse', 'HEAD');
   }
 
+  /**
+   * Lets the run token push to `owner/name.git` (C08). `protect`: branches the server refuses, like
+   * GitHub's branch protection on the default branch (N6): a `pre-receive` hook rejects them.
+   */
+  allowPush(repo: string, options: { protect?: readonly string[] } = {}): void {
+    const bare = path.join(this.root, `${repo}.git`);
+    git(bare, 'config', 'http.receivepack', 'true');
+    const refs = (options.protect ?? []).map((branch) => `refs/heads/${branch}`);
+    const hook = path.join(bare, 'hooks', 'pre-receive');
+    fs.mkdirSync(path.dirname(hook), { recursive: true });
+    fs.writeFileSync(
+      hook,
+      [
+        '#!/bin/sh',
+        'while read old new ref; do',
+        ...refs.map((ref) => `  [ "$ref" = "${ref}" ] && { echo "protected branch" >&2; exit 1; }`),
+        '  :',
+        'done',
+        'exit 0',
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+  }
+
+  /** The commit a branch of `owner/name.git` points to, or null. */
+  branchHead(repo: string, branch: string): string | null {
+    try {
+      return git(
+        path.join(this.root, `${repo}.git`),
+        'rev-parse',
+        '--verify',
+        `refs/heads/${branch}`,
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /** Runs git in the bare repository `owner/name.git` (tests: read commits, move a branch). */
+  gitIn(repo: string, ...args: string[]): string {
+    return git(path.join(this.root, `${repo}.git`), ...args);
+  }
+
   async stop(): Promise<void> {
     this.server.closeAllConnections();
     await new Promise<void>((resolve) => this.server.close(() => resolve()));

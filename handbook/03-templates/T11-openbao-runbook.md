@@ -341,7 +341,7 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
    pnpm openbao:bootstrap runner-credentials
    ```
    Record it in the operations log (role `runner`, date, reason; not the secret ID).
-3b. Give the runner its SeaweedFS identity for the proposals of High-risk (L1) runs (task C06, `design/ADR-M33-gate-g4.md` §2.9) and the diffs of every run (task C07, `design/ADR-M34-gate-g5.md` §2.2). SeaweedFS must run (`pnpm compose:core`). The command asks for an admin token (hidden). It makes a new key pair inside the openbao container, stores it at `kv/runner/evidence` and gives it to SeaweedFS as the identity `runner-evidence`, which may only **write** under `evidence/proposals/` and `evidence/diffs/` (no read, no list). It prints no secret. An identity made before C07 can write proposals only: run the command again once after the C07 update, then restart `sdlc-runner`:
+3b. Give the runner its SeaweedFS identity for the proposals of High-risk (L1) runs (task C06, `design/ADR-M33-gate-g4.md` §2.9) and the diffs of every run (task C07, `design/ADR-M34-gate-g5.md` §2.2). SeaweedFS must run (`pnpm compose:core`). The command asks for an admin token (hidden). It makes a new key pair inside the openbao container, stores it at `kv/runner/evidence` and gives it to SeaweedFS as the identity `runner-evidence`, which may **write** under `evidence/proposals/` and `evidence/diffs/`, and **read** under `evidence/diffs/` only (task C08, `design/ADR-M38-gate-g6.md` §2.2: the push applies the checked diff; no list, no read of proposals). It prints no secret. An identity made before C08 cannot read diffs, so pushes fail (`evidence_unavailable`): run the command again once after the C08 update, then restart `sdlc-runner`:
    ```bash
    pnpm openbao:bootstrap runner-evidence-credentials
    ```
@@ -366,7 +366,7 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
 |---|---|
 | The `platform_app` password | See section 5f: all three credentials commands, then restart the three services |
 | The runner's secret ID (every 90 days, section 8.1) | `pnpm openbao:bootstrap runner-credentials`, then restart `sdlc-runner`. The command destroys the old secret ID itself (section 8.1) |
-| The runner's evidence key (`runner-evidence`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap runner-evidence-credentials`, then restart `sdlc-runner`. The old key stops working at once; do it when no High-risk run is ending |
+| The runner's evidence key (`runner-evidence`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap runner-evidence-credentials`, then restart `sdlc-runner`. The old key stops working at once; do it when no run is ending and no push is under way (a failed push is tried again) |
 
 ### After a crash or restart
 
@@ -527,3 +527,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.15 | 2026-09-27 | Claude Code (task C06, session 2b) | Section 5g step 3b: `runner-evidence-credentials` (write-only SeaweedFS identity `runner-evidence` at `kv/runner/evidence`); rotation and troubleshooting rows (ADR-M33 §2.9). Tested with throw-away keys (`pnpm test:runner-compose`) |
 | 0.16 | 2026-10-03 | Claude Code (task C07, PR 1) | Section 5g step 3b: the identity `runner-evidence` also writes run diffs under `evidence/diffs/` (run the command again once after the update); troubleshooting row `agent_changes_unavailable` (ADR-M34 §2.2). Tested with throw-away keys (`pnpm test:runner-compose`) |
 | 0.17 | 2026-10-03 | Claude Code (task B13, PR 2) | Section 5e step 5: the first tenant admin with `sdlc ops bootstrap`; the operator commands are `sdlc ops …` (renamed from `sdlc admin …`, ADR-M37 §2.8) |
+| 0.18 | 2026-10-03 | Claude Code (task C08, PR 1) | Section 5g step 3b: the identity `runner-evidence` also reads run diffs (`Read:evidence/diffs/*`), which the push applies; run the command again once after the update (ADR-M38 §2.2, QUESTIONS #155). Tested with throw-away keys (`pnpm test:runner-compose`) |

@@ -71,6 +71,7 @@ import {
 } from './spec-check.js';
 import { stepG4 } from './g4.js';
 import { stepG5, stepPausedG5 } from './g5.js';
+import { stepG6, stepPausedG6 } from './g6.js';
 import { refusedPlanHashes, returnedFromG5 } from './g5-scope.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
 import { moveTo, moveToRunning, stepPaused, stepRunning } from './run-lifecycle.js';
@@ -110,6 +111,11 @@ export interface StepDeps {
    * `run_ended`). Without it a decided G4 waits (`run_pending`).
    */
   readonly startRuns?: boolean;
+  /**
+   * C08 (ADR-M38 §2.1): the workflow can push a run's changes and open its pull request at G6
+   * (`publish`). Without it the intent waits at G6 (`later_gate`).
+   */
+  readonly publish?: boolean;
 }
 
 export class WorkflowError extends Error {
@@ -210,6 +216,15 @@ export async function stepIntent(
         intent,
       );
     }
+    // C08: the push or the pull request stopped; a person's decision on its escalation moves it on.
+    if (intent.status === 'paused' && intent.current_gate === 'G6') {
+      return stepPausedG6(
+        tx,
+        deps.registry,
+        await deps.registry.policyFor(tx, intent.project_id),
+        intent,
+      );
+    }
     if (intent.status !== 'in_gate' || intent.current_gate === null) return waiting('not_in_gate');
     const policy = await deps.registry.policyFor(tx, intent.project_id);
     const block = await earlierBlock(tx, intent, policy.config);
@@ -224,6 +239,8 @@ export async function stepIntent(
     const gate = intent.current_gate;
     if (gate === 'G4' && facts) return atG4(tx, deps, policy, intent, facts);
     if (gate === 'G5') return stepG5(tx, deps.registry, policy, intent);
+    // C08: the push and the pull request (`publish`); without them G6 waits.
+    if (gate === 'G6' && deps.publish) return stepG6(tx, deps.registry, policy, intent);
     if (!isCommandGate(gate)) {
       if (hold) return waiting(hold.reason, hold.wakeInMs);
       // G4 onwards: C06 continues. Wake when the last HOTL block window closes (C06 waits for it).

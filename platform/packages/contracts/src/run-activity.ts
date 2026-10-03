@@ -30,7 +30,34 @@ export type ExecuteRunResult =
    */
   | { readonly outcome: 'refused'; readonly reason: string };
 
+/**
+ * The push of a run's changes (task C08, D-08 C08 AC1, design/ADR-M38 §2.2): the runner applies
+ * the run's stored diff (the diff G5 checked) to a fresh clone of the run's base commit, makes one
+ * commit and pushes `agent/INT-…`. Only after G5 passed (QUESTIONS #52).
+ */
+export interface PublishRunInput {
+  readonly tenantId: string;
+  readonly runId: string;
+  /**
+   * Single-use wrapping token around `{ token }`: a single-repository GitHub token with
+   * `contents: write`, issued for this push only (ADR-M38 §2.3).
+   */
+  readonly wrappedPushToken: string;
+}
+
+export type PublishRunResult =
+  /** The branch points at the run's commit (pushed now, or already by an earlier attempt). */
+  | { readonly outcome: 'pushed' }
+  /**
+   * The runner did not push. `reason` is a code; the runner recorded it as the run event
+   * `publish_refused` (final: a person decides, QUESTIONS #156) or `publish_failed` (may work on a
+   * new attempt).
+   */
+  | { readonly outcome: 'refused' | 'failed'; readonly reason: string };
+
 /** Activities of the runner's Temporal worker. */
 export interface RunnerActivities {
   executeRun(input: ExecuteRunInput): Promise<ExecuteRunResult>;
+  /** C08: push the run's checked changes (see `PublishRunInput`). */
+  publishRun(input: PublishRunInput): Promise<PublishRunResult>;
 }

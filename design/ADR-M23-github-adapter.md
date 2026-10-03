@@ -38,7 +38,7 @@ Task B05 builds the first Git host adapter: GitHub, through a GitHub App. D-03 �
 - The adapter's own token (per repository) has `checks`, `contents`, `pull_requests`, `statuses`: read, and `issues`: write (comments). It is cached until `tokenRefreshMarginSeconds` (default 300 s) before it expires; concurrent calls share one mint. After a 401 the cached token is dropped and the call is tried once more.
 - `issueShortLivedToken` accepts only `contents`, `pull_requests`, `issues`, `checks`, `statuses` with `read` or `write`. Its tokens are never cached: each call gives a new token, owned by the caller (C04, C11).
 
-**GitHub App settings (minimal, B05):** repository permissions Metadata: read, Issues: read and write, Pull requests: read, Checks: read, Commit statuses: read, Contents: read. No organisation or account permissions. No webhook subscription. Installed on selected repositories only. Later: Contents: write (C04, the sandbox pushes `agent/*`), Pull requests: write (C08).
+**GitHub App settings (minimal, B05):** repository permissions Metadata: read, Issues: read and write, Pull requests: read, Checks: read, Commit statuses: read, Contents: read. No organisation or account permissions. No webhook subscription. Installed on selected repositories only. C08 (ADR-M38 §2.3, §4): Contents: read and write (the runner pushes `agent/*` with a single-repository token issued for one push; the sandbox never pushes, QUESTIONS #52) and Pull requests: read and write (the adapter opens the pull request with a token minted for that call; its cached token stays read-only). C08 PR 2: Code scanning alerts: read (QUESTIONS #157).
 
 ### 2.3. Polling and the cursor
 

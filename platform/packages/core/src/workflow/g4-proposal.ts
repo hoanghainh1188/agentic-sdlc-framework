@@ -29,6 +29,7 @@ import { instructionsSha256 } from '../agents/rules.js';
 import type { Intent, Project } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { loadEffectiveConfig } from '../registry/effective-config.js';
+import { lastPushedHead } from './publish-state.js';
 
 /** What G4 needs from outside the database (the worker wires them in; tests pass fakes). */
 export interface G4Deps {
@@ -89,7 +90,7 @@ export function projectRepoRef(project: Pick<Project, 'repo_full_name'>): RepoRe
 export async function gatherG4Facts(
   scope: TenantScope,
   deps: G4Deps,
-  intent: Pick<Intent, 'project_id' | 'data_class'>,
+  intent: Pick<Intent, 'id' | 'project_id' | 'data_class'>,
   /** The head the step already read for the spec check (B08): one head for both. */
   headSha?: string,
 ): Promise<G4Facts> {
@@ -97,7 +98,13 @@ export async function gatherG4Facts(
   const ref = project ? projectRepoRef(project) : undefined;
   if (!project || !ref) throw new GitHostError('invalid_input', { field: 'repo' });
   const { config } = await loadEffectiveConfig(scope.projectConfigs, intent.project_id);
-  const baseSha = headSha ?? (await deps.gitHost.getBranchHead(ref, project.default_branch));
+  // QUESTIONS #109: the head of the default branch (B08: the one the spec check read). Once a run
+  // of the intent was pushed, the commit it pushed (QUESTIONS #134, C08, ADR-M38 §2.6): the next
+  // run continues the pull request.
+  const baseSha =
+    (await lastPushedHead(scope, intent.id)) ??
+    headSha ??
+    (await deps.gitHost.getBranchHead(ref, project.default_branch));
   const key = config.run.agent_key;
   const agent = key === null ? undefined : await scope.agents.getByKey(key);
   let instructions: G4Facts['instructions'] = null;

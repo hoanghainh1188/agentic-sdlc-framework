@@ -37,6 +37,15 @@ export interface CloneInput {
 
 export type CloneFailure = 'clone_failed' | 'base_sha_not_found' | 'token_leaked';
 
+/** Why a network step of the push failed (C08): codes only, never git's own text. */
+export type PushFailure = 'clone_failed' | 'remote_read_failed' | 'push_rejected';
+
+export class PushError extends RunnerError {
+  constructor(readonly reason: PushFailure) {
+    super('runner.workspace.push_failed', { reason });
+  }
+}
+
 export class CloneError extends RunnerError {
   constructor(readonly reason: CloneFailure) {
     super('runner.workspace.clone_failed', { reason });
@@ -98,6 +107,131 @@ function git(args: string[], env: NodeJS.ProcessEnv, timeoutMs: number): Promise
       else resolve(stdout.trim());
     });
   });
+}
+
+/** Checks the inputs of a push: repository, branch (`agent/INT-…`) and commit. */
+function checkPushInput(repo: string, branch: string, commit?: string): void {
+  if (!REPO.test(repo) || !BRANCH.test(branch) || (commit !== undefined && !SHA.test(commit))) {
+    throw new PushError('push_rejected');
+  }
+}
+
+/**
+ * Clones `repo` without a working tree for a push (task C08, ADR-M38 §2.2): the runner builds the
+ * commit in the index only, so no file of the change is ever written to its disk. The token goes
+ * into the git process's environment only, as for `cloneForRun`, and is checked to be nowhere in
+ * `.git`. Returns the repository directory (`<dir>/repo`); `<dir>/home` is git's HOME.
+ */
+export async function cloneForPush(
+  settings: GitSettings,
+  input: { readonly repo: string; readonly token: RedactedSecret; readonly dir: string },
+): Promise<string> {
+  if (!REPO.test(input.repo)) throw new PushError('clone_failed');
+  const home = path.join(input.dir, 'home');
+  const repoDir = path.join(input.dir, 'repo');
+  fs.mkdirSync(home, { mode: 0o700 });
+  try {
+    await git(
+      [
+        ...safetyArgs(settings),
+        'clone',
+        '--quiet',
+        '--no-tags',
+        '--no-checkout',
+        '--no-recurse-submodules',
+        '--',
+        cloneUrl(settings, input.repo),
+        repoDir,
+      ],
+      { ...baseEnv(home), ...authEnv(settings, input.token) },
+      settings.timeoutMs,
+    );
+  } catch {
+    throw new PushError('clone_failed');
+  }
+  const config = fs.readFileSync(path.join(repoDir, '.git', 'config'), 'utf8');
+  if (config.includes(input.token.reveal()) || /extraheader|authorization/i.test(config)) {
+    throw new PushError('clone_failed');
+  }
+  return repoDir;
+}
+
+/** The commit `refs/heads/<branch>` points to on the Git host now, or null when it does not exist. */
+export async function remoteBranchHead(
+  settings: GitSettings,
+  input: {
+    readonly repo: string;
+    readonly branch: string;
+    readonly token: RedactedSecret;
+    readonly home: string;
+  },
+): Promise<string | null> {
+  checkPushInput(input.repo, input.branch);
+  let out: string;
+  try {
+    out = await git(
+      [
+        ...safetyArgs(settings),
+        'ls-remote',
+        '--refs',
+        '--',
+        cloneUrl(settings, input.repo),
+        `refs/heads/${input.branch}`,
+      ],
+      { ...baseEnv(input.home), ...authEnv(settings, input.token) },
+      settings.timeoutMs,
+    );
+  } catch {
+    throw new PushError('remote_read_failed');
+  }
+  // `ls-remote` matches patterns by their trailing components: keep the exact ref only, so a ref
+  // such as `refs/heads/x/refs/heads/agent/INT-…` can neither hide nor block the branch.
+  const exact = out
+    .split('\n')
+    .map((line) => line.split('\t'))
+    .filter(([, ref]) => ref === `refs/heads/${input.branch}`);
+  if (exact.length === 0) return null;
+  const sha = exact.length === 1 ? exact[0]![0] : undefined;
+  if (!sha || !SHA.test(sha)) throw new PushError('remote_read_failed');
+  return sha;
+}
+
+/**
+ * Pushes `commit` to `refs/heads/<branch>` with an explicit refspec and no force (ADR-M25 §2.1,
+ * ADR-M38 §2.2): the Git host accepts it only as a new branch or a fast-forward. Branch
+ * protection on the default branch is the backstop (N6); the branch pattern is checked here too.
+ */
+export async function pushCommit(
+  settings: GitSettings,
+  input: {
+    readonly repoDir: string;
+    readonly repo: string;
+    readonly branch: string;
+    readonly commit: string;
+    readonly token: RedactedSecret;
+    readonly home: string;
+  },
+): Promise<void> {
+  checkPushInput(input.repo, input.branch, input.commit);
+  try {
+    await git(
+      [
+        ...safetyArgs(settings),
+        '-C',
+        input.repoDir,
+        'push',
+        '--quiet',
+        '--no-verify',
+        '--',
+        cloneUrl(settings, input.repo),
+        `${input.commit}:refs/heads/${input.branch}`,
+      ],
+      { ...baseEnv(input.home), ...authEnv(settings, input.token) },
+      settings.timeoutMs,
+    );
+  } catch {
+    throw new PushError('push_rejected');
+  }
 }
 
 export function cloneUrl(settings: GitSettings, repo: string): string {

@@ -96,7 +96,9 @@ async function main(): Promise<void> {
         registry,
         // B08 (ADR-M39 §2.4): the spec re-check at G2–G4, always on.
         specs: { gitHost },
-        ...(workerRuns ? { g4: workerRuns.g4, runs: workerRuns.runs } : {}),
+        ...(workerRuns
+          ? { g4: workerRuns.g4, runs: workerRuns.runs, publish: workerRuns.publish }
+          : {}),
       }),
       workflowBundlePath: settings.workflowBundle,
     });

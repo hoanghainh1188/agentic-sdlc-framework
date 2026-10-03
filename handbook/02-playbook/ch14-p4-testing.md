@@ -123,7 +123,43 @@ Security findings at or above the configured severity (default **HIGH**; **CRITI
 
 ## 14.10. Using the platform
 
-> To be written by Claude Code together with the platform code: how G6 reads CI results, retry limits, the verification summary and the evidence pack.
+> Written by Claude Code together with the platform code (task C08, `design/ADR-M38-gate-g6.md`). §14.10.2 (how G6 reads CI) comes with the second part of C08.
+
+### 14.10.1. The push and the pull request
+
+When the platform passed G5 (Chapter 13 §13.10.5), the intent waits at **G6**. The platform then puts the agent's changes into a pull request by itself:
+
+1. **It waits for the G5 block window.** While Person A can still send the changes back at G5, nothing leaves the platform.
+2. **It pushes the checked changes.** The agent in its sandbox has no access to GitHub. The platform's runner takes the diff that G5 checked (never what the agent reports), makes **one commit** from it on the run's start commit, and pushes it to the branch `agent/INT-…`. The commit's author is `sdlc-agent`. The runner never pushes to the default branch, and never force-pushes; branch protection on the default branch also refuses it.
+3. **It opens the pull request** from `agent/INT-…` into the default branch, or uses the open one, and posts a comment on the intent's issue: **the pull request is open**. The comment mentions Person B.
+
+The pull request follows template T2:
+
+- The description holds codes only: the intent code (with a link to its issue), the run ID, the agent, its version and model, the autonomy level, and the hashes of the approved plan and of the checked diff. It never holds the intent's title or description, file paths, or text from the agent: in a public repository everybody can read it.
+- "AI wrote most / all of this change" is ticked, and so is "Only files in the approved plan were changed" (G5 checked it). The box "A human reviewed every file" is **never** ticked by the platform: the reviewer ticks it when approving (T2 rule).
+- The author of the pull request is the platform's GitHub App, so Person B can approve it.
+- Decide gates in comments on the intent's **issue**, not on the pull request.
+
+**Later runs of the same intent** (for example after a request for changes) start from the commit the platform pushed, and push to the same branch: the same pull request shows the new commit.
+
+**When the platform cannot push or open the pull request**, it tries again after a minute, up to three times in all. It stops at once when:
+
+| Cause | Meaning |
+|---|---|
+| `empty_diff` | The run changed nothing |
+| `diff_mismatch` | The stored diff is not the one G5 checked |
+| `branch_moved` | Someone else changed the branch `agent/INT-…` |
+| `publish_attempts` | Three attempts failed (GitHub, the runner, the token, or the pull request kept showing another commit) |
+
+The intent is then **paused** at G6, and a **technical** escalation goes to Person B (Chapter 18). Acknowledge it, then decide:
+
+| Decision | What happens |
+|---|---|
+| `resume` | The intent goes back to **G4**, and a new run starts after G4. After `branch_moved`, first restore the branch to the platform's last commit, or delete it |
+| `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on |
+| `terminate` | The intent is closed (`cancelled`). Close the pull request if one is open |
+
+**Platform operator:** the GitHub App needs Contents and Pull requests "Read and write" (`platform/GETTING-STARTED.md` Step 11), and the runner's evidence identity must be created again once after this update (runbook T11 §5g step 3b).
 
 ---
 
@@ -163,3 +199,4 @@ Security findings at or above the configured severity (default **HIGH**; **CRITI
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content; platform usage section reserved for Claude Code |
 | 0.2 | 2026-09-25 | Claude (draft) | G6 security findings: configurable severity threshold, default HIGH, CRITICAL always (QUESTIONS #19) |
+| 0.3 | 2026-10-03 | Claude Code (task C08, PR 1) | §14.10.1: the push and the pull request (ADR-M38 §2.1–§2.6, QUESTIONS #155, #156) |

@@ -57,7 +57,8 @@ flowchart TB
     LL --> LLM
     LL --> LF
     LL --> VK
-    OH -- "push branch agent/*" --> GH
+    RUN -- "clone; push agent/* after G5" --> GH
+    WK -- "open PR (G6)" --> GH
     MOD --> PG
     EVD --> S3
     COST <--> LL

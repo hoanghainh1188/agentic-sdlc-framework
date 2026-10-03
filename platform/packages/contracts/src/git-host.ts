@@ -42,6 +42,20 @@ export interface PullRequestInfo {
   readonly url: string;
 }
 
+/**
+ * A new pull request (task C08, D-08 C08 AC1, design/ADR-M38 §2.4). The platform fills the title
+ * and body from the message catalog with coded values only (QUESTIONS #123: the pilot repository
+ * is public).
+ */
+export interface NewPullRequest {
+  /** The branch with the changes, for example `agent/INT-2026-0001`. */
+  readonly head: string;
+  /** The branch the changes go into: the project's default branch. */
+  readonly base: string;
+  readonly title: string;
+  readonly body: string;
+}
+
 /** Conclusion of a finished check (GitHub check runs and commit statuses). */
 export type CheckConclusion =
   | 'success'
@@ -185,6 +199,16 @@ export interface GitHostAdapter {
    */
   listPaths(ref: RepoRef, sha: string): Promise<string[]>;
   issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken>;
+  /**
+   * Opens a pull request (task C08, ADR-M38 §2.4). Never a draft. The adapter uses a token that
+   * may write pull requests for this call only; its own token stays read-only.
+   */
+  openPullRequest(ref: RepoRef, input: NewPullRequest): Promise<PullRequestInfo>;
+  /**
+   * The open pull request from `head` (a branch of the same repository) into `base`, or null
+   * (task C08: find before opening, so a repeated call never opens a second one).
+   */
+  findOpenPullRequest(ref: RepoRef, head: string, base: string): Promise<PullRequestInfo | null>;
   /** MVP: polling. Pass `INITIAL_EVENT_CURSOR` for a project that has never been polled. */
   listEventsSince(
     ref: RepoRef,

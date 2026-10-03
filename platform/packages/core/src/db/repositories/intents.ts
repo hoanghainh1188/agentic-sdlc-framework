@@ -406,6 +406,48 @@ export class IntentRepository extends TenantRepository {
     );
   }
 
+  /**
+   * Links the pull request of the intent's agent branch (task C08, ADR-M38 §2.4): `pr_number`
+   * goes from null to `prNumber`, or stays when it already is `prNumber` (a repeated call).
+   * Returns false when the intent holds another pull request. The unique index of migration 0011
+   * keeps one open intent per pull request. Appends `intent.pr_linked` when the link is new.
+   * Call under the intent lock.
+   */
+  async linkPullRequest(
+    id: string,
+    link: { readonly prNumber: number; readonly runId: string; readonly headSha: string },
+  ): Promise<boolean> {
+    if (!Number.isSafeInteger(link.prNumber) || link.prNumber < 1) {
+      throw new DbError('invalid_value', 'prNumber');
+    }
+    if (!isUuid(link.runId)) throw new DbError('invalid_value', 'runId');
+    if (!/^[0-9a-f]{40}$/.test(link.headSha)) throw new DbError('invalid_value', 'headSha');
+    return this.run(
+      this.transactional(async (db) => {
+        const updated = await db
+          .updateTable('intents')
+          .set({ pr_number: link.prNumber, updated_at: sql<Date>`now()` })
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', id)
+          .where('pr_number', 'is', null)
+          .returning('id')
+          .executeTakeFirst();
+        if (!updated) {
+          const current = await new IntentRepository(db, this.tenantId).getById(id);
+          return current?.pr_number === link.prNumber;
+        }
+        await new AuditLogRepository(db, this.tenantId).append({
+          action: 'intent.pr_linked',
+          actorType: 'system',
+          actorId: null,
+          entityId: id,
+          payload: { run_id: link.runId, pr_number: link.prNumber, head_sha: link.headSha },
+        });
+        return true;
+      }),
+    );
+  }
+
   /** Highest number used this year by the tenant, 0 when none. Call with the code lock held. */
   private async lastNumber(db: Kysely<Database>, year: number): Promise<number> {
     const row = await db

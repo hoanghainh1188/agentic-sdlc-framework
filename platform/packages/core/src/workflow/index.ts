@@ -63,3 +63,21 @@ export {
   type SpecFacts,
   type SpecHold,
 } from './spec-check.js';
+export { stepG6, stepPausedG6, PUBLISH_ATTEMPTS } from './g6.js';
+export {
+  abandonPublish,
+  finishPublish,
+  preparePublish,
+  pullRequestBody,
+  PUSH_TOKEN_WRAP_SECONDS,
+  type FinishPublishResult,
+  type PreparePublishResult,
+  type PublishDeps,
+} from './publish.js';
+export {
+  lastPushedHead,
+  MAX_PUBLISH_ATTEMPTS,
+  PUBLISH_RETRY_MS,
+  publishState,
+  type PublishState,
+} from './publish-state.js';

@@ -61,7 +61,14 @@ export type IntentStepResult =
    */
   | { readonly outcome: 'run_prepare' }
   /** C06 session 2: the intent's run ended (a final status); the workflow calls `finishRun`. */
-  | { readonly outcome: 'run_ended'; readonly runId: string };
+  | { readonly outcome: 'run_ended'; readonly runId: string }
+  /**
+   * C08 (ADR-M38 §2.1): the run passed G5 and its block window closed. `push`: the workflow asks
+   * for a push token (`preparePublish`), the runner pushes (`publishRun`), then the worker opens
+   * or finds the pull request (`finishPublish`). `open_pr`: the branch is pushed; only
+   * `finishPublish` is left.
+   */
+  | { readonly outcome: 'publish'; readonly runId: string; readonly step: 'push' | 'open_pr' };
 
 export type IntentWaitReason =
   /** The gate needs a person's decision. */
@@ -124,5 +131,18 @@ export type IntentWaitReason =
    * plan; G3 waits for a new plan (a plan hash G5 has not refused).
    */
   | 'new_plan_needed'
+  /**
+   * C08 (ADR-M38 §2.5): the push or the pull request could not be done (an empty diff, a branch
+   * someone else changed, repeated failures); the intent is paused at G6 until a person decides on
+   * the `technical` escalation (QUESTIONS #156).
+   */
+  | 'publish_review'
+  /**
+   * C08: the push failed for a reason that may pass (the Git host, the runner); the workflow tries
+   * again after a delay, a few times.
+   */
+  | 'publish_retry'
+  /** C08: the pull request is open; G6 waits for CI (C08 PR 2 reads the checks). */
+  | 'ci_pending'
   /** A status that the workflow does not move (`paused`, `blocked`, `running`). */
   | 'not_in_gate';

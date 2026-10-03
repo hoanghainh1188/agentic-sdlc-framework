@@ -179,7 +179,8 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
         expect(result.outputs?.headSha).not.toBe(r.repoBase);
         expect(result.outputs?.events.length).toBeGreaterThan(2);
         const run = await r.scope.runs.getById(runId);
-        expect(run).toMatchObject({ status: 'succeeded', head_sha: result.outputs?.headSha });
+        // C08: the sandbox's HEAD is not the pushed head (ADR-M38 §2.2).
+        expect(run).toMatchObject({ status: 'succeeded', head_sha: null });
         expect(run?.iterations).toBeGreaterThanOrEqual(1);
         expect((await agentEvents(r)).map(([type]) => type)).toEqual([
           'agent_started',

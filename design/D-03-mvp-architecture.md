@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.17 |
+| Version | 1.18 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29); 1.9 approved by Harry on 2026-09-27 in the B07 session 2 plan (HOTL block window, C06 waits for it, the gate deadline timer; ADR-M30); 1.10 approved by Harry on 2026-09-27 in the B12 plan (project AI record module: codes only, write roles, G1 check at the submit; ADR-M32); 1.11 approved by Harry on 2026-09-27 in the C06 plan (G4 checks and decisions, `getBranchHead`, the worker holds the Cost Controller AppRole; QUESTIONS #108–#112; ADR-M33); 1.12 approved by Harry on 2026-09-27 in the C06 session 2 plan (the run's round after G4, the task queue `sdlc-runner`, a failed or lost run is escalated, `revokeRunKey`; ADR-M33 §2.6–§2.7); 1.13 approved by Harry on 2026-09-27 in the C06 session 2 plan, PR 2b (the L1 proposal as evidence, `EvidenceStore` as built, the runner reads a sandbox's workspace; ADR-M33 §2.9); 1.14 approved by Harry on 2026-09-30 in the A08 plan (OpenTelemetry Collector in the profile `observability`, one OTLP pipeline to Langfuse v4; QUESTIONS #4; ADR-M35); 1.15 approved by Harry on 2026-09-28 in the C07 plan (`listPaths`, the run's changes checked and stored by the runner, the in-run spend check; QUESTIONS #126, #130; ADR-M34); 1.16 approved by Harry on 2026-09-28 in the C07 plan and on 2026-10-03 (decisions A–C) (the G5 step, the G5 escalation and its decisions, the budget warning during the run; QUESTIONS #131–#134; ADR-M34 §2.8–§2.9); 1.17 approved by Harry on 2026-10-03 in the B08 plan (the spec is the file on the default branch, checked again at G2–G4; QUESTIONS #160–#164; ADR-M39) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29); 1.9 approved by Harry on 2026-09-27 in the B07 session 2 plan (HOTL block window, C06 waits for it, the gate deadline timer; ADR-M30); 1.10 approved by Harry on 2026-09-27 in the B12 plan (project AI record module: codes only, write roles, G1 check at the submit; ADR-M32); 1.11 approved by Harry on 2026-09-27 in the C06 plan (G4 checks and decisions, `getBranchHead`, the worker holds the Cost Controller AppRole; QUESTIONS #108–#112; ADR-M33); 1.12 approved by Harry on 2026-09-27 in the C06 session 2 plan (the run's round after G4, the task queue `sdlc-runner`, a failed or lost run is escalated, `revokeRunKey`; ADR-M33 §2.6–§2.7); 1.13 approved by Harry on 2026-09-27 in the C06 session 2 plan, PR 2b (the L1 proposal as evidence, `EvidenceStore` as built, the runner reads a sandbox's workspace; ADR-M33 §2.9); 1.14 approved by Harry on 2026-09-30 in the A08 plan (OpenTelemetry Collector in the profile `observability`, one OTLP pipeline to Langfuse v4; QUESTIONS #4; ADR-M35); 1.15 approved by Harry on 2026-09-28 in the C07 plan (`listPaths`, the run's changes checked and stored by the runner, the in-run spend check; QUESTIONS #126, #130; ADR-M34); 1.16 approved by Harry on 2026-09-28 in the C07 plan and on 2026-10-03 (decisions A–C) (the G5 step, the G5 escalation and its decisions, the budget warning during the run; QUESTIONS #131–#134; ADR-M34 §2.8–§2.9); 1.17 approved by Harry on 2026-10-03 in the B08 plan (the spec is the file on the default branch, checked again at G2–G4; QUESTIONS #160–#164; ADR-M39); 1.18 approved by Harry on 2026-10-03 in the C08 plan (the push after G5, the pull request, `openPullRequest` and `findOpenPullRequest`, the push token, the runner reads run diffs; QUESTIONS #155, #156; ADR-M38 §2.1–§2.6) |
 | Readers | Tech lead / architect, developers, Claude Code |
 | Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
 | Main source | Draft v1.0, Chapter 4 (logical architecture), 5.8 (MVP). This document is **the reduced MVP version** |
@@ -94,7 +94,8 @@ flowchart TB
     LL --> LLM
     LL --> LF
     LL --> VK
-    OH -- "push branch agent/*" --> GH
+    RUN -- "clone; push agent/* after G5" --> GH
+    WK -- "open PR (G6)" --> GH
     MOD --> PG
     EVD --> S3
     COST <--> LL
@@ -104,7 +105,7 @@ flowchart TB
 
 SVG version: [d11-mvp-architecture.svg](../diagrams/svg/d11-mvp-architecture.svg)
 
-- Note (version 1.6, QUESTIONS #52): the **runner**, not the agent in the sandbox, clones the repository and pushes `agent/*`; the sandbox reaches only LiteLLM and the package proxy (section 9). The arrow "OH → push branch agent/*" above, diagram D11 and the D-02 §5 flow are updated in task C08.
+- Note (version 1.6, QUESTIONS #52; diagram updated in version 1.18, task C08): the **runner**, not the agent in the sandbox, clones the repository and pushes `agent/*`, after G5 passed the run; the worker opens the pull request. The sandbox reaches only LiteLLM and the package proxy (section 9).
 
 ---
 
@@ -178,6 +179,7 @@ stateDiagram-v2
     G6 --> Running: CI fail (retries left)
     G6 --> G3: CI fail (no retries left)
     G6 --> Escalated: critical security finding
+    G6 --> Escalated: push or pull request refused
     G6 --> G7: pass
     G7 --> Running: request changes
     G7 --> G8: approved (+ 2nd approver if flagged) + merged
@@ -214,6 +216,12 @@ General rules:
   - Otherwise HOTL: a system `pass` → G6 (the block window applies; a request for changes within it starts a new run after G4). HITL (configuration): a person approves; the run's producer never does.
   - The escalation's decision: `resume` → back to G4 (a new run from the latest commit of the default branch), with a budget increase only when the decision names it with an amount (API); `modify` or `roll_back` → back to G3, HITL, the same plan allowed; `terminate` → `cancelled`. A changed G5 input voids the decision, closes the escalation and evaluates G5 again.
   - The budget warning at `budget.warn_percent` is posted during the run: the runner records the run event and the intent's notice in one transaction.
+- **G6, the push and the pull request** (version 1.18, ADR-M38 §2.1–§2.6, QUESTIONS #52, #134, #155, #156): when G5 passed a run, G6 waits until the G5 block window closes and checks the freeze (`push`, `open_pr`). Then:
+  - the worker issues a single-repository token with `contents: write` for this push only and hands it to the runner as a single-use wrapping token (10 minutes);
+  - the runner reads the run's stored diff back (the diff G5 checked; its SHA-256 and the hash of its changed paths must match), builds one commit in a private index on the run's base commit (author `sdlc-agent`, dates of the run's end, so a repeated push makes the same commit) and pushes it to `agent/INT-…` with an explicit refspec and no force. The branch must be absent, at the base commit, or already at the commit. `runs.head_sha` is that commit, recomputed outside the sandbox (ADR-M29 §2.5);
+  - the worker finds the open pull request from the branch, or opens it (template T2, filled from codes only), checks that it shows the pushed commit, and links it to the intent (`intents.pr_number`). The intent then waits for CI (C08 PR 2).
+  - The runner's refusal (`empty_diff`, `diff_mismatch`, `branch_moved`…) or three failed attempts (a lost runner counts) → `paused` at G6 and a `technical` escalation at `run.failed_run_escalation`; `resume` → G4 (a new run), `modify` or `roll_back` → G3 (HITL), `terminate` → `cancelled`.
+  - Once a run of the intent was pushed, the next run starts from the pushed commit, so its changes go on top of the pull request (QUESTIONS #134).
 - Retry counts, thresholds, the oversight matrix and SLAs **come from per-project configuration**.
 
 ### 6.1. Resolving the oversight mode
@@ -284,6 +292,8 @@ interface GitHostAdapter {
   getBranchHead(ref: RepoRef, branch: string): Promise<string>;
   listPaths(ref: RepoRef, sha: string): Promise<string[]>;
   issueShortLivedToken(ref: RepoRef, scope: TokenScope): Promise<ShortLivedToken>;
+  openPullRequest(ref: RepoRef, input: NewPullRequest): Promise<PullRequestInfo>;
+  findOpenPullRequest(ref: RepoRef, head: string, base: string): Promise<PullRequestInfo | null>;
   listEventsSince(ref: RepoRef, cursor: EventCursor): Promise<{ events: GitEvent[]; next: EventCursor }>; // MVP: polling
   verifyWebhook(headers: Record<string, string>, rawBody: Buffer): GitEvent; // enabled later
 }
@@ -292,7 +302,7 @@ MVP: `GitHubAdapter` through a **GitHub App** (short-lived per-repo tokens), rea
 
 - Polling and webhooks return the same `GitEvent` type → one handler for `/approve` commands, reviews and CI.
 - The `EventCursor` is stored per project in the database, so events are not processed twice after a restart.
-- The exact TypeScript interface is `GitHostAdapter` in `@sdlc/contracts` (`platform/packages/contracts/src/git-host.ts`, task B05, ADR-M23). Same eleven methods and parameters as above. Notes:
+- The exact TypeScript interface is `GitHostAdapter` in `@sdlc/contracts` (`platform/packages/contracts/src/git-host.ts`, task B05, ADR-M23). Same thirteen methods and parameters as above (version 1.18). Notes:
   - `GitEvent` has three kinds: `comment_created`, `review_submitted`, `check_completed`. Each has a stable `id` (the same for polling and webhooks) and a `url` to store as a reference. Only a comment's `body` is free text; it is never stored in an append-only table.
   - Only **new** comments are events; an edited comment never is (QUESTIONS #43).
   - Actors carry the numeric account ID and `type: user | bot`. Users are mapped by the numeric ID only; bots never count as approvers (QUESTIONS #45).
@@ -300,7 +310,8 @@ MVP: `GitHubAdapter` through a **GitHub App** (short-lived per-repo tokens), rea
   - `getChangedFiles` returns both paths of a renamed file and fails instead of returning a partial list. `getApprovals` returns each reviewer's latest decision, bound to the reviewed commit.
   - `getBranchHead` (version 1.11, task C06, QUESTIONS #109): the commit a branch points to now. G4 reads the head of the default branch as the run's `base_sha`.
   - `listPaths` (version 1.15, task C07, QUESTIONS #126): every path of a commit's tree that is not a directory, sorted. G4 reads it at `base_sha` and refuses a run when an agent instruction file other than the pinned one exists (`instructions_unpinned`, ADR-M34 §2.4). A tree the host lists only in part fails (`tree_truncated`) and G4 refuses the run: very large repositories cannot run an agent for now.
-  - Later tasks add what they need, with a D-03 update: opening a pull request (C08), revoking a short-lived token (C11), the merge event (E01).
+  - `openPullRequest` and `findOpenPullRequest` (version 1.18, task C08, ADR-M38 §2.4): open the pull request of an agent branch into the default branch, never as a draft, with a token of its own that may write pull requests (the adapter's cached token stays read-only); find an open one first, so a repeated call never opens a second. More than one match fails.
+  - Later tasks add what they need, with a D-03 update: revoking a short-lived token (C11), the merge event (E01).
 
 ### 7.2. Agent
 
@@ -429,7 +440,7 @@ Licence note [External]:
 | Secret | Engine | Who may read it |
 |---|---|---|
 | Run Contract signing key | Transit (non-exportable) | worker (signs), runner (reads the public key) |
-| GitHub App private key | KV | api, worker (polls GitHub, posts gate comments, reads specs, issues the run's single-repository token; QUESTIONS #42, #44). **Not the runner**: it receives the run's token from the worker as an OpenBao response-wrapped token (single use), unwraps it once and keeps it in memory only (ADR-M25) |
+| GitHub App private key | KV | api, worker (polls GitHub, posts gate comments, reads specs, issues the run's single-repository token, issues the push token at G6 and opens the pull request; QUESTIONS #42, #44; version 1.18). **Not the runner**: it receives the run's token from the worker as an OpenBao response-wrapped token (single use), unwraps it once and keeps it in memory only (ADR-M25) |
 | LiteLLM master key | KV (`kv/cost-controller/litellm-master-key`) | Cost Controller; LiteLLM through its OpenBao Agent sidecar (AppRole `litellm`, this one path only). One source for both (ADR-M24). Version 1.11 (ADR-M33 §2.5, QUESTIONS #112): the Cost Controller runs in the **worker** process, which logs in with two AppRoles (`worker` and `cost-controller`) and so can use this key. The worker hands the run's virtual key to the runner as a single-use wrapping token, like the GitHub token |
 | Model provider API keys | KV | **LiteLLM only**, through an OpenBao Agent sidecar (AppRole `litellm`) that renders them to a tmpfs file LiteLLM reads at start-up. No LiteLLM Enterprise licence (QUESTIONS #1) |
 | Database and SeaweedFS passwords | KV | The matching process |
@@ -444,7 +455,7 @@ Licence note [External]:
 
 | Topic | What the MVP does |
 |---|---|
-| GitHub permissions | GitHub App with minimal permissions. Short-lived tokens, issued per run by the worker, for the run's repo only. Used by the runner to clone and push; never given to the sandbox |
+| GitHub permissions | GitHub App with minimal permissions. Short-lived tokens, issued by the worker, for the run's repo only: `contents: read` to clone, and (version 1.18) `contents: write` for one push after G5. Used by the runner only; never given to the sandbox. Opening the pull request needs `pull_requests: write`, minted by the adapter for that call. Branch protection on the default branch refuses any push to it (N6) |
 | Branches | The agent only pushes `agent/*`. `main` has branch protection (D-09 section 6) |
 | Model keys | The agent only has a LiteLLM **virtual key**, with a cap, revoked when the run ends |
 | Sandbox network | Outbound only to LiteLLM and the package proxy (npm first), on an internal Docker network per run; no route to the internet. GitHub is reached by the runner, never by the sandbox: the runner clones and pushes `agent/*` with the run's short-lived single-repository token. Everything else is blocked (ADR-M25) |
@@ -472,7 +483,7 @@ Licence note [External]:
 | `otel-collector` (profile `observability`) | OpenTelemetry Collector (core distribution, pinned) on a small pinned base image with a health check. Tracing of the platform processes and LiteLLM is off unless `SDLC_OTEL_ENDPOINT` points at it (version 1.14, ADR-M35) |
 | `seaweedfs` | S3 API for Evidence Packs and Langfuse. Single node |
 | `openbao` | Raft storage. Needs an unseal procedure and key backup (see 10.2) |
-| `sdlc-api`, `sdlc-worker`, `sdlc-runner` | Built by us. Version 1.12: the runner is a Temporal worker on the task queue `sdlc-runner`, its activity slots = its sandbox limit, so extra runs wait in Temporal (ADR-M33 §2.6). Version 1.13: the runner writes L1 proposals to SeaweedFS with its own write-only identity from OpenBao (`kv/runner/evidence`); its Docker access adds reading the archive of a run sandbox (ADR-M33 §2.9) |
+| `sdlc-api`, `sdlc-worker`, `sdlc-runner` | Built by us. Version 1.12: the runner is a Temporal worker on the task queue `sdlc-runner`, its activity slots = its sandbox limit, so extra runs wait in Temporal (ADR-M33 §2.6). Version 1.13: the runner writes L1 proposals to SeaweedFS with its own write-only identity from OpenBao (`kv/runner/evidence`); its Docker access adds reading the archive of a run sandbox (ADR-M33 §2.9). Version 1.18: the same identity may read run diffs (`Read:evidence/diffs/*`), which the push applies (ADR-M38 §2.2) |
 | OpenHands sandbox | **Not declared up front**. The runner creates it per run, from the project's sandbox image pinned by digest (config `sandbox.image`), with its own internal network and workspace volume, and removes all three afterwards (ADR-M25) |
 | `npm-proxy`, `docker-socket-proxy`, `registry` (profile `sandbox`) | Package proxy for sandboxes (Verdaccio); the runner's limited access to Docker; a local registry for sandbox images (`registry:2`; GHCR after the GitHub Team upgrade). Added in C04 session 3 (ADR-M25, QUESTIONS #54, #59) |
 
@@ -658,4 +669,5 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.15 | 2026-10-03 | Claude (task C07, PR 1), approved by Harry | §7.1: `listPaths` (eleven methods), a truncated tree is refused; §6: the runner checks and stores the run's changes, and stops the run at the budget (ADR-M34, QUESTIONS #126, #130) |
 | 1.16 | 2026-10-03 | Claude (task C07, PR 2), approved by Harry | §6: the G5 step, its outcomes and the escalation's decisions; state machine and diagram D12: G5 → Escalated causes, Escalated → G4 / G3 / Cancelled (ADR-M34 §2.8–§2.9, QUESTIONS #131–#134) |
 | 1.17 | 2026-10-03 | Claude (task B08), approved by Harry | §6: the spec is the file on the default branch, checked again at G2–G4 before the transaction; changed or unreadable → back to G2; state machine and diagram D12: G3 → G2, G4 → G2 (ADR-M39, QUESTIONS #160–#164) |
+| 1.18 | 2026-10-03 | Claude (task C08, PR 1), approved by Harry | §4: diagram D11, the runner pushes after G5 and the worker opens the pull request; §6: G6, the push and the pull request, state machine and D12 (push or pull request refused → Escalated); §7.1: `openPullRequest`, `findOpenPullRequest` (thirteen methods); §8.2, §9: the push token; §10: the runner reads run diffs (ADR-M38, QUESTIONS #134, #155, #156) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Principles renamed AP1–AP7 (to avoid clashing with phase codes P1–P6). ADRs listed in order. Content unchanged |

@@ -14,12 +14,13 @@ sequenceDiagram
     P-->>B: Request plan approval (G3, oversight from matrix)
     B->>P: /approve G3 (bound to plan hash, expiry)
     P->>R: G4: registered agent, autonomy, contract, limits
-    R->>AG: Run the agent on its own branch
+    R->>AG: Run the agent in its sandbox (no Git host access)
     AG->>GW: Call the model (labelled tenant/intent/run)
     GW-->>R: Tokens used
     R->>P: G5: file scope, budget, loop detection
     Note over P,A: Breach → escalation (SLA clocks, backup owner, freeze)
-    AG->>G: Push branch, open PR
+    R->>G: Push the checked changes to agent/INT-… (after G5)
+    P->>G: Open the PR (template T2, codes only)
     G-->>P: G6: CI, test, scan results
     P-->>B: Request review (G7) + evidence pack
     B->>G: Approve PR (+ second approver for sensitive changes)

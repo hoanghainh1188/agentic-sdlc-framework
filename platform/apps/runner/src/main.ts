@@ -69,8 +69,8 @@ async function connectDatabase(
 
 /**
  * The evidence stores of L1 proposals (C06 session 2b, ADR-M33 §2.9) and run diffs (C07, ADR-M34
- * §2.2), with the runner's write-only
- * SeaweedFS credential from OpenBao (`kv/runner/evidence`). Without it the runner still starts; an
+ * §2.2), with the runner's SeaweedFS credential from OpenBao (`kv/runner/evidence`): write under
+ * `proposals/` and `diffs/`, read under `diffs/` only (C08, QUESTIONS #155). Without it the runner still starts; an
  * L1 run that finishes then fails (`proposal_unavailable`) and the intent is paused.
  */
 async function evidenceStores(
@@ -166,7 +166,14 @@ async function main(): Promise<void> {
       namespace: proc.temporal.namespace,
       taskQueue: RUNNER_TASK_QUEUE,
       activities: {
-        ...createRunnerActivities({ db, runner, unwrapper: openbao.wrapping(), logger }),
+        ...createRunnerActivities({
+          db,
+          runner,
+          unwrapper: openbao.wrapping(),
+          logger,
+          // C08 (ADR-M38 §2.2): the push reads the run's diff back (`Read:evidence/diffs/*`).
+          publish: { settings, ...(evidence ? { diffEvidence: evidence.diffs } : {}) },
+        }),
       },
       // The log context (tenant, run) of each activity (A08, ADR-M35 §2.6). No runner traces yet.
       interceptors: { activity: [activityTracingInterceptor({ withLogContext })] },

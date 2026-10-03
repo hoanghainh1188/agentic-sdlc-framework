@@ -11,6 +11,7 @@ import {
   parseTenantId,
   type G4Deps,
   type PlatformDatabase,
+  type PublishDeps,
   type Registry,
   type RunDeps,
 } from '@sdlc/core';
@@ -24,6 +25,8 @@ export const MASTER_KEY_FIELD = 'value';
 export interface WorkerRuns {
   readonly g4: G4Deps;
   readonly runs: RunDeps;
+  /** C08: the push token and the pull request at G6. */
+  readonly publish: PublishDeps;
   close(): Promise<void>;
 }
 
@@ -73,6 +76,7 @@ export async function createWorkerRuns(options: {
         wrapper: options.wrapper,
         egressAllowlist: settings.egressAllowlist,
       },
+      publish: { registry: options.registry, gitHost: options.gitHost, wrapper: options.wrapper },
       close: () => cost.close(),
     };
   } catch (error) {

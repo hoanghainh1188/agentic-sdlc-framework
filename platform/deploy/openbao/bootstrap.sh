@@ -51,8 +51,9 @@ Commands:
                        Ask for an admin token (hidden). Create a new SeaweedFS key pair for the
                        runner's L1 proposals and run diffs, store it at kv/runner/evidence and
                        apply it to SeaweedFS as the identity "runner-evidence", limited to
-                       Write:evidence/proposals/* and Write:evidence/diffs/* (C06, ADR-M33 §2.9;
-                       C07, ADR-M34 §2.2). The old key stops working.
+                       Write:evidence/proposals/*, Write:evidence/diffs/* and Read:evidence/diffs/*
+                       (C06, ADR-M33 §2.9; C07, ADR-M34 §2.2; C08, ADR-M38 §2.2: the push reads
+                       the checked diff back). The old key stops working.
                        Prints no secret. Run it again to rotate, then restart sdlc-runner.
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
@@ -405,14 +406,14 @@ cmd_runner_evidence_credentials() {
       [ "${#access}" -eq 30 ] && [ "${#secret}" -eq 60 ]
       printf "{\"access_key\":\"%s\",\"secret_key\":\"%s\"}" "$access" "$secret" |
         bao kv put -mount=kv runner/evidence - >/dev/null
-      printf "s3.configure -user runner-evidence -access_key %s -secret_key %s -actions Write:evidence/proposals/*,Write:evidence/diffs/* -apply\n" "$access" "$secret"' |
+      printf "s3.configure -user runner-evidence -access_key %s -secret_key %s -actions Write:evidence/proposals/*,Write:evidence/diffs/*,Read:evidence/diffs/* -apply\n" "$access" "$secret"' |
     compose exec -T seaweedfs $weed >/dev/null 2>&1 ||
     fail "could not create the runner evidence credentials (token valid? OpenBao configured? SeaweedFS running?)"
   [ "$(kv_version)" = "$((before + 1))" ] ||
     fail "kv/runner/evidence was not stored (token valid? OpenBao configured?); run the command again"
   echo "s3.configure" | compose exec -T seaweedfs sh -c "$weed 2>/dev/null | grep -q '\"name\": *\"runner-evidence\"'" ||
     fail "SeaweedFS has no identity runner-evidence; run the command again"
-  say "kv/runner/evidence stored; SeaweedFS identity runner-evidence (Write:evidence/proposals/*, Write:evidence/diffs/*) applied; restart sdlc-runner to use it"
+  say "kv/runner/evidence stored; SeaweedFS identity runner-evidence (Write:evidence/proposals/*, Write:evidence/diffs/*, Read:evidence/diffs/*) applied; restart sdlc-runner to use it"
 }
 
 case "$command" in

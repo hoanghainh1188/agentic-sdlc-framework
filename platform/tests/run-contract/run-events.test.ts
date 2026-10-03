@@ -10,7 +10,7 @@ const refused = (type: string, payload: Record<string, unknown>) => () =>
   checkRunEvent(type, payload);
 
 describe('run event payloads', () => {
-  it('declares the C02, C04, C05, C06 and C07 event types', () => {
+  it('declares the C02, C04, C05, C06, C07 and C08 event types', () => {
     expect(Object.keys(RUN_EVENT_TYPES)).toEqual([
       'contract_issued',
       'contract_accepted',
@@ -30,7 +30,27 @@ describe('run event payloads', () => {
       'budget_warning',
       'diff_stored',
       'changes_checked',
+      'branch_pushed',
+      'publish_refused',
+      'publish_failed',
     ]);
+  });
+
+  it('C08: branch_pushed holds commits and hashes; publish_refused and publish_failed a code', () => {
+    const head = 'a'.repeat(40);
+    const pushed = {
+      head_sha: head,
+      parent_sha: 'b'.repeat(40),
+      diff_sha256: 'c'.repeat(64),
+      paths_sha256: 'd'.repeat(64),
+    };
+    expect(checkRunEvent('branch_pushed', pushed)).toEqual(pushed);
+    expect(refused('branch_pushed', { ...pushed, diff_sha256: 'x' })).toThrow(DbError);
+    expect(refused('branch_pushed', { ...pushed, path: 'src/a.ts' })).toThrow(DbError);
+    expect(checkRunEvent('publish_refused', { reason: 'branch_moved' })).toEqual({
+      reason: 'branch_moved',
+    });
+    expect(refused('publish_failed', { reason: 'git said: no' })).toThrow(DbError);
   });
 
   it('C07: key_issued holds the cap as a decimal string and which budget set it', () => {

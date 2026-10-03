@@ -22,7 +22,7 @@
 
 - A PR without an AI disclosure → the reviewer asks for it before reading the code.
 - The "human reviewed every file" box is ticked **only by the reviewer**, when approving. The author or the AI never ticks it (producer ≠ approver, Chapter 5).
-- PRs created by the platform's agent: the platform fills in the intent and run ID (task C08 in D-08).
+- PRs created by the platform's agent: the platform opens the PR and fills this template from codes only: intent, run, agent, model, autonomy, the plan and diff hashes, "AI wrote most / all" and "Only files in the approved plan" (checked at G5). It never ticks "A human reviewed every file" and never writes the intent's title, file paths or text from the agent (handbook Ch.14 §14.10.1; `design/ADR-M38-gate-g6.md` §2.4).
 
 ## Version history
 
@@ -32,3 +32,4 @@
 | 0.1 | 2026-09-24 | Claude (draft) | First content + `.github/pull_request_template.md` |
 | 0.2 | 2026-09-24 | Claude (draft) | Translated into English |
 | 0.3 | 2026-09-25 | Claude (draft) | Human-review box separated from the AI disclosure; ticked only by the reviewer |
+| 0.4 | 2026-10-03 | Claude Code (task C08, PR 1) | Rule: how the platform fills the template for its agent's PRs |
