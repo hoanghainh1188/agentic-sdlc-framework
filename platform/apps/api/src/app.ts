@@ -8,6 +8,7 @@ import type { IntentWorkflowSignals } from '@sdlc/contracts';
 import { Registry, type PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
+import { AdminAgentsController } from './admin/agents.controller.js';
 import { AdminAuditController } from './admin/audit.controller.js';
 import { AdminProjectsController } from './admin/projects.controller.js';
 import { AdminTenantAdminsController } from './admin/tenant-admins.controller.js';
@@ -68,6 +69,7 @@ class ApiModule {
         AdminUsersController,
         AdminTenantAdminsController,
         AdminAuditController,
+        AdminAgentsController,
         MeTokensController,
       ],
       providers: [

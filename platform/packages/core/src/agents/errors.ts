@@ -25,6 +25,13 @@ export type AgentRegisterErrorCode =
   | 'model_not_pinned'
   /** A recertification date in the future, or before the last one. */
   | 'recertification_date_invalid'
+  // --- the register through the API (B13 AC7, handbook Ch.20) ---
+  /** The person may not do this: register (tenant admin), change, hand over, recertify, stop. */
+  | 'not_permitted'
+  /** The person does not fill the capacity, or the capacity does not approve this step. */
+  | 'not_an_approver'
+  /** The person, or someone in the same capacity, already approved this round. */
+  | 'approval_duplicate'
   // --- the check before a run (C06, D-02 FR-36) ---
   /** No agent with this ID in the tenant. */
   | 'agent_not_found'
@@ -64,6 +71,9 @@ export const AGENT_REGISTER_ERROR_MESSAGES = {
   reason_required: 'agent_register.error.reason_required',
   model_not_pinned: 'agent_register.error.model_not_pinned',
   recertification_date_invalid: 'agent_register.error.recertification_date_invalid',
+  not_permitted: 'agent_register.error.not_permitted',
+  not_an_approver: 'agent_register.error.not_an_approver',
+  approval_duplicate: 'agent_register.error.approval_duplicate',
   agent_not_found: 'agent_register.error.agent_not_found',
   agent_not_active: 'agent_register.error.agent_not_active',
   autonomy_above_agent: 'agent_register.error.autonomy_above_agent',
@@ -73,6 +83,10 @@ export const AGENT_REGISTER_ERROR_MESSAGES = {
 } as const satisfies Record<AgentRegisterErrorCode, MessageKey>;
 
 /** The text of a refusal. `agentKey` names the agent in the text; missing values render as `-`. */
+export function isAgentRegisterErrorCode(code: string): code is AgentRegisterErrorCode {
+  return Object.hasOwn(AGENT_REGISTER_ERROR_MESSAGES, code);
+}
+
 export function agentRegisterErrorMessage(
   error: AgentRegisterError,
   agentKey = '-',

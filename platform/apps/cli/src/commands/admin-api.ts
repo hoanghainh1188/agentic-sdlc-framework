@@ -7,6 +7,7 @@ import { t } from '@sdlc/messages';
 
 import { parseCommand, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
+import { AGENT_COMMANDS } from './admin-agents.js';
 import type { AdminApiCommand } from './admin-call.js';
 import { PROJECT_COMMANDS } from './admin-projects.js';
 import { USER_COMMANDS } from './admin-users.js';
@@ -20,11 +21,13 @@ export const ADMIN_API_GROUPS = [
   'config',
   'tenant-admin',
   'token',
+  'agent',
 ] as const;
 
 const COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
   ...PROJECT_COMMANDS,
   ...USER_COMMANDS,
+  ...AGENT_COMMANDS,
 };
 
 export function isAdminApiGroup(group: string | undefined): boolean {

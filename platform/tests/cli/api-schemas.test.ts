@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   adminConfigSchema,
+  agentRoundSchema,
+  agentSchema,
   adminIdentitySchema,
   adminProjectSchema,
   adminRoleSchema,
@@ -20,6 +22,8 @@ import {
   meSchema,
 } from '../../apps/cli/src/api/schemas.js';
 import {
+  agentBody,
+  roundBody,
   aiRecordBody,
   chainBody,
   issuedTokenBody,
@@ -65,6 +69,9 @@ describe('CLI response schemas match the API presenters', () => {
     ['issued token', issuedTokenSchema, issuedTokenBody(`sdlc_pat_${'k'.repeat(43)}`, true)],
     ['audit chain', chainSchema, chainBody()],
     ['broken audit chain', chainSchema, chainBody(true)],
+    ['agent', agentSchema, agentBody({ status: 'active', last_recertified_at: '2026-01-05' })],
+    ['agent round', agentRoundSchema, roundBody()],
+    ['completed agent round', agentRoundSchema, roundBody(true)],
   ] as const)('%s', (_name, schema, body) => {
     const parsed = schema.safeParse(body);
     expect(parsed.error?.issues).toBeUndefined();

@@ -297,7 +297,7 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
    ```
 2. Migrate the database (`pnpm db:migrate`), then create your tenant, your user and your first token. `SDLC_DB_URL` is the `platform_app` URL (`platform/deploy/README.md`, "First admin and API tokens"):
    ```bash
-   pnpm sdlc admin bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
+   pnpm sdlc ops bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
    ```
 3. Check the token: `curl -s -H "Authorization: Bearer <token>" http://127.0.0.1:8090/v1/me`.
 4. Log in with the CLI (task B04, [ADR-M36](../design/ADR-M36-cli-api-client.md)) and paste the token at the hidden prompt. The login is saved in `~/.config/sdlc/credentials.json`, readable only by you:
@@ -305,7 +305,7 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
    pnpm sdlc login --api-url http://127.0.0.1:8090
    pnpm sdlc whoami
    ```
-   Then `pnpm sdlc intent …`, `pnpm sdlc gate …`, `pnpm sdlc escalation …` and `pnpm sdlc ai-record …` work through the API (handbook Ch.19 §19.8c). `pnpm sdlc logout` deletes the saved login but does not revoke the token.
+   Then `pnpm sdlc intent …`, `pnpm sdlc gate …`, `pnpm sdlc escalation …` and `pnpm sdlc ai-record …` work through the API (handbook Ch.19 §19.8c). `pnpm sdlc logout` revokes the token on the server, then deletes the saved login.
 
 5. Set up a project and its team through the API (task B13, [ADR-M37](../design/ADR-M37-admin-onboarding.md), handbook Ch.19 §19.8d). The bootstrap made you a tenant admin. Nobody gives a role to themselves, so add a second person for each role you need; Person A and Person B are always different people:
    ```bash
@@ -315,7 +315,8 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
    pnpm sdlc admin role grant --project pilot --user colleague@example.com --role person_b
    pnpm sdlc admin config show --project pilot
    ```
-   The numeric GitHub ID comes from `gh api users/<login> --jq .id`. Until B13 PR 2 adds `sdlc ops role grant`, a role for yourself needs a second tenant admin (`pnpm sdlc admin tenant-admin grant --user <email>`), who then grants it.
+   The numeric GitHub ID comes from `gh api users/<login> --jq .id`. Nobody gives a role to themselves through the API: a role for yourself comes from a second tenant admin (`pnpm sdlc admin tenant-admin grant --user <email>`), or from the operator on the server (`pnpm sdlc ops role grant --tenant internal --project pilot --email you@example.com --role person_a`, with `SDLC_DB_URL`).
+6. Replace the bootstrap token with your own: `pnpm sdlc token create --name laptop-you`, log in again with it (`pnpm sdlc login`), then revoke the bootstrap token (`pnpm sdlc token list`, `pnpm sdlc token revoke --id <ID>`).
 
 ## Sending handbook comments
 

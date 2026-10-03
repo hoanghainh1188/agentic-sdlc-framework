@@ -1,6 +1,6 @@
 // Request schemas of the admin endpoints (task B13, ADR-M37 §2.6). Shapes only; the core admin
 // services check the values again, so the operator commands follow the same rules.
-import { PROJECT_ROLES } from '@sdlc/contracts';
+import { AGENT_KEY_PATTERN, PROJECT_ROLES } from '@sdlc/contracts';
 import {
   API_TOKEN_MAX_LIFETIME_DAYS,
   API_TOKEN_NAME_PATTERN,
@@ -74,4 +74,48 @@ export const historyQuerySchema = z.strictObject({
 export const issueTokenSchema = z.strictObject({
   name: z.string().regex(API_TOKEN_NAME_PATTERN),
   days: z.number().int().min(1).max(API_TOKEN_MAX_LIFETIME_DAYS).optional(),
+});
+
+// The agent register (B13 AC7). The core rules (`agents/rules.ts`) check the formats again.
+export const agentKeySchema = z.string().regex(AGENT_KEY_PATTERN);
+const tools = z.array(z.string().max(64)).max(32);
+const environments = z.array(z.enum(['sandbox', 'staging', 'production'])).max(3);
+const autonomy = z.enum(['L0', 'L1', 'L2']);
+const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
+
+export const registerAgentSchema = z.strictObject({
+  key: agentKeySchema,
+  version: z.string().max(64),
+  owner_id: idSchema,
+  model_ref: z.string().max(128).nullable().optional(),
+  instructions_ref: z.string().max(300),
+  instructions_sha256: sha256,
+  allowed_tools: tools.default([]),
+  max_autonomy: autonomy,
+  approved_environments: environments.default(['sandbox']),
+});
+
+export const updateAgentSchema = z.strictObject({
+  version: z.string().max(64),
+  model_ref: z.string().max(128).nullable().optional(),
+  instructions_ref: z.string().max(300).optional(),
+  instructions_sha256: sha256.optional(),
+  allowed_tools: tools.optional(),
+  max_autonomy: autonomy.optional(),
+  approved_environments: environments.optional(),
+});
+
+export const approveAgentSchema = z.strictObject({
+  purpose: z.enum(['activate', 'retire']),
+  as: z.enum(['owner', 'person_a', 'person_b', 'governance']),
+  reason_code: z.string().max(64).optional(),
+});
+
+export const stopAgentSchema = z.strictObject({ reason_code: z.string().max(64) });
+export const changeOwnerSchema = z.strictObject({ owner_id: idSchema });
+export const recertifySchema = z.strictObject({
+  day: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });

@@ -3,6 +3,7 @@ export {
   AGENT_REGISTER_ERROR_MESSAGES,
   AgentRegisterError,
   agentRegisterErrorMessage,
+  isAgentRegisterErrorCode,
   type AgentRegisterErrorCode,
 } from './errors.js';
 export {
@@ -35,3 +36,27 @@ export {
   type AgentStatusReason,
   type RecertificationStatus,
 } from './rules.js';
+export {
+  APPROVAL_CAPACITIES,
+  APPROVAL_PURPOSES,
+  CHANGE_APPROVERS,
+  RETIRE_APPROVERS,
+  requiredApprovers,
+  STOP_CAPACITIES,
+  USE_APPROVERS,
+  type ApprovalCapacity,
+  type ApprovalPurpose,
+} from './approval-rules.js';
+export {
+  agentRound,
+  approveAgent,
+  changeOwnerAs,
+  holdsCapacity,
+  recertifyAgentAs,
+  registerAgentAs,
+  stopAgentAs,
+  updateAgentAs,
+  type AgentRound,
+  type ApprovalResult,
+  type ApproveAgent,
+} from './approvals.js';

@@ -124,3 +124,4 @@ Four points were open in the C10 plan:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task C10) | First version |
+| 0.2 | 2026-10-03 | Claude (task B13, PR 2) | Note: §2.2's known gap is closed by ADR-M37 §2.8: the register through the API with handbook Ch.20's approvals; the operator keeps `sdlc ops agent show|list|suspend|quarantine` |

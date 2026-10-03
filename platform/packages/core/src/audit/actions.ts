@@ -269,6 +269,14 @@ export const AUDIT_ACTIONS = {
     entityType: 'agent',
     fields: { agent_key: 'code', from: 'code', to: 'code', reason_code: 'code?' },
   },
+  /**
+   * A person approved an agent's activation or retirement (B13 AC7, Ch.20 §20.7, §20.11), in a
+   * capacity (`owner`, `person_a`, `person_b`, `governance`). The actor is the approver.
+   */
+  'agent.approval_recorded': {
+    entityType: 'agent',
+    fields: { agent_key: 'code', version: 'code', purpose: 'code', capacity: 'code' },
+  },
   /** The agent's owner changed (the owner left, Ch.20 §20.8). Never who the owner is. */
   'agent.owner_changed': { entityType: 'agent', fields: { agent_key: 'code' } },
   /** An agent was recertified (Ch.20 §20.8), or certified by its first activation (ADR-M31 §2.6). */
