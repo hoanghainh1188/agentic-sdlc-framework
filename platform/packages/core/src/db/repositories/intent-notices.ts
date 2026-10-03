@@ -53,6 +53,9 @@ export const INTENT_NOTICE_KINDS = [
   'g5_breach',
   'g5_returned',
   'terminated',
+  // B08 (ADR-M39 §2.4): the spec changed at the head of the default branch, or cannot be read.
+  'spec_changed',
+  'spec_unavailable',
   // C08 PR 1 (ADR-M38 §2.4–§2.5): the push and the pull request.
   'pr_opened',
   'g6_publish_stopped',

@@ -189,6 +189,11 @@ export interface ProjectConfig {
     /** Who may read the project AI record. Writers may always read. */
     readonly ai_record_read_roles: readonly ProjectRole[];
     /**
+     * Who may link an intent's spec (task B08, ADR-M39, QUESTIONS #162; D-02 FR-02). The viewer
+     * role never links a spec (mandatory rule M23).
+     */
+    readonly spec_link_roles: readonly ProjectRole[];
+    /**
      * Pairs of roles one person may not hold together on the project (task B13, ADR-M37,
      * QUESTIONS #154): a grant that would give someone both roles of a pair is refused. Person A
      * and Person B always stay apart (mandatory rule M21).

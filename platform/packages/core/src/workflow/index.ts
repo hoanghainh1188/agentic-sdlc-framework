@@ -54,6 +54,15 @@ export {
   type RunDeps,
 } from './run-lifecycle.js';
 export { isFinalRun, roundRuns } from './run-round.js';
+export {
+  checkSpec,
+  gatherSpecFacts,
+  isSpecCheckGate,
+  SPEC_CHECK_GATES,
+  type SpecCheckOutcome,
+  type SpecFacts,
+  type SpecHold,
+} from './spec-check.js';
 export { stepG6, stepPausedG6, PUBLISH_ATTEMPTS } from './g6.js';
 export {
   abandonPublish,

@@ -5,7 +5,7 @@
 | Status | **Proposed** (task C08; PR 1 in review: the push and the pull request; PR 2 follows: G6 reads CI) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03: two PRs; QUESTIONS #155 A, #156, #157 A with a known limit, #158, #159) |
-| Related | D-02 FR-13, FR-17, FR-18, FR-30, FR-33; D-02 §5 (version 1.2); D-03 sections 4, 6, 7.1, 8.2, 9, 10 (version 1.17); D-05 sections 6.2, 6.4 (version 1.22); D-08 C08 AC1–AC3; D-09 N2, N6; handbook Ch.14 §14.10, template T2; ADR-M23, ADR-M25 §2.1, ADR-M28, ADR-M29 §2.5, ADR-M30 §2.1, ADR-M33 §2.5, §2.9, ADR-M34 §2.8–§2.9; QUESTIONS #52, #57, #123, #124, #134, #155–#159 |
+| Related | D-02 FR-13, FR-17, FR-18, FR-30, FR-33; D-02 §5 (version 1.2); D-03 sections 4, 6, 7.1, 8.2, 9, 10 (version 1.18); D-05 sections 6.2, 6.4 (version 1.23); D-08 C08 AC1–AC3; D-09 N2, N6; handbook Ch.14 §14.10, template T2; ADR-M23, ADR-M25 §2.1, ADR-M28, ADR-M29 §2.5, ADR-M30 §2.1, ADR-M33 §2.5, §2.9, ADR-M34 §2.8–§2.9; QUESTIONS #52, #57, #123, #124, #134, #155–#159 |
 
 ## 1. Context
 

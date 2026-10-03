@@ -14,3 +14,4 @@ export * from './agents/index.js';
 export * from './ai-record/index.js';
 export * from './workflow/index.js';
 export * from './observability/index.js';
+export * from './specs/index.js';

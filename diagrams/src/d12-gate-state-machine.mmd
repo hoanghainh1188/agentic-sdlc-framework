@@ -4,6 +4,8 @@ stateDiagram-v2
     G1 --> G2: approve (HITL, Person A)
     G2 --> G3: approve / HOTL pass
     G3 --> G4: approve plan / HOTL pass
+    G3 --> G2: spec changed at head of default branch
+    G4 --> G2: spec changed at head of default branch
     G4 --> Running: agent registered + autonomy + contract OK
     G4 --> Blocked: Critical / bad config
     Running --> G5: run finished / cost sync

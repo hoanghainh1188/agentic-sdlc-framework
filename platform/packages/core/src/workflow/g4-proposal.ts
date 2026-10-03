@@ -91,15 +91,19 @@ export async function gatherG4Facts(
   scope: TenantScope,
   deps: G4Deps,
   intent: Pick<Intent, 'id' | 'project_id' | 'data_class'>,
+  /** The head the step already read for the spec check (B08): one head for both. */
+  headSha?: string,
 ): Promise<G4Facts> {
   const project = await scope.projects.getById(intent.project_id);
   const ref = project ? projectRepoRef(project) : undefined;
   if (!project || !ref) throw new GitHostError('invalid_input', { field: 'repo' });
   const { config } = await loadEffectiveConfig(scope.projectConfigs, intent.project_id);
-  // QUESTIONS #109: the head of the default branch; once a run of the intent was pushed, the commit
-  // it pushed (QUESTIONS #134, C08, ADR-M38 §2.6): the next run continues the pull request.
+  // QUESTIONS #109: the head of the default branch (B08: the one the spec check read). Once a run
+  // of the intent was pushed, the commit it pushed (QUESTIONS #134, C08, ADR-M38 §2.6): the next
+  // run continues the pull request.
   const baseSha =
     (await lastPushedHead(scope, intent.id)) ??
+    headSha ??
     (await deps.gitHost.getBranchHead(ref, project.default_branch));
   const key = config.run.agent_key;
   const agent = key === null ? undefined : await scope.agents.getByKey(key);

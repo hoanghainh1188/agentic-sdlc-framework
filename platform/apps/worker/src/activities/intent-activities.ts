@@ -13,6 +13,7 @@ import {
   startRun,
   stepIntent,
   type G4Deps,
+  type SpecGitHost,
   type PlatformDatabase,
   type PublishDeps,
   type Registry,
@@ -64,6 +65,11 @@ export interface IntentActivityDeps {
   readonly registry: Registry;
   /** G4 facts from outside the database (C06). Without it G4 is not evaluated. */
   readonly g4?: G4Deps;
+  /**
+   * The Git host for the spec re-check at G2–G4 (B08, ADR-M39 §2.4). `main.ts` always wires it;
+   * without it the step does not re-check the spec.
+   */
+  readonly specs?: SpecGitHost;
   /** Everything a run needs (C06 session 2). Without it a decided G4 waits (`run_pending`). */
   readonly runs?: RunDeps;
   /** The push and the pull request at G6 (C08). Wired with `runs`. */
@@ -92,6 +98,7 @@ export function createIntentActivities(deps: IntentActivityDeps): IntentActiviti
         {
           registry: deps.registry,
           ...(deps.g4 ? { g4: deps.g4 } : {}),
+          ...(deps.specs ? { specs: deps.specs } : {}),
           ...(deps.g4 && deps.runs ? { startRuns: true } : {}),
           ...(deps.publish ? { publish: true } : {}),
         },

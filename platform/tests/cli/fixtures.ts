@@ -31,6 +31,7 @@ import {
   presentUser,
 } from '../../apps/api/src/admin/present.js';
 import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
+import { presentLinkedSpec, presentSpecList } from '../../apps/api/src/specs/present.js';
 import { presentEscalation } from '../../apps/api/src/escalations/present.js';
 import {
   presentDecision,
@@ -119,6 +120,23 @@ export function intentDetailBody(): Record<string, unknown> {
     plan: presentPlan(plan),
     decisions: [presentDecision(decisionRow())],
   };
+}
+
+const SPEC_ROW = {
+  version: 2,
+  path: 'docs/specs/T07 cancel.md',
+  commit_sha: 'd'.repeat(40),
+  content_sha256: HASH,
+} as SpecRef;
+
+/** B08: `POST /v1/intents/:intent/specs`. */
+export function linkedSpecBody(): Record<string, unknown> {
+  return presentLinkedSpec('INT-2026-0007', SPEC_ROW);
+}
+
+/** B08: `GET /v1/intents/:intent/specs`. */
+export function specListBody(empty = false): Record<string, unknown> {
+  return presentSpecList('INT-2026-0007', empty ? [] : [{ ...SPEC_ROW, version: 1 }, SPEC_ROW]);
 }
 
 export function escalationBody(overrides: Partial<Escalation> = {}): Record<string, unknown> {
