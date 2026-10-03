@@ -127,6 +127,12 @@ jobs:
             "a sandbox image, the runner, the agent adapter, the package proxy or a live test" \
             platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/
 
+      # Diagrams: every SVG carries the SHA-256 of its Mermaid source (scripts/diagrams.py). The
+      # author renders with `pnpm diagrams:render` and commits the SVG; CI never commits.
+      - name: Diagrams match their Mermaid sources
+        if: ${{ !cancelled() }}
+        run: python3 scripts/diagrams.py check
+
       # Gitleaks
       - name: Install gitleaks
         if: ${{ !cancelled() }}
