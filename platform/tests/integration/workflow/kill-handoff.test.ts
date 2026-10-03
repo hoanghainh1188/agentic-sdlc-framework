@@ -94,7 +94,12 @@ describeWorkflow(
         ctx.heartbeat();
         const current = (await scope.runs.getById(input.runId))!;
         if (current.status === 'stopping' && mode === 'dies') {
-          // The runner process dies before it ends the run.
+          // The runner process dies before it ends the run. It dies a second later, after the
+          // workflow recorded its cancel request: the time-skipping test server rejects a workflow
+          // task whose cancel request races with the activity's failure (`ACTIVITY_UNKNOWN`) and
+          // never times that task out while time is locked. A real server buffers the failure and
+          // retries the workflow task.
+          await new Promise((resolve) => setTimeout(resolve, 1000));
           throw new Error('runner died');
         }
         if (current.status === 'stopping') {
