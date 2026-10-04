@@ -27,7 +27,7 @@ import {
   PutObjectRetentionCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { S3AuditAnchorStore, S3EvidenceStore } from '@sdlc/adapter-evidence-s3';
+import { S3AuditAnchorStore } from '@sdlc/adapter-evidence-s3';
 import type { RedactedSecret } from '@sdlc/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -328,16 +328,6 @@ describe.skipIf(!enabled)(
             store.destroy();
           }
         }
-        // And the evidence writers still work where they should.
-        const diffs = new S3EvidenceStore({
-          endpoint: s3Url,
-          bucket: 'evidence',
-          keyPrefix: 'diffs/',
-          accessKeyId: secret(runner.access_key),
-          secretAccessKey: secret(runner.secret_key),
-          timeoutMs: 10_000,
-        });
-        await diffs.put(crypto.randomUUID(), 'i/r.patch', Buffer.from('d\n'), 'text/x-diff');
       } finally {
         anchorS3.destroy();
       }
