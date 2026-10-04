@@ -76,13 +76,13 @@ Do this **after** the first push, so protection does not block it.
 
 `.github/CODEOWNERS` (task A09) names Harry as the only owner today. GitHub ignores CODEOWNERS for private repositories on the Free plan; it takes effect after the upgrade. Add Person B then.
 
-## Step 3. Create milestones, labels and the 46 issues
+## Step 3. Create milestones, labels and the 47 issues
 
 ```bash
 # Dry run: shows what would be created, creates nothing
 python3 scripts/create-issues.py --repo harryforge/agentic-sdlc-framework --dry-run
 
-# Create: 5 milestones (M-A, M-B, M-0, M-C, M-D), labels, 46 issues
+# Create: 5 milestones (M-A, M-B, M-0, M-C, M-D), labels, 47 issues
 python3 scripts/create-issues.py --repo harryforge/agentic-sdlc-framework
 ```
 
@@ -91,7 +91,7 @@ python3 scripts/create-issues.py --repo harryforge/agentic-sdlc-framework
 - `--only A01,A02` creates only some tasks.
 - Tasks `R01–R04` are labelled `repo:pilot`: tracked here, code in the separate repo `pilot-order-inventory`.
 
-Check: 46 issues, each with its milestone, size label and acceptance criteria.
+Check: 47 issues, each with its milestone, size label and acceptance criteria.
 
 ### Tasks most affected by handbook changes
 
