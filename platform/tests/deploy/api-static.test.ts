@@ -21,6 +21,7 @@ interface ApiService {
   user?: string;
   security_opt: string[];
   healthcheck: { test: string[] };
+  depends_on: Record<string, { condition: string }>;
 }
 
 const api = loadCompose().services['sdlc-api'] as unknown as ApiService;
@@ -101,5 +102,27 @@ describe('sdlc-api service', () => {
     const dockerfile = fs.readFileSync(path.join(root, 'platform/apps/api/Dockerfile'), 'utf8');
     expect(dockerfile).toMatch(/^USER node$/m);
     expect(dockerfile).not.toMatch(/ARG .*(PASSWORD|TOKEN|SECRET)|ENV .*(PASSWORD|TOKEN|SECRET)/);
+  });
+
+  it('E02: reads Evidence Packs with its own SeaweedFS identity from OpenBao (api-evidence-credentials)', () => {
+    expect(api.environment.SDLC_API_EVIDENCE_URL).toBe('http://seaweedfs:8333');
+    expect(api.environment.SDLC_API_EVIDENCE_BUCKET).toBe('evidence');
+    expect(api.depends_on['seaweedfs-init']).toEqual({
+      condition: 'service_completed_successfully',
+    });
+    const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
+    expect(bootstrap).toMatch(/^ {2}api-evidence-credentials\) cmd_api_evidence_credentials ;;$/m);
+    const fn = /^cmd_api_evidence_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
+    // Read proposals and diffs (the hash re-check), read and write packs; nothing else.
+    expect(fn).toContain(
+      '-actions Read:evidence/proposals/*,Read:evidence/diffs/*,Read:evidence/packs/*,Write:evidence/packs/* -apply',
+    );
+    expect(fn).toContain('echo "s3.configure -user api-evidence -delete -apply" |');
+    expect(fn).toMatch(/compose exec -T seaweedfs \$weed >\/dev\/null 2>&1/);
+    expect(fn).toContain('bao kv put -mount=kv api/evidence - >/dev/null');
+    expect(fn).not.toContain('s3.config.show');
+    // The AppRole "api" reads kv/data/api/* already: the credential needs no policy change.
+    const policy = readDeployFile('openbao/bootstrap/policies/api.hcl');
+    expect(policy).toContain('path "kv/data/api/*"');
   });
 });
