@@ -7,6 +7,12 @@ import { createHash } from 'node:crypto';
 /** One agent step = one tool call. */
 const ACTION_EVENT = 'ActionEvent';
 
+/**
+ * Deeper values compare as one marker: the agent's input could be nested deeper than the stack
+ * allows (code review of C11 PR 2). Real tool arguments are a few levels deep.
+ */
+const MAX_DEPTH = 64;
+
 /** Fields that change between otherwise identical calls and must not break the comparison. */
 const VOLATILE_FIELDS = new Set(['summary', 'security_risk', 'kind']);
 
@@ -16,8 +22,9 @@ const VOLATILE_FIELDS = new Set(['summary', 'security_risk', 'kind']);
  * the agent's, so a lone surrogate is made well formed and anything that is not JSON becomes
  * `null`. That only affects the comparison, never what the agent did.
  */
-export function canonicalArguments(value: unknown, dropVolatile = true): string {
+export function canonicalArguments(value: unknown, dropVolatile = true, depth = 0): string {
   if (value === null || value === undefined) return 'null';
+  if (depth > MAX_DEPTH) return '"[too deep]"';
   switch (typeof value) {
     case 'boolean':
       return value ? 'true' : 'false';
@@ -27,7 +34,8 @@ export function canonicalArguments(value: unknown, dropVolatile = true): string 
       return JSON.stringify(value.toWellFormed());
     case 'object': {
       if (Array.isArray(value)) {
-        return `[${value.map((item) => canonicalArguments(item, dropVolatile)).join(',')}]`;
+        const items = value.map((item) => canonicalArguments(item, dropVolatile, depth + 1));
+        return `[${items.join(',')}]`;
       }
       const entries = Object.entries(value as Record<string, unknown>).filter(
         ([key, v]) => v !== undefined && !(dropVolatile && VOLATILE_FIELDS.has(key)),
@@ -36,7 +44,7 @@ export function canonicalArguments(value: unknown, dropVolatile = true): string 
       entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
       const members = entries.map(
         ([key, v]) =>
-          `${JSON.stringify(key.toWellFormed())}:${canonicalArguments(v, dropVolatile)}`,
+          `${JSON.stringify(key.toWellFormed())}:${canonicalArguments(v, dropVolatile, depth + 1)}`,
       );
       return `{${members.join(',')}}`;
     }
@@ -67,7 +75,14 @@ export function toolCallKey(event: Readonly<Record<string, unknown>>): string {
   const args = toolCall?.arguments;
   const source = args === undefined ? (event.action ?? {}) : parseArguments(args);
   const tool = typeof event.tool_name === 'string' ? event.tool_name : '';
-  const digest = createHash('sha256').update(canonicalArguments(source), 'utf8').digest('hex');
+  let canonical: string;
+  try {
+    canonical = canonicalArguments(source);
+  } catch {
+    // Never fail a status read on the agent's input: compare the raw text instead.
+    canonical = `raw:${typeof args === 'string' ? args.toWellFormed() : ''}`;
+  }
+  const digest = createHash('sha256').update(canonical, 'utf8').digest('hex');
   return `${tool}|${digest}`;
 }
 

@@ -1058,6 +1058,35 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     expect(recorded[0]).toEqual(['agent_stopped', { reason: 'max_budget', method: 'interrupt' }]);
   });
 
+  it('C11 PR 2: the time cap and a loop due in the same poll → the time cap wins (stopped_timeout)', async () => {
+    const s = await seed({ extra: { maxDurationMin: 1 } });
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'running', iterations: 4, identicalCalls: 4 }];
+    let now = 0;
+    // The first poll is already past the one-minute cap.
+    const result = await driveAgent(
+      deps(agent, () => (now += 61_000)),
+      request(s),
+    );
+    expect(result).toMatchObject({ outcome: 'max_duration', status: 'stopped_timeout' });
+    expect((await loopEvents(s)).map(([type]) => type)).not.toContain('loop_detected');
+  });
+
+  it('C11 PR 2: an agent that finished in the poll that shows a loop is finished', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'finished', iterations: 4, identicalCalls: 4 }];
+    expect(
+      await driveAgent(
+        deps(agent, () => 0),
+        request(s),
+      ),
+    ).toMatchObject({
+      outcome: 'finished',
+      status: 'succeeded',
+    });
+  });
+
   it('C11 PR 2: a kill that lands in the poll that finds a loop still ends the run stopped_killed', async () => {
     const s = await seed();
     const agent = new FakeAgent();

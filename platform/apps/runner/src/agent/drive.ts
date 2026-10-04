@@ -15,7 +15,8 @@
 //    loop detection (C11 PR 2, `loop-watch.ts`, ADR-M42 §2.7): more identical tool calls in a
 //    row than the contract's `loop_threshold`, or no new agent event for the configured window
 //    → `loop_detected`, then `agent_stopped`; the run ends `stopped_stalled`. Order when several
-//    stops are due in one poll: kill, cancel, the agent's own end, time cap, budget, loop;
+//    stops are due in one poll: kill (a cancel of a run being killed is the kill), cancel, the
+//    agent's own end, time cap, budget, loop;
 // 6. when the agent finished: commit what it left, with the fixed agent author (QUESTIONS #80);
 // 7. collect the changed files since `base_sha`, the last commit and the log (AC4);
 // 7b. (C07, ADR-M34 §2.2) a run that goes to G5 (succeeded or stopped at a cap): the runner computes
@@ -274,7 +275,8 @@ async function pollUntilDone(
       if ((await watch.check()) === 'stop') return { ...last, timedOut: false, overBudget: true };
       nextSpendCheck = clock() + deps.settings.agent.spendCheckMs;
     }
-    // Only a status that was read counts: a failed read is neither progress nor silence.
+    // Only a status that was read is observed. The idle clock is wall time, so failed reads count
+    // as silence; the fifth failed read in a row fails the run anyway (`MAX_STATUS_ERRORS`).
     const loop = read ? loops?.observe(last) : undefined;
     if (loop) return { ...last, timedOut: false, loop };
     await sleep(Math.min(deps.settings.agent.pollMs, Math.max(0, deadline - clock())));

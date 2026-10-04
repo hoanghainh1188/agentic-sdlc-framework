@@ -46,6 +46,13 @@ describe('canonicalArguments', () => {
     );
   });
 
+  it('never throws on arguments nested deeper than the stack allows (code review)', () => {
+    const deep = `${'['.repeat(20_000)}${']'.repeat(20_000)}`;
+    expect(() => toolCallKey(call(deep))).not.toThrow();
+    expect(toolCallKey(call(deep))).toBe(toolCallKey(call(deep)));
+    expect(canonicalArguments([[[[1]]]])).toBe('[[[[1]]]]');
+  });
+
   it('never throws on input that is not JSON data', () => {
     expect(canonicalArguments({ a: Number.NaN, b: '\ud800', c: () => 1, d: undefined })).toBe(
       '{"a":null,"b":"�","c":null}',
