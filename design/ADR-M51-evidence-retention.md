@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task E05 PR 1, for review) |
+| Status | **Proposed** (task E05 PR 1, merged; PR 2, for review) |
 | Date | 2026-10-04 |
 | Decided by | Harry (plan approved 2026-10-04, with answers to QUESTIONS #235–#239) |
 | Related | D-08 task E05 (AC1–AC4); D-02 FR-44, §10; D-03 §7.5, §8.2, §10; D-05 §6.6, §7.4, §10, §10.1; ADR-M17 (Compose, SeaweedFS); ADR-M24 §2.5 and ADR-M28 (worker loops); ADR-M33 §2.9 (gaps 1–4); ADR-M35 (Langfuse holds client data); ADR-M37 (archive); ADR-M48 §2.1, §2.7; ADR-M49 §2.7; handbook Ch.15, Ch.19 §19.8d, T11 §5j; QUESTIONS #235–#239 |
@@ -15,7 +15,7 @@ D-02 FR-44 asks for three things:
 - evidence files are kept 6 months by default;
 - archiving a project purges its client data and evidence files unless on hold, keeping hashes.
 
-D-05 §10.1 describes the purge: delete the files in SeaweedFS, keep the rows and hashes, set `purged_at`, write `evidence.purged`. D-05 §7.4 adds a daily anchor of each tenant's audit hash (AC4, PR 2 of this task).
+D-05 §10.1 describes the purge: delete the files in SeaweedFS, keep the rows and hashes, set `purged_at`, write `evidence.purged`. D-05 §7.4 adds a daily anchor of each tenant's audit hash (AC4, PR 2 of this task, §2.9).
 
 What existed before E05:
 
@@ -155,6 +155,7 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
 ### 2.8. The loop
 
 - **`RetentionLoop`** (worker): a plain loop like the escalation clocks (ADR-M28) and the spend sync (C12), not a Temporal schedule. It carries no workflow data, a fake clock tests it, and the advisory lock gives one process at a time.
+- **Before the retention steps** (PR 2): the daily audit anchor of every tenant (`runAnchorPass`, §2.9).
 - **Each pass** (`runRetentionPass`, core), every tenant:
   1. holds;
   2. lock moves;
@@ -164,11 +165,61 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
 - **Failures:** a failed row, project or tenant is logged by its code and counted; the next pass retries. The loop never throws.
 - **Operator report:** `pnpm sdlc ops retention report --tenant <slug> [--json]`. Counts only, from the database: per project, stored, due now, held, open, purged.
 
+### 2.9. The daily audit anchor (PR 2, AC4; D-05 §7.4)
+
+`sdlc audit verify` finds a changed or missing row. It cannot find a whole chain that someone with database access rewrote with new, linked hashes. D-05 §7.4 therefore writes each tenant's latest audit hash outside the database every day; an older anchor then no longer matches.
+
+**Checked live on the pinned SeaweedFS 4.48** (throw-away containers, 2026-10-04), bucket versioned, object lock COMPLIANCE 731 days, an identity with `Write`, `Read`, `List` on that bucket only:
+
+| Check | Result |
+|---|---|
+| A second write of the same key with `If-None-Match: *` | 412 |
+| The anchor identity deletes a version | 403 |
+| The admin deletes a version, with or without the bypass header | 403 |
+| The admin shortens a version's lock, or changes it to GOVERNANCE | 403 |
+| The admin suspends versioning | 409 |
+| A restart | versions and locks kept |
+| The anchor identity reads or writes `evidence` | 403 |
+| ⚠ The admin changes the bucket's **default** to GOVERNANCE 1 day | Allowed; only new versions are affected |
+| ⚠ The anchor identity sends a plain DELETE (no version) | Allowed: a delete marker. After it, `If-None-Match` accepts a **second version** of the key. The original stays readable and locked |
+| `GetObjectRetention` | Needs its own action |
+
+**Decision (Harry, plan approval, 2026-10-04):**
+
+- **The bucket** `audit-anchors`, apart from `evidence` (so a `List` there sees no evidence): versioned, object lock **COMPLIANCE, 731 days** (more than the 2 years of FR-44). `seaweedfs-init` creates and locks it with the existing settings (`SEAWEEDFS_BUCKETS`, `SEAWEEDFS_VERSIONED_BUCKETS`, `SEAWEEDFS_LOCKED_BUCKETS=… audit-anchors:COMPLIANCE:731`); `create-buckets.sh` needs no change.
+- **The identity** `worker-anchor` (`kv/worker/anchor`, `pnpm openbao:bootstrap worker-anchor-credentials`, the generic `s3_credentials` helper, runbook T11 §5k): `Write`, `Read`, `List`, `GetObjectRetention` on `audit-anchors` only. Under COMPLIANCE its `Write` can delete no version.
+- **The anchor:** `<tenant ID>/<YYYY-MM-DD>.json`, the RFC 8785 canonical JSON of `{anchored_at, hash, hash_version, seq, tenant_id}` of the tenant's last audit row. The date is the UTC date of `anchored_at`. Written with `If-None-Match: *`.
+- **Interfaces:** `AuditAnchorStore` (`@sdlc/contracts`), `S3AuditAnchorStore` (`@sdlc/adapter-evidence-s3`, keys `<uuid>/<YYYY-MM-DD>.json` only), `runAnchorPass` and the pure rules in core `audit/anchor.ts`, `AuditLogRepository.latest` and `hashesAt`.
+- **When:** in the retention loop (§2.8), **first**, under the same advisory lock, at its interval. Once per tenant and UTC day per process (the loop remembers the day); after a restart one write per tenant answers 412, which counts as "already anchored today". The loop now runs when either identity exists (`worker-purge`, `worker-anchor`); each part runs only with its own, and a failed anchor pass never stops the retention steps. Setting `SDLC_WORKER_ANCHOR_URL` (`off`), `_BUCKET`, `_SECRET_PATH`.
+- **No backfill:** a day the worker was down gets no anchor. An anchor's date is the day it was written; a back-dated one would be false.
+- **Written even without new rows:** it shows that the chain did not shrink.
+- **A tenant without audit rows** gets no anchor (`worker.audit_anchor_empty`). Every tenant has `tenant.created` from its bootstrap, so this should not happen; a new tenant is anchored at the next pass.
+- **Check first, then write.** Each tenant, once a day: every version of every anchor under its folder is read and compared with the row at its `seq`. The reasons:
+  - `hash_mismatch`: the row has another hash (the chain was rewritten);
+  - `seq_missing`: no row at that `seq` (the chain shrank);
+  - `anchor_invalid`: not a well-formed anchor of this tenant and date (strict parse: exactly the five fields, the folder's tenant, the key's date, canonical bytes);
+  - `anchor_versions`: a key with a delete marker or more than one version (the ⚠ row above). Every version is still compared, so the original is checked too.
+- **On a mismatch:** one `worker.audit_anchor_mismatch` log line (error) per mismatch (tenant, date, `seq`, reason) and one `audit.anchor_mismatch` audit event per check run in that tenant's chain (counts, the first reason and `seq`). **Never a hash** in either. Runbook T11 §5k gives the operator's steps.
+- **The new anchor's lock is checked** (the other ⚠ row): COMPLIANCE until at least `anchored_at` + 730 days, else `worker.audit_anchor_unlocked` (error).
+- **The operator log:** `worker.audit_anchored` carries `seq`, `hash` and `hash_version` (D-05 §7.4 "the operations log"; an audit hash is neither personal data nor a secret; the logger keeps a field named `hash`, tested).
+- **`sdlc audit verify` stays database-only.** An operator command that reads the anchors with its own S3 credential may come later.
+- **Cost:** every anchor of every tenant once a day: about 731 small reads (≤ 1 KiB) per tenant and day at most, plus one database query per 1000 anchors. Accepted for the MVP (Harry, plan approval).
+- **Later optimisation (not built):** anchors never change, so the check could list the versions daily (that still finds delete markers and new versions), read only versions it has not seen before, and keep their parsed content in memory.
+
+**Gaps of PR 2:**
+
+- **Gap 5 applies to anchors too:** the filer API (`seaweedfs:8888`) can delete an anchor whatever its lock, until task A12.
+- **After 731 days** an anchor's lock ends and the anchor identity could delete it. That is past the 2 years of FR-44; accepted.
+- **The admin can lower the bucket's default lock** for new anchors. The per-anchor check finds it the same day; anchors already written keep their lock.
+- **COMPLIANCE cannot be undone.** On the server, anchors stay 731 days. On development volumes too; removing the volume removes them.
+
 ## 3. Alternatives considered
 
 - **A per-object lock at write time, equal to the project's retention.** Rejected: the three writers would need the project's retention and `PutObjectRetention` on their prefixes, and a hold would still need the legal hold. The bucket default locks every writer with no change, and the loop extends longer projects.
 - **No lock in the MVP (versioning and hashes only).** Rejected: the writers can delete versions (gap 1), and the purge would be the only line.
-- **COMPLIANCE.** Rejected for `evidence`: the archive purge needs to delete young evidence (FR-44). COMPLIANCE is planned for the audit anchors (PR 2).
+- **COMPLIANCE.** Rejected for `evidence`: the archive purge needs to delete young evidence (FR-44). Used for the audit anchors (§2.9).
+- **Anchors in the bucket `evidence`** (PR 2). Rejected: its GOVERNANCE lock can be bypassed by `worker-purge`, and a `List` there would show evidence keys to the anchor identity.
+- **Checking only the last N days of anchors** (PR 2). Rejected for the MVP: a whole-chain rewrite is shown only by an anchor older than the rewrite, which may be months old.
 - **A new bucket.** Not needed: the live check showed the lock can be turned on for the existing versioned bucket.
 - **A Temporal schedule.** Rejected as in C12 (QUESTIONS #225).
 
@@ -203,3 +254,4 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
 | 0.1 | 2026-10-04 | Claude (task E05, PR 1) | First version: lock, purge, holds, archive, guard, report mode (AC1–AC3). PR 2 adds the daily audit anchor (AC4) |
 | 0.2 | 2026-10-04 | Claude (task E05, PR 1) | After the code review: the archive purge is scheduled first (`project.purge_scheduled`), the guard counts every due row, the re-check reads project and configuration again, the orphan sweep needs two sightings and a cap; known limits |
 | 0.3 | 2026-10-04 | Claude (task E05, PR 1) | §4: open items for M-F (an un-archive command; who may release a hold), after Harry's review |
+| 0.4 | 2026-10-04 | Claude (task E05, PR 2) | §2.9: the daily audit anchor (AC4): the live check of COMPLIANCE on SeaweedFS 4.48, the bucket `audit-anchors`, the identity `worker-anchor`, check then write once per tenant and UTC day, the mismatch reasons, the lock check, the later optimisation; §3: two alternatives |

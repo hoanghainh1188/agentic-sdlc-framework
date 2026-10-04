@@ -489,6 +489,75 @@ The loop starts in `report` mode: it counts what it would purge and deletes noth
 |---|---|
 | The purge key (`worker-purge`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap worker-purge-credentials`, then restart `sdlc-worker`. The old key stops working at once; a pass that runs at that moment fails and the next one tries again |
 
+## 5k. The daily audit anchor
+
+Once a day the worker writes each tenant's latest audit hash to SeaweedFS, outside the database (task E05 PR 2, `design/ADR-M51-evidence-retention.md` §2.9, D-05 §7.4). `sdlc audit verify` finds a changed row, but not a whole chain that someone with database access rewrote with new hashes. An older anchor still shows that.
+
+**What is written.** One file per tenant and UTC day, `audit-anchors/<tenant ID>/<YYYY-MM-DD>.json`: the tenant ID, the `seq` and `hash` of its last audit row, the hash version and the time. The bucket `audit-anchors` is versioned and carries object lock **COMPLIANCE, 731 days** (`seaweedfs-init`, `SEAWEEDFS_LOCKED_BUCKETS`): nobody can delete an anchor or shorten its lock through S3, the admin included. The lock cannot be turned off.
+
+**The identity** `worker-anchor`, stored at `kv/worker/anchor`:
+
+| Right | Where | Why |
+|---|---|---|
+| `Write` | the bucket `audit-anchors` | write the day's anchor (once: `If-None-Match`) |
+| `Read`, `List` | the bucket `audit-anchors` | read every anchor back and compare it with the database |
+| `GetObjectRetention` | the bucket `audit-anchors` | check that a new anchor got the COMPLIANCE lock |
+
+Nothing in `evidence`.
+
+**When.** In the retention loop (every `SDLC_WORKER_RETENTION_INTERVAL_MINUTES`, 60 by default), before the retention steps, once per tenant and UTC day. Each tenant: first every anchor is read and compared with the row at its `seq`, then today's anchor is written. Days the worker was down get no anchor: an anchor is never back-dated.
+
+> Known gap (QUESTIONS #239, task A12): the SeaweedFS filer API on port 8888 of the Compose network has no authentication and can delete files whatever their lock, anchors included.
+
+### First set-up
+
+1. `seaweedfs-init` ran after the update (`pnpm compose:core`). Its log ends with `bucket audit-anchors locked (COMPLIANCE, 731 days)`.
+2. Create the identity (asks for an admin token, hidden; prints no secret):
+   ```bash
+   pnpm openbao:bootstrap worker-anchor-credentials
+   ```
+   Record it in the operations log (identity `worker-anchor`, date, reason; not the keys).
+3. Restart `sdlc-worker` (section 5j, step 3).
+4. Check the worker's log: one line `worker.audit_anchored` per tenant with `outcome: written`, `seq` and `hash`, and a line `worker.anchor_pass` every pass. No line `worker.anchor_missing`, `worker.audit_anchor_unlocked` or `worker.audit_anchor_mismatch`.
+
+The `hash` in `worker.audit_anchored` is the second copy D-05 §7.4 asks for: keep the worker's logs with the operations log.
+
+### On `worker.audit_anchor_mismatch`
+
+The line names the tenant, the anchor's date, its `seq` and a reason. It never holds a hash. The tenant's audit log gets one `audit.anchor_mismatch` event per check, with counts and the first reason.
+
+| Reason | Meaning |
+|---|---|
+| `hash_mismatch` | The row at that `seq` has another hash than on that day: the chain was rewritten after it |
+| `seq_missing` | No row at that `seq`: rows were deleted |
+| `anchor_versions` | The anchor key has a delete marker or a second version: someone wrote over it with the anchor key. The original version is still there |
+| `anchor_invalid` | A file in the tenant's folder is not a well-formed anchor of that tenant and date |
+
+Treat every mismatch as a security incident (handbook Ch.6, level `incident`):
+
+1. Stop writers: stop `sdlc-api` and `sdlc-worker` so the chain does not grow while you look.
+2. Check the chain on the server: `SDLC_DB_URL=<platform_app URL> pnpm sdlc ops audit verify --tenant <slug>`. A broken chain names its first broken `seq`. A chain that verifies but does not match the anchor was rewritten as a whole.
+3. Read the anchor of that day with the admin identity, on the server, never from a chat tool. Compare its `seq` and `hash` with the row in the database and with the last database backup that is older than the anchor's date.
+4. For `anchor_versions`: rotate the anchor key at once (below). List the key's versions; the oldest version is the real anchor.
+5. Restore the database from the last good backup (section 7 and task A10) if rows were changed or deleted. Record the incident (template T9).
+6. **Only that tenant's anchors and hashes** go into the incident note or to the tenant. Never send one tenant another tenant's anchors, hashes or log lines.
+
+The same mismatch is reported again every day until the database is restored: anchors cannot be removed.
+
+### `worker.audit_anchor_unlocked`
+
+A new anchor did not get COMPLIANCE for at least 730 days: someone changed the bucket's default lock. Run `seaweedfs-init` again (`pnpm compose:core`): it sets `COMPLIANCE`, 731 days back. Anchors written before keep their own lock. Record it in the operations log.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| The anchor key (`worker-anchor`, every 90 days, when it may have leaked, or after `anchor_versions`) | `pnpm openbao:bootstrap worker-anchor-credentials`, then restart `sdlc-worker`. The old key stops working at once |
+
+### Development machines
+
+Anchors on a development volume stay 731 days and cannot be removed through S3. They are small (about 200 bytes per tenant and day). `pnpm compose:down` with `-v` removes the volume, anchors included. Throw-away test projects remove their volume.
+
 ## 6. Daily snapshot backup
 
 > Commands only. The procedure is tested in the recovery drill of task A10, which also adds the backup script.
@@ -650,3 +719,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.19 | 2026-10-04 | Claude Code (task E02) | Section 5h: `api-evidence-credentials` (SeaweedFS identity `api-evidence` at `kv/api/evidence`: reads proposals and diffs, reads and writes packs), rotation; troubleshooting rows `evidence_unavailable` and failed hash checks (ADR-M48). Tested with throw-away keys (`pnpm test:openbao`) |
 | 0.20 | 2026-10-04 | Claude Code (task E03) | Section 5i: `worker-evidence-credentials` (SeaweedFS identity `worker-evidence` at `kv/worker/evidence`, the same rights as `api-evidence`), rotation (ADR-M49). Tested with throw-away keys (`pnpm test:openbao`) |
 | 0.21 | 2026-10-04 | Claude Code (task E05, PR 1) | Section 5j: `worker-purge-credentials` (SeaweedFS identity `worker-purge` at `kv/worker/purge`: delete, bypass, legal hold and lock on the evidence prefixes, list, no read), the GOVERNANCE lock on `evidence`, from `report` to `purge`, archived projects, the manual Langfuse deletion, rotation (ADR-M51) |
+| 0.22 | 2026-10-04 | Claude Code (task E05, PR 2) | Section 5k: the daily audit anchor (bucket `audit-anchors`, COMPLIANCE 731 days; `worker-anchor-credentials`: SeaweedFS identity `worker-anchor` at `kv/worker/anchor`), what to do on `worker.audit_anchor_mismatch` and `worker.audit_anchor_unlocked`, rotation (ADR-M51 §2.9). Tested with throw-away keys (`pnpm test:openbao`) |

@@ -492,6 +492,16 @@ export const AUDIT_ACTIONS = {
     entityType: 'intent',
     fields: { pack_id: 'uuid', files: 'count', versions: 'count' },
   },
+  /**
+   * The daily audit anchor check found anchors that do not match this tenant's chain (E05 PR 2,
+   * D-05 §7.4, ADR-M51 §2.9). Once per check run. Counts and the first mismatch's `reason`
+   * (`hash_mismatch`, `seq_missing`, `anchor_invalid`, `anchor_versions`) and `seq`; **never a
+   * hash**. The tenant is the entity.
+   */
+  'audit.anchor_mismatch': {
+    entityType: 'tenant',
+    fields: { checked: 'count', mismatched: 'count', reason: 'code', first_seq: 'count?' },
+  },
   /** A person put an intent's evidence on hold (E05, QUESTIONS #235): never purged until released. */
   'evidence.hold_set': { entityType: 'intent', fields: { hold_id: 'uuid' } },
   /** A person released the hold on an intent's evidence (E05, QUESTIONS #235). */

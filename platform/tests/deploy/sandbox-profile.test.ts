@@ -247,7 +247,9 @@ describe('sdlc-runner service', () => {
     expect(runner.depends_on?.['seaweedfs-init']).toEqual({
       condition: 'service_completed_successfully',
     });
-    expect(svc('seaweedfs-init').environment?.SEAWEEDFS_VERSIONED_BUCKETS).toBe('evidence');
+    expect(svc('seaweedfs-init').environment?.SEAWEEDFS_VERSIONED_BUCKETS?.split(' ')).toContain(
+      'evidence',
+    );
     const dockerfile = read('platform/apps/runner/Dockerfile');
     expect(dockerfile).toMatch(/^USER node$/m);
     expect(dockerfile).toMatch(/apt-get install -y --no-install-recommends git ca-certificates/);

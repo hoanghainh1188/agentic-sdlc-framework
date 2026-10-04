@@ -74,6 +74,11 @@ Commands:
                        PutObjectLegalHold, PutObjectRetention, GetObjectRetention. No read. The old
                        key stops working. Prints no secret. Run it again to rotate, then restart
                        sdlc-worker.
+  worker-anchor-credentials
+                       The worker's daily audit anchor (E05 PR 2, ADR-M51 §2.9): kv/worker/anchor,
+                       the identity "worker-anchor": Write, Read, List and GetObjectRetention on
+                       the bucket audit-anchors (object lock COMPLIANCE) only. The old key stops
+                       working. Prints no secret. Run it again to rotate, then restart sdlc-worker.
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -119,7 +124,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -502,6 +507,12 @@ done
 PURGE_ACTIONS="List:evidence$PURGE_ACTIONS"
 cmd_worker_purge_credentials() { s3_credentials worker purge sdlcwrkpg "$PURGE_ACTIONS" sdlc-worker; }
 
+# The worker's audit anchor identity (E05 PR 2, ADR-M51 §2.9): writes, reads and lists the daily
+# anchors in the bucket `audit-anchors` (object lock COMPLIANCE: its write can never delete a
+# version) and reads their lock. Nothing in `evidence`. Stored at kv/worker/anchor.
+ANCHOR_ACTIONS='Write:audit-anchors,Read:audit-anchors,List:audit-anchors,GetObjectRetention:audit-anchors'
+cmd_worker_anchor_credentials() { s3_credentials worker anchor sdlcwrkan "$ANCHOR_ACTIONS" sdlc-worker; }
+
 cmd_api_evidence_credentials() { pack_evidence_credentials api sdlcapiev sdlc-api; }
 cmd_worker_evidence_credentials() { pack_evidence_credentials worker sdlcwrkev sdlc-worker; }
 
@@ -519,4 +530,5 @@ case "$command" in
   api-evidence-credentials) cmd_api_evidence_credentials ;;
   worker-evidence-credentials) cmd_worker_evidence_credentials ;;
   worker-purge-credentials) cmd_worker_purge_credentials ;;
+  worker-anchor-credentials) cmd_worker_anchor_credentials ;;
 esac
