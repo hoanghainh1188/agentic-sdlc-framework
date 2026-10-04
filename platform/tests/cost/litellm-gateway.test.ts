@@ -322,6 +322,23 @@ describe('AC4: listSpend', () => {
     expect(error.code).toBe('unexpected_response');
   });
 
+  it('fails with truncated when the range has more pages than the cap, never returns a part (C12)', async () => {
+    const capped = new LiteLLMGateway({
+      baseUrl: stub.url,
+      masterKey: new Redacted(MASTER_KEY),
+      maxPages: 2,
+    });
+    stub.on('GET', '/spend/logs/v2', (r) => ({
+      body: {
+        data: [row(`r-${r.query.get('page')}`, '2026-09-26T08:00:01.000+00:00')],
+        total_pages: 3,
+      },
+    }));
+    const error = await failure(() => capped.listSpend({ from: new Date(0), to: new Date() }));
+    expect(error.code).toBe('truncated');
+    expect(stub.requests.map((r) => r.query.get('page'))).toEqual(['1', '2']);
+  });
+
   it('counts rows it cannot read, and still returns the others', async () => {
     stub.on('GET', '/spend/logs/v2', () => ({
       body: {

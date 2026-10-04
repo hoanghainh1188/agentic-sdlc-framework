@@ -36,7 +36,7 @@ export const WASTED_RUN_STATUSES = [
   'stopped_killed',
 ] as const satisfies readonly RunStatus[];
 
-/** Runs whose spend is synced when they end, so a report does not show it yet (QUESTIONS #197). */
+/** Runs still in progress: their latest calls may not be synced yet (QUESTIONS #197, C12). */
 export const IN_PROGRESS_RUN_STATUSES = [
   'queued',
   'provisioning',

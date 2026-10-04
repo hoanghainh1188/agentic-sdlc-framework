@@ -40,6 +40,14 @@ export interface PollableProject {
   readonly repoFullName: string;
 }
 
+/** The result of `withSpendSyncLock`: `ran: false` when another process holds the lock. */
+export type SpendSyncLockResult<T> =
+  { readonly ran: true; readonly value: T } | { readonly ran: false };
+
+/** Two-key session advisory lock of the scheduled spend sync (task C12, ADR-M24 §2.5). */
+const SPEND_SYNC_LOCK_CLASS = 0x43_4f_53_01;
+const SPEND_SYNC_LOCK_KEY = 1;
+
 export class SystemScope {
   /** @internal Use `PlatformDatabase.system`. */
   constructor(private readonly db: Kysely<Database>) {}
@@ -224,6 +232,51 @@ export class SystemScope {
         .execute(),
     );
     return rows.map((row) => ({ tenantId: parseTenantId(row.tenant_id), intentId: row.id }));
+  }
+
+  /**
+   * The scheduled spend sync (task C12, ADR-M24 §2.5): one gateway read covers every tenant, so
+   * only one process may sync at a time. Takes a session advisory lock on one reserved connection
+   * without waiting, runs `fn`, and releases the lock; a process that dies releases it with its
+   * session. Another holder → `{ ran: false }`, `fn` is not called.
+   */
+  async withSpendSyncLock<T>(fn: () => Promise<T>): Promise<SpendSyncLockResult<T>> {
+    return this.db.connection().execute(async (conn) => {
+      const got = await run(
+        sql<{
+          locked: boolean;
+        }>`SELECT pg_try_advisory_lock(${SPEND_SYNC_LOCK_CLASS}::int4, ${SPEND_SYNC_LOCK_KEY}::int4) AS locked`.execute(
+          conn,
+        ),
+      );
+      if (got.rows[0]?.locked !== true) return { ran: false };
+      try {
+        return { ran: true, value: await fn() };
+      } finally {
+        await run(
+          sql`SELECT pg_advisory_unlock(${SPEND_SYNC_LOCK_CLASS}::int4, ${SPEND_SYNC_LOCK_KEY}::int4)`.execute(
+            conn,
+          ),
+        );
+      }
+    });
+  }
+
+  /**
+   * The scheduled spend sync (task C12): the earliest start of the runs, of any tenant, that ended
+   * at or after `since`, so the sync covers the whole of a run that just ended, also one longer than
+   * the look-back window. A time only; null when no run ended since then.
+   */
+  async earliestStartOfRunsEndedSince(since: Date): Promise<Date | null> {
+    const row = await run(
+      this.db
+        .selectFrom('runs')
+        .select((eb) => eb.fn.min('created_at').as('earliest'))
+        .where('finished_at', '>=', since)
+        .executeTakeFirst(),
+    );
+    const earliest = row?.earliest as Date | string | null | undefined;
+    return earliest == null ? null : new Date(earliest);
   }
 
   /** Health check (task B03): true when the database answers. Reads no table. */

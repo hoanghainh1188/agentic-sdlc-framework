@@ -184,6 +184,21 @@ Design: [ADR-M35](../../design/ADR-M35-observability.md). Usage for operators: h
 - **LiteLLM** traces every model call with its `langfuse_otel` callback (rendered by `litellm/config.ctmpl` when the sidecar has `SDLC_OTEL_ENDPOINT`). Each call is one Langfuse trace tagged with the seven labels (`tenant:`, `project:`, `intent_id:`, `run_id:`, `gate:`, `agent:`, `data_class:`). It holds the prompt and the answer: client data (ADR-M35 §2.5).
 - Langfuse runs v4 in `events_only` mode: read traces through `GET /api/public/v2/observations` (the old `/api/public/traces` answers 404).
 
+## Scheduled spend sync (C12)
+
+Design: [ADR-M24 §2.5](../../design/ADR-M24-litellm-cost-controller.md). `sdlc-worker` copies spend from LiteLLM into `cost_records` on a schedule, besides the copy when each run ends. It runs only when the worker has the `cost-controller` AppRole (`pnpm openbao:bootstrap worker-credentials`); otherwise it logs `worker.cost_sync_off`. The defaults need no setting:
+
+| Setting | Default | Bounds | Meaning |
+|---|---|---|---|
+| `SDLC_WORKER_COST_SYNC_INTERVAL_SECONDS` | 300 | 30–3600 | Time between two passes |
+| `SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES` | 120 | 10–1440, at least two intervals | Each pass reads the calls of this window again (LiteLLM writes spend logs in batches) |
+| `SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES` | 1440 | look-back–10080 | The first pass after a start reads this far back; a retry never reaches further |
+| `SDLC_WORKER_COST_SYNC_SETTLE_MINUTES` | 30 | 5–1440 | Runs that ended within this window are read again from their start |
+
+Logs: `worker.cost_synced` (counts), `worker.cost_sync_failed` (an error code; the next pass retries from the failed slice), `worker.cost_sync_busy` (another worker holds the lock), and `worker.cost_sync_gap` (warning, `uncovered_minutes`): the sync failed for longer than the catch-up window, so the calls of those minutes are not recorded.
+
+**Manual sync: no operator command yet (open item, ADR-M24 §3).** After a `worker.cost_sync_gap` warning, set `SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES` to cover the gap (at most 10080, seven days) and restart `sdlc-worker`: its first pass reads that window again. Calls already recorded are never counted twice. Calls older than seven days, or older than LiteLLM keeps its spend logs, cannot be recovered this way.
+
 ## Shared Valkey: memory limit
 
 Langfuse and LiteLLM share one Valkey with `maxmemory-policy noeviction`, which Langfuse requires. The limit is `VALKEY_MAXMEMORY` in `.env` (default `256mb`). **When Valkey is full, writes fail for both Langfuse and LiteLLM.** Watch memory use:

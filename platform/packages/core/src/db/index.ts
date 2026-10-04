@@ -15,6 +15,7 @@ export {
   type OpenIntent,
   type PollableProject,
   type ResolvedApiToken,
+  type SpendSyncLockResult,
 } from './system-scope.js';
 export { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 export { hashApiToken } from './repositories/api-tokens.js';

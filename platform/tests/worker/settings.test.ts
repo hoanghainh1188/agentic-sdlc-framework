@@ -26,7 +26,41 @@ describe('worker settings', () => {
       reconcileBatch: 500,
       workflowBundle: null,
       runs: null,
+      costSync: {
+        intervalMs: 300_000,
+        lookbackMs: 7_200_000,
+        catchUpMs: 86_400_000,
+        settleMs: 1_800_000,
+      },
     });
+  });
+
+  it('C12: the spend sync window holds two passes at least and the catch-up covers the look-back', () => {
+    expect(
+      loadSettings({
+        SDLC_WORKER_COST_SYNC_INTERVAL_SECONDS: '600',
+        SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES: '20',
+        SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES: '20',
+        SDLC_WORKER_COST_SYNC_SETTLE_MINUTES: '5',
+      }).costSync,
+    ).toEqual({
+      intervalMs: 600_000,
+      lookbackMs: 1_200_000,
+      catchUpMs: 1_200_000,
+      settleMs: 300_000,
+    });
+    expect(() =>
+      loadSettings({
+        SDLC_WORKER_COST_SYNC_INTERVAL_SECONDS: '600',
+        SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES: '19',
+      }),
+    ).toThrow(expect.objectContaining({ setting: 'SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES' }));
+    expect(() =>
+      loadSettings({
+        SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES: '120',
+        SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES: '119',
+      }),
+    ).toThrow(expect.objectContaining({ setting: 'SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES' }));
   });
 
   it('C06 session 2: agent runs need both files of the cost-controller AppRole', () => {
@@ -82,6 +116,12 @@ describe('worker settings', () => {
     ['SDLC_WORKER_RECONCILE_MS', '100'],
     ['SDLC_WORKER_RECONCILE_BATCH', '0'],
     ['SDLC_WORKER_WORKFLOW_BUNDLE', 'relative.js'],
+    ['SDLC_WORKER_COST_SYNC_INTERVAL_SECONDS', '29'],
+    ['SDLC_WORKER_COST_SYNC_INTERVAL_SECONDS', '3601'],
+    ['SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES', '9'],
+    ['SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES', '1441'],
+    ['SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES', '10081'],
+    ['SDLC_WORKER_COST_SYNC_SETTLE_MINUTES', '4'],
   ])('refuses %s=%s', (name, value) => {
     expect(() => loadSettings({ [name]: value })).toThrow(
       expect.objectContaining({ key: 'worker.settings.invalid', setting: name }),

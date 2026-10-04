@@ -7,7 +7,7 @@
 //   A zero or negative remainder is refused, never turned into a zero-budget key.
 // - `endRun`: revokes the key first, then syncs spend once.
 // - `syncSpend`: gateway spend rows → `cost_records` (never twice: unique source_ref). The worker
-//   schedules it (B07 / C07, ADR-M24 §2.5).
+//   schedules it with `CostSyncLoop` (C12, ADR-M24 §2.5).
 //
 // The gateway's own budgets (key, tenant team) are a backstop only: spend is updated
 // asynchronously and can overshoot by about one call (QUESTIONS #14). G5 (C07) reads

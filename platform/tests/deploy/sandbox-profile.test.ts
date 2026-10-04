@@ -253,6 +253,20 @@ describe('sdlc-runner service', () => {
     expect(dockerfile).toMatch(/apt-get install -y --no-install-recommends git ca-certificates/);
     expect(dockerfile).not.toMatch(/ARG .*(PASSWORD|TOKEN|SECRET)|ENV .*(PASSWORD|TOKEN|SECRET)/);
   });
+
+  it('C12: every key length check stops the script on its own (`|| exit 1`), never `[ … ] && [ … ]`', () => {
+    const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
+    // Under `set -e` a failed test before the last command of an `&&` list does not stop the
+    // script, so a key of the wrong length would be stored.
+    expect(bootstrap).not.toMatch(/\[ "\$\{#\w+\}" -eq \d+ \] &&/);
+    const checks = bootstrap.match(/^\s*\[ "\$\{#\w+\}" -eq \d+ \].*$/gm) ?? [];
+    expect(checks.length).toBeGreaterThanOrEqual(2);
+    for (const check of checks) expect(check.trim()).toMatch(/\] \|\| exit 1$/);
+    const evidence =
+      /^cmd_runner_evidence_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
+    expect(evidence).toContain('[ "${#access}" -eq 30 ] || exit 1');
+    expect(evidence).toContain('[ "${#secret}" -eq 60 ] || exit 1');
+  });
 });
 
 describe('npm-proxy (Verdaccio, ADR-M25 §2.10)', () => {
