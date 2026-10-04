@@ -15,6 +15,9 @@
 // - N1: changes outside the plan → G5 fails → back to G3;
 // - N3: the cost cap → G5 fails → paused at G5 with an `intent` escalation at `pause`; `resume`
 //   with a budget increase → G4 → a new run with the new cap → G5 → G6; the history replays.
+// C11 PR 2 (design/ADR-M42 §2.7, D-02 FR-35): a run the runner stopped for a loop
+// (`stopped_stalled` / `loop_detected`) → G5 `run_cap_reached` → paused at G5 with an `intent`
+// escalation; its key was revoked when the run ended.
 // The runner here is a fake activity worker: provisioning and the agent are C04 and C05's tests.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -71,7 +74,7 @@ type Mode = 'succeed' | 'expire_once' | 'lost';
 
 /** How the fake runner ends a run, and the changes it records (C07: `changes_checked`). */
 interface RunOutcome {
-  readonly status: 'succeeded' | 'stopped_budget';
+  readonly status: 'succeeded' | 'stopped_budget' | 'stopped_stalled';
   readonly stopReason: string | null;
   readonly outOfScope: number;
 }
@@ -317,6 +320,28 @@ describeWorkflow(
       await expect(
         Worker.runReplayHistory({ workflowBundle: { codePath: bundlePath } }, history),
       ).resolves.toBeUndefined();
+    });
+
+    it('C11 PR 2: a loop the runner detected → G5 run_cap_reached → paused at G5, intent escalation, key revoked', async () => {
+      mode = 'succeed';
+      t.setClock(T0);
+      const intent = await atG4(t, 'medium');
+      outcomes.set(intent.id, [
+        { status: 'stopped_stalled', stopReason: 'loop_detected', outOfScope: 0 },
+      ]);
+      await signals.wake(ref(intent));
+      await until(intent, 'paused', 'G5');
+      const g5 = await t.f.scope.gateDecisions.listForIntent(intent.id, 'G5');
+      expect(g5.map((d) => [d.decision, d.reason_code])).toEqual([['fail', 'run_cap_reached']]);
+      const [escalation] = await t.f.scope.escalations.listForIntent(intent.id);
+      expect(escalation).toMatchObject({
+        route: 'intent',
+        response_level: 'pause',
+        packet: { gate: 'G5', reason_code: 'run_cap_reached', subject_kind: 'g5_input' },
+      });
+      const [run] = await t.f.scope.runs.listForIntent(intent.id);
+      expect(run).toMatchObject({ status: 'stopped_stalled', stop_reason: 'loop_detected' });
+      expect(t.calls.revoked).toContain(run!.id);
     });
 
     it('a lost runner: the key is revoked at once, the run fails, the intent is paused and escalated', async () => {

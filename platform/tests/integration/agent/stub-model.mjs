@@ -7,6 +7,9 @@
 //   [stub:edit]  create hello.txt with file_editor, then finish
 //   [stub:loop]  run the same terminal command forever (iteration cap)
 //   [stub:slow]  like edit, but every reply waits 120 s (time cap: interrupt)
+//   [stub:repeat] the same terminal command forever, one reply every 2 s, so the runner's 1 s
+//                poll sees every call (C11 PR 2: loop detection, identical tool calls)
+//   [stub:silent] never answers within the test (600 s): no new agent event (C11 PR 2: no progress)
 // It logs `stub:check:<name>:<yes|no>` for what the first request contained, never the content.
 import http from 'node:http';
 
@@ -68,14 +71,11 @@ function call(request, step, name, args) {
 
 function reply(request) {
   const first = textOf(request.messages.find((m) => m.role === 'user')?.content);
-  const script = first.includes('[stub:loop]')
-    ? 'loop'
-    : first.includes('[stub:slow]')
-      ? 'slow'
-      : 'edit';
+  const script =
+    ['loop', 'slow', 'repeat', 'silent'].find((name) => first.includes(`[stub:${name}]`)) ?? 'edit';
   const step = request.messages.filter((m) => m.role === 'assistant').length;
-  const delayMs = script === 'slow' ? 120_000 : 0;
-  if (script === 'loop')
+  const delayMs = { slow: 120_000, repeat: 2_000, silent: 600_000 }[script] ?? 0;
+  if (script === 'loop' || script === 'repeat')
     return { delayMs, toolCalls: [call(request, step, 'terminal', { command: 'ls' })] };
   if (step === 0) {
     return {

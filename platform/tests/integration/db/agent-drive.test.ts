@@ -12,6 +12,10 @@
 //   it fails (`agent_changes_unavailable`); the spend of the run's key is watched: one warning, a
 //   stop at the stop share (`stopped_budget`, `max_budget`), and an agent error is checked once
 //   more after a bounded wait, because LiteLLM records spend late.
+// - C11 PR 2 (FR-35, ADR-M42 §2.7): loop detection: more identical tool calls in a row than the
+//   contract's threshold (`loop_detected`) or no new agent event for the configured window
+//   (`no_progress`) → `stopped_stalled`; the budget wins over the loop in the same poll; a kill
+//   still wins.
 // Run events hold codes and counts only: no path, no key, no text.
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
 import {
@@ -27,6 +31,7 @@ import {
   type SpendInfo,
   type StartAgentRun,
 } from '@sdlc/contracts';
+import { loadProjectConfig } from '@sdlc/config';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 
 import {
@@ -69,13 +74,21 @@ function secret(value: string): RedactedSecret {
   return { reveal: () => value, toString: () => '[redacted]' } as RedactedSecret;
 }
 
+/** A status as tests write it; loop detection counts default to "progress on every poll". */
+type FakeStatus = Pick<AgentRunStatus, 'state' | 'iterations'> & Partial<AgentRunStatus>;
+
+/** Fills in the loop detection counts (C11 PR 2): the log grows on every poll, no repeats. */
+function withProgress(status: FakeStatus, poll: number): AgentRunStatus {
+  return { events: poll, identicalCalls: 0, ...status };
+}
+
 /** A scripted agent. `states` are returned by `getStatus` in order; the last one repeats. */
 class FakeAgent implements AgentAdapter {
   started: StartAgentRun | undefined;
   stopped = 0;
   commits = 0;
-  states: AgentRunStatus[] = [{ state: 'finished', iterations: 3 }];
-  afterStop: AgentRunStatus | undefined = { state: 'stopped', iterations: 4 };
+  states: FakeStatus[] = [{ state: 'finished', iterations: 3 }];
+  afterStop: FakeStatus | undefined = { state: 'stopped', iterations: 4 };
   commitError: AgentError | undefined;
   #polls = 0;
 
@@ -90,10 +103,12 @@ class FakeAgent implements AgentAdapter {
   }
 
   getStatus(): Promise<AgentRunStatus> {
-    if (this.stopped > 0 && this.afterStop) return Promise.resolve(this.afterStop);
-    const status = this.states[Math.min(this.#polls, this.states.length - 1)]!;
     this.#polls += 1;
-    return Promise.resolve(status);
+    if (this.stopped > 0 && this.afterStop) {
+      return Promise.resolve(withProgress(this.afterStop, this.#polls));
+    }
+    const status = this.states[Math.min(this.#polls - 1, this.states.length - 1)]!;
+    return Promise.resolve(withProgress(status, this.#polls));
   }
 
   stop(): Promise<void> {
@@ -568,7 +583,9 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
           now: new Date(),
         });
       }
-      return polls < at + 5 ? { state: 'running', iterations: polls } : original();
+      return polls < at + 5
+        ? withProgress({ state: 'running', iterations: polls }, polls)
+        : original();
     };
   }
 
@@ -725,9 +742,12 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
           now: new Date(),
           stopReason: 'killed',
         });
-        return { state: 'running', iterations: 2 };
+        return withProgress({ state: 'running', iterations: 2 }, polls);
       }
-      return polls < 2 ? { state: 'running', iterations: 1 } : { state: 'finished', iterations: 3 };
+      return withProgress(
+        polls < 2 ? { state: 'running', iterations: 1 } : { state: 'finished', iterations: 3 },
+        polls,
+      );
     };
     const result = await driveAgent(deps(agent), request(s));
     expect(result).toMatchObject({ outcome: 'finished', status: undefined });
@@ -916,5 +936,155 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     expect(spend.reads).toBeGreaterThan(0);
     expect(await spendEvents(s)).toEqual([]);
     await noClientData(s);
+  });
+
+  const loopEvents = async (s: Seeded) =>
+    (await s.scope.runEvents.list(s.envelope.contract.run_id))
+      .map((e) => [e.event_type, e.payload] as const)
+      .filter(([type]) => ['loop_detected', 'agent_stopped', 'agent_finished'].includes(type));
+
+  const setWindow = async (s: Seeded, minutes: number) => {
+    const yaml = `run:\n  loop_detection:\n    no_progress_window_minutes: ${String(minutes)}\n`;
+    const loaded = loadProjectConfig(yaml);
+    if (!loaded.ok) throw new Error('test configuration refused');
+    await s.scope.projectConfigs.save(s.envelope.contract.project_id, {
+      configYaml: yaml,
+      configHash: loaded.configHash,
+      updatedBy: null,
+      expectedVersion: 0,
+    });
+  };
+
+  it('C11 PR 2: more than loop_threshold identical tool calls → interrupt, stopped_stalled, loop_detected; counts only', async () => {
+    const s = await seed();
+    expect(s.envelope.contract.loop_threshold).toBe(3);
+    const agent = new FakeAgent();
+    agent.states = [1, 2, 3, 4].map((identicalCalls) => ({
+      state: 'running' as const,
+      iterations: identicalCalls,
+      identicalCalls,
+    }));
+    const result = await driveAgent(
+      deps(agent, () => 0),
+      request(s),
+    );
+    expect(result).toMatchObject({
+      outcome: 'loop_detected',
+      status: 'stopped_stalled',
+      stopReason: 'loop_detected',
+    });
+    expect(agent.stopped).toBe(1);
+    expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
+      status: 'stopped_stalled',
+      stop_reason: 'loop_detected',
+    });
+    expect((await loopEvents(s)).slice(0, 2)).toEqual([
+      ['loop_detected', { identical_calls: 4, threshold: 3, idle_minutes: 0 }],
+      ['agent_stopped', { reason: 'loop_detected', method: 'interrupt' }],
+    ]);
+    // A stalled run goes to G5 (run_cap_reached): its changes are checked first.
+    expect(changed).toEqual([s.envelope.contract.run_id]);
+    await noClientData(s);
+  });
+
+  it('C11 PR 2: exactly loop_threshold identical calls never stop the run', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    agent.states = [
+      { state: 'running', iterations: 3, identicalCalls: 3 },
+      { state: 'finished', iterations: 4, identicalCalls: 3 },
+    ];
+    expect(
+      await driveAgent(
+        deps(agent, () => 0),
+        request(s),
+      ),
+    ).toMatchObject({
+      outcome: 'finished',
+      status: 'succeeded',
+    });
+  });
+
+  it('C11 PR 2: no new agent event for the window read from the configuration → no_progress', async () => {
+    const s = await seed();
+    await setWindow(s, 5);
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'running', iterations: 2, events: 9, identicalCalls: 1 }];
+    let now = 0;
+    // Every clock read moves 30 s: the log never grows.
+    const result = await driveAgent(
+      deps(agent, () => (now += 30_000)),
+      request(s),
+    );
+    expect(result).toMatchObject({
+      outcome: 'no_progress',
+      status: 'stopped_stalled',
+      stopReason: 'no_progress',
+    });
+    const [detected, stopped] = await loopEvents(s);
+    expect(detected?.[0]).toBe('loop_detected');
+    expect(detected?.[1]).toMatchObject({ identical_calls: 1, threshold: 3 });
+    const idle = (detected?.[1] as { idle_minutes: number }).idle_minutes;
+    // Read from the configuration (5), not the default (15).
+    expect(idle).toBeGreaterThanOrEqual(5);
+    expect(idle).toBeLessThan(15);
+    expect(stopped).toEqual(['agent_stopped', { reason: 'no_progress', method: 'interrupt' }]);
+    expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
+      status: 'stopped_stalled',
+      stop_reason: 'no_progress',
+    });
+    await noClientData(s);
+  });
+
+  it('C11 PR 2 (Harry): the budget and a loop due in the same poll → the budget wins (stopped_budget)', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'running', iterations: 4, identicalCalls: 4 }];
+    const spend = new FakeSpend([spent('0.5')]);
+    let now = 0;
+    const result = await driveAgent(
+      // The first poll is past the spend check interval (30 s): both stops are due.
+      { ...deps(agent, () => (now += 31_000)), spendReader: spend },
+      request(s),
+    );
+    expect(result).toMatchObject({
+      outcome: 'max_budget',
+      status: 'stopped_budget',
+      stopReason: 'max_budget',
+    });
+    expect(spend.reads).toBe(1);
+    const recorded = await loopEvents(s);
+    expect(recorded.map(([type]) => type)).not.toContain('loop_detected');
+    expect(recorded[0]).toEqual(['agent_stopped', { reason: 'max_budget', method: 'interrupt' }]);
+  });
+
+  it('C11 PR 2: a kill that lands in the poll that finds a loop still ends the run stopped_killed', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    const runId = s.envelope.contract.run_id;
+    const original = agent.getStatus.bind(agent);
+    let polls = 0;
+    agent.getStatus = async () => {
+      polls += 1;
+      if (polls === 1) {
+        // The kill lands after the driver's kill check, in the poll whose status shows the loop.
+        await s.scope.runs.transition(runId, {
+          from: ['running'],
+          to: 'stopping',
+          now: new Date(),
+        });
+        return { state: 'running', iterations: 4, events: 8, identicalCalls: 4 };
+      }
+      return original();
+    };
+    const result = await driveAgent(
+      deps(agent, () => 0),
+      request(s),
+    );
+    expect(result).toMatchObject({ outcome: 'killed', status: 'stopped_killed' });
+    expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
+      status: 'stopped_killed',
+      stop_reason: 'killed',
+    });
   });
 });

@@ -93,8 +93,13 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
 
   type Run = AgentRunFixture;
 
-  const start = (script: string, caps: { maxIterations: number; maxDurationMin: number }) =>
+  const start = (
+    script: string,
+    caps: { maxIterations: number; maxDurationMin: number },
+    configYaml?: string,
+  ) =>
     startAgentRun({
+      ...(configYaml === undefined ? {} : { configYaml }),
       t,
       client,
       image,
@@ -281,6 +286,103 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
           { reason: 'max_duration', method: 'interrupt' },
         ]);
         expect(Date.now() - started).toBeLessThan(60_000);
+      } finally {
+        await teardownSandbox(client, runId).catch(() => undefined);
+        quietly('rm', '-f', r.relay);
+      }
+    },
+  );
+
+  // C11 PR 2 (D-02 FR-35, ADR-M42 §2.7) on the real Agent Server.
+  const loopConfig = (threshold: number, windowMinutes: number) =>
+    `run:\n  loop_detection:\n    identical_tool_calls_max: ${String(threshold)}\n    no_progress_window_minutes: ${String(windowMinutes)}\n`;
+
+  it(
+    'C11 PR 2: the same tool call again and again → the runner stops the agent: stopped_stalled, loop_detected',
+    { timeout: 600_000 },
+    async () => {
+      // Threshold 2: the platform stops at the 3rd identical call, before OpenHands' own stuck
+      // detector (fixed at 4, ADR-M10 §4.1 item 2) can.
+      const r = await start(
+        '[stub:repeat]',
+        { maxIterations: 20, maxDurationMin: 10 },
+        loopConfig(2, 15),
+      );
+      const runId = r.envelope.contract.run_id;
+      expect(r.envelope.contract.loop_threshold).toBe(2);
+      try {
+        const result = await driveAgent(
+          {
+            db: t.app as unknown as AgentDriveDeps['db'],
+            docker: client,
+            settings: r.settings,
+            adapter: new OpenHandsAdapter(),
+            agentUrl: () => r.relayUrl,
+            ...changesStep(t, client, r, []),
+          },
+          request(r),
+        );
+        expect(result).toMatchObject({ outcome: 'loop_detected', status: 'stopped_stalled' });
+        expect(await r.scope.runs.getById(runId)).toMatchObject({ stop_reason: 'loop_detected' });
+        const events = (await r.scope.runEvents.list(runId)).map((e) => [e.event_type, e.payload]);
+        const detected = events.find(([type]) => type === 'loop_detected')?.[1] as
+          { identical_calls: number; threshold: number } | undefined;
+        expect(detected?.threshold).toBe(2);
+        expect(detected?.identical_calls).toBeGreaterThan(2);
+        expect(await agentEvents(r)).toContainEqual([
+          'agent_stopped',
+          { reason: 'loop_detected', method: 'interrupt' },
+        ]);
+        // Counts only: the command the agent repeated is not in the run events.
+        expect(JSON.stringify(events)).not.toContain('"ls"');
+      } finally {
+        await teardownSandbox(client, runId).catch(() => undefined);
+        quietly('rm', '-f', r.relay);
+      }
+    },
+  );
+
+  it(
+    'C11 PR 2: the model goes silent → no new Agent Server event for the window → no_progress (no periodic events)',
+    { timeout: 600_000 },
+    async () => {
+      // Real time on purpose (Harry's review, ADR-M42 §2.7): a one-minute window against a
+      // five-minute time cap. The run can end `no_progress` only if the Agent Server sent no event
+      // of any kind (no heartbeat, no state update) for a whole real minute while the agent waited
+      // for the model; otherwise the time cap ends it and the test fails.
+      const r = await start(
+        '[stub:silent]',
+        { maxIterations: 30, maxDurationMin: 5 },
+        loopConfig(3, 1),
+      );
+      const runId = r.envelope.contract.run_id;
+      try {
+        const started = Date.now();
+        const result = await driveAgent(
+          {
+            db: t.app as unknown as AgentDriveDeps['db'],
+            docker: client,
+            settings: r.settings,
+            adapter: new OpenHandsAdapter(),
+            agentUrl: () => r.relayUrl,
+            ...changesStep(t, client, r, []),
+          },
+          request(r),
+        );
+        const elapsed = Date.now() - started;
+        expect(result).toMatchObject({ outcome: 'no_progress', status: 'stopped_stalled' });
+        expect(await r.scope.runs.getById(runId)).toMatchObject({ stop_reason: 'no_progress' });
+        expect(await agentEvents(r)).toContainEqual([
+          'agent_stopped',
+          { reason: 'no_progress', method: 'interrupt' },
+        ]);
+        const detected = (await r.scope.runEvents.list(runId)).find(
+          (e) => e.event_type === 'loop_detected',
+        )?.payload;
+        expect(detected).toEqual({ identical_calls: 0, threshold: 3, idle_minutes: 1 });
+        // At least the whole window passed in real time, well before the time cap.
+        expect(elapsed).toBeGreaterThanOrEqual(60_000);
+        expect(elapsed).toBeLessThan(3 * 60_000);
       } finally {
         await teardownSandbox(client, runId).catch(() => undefined);
         quietly('rm', '-f', r.relay);

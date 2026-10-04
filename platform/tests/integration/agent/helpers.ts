@@ -79,6 +79,11 @@ export interface StartAgentRun {
   readonly specText: string;
   readonly agentsMd: string;
   readonly caps: { readonly maxIterations: number; readonly maxDurationMin: number };
+  /**
+   * The project's configuration YAML, stored before the contract is issued (C11 PR 2: the loop
+   * threshold goes into the contract; the runner reads the no-progress window at run start).
+   */
+  readonly configYaml?: string;
   /** Runs after the claim, while the run is `provisioning` (the Cost Controller issues its key). */
   readonly afterClaim?: (scope: TenantScope, envelope: RunContractEnvelope) => Promise<void>;
 }
@@ -112,6 +117,16 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
     git_provider: 'github',
     repo_full_name: 'org/fixture',
   });
+  if (input.configYaml !== undefined) {
+    const loaded = loadProjectConfig(input.configYaml);
+    if (!loaded.ok) throw new Error('test configuration refused');
+    await scope.projectConfigs.save(project.id, {
+      configYaml: input.configYaml,
+      configHash: loaded.configHash,
+      updatedBy: null,
+      expectedVersion: 0,
+    });
+  }
   const person = (await scope.users.create({ display_name: 'a', email: 'a@example.com' })).id;
   const intent = await registry.createIntent(scope, {
     projectId: project.id,

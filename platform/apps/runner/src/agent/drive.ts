@@ -12,6 +12,10 @@
 //    a stop at `budget.stop_percent`, like at the time cap                 → `agent_stopped`;
 //    an agent that ends with an error is checked once more against the budget (LiteLLM records
 //    spend late): a budget stop is `stopped_budget`, never `failed`;
+//    loop detection (C11 PR 2, `loop-watch.ts`, ADR-M42 §2.7): more identical tool calls in a
+//    row than the contract's `loop_threshold`, or no new agent event for the configured window
+//    → `loop_detected`, then `agent_stopped`; the run ends `stopped_stalled`. Order when several
+//    stops are due in one poll: kill, cancel, the agent's own end, time cap, budget, loop;
 // 6. when the agent finished: commit what it left, with the fixed agent author (QUESTIONS #80);
 // 7. collect the changed files since `base_sha`, the last commit and the log (AC4);
 // 7b. (C07, ADR-M34 §2.2) a run that goes to G5 (succeeded or stopped at a cap): the runner computes
@@ -39,6 +43,8 @@ import {
   type AgentOutputs,
   type AgentRunHandle,
   type AgentRunState,
+  type AgentRunStatus,
+  type ProjectConfig,
   type RedactedSecret,
   type RunContract,
   type RunKeySpendReader,
@@ -60,6 +66,7 @@ import type { RunnerSettings } from '../settings.js';
 import { attachRunner } from './access.js';
 import { AgentRunError } from './errors.js';
 import { discardFeedbackToken, type FeedbackReader } from './feedback.js';
+import { LoopWatch, type LoopStop } from './loop-watch.js';
 import { SpendWatch } from './spend.js';
 import { loadAgentTask } from './task.js';
 
@@ -141,6 +148,8 @@ export type AgentOutcome =
   | 'max_duration'
   | 'max_budget'
   | 'stuck'
+  | 'loop_detected'
+  | 'no_progress'
   | 'agent_error'
   | 'killed'
   | 'failed';
@@ -170,6 +179,9 @@ const STATUS_OF: Readonly<Record<EndOutcome, RunStatus>> = {
   // The run's key reached `budget.stop_percent` of its cap (C07, FR-52).
   max_budget: 'stopped_budget',
   stuck: 'stopped_stalled',
+  // Loop detection (C11 PR 2, FR-35): G5 treats both as `run_cap_reached` (ADR-M34 §2.8).
+  loop_detected: 'stopped_stalled',
+  no_progress: 'stopped_stalled',
   agent_error: 'failed',
 };
 
@@ -179,6 +191,8 @@ const STOP_REASON_OF: Readonly<Record<EndOutcome, string | undefined>> = {
   max_duration: 'max_duration',
   max_budget: 'max_budget',
   stuck: 'agent_stuck',
+  loop_detected: 'loop_detected',
+  no_progress: 'no_progress',
   agent_error: 'agent_error',
 };
 
@@ -223,6 +237,8 @@ interface Polled {
   readonly overBudget?: boolean;
   /** The run was moved to `stopping` by the kill switch (C11). */
   readonly killed?: boolean;
+  /** Loop detection stopped the run (C11 PR 2). */
+  readonly loop?: LoopStop;
 }
 
 async function pollUntilDone(
@@ -232,28 +248,35 @@ async function pollUntilDone(
   signal?: AbortSignal,
   watch?: SpendWatch,
   killRequested: () => Promise<boolean> = () => Promise.resolve(false),
+  loops?: LoopWatch,
 ): Promise<Polled> {
   const clock = clockOf(deps);
   const sleep = sleepOf(deps);
   let errors = 0;
-  let last = { state: 'running' as AgentRunState, iterations: 0 };
+  let last: AgentRunStatus = { state: 'running', iterations: 0, events: 0, identicalCalls: 0 };
   let nextSpendCheck = clock() + deps.settings.agent.spendCheckMs;
   for (;;) {
     if (signal?.aborted) return { ...last, timedOut: false, cancelled: true };
     if (await killRequested()) return { ...last, timedOut: false, killed: true };
+    let read = false;
     try {
       last = await deps.adapter.getStatus(handle);
       errors = 0;
+      read = true;
     } catch (error) {
       errors += 1;
       if (errors >= MAX_STATUS_ERRORS) throw error;
     }
     if (last.state !== 'running') return { ...last, timedOut: false };
     if (clock() >= deadline) return { ...last, timedOut: true };
+    // The budget before the loop checks: `stopped_budget` tells the reviewer more (ADR-M42 §2.7).
     if (watch && clock() >= nextSpendCheck) {
       if ((await watch.check()) === 'stop') return { ...last, timedOut: false, overBudget: true };
       nextSpendCheck = clock() + deps.settings.agent.spendCheckMs;
     }
+    // Only a status that was read counts: a failed read is neither progress nor silence.
+    const loop = read ? loops?.observe(last) : undefined;
+    if (loop) return { ...last, timedOut: false, loop };
     await sleep(Math.min(deps.settings.agent.pollMs, Math.max(0, deadline - clock())));
   }
 }
@@ -370,12 +393,15 @@ export async function driveAgent(
 
   let handle: AgentRunHandle;
   let watch: SpendWatch | undefined;
+  let config: ProjectConfig;
   let taskLoading = false;
   try {
     if (!llmReachable(contract, deps.settings.agent.llmBaseUrl)) {
       throw new AgentRunError('model_unreachable');
     }
-    watch = await spendWatchFor(deps, scope, contract, request.virtualKey);
+    // The effective configuration when the run starts: budget shares and the loop window.
+    ({ config } = await loadEffectiveConfig(scope.projectConfigs, contract.project_id));
+    watch = spendWatchFor(deps, scope, contract, request.virtualKey, config);
     taskLoading = true; // from here `readRunFeedback` uses or revokes the token
     const task = await loadAgentTask(scope, contract, feedback);
     const endpoint = await attachRunner(
@@ -405,9 +431,24 @@ export async function driveAgent(
   });
 
   const deadline = clockOf(deps)() + contract.max_duration_min * 60_000;
+  const loops = new LoopWatch(
+    {
+      identicalCallsMax: contract.loop_threshold,
+      noProgressWindowMs: config.run.loop_detection.no_progress_window_minutes * 60_000,
+    },
+    clockOf(deps),
+  );
   let polled: Polled;
   try {
-    polled = await pollUntilDone(deps, handle, deadline, request.signal, watch, killRequested);
+    polled = await pollUntilDone(
+      deps,
+      handle,
+      deadline,
+      request.signal,
+      watch,
+      killRequested,
+      loops,
+    );
   } catch (error) {
     return failRun(deps, scope, contract, failureCode(error));
   }
@@ -434,8 +475,15 @@ export async function driveAgent(
   let outcome: AgentOutcome;
   let iterations: number | undefined = polled.iterations;
   let reachable = true;
-  if (polled.timedOut || polled.overBudget) {
-    const reason = polled.overBudget ? 'max_budget' : 'max_duration';
+  if (polled.timedOut || polled.overBudget || polled.loop) {
+    const reason = polled.overBudget ? 'max_budget' : (polled.loop?.reason ?? 'max_duration');
+    if (polled.loop) {
+      await scope.runEvents.append(contract.run_id, 'loop_detected', {
+        identical_calls: polled.loop.identical_calls,
+        threshold: polled.loop.threshold,
+        idle_minutes: polled.loop.idle_minutes,
+      });
+    }
     const stopped = await stopAtTimeCap(deps, handle);
     await scope.runEvents.append(contract.run_id, 'agent_stopped', {
       reason,
@@ -609,14 +657,14 @@ const TO_G5: readonly RunStatus[] = [
 ];
 
 /** The run's spend watch, with the project's warning and stop shares; none without a reader. */
-async function spendWatchFor(
+function spendWatchFor(
   deps: AgentDriveDeps,
   scope: TenantScope,
   contract: RunContract,
   key: RedactedSecret,
-): Promise<SpendWatch | undefined> {
+  config: ProjectConfig,
+): SpendWatch | undefined {
   if (!deps.spendReader) return undefined;
-  const { config } = await loadEffectiveConfig(scope.projectConfigs, contract.project_id);
   return new SpendWatch({
     reader: deps.spendReader,
     key,

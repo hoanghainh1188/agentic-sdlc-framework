@@ -158,6 +158,8 @@ run:
     # D-02 FR-35; handbook Ch.3 §3.6 "more than 3 repeated identical tool calls → stop".
     identical_tool_calls_max: 3
     # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). FR-35; QUESTIONS.md #9.
+    # No new agent event of any kind for this many minutes → the run stops (ADR-M42 §2.7). At most
+    # 30 (rule M27); under 5 gives a warning (a long silent command may stop a healthy run).
     no_progress_window_minutes: 15
   # [Proposal] pilot default, review after 2–4 weeks of data (handbook Ch.8). D-03 §8; QUESTIONS.md #33.
   # Run Contract validity from issue to sandbox start only; the run itself is capped by its

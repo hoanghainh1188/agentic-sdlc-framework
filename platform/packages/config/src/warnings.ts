@@ -126,6 +126,24 @@ function raisedRunCaps(config: ProjectConfig, defaults: ProjectConfig): ConfigIs
   );
 }
 
+/**
+ * Below this, a long silent command (for example `pnpm install`, whose output the agent sees only
+ * at the end) may stop a healthy run as `no_progress` (ADR-M42 §2.7): a warning, not an error.
+ */
+export const MIN_NO_PROGRESS_WINDOW_MINUTES = 5;
+
+function shortNoProgressWindow(config: ProjectConfig): ConfigIssue[] {
+  const minutes = config.run.loop_detection.no_progress_window_minutes;
+  return minutes < MIN_NO_PROGRESS_WINDOW_MINUTES
+    ? [
+        issue('config.warning.loop_window_short', 'run.loop_detection.no_progress_window_minutes', {
+          minutes,
+          minimum: MIN_NO_PROGRESS_WINDOW_MINUTES,
+        }),
+      ]
+    : [];
+}
+
 export function loosenedSettings(config: ProjectConfig, defaults: ProjectConfig): ConfigIssue[] {
   return [
     ...loosenedCells(config, defaults),
@@ -133,5 +151,6 @@ export function loosenedSettings(config: ProjectConfig, defaults: ProjectConfig)
     ...loosenedCalendar(config, defaults),
     ...longContractValidity(config),
     ...raisedRunCaps(config, defaults),
+    ...shortNoProgressWindow(config),
   ];
 }

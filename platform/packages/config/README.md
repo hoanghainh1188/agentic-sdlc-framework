@@ -60,7 +60,7 @@ Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `wo
 
 ## Mandatory rules
 
-A project may tighten anything. It may **not** loosen these (rules M1–M26 and M28; M27 is reserved for C11 PR 2; sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
+A project may tighten anything. It may **not** loosen these (rules M1–M28; sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
 
 | Rule | What |
 |---|---|
@@ -88,9 +88,10 @@ A project may tighten anything. It may **not** loosen these (rules M1–M26 and 
 | M24 | `viewer` never submits a plan (`access.plan_submit_roles`; B09, ADR-M40) |
 | M25 | `access.kill_roles` always holds `person_a`, `person_b`, `governance`, never `viewer` (C11, D-02 FR-34, ADR-M42) |
 | M26 | `run.kill_escalation.response_level` is `pause`, `contain` or `incident` (C11, ADR-M42) |
+| M27 | `run.loop_detection.no_progress_window_minutes` ≤ 30 (C11 PR 2, D-02 FR-35, ADR-M42 §2.7) |
 | M28 | `access.cost_read_roles` never holds `viewer` (E04, ADR-M45) |
 
-Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
+Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. A Run Contract validity above 60 minutes, a run cap above the default and a no-progress window under 5 minutes (`run.loop_detection.no_progress_window_minutes`: a long silent command may stop a healthy run) also give a warning. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 
 ## Changing the defaults
 

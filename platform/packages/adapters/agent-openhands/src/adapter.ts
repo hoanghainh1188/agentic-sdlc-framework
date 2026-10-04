@@ -14,6 +14,7 @@ import {
 
 import { AgentServerClient, type ClientOptions, type ExecutionStatus } from './client.js';
 import { commitCommand, diffCommand, parseCommitOutput, parseDiffOutput } from './git.js';
+import { trailingIdenticalCalls } from './loop.js';
 import { buildConversationRequest } from './request.js';
 
 export interface OpenHandsAdapterOptions {
@@ -102,14 +103,16 @@ export class OpenHandsAdapter implements AgentAdapter {
     // test), so the adapter reads the whole log and filters here.
     const events = await client.listEvents(handle.conversationId);
     const iterations = events.filter((event) => event.kind === STEP_EVENT).length;
+    // Loop detection (C11, ADR-M42 §2.7): counts only; the arguments never leave the adapter.
+    const progress = { events: events.length, identicalCalls: trailingIdenticalCalls(events) };
     const state = toAgentState(status, iterations);
     if (
       (state === 'error' || state === 'stopped') &&
       events.some((e) => e.kind === ERROR_EVENT && e.code === MAX_ITERATIONS_CODE)
     ) {
-      return { state: 'max_iterations', iterations };
+      return { state: 'max_iterations', iterations, ...progress };
     }
-    return { state, iterations };
+    return { state, iterations, ...progress };
   }
 
   async stop(handle: AgentRunHandle): Promise<void> {
