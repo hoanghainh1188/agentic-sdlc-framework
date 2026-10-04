@@ -225,6 +225,11 @@ export interface ProjectConfig {
      */
     readonly cost_read_roles: readonly ProjectRole[];
     /**
+     * Who may read the gate waiting-time metrics of the project (task E06, ADR-M47, QUESTIONS
+     * #206; D-02 FR-12). Tenant admins always may. The viewer never (mandatory rule M29).
+     */
+    readonly metrics_read_roles: readonly ProjectRole[];
+    /**
      * Pairs of roles one person may not hold together on the project (task B13, ADR-M37,
      * QUESTIONS #154): a grant that would give someone both roles of a pair is refused. Person A
      * and Person B always stay apart (mandatory rule M21).

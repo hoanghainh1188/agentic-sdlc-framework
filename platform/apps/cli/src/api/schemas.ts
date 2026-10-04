@@ -193,6 +193,47 @@ export const costReportSchema = z.object({
 });
 export type CostReportView = z.infer<typeof costReportSchema>['report'];
 
+/** Whole seconds, or null when there is nothing to measure (task E06, ADR-M47). */
+const seconds = z.number().int().min(0);
+const waitStatsSchema = z.object({
+  count: z.number().int().min(0),
+  avg_seconds: seconds.nullable(),
+  max_seconds: seconds.nullable(),
+  p50_seconds: seconds.nullable(),
+  p90_seconds: seconds.nullable(),
+});
+export type WaitStatsView = z.infer<typeof waitStatsSchema>;
+
+/** `GET /v1/metrics/gates` (E06, ADR-M47). */
+export const gateMetricsSchema = z.object({
+  metrics: z.object({
+    scope: z.object({ kind: z.enum(['tenant', 'project']), project: code.optional() }),
+    from: time,
+    to: time,
+    as_of: time,
+    clock: z.literal('wall_clock'),
+    filters: z.object({
+      gate: code.nullable(),
+      mode: code.nullable(),
+      risk: code.nullable(),
+    }),
+    rows: z
+      .array(
+        z.object({
+          project: code,
+          gate: z.enum(['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8']),
+          first_round: waitStatsSchema,
+          after_changes: waitStatsSchema,
+          auto_passed: z.number().int().min(0),
+          open: z.object({ count: z.number().int().min(0), oldest_seconds: seconds.nullable() }),
+        }),
+      )
+      .max(500),
+    truncated: z.boolean(),
+  }),
+});
+export type GateMetricsView = z.infer<typeof gateMetricsSchema>['metrics'];
+
 /** `GET /v1/intents/:intent/specs` (B08). */
 export const specListSchema = z.object({
   intent: code,

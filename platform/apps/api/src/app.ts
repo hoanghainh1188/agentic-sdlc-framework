@@ -29,6 +29,8 @@ import { PlansController } from './plans/plans.controller.js';
 import { PlansService } from './plans/plans.service.js';
 import { CostController } from './cost/cost.controller.js';
 import { CostService } from './cost/cost.service.js';
+import { MetricsController } from './metrics/metrics.controller.js';
+import { MetricsService } from './metrics/metrics.service.js';
 import { RunsController } from './runs/runs.controller.js';
 import { RunsService } from './runs/runs.service.js';
 import { SpecsController } from './specs/specs.controller.js';
@@ -45,6 +47,7 @@ import {
   PLANS,
   RUNS,
   COST,
+  METRICS,
   REGISTRY,
   SETTINGS,
   SPECS,
@@ -93,6 +96,7 @@ class ApiModule {
         PlansController,
         RunsController,
         CostController,
+        MetricsController,
         EscalationsController,
         AiRecordsController,
         AdminProjectsController,
@@ -141,6 +145,7 @@ class ApiModule {
           inject: [REGISTRY],
         },
         { provide: COST, useValue: new CostService(now) },
+        { provide: METRICS, useValue: new MetricsService(now) },
         { provide: AI_RECORDS, useValue: new AiRecordsService(signals, wakeLogger, now) },
         {
           provide: APP_GUARD,
