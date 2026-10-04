@@ -254,6 +254,13 @@ access:
   # in the list and the viewer role never kills. The producer of the run may kill it: killing is
   # containment, never an approval, and the escalation it raises is decided by someone else.
   kill_roles: [person_a, person_b, governance]
+  # Task E04, ADR-M45, QUESTIONS #196. Who reads the cost report of this project or of one of its
+  # intents (`sdlc cost report`, D-02 FR-53): Person A operates runs and receives budget
+  # escalations, Person B decides technical escalations, PM / BrSE talks to the client about cost,
+  # governance and admin own budgets. Tenant admins always read it, also for the whole tenant.
+  # Cost is commercial data (client billing later, D-07 §5): the viewer role never reads it
+  # (mandatory rule M28).
+  cost_read_roles: [person_a, person_b, pm_brse, governance, admin]
   # Task B13, ADR-M37, QUESTIONS #154. Separation of duties (handbook Ch.5, codes table §5): one
   # person never holds both roles of a pair on the same project. Person A (owner) and Person B
   # (independent reviewer) always stay apart (mandatory rule M21): G1–G3 have no producers

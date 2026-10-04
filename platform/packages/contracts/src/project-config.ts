@@ -220,6 +220,11 @@ export interface ProjectConfig {
      */
     readonly kill_roles: readonly ProjectRole[];
     /**
+     * Who may read the cost report of the project or of one of its intents (task E04, ADR-M45,
+     * QUESTIONS #196; D-02 FR-53). Tenant admins always may. The viewer never (mandatory rule M28).
+     */
+    readonly cost_read_roles: readonly ProjectRole[];
+    /**
      * Pairs of roles one person may not hold together on the project (task B13, ADR-M37,
      * QUESTIONS #154): a grant that would give someone both roles of a pair is refused. Person A
      * and Person B always stay apart (mandatory rule M21).

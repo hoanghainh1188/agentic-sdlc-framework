@@ -224,6 +224,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc plan list <INT-…>` / `sdlc plan show <INT-…>` | Lists the submitted plan versions / shows the latest one with its path patterns, tools and change flags |
 | `sdlc ai-record show --project <slug>` | Shows the project AI record |
 | `sdlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
+| `sdlc cost report [--project <slug> \| --intent <INT-…>] [--from <time>] [--to <time>] [--by project\|intent\|model\|status]` | Shows tokens and cost (below) |
 
 - Gate decisions take **codes only**: a reason code (§19.8b) and, if you want, `--reason-ref` with an `https://` link to a comment that explains it. The platform never stores your words, because its records are kept for years.
 - The rules are the same as for comments (§19.8b): you need the gate's role, you can decide only the gate the intent waits at, and a producer never approves.
@@ -263,6 +264,14 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - Leave out `--commit`, or give a commit that holds the same file as the default branch; otherwise the platform refuses (`plan_not_on_default_branch`). A refused file answers `plan_invalid` with the reason, for example `pattern_too_broad` or `platform_field`.
 - **If someone edits the plan file on the default branch after you submitted it**, G3 or G4 waits (`plan_resubmit_needed`) and the platform posts a comment. It never takes the new file by itself: submit it again with `sdlc plan submit`. At G4 a new plan takes the intent back to G3, where Person B approves it again; earlier approvals no longer count.
 - If GitHub cannot be reached, the intent waits; it never passes G3 or starts a run without the check.
+
+**Reading the cost report.** `sdlc cost report` shows what the model calls cost (task E04, `design/ADR-M45-cost-report.md`, D-02 FR-53):
+
+- Who: the whole tenant (no `--project`, no `--intent`): tenant admins only. One project or one intent: a tenant admin, or a role in the project setting `access.cost_read_roles` (by default Person A, Person B, PM / BrSE, governance and admin). The viewer role never may.
+- When: times are UTC, written `YYYY-MM-DD` (00:00 that day) or `YYYY-MM-DDThh:mm:ssZ`. `--from` is included and `--to` is excluded: `--from 2026-10-01 --to 2026-11-01` is all of October. Without them, the report covers the current month until now. At most 366 days. A range that is empty (`--to` not after `--from`) or longer than 366 days is refused: the API answers 400 `invalid_request` with the reason `range_empty` or `range_too_long`, and the command exits with code 2. So does a time in another format, or `--project` together with `--intent`.
+- The table has one row per project (whole tenant), per intent (one project) or per model (one intent); `--by` chooses another grouping, also `status` (the run's status). Each row and the total show the calls, tokens in, tokens out, cached tokens, cost, wasted tokens and wasted cost. Amounts are USD with 6 decimals. At most 500 rows are shown, largest cost first; the total always covers everything.
+- **Wasted** = tokens and cost of runs that ended failed, cancelled or stopped (budget, scope, time, stalled, killed). Runs that succeeded, and L1 runs that produced a proposal, are not wasted. Runs sent back later by G6 or G7 are not counted as wasted yet.
+- **The numbers are as fresh as the last copy from the model gateway.** The platform copies a run's spend when the run ends. Every report ends with the time of the latest recorded call, the time of the last copy, and the number of runs still in progress, whose cost is not shown yet.
 
 **When a command fails.** The message says why. The exit code tells scripts what happened:
 
@@ -365,3 +374,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.7 | 2026-10-03 | Claude (task C08, PR 2) | §19.8: which gates can be decided by comment, G6 included (ADR-M38 §2.7) |
 | 0.8 | 2026-10-03 | Claude (task B09, PR 1) | §19.8c: `sdlc plan submit|list|show`; the plan file, its rules, who submits, the re-check at G3–G4 (ADR-M40) |
 | 0.9 | 2026-10-03 | Claude (task C11, PR 1) | §19.8b, §19.8c: `/kill` and `sdlc run list|kill` point to Chapter 18 §18.8d (ADR-M42) |
+| 0.10 | 2026-10-04 | Claude (task E04) | §19.8c: `sdlc cost report`: who, the range, the grouping, wasted tokens, freshness (ADR-M45) |

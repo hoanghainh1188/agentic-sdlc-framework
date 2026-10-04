@@ -15,3 +15,25 @@ export {
 } from './logger.js';
 export { fromMicros, isUsd, startOfUtcMonth, toMicros } from './money.js';
 export { SYNC_SKIP_REASONS, type SyncRange, type SyncResult, type SyncSkipReason } from './sync.js';
+export {
+  COST_REPORT_GROUPS,
+  COST_REPORT_MAX_DAYS,
+  COST_REPORT_MAX_ROWS,
+  IN_PROGRESS_RUN_STATUSES,
+  WASTED_RUN_STATUSES,
+  buildCostReport,
+  checkCostReportRange,
+  defaultCostReportGroup,
+  formatUsd6,
+  parseCostReportTime,
+  resolveCostReportRange,
+  toCostAmounts,
+  type CostAmounts,
+  type CostReport,
+  type CostReportGroup,
+  type CostReportInput,
+  type CostReportRange,
+  type CostReportRangeIssue,
+  type CostReportRow,
+  type CostReportScope,
+} from './report.js';

@@ -54,12 +54,13 @@ escalation:
 | `access.spec_link_roles` | Who may link an intent's spec through the API (B08, ADR-M39). Default: `person_a` and `pm_brse` |
 | `access.plan_submit_roles` | Who may submit an intent's plan file through the API (B09, ADR-M40). The submitter never approves G3. Default: `person_a` |
 | `access.kill_roles` | Who may stop a run with the kill switch (C11, ADR-M42). Default and minimum: `person_a`, `person_b`, `governance` |
+| `access.cost_read_roles` | Who may read the cost report of a project or intent (E04, ADR-M45). Default: `person_a`, `person_b`, `pm_brse`, `governance`, `admin`; tenant admins always may; never `viewer` (M28) |
 
 Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `working_hours`, `working_days` (working calendar; one working day = the working hours). Deadlines may also be `{ kind: end_of_working_day }` or `{ kind: next_planned_work }` (no clock).
 
 ## Mandatory rules
 
-A project may tighten anything. It may **not** loosen these (rules M1–M26, sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
+A project may tighten anything. It may **not** loosen these (rules M1–M26 and M28; M27 is reserved for C11 PR 2; sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
 
 | Rule | What |
 |---|---|
@@ -87,6 +88,7 @@ A project may tighten anything. It may **not** loosen these (rules M1–M26, sou
 | M24 | `viewer` never submits a plan (`access.plan_submit_roles`; B09, ADR-M40) |
 | M25 | `access.kill_roles` always holds `person_a`, `person_b`, `governance`, never `viewer` (C11, D-02 FR-34, ADR-M42) |
 | M26 | `run.kill_escalation.response_level` is `pause`, `contain` or `incident` (C11, ADR-M42) |
+| M28 | `access.cost_read_roles` never holds `viewer` (E04, ADR-M45) |
 
 Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 

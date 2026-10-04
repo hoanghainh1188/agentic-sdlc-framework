@@ -110,6 +110,31 @@ describeDb('B13 AC8: stored configurations after a change of platform defaults',
     expect((await scope.audit.verify()).broken).toBeUndefined();
   });
 
+  it('E04: a configuration stored before `access.cost_read_roles` existed is re-hashed and loads', async () => {
+    // A YAML that only repeats a default has the default configuration's hash. Before E04 that was
+    // the pinned hash below (platform/tests/config/hash.test.ts); E04 added `cost_read_roles`.
+    const PRE_E04_DEFAULT_HASH = '07c4252b04aecaad7d4fa8b5c09bc4b18d8f89f6174f4cf0b280350181edf788';
+    const yaml = 'budget:\n  warn_percent: 80\n';
+    const { projectId } = await stored(yaml);
+    const current = (await scope.projectConfigs.get(projectId))!.config_hash;
+    expect(current).not.toBe(PRE_E04_DEFAULT_HASH);
+    await tamper(t0.name, `UPDATE project_configs SET config_hash = $1 WHERE project_id = $2`, [
+      PRE_E04_DEFAULT_HASH,
+      projectId,
+    ]);
+    expect(await refusal(projectId)).toBe('config_defaults_drift');
+    expect(await outcomeOf(projectId)).toMatchObject({ outcome: 'rehashed', version: 2 });
+    const { config, configHash } = await loadEffectiveConfig(scope.projectConfigs, projectId);
+    expect(configHash).toBe(current);
+    expect(config.access.cost_read_roles).toEqual([
+      'person_a',
+      'person_b',
+      'pm_brse',
+      'governance',
+      'admin',
+    ]);
+  });
+
   it('leaves a YAML changed outside the platform refused', async () => {
     const { projectId } = await stored();
     await tamper(t0.name, `UPDATE project_configs SET config_yaml = $1 WHERE project_id = $2`, [
