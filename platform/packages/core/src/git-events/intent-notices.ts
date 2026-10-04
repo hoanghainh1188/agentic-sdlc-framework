@@ -93,6 +93,7 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
     case 'g5_returned':
       return 'intent.status.g5_returned';
     case 'terminated':
+      if (notice.gate === 'G8') return 'intent.status.g8_terminated';
       if (notice.gate === 'G7') return 'intent.status.g7_terminated';
       if (notice.gate === 'G6') return 'intent.status.g6_terminated';
       // C11: `terminate` on the escalation of a failed or killed run (paused at G4).
@@ -137,6 +138,18 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.merged';
     case 'run_killed':
       return 'intent.status.run_killed';
+    case 'g8_review_needed':
+      return 'intent.status.g8_review_needed';
+    case 'g8_changes_requested':
+      return 'intent.status.g8_changes_requested';
+    case 'g8_refused':
+      return 'intent.status.g8_refused';
+    case 'g8_escalated':
+      return 'intent.status.g8_escalated';
+    case 'g8_resumed':
+      return 'intent.status.g8_resumed';
+    case 'released':
+      return 'intent.status.released';
     default:
       return notice.gate !== null && isCommandGate(notice.gate)
         ? 'intent.status.advanced'
@@ -157,6 +170,11 @@ export interface IntentNoticeView {
   readonly baseSha?: string | null;
   /** C07: the budget warning's share of the run's cap, from the run event `budget_warning`. */
   readonly percent?: number | null;
+  /**
+   * E03 (ADR-M49 §2.6, QUESTIONS #222): the project's disclosure format is `client_format`; the
+   * link to the human AI record, where the client's note is written.
+   */
+  readonly clientRecordRef?: string | null;
 }
 
 /** `YYYY-MM-DD HH:MM UTC`: the same text whatever the reader's locale. */
@@ -189,6 +207,10 @@ export function renderIntentNotice(
       agent: view.agentKey ?? '—',
       base_sha: view.baseSha ?? '—',
       percent: view.percent ?? '—',
+      client_note:
+        view.clientRecordRef === undefined || view.clientRecordRef === null
+          ? ''
+          : t('intent.status.g8_client_note', { record_ref: view.clientRecordRef }, locale),
     },
     locale,
   );
@@ -224,6 +246,8 @@ async function viewOf(
   const proposal = notice.kind === 'run_proposed' ? await lastProposal(scope, intent.id) : null;
   const percent =
     notice.kind === 'budget_warning' ? await lastWarningPercent(scope, intent.id) : null;
+  const clientRecordRef =
+    notice.kind === 'g8_review_needed' ? await clientNoteRef(scope, intent) : null;
   const mentions = await mentionsFor(scope, intent.project_id, notice.audience_roles, []);
   // The recertification warning goes to the agent's owner (ADR-M31 §2.7), read now.
   if (agent) mentions.push(...(await loginsOf(scope, agent.owner_id)));
@@ -236,7 +260,19 @@ async function viewOf(
     agentKey: agent?.agent_key ?? (proposal ? await agentKeyOf(scope, proposal.agentId) : null),
     baseSha: proposal ? proposal.baseSha.slice(0, 12) : null,
     percent,
+    clientRecordRef,
   };
+}
+
+/**
+ * E03 (QUESTIONS #222): when the latest pack uses the client's own disclosure format, the link to
+ * the human AI record; Person B's G8 approval confirms that the client's note is ready.
+ */
+async function clientNoteRef(scope: TenantScope, intent: Intent): Promise<string | null> {
+  const pack = await scope.evidencePacks.latest(intent.id);
+  if (pack?.disclosure_format !== 'client_format') return null;
+  const record = await scope.projectAiRecords.get(intent.project_id);
+  return record?.record_ref ?? t('evidence.md.none', {});
 }
 
 /** The percent of the last `budget_warning` of the intent's last run (C07), or null. */

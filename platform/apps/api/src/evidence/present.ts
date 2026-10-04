@@ -8,6 +8,8 @@ export function presentPack(intentCode: string, pack: EvidencePack): Record<stri
     id: pack.id,
     version: pack.version,
     content_sha256: pack.content_sha256,
+    // E03 (ADR-M49 §2.2): what a G8 approval is bound to; null for packs built before E03.
+    release_sha256: pack.release_sha256,
     manifest: {
       uri: pack.manifest_uri,
       sha256: pack.manifest_sha256,

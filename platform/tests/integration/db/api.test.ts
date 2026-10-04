@@ -628,7 +628,7 @@ describeDb('B03: API app on PostgreSQL', () => {
       });
     });
 
-    it('G8 is not supported yet (E03); unknown gates are invalid', async () => {
+    it('G8 is decided at G8 only (E03); unknown gates are invalid', async () => {
       const created = await createIntent(tenantA);
       // E01 (QUESTIONS #175): G7 is approved by a PR review, never by the API.
       expectError(
@@ -636,10 +636,11 @@ describeDb('B03: API app on PostgreSQL', () => {
         422,
         'g7_use_pr_review',
       );
+      // E03 (ADR-M49): Person B decides G8 through the API, when the intent waits there.
       expectError(
         await decide(tenantA, 'b', created.code, 'G8', { decision: 'approve' }),
-        422,
-        'gate_not_supported',
+        409,
+        'gate_not_current',
       );
       expectError(
         await decide(tenantA, 'b', created.code, 'G9', { decision: 'approve' }),

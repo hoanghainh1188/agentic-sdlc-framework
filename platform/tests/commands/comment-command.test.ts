@@ -31,6 +31,10 @@ describe('comment command grammar', () => {
     ['/request-changes G1\nThe scope is too wide.', 'request_changes', 'G1', 'other'],
     ['/reject G3\tout_of_scope\tsee below', 'reject', 'G3', 'out_of_scope'],
     ['/approve G7', 'approve', 'G7', null],
+    // E03 (ADR-M49): Person B decides the release.
+    ['/approve G8', 'approve', 'G8', null],
+    ['/reject G8 security_finding the rollback is untested', 'reject', 'G8', 'security_finding'],
+    ['/request-changes G8\nThe release notes are missing.', 'request_changes', 'G8', 'other'],
     // A named reason code is a reason by itself.
     ['/reject G3 spec_unclear', 'reject', 'G3', 'spec_unclear'],
     ['/request-changes G2 tests-insufficient', 'request_changes', 'G2', 'tests_insufficient'],

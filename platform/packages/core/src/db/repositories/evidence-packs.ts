@@ -1,6 +1,6 @@
 // Evidence Packs (design/D-05 section 6.6, version 1.30; D-08 E02; design/ADR-M48). A row names one
 // build of an intent's pack: its version, the hashes and URIs of its two files (manifest, Markdown)
-// in the evidence store. Written once; E03 seals one version, E05 purges the files.
+// in the evidence store. Written once; E03 seals one version (migration 0022), E05 purges the files.
 import type { DisclosureFormat } from '@sdlc/contracts';
 
 import { DbError } from '../errors.js';
@@ -13,6 +13,8 @@ export interface NewEvidencePack {
   readonly intentId: string;
   readonly version: number;
   readonly contentSha256: string;
+  /** E03 (ADR-M49 §2.2): the content without the G8 parts; G8 approvals are bound to it. */
+  readonly releaseSha256: string;
   readonly manifest: StoredPackFile;
   readonly markdown: StoredPackFile;
   readonly locale: string;
@@ -50,6 +52,7 @@ export class EvidencePackRepository extends TenantRepository {
     if (!isUuid(pack.intentId)) invalid('intentId');
     if (!Number.isSafeInteger(pack.version) || pack.version < 1) invalid('version');
     if (!SHA256.test(pack.contentSha256)) invalid('contentSha256');
+    if (!SHA256.test(pack.releaseSha256)) invalid('releaseSha256');
     checkFile(pack.manifest, 'manifest');
     checkFile(pack.markdown, 'markdown');
     if (!/^[a-z]{2}(-[A-Z]{2})?$/.test(pack.locale)) invalid('locale');
@@ -64,6 +67,7 @@ export class EvidencePackRepository extends TenantRepository {
           intent_id: pack.intentId,
           version: pack.version,
           content_sha256: pack.contentSha256,
+          release_sha256: pack.releaseSha256,
           manifest_uri: pack.manifest.uri,
           manifest_sha256: pack.manifest.sha256,
           manifest_size_bytes: pack.manifest.sizeBytes,
@@ -137,5 +141,24 @@ export class EvidencePackRepository extends TenantRepository {
         .executeTakeFirst(),
     );
     return row !== undefined;
+  }
+
+  /**
+   * Seals one version (E03 at G8, ADR-M49 §2.4). Returns the sealed row, or undefined when the
+   * version was sealed already or is not the intent's (the trigger and the one-sealed index refuse
+   * any other change).
+   */
+  seal(packId: string, at: Date): Promise<EvidencePack | undefined> {
+    if (!isUuid(packId)) return Promise.resolve(undefined);
+    return this.run(
+      this.db
+        .updateTable('evidence_packs')
+        .set({ sealed_at: at })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', packId)
+        .where('sealed_at', 'is', null)
+        .returningAll()
+        .executeTakeFirst(),
+    );
   }
 }

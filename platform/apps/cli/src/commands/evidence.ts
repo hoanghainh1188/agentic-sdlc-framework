@@ -44,6 +44,9 @@ function printPack(ctx: CliContext, pack: EvidencePackView): void {
     items: pack.item_count,
     sealed: show(pack.sealed_at),
   });
+  if (pack.release_sha256 !== null) {
+    say(ctx, 'cli.evidence.release', { sha256: pack.release_sha256 });
+  }
   say(ctx, 'cli.evidence.file', { name: 'manifest.json', sha256: pack.manifest.sha256 });
   say(ctx, 'cli.evidence.file', { name: 'pack.md', sha256: pack.markdown.sha256 });
 }

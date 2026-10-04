@@ -80,6 +80,13 @@ export const INTENT_NOTICE_KINDS = [
   'merged',
   // C11 (ADR-M42): a person used the kill switch on the intent's run; an escalation was raised.
   'run_killed',
+  // E03 (ADR-M49): G8, the release.
+  'g8_review_needed',
+  'g8_changes_requested',
+  'g8_refused',
+  'g8_escalated',
+  'g8_resumed',
+  'released',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

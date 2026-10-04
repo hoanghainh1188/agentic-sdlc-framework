@@ -29,6 +29,10 @@ export const WORKER_ENV = {
   costMasterKeyPath: 'SDLC_WORKER_COST_MASTER_KEY_PATH',
   litellmUrl: 'SDLC_WORKER_LITELLM_URL',
   runEgress: 'SDLC_WORKER_RUN_EGRESS',
+  evidenceUrl: 'SDLC_WORKER_EVIDENCE_URL',
+  evidenceBucket: 'SDLC_WORKER_EVIDENCE_BUCKET',
+  evidenceSecretPath: 'SDLC_WORKER_EVIDENCE_SECRET_PATH',
+  evidenceMaxItemMb: 'SDLC_WORKER_EVIDENCE_MAX_ITEM_MB',
   devMode: 'SDLC_WORKER_DEV_MODE',
   devDbUrl: 'SDLC_WORKER_DEV_DB_URL',
 } as const;
@@ -100,10 +104,53 @@ const schema = z.object({
     .string()
     .regex(/^[a-z][a-z0-9-]*:[0-9]{1,5}(,[a-z][a-z0-9-]*:[0-9]{1,5})*$/)
     .default('litellm:4000,npm-proxy:4873'),
+  // E03 (ADR-M49 §2.2): the evidence store for G8's release pack, SeaweedFS's S3 API on the
+  // Compose network; `off`: intents wait at G8. An origin only.
+  [WORKER_ENV.evidenceUrl]: z
+    .string()
+    .refine((v) => v === 'off' || isOrigin(v))
+    .default('http://seaweedfs:8333'),
+  [WORKER_ENV.evidenceBucket]: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .default('evidence'),
+  // The `worker` AppRole reads `kv/data/worker/*` only.
+  [WORKER_ENV.evidenceSecretPath]: z
+    .string()
+    .regex(/^worker\/[A-Za-z0-9_.-]+$/)
+    .default('worker/evidence'),
+  // The largest evidence file the worker reads back to check its hash, one file at a time.
+  [WORKER_ENV.evidenceMaxItemMb]: z.coerce.number().int().min(1).max(4096).default(256),
   [WORKER_ENV.devMode]: z.enum(['', '0', '1']).default(''),
   [WORKER_ENV.devDbUrl]: z.string().optional(),
   NODE_ENV: z.string().optional(),
 });
+
+function isOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      ['http:', 'https:'].includes(url.protocol) &&
+      url.username === '' &&
+      url.password === '' &&
+      url.pathname === '/' &&
+      url.search === '' &&
+      url.hash === '' &&
+      !value.endsWith('#') &&
+      !value.endsWith('?')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** E03: the worker's evidence store (ADR-M49 §2.2). */
+export interface WorkerEvidenceSettings {
+  readonly url: string;
+  readonly bucket: string;
+  readonly secretPath: string;
+  readonly maxItemBytes: number;
+}
 
 export type WorkerDatabase =
   | {
@@ -148,6 +195,8 @@ export interface WorkerSettings {
   readonly workflowBundle: string | null;
   /** C06 session 2: agent runs (G4, the handoff to the runner); null: G4 waits. */
   readonly runs: WorkerRunSettings | null;
+  /** E03: the evidence store for G8's release pack; null: `SDLC_WORKER_EVIDENCE_URL=off`. */
+  readonly evidence: WorkerEvidenceSettings | null;
 }
 
 export type WorkerSettingsKey =
@@ -239,6 +288,15 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
             costMasterKeyPath: v[WORKER_ENV.costMasterKeyPath],
             litellmUrl: v[WORKER_ENV.litellmUrl],
             egressAllowlist: v[WORKER_ENV.runEgress].split(','),
+          },
+    evidence:
+      v[WORKER_ENV.evidenceUrl] === 'off'
+        ? null
+        : {
+            url: new URL(v[WORKER_ENV.evidenceUrl]).origin,
+            bucket: v[WORKER_ENV.evidenceBucket],
+            secretPath: v[WORKER_ENV.evidenceSecretPath],
+            maxItemBytes: v[WORKER_ENV.evidenceMaxItemMb] * 1024 * 1024,
           },
   };
 }

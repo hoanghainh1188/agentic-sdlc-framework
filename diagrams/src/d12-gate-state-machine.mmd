@@ -16,7 +16,7 @@ stateDiagram-v2
     Escalated --> Running: decision = resume (bound, not expired)
     Escalated --> G4: resume after a G5 breach, a failed or a killed run (new run after G4)
     Escalated --> G3: modify / roll back after a G5 breach or a gone G7 feedback (G3 HITL)
-    Escalated --> Cancelled: terminate after a G5 breach, a failed or a killed run
+    Escalated --> Cancelled: terminate after a G5 breach, a failed or a killed run, a G8 stop
     Escalated --> Frozen: no acknowledgement within SLA
     Frozen --> Escalated: backup / governance acknowledges
     G5 --> G6: pass
@@ -30,7 +30,10 @@ stateDiagram-v2
     G7 --> Escalated: pull request closed or changed, merged before approval
     Escalated --> G7: resume after a G7 stop, or after the G7 feedback was gone (same head)
     G7 --> G8: approved (+ 2nd approver if flagged) + merged by a person
-    G8 --> Done: approve release (disclosure present)
+    G8 --> Done: Person B approves the release (+ 2nd at Critical), pack sealed
+    G8 --> Escalated: evidence file fails its hash check (security)
+    Escalated --> G8: resume after a G8 stop (pack built again)
+    G8 --> G8: no AI record (fail, waits) / request changes
     G1 --> Rejected: reject
     G2 --> Rejected: reject
     G3 --> Rejected: reject

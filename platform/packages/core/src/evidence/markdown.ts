@@ -97,6 +97,7 @@ export function renderPackMarkdown(input: MarkdownInput): string {
           build.builtBy === null ? l('evidence.md.platform') : c(build.builtBy),
         ],
         [l('evidence.md.content_sha256'), c(build.contentSha256)],
+        [l('evidence.md.release_sha256'), c(build.releaseSha256)],
       ],
       none,
     ),

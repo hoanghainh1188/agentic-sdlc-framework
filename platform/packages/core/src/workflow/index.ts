@@ -113,3 +113,19 @@ export {
   type FeedbackUnavailable,
 } from './g7-feedback.js';
 export { recordReviews, voidStaleReviewApprovals } from './g7-reviews.js';
+export {
+  g8InputSha256,
+  g8Producers,
+  gatherG8Facts,
+  gatherG8Merge,
+  type G8Facts,
+  type G8Merge,
+} from './g8-facts.js';
+export {
+  buildReleasePack,
+  stepG8,
+  stepPausedG8,
+  type G8Check,
+  type ReleasePackDeps,
+  type ReleasePackOutcome,
+} from './g8.js';

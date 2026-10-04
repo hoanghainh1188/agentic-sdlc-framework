@@ -26,7 +26,36 @@ describe('worker settings', () => {
       reconcileBatch: 500,
       workflowBundle: null,
       runs: null,
+      evidence: {
+        url: 'http://seaweedfs:8333',
+        bucket: 'evidence',
+        secretPath: 'worker/evidence',
+        maxItemBytes: 256 * 1024 * 1024,
+      },
     });
+  });
+
+  it('E03: the evidence store for G8 (an origin, the worker KV path, a size cap; off)', () => {
+    expect(loadSettings({ SDLC_WORKER_EVIDENCE_URL: 'off' }).evidence).toBeNull();
+    expect(
+      loadSettings({
+        SDLC_WORKER_EVIDENCE_URL: 'http://seaweedfs:8333/',
+        SDLC_WORKER_EVIDENCE_MAX_ITEM_MB: '8',
+      }).evidence,
+    ).toMatchObject({ url: 'http://seaweedfs:8333', maxItemBytes: 8 * 1024 * 1024 });
+    for (const env of [
+      { SDLC_WORKER_EVIDENCE_URL: 'http://seaweedfs:8333/evidence' },
+      { SDLC_WORKER_EVIDENCE_URL: 'http://user:pw@seaweedfs:8333' },
+      { SDLC_WORKER_EVIDENCE_URL: 'ftp://seaweedfs' },
+      // The worker AppRole reads kv/data/worker/* only.
+      { SDLC_WORKER_EVIDENCE_SECRET_PATH: 'api/evidence' },
+      { SDLC_WORKER_EVIDENCE_MAX_ITEM_MB: '0' },
+      { SDLC_WORKER_EVIDENCE_BUCKET: 'Evidence' },
+    ]) {
+      expect(() => loadSettings(env), JSON.stringify(env)).toThrow(
+        expect.objectContaining({ key: 'worker.settings.invalid' }),
+      );
+    }
   });
 
   it('C06 session 2: agent runs need both files of the cost-controller AppRole', () => {

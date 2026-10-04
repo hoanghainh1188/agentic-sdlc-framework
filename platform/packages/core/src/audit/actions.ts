@@ -21,8 +21,9 @@ import { isUuid } from '../db/tenant-id.js';
  * - `code`: a short code such as `G3`, `INT-2026-0001` or an enum value (no spaces, max 64)
  * - `codes`: a list of 1 to `MAX_AUDIT_CODES` codes (B13: the warning codes of `config.changed`)
  * - `decimal`: an amount of money in USD as a decimal string with at most 6 decimals (C07)
+ * - `count`: a count or a duration in seconds, an integer of 0 or more (E03, `intent.closed`)
  */
-export type AuditFieldKind = 'uuid' | 'sha256' | 'version' | 'code' | 'codes' | 'decimal';
+export type AuditFieldKind = 'uuid' | 'sha256' | 'version' | 'code' | 'codes' | 'decimal' | 'count';
 
 /** A declared field: its kind, with a trailing `?` when the field is optional. */
 export type AuditFieldSpec = AuditFieldKind | `${AuditFieldKind}?`;
@@ -432,11 +433,52 @@ export const AUDIT_ACTIONS = {
     entityType: 'evidence_pack',
     fields: { intent_id: 'uuid', version: 'version', file: 'code', reason: 'code' },
   },
+  /**
+   * G8 sealed one version of the intent's Evidence Pack (E03, ADR-M49 §2.4): the version, the
+   * content hash and the release hash G8 approved. Never the pack's content.
+   */
+  'evidence.pack_sealed': {
+    entityType: 'evidence_pack',
+    fields: {
+      intent_id: 'uuid',
+      version: 'version',
+      content_sha256: 'sha256',
+      release_sha256: 'sha256',
+    },
+  },
+  /**
+   * G8 stopped (E03, ADR-M49 §2.5): `check` `evidence_hash_mismatch` or `evidence_missing` (a
+   * stored evidence file failed its re-check while the release pack was built). The intent is
+   * paused at G8 with a `security` escalation.
+   */
+  'gate.g8_check_failed': {
+    entityType: 'intent',
+    fields: { check: 'code', escalation_id: 'uuid' },
+  },
+  /**
+   * G8 passed and the intent is `done` (E03 AC3, ADR-M49 §2.4): the sealed pack and the intent's
+   * coded metrics. `lead_time_seconds` from the intent's creation to its close; token sums as digit
+   * strings and the cost as a decimal string (as in E04). Never names or text.
+   */
+  'intent.closed': {
+    entityType: 'intent',
+    fields: {
+      pack_id: 'uuid',
+      pack_version: 'version',
+      release_sha256: 'sha256',
+      lead_time_seconds: 'count',
+      runs: 'count',
+      g7_change_requests: 'count',
+      cost_usd: 'decimal',
+      input_tokens: 'code',
+      output_tokens: 'code',
+    },
+  },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;
 
-type FieldValue<K> = K extends 'version' | 'version?'
+type FieldValue<K> = K extends 'version' | 'version?' | 'count' | 'count?'
   ? number
   : K extends 'codes' | 'codes?'
     ? readonly string[]
@@ -480,6 +522,8 @@ function isValidField(kind: AuditFieldKind, value: unknown): boolean {
       );
     case 'decimal':
       return isUsd(value);
+    case 'count':
+      return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
   }
 }
 

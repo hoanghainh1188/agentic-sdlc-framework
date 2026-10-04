@@ -89,6 +89,23 @@ describe('sdlc-worker service', () => {
     );
   });
 
+  it('E03: builds release packs with its own SeaweedFS identity from OpenBao (worker-evidence-credentials)', () => {
+    expect(worker.environment).toMatchObject({
+      SDLC_WORKER_EVIDENCE_URL: 'http://seaweedfs:8333',
+      SDLC_WORKER_EVIDENCE_BUCKET: 'evidence',
+    });
+    const depends = (compose.services['sdlc-worker'] as { depends_on: Record<string, unknown> })
+      .depends_on;
+    expect(depends['seaweedfs-init']).toEqual({ condition: 'service_completed_successfully' });
+    const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
+    expect(bootstrap).toMatch(
+      /^ {2}worker-evidence-credentials\) cmd_worker_evidence_credentials ;;$/m,
+    );
+    expect(bootstrap).toMatch(
+      /^cmd_worker_evidence_credentials\(\) \{ pack_evidence_credentials worker sdlcwrkev sdlc-worker; \}$/m,
+    );
+  });
+
   it('the worker AppRole policy reads its own KV path and the GitHub App key, nothing else of other processes', () => {
     const policy = fs.readFileSync(
       path.join(deployDir, 'openbao/bootstrap/policies/worker.hcl'),

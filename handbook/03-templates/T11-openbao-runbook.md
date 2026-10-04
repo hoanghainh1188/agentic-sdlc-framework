@@ -405,6 +405,31 @@ Without it the API still starts (log line `api.evidence_missing`), but `sdlc evi
 |---|---|
 | The API's evidence key (`api-evidence`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap api-evidence-credentials`, then restart `sdlc-api`. The old key stops working at once; a build that runs at that moment fails and can be repeated |
 
+## 5i. The worker's evidence identity (G8 release packs)
+
+At gate G8 the worker builds the intent's Evidence Pack itself before Person B approves the release (task E03, `design/ADR-M49-gate-g8.md`, handbook Ch.15 §15.10.3). It uses its own SeaweedFS identity `worker-evidence`, stored at `kv/worker/evidence`, with **the same rights as `api-evidence`** (section 5h table). The AppRole `worker` already reads `kv/data/worker/*`, so `configure` needs no change.
+
+So three processes can read client code in the evidence store: the runner, the API and the worker. Each has its own key; the worker reads one file at a time, at most `SDLC_WORKER_EVIDENCE_MAX_ITEM_MB` (default 256), keeps only the hash, and never logs the content.
+
+### First set-up
+
+1. OpenBao is initialised, unsealed and configured (sections 3 and 4); SeaweedFS runs (`pnpm compose:core`).
+2. Create the identity (asks for an admin token, hidden; prints no secret):
+   ```bash
+   pnpm openbao:bootstrap worker-evidence-credentials
+   ```
+   Record it in the operations log (identity `worker-evidence`, date, reason; not the keys).
+3. Restart the worker: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile platform restart sdlc-worker`.
+4. Check: the worker's log has no line with `worker.evidence_missing`.
+
+Without it the worker still starts (log line `worker.evidence_missing`), but intents wait at G8 (`evidence_unavailable`); people's rejections are still handled.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| The worker's evidence key (`worker-evidence`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap worker-evidence-credentials`, then restart `sdlc-worker`. The old key stops working at once; a build that runs at that moment fails, and the workflow tries again a minute later |
+
 ## 6. Daily snapshot backup
 
 > Commands only. The procedure is tested in the recovery drill of task A10, which also adds the backup script.
@@ -564,3 +589,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.17 | 2026-10-03 | Claude Code (task B13, PR 2) | Section 5e step 5: the first tenant admin with `sdlc ops bootstrap`; the operator commands are `sdlc ops …` (renamed from `sdlc admin …`, ADR-M37 §2.8) |
 | 0.18 | 2026-10-03 | Claude Code (task C08, PR 1) | Section 5g step 3b: the identity `runner-evidence` also reads run diffs (`Read:evidence/diffs/*`), which the push applies; run the command again once after the update (ADR-M38 §2.2, QUESTIONS #155). Tested with throw-away keys (`pnpm test:runner-compose`) |
 | 0.19 | 2026-10-04 | Claude Code (task E02) | Section 5h: `api-evidence-credentials` (SeaweedFS identity `api-evidence` at `kv/api/evidence`: reads proposals and diffs, reads and writes packs), rotation; troubleshooting rows `evidence_unavailable` and failed hash checks (ADR-M48). Tested with throw-away keys (`pnpm test:openbao`) |
+| 0.20 | 2026-10-04 | Claude Code (task E03) | Section 5i: `worker-evidence-credentials` (SeaweedFS identity `worker-evidence` at `kv/worker/evidence`, the same rights as `api-evidence`), rotation (ADR-M49). Tested with throw-away keys (`pnpm test:openbao`) |

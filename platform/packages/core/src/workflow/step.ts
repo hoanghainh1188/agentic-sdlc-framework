@@ -11,7 +11,8 @@
 //   HOTL (session 2, QUESTIONS #88): the platform passes G2 or G3 when the policy conditions hold;
 //   a person's block within the block window takes the intent back to the passed gate, or ends it;
 //   G5 (C07, g5.ts): the run's changes and caps; a block of a passed G5 takes the intent back to
-//   G4 (a new run), a scope failure back to G3, where a new plan and a person's approval are needed.
+//   G4 (a new run), a scope failure back to G3, where a new plan and a person's approval are needed;
+//   G8 (E03, g8.ts): the release approval, sealing the Evidence Pack, `done`.
 // A gate that waits for a person past its deadline raises one escalation (session 2, #90); the
 // step asks the workflow to wake it at the deadline (`wakeInMs`).
 //
@@ -76,6 +77,7 @@ import { stepG5, stepPausedG5 } from './g5.js';
 import { stepG6, stepPausedG6 } from './g6.js';
 import { readCi, type CiReading, type G6Deps } from './g6-ci.js';
 import { stepG7, stepPausedG7 } from './g7.js';
+import { stepG8, stepPausedG8 } from './g8.js';
 import { readG7, type G7Deps, type G7Reading } from './g7-facts.js';
 import { refusedPlanHashes, returnedFromG5 } from './g5-scope.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
@@ -133,6 +135,12 @@ export interface StepDeps {
    * authors). Without it the intent waits at G7 (`g7_decision`).
    */
   readonly g7?: G7Deps;
+  /**
+   * E03 (ADR-M49 §2.1): the worker can build Evidence Packs (its evidence store identity). G8 then
+   * asks the workflow to build the release pack (`build_pack`); without it the intent waits at G8
+   * (`evidence_unavailable`). People's rejections are handled either way.
+   */
+  readonly releases?: boolean;
 }
 
 export class WorkflowError extends Error {
@@ -291,6 +299,10 @@ export async function stepIntent(
         intent,
       );
     }
+    // E03: a stored evidence file failed its check at G8; a person decides on the escalation.
+    if (intent.status === 'paused' && intent.current_gate === 'G8') {
+      return stepPausedG8(tx, deps.registry, intent);
+    }
     if (intent.status !== 'in_gate' || intent.current_gate === null) return waiting('not_in_gate');
     const policy = await deps.registry.policyFor(tx, intent.project_id);
     const block = await earlierBlock(tx, intent, policy.config);
@@ -315,6 +327,8 @@ export async function stepIntent(
     if (gate === 'G6' && deps.publish) return stepG6(tx, deps.registry, policy, intent, ci);
     // E01: review and merge.
     if (gate === 'G7' && deps.g7) return stepG7(tx, deps.registry, policy, intent, g7);
+    // E03: the release.
+    if (gate === 'G8') return stepG8(tx, deps.registry, policy, intent, deps.releases === true);
     if (!isCommandGate(gate)) {
       if (hold) return waiting(hold.reason, hold.wakeInMs);
       // G4 onwards: C06 continues. Wake when the last HOTL block window closes (C06 waits for it).

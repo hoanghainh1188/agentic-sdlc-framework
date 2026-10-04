@@ -13,6 +13,7 @@ import { refusedPlanHashes, returnedFromG5 } from '../workflow/g5-scope.js';
 import { RegistryError } from '../registry/errors.js';
 import { gatherG6Facts } from '../workflow/g6-ci.js';
 import { g7Producers } from '../workflow/g7-facts.js';
+import { g8Producers } from '../workflow/g8-facts.js';
 import { contextOf } from '../workflow/g6-verify.js';
 import { isPassableGate, openBlockWindow } from '../workflow/hotl.js';
 import { waitedSeconds } from '../workflow/waited.js';
@@ -99,8 +100,9 @@ export async function decideGate(
     }
     const inputSha256 = await gateInputSha256(tx, current, gate);
     const producers = await producersOf(tx, current, gate);
-    // E01 (QUESTIONS #179): a producer never decides G7, a request for changes included.
-    if (gate === 'G7' && producers.includes(command.actorId)) {
+    // E01 (QUESTIONS #179): a producer never decides G7, a request for changes included; E03:
+    // nor G8 (FR-11, ADR-M49 §2.3).
+    if ((gate === 'G7' || gate === 'G8') && producers.includes(command.actorId)) {
       throw new RegistryError(
         'decision_not_allowed',
         `${gate} ${command.decision}: producer`,
@@ -133,19 +135,23 @@ export async function decideGate(
       ...(returned ? { context: { returnedFromG5: true } } : {}),
       // C08 PR 2: G6's oversight depends on the findings G6 read (QUESTIONS #157).
       ...(gate === 'G6' ? { context: await g6Context(tx, current.id) } : {}),
+      // E03 (QUESTIONS #220): every G8 is a production release in the MVP.
+      ...(gate === 'G8' ? { context: { environment: 'production' as const } } : {}),
     });
   });
 }
 
 /**
  * The producers of what a person decides at `gate` (FR-11): the plan at G3 (B09), the run at G5
- * and G6 (C07, C08), the change under review at G7 (E01).
+ * and G6 (C07, C08), the change under review at G7 (E01) and its release at G8 (E03).
  */
 async function producersOf(tx: TenantScope, intent: Intent, gate: string): Promise<string[]> {
   if (gate === 'G3') return planSubmitters(tx, intent.id);
   if (gate === 'G5' || gate === 'G6') return runProducers(tx, intent.id);
   // E01: the creator, every run's starter, the plan submitters (QUESTIONS #16, AC2).
   if (gate === 'G7') return g7Producers(tx, intent);
+  // E03: the producers of the merged change never decide its release.
+  if (gate === 'G8') return g8Producers(tx, intent);
   return [];
 }
 
