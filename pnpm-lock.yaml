@@ -116,6 +116,9 @@ importers:
       '@opentelemetry/api':
         specifier: 1.9.1
         version: 1.9.1
+      '@sdlc/adapter-evidence-s3':
+        specifier: workspace:*
+        version: link:../../packages/adapters/evidence-s3
       '@sdlc/adapter-git-github':
         specifier: workspace:*
         version: link:../../packages/adapters/git-github

@@ -4,7 +4,7 @@ import { Logger, Module, type DynamicModule, type LoggerService } from '@nestjs/
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, NestFactory, Reflector } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type { GitHostAdapter, IntentWorkflowSignals } from '@sdlc/contracts';
+import type { EvidenceStore, GitHostAdapter, IntentWorkflowSignals } from '@sdlc/contracts';
 import { Registry, type PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
@@ -19,6 +19,8 @@ import { AuthGuard } from './auth/auth.guard.js';
 import { RateLimiter } from './auth/rate-limiter.js';
 import { ErrorFilter } from './errors/error.filter.js';
 import { EscalationsController } from './escalations/escalations.controller.js';
+import { EvidenceController } from './evidence/evidence.controller.js';
+import { EvidenceService } from './evidence/evidence.service.js';
 import { EscalationsService } from './escalations/escalations.service.js';
 import { HealthController } from './health/health.controller.js';
 import { IntentsController } from './intents/intents.controller.js';
@@ -43,6 +45,7 @@ import {
   CLOCK,
   DATABASE,
   ESCALATIONS,
+  EVIDENCE,
   INTENTS,
   PLANS,
   RUNS,
@@ -78,6 +81,12 @@ export interface ApiDeps {
    * `git_host_unavailable`.
    */
   readonly gitHost?: Pick<GitHostAdapter, 'getBranchHead' | 'getFileAtCommit'>;
+  /**
+   * The evidence store of the Evidence Pack endpoints (E02, ADR-M48), with the api's identity
+   * `api-evidence`. Undefined (no credential, or dev mode without OpenBao): building or reading a
+   * pack file answers `evidence_unavailable`.
+   */
+  readonly evidence?: { readonly store: EvidenceStore; readonly maxItemBytes: number };
 }
 
 @Module({})
@@ -97,6 +106,7 @@ class ApiModule {
         RunsController,
         CostController,
         MetricsController,
+        EvidenceController,
         EscalationsController,
         AiRecordsController,
         AdminProjectsController,
@@ -146,6 +156,14 @@ class ApiModule {
         },
         { provide: COST, useValue: new CostService(now) },
         { provide: METRICS, useValue: new MetricsService(now) },
+        {
+          provide: EVIDENCE,
+          useValue: new EvidenceService({
+            store: deps.evidence?.store,
+            maxItemBytes: deps.evidence?.maxItemBytes ?? 0,
+            now,
+          }),
+        },
         { provide: AI_RECORDS, useValue: new AiRecordsService(signals, wakeLogger, now) },
         {
           provide: APP_GUARD,

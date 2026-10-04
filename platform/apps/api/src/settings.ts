@@ -18,7 +18,17 @@ export const API_ENV = {
   temporalAddress: 'SDLC_API_TEMPORAL_ADDRESS',
   temporalNamespace: 'SDLC_API_TEMPORAL_NAMESPACE',
   githubApiUrl: 'SDLC_API_GITHUB_API_URL',
+  evidenceUrl: 'SDLC_API_EVIDENCE_URL',
+  evidenceBucket: 'SDLC_API_EVIDENCE_BUCKET',
+  evidenceSecretPath: 'SDLC_API_EVIDENCE_SECRET_PATH',
+  evidenceMaxItemMb: 'SDLC_API_EVIDENCE_MAX_ITEM_MB',
 } as const;
+
+/** Fields of the KV entry written by `openbao:bootstrap api-evidence-credentials` (E02). */
+export const EVIDENCE_ACCESS_KEY_FIELD = 'access_key';
+export const EVIDENCE_SECRET_KEY_FIELD = 'secret_key';
+/** The api writes Evidence Packs under this prefix only (SeaweedFS `Write:evidence/packs/*`). */
+export const EVIDENCE_PACK_KEY_PREFIX = 'packs/';
 
 /** The database role of every platform process (ADR-M09 section 2.3). */
 export const DB_USER = 'platform_app';
@@ -55,8 +65,42 @@ const schema = z.object({
     .string()
     .regex(/^https:\/\/[^\s]+$/)
     .default('https://api.github.com'),
+  // The Evidence Pack store (E02, ADR-M48): SeaweedFS's S3 API on the Compose network; `off`
+  // turns the pack endpoints off (they answer evidence_unavailable). An origin only.
+  [API_ENV.evidenceUrl]: z
+    .string()
+    .refine((v) => v === 'off' || isOrigin(v))
+    .default('http://seaweedfs:8333'),
+  [API_ENV.evidenceBucket]: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .default('evidence'),
+  [API_ENV.evidenceSecretPath]: z
+    .string()
+    .regex(/^api\/[A-Za-z0-9_.-]+$/)
+    .default('api/evidence'),
+  // The largest evidence file the api reads back to check its hash, one file at a time.
+  [API_ENV.evidenceMaxItemMb]: z.coerce.number().int().min(1).max(4096).default(256),
   NODE_ENV: z.string().optional(),
 });
+
+function isOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      ['http:', 'https:'].includes(url.protocol) &&
+      url.username === '' &&
+      url.password === '' &&
+      url.pathname === '/' &&
+      url.search === '' &&
+      url.hash === '' &&
+      !value.endsWith('#') &&
+      !value.endsWith('?')
+    );
+  } catch {
+    return false;
+  }
+}
 
 export type Database =
   | {
@@ -78,6 +122,13 @@ export interface ApiSettings {
   readonly temporal: TemporalSettings | null;
   /** GitHub API base URL for the spec endpoints (B08). */
   readonly githubApiUrl: string;
+  /** The Evidence Pack store (E02, ADR-M48); null: `SDLC_API_EVIDENCE_URL=off`. */
+  readonly evidence: {
+    readonly url: string;
+    readonly bucket: string;
+    readonly secretPath: string;
+    readonly maxItemBytes: number;
+  } | null;
 }
 
 /** A setting is missing or wrong. `key` is a message catalog key; `name` the variable. */
@@ -131,6 +182,15 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     rateLimitPerMinute: v[API_ENV.rateLimitPerMinute],
     authFailuresPerMinute: v[API_ENV.authFailuresPerMinute],
     githubApiUrl: v[API_ENV.githubApiUrl],
+    evidence:
+      v[API_ENV.evidenceUrl] === 'off'
+        ? null
+        : {
+            url: new URL(v[API_ENV.evidenceUrl]).origin,
+            bucket: v[API_ENV.evidenceBucket],
+            secretPath: v[API_ENV.evidenceSecretPath],
+            maxItemBytes: v[API_ENV.evidenceMaxItemMb] * 1024 * 1024,
+          },
     temporal: temporalOff
       ? null
       : { address: v[API_ENV.temporalAddress], namespace: v[API_ENV.temporalNamespace] },
