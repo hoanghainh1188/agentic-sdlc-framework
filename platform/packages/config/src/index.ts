@@ -28,6 +28,7 @@ export {
   HANDBOOK_SLA,
   MANDATORY_RULES,
   MAX_IDENTICAL_TOOL_CALLS,
+  MAX_NO_PROGRESS_WINDOW_MINUTES,
   MAX_RECERTIFICATION_MONTHS,
   MAX_STOP_PERCENT,
   MAX_WARN_PERCENT,
@@ -36,6 +37,6 @@ export {
   MVP_MAX_AUTONOMY,
   severityAtOrAbove,
 } from './mandatory-rules.js';
-export { MAX_HOLIDAYS_PER_YEAR } from './warnings.js';
+export { MAX_HOLIDAYS_PER_YEAR, MIN_NO_PROGRESS_WINDOW_MINUTES } from './warnings.js';
 // B09 (ADR-M40 §2.2): core reads plan files with the same safe YAML reader.
 export { readYamlMapping, type YamlResult } from './yaml.js';

@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M26, M28 and M29 (M27 is reserved for C11 PR 2) and their sources:
+// Rule ids M1–M29 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -35,6 +35,8 @@
 //                                                                      QUESTIONS.md #180
 //   M26 a kill freezes the intent (pause or higher) .................. D-03 §6.5, ADR-M42,
 //                                                                      QUESTIONS.md #181
+//   M27 the no-progress window of loop detection ≤ 30 minutes ....... D-02 FR-35, ADR-M42 §2.7,
+//                                                                      QUESTIONS.md #184
 //   M28 the viewer role never reads the cost report ................. D-07 §5, ADR-M45,
 //                                                                      QUESTIONS.md #196
 //   M29 the viewer role never reads the gate metrics ................ D-02 FR-12, ADR-M47,
@@ -88,6 +90,8 @@ export const DUAL_APPROVAL_ROLES: readonly ProjectRole[] = ['person_b', 'second_
 export const MAX_WARN_PERCENT = 80;
 export const MAX_STOP_PERCENT = 100;
 export const MAX_IDENTICAL_TOOL_CALLS = 3;
+/** Rule M27: a stalled agent is stopped after at most this many silent minutes ([Proposal], #184). */
+export const MAX_NO_PROGRESS_WINDOW_MINUTES = 30;
 
 /**
  * Calendar floor for M11. SLA clocks are compared in the project's own calendar, so a shrunken
@@ -564,6 +568,15 @@ const m26: Rule = (c) =>
         }),
       ];
 
+const m27: Rule = (c) =>
+  c.run.loop_detection.no_progress_window_minutes > MAX_NO_PROGRESS_WINDOW_MINUTES
+    ? [
+        issue('config.rule.loop_window_max', 'run.loop_detection.no_progress_window_minutes', {
+          maximum: MAX_NO_PROGRESS_WINDOW_MINUTES,
+        }),
+      ]
+    : [];
+
 const m28: Rule = (c) =>
   c.access.cost_read_roles.includes('viewer')
     ? [issue('config.rule.viewer_never_reads_cost', 'access.cost_read_roles')]
@@ -603,6 +616,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M24: m24,
   M25: m25,
   M26: m26,
+  M27: m27,
   M28: m28,
   M29: m29,
 };

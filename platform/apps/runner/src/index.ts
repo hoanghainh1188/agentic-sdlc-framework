@@ -26,6 +26,12 @@ export {
 } from './agent/drive.js';
 export { AgentRunError, type AgentRunFailure } from './agent/errors.js';
 export {
+  LoopWatch,
+  type LoopLimits,
+  type LoopStop,
+  type LoopStopReason,
+} from './agent/loop-watch.js';
+export {
   SpendWatch,
   type BudgetWarning,
   type SpendLimits,

@@ -111,6 +111,16 @@ export interface AgentRunStatus {
   readonly state: AgentRunState;
   /** Agent steps so far (one model reply each). */
   readonly iterations: number;
+  /**
+   * Loop detection (C11, D-02 FR-35, ADR-M42 §2.7): the number of events of any kind in the
+   * agent's log. The runner sees no progress when it stops growing for the configured window.
+   */
+  readonly events: number;
+  /**
+   * Identical tool calls in a row at the end of the log: the same tool and the same SHA-256 of
+   * the canonical arguments. Counts only; the arguments are client data.
+   */
+  readonly identicalCalls: number;
 }
 
 /** What `commitWork` found and did (QUESTIONS #80). */

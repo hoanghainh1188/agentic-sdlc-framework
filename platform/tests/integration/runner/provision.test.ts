@@ -440,7 +440,12 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
           });
         },
         getStatus: (): Promise<AgentRunStatus> =>
-          Promise.resolve({ state: stopped ? 'stopped' : 'running', iterations: 3 }),
+          Promise.resolve({
+            state: stopped ? 'stopped' : 'running',
+            iterations: 3,
+            events: 3,
+            identicalCalls: 0,
+          }),
         stop: () => {
           stopped = true;
           return Promise.resolve();
