@@ -39,8 +39,16 @@ export interface EvidenceStore {
     content: Buffer,
     contentType: string,
   ): Promise<StoredEvidence>;
-  /** Reads a file back by its URI (needs a credential that may read; the runner's may not). */
-  get(uri: string): Promise<Buffer>;
+  /**
+   * Reads a file back by its URI (needs a credential that may read; the runner's may only read
+   * run diffs). With `maxBytes`, a larger file is refused (`EvidenceError('too_large')`) before
+   * its body is read (E02, ADR-M48).
+   */
+  get(uri: string, options?: EvidenceGetOptions): Promise<Buffer>;
+}
+
+export interface EvidenceGetOptions {
+  readonly maxBytes?: number;
 }
 
 export const EVIDENCE_ERROR_CODES = [
@@ -48,6 +56,8 @@ export const EVIDENCE_ERROR_CODES = [
   'exists',
   'forbidden',
   'not_found',
+  /** The file is larger than the caller's `maxBytes` (E02). */
+  'too_large',
   'unavailable',
 ] as const;
 export type EvidenceErrorCode = (typeof EVIDENCE_ERROR_CODES)[number];

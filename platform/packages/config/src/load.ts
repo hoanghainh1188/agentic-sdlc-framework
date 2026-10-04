@@ -38,7 +38,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-/** The only place that brands a configuration as validated: schema and the mandatory rules (M1–M29) both passed. */
+/** The only place that brands a configuration as validated: schema and the mandatory rules (M1–M30) both passed. */
 function validate(raw: unknown): { config: ValidatedProjectConfig } | { errors: ConfigIssue[] } {
   const parsed = projectConfigSchema.safeParse(raw, { reportInput: true });
   if (!parsed.success) return { errors: toConfigIssues(parsed.error.issues) };

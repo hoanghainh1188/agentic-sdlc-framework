@@ -251,6 +251,9 @@ export const projectConfigSchema = z.strictObject({
     cost_read_roles: uniqueList(role).min(1),
     // E06 (ADR-M47, QUESTIONS #206): who may read the gate waiting-time metrics of one project.
     metrics_read_roles: uniqueList(role).min(1),
+    // E02 (ADR-M48, QUESTIONS #218): who may build, and who may read, an intent's Evidence Pack.
+    evidence_build_roles: uniqueList(role).min(1),
+    evidence_read_roles: uniqueList(role).min(1),
     conflicting_roles: z.array(uniqueList(role).length(2)),
   }),
   agents: z.strictObject({ recertification_months: positiveInt }),

@@ -155,6 +155,21 @@ describe('S3EvidenceStore', () => {
     expect(s3.seen).toEqual([]);
   });
 
+  it('E02: get with maxBytes returns a file up to the cap and refuses a larger one (too_large)', async () => {
+    const content = Buffer.from('0123456789');
+    const stored = await store.put(TENANT, 'cap/a.patch', content, 'text/x-diff');
+    expect((await store.get(stored.uri, { maxBytes: 10 })).equals(content)).toBe(true);
+    await expect(store.get(stored.uri, { maxBytes: 9 })).rejects.toMatchObject({
+      code: 'too_large',
+    });
+    await expect(store.get(stored.uri, { maxBytes: -1 })).rejects.toMatchObject({
+      code: 'invalid_input',
+    });
+    await expect(
+      store.get(`s3://evidence/proposals/${TENANT}/cap/missing.patch`, { maxBytes: 10 }),
+    ).rejects.toMatchObject({ code: 'not_found' });
+  });
+
   it('refuses a URI of another bucket', async () => {
     await expect(store.get('s3://other/proposals/x.patch')).rejects.toMatchObject({
       code: 'invalid_input',
