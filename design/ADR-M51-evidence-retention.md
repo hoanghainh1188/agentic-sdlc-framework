@@ -178,7 +178,7 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
   - a plain HTTP `DELETE` on `seaweedfs:8888`, and `weed shell fs.rm`, delete a version that has a COMPLIANCE lock and a legal hold;
   - an HTTP `GET` from another container reads any file.
   - The filer has no authentication, and every container on the network `sdlc` reaches it. So any process there (api, worker, runner, LiteLLM, Langfuse, Temporal…) can read or delete all evidence, bypassing the S3 identities and the lock. Sandboxes are not on that network.
-  - Not fixed in E05: follow-up task A12, before the trial M-E (for example filer JWT signing in `security.toml`, or a filer bound to its own container, with a live test).
+  - Not fixed in E05: task A12, before the trial M-E (for example filer JWT signing in `security.toml`, or a filer bound to its own container, with a live test).
 - **Gap 3 stays:** the `.env` admin identity can bypass GOVERNANCE.
 - **Gap 4 stays:** the S3 secrets sit in the filer store on disk.
 - **The worker holds one more credential** (`worker-purge`). It can delete evidence after its lock, and bypass the lock under the three prefixes. It cannot read.
