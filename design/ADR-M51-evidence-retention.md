@@ -192,6 +192,9 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
   - the session advisory lock is lost if its connection drops mid-pass (as C12); the per-row intent lock still serialises deletes;
   - any role in `access.evidence_hold_roles` may release a hold someone else set; the audit log records who.
 - **Langfuse is not purged** (QUESTIONS #238, E08).
+- **Open items for M-F** (Harry, review of PR 1):
+  - an un-archive command (today a mistaken archive is undone only within the grace period, by a database change on the server);
+  - whether a hold must be released by a different person than the one who set it.
 
 ## Version history
 
@@ -199,3 +202,4 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
 |---|---|---|---|
 | 0.1 | 2026-10-04 | Claude (task E05, PR 1) | First version: lock, purge, holds, archive, guard, report mode (AC1–AC3). PR 2 adds the daily audit anchor (AC4) |
 | 0.2 | 2026-10-04 | Claude (task E05, PR 1) | After the code review: the archive purge is scheduled first (`project.purge_scheduled`), the guard counts every due row, the re-check reads project and configuration again, the orphan sweep needs two sightings and a cap; known limits |
+| 0.3 | 2026-10-04 | Claude (task E05, PR 1) | §4: open items for M-F (an un-archive command; who may release a hold), after Harry's review |
