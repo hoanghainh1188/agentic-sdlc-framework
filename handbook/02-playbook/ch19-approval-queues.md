@@ -226,6 +226,9 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
 | `sdlc cost report [--project <slug> \| --intent <INT-…>] [--from <time>] [--to <time>] [--by project\|intent\|model\|status]` | Shows tokens and cost (below) |
 | `sdlc metrics gates [--project <slug>] [--gate G1..G8] [--mode HITL\|HOTL\|AUDIT\|POLICY] [--risk low\|medium\|high\|critical] [--from <time>] [--to <time>]` | Shows how long gates waited for people (below) |
+| `sdlc evidence build <INT-…>` | Builds a new version of the intent's Evidence Pack, or returns the latest one when nothing changed: Chapter 15 §15.10.2 |
+| `sdlc evidence list <INT-…>` / `sdlc evidence show <INT-…> [--version <n>]` | Lists the pack's versions / shows one (default: the latest) |
+| `sdlc evidence export <INT-…> [--version <n>] [--manifest] [--output <file>]` | Prints or saves the readable pack (`pack.md`), or the manifest with `--manifest`, after checking its SHA-256; `--output` never overwrites a file |
 
 - Gate decisions take **codes only**: a reason code (§19.8b) and, if you want, `--reason-ref` with an `https://` link to a comment that explains it. The platform never stores your words, because its records are kept for years.
 - The rules are the same as for comments (§19.8b): you need the gate's role, you can decide only the gate the intent waits at, and a producer never approves.
@@ -392,3 +395,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.9 | 2026-10-03 | Claude (task C11, PR 1) | §19.8b, §19.8c: `/kill` and `sdlc run list|kill` point to Chapter 18 §18.8d (ADR-M42) |
 | 0.10 | 2026-10-04 | Claude (task E04) | §19.8c: `sdlc cost report`: who, the range, the grouping, wasted tokens, freshness (ADR-M45) |
 | 0.11 | 2026-10-04 | Claude (task E06) | §19.8c: `sdlc metrics gates`: who, the range, first round and after changes, platform passes, intents at the gate now, wall-clock time (ADR-M47) |
+| 0.12 | 2026-10-04 | Claude (task E02) | §19.8c: `sdlc evidence build\|list\|show\|export` (ADR-M48) |

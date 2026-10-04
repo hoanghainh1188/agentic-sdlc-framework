@@ -680,6 +680,8 @@ flowchart LR
 - [ ] AC2: G8 fails without the disclosure note
 - [ ] AC3: Seal the Evidence Pack (`sealed_at`), close the intent, record metrics
 
+> Note: Builds on E02 (ADR-M48, QUESTIONS #215, #217): call `buildEvidencePack` (core) with actor `system` and seal ONE version (`evidence_packs.sealed_at`; at most one sealed version per intent; no build after that; add the UPDATE grant on `sealed_at`); bind the G8 approval to that version's `content_sha256`. FR-43: the manifest's `disclosure`; decide whether G8 needs a person to confirm the client note when `client_text_required` is true (`client_format`). Open (ADR-M48 §2.2): how the worker builds the pack at G8 (its own SeaweedFS identity, or another way); the api process holds `api-evidence` today
+
 #### E04. Cost report
 
 | Size | Depends on | Requirements | Code area |
@@ -704,7 +706,7 @@ flowchart LR
 - [ ] AC3: Project archive → purge its evidence files and stored client material unless on hold; keep hashes; audit `project.purged`
 - [ ] AC4: Daily: write each tenant's latest audit hash to SeaweedFS
 
-> Note: Object lock for evidence (ADR-M33 §2.9 gap 1, Harry's review of PR #112: not in C06): SeaweedFS can lock objects (COMPLIANCE, even the admin cannot delete a locked version), but only on a bucket created with lock enabled, and the lock period is set per bucket or per object, while retention is per project (`evidence_retention_days`) and `retention_hold` must be able to keep an object longer. Decide how they meet (for example a lock per object at write time equal to the project's retention, and legal hold for `retention_hold`) before the purge job deletes anything; the runner's proposal identity can delete under `proposals/` until then Langfuse holds client data: LiteLLM's traces carry prompts and responses (D-05 §2, D-07; ADR-M35 §2.5, §4). Project archive (FR-44) and retention must also purge the project's Langfuse data (traces tagged with its `tenant:` and `project:` labels)
+> Note: Object lock for evidence (ADR-M33 §2.9 gap 1, Harry's review of PR #112: not in C06): SeaweedFS can lock objects (COMPLIANCE, even the admin cannot delete a locked version), but only on a bucket created with lock enabled, and the lock period is set per bucket or per object, while retention is per project (`evidence_retention_days`) and `retention_hold` must be able to keep an object longer. Decide how they meet (for example a lock per object at write time equal to the project's retention, and legal hold for `retention_hold`) before the purge job deletes anything; the runner's proposal identity can delete under `proposals/` until then Langfuse holds client data: LiteLLM's traces carry prompts and responses (D-05 §2, D-07; ADR-M35 §2.5, §4). Project archive (FR-44) and retention must also purge the project's Langfuse data (traces tagged with its `tenant:` and `project:` labels). E02 (ADR-M48 §2.1, §2.7): `evidence_packs` holds one row per build; purge both files of every unsealed and sealed version past retention (they hold approver names), keep the rows and hashes, set `purged_at` (UPDATE grant on `retention_hold` and `purged_at`); also sweep pack files without a row (a build that failed after its upload). The api identity `api-evidence` can delete under `packs/` until object lock is decided
 
 #### E06. Gate waiting-time metrics
 
@@ -795,4 +797,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.13 | 2026-10-03 | Claude (task C07, PR 2), approved by Harry | C08 note: after a G5 `resume` the next run continues from the pushed `agent/INT-...` branch; wait for the G5 block window (QUESTIONS #134, ADR-M34 §2.9) |
 | 1.14 | 2026-10-03 | Claude (task B09, PR 1), approved by Harry | B09 note: two PRs; E01 note: the change flags of the plan G3 approved (ADR-M40, QUESTIONS #165–#169) |
 | 1.15 | 2026-10-04 | Claude, approved by Harry | New task C12: the scheduled spend sync of ADR-M24 §2.5, which was never built (QUESTIONS #197, ADR-M45); E07 depends on C12; E07 note: plan the MVP+1 user interface after M-E |
+| 1.16 | 2026-10-04 | Claude (task E02), approved by Harry | E03 note: seal one version of the pack, the disclosure check, how the worker builds the pack (open); E05 note: purge the pack files of every version, keep the rows, sweep unreferenced files (ADR-M48, QUESTIONS #215–#217) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

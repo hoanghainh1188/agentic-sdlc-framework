@@ -149,7 +149,7 @@ Dual approval also applies at **any** tier for the change types listed in Step 2
 
 ## 15.10. Using the platform
 
-> Written by Claude Code together with the platform code (task E01, `design/ADR-M41-gate-g7.md`). G8 (approval by CLI or comment, sealing the evidence pack, closing the intent) comes with task E03.
+> Written by Claude Code together with the platform code (task E01, `design/ADR-M41-gate-g7.md`; task E02, `design/ADR-M48-evidence-builder.md`). G8 (approval by CLI or comment, sealing the evidence pack, closing the intent) comes with task E03.
 
 ### 15.10.1. Gate G7: review and merge
 
@@ -229,6 +229,48 @@ The new run does not start, and the intent is **paused** at G4 with a `technical
 
 **Platform operator:** no new GitHub App permission is needed. The feedback is read with Pull requests: read (reviews, pull request comments) or Issues: read (issue comments); the App already has both.
 
+### 15.10.2. The Evidence Pack
+
+> Written by Claude Code together with the platform code (task E02, `design/ADR-M48-evidence-builder.md`). Sealing the pack at G8 comes with task E03.
+
+The **Evidence Pack** of an intent lists what the platform recorded for it, in one place (D-02 FR-40, FR-42, FR-43). Use it for the release record (T14) and to show a client how the change was made and checked.
+
+**What it holds:**
+
+- the intent: code, risk tier, data class, autonomy, status, repository, issue and pull request;
+- the spec and the plan: each version's path, commit and SHA-256;
+- the agent runs: status, agent and version, model, start and pushed commits, and the latest checks (files in scope, push, CI and security findings, reviews, merge);
+- the stored evidence files (the run's diff, L1 proposals): kind, SHA-256 and size. The platform reads each file back and checks its hash before it builds the pack;
+- every gate decision G1–G8: decision, oversight mode (HITL, HOTL, AUDIT, POLICY), the role and **the name of the person who decided**, the reason code and link, the waiting time;
+- the escalations, and the tokens and cost (with wasted cost);
+- the **client AI disclosure note** (Chapter 2 Rule 6), in the project's disclosure format (see below).
+
+**What it never holds:** source code (the diff stays in the pull request), the spec or plan text, comment or review text, the intent's title or description, secrets. Codes, hashes, counts and links only. So it can be sent to a client as it is: the only personal data is the approvers' names.
+
+**Two files per version:**
+
+- `pack.md`: the readable pack (Markdown, English);
+- `manifest.json`: the same data with IDs, for tools.
+
+**How to build and read it** (Chapter 19 §19.8c):
+
+| Command | What it does |
+|---|---|
+| `sdlc evidence build INT-2026-0007` | Builds a new version. If nothing changed since the latest version, you get that version and no new one |
+| `sdlc evidence list INT-2026-0007` | Lists the versions |
+| `sdlc evidence show INT-2026-0007 [--version 2]` | Shows one version (default: the latest) |
+| `sdlc evidence export INT-2026-0007 [--version 2] --output INT-2026-0007-evidence.md` | Saves `pack.md` to a new file. `--manifest` saves `manifest.json` instead. Without `--output`, it prints the file |
+
+- **Who:** Person A, Person B, PM / BrSE, governance and admin may build (project setting `access.evidence_build_roles`). The same and the second approver may read and export (`access.evidence_read_roles`). Tenant admins always may. The viewer role never may.
+- **Versions:** every build that finds new data makes a new version; old versions never change. At G8 the platform seals one version (task E03); after that, no new version can be built.
+- **The disclosure note:**
+  - **Standard note**: the platform writes it from its data: which agent and model wrote code, in how many runs, that people approved the change at G7, and the CI result.
+  - **Client's own format**: the pack gives the same facts and says that the client's format applies. **The PM / BrSE writes that note** from the project AI record (its link is in the pack) and adds it to the delivery. The manifest marks `client_text_required: true`.
+- **If a stored evidence file was changed or deleted**, the platform refuses to build the pack (`evidence_hash_mismatch` or `evidence_missing`) and records the failure in the audit log. Treat it as a possible security incident: tell Person B and the platform operator (Chapter 18). The same applies when a saved pack file no longer matches its hash.
+- `export` checks the file's SHA-256 before it saves it, and never overwrites an existing file. The file is readable by you only (it names the approvers).
+- **Retention:** the pack files are deleted with the other evidence files after the retention period (180 days by default, Chapter 3); their hashes stay recorded.
+- If the platform cannot reach its evidence store, building and exporting answer `evidence_unavailable`; ask the platform operator (runbook T11 §5h).
+
 ---
 
 ## 15.11. Metrics
@@ -269,3 +311,4 @@ The new run does not start, and the intent is **paused** at G4 with a `technical
 | 0.2 | 2026-09-24 | Claude (draft) | Dual approval at G7 for migration, payment, personal data, production infrastructure, breaking change, safety function (Harry) |
 | 0.3 | 2026-10-03 | Claude (task E01) | §15.10.1: G7 with the platform (reviews, producers, dual approval, merge, escalations); ADR-M41 |
 | 0.4 | 2026-10-04 | Claude (task E01, PR 2) | §15.10.1: a request for changes starts a new run with the reviewer's feedback; requests only by a review or a comment (QUESTIONS #190); the decisions when the feedback is gone (#191); ADR-M41 §2.7 |
+| 0.5 | 2026-10-04 | Claude (task E02) | §15.10.2: the Evidence Pack (contents, versions, who, the disclosure note, failed hash checks, export); ADR-M48 |
