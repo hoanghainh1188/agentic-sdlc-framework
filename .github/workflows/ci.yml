@@ -123,9 +123,10 @@ jobs:
             platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts
 
           # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
+          # C09: the gate steps and the worker too, which the pilot suite runs with the real runner.
           decide_heavy run_sandbox_image "Sandbox image job" \
-            "a sandbox image, the runner, the agent adapter, the package proxy or a live test" \
-            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/
+            "a sandbox image, the runner, the agent adapter, the package proxy, the gate steps, the worker or a live test" \
+            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/ platform/packages/core/src/workflow/ platform/apps/worker/ platform/tests/integration/pilot/ platform/tests/integration/workflow/g1-g3/
 
       # Diagrams: every SVG carries the SHA-256 of its Mermaid source (scripts/diagrams.py). The
       # author renders with `pnpm diagrams:render` and commits the SVG; CI never commits.
@@ -361,6 +362,10 @@ jobs:
       # C05 (design/ADR-M29): the runner drives the real OpenHands Agent Server in a node24 sandbox
       # with a scripted stub model (no provider, no key) and a throw-away PostgreSQL.
       - run: pnpm test:agent
+      # C09 (D-08 C09 AC1–AC5): G1–G6 on the sample repository's shape with the real runner, the
+      # node24 sandbox and the Agent Server (stub model), the intent workflow on the Temporal test
+      # server, a local Git host that protects main, and a throw-away PostgreSQL. One file at a time.
+      - run: pnpm test:pilot
       - name: Remove the image archive
         if: always()
         run: rm -f "$RUNNER_TEMP/node24.tar"

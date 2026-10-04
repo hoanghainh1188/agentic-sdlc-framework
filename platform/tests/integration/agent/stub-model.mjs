@@ -10,12 +10,30 @@
 //   [stub:repeat] the same terminal command forever, one reply every 2 s, so the runner's 1 s
 //                poll sees every call (C11 PR 2: loop detection, identical tool calls)
 //   [stub:silent] never answers within the test (600 s): no new agent event (C11 PR 2: no progress)
+//   [stub:append] C09: appends one line to NOTES_FILE with the terminal, then finishes, so every
+//                run (also a retry from the pushed commit) has a change inside the pilot plan
+//   [stub:count]  C09: a different terminal command at every step, one reply a second, forever, so
+//                the spend grows and loop detection never fires (budget warning and stop, N3)
+// C09: with STUB_ADMIN_KEY set, the test registers and revokes run keys (`POST`/`DELETE
+// /test/keys`, like the Cost Controller at LiteLLM), and `GET /key/info` answers a key's spend
+// (STUB_PRICE_USD per call) and cap, as LiteLLM does for the runner's spend check. A revoked or
+// unknown key gets 401; a key at its cap gets 400, as LiteLLM refuses it.
 // It logs `stub:check:<name>:<yes|no>` for what the first request contained, never the content.
 import http from 'node:http';
 
 const expected = process.env.STUB_EXPECTED_KEY ?? '';
-if (expected.length < 16) throw new Error('STUB_EXPECTED_KEY is missing or too short');
+const ADMIN_KEY = process.env.STUB_ADMIN_KEY ?? '';
+if (expected.length < 16 && ADMIN_KEY.length < 16) {
+  throw new Error('STUB_EXPECTED_KEY or STUB_ADMIN_KEY is missing or too short');
+}
 const CANARY = process.env.STUB_AGENTS_CANARY ?? '';
+const PRICE = Number(process.env.STUB_PRICE_USD ?? '0.01');
+const NOTES_FILE = '/workspace/apps/web/src/features/products/NOTES.md';
+
+/** C09: the run keys the test registered: key → { maxBudget, calls, revoked }. */
+const keys = new Map();
+const bearer = (req) => /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1] ?? '';
+const spendOf = (entry) => Math.round(entry.calls * PRICE * 1e6) / 1e6;
 
 let calls = 0;
 const checked = new Set();
@@ -72,9 +90,22 @@ function call(request, step, name, args) {
 function reply(request) {
   const first = textOf(request.messages.find((m) => m.role === 'user')?.content);
   const script =
-    ['loop', 'slow', 'repeat', 'silent'].find((name) => first.includes(`[stub:${name}]`)) ?? 'edit';
+    ['loop', 'slow', 'repeat', 'silent', 'append', 'count'].find((name) =>
+      first.includes(`[stub:${name}]`),
+    ) ?? 'edit';
   const step = request.messages.filter((m) => m.role === 'assistant').length;
-  const delayMs = { slow: 120_000, repeat: 2_000, silent: 600_000 }[script] ?? 0;
+  const delayMs = { slow: 120_000, repeat: 2_000, silent: 600_000, count: 1_000 }[script] ?? 0;
+  if (script === 'count') {
+    return {
+      delayMs,
+      toolCalls: [call(request, step, 'terminal', { command: `echo c09-${step}` })],
+    };
+  }
+  if (script === 'append' && step === 0) {
+    const dir = NOTES_FILE.slice(0, NOTES_FILE.lastIndexOf('/'));
+    const command = `mkdir -p ${dir} && printf 'C09 stub note.\\n' >> ${NOTES_FILE}`;
+    return { delayMs, toolCalls: [call(request, step, 'terminal', { command })] };
+  }
   if (script === 'loop' || script === 'repeat')
     return { delayMs, toolCalls: [call(request, step, 'terminal', { command: 'ls' })] };
   if (step === 0) {
@@ -99,13 +130,29 @@ function send(res, status, body) {
 
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, calls });
+  if (req.url === '/test/keys' && ADMIN_KEY.length >= 16) return adminKeys(req, res);
+  if (req.method === 'GET' && req.url === '/key/info') {
+    const entry = keys.get(bearer(req));
+    if (!entry || entry.revoked) return send(res, 401, { error: { message: 'invalid key' } });
+    return send(res, 200, {
+      key: 'hashed',
+      info: { spend: spendOf(entry), max_budget: entry.maxBudget },
+    });
+  }
   if (req.method !== 'POST' || !req.url?.endsWith('/chat/completions')) {
     return send(res, 404, { error: { message: 'not found' } });
   }
-  if (req.headers.authorization !== `Bearer ${expected}`) {
+  const entry = keys.get(bearer(req));
+  const known = expected.length >= 16 && req.headers.authorization === `Bearer ${expected}`;
+  if (!known && (!entry || entry.revoked)) {
     console.log('stub:refused:wrong_key');
     return send(res, 401, { error: { message: 'wrong key', type: 'auth' } });
   }
+  if (entry && entry.maxBudget !== null && spendOf(entry) >= entry.maxBudget) {
+    console.log('stub:refused:budget');
+    return send(res, 400, { error: { message: 'budget exceeded', type: 'budget_exceeded' } });
+  }
+  if (entry) entry.calls += 1;
   let raw = '';
   req.on('data', (chunk) => (raw += chunk));
   req.on('end', async () => {
@@ -141,6 +188,32 @@ const server = http.createServer((req, res) => {
     });
   });
 });
+
+/** C09: `POST` registers a run key with its cap, `DELETE` revokes it (admin key only). */
+function adminKeys(req, res) {
+  if (req.headers.authorization !== `Bearer ${ADMIN_KEY}`) {
+    return send(res, 401, { error: { message: 'wrong admin key' } });
+  }
+  let raw = '';
+  req.on('data', (chunk) => (raw += chunk));
+  req.on('end', () => {
+    const body = JSON.parse(raw || '{}');
+    if (typeof body.key !== 'string' || body.key.length < 16) {
+      return send(res, 400, { error: { message: 'key' } });
+    }
+    if (req.method === 'POST') {
+      const maxBudget = body.max_budget === null ? null : Number(body.max_budget);
+      keys.set(body.key, { maxBudget, calls: 0, revoked: false });
+      return send(res, 200, { ok: true });
+    }
+    if (req.method === 'DELETE') {
+      const known = keys.get(body.key);
+      if (known) known.revoked = true;
+      return send(res, 200, { ok: true });
+    }
+    return send(res, 405, { error: { message: 'method' } });
+  });
+}
 
 server.listen(4000, '0.0.0.0');
 process.on('SIGTERM', () => server.close(() => process.exit(0)));

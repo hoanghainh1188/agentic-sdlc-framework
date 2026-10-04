@@ -7,6 +7,8 @@
 // - the worker's escalation clock loop and reconcile loop, ticked by the test.
 // Core functions are used only to read the state the tests check. One clock drives the registry,
 // the API, the GitHub stub and the escalation loop; `advance` also skips the same Temporal time.
+// C09 (`pilot/stack.ts`) plugs in another repository source (a bare Git repository the runner
+// clones), the real clock, its project configuration and the worker's G4–G7 activities.
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -42,14 +44,14 @@ import { planPath } from '../../../../packages/core/src/plans/rules.js';
 import { Registry } from '../../../../packages/core/src/registry/registry.js';
 import { TemporalIntentSignals } from '../../../../packages/workflow-client/src/index.js';
 import { startHarness, type Harness } from '../../../git-github/helpers.js';
-import { comment, user } from '../../../git-github/stub-github.js';
+import { comment, user, type StubGitHub } from '../../../git-github/stub-github.js';
 import { createTestDatabase, urlFor, type TestDatabase } from '../../db/helpers.js';
 
 const WORKFLOWS = path.resolve(__dirname, '../../../../apps/worker/dist/workflows/index.js');
 const API_URL = 'https://sdlc.b10.test';
-const OWNER = 'acme';
-const REPO = 'pilot-order-inventory';
-const REPO_PATH = `/repos/${OWNER}/${REPO}`;
+export const OWNER = 'acme';
+export const REPO = 'pilot-order-inventory';
+export const REPO_PATH = `/repos/${OWNER}/${REPO}`;
 export const PROJECT = 'pilot';
 export const SPEC_PATH = 'docs/specs/T07.md';
 export const SPEC_TEXT = '# T07 Cancel an order\nAC1: the stock returns.\n';
@@ -80,9 +82,79 @@ export interface CliResult {
   readonly err: string;
 }
 
+/** Where the GitHub stub reads the repository's branch head and files (C09: pluggable). */
+export interface RepoBackend {
+  /** Sets the stub's routes for refs, contents (and trees) of `repoPath`. */
+  route(stub: StubGitHub, repoPath: string): void;
+  /** A new head commit on the default branch: `text` sets a file, null removes it. */
+  commit(changes: Readonly<Record<string, string | null>>): string;
+}
+
+/** What the worker's activities may add, built once the API and the Git host exist. */
+export interface ActivityContext {
+  readonly gitHost: ReturnType<Harness['adapter']>;
+  readonly registry: Registry;
+}
+
 export interface StackOptions {
   /** Skip `sdlc ai-record set` (AC6: the intents wait for the record). */
   readonly withoutAiRecord?: boolean;
+  /** Default: files kept in memory (B10). */
+  readonly repo?: RepoBackend;
+  /**
+   * `real`: the registry, the API and the GitHub stub use the wall clock (C09: the runner checks
+   * the Run Contract's times against it). Default `fixed`: the shared test clock from T0.
+   */
+  readonly clock?: 'fixed' | 'real';
+  /** The project configuration the tenant admin uploads. Default: B10's. */
+  readonly projectConfig?: string;
+  /** Extra worker activity settings (C09: G4–G7). */
+  readonly activities?: (ctx: ActivityContext) => Partial<IntentActivityDeps>;
+  /**
+   * C09 live test: the real Git host and repository (`owner/name`) instead of the GitHub stub.
+   * Intents then get no issue, so the platform posts nothing on the (public) repository.
+   */
+  readonly live?: { readonly gitHost: ActivityContext['gitHost']; readonly repoFullName: string };
+}
+
+/** B10's repository: files in memory, served by the stub at each commit. */
+export class MemoryRepo implements RepoBackend {
+  readonly #commits = new Map<string, Map<string, string>>();
+  #head = '';
+  #count = 0;
+  #stub: StubGitHub | undefined;
+  #repoPath = '';
+
+  route(stub: StubGitHub, repoPath: string): void {
+    this.#stub = stub;
+    this.#repoPath = repoPath;
+    stub.on('GET', `${repoPath}/git/ref/heads/main`, () => ({
+      body: { ref: 'refs/heads/main', object: { type: 'commit', sha: this.#head } },
+    }));
+  }
+
+  commit(changes: Readonly<Record<string, string | null>>): string {
+    const files = new Map(this.#commits.get(this.#head) ?? []);
+    for (const [file, text] of Object.entries(changes)) {
+      if (text === null) files.delete(file);
+      else {
+        files.set(file, text);
+        this.#stub?.on('GET', `${this.#repoPath}/contents/${file}`, (req) => {
+          const content = this.#commits.get(req.query.get('ref') ?? '')?.get(file);
+          return content === undefined
+            ? { status: 404, body: { message: 'Not Found' } }
+            : {
+                raw: Buffer.from(content, 'utf8'),
+                headers: { 'content-type': 'application/vnd.github.raw; charset=utf-8' },
+              };
+        });
+      }
+    }
+    this.#count += 1;
+    this.#head = this.#count.toString(16).padStart(40, '0');
+    this.#commits.set(this.#head, files);
+    return this.#head;
+  }
 }
 
 export const sha256 = (text: string): string =>
@@ -99,11 +171,15 @@ export async function waitFor<T>(read: () => Promise<T>, ok: (value: T) => boole
   }
 }
 
-/** A plan file (template T13, schema version 1) with one task. */
+/**
+ * A plan file (template T13, schema version 1) with one task. C09: `summary` is the task's text
+ * the agent reads (the stub model's script marker).
+ */
 export function planYaml(
   code: string,
   paths: readonly string[] = ['apps/api/src/orders/**'],
   changeFlags: readonly string[] = [],
+  summary?: string,
 ): string {
   return [
     'plan:',
@@ -111,6 +187,7 @@ export function planYaml(
     ...(changeFlags.length > 0 ? [`  change_flags: [${changeFlags.join(', ')}]`] : []),
     'tasks:',
     '  - id: T1',
+    ...(summary === undefined ? [] : [`    summary: ${JSON.stringify(summary)}`]),
     `    allowed_paths: [${paths.join(', ')}]`,
     '    tools: [file_editor, terminal]',
     '',
@@ -131,31 +208,56 @@ export class Stack {
   #worker: IntentWorkerHandle | undefined;
   #registry!: Registry;
   #now = T0;
+  #realClock = false;
+  #repo: RepoBackend = new MemoryRepo();
+  #gitHost!: ActivityContext['gitHost'];
+  #live = false;
   readonly #tokens = {} as Record<Person | 'admin', string>;
   readonly #home = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-b10-'));
   readonly #comments: ReturnType<typeof comment>[] = [];
   #commentId = 9000;
   #issue = 200;
-  readonly #commits = new Map<string, Map<string, string>>();
-  #head = '';
-  #commitCount = 0;
 
   /** The shared clock (registry, API, GitHub stub, escalation loop). */
   now(): Date {
-    return this.#now;
+    return this.#realClock ? new Date() : this.#now;
+  }
+
+  /** The test database, the GitHub stub harness and the registry (C09 adds its own pieces). */
+  get db(): TestDatabase {
+    return this.#db;
+  }
+
+  get github(): Harness {
+    return this.#h;
+  }
+
+  get registry(): Registry {
+    return this.#registry;
+  }
+
+  /** A private folder for the test's files (removed at `stop`). */
+  get home(): string {
+    return this.#home;
   }
 
   async start(options: StackOptions = {}): Promise<void> {
+    this.#realClock = options.clock === 'real';
+    if (options.repo) this.#repo = options.repo;
     this.#db = await createTestDatabase();
     this.#registry = new Registry({
       policyFactory: (config) => createSimplePolicyEngine({ config }),
-      now: () => this.#now,
+      now: () => this.now(),
     });
     this.#h = await startHarness();
-    this.#h.stub.now = T0;
+    if (this.#realClock) {
+      Object.defineProperty(this.#h.stub, 'now', { get: () => new Date(), set: () => undefined });
+    } else this.#h.stub.now = T0;
     this.#routeGitHub();
-    this.commit({ [SPEC_PATH]: SPEC_TEXT });
-    const gitHost = this.#h.adapter();
+    if (!options.repo && !options.live) this.commit({ [SPEC_PATH]: SPEC_TEXT });
+    this.#live = options.live !== undefined;
+    const gitHost = options.live?.gitHost ?? this.#h.adapter();
+    this.#gitHost = gitHost;
 
     this.env = await TestWorkflowEnvironment.createTimeSkipping({
       server: {
@@ -166,13 +268,13 @@ export class Stack {
     this.#app = await createApp({
       db: this.#db.app as unknown as ApiDeps['db'],
       settings: { rateLimitPerMinute: 10_000, authFailuresPerMinute: 1_000 },
-      now: () => this.#now,
+      now: () => this.now(),
       intentSignals: this.signals,
       gitHost,
       log: { log: () => undefined },
     });
 
-    await this.#onboard(options);
+    await this.#onboard(options, options.live?.repoFullName ?? `${OWNER}/${REPO}`);
 
     const { code } = await bundleWorkflowCode({ workflowsPath: WORKFLOWS });
     const bundlePath = path.join(this.#home, 'bundle.js');
@@ -186,6 +288,7 @@ export class Stack {
         specs: {
           gitHost: gitHost as unknown as NonNullable<IntentActivityDeps['specs']>['gitHost'],
         },
+        ...options.activities?.({ gitHost, registry: this.#registry }),
       }),
     });
 
@@ -200,7 +303,7 @@ export class Stack {
         >,
       advance: (due, now) =>
         advanceEscalation(db.forTenant(parseTenantId(due.tenantId)), due.escalationId, now),
-      now: () => this.#now,
+      now: () => this.now(),
       logger,
       batchSize: 50,
     });
@@ -229,6 +332,7 @@ export class Stack {
    * loop, the approval expiry), as when the workflow is not woken.
    */
   async advanceTo(at: Date, options: { temporal: boolean }): Promise<void> {
+    if (this.#realClock) throw new Error('the real clock cannot be moved');
     const ms = at.getTime() - this.#now.getTime();
     if (ms < 0) throw new Error('the clock never goes back');
     this.#now = at;
@@ -298,30 +402,11 @@ export class Stack {
 
   /** A new head commit on the default branch: `text` sets a file, null removes it. */
   commit(changes: Readonly<Record<string, string | null>>): string {
-    const files = new Map(this.#commits.get(this.#head) ?? []);
-    for (const [file, text] of Object.entries(changes)) {
-      if (text === null) files.delete(file);
-      else {
-        files.set(file, text);
-        this.#h.stub.on('GET', `${REPO_PATH}/contents/${file}`, (req) => {
-          const content = this.#commits.get(req.query.get('ref') ?? '')?.get(file);
-          return content === undefined
-            ? { status: 404, body: { message: 'Not Found' } }
-            : {
-                raw: Buffer.from(content, 'utf8'),
-                headers: { 'content-type': 'application/vnd.github.raw; charset=utf-8' },
-              };
-        });
-      }
-    }
-    this.#commitCount += 1;
-    this.#head = this.#commitCount.toString(16).padStart(40, '0');
-    this.#commits.set(this.#head, files);
-    return this.#head;
+    return this.#repo.commit(changes);
   }
 
   /** Commits the intent's plan file (`.sdlc/plans/<INT>.yaml`). */
-  commitPlan(intent: Pick<Intent, 'code'>, ...args: [string[]?, string[]?]): string {
+  commitPlan(intent: Pick<Intent, 'code'>, ...args: [string[]?, string[]?, string?]): string {
     return this.commit({ [planPath(intent.code)]: planYaml(intent.code, ...args) });
   }
 
@@ -329,7 +414,7 @@ export class Stack {
   comment(intent: Pick<Intent, 'issue_number'>, body: string, who: Person, bot = false): void {
     this.#commentId += 1;
     // Listed by `updated_at >= since`: one second apart after the clock keeps them in order.
-    const at = new Date(this.#now.getTime() + (this.#commentId - 9000) * 1000)
+    const at = new Date(this.now().getTime() + (this.#commentId - 9000) * 1000)
       .toISOString()
       .replace(/\.\d{3}Z$/, 'Z');
     const p = PEOPLE[who];
@@ -345,7 +430,7 @@ export class Stack {
     return pollProject(
       {
         db: this.#db.app,
-        gitHost: this.#h.adapter(),
+        gitHost: this.#gitHost,
         registry: this.#registry,
         now: () => this.#h.stub.now,
         ...(options.signals === false ? {} : { intentSignals: this.signals }),
@@ -403,12 +488,16 @@ export class Stack {
   // --- Creating intents through the CLI ----------------------------------------------------------
 
   /** `sdlc intent create` by Person A, on a new issue. Returns the intent as stored. */
-  async createIntent(risk: 'low' | 'medium' | 'high'): Promise<Intent> {
+  async createIntent(
+    risk: 'low' | 'medium' | 'high' | 'critical',
+    extra: readonly string[] = [],
+  ): Promise<Intent> {
     this.#issue += 1;
     this.#h.stub.on('POST', `${REPO_PATH}/issues/${String(this.#issue)}/comments`, {
       status: 201,
       body: { id: 1 },
     });
+    const issue = this.#live ? [] : ['--issue', String(this.#issue)];
     const created = await this.cliJson<{ id: string }>('a', [
       'intent',
       'create',
@@ -420,8 +509,8 @@ export class Stack {
       risk,
       '--data-class',
       'internal',
-      '--issue',
-      String(this.#issue),
+      ...issue,
+      ...extra,
     ]);
     return this.reload({ id: created.id });
   }
@@ -429,10 +518,17 @@ export class Stack {
   /** `sdlc spec link` (Person A) and, after committing the plan file, `sdlc plan submit`. */
   async linkInputs(
     intent: Intent,
-    plan: { flags?: string[]; submitter?: Person } = {},
+    plan: {
+      flags?: string[];
+      submitter?: Person;
+      /** C09: the spec file, the plan's paths and its task text. */
+      specPath?: string;
+      paths?: string[];
+      summary?: string;
+    } = {},
   ): Promise<void> {
-    await this.cliJson('a', ['spec', 'link', intent.code, '--path', SPEC_PATH]);
-    this.commitPlan(intent, undefined, plan.flags);
+    await this.cliJson('a', ['spec', 'link', intent.code, '--path', plan.specPath ?? SPEC_PATH]);
+    this.commitPlan(intent, plan.paths, plan.flags, plan.summary);
     await this.cliJson(plan.submitter ?? 'a', ['plan', 'submit', intent.code]);
   }
 
@@ -441,15 +537,13 @@ export class Stack {
   #routeGitHub(): void {
     const stub = this.#h.stub;
     stub.on('GET', REPO_PATH, { body: { id: 1 } });
-    stub.on('GET', `${REPO_PATH}/git/ref/heads/main`, () => ({
-      body: { ref: 'refs/heads/main', object: { type: 'commit', sha: this.#head } },
-    }));
     stub.on('GET', `${REPO_PATH}/issues/comments`, (req) => ({
       body: this.#comments.filter(
         (c) => Date.parse(c.updated_at) >= Date.parse(req.query.get('since')!),
       ),
     }));
     stub.on('GET', `${REPO_PATH}/pulls`, { body: [] });
+    this.#repo.route(stub, REPO_PATH);
   }
 
   /**
@@ -457,7 +551,7 @@ export class Stack {
    * project, the people, their GitHub identities, their roles and the configuration through the
    * API (`sdlc admin …`); the operator issues each person's token; Person A saves the AI record.
    */
-  async #onboard(options: StackOptions): Promise<void> {
+  async #onboard(options: StackOptions, repoFullName: string): Promise<void> {
     const boot = await this.cliJson<{ tenant_id: string; token: string }>('operator', [
       'ops',
       'bootstrap',
@@ -482,15 +576,15 @@ export class Stack {
       '--name',
       'Pilot',
       '--repo',
-      `${OWNER}/${REPO}`,
+      repoFullName,
     ]);
     this.target = {
       tenantId: parseTenantId(boot.tenant_id),
       projectId: project.id,
-      repoFullName: `${OWNER}/${REPO}`,
+      repoFullName,
     };
     const configFile = path.join(this.#home, 'config.yaml');
-    fs.writeFileSync(configFile, PROJECT_CONFIG);
+    fs.writeFileSync(configFile, options.projectConfig ?? PROJECT_CONFIG);
     await this.cliJson('admin', [
       'admin',
       'config',

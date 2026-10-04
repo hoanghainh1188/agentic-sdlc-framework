@@ -35,6 +35,11 @@ export class StubGitHost {
   readonly requests: GitRequest[] = [];
   /** The token the server accepts; change it to test a wrong or expired token. */
   token: string;
+  /**
+   * C09: also accepts every token this predicate accepts (the tokens the GitHub API stub issued),
+   * so the runner can clone and push with the run's real short-lived tokens.
+   */
+  acceptToken: ((token: string) => boolean) | undefined;
 
   private constructor(
     private readonly server: http.Server,
@@ -159,7 +164,13 @@ export class StubGitHost {
 
   private handle(req: http.IncomingMessage, res: http.ServerResponse): void {
     const expected = `basic ${Buffer.from(`x-access-token:${this.token}`).toString('base64')}`;
-    const authorized = (req.headers.authorization ?? '').toLowerCase() === expected.toLowerCase();
+    const header = req.headers.authorization ?? '';
+    const basic = /^basic (.+)$/i.exec(header)?.[1];
+    const given = basic ? Buffer.from(basic, 'base64').toString('utf8') : '';
+    const authorized =
+      header.toLowerCase() === expected.toLowerCase() ||
+      (given.startsWith('x-access-token:') &&
+        this.acceptToken?.(given.slice('x-access-token:'.length)) === true);
     this.requests.push({ url: req.url ?? '', authorized });
     if (!authorized) {
       res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="stub"' });
