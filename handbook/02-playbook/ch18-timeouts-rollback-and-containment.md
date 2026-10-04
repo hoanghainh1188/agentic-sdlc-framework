@@ -279,6 +279,39 @@ Use the kill switch when an agent run must stop **now**: it does something it sh
 - A run that already ended cannot be stopped (`run_not_active`). To stop a push or a pull request at G6, raise or decide an escalation: its freeze stops the push.
 - The target is under 5 minutes from your command to everything removed (D-02 FR-34). The platform's own test measures about one second. If the runner itself is down, the run ends after at most 2 minutes, and the sandbox is removed when the runner starts again.
 
+**Loop detection: the platform stops a stuck run by itself** (D-02 FR-35, `design/ADR-M42-kill-switch.md` §2.7). You do not need to watch for these two cases:
+
+| The run's stop reason | What the platform saw | Project setting |
+|---|---|---|
+| `loop_detected` | The agent made the same tool call (same tool, same arguments) more than 3 times in a row | `run.loop_detection.identical_tool_calls_max` (default 3; never more than 3, rule M10) |
+| `no_progress` | The agent's log got no new entry of any kind for the whole window | `run.loop_detection.no_progress_window_minutes` (default 15; never more than 30, rule M27; under 5 gives a warning) |
+| `agent_stuck` | OpenHands' own stuck detector stopped the agent (it also counts repeats, with a fixed limit) | none |
+
+The runner interrupts the agent, the run ends `stopped_stalled`, and its diff is checked as for any run. Gate G5 then fails the run (`run_cap_reached`) and raises an escalation to Person A (route intent, level `pause` at least): the intent is frozen until a person decides (§18.8b). If the run was also over its budget in the same moment, the budget wins and the stop reason is `max_budget`.
+
+**Is a `no_progress` stop real?** A command that prints nothing until it ends looks like no progress: the agent sees its output only at the end. To tell the two apart:
+
+1. `sdlc run list <INT-…>` shows the stop reason. The run event `loop_detected` gives `idle_minutes`: how long the log was silent.
+2. Open the run's last steps in the traces (§18.8c, filter by the run ID):
+   - **A false stop:** the agent's last step was a long command that was still working, for example `pnpm install` on a cold package cache, a full test suite or a build. The last model call ended normally and asked for that command.
+   - **A real stall:** the last model call never ended or failed again and again, or the agent was waiting with nothing running. The same happens when the model gateway or the package proxy was down: check §18.8c and the platform's health first.
+3. For a false stop: decide the escalation with `resume` (a new run after G4). If the same long command will run again, raise the window first. If it was a real stall, find the cause before you resume, or decide `terminate`.
+
+**Raising the window.** It is a project setting, changed by a tenant admin or the project admin (§19.8d):
+
+1. `sdlc admin config show --project <slug>` shows the configuration and its version.
+2. In the YAML, set for example:
+
+   ```yaml
+   run:
+     loop_detection:
+       no_progress_window_minutes: 25
+   ```
+
+3. `sdlc admin config set --project <slug> --file <config.yaml> --expected-version <version>`.
+
+The new window applies to runs that start after the change; a run already working keeps the window it started with. The platform refuses more than 30 minutes (rule M27): a run silent for longer is not making progress you can review. Prefer making the long command shorter or louder (for example a warm package cache, or tests split by package) to a longer window.
+
 ---
 
 ## 18.9. Drills and metrics
@@ -342,3 +375,4 @@ Track:
 | 0.6 | 2026-10-03 | Claude (task B04) | §18.8b: the `sdlc escalation` commands (ADR-M36) |
 | 0.7 | 2026-10-03 | Claude (task C07, PR 2) | §18.8b: resume a G5 breach with more budget (the request body, `run_start` and `budget_increase`; ADR-M34 §2.9) |
 | 0.8 | 2026-10-03 | Claude (task C11, PR 1) | §18.8d platform usage: the kill switch (`/kill`, `sdlc run kill`, `sdlc ops run kill`, who, what happens, afterwards; ADR-M42) |
+| 0.9 | 2026-10-04 | Claude (task C11, PR 2) | §18.8d: loop detection (`loop_detected`, `no_progress`), telling a false `no_progress` from a real stall, raising the window (rule M27; ADR-M42 §2.7) |

@@ -60,13 +60,21 @@ export const RUN_EVENT_TYPES = {
    */
   agent_started: { max_iterations: 'count', max_duration_min: 'count' },
   /**
-   * The runner interrupted the agent (C05): `reason` `max_duration`; `method` `interrupt` (the agent
+   * The runner interrupted the agent (C05): `reason` `max_duration`, `max_budget` (C07), `killed`,
+   * `cancelled` (C11), `loop_detected` or `no_progress` (C11 PR 2); `method` `interrupt` (the agent
    * stopped within the grace period) or `kill` (the sandbox was removed without waiting).
    */
   agent_stopped: { reason: 'code', method: 'code' },
   /**
+   * Loop detection stopped the agent (C11 PR 2, D-02 FR-35, ADR-M42 §2.7), written before
+   * `agent_stopped` (which names the cause). Counts only, never tool arguments, paths or commands:
+   * `identical_calls` in a row at the end of the log, the contract's `threshold`, and the whole
+   * minutes since the agent's log last grew (`idle_minutes`).
+   */
+  loop_detected: { identical_calls: 'count', threshold: 'count', idle_minutes: 'count' },
+  /**
    * The agent run ended (C05, ADR-M29). `outcome`: `finished`, `max_iterations`, `max_duration`,
-   * `stuck`, `agent_error`. `commit`: `committed` (the runner committed what the agent left, QUESTIONS
+   * `max_budget`, `stuck`, `loop_detected`, `no_progress`, `agent_error`, `killed`. `commit`: `committed` (the runner committed what the agent left, QUESTIONS
    * #80) or `nothing`; left out when the runner did not commit. `head_sha` is the final `HEAD`;
    * `changed_files` counts the files changed since `base_sha` (the paths are client data).
    */

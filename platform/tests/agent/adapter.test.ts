@@ -91,7 +91,12 @@ describe('OpenHandsAdapter', () => {
       { kind: 'ObservationEvent' },
       { kind: 'ActionEvent' },
     ]);
-    expect(await adapter.getStatus(handle)).toEqual({ state: 'finished', iterations: 2 });
+    expect(await adapter.getStatus(handle)).toEqual({
+      state: 'finished',
+      iterations: 2,
+      events: 4,
+      identicalCalls: 2,
+    });
     // The kind filter matches nothing in Agent Server 1.48.0 (C05 live test): never used.
     expect(calls.some((c) => c.url.searchParams.has('kind'))).toBe(false);
     expect(calls.every((c) => c.headers['X-Session-API-Key'] === SESSION_KEY)).toBe(true);
@@ -104,7 +109,12 @@ describe('OpenHandsAdapter', () => {
       { kind: 'ActionEvent' },
       { kind: 'ConversationErrorEvent', code: 'MaxIterationsReached' },
     ]);
-    expect(await adapter.getStatus(handle)).toEqual({ state: 'max_iterations', iterations: 3 });
+    expect(await adapter.getStatus(handle)).toEqual({
+      state: 'max_iterations',
+      iterations: 3,
+      events: 4,
+      identicalCalls: 3,
+    });
   });
 
   it('keeps an error an error when no iteration cap was reached', async () => {
@@ -112,7 +122,31 @@ describe('OpenHandsAdapter', () => {
       { kind: 'ActionEvent' },
       { kind: 'ConversationErrorEvent', code: 'LLMError' },
     ]);
-    expect(await adapter.getStatus(handle)).toEqual({ state: 'error', iterations: 1 });
+    expect(await adapter.getStatus(handle)).toEqual({
+      state: 'error',
+      iterations: 1,
+      events: 2,
+      identicalCalls: 1,
+    });
+  });
+
+  it('C11 PR 2: reports the events and the identical tool calls at the end of the log, counts only', async () => {
+    const ls = (summary: string) => ({
+      kind: 'ActionEvent',
+      tool_name: 'terminal',
+      summary,
+      tool_call: { id: summary, arguments: '{"command":"ls secret-dir"}' },
+    });
+    const { adapter } = logServer('running', [
+      { kind: 'ActionEvent', tool_name: 'terminal', tool_call: { arguments: '{"command":"pwd"}' } },
+      ls('a'),
+      { kind: 'ObservationEvent', observation: 'secret output' },
+      ls('b'),
+      ls('c'),
+    ]);
+    const status = await adapter.getStatus(handle);
+    expect(status).toEqual({ state: 'running', iterations: 4, events: 5, identicalCalls: 3 });
+    expect(JSON.stringify(status)).not.toContain('secret');
   });
 
   it.each([

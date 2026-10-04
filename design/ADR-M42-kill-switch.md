@@ -5,7 +5,7 @@
 | Status | **Proposed** (task C11, for review) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #180–#184) |
-| Related | D-08 task C11 (AC1–AC3); D-02 FR-11, FR-18, FR-34, FR-35, §10 item 5d; D-03 §6, §6.5, §7.1, §8.2, §9 (version 1.22); D-05 §5, §6.2, §6.4 (version 1.27); handbook Ch.3 §3.6, Ch.6 §6.7, Ch.18; ADR-M10 §4.1, ADR-M22, ADR-M23, ADR-M25, ADR-M27, ADR-M28, ADR-M29, ADR-M33 §2.6–§2.7, ADR-M34 §2.2, §2.6, ADR-M38 §2.3; QUESTIONS #44, #52, #180–#184 |
+| Related | D-08 task C11 (AC1–AC3); D-02 FR-11, FR-18, FR-34, FR-35, §10 item 5d; D-03 §6, §6.5, §7.1, §8.2, §9 (version 1.22; PR 2: §6.5, §7.2, 1.24); D-05 §5, §6.2, §6.4 (version 1.27; PR 2: 1.29); config rule M27 (PR 2); handbook Ch.3 §3.6, Ch.6 §6.7, Ch.18; ADR-M10 §4.1, ADR-M22, ADR-M23, ADR-M25, ADR-M27, ADR-M28, ADR-M29, ADR-M33 §2.6–§2.7, ADR-M34 §2.2, §2.6, ADR-M38 §2.3; QUESTIONS #44, #52, #180–#184 |
 
 ## 1. Context
 
@@ -80,10 +80,16 @@ runner lost              ──► heartbeat timeout (2 min) ──► abandonRu
 
 ### 2.7. Loop detection (AC3, QUESTIONS #184, PR 2)
 
-- **Identical** tool calls: the same tool and the same SHA-256 of the canonical arguments (RFC 8785; volatile fields dropped, as in the spike's `loop-detector.ts`). The adapter computes the number of consecutive identical calls at the end of the log, and the number of events, from the event log it already reads on every poll; hashes stay in memory.
-- The runner stops the agent (interrupt, then kill) when the count is **more than** `loop_threshold` (the contract; config `run.loop_detection.identical_tool_calls_max`, rule M10: ≤ 3) → `stopped_stalled` / `loop_detected`.
-- **No progress:** no new Agent Server event of any kind for `run.loop_detection.no_progress_window_minutes`, read from the effective configuration when the run starts (not a contract field: that would change `schema_version`, ADR-M22) → `stopped_stalled` / `no_progress`. File changes are not used: they are invisible while the agent reads or runs tests, and a long `pnpm install` gives its observation only at the end, so the window needs slack. New mandatory rule: at most 30 minutes ([Proposal]); a warning under 5.
-- Run event `loop_detected` with counts only (`identical_calls`, `threshold`, `idle_minutes`). Both stops go to G5, which already treats `stopped_stalled` as `run_cap_reached` (ADR-M34 §2.8).
+As built in PR 2 (`packages/adapters/agent-openhands/src/loop.ts`, `apps/runner/src/agent/loop-watch.ts`, `drive.ts`):
+
+- **Identical** tool calls: the same tool and the same SHA-256 of the canonical arguments (RFC 8785; the volatile fields `summary`, `security_risk` and `kind` dropped at every depth, as in the spike's `loop-detector.ts`; string arguments are parsed first, so a string and an object with the same content are equal; the tool-call ID never counts). Adapters import `@sdlc/contracts` only, so the adapter has its own canonicaliser; a test checks that it gives the same text as `canonicalJson` of `@sdlc/config` for JSON data. Unlike that module it never throws on the agent's input (a lone surrogate is made well formed, a value that is not JSON counts as `null`, a value nested deeper than 64 levels compares as one marker; if anything still throws, the raw argument text is hashed); this changes only the comparison. The volatile field names are dropped at every depth, so two calls that differ only in a nested argument named `kind` or `summary` count as identical: accepted, OpenHands' tool schemas have no such argument.
+- `AgentRunStatus` (`@sdlc/contracts`, D-03 §7.2) carries two counts the adapter computes from the event log it already reads on every poll: `events` (events of any kind) and `identicalCalls` (identical calls in a row at the end of the log; other events between them do not break the run). The hashes stay in the adapter's memory.
+- The runner stops the agent (interrupt, then kill, as at the time cap) when `identicalCalls` is **more than** `loop_threshold` (the contract; config `run.loop_detection.identical_tool_calls_max`, rule M10: ≤ 3) → `stopped_stalled` / stop reason `loop_detected`.
+- **No progress:** `events` has not grown for `run.loop_detection.no_progress_window_minutes`, read from the effective configuration when the run starts (not a contract field: that would change `schema_version`, ADR-M22) → `stopped_stalled` / `no_progress`. The window starts when the agent starts; only a status that was read is observed. The idle clock is wall time, so failed reads count as silence; the fifth failed read in a row fails the run anyway. File changes are not used: they are invisible while the agent reads or runs tests, and a long `pnpm install` gives its observation only at the end, so the window needs slack. Rule **M27**: at most 30 minutes ([Proposal]); a warning under 5 (`config.warning.loop_window_short`). The default (15) is unchanged, so stored configuration hashes do not change; a stored configuration with a window above 30 now fails closed (`config_invalid`).
+- **Periodic events (Harry's review):** "any new event" only works if the Agent Server sends nothing while the agent waits. Checked on Agent Server 1.48.0 in `pnpm test:agent` on 2026-10-04 (`[stub:silent]`: the model holds its first reply for 10 minutes; real time, no scaled clock; a one-minute window against a five-minute time cap): the run ended `no_progress` with `idle_minutes` 1, more than a full real minute after the agent's last event, well before the time cap. While the agent waits for the model the Agent Server sends **no** periodic event (no heartbeat, no state update) into the conversation's event log, so no event kind needs to be filtered. If a later Agent Server version adds such events, this test fails (the time cap ends the run instead): check it whenever the pinned version changes.
+- **Order** when several stops are due in one poll: the kill, the activity's cancel, the agent's own end, the time cap, the budget, then the loop checks (identical calls before no progress). A run over budget ends `stopped_budget` (`max_budget`), which tells the reviewer more; every one of them goes to G5. A kill that lands after the poll still wins (`RunRepository.end`, §2.2).
+- Run event `loop_detected` with counts only (`identical_calls`, `threshold`, `idle_minutes`: whole minutes since the log last grew), then `agent_stopped` with `reason` `loop_detected` or `no_progress`. Never tool arguments, paths, commands or agent text. Both stops go to G5, which already treats `stopped_stalled` as `run_cap_reached` (ADR-M34 §2.8): the intent is paused at G5 with an `intent` escalation; the run's key is revoked when the run ends (`finishRun`), as for any run.
+- **OpenHands' own stuck detector** stays on (ADR-M29). It has fixed thresholds (4 repeats, ADR-M10 §4.1 item 2): with the default threshold 3 both may fire on the 4th identical call, and the run may end `agent_stuck` instead of `loop_detected`. Both are `stopped_stalled` and G5 treats them the same; the stop reason tells which detector fired. Not turned off: it is a second, independent check.
 - At a 1-second poll the agent may make one more call before the interrupt lands; the stop still happens after more than 3 identical calls, as FR-35 asks. Reading events over the WebSocket stays a later option (ADR-M10 §4.1 item 2).
 
 ### 2.8. Where the rules live
@@ -93,7 +99,8 @@ runner lost              ──► heartbeat timeout (2 min) ──► abandonRu
 | Who may kill | FR-34; QUESTIONS #180 | Config `access.kill_roles`; mandatory rule M25 |
 | The kill's escalation freezes the intent | D-03 §6.5; QUESTIONS #181 | Config `run.kill_escalation`; mandatory rule M26 |
 | Loop threshold | FR-35; Ch.3 §3.6 | Config `run.loop_detection.identical_tool_calls_max` → contract `loop_threshold`; rule M10 |
-| No-progress window | FR-35; QUESTIONS #184 | Config `run.loop_detection.no_progress_window_minutes`; new rule (PR 2) |
+| No-progress window | FR-35; QUESTIONS #184 | Config `run.loop_detection.no_progress_window_minutes`; mandatory rule M27 (≤ 30), warning under 5 |
+| Order of stops due in the same poll | Harry's review of the PR 2 plan | Code (`apps/runner/src/agent/drive.ts`, `pollUntilDone`) |
 | Time for a killed run's evidence | QUESTIONS #183 | Runner setting `SDLC_RUNNER_KILL_EVIDENCE_SECONDS` (technical) |
 | A kill stays a kill: `stopping` ends `stopped_killed` only; `killed_by` set once; stop reason `killed` | D-05 §6.4 | Database (migration 0020, `SDA13`) |
 | Tokens revoked after use; a reused wrapping token goes to security | ADR-M38 §2.3; QUESTIONS #182 | Code (`apps/runner/src/tokens.ts`, `kill/kill-run.ts`) |
@@ -117,3 +124,10 @@ runner lost              ──► heartbeat timeout (2 min) ──► abandonRu
 
 - Kill by intent in one call (`POST /v1/intents/:intent/kill`): not needed; the CLI resolves the current run.
 - An automatic kill by the platform (for example on a critical finding during a run) is not in the MVP; the operator command covers "the platform" of FR-34.
+
+## Version history
+
+| Version | Date | Author | Notes |
+|---|---|---|---|
+| 1.0 | 2026-10-03 | Claude (task C11, PR 1), approved by Harry | Kill switch (§2.1–§2.6); loop detection planned |
+| 1.1 | 2026-10-04 | Claude (task C11, PR 2), approved by Harry | §2.7 as built: the adapter's counts, the runner's loop watch, rule M27, the order of stops, the periodic-events check, the OpenHands stuck detector; §2.8 |

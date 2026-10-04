@@ -25,6 +25,7 @@ export {
   type CommitAnswer,
   type DiffAnswer,
 } from './git.js';
+export { canonicalArguments, toolCallKey, trailingIdenticalCalls } from './loop.js';
 export {
   buildConversationRequest,
   buildTaskMessage,
