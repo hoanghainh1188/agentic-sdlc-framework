@@ -44,6 +44,7 @@
 | ADR-M47 | [Gate waiting-time metrics](ADR-M47-gate-metrics.md) (task E06) | Proposed | |
 | ADR-M48 | [Evidence Builder and the readable Evidence Pack](ADR-M48-evidence-builder.md) (task E02) | Proposed | |
 | ADR-M49 | [Gate G8: release approval, sealing the Evidence Pack, closing the intent](ADR-M49-gate-g8.md) (task E03) | Proposed | |
+| ADR-M51 | [Evidence retention: object lock, the purge, holds, archived projects](ADR-M51-evidence-retention.md) (task E05) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

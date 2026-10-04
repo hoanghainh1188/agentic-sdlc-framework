@@ -22,6 +22,7 @@ import { migration0019GateG7 } from './0019-gate-g7.js';
 import { migration0020KillSwitch } from './0020-kill-switch.js';
 import { migration0021EvidencePacks } from './0021-evidence-packs.js';
 import { migration0022GateG8 } from './0022-gate-g8.js';
+import { migration0023Retention } from './0023-retention.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -47,4 +48,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0020-kill-switch': migration0020KillSwitch,
   '0021-evidence-packs': migration0021EvidencePacks,
   '0022-gate-g8': migration0022GateG8,
+  '0023-retention': migration0023Retention,
 };

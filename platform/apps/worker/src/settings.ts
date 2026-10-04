@@ -37,6 +37,16 @@ export const WORKER_ENV = {
   evidenceBucket: 'SDLC_WORKER_EVIDENCE_BUCKET',
   evidenceSecretPath: 'SDLC_WORKER_EVIDENCE_SECRET_PATH',
   evidenceMaxItemMb: 'SDLC_WORKER_EVIDENCE_MAX_ITEM_MB',
+  retentionUrl: 'SDLC_WORKER_RETENTION_URL',
+  retentionBucket: 'SDLC_WORKER_RETENTION_BUCKET',
+  retentionSecretPath: 'SDLC_WORKER_RETENTION_SECRET_PATH',
+  retentionMode: 'SDLC_WORKER_RETENTION_MODE',
+  retentionIntervalMinutes: 'SDLC_WORKER_RETENTION_INTERVAL_MINUTES',
+  retentionBatch: 'SDLC_WORKER_RETENTION_BATCH',
+  retentionGuardPercent: 'SDLC_WORKER_RETENTION_GUARD_PERCENT',
+  retentionGuardFloor: 'SDLC_WORKER_RETENTION_GUARD_FLOOR',
+  retentionArchiveGraceDays: 'SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS',
+  retentionOrphanGraceHours: 'SDLC_WORKER_RETENTION_ORPHAN_GRACE_HOURS',
   devMode: 'SDLC_WORKER_DEV_MODE',
   devDbUrl: 'SDLC_WORKER_DEV_DB_URL',
 } as const;
@@ -131,6 +141,30 @@ const schema = z.object({
     .default('worker/evidence'),
   // The largest evidence file the worker reads back to check its hash, one file at a time.
   [WORKER_ENV.evidenceMaxItemMb]: z.coerce.number().int().min(1).max(4096).default(256),
+  // E05 (ADR-M51): the retention loop with the purge identity `worker-purge` (`kv/worker/purge`).
+  // `off`: no retention loop. Mode `report` (default) counts and deletes nothing; `purge` deletes.
+  [WORKER_ENV.retentionUrl]: z
+    .string()
+    .refine((v) => v === 'off' || isOrigin(v))
+    .default('http://seaweedfs:8333'),
+  [WORKER_ENV.retentionBucket]: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .default('evidence'),
+  [WORKER_ENV.retentionSecretPath]: z
+    .string()
+    .regex(/^worker\/[A-Za-z0-9_.-]+$/)
+    .default('worker/purge'),
+  [WORKER_ENV.retentionMode]: z.enum(['report', 'purge']).default('report'),
+  [WORKER_ENV.retentionIntervalMinutes]: z.coerce.number().int().min(5).max(1440).default(60),
+  [WORKER_ENV.retentionBatch]: z.coerce.number().int().min(1).max(5000).default(200),
+  // The guard: one pass purges at most this share of a tenant's stored rows for retention, or the
+  // floor when larger (ADR-M51 §2.4). Archive purges are not counted.
+  [WORKER_ENV.retentionGuardPercent]: z.coerce.number().int().min(1).max(100).default(20),
+  [WORKER_ENV.retentionGuardFloor]: z.coerce.number().int().min(0).max(100_000).default(20),
+  // Days after `project.archived` before its evidence is purged: a mistaken archive is noticed first.
+  [WORKER_ENV.retentionArchiveGraceDays]: z.coerce.number().int().min(1).max(365).default(7),
+  [WORKER_ENV.retentionOrphanGraceHours]: z.coerce.number().int().min(24).max(720).default(24),
   [WORKER_ENV.devMode]: z.enum(['', '0', '1']).default(''),
   [WORKER_ENV.devDbUrl]: z.string().optional(),
   NODE_ENV: z.string().optional(),
@@ -152,6 +186,20 @@ function isOrigin(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** E05: the retention loop (ADR-M51). */
+export interface WorkerRetentionSettings {
+  readonly url: string;
+  readonly bucket: string;
+  readonly secretPath: string;
+  readonly mode: 'report' | 'purge';
+  readonly intervalMs: number;
+  readonly batch: number;
+  readonly guardPercent: number;
+  readonly guardFloor: number;
+  readonly archiveGraceDays: number;
+  readonly orphanGraceHours: number;
 }
 
 /** E03: the worker's evidence store (ADR-M49 §2.2). */
@@ -221,6 +269,8 @@ export interface WorkerSettings {
   readonly costSync: CostSyncSettings;
   /** E03: the evidence store for G8's release pack; null: `SDLC_WORKER_EVIDENCE_URL=off`. */
   readonly evidence: WorkerEvidenceSettings | null;
+  /** E05: the retention loop; null: `SDLC_WORKER_RETENTION_URL=off`. */
+  readonly retention: WorkerRetentionSettings | null;
 }
 
 export type WorkerSettingsKey =
@@ -337,6 +387,21 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
             bucket: v[WORKER_ENV.evidenceBucket],
             secretPath: v[WORKER_ENV.evidenceSecretPath],
             maxItemBytes: v[WORKER_ENV.evidenceMaxItemMb] * 1024 * 1024,
+          },
+    retention:
+      v[WORKER_ENV.retentionUrl] === 'off'
+        ? null
+        : {
+            url: new URL(v[WORKER_ENV.retentionUrl]).origin,
+            bucket: v[WORKER_ENV.retentionBucket],
+            secretPath: v[WORKER_ENV.retentionSecretPath],
+            mode: v[WORKER_ENV.retentionMode],
+            intervalMs: v[WORKER_ENV.retentionIntervalMinutes] * 60_000,
+            batch: v[WORKER_ENV.retentionBatch],
+            guardPercent: v[WORKER_ENV.retentionGuardPercent],
+            guardFloor: v[WORKER_ENV.retentionGuardFloor],
+            archiveGraceDays: v[WORKER_ENV.retentionArchiveGraceDays],
+            orphanGraceHours: v[WORKER_ENV.retentionOrphanGraceHours],
           },
   };
 }

@@ -197,6 +197,22 @@ export class IntentRepository extends TenantRepository {
     );
   }
 
+  /** Whether the project has an intent that is not finished (E05: an archive refuses it). */
+  async hasOpenInProject(projectId: string): Promise<boolean> {
+    if (!isUuid(projectId)) return false;
+    const row = await this.run(
+      this.db
+        .selectFrom('intents')
+        .select('id')
+        .where('tenant_id', '=', this.tenantId)
+        .where('project_id', '=', projectId)
+        .where('status', 'not in', ['done', 'rejected', 'cancelled', 'blocked'])
+        .limit(1)
+        .executeTakeFirst(),
+    );
+    return row !== undefined;
+  }
+
   listForProject(projectId: string, query: IntentQuery = {}): Promise<Intent[]> {
     return this.run(
       this.db

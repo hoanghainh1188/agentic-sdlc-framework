@@ -115,17 +115,20 @@ describe('sdlc-api service', () => {
     expect(bootstrap).toMatch(
       /^cmd_api_evidence_credentials\(\) \{ pack_evidence_credentials api sdlcapiev sdlc-api; \}$/m,
     );
-    // E03: the api and the worker share the helper (one identity each).
+    // E03: the api and the worker share the helper (one identity each); E05 made it generic.
     const fn = /^pack_evidence_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
     // Read proposals and diffs (the hash re-check), read and write packs; nothing else.
     expect(fn).toContain(
-      '-actions Read:evidence/proposals/*,Read:evidence/diffs/*,Read:evidence/packs/*,Write:evidence/packs/* -apply',
+      "'Read:evidence/proposals/*,Read:evidence/diffs/*,Read:evidence/packs/*,Write:evidence/packs/*'",
     );
-    expect(fn).toContain('echo "s3.configure -user $identity -delete -apply" |');
-    expect(fn).toContain('identity="$role-evidence"');
-    expect(fn).toMatch(/compose exec -T seaweedfs \$weed >\/dev\/null 2>&1/);
-    expect(fn).toContain('bao kv put -mount=kv "$1/evidence" - >/dev/null');
-    expect(fn).not.toContain('s3.config.show');
+    expect(fn).toMatch(/s3_credentials "\$1" evidence "\$2"/);
+    const helper = /^s3_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
+    expect(helper).toContain('echo "s3.configure -user $identity -delete -apply" |');
+    expect(helper).toContain('identity="$role-$name"');
+    expect(helper).toContain('-actions %s -apply');
+    expect(helper).toMatch(/compose exec -T seaweedfs \$weed >\/dev\/null 2>&1/);
+    expect(helper).toContain('bao kv put -mount=kv "$1/$2" - >/dev/null');
+    expect(helper).not.toContain('s3.config.show');
     // The AppRole "api" reads kv/data/api/* already: the credential needs no policy change.
     const policy = readDeployFile('openbao/bootstrap/policies/api.hcl');
     expect(policy).toContain('path "kv/data/api/*"');

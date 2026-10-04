@@ -15,6 +15,7 @@ import {
   SpecError,
   DbError,
   EscalationError,
+  EvidenceHoldError,
   EvidencePackError,
   RegistryError,
   TenantGuardError,
@@ -81,6 +82,9 @@ export const API_ERROR_CODES = [
   'agent_refused',
   'role_binding_not_found',
   'project_archived',
+  'project_has_open_intents',
+  'evidence_hold_exists',
+  'evidence_hold_not_found',
   'user_not_active',
   'self_action',
   'conflicting_role',
@@ -146,6 +150,9 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   agent_refused: 'api.error.agent_refused',
   role_binding_not_found: 'api.error.role_binding_not_found',
   project_archived: 'api.error.project_archived',
+  project_has_open_intents: 'api.error.project_has_open_intents',
+  evidence_hold_exists: 'api.error.evidence_hold_exists',
+  evidence_hold_not_found: 'api.error.evidence_hold_not_found',
   user_not_active: 'api.error.user_not_active',
   self_action: 'api.error.self_action',
   conflicting_role: 'api.error.conflicting_role',
@@ -236,6 +243,7 @@ const ADMIN: Readonly<Record<AdminErrorCode, [number, ApiErrorCode]>> = {
   token_not_found: [404, 'token_not_found'],
   role_binding_not_found: [404, 'role_binding_not_found'],
   project_archived: [409, 'project_archived'],
+  project_has_open_intents: [409, 'project_has_open_intents'],
   user_not_active: [409, 'user_not_active'],
   self_action: [403, 'self_action'],
   conflicting_role: [409, 'conflicting_role'],
@@ -348,6 +356,9 @@ export function toApiError(error: unknown): ApiError {
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
   if (error instanceof KillError) return new ApiError(...KILL[error.code]);
   if (error instanceof EvidencePackError) return new ApiError(...EVIDENCE[error.code]);
+  if (error instanceof EvidenceHoldError) {
+    return new ApiError(error.code === 'evidence_hold_exists' ? 409 : 404, error.code);
+  }
   if (error instanceof SpecError) return specApiError(error);
   if (error instanceof PlanError) return planApiError(error);
   if (error instanceof AgentRegisterError) return agentApiError(error, '-');

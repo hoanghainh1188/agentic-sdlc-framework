@@ -142,11 +142,16 @@ const UPDATABLE: Record<string, readonly string[]> = {
   intent_notices: ['attempts', 'posted_at', 'abandoned_at'],
   // Append-only (B12, ADR-M32): every version of the project AI record, written by a trigger.
   project_ai_record_versions: [],
-  // C06 session 2b: written once; the purge (E05) will get UPDATE on `purged_at` only.
-  evidence_items: [],
-  // E02 (migration 0021): written once; E03 (migration 0022) seals one version, E05 gets
-  // `retention_hold` and `purged_at` (trigger: everything else fixed, SDA14).
-  evidence_packs: ['sealed_at'],
+  // C06 session 2b: written once; the purge (E05, migration 0023) sets `purged_at` once and moves
+  // the lock forward (trigger SDA15: everything else fixed).
+  evidence_items: ['purged_at', 'lock_extended_until'],
+  // E02 (migration 0021): written once; E03 (migration 0022) seals one version; E05 (migration
+  // 0023) sets `purged_at` once and moves the lock forward (trigger SDA14: everything else fixed).
+  // `retention_hold` is not used (QUESTIONS #235): no grant.
+  evidence_packs: ['sealed_at', 'purged_at', 'lock_extended_until'],
+  // E05 (migration 0023, QUESTIONS #235): a hold is released once; the loop records what it
+  // applied (trigger SDA16).
+  evidence_holds: ['applied_at', 'released_at', 'released_by', 'release_applied_at'],
   // B13: a tenant role is withdrawn by `revoked_at`, never deleted (trigger: final once set).
   tenant_role_bindings: ['revoked_at'],
   // Append-only (B13 AC7): approvals of the agent register.
@@ -282,7 +287,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // B13: tenant_role_bindings → tenants, users; agent_approvals → agents, users.
     // B09: plans → users (submitted_by).
     // E02: evidence_packs → intents, users (built_by).
-    expect(fks).toHaveLength(54);
+    // E05: evidence_holds → intents, users ×2 (held_by, released_by).
+    expect(fks).toHaveLength(57);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {
@@ -336,6 +342,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       // E02: one row per build; one sealed version per intent (E03).
       'public.evidence_packs (tenant_id, intent_id, version)',
       'public.evidence_packs (tenant_id, intent_id) WHERE (sealed_at IS NOT NULL)',
+      // E05: one active hold per intent.
+      'public.evidence_holds (tenant_id, intent_id) WHERE (released_at IS NULL)',
     ]) {
       expect(defs, expected).toContain(expected);
     }

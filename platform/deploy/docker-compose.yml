@@ -335,6 +335,13 @@ services:
       SEAWEEDFS_BUCKETS: evidence langfuse
       # A plain delete keeps the older versions (C06 session 2b, ADR-M33 §2.9).
       SEAWEEDFS_VERSIONED_BUCKETS: evidence
+      # E05 (ADR-M51): object lock on `evidence`, GOVERNANCE, every new version locked 180 days.
+      # No writer can delete a locked version; only the purge identity (`worker-purge`) may bypass
+      # it. The days equal rule M31's floor; never lower them without a handbook change.
+      SEAWEEDFS_LOCKED_BUCKETS: evidence:GOVERNANCE:180
+      # The admin identity sets the lock's default retention through the S3 API (on curl's stdin).
+      SEAWEEDFS_S3_ACCESS_KEY: ${SEAWEEDFS_S3_ACCESS_KEY:?set SEAWEEDFS_S3_ACCESS_KEY in .env}
+      SEAWEEDFS_S3_SECRET_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?set SEAWEEDFS_S3_SECRET_KEY in .env}
     volumes:
       - ./seaweedfs/create-buckets.sh:/scripts/create-buckets.sh:ro
     entrypoint: [/bin/sh, /scripts/create-buckets.sh]
@@ -594,6 +601,13 @@ services:
       # diffs to re-check their hashes, reads and writes packs/ only. Without it intents wait at G8.
       SDLC_WORKER_EVIDENCE_URL: http://seaweedfs:8333
       SDLC_WORKER_EVIDENCE_BUCKET: evidence
+      # E05 (ADR-M51): the evidence retention loop with its own identity `worker-purge`
+      # (kv/worker/purge, `openbao:bootstrap worker-purge-credentials`). `report` (default) counts
+      # and deletes nothing; set `purge` in .env to delete. Without the credential: no loop.
+      SDLC_WORKER_RETENTION_URL: http://seaweedfs:8333
+      SDLC_WORKER_RETENTION_BUCKET: evidence
+      SDLC_WORKER_RETENTION_MODE: ${SDLC_WORKER_RETENTION_MODE:-report}
+      SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS: ${SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS:-7}
     volumes:
       - worker-approle:/run/sdlc/approle
       - worker-cost-approle:/run/sdlc/cost-approle

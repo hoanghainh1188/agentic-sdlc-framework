@@ -45,7 +45,7 @@ escalation:
 | `run` | `g6_ci_retries`, `loop_detection.identical_tool_calls_max`, `loop_detection.no_progress_window_minutes`, `failed_run_escalation`, `g5_breach_escalation` and `kill_escalation` (`severity`, `response_level` of the escalation a failed run, a G5 breach or a kill raises) |
 | `budget` | `warn_percent`, `stop_percent`, `default_intent_usd`, `default_run_usd` |
 | `model_routing.allowed_provider_types` | `api` / `self_hosted` per data class |
-| `retention.evidence_retention_days` | Default 180 |
+| `retention.evidence_retention_days` | Default 180; between 180 and 3650 (rule M31, E05). The worker purges evidence files this long after the intent ends (ADR-M51) |
 | `github.poll_interval_seconds` | Default 30 |
 | `verification.required_checks` | C08: the CI checks G6 waits for, by name; default `[]` (every check). The pilot: `[ci-ok]` |
 | `verification.ci_timeout_minutes` | C08: CI still pending after this → paused at G6, technical escalation; default 60, at most 1440 |
@@ -56,13 +56,14 @@ escalation:
 | `access.kill_roles` | Who may stop a run with the kill switch (C11, ADR-M42). Default and minimum: `person_a`, `person_b`, `governance` |
 | `access.cost_read_roles` | Who may read the cost report of a project or intent (E04, ADR-M45). Default: `person_a`, `person_b`, `pm_brse`, `governance`, `admin`; tenant admins always may; never `viewer` (M28) |
 | `access.evidence_build_roles`, `access.evidence_read_roles` | Who may build, and who may list, show and export, an intent's Evidence Pack (E02, ADR-M48). Defaults: `person_a`, `person_b`, `pm_brse`, `governance`, `admin` (build); the same and `second_approver` (read); tenant admins always may; never `viewer` (M30) |
+| `access.evidence_hold_roles` | Who may put an intent's evidence on hold and release it (E05, ADR-M51); held evidence is never purged. Default `[governance, admin]`; never `viewer` (rule M32) |
 | `access.metrics_read_roles` | Who may read the gate waiting-time metrics of a project (E06, ADR-M47). Default: `person_a`, `person_b`, `second_approver`, `pm_brse`, `governance`, `admin`; tenant admins always may; never `viewer` (M29) |
 
 Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `working_hours`, `working_days` (working calendar; one working day = the working hours). Deadlines may also be `{ kind: end_of_working_day }` or `{ kind: next_planned_work }` (no clock).
 
 ## Mandatory rules
 
-A project may tighten anything. It may **not** loosen these (rules M1–M30; sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
+A project may tighten anything. It may **not** loosen these (rules M1–M32; sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
 
 | Rule | What |
 |---|---|
@@ -94,6 +95,8 @@ A project may tighten anything. It may **not** loosen these (rules M1–M30; sou
 | M28 | `access.cost_read_roles` never holds `viewer` (E04, ADR-M45) |
 | M29 | `access.metrics_read_roles` never holds `viewer` (E06, ADR-M47) |
 | M30 | `access.evidence_build_roles` and `access.evidence_read_roles` never hold `viewer` (E02, ADR-M48) |
+| M31 | `retention.evidence_retention_days` is between 180 and 3650 (E05, ADR-M51, QUESTIONS #236) |
+| M32 | `access.evidence_hold_roles` never holds `viewer` (E05, ADR-M51, QUESTIONS #235) |
 
 Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. A Run Contract validity above 60 minutes, a run cap above the default and a no-progress window under 5 minutes (`run.loop_detection.no_progress_window_minutes`: a long silent command may stop a healthy run) also give a warning. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 

@@ -5,7 +5,7 @@ import { sql, type Kysely } from 'kysely';
 import { translatePgError } from './errors.js';
 import { assertTokenHash } from './repositories/api-tokens.js';
 import type { Database, Tenant } from './schema.js';
-import { parseTenantId, type TenantId } from './tenant-id.js';
+import { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 import { TenantScope } from './tenant-scope.js';
 
 export interface NewTenant {
@@ -43,6 +43,10 @@ export interface PollableProject {
 /** The result of `withSpendSyncLock`: `ran: false` when another process holds the lock. */
 export type SpendSyncLockResult<T> =
   { readonly ran: true; readonly value: T } | { readonly ran: false };
+
+/** Two-key session advisory lock of the retention loop (task E05, ADR-M51). */
+const RETENTION_LOCK_CLASS = 0x45_56_52_01;
+const RETENTION_LOCK_KEY = 1;
 
 /** Two-key session advisory lock of the scheduled spend sync (task C12, ADR-M24 §2.5). */
 const SPEND_SYNC_LOCK_CLASS = 0x43_4f_53_01;
@@ -277,6 +281,45 @@ export class SystemScope {
     );
     const earliest = row?.earliest as Date | string | null | undefined;
     return earliest == null ? null : new Date(earliest);
+  }
+
+  /**
+   * The retention loop (task E05, ADR-M51): one process at a time deletes evidence files. Same
+   * pattern as `withSpendSyncLock`: a session advisory lock without waiting.
+   */
+  async withRetentionLock<T>(fn: () => Promise<T>): Promise<SpendSyncLockResult<T>> {
+    return this.db.connection().execute(async (conn) => {
+      const got = await run(
+        sql<{
+          locked: boolean;
+        }>`SELECT pg_try_advisory_lock(${RETENTION_LOCK_CLASS}::int4, ${RETENTION_LOCK_KEY}::int4) AS locked`.execute(
+          conn,
+        ),
+      );
+      if (got.rows[0]?.locked !== true) return { ran: false };
+      try {
+        return { ran: true, value: await fn() };
+      } finally {
+        await run(
+          sql`SELECT pg_advisory_unlock(${RETENTION_LOCK_CLASS}::int4, ${RETENTION_LOCK_KEY}::int4)`.execute(
+            conn,
+          ),
+        );
+      }
+    });
+  }
+
+  /**
+   * The orphan sweep of the retention loop (task E05, ADR-M48 §2.7): which of these pack IDs, read
+   * from file paths in the evidence store, have a row in any tenant. IDs in, IDs out.
+   */
+  async existingPackIds(ids: readonly string[]): Promise<Set<string>> {
+    const valid = ids.filter((id) => isUuid(id));
+    if (valid.length === 0) return new Set();
+    const rows = await run(
+      this.db.selectFrom('evidence_packs').select('id').where('id', 'in', valid).execute(),
+    );
+    return new Set(rows.map((row) => row.id));
   }
 
   /** Health check (task B03): true when the database answers. Reads no table. */

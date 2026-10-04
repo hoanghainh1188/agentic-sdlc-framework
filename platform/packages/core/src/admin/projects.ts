@@ -96,7 +96,12 @@ export async function updateProject(
   });
 }
 
-/** Archives an active project. Idempotent refusal: an archived project gives `project_archived`. */
+/**
+ * Archives an active project. Idempotent refusal: an archived project gives `project_archived`.
+ * A project with open intents is refused (`project_has_open_intents`, E05). The retention loop
+ * purges its evidence files after the archive grace period (FR-44, ADR-M51); there is no
+ * un-archive in the MVP.
+ */
 export async function archiveProject(
   scope: TenantScope,
   actor: AdminActor,
@@ -105,6 +110,11 @@ export async function archiveProject(
   return scope.transaction(async (tx) => {
     await assertTenantAdmin(tx, actor);
     const project = await activeProject(tx, slug);
+    // E05 (QUESTIONS #237): an archive purges the project's evidence after the grace period;
+    // its intents are finished (done, rejected, cancelled, blocked) first.
+    if (await tx.intents.hasOpenInProject(project.id)) {
+      throw new AdminError('project_has_open_intents', `project ${slug} has open intents`);
+    }
     const archived = await tx.projects.setStatus(project.id, 'archived');
     if (!archived) throw new AdminError('project_not_found', `project ${slug} not found`);
     await tx.audit.append({

@@ -8,6 +8,7 @@ import { t } from '@sdlc/messages';
 import { parseCommand, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
 import { AGENT_COMMANDS } from './admin-agents.js';
+import { EVIDENCE_HOLD_COMMANDS } from './admin-evidence.js';
 import type { AdminApiCommand } from './admin-call.js';
 import { PROJECT_COMMANDS } from './admin-projects.js';
 import { USER_COMMANDS } from './admin-users.js';
@@ -22,12 +23,14 @@ export const ADMIN_API_GROUPS = [
   'tenant-admin',
   'token',
   'agent',
+  'evidence',
 ] as const;
 
 const COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
   ...PROJECT_COMMANDS,
   ...USER_COMMANDS,
   ...AGENT_COMMANDS,
+  ...EVIDENCE_HOLD_COMMANDS,
 };
 
 export function isAdminApiGroup(group: string | undefined): boolean {
@@ -39,11 +42,13 @@ export async function runAdminApi(args: readonly string[], ctx: CliContext): Pro
   const [group, command, ...rest] = args;
   const key = `${group ?? ''} ${command ?? ''}`;
   const spec = Object.hasOwn(COMMANDS, key) ? COMMANDS[key] : undefined;
-  const parsed = spec ? parseCommand(rest, spec.options) : undefined;
+  const parsed = spec ? parseCommand(rest, spec.options, spec.positionals ?? 0) : undefined;
   if (!spec || !parsed || !spec.required.every((name) => typeof parsed.values[name] === 'string')) {
     ctx.stderr(t('cli.admin.api.usage'));
     return EXIT.usage;
   }
   const json = parsed.values.json === true;
-  return withApi(ctx, json, (client) => spec.run({ ctx, client, values: parsed.values, json }));
+  return withApi(ctx, json, (client) =>
+    spec.run({ ctx, client, values: parsed.values, json, positionals: parsed.positionals }),
+  );
 }

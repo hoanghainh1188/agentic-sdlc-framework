@@ -11,6 +11,8 @@ export interface AdminApiCommand {
   readonly options: NonNullable<ParseArgsConfig['options']>;
   /** Options that must be given. */
   readonly required: readonly string[];
+  /** Positional arguments after the command (E05: `sdlc admin evidence hold <INT>`); default 0. */
+  readonly positionals?: number;
   readonly run: (call: AdminCall) => Promise<number>;
 }
 
@@ -19,6 +21,8 @@ export interface AdminCall {
   readonly client: ApiClient;
   readonly values: Values;
   readonly json: boolean;
+  /** The positional arguments, as many as the command declares. */
+  readonly positionals: readonly string[];
 }
 
 /** A string option that `required` already checked. */

@@ -615,6 +615,7 @@ export function evidencePackBody(version = 1, sealed = false): Record<string, un
     retention_hold: false,
     purged_at: null,
     created_at: new Date('2026-10-04T09:00:00.000Z'),
+    lock_extended_until: null,
   });
 }
 

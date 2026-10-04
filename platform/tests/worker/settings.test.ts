@@ -38,6 +38,18 @@ describe('worker settings', () => {
         secretPath: 'worker/evidence',
         maxItemBytes: 256 * 1024 * 1024,
       },
+      retention: {
+        url: 'http://seaweedfs:8333',
+        bucket: 'evidence',
+        secretPath: 'worker/purge',
+        mode: 'report',
+        intervalMs: 3_600_000,
+        batch: 200,
+        guardPercent: 20,
+        guardFloor: 20,
+        archiveGraceDays: 7,
+        orphanGraceHours: 24,
+      },
     });
   });
 

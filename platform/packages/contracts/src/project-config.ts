@@ -180,6 +180,10 @@ export interface ProjectConfig {
   readonly model_routing: {
     readonly allowed_provider_types: Readonly<Record<DataClass, readonly ProviderType[]>>;
   };
+  /**
+   * Days evidence files are kept after the intent ends (D-05 §10.1, D-02 FR-44). Between 180 and
+   * 3650 (mandatory rule M31, task E05, ADR-M51, QUESTIONS #236).
+   */
   readonly retention: { readonly evidence_retention_days: number };
   readonly github: { readonly poll_interval_seconds: number };
   /** What G6 reads from CI (task C08 PR 2, QUESTIONS #159, ADR-M38 §2.7). */
@@ -236,6 +240,12 @@ export interface ProjectConfig {
      */
     readonly evidence_build_roles: readonly ProjectRole[];
     readonly evidence_read_roles: readonly ProjectRole[];
+    /**
+     * Who may put an intent's evidence on hold, and release the hold (task E05, ADR-M51,
+     * QUESTIONS #235): held evidence is never purged. Tenant admins always may. The viewer never
+     * (mandatory rule M32).
+     */
+    readonly evidence_hold_roles: readonly ProjectRole[];
     /**
      * Pairs of roles one person may not hold together on the project (task B13, ADR-M37,
      * QUESTIONS #154): a grant that would give someone both roles of a pair is refused. Person A

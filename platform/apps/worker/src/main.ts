@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Entry point of the worker process (task B06, design/ADR-M27). It runs the GitHub poller, the
 // escalation clock loop (B11, ADR-M28), and the Temporal worker of the intent workflow with its
-// reconcile loop (B07, ADR-M30), and the scheduled spend sync (C12). Settings come from the environment, the database password and the
+// reconcile loop (B07, ADR-M30), the scheduled spend sync (C12) and the evidence retention loop
+// (E05, ADR-M51). Settings come from the environment, the database password and the
 // GitHub App key from OpenBao (AppRole `worker`).
 // Tracing starts first (A08, ADR-M35): `./telemetry.js` must stay the first import.
 import { tracing, tracingEndpointValid } from './telemetry.js';
@@ -14,6 +15,7 @@ import { GitHostError, type IntentWorkflowSignals } from '@sdlc/contracts';
 import {
   advanceEscalation,
   checkStoredConfigsAtStart,
+  runRetentionPass,
   gitHostErrorMessage,
   loadEffectiveConfig,
   pollProject,
@@ -37,6 +39,8 @@ import { EscalationLoop } from './escalation-loop.js';
 import { jsonLogger } from './logger.js';
 import { PollerLoop } from './poller-loop.js';
 import { ReconcileLoop } from './reconcile-loop.js';
+import { RetentionLoop } from './retention-loop.js';
+import { openRetentionStore } from './retention-store.js';
 import { createWorkerRuns, type WorkerRuns } from './runs.js';
 import { loadSettings, SettingsError } from './settings.js';
 import { installTemporalLogging, startIntentWorker, type IntentWorkerHandle } from './temporal.js';
@@ -175,6 +179,40 @@ async function main(): Promise<void> {
     : undefined;
   if (costSync) costSync.start();
   else logger.log('warn', 'worker.cost_sync_off', { message: t('worker.start.cost_sync_off') });
+  // Evidence retention (E05, ADR-M51): its own SeaweedFS identity `worker-purge`.
+  const retentionStore = await openRetentionStore(settings.retention, secrets, logger);
+  // Pack IDs found without a row, kept across passes: deleted only when seen twice.
+  const orphanSuspects = new Set<string>();
+  const retention =
+    retentionStore && settings.retention
+      ? new RetentionLoop({
+          pass: (orphanCursor) =>
+            runRetentionPass(
+              {
+                db,
+                store: retentionStore,
+                logger,
+                now: () => new Date(),
+                orphanSuspects,
+                settings: {
+                  mode: settings.retention!.mode,
+                  bucket: settings.retention!.bucket,
+                  batch: settings.retention!.batch,
+                  guardPercent: settings.retention!.guardPercent,
+                  guardFloor: settings.retention!.guardFloor,
+                  archiveGraceDays: settings.retention!.archiveGraceDays,
+                  orphanGraceHours: settings.retention!.orphanGraceHours,
+                },
+              },
+              orphanCursor,
+            ),
+          withLock: (fn) => db.system.withRetentionLock(fn),
+          logger,
+          mode: settings.retention.mode,
+          intervalMs: settings.retention.intervalMs,
+        })
+      : undefined;
+  retention?.start();
   const reconcile = settings.temporal
     ? new ReconcileLoop({
         listOpen: (limit, after) => db.system.listOpenIntents(limit, after),
@@ -197,8 +235,10 @@ async function main(): Promise<void> {
       escalations.stop(),
       reconcile?.stop(),
       costSync?.stop(),
+      retention?.stop(),
       intentWorker?.shutdown(),
     ])
+      .then(() => retentionStore?.destroy())
       .then(() =>
         Promise.all([
           db.close(),
