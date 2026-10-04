@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M29: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M30: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -489,6 +489,21 @@ const CASES: Case[] = [
     yaml: 'access:\n  metrics_read_roles: [person_a, viewer]\n',
     key: 'config.rule.viewer_never_reads_metrics',
     path: 'access.metrics_read_roles',
+  },
+  // M30: the viewer never builds or reads an Evidence Pack (E02, ADR-M48, QUESTIONS #218).
+  {
+    name: 'viewer may build evidence packs',
+    rule: 'M30',
+    yaml: 'access:\n  evidence_build_roles: [person_a, viewer]\n',
+    key: 'config.rule.viewer_never_reads_evidence',
+    path: 'access.evidence_build_roles',
+  },
+  {
+    name: 'viewer may read evidence packs',
+    rule: 'M30',
+    yaml: 'access:\n  evidence_read_roles: [person_a, viewer]\n',
+    key: 'config.rule.viewer_never_reads_evidence',
+    path: 'access.evidence_read_roles',
   },
 ];
 

@@ -372,6 +372,39 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
 
 The runner cleans up by itself when it starts: it removes every sandbox, network and workspace volume that carries its instance label (`COMPOSE_PROJECT_NAME`). Runs that were still provisioning or running end as `failed` with `runner_restarted`. Nothing to do by hand. Run **one** `sdlc-runner` per Compose project: two runners with the same instance label would remove each other's sandboxes.
 
+## 5h. The API's evidence identity (Evidence Packs)
+
+The API builds and serves the Evidence Packs of intents (task E02, `design/ADR-M48-evidence-builder.md`, handbook Ch.15 §15.10.2). It uses its own SeaweedFS identity `api-evidence`, stored at `kv/api/evidence`. The AppRole `api` already reads `kv/data/api/*`, so `configure` needs no change.
+
+What the identity may do:
+
+| Prefix of the bucket `evidence` | Read | Write |
+|---|---|---|
+| `proposals/`, `diffs/` | Yes: the API reads every stored file back and checks its SHA-256 before it builds a pack | No |
+| `packs/` | Yes | Yes (never overwrites; SeaweedFS lets write also delete, as for the runner: versioning keeps the content) |
+| Anything else | No | No |
+
+So the API can now read client code (proposals and diffs). It reads one file at a time, at most `SDLC_API_EVIDENCE_MAX_ITEM_MB` (default 256), keeps only the hash, and never logs the content.
+
+### First set-up
+
+1. OpenBao is initialised, unsealed and configured (sections 3 and 4); SeaweedFS runs (`pnpm compose:core`).
+2. Create the identity. The command asks for an admin token (hidden). It makes a new key pair inside the openbao container, stores it at `kv/api/evidence` and gives it to SeaweedFS as `api-evidence`. It prints no secret:
+   ```bash
+   pnpm openbao:bootstrap api-evidence-credentials
+   ```
+   Record it in the operations log (identity `api-evidence`, date, reason; not the keys).
+3. Restart the API: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile platform restart sdlc-api`.
+4. Check: the API's log has no line with `api.evidence_missing`. `sdlc evidence build <INT-…>` on an intent you may build answers with a version.
+
+Without it the API still starts (log line `api.evidence_missing`), but `sdlc evidence build` and `sdlc evidence export` answer `evidence_unavailable`. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| The API's evidence key (`api-evidence`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap api-evidence-credentials`, then restart `sdlc-api`. The old key stops working at once; a build that runs at that moment fails and can be repeated |
+
 ## 6. Daily snapshot backup
 
 > Commands only. The procedure is tested in the recovery drill of task A10, which also adds the backup script.
@@ -488,6 +521,8 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | `sdlc-api` restarts with "Cannot read SDLC_OPENBAO_ROLE_ID_FILE" or "no password field" | `api-credentials` was not run, or the volume was removed | Section 5e, step 2 |
 | `sdlc-runner` restarts with `runner.start_failed` ("no password field", "Cannot read SDLC_OPENBAO_ROLE_ID_FILE") | `runner-credentials` was not run, or the volume was removed | Section 5g, step 3 |
 | The runner logs `runner.evidence_missing`, or High-risk runs fail with `agent_proposal_unavailable` or `agent_proposal_failed`, or runs fail with `agent_changes_unavailable` | `runner-evidence-credentials` was not run, SeaweedFS was reset, or the bucket `evidence` is missing. Or the sandbox's workspace was larger than `SDLC_RUNNER_EXPORT_MAX_MB` (everything, `node_modules` included, default 8192), or its files outside the ignore rules were larger than `SDLC_RUNNER_WORKSPACE_MAX_MB` | Section 5g, step 3b; check that `seaweedfs-init` completed; raise the limit only if the workspace is really that large |
+| The API logs `api.evidence_missing`, or `sdlc evidence build` / `export` answers `evidence_unavailable` | `api-evidence-credentials` was not run, SeaweedFS was reset, or the API was not restarted after the command | Section 5h |
+| `sdlc evidence build` answers `evidence_hash_mismatch` or `evidence_missing` | A stored evidence file (a proposal or a diff) was changed or deleted in SeaweedFS after it was recorded. The audit log has an `evidence.check_failed` event | **Treat it as a possible security incident** (handbook Ch.18): do not "fix" the file; tell Person B. SeaweedFS keeps older versions of the bucket `evidence`: the original can be found by its SHA-256 |
 | `docker-socket-proxy` stays unhealthy, or the runner says it cannot reach the Docker socket (`EACCES`) | `SDLC_DOCKER_GID` is not the group of the host's Docker socket | Section 5g, step 2; then `pnpm compose:sandbox` again |
 | A run fails with `image_unavailable` | `sandbox.image` names a digest the local registry does not have, or the registry is down | Section 5g, sandbox images: push the image again and check the digest |
 | A run fails with `agent_runner_not_attachable` or `agent_model_unreachable` | `SDLC_RUNNER_SELF_CONTAINER` is not the runner's container name, or `SDLC_RUNNER_AGENT_LLM_URL` (`alias:port`) is not in the run's egress list | Check the `sdlc-runner` environment in `platform/deploy/docker-compose.yml` (design/ADR-M29 §2.7) |
@@ -528,3 +563,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.16 | 2026-10-03 | Claude Code (task C07, PR 1) | Section 5g step 3b: the identity `runner-evidence` also writes run diffs under `evidence/diffs/` (run the command again once after the update); troubleshooting row `agent_changes_unavailable` (ADR-M34 §2.2). Tested with throw-away keys (`pnpm test:runner-compose`) |
 | 0.17 | 2026-10-03 | Claude Code (task B13, PR 2) | Section 5e step 5: the first tenant admin with `sdlc ops bootstrap`; the operator commands are `sdlc ops …` (renamed from `sdlc admin …`, ADR-M37 §2.8) |
 | 0.18 | 2026-10-03 | Claude Code (task C08, PR 1) | Section 5g step 3b: the identity `runner-evidence` also reads run diffs (`Read:evidence/diffs/*`), which the push applies; run the command again once after the update (ADR-M38 §2.2, QUESTIONS #155). Tested with throw-away keys (`pnpm test:runner-compose`) |
+| 0.19 | 2026-10-04 | Claude Code (task E02) | Section 5h: `api-evidence-credentials` (SeaweedFS identity `api-evidence` at `kv/api/evidence`: reads proposals and diffs, reads and writes packs), rotation; troubleshooting rows `evidence_unavailable` and failed hash checks (ADR-M48). Tested with throw-away keys (`pnpm test:openbao`) |

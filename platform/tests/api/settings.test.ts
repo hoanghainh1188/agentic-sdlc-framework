@@ -19,7 +19,43 @@ describe('api settings', () => {
       authFailuresPerMinute: 10,
       temporal: { address: 'temporal:7233', namespace: 'default' },
       githubApiUrl: 'https://api.github.com',
+      evidence: {
+        url: 'http://seaweedfs:8333',
+        bucket: 'evidence',
+        secretPath: 'api/evidence',
+        maxItemBytes: 256 * 1024 * 1024,
+      },
     });
+  });
+
+  it('E02: the evidence store is an origin, a bucket and a path under api/; off turns it off', () => {
+    expect(loadSettings({ SDLC_API_EVIDENCE_URL: 'off' }).evidence).toBeNull();
+    expect(
+      loadSettings({
+        SDLC_API_EVIDENCE_URL: 'https://s3.internal:8443',
+        SDLC_API_EVIDENCE_BUCKET: 'packs-1',
+        SDLC_API_EVIDENCE_SECRET_PATH: 'api/evidence2',
+        SDLC_API_EVIDENCE_MAX_ITEM_MB: '8',
+      }).evidence,
+    ).toEqual({
+      url: 'https://s3.internal:8443',
+      bucket: 'packs-1',
+      secretPath: 'api/evidence2',
+      maxItemBytes: 8 * 1024 * 1024,
+    });
+    for (const [name, value] of [
+      ['SDLC_API_EVIDENCE_URL', 'http://user:pass@seaweedfs:8333'],
+      ['SDLC_API_EVIDENCE_URL', 'http://seaweedfs:8333/evidence'],
+      ['SDLC_API_EVIDENCE_URL', 'file:///tmp'],
+      ['SDLC_API_EVIDENCE_BUCKET', 'Evidence_1'],
+      // The AppRole "api" reads kv/data/api/* only: another path is a mistake.
+      ['SDLC_API_EVIDENCE_SECRET_PATH', 'runner/evidence'],
+      ['SDLC_API_EVIDENCE_MAX_ITEM_MB', '0'],
+    ] as const) {
+      expect(() => loadSettings({ [name]: value }), `${name}=${value}`).toThrowError(
+        expect.objectContaining({ key: 'api.settings.invalid', setting: name }),
+      );
+    }
   });
 
   it('B08: the GitHub API URL of the spec endpoints is https only', () => {

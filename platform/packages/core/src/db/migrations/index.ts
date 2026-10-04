@@ -20,6 +20,7 @@ import { migration0017PushedHead } from './0017-pushed-head.js';
 import { migration0018PlanFiles } from './0018-plan-files.js';
 import { migration0019GateG7 } from './0019-gate-g7.js';
 import { migration0020KillSwitch } from './0020-kill-switch.js';
+import { migration0021EvidencePacks } from './0021-evidence-packs.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -43,4 +44,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0018-plan-files': migration0018PlanFiles,
   '0019-gate-g7': migration0019GateG7,
   '0020-kill-switch': migration0020KillSwitch,
+  '0021-evidence-packs': migration0021EvidencePacks,
 };

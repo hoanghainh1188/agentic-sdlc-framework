@@ -17,6 +17,7 @@ import {
 } from '@aws-sdk/client-s3';
 import {
   EvidenceError,
+  type EvidenceGetOptions,
   type EvidenceStore,
   type RedactedSecret,
   type StoredEvidence,
@@ -122,16 +123,34 @@ export class S3EvidenceStore implements EvidenceStore {
     return { uri: `s3://${this.#bucket}/${key}`, sha256, sizeBytes: content.length };
   }
 
-  async get(uri: string): Promise<Buffer> {
+  /**
+   * Reads a file. With `maxBytes` (E02, ADR-M48), a file whose `Content-Length` is larger, or
+   * missing, is refused before its body is read, and the body is checked again after reading.
+   */
+  async get(uri: string, options: EvidenceGetOptions = {}): Promise<Buffer> {
     const prefix = `s3://${this.#bucket}/`;
     if (!uri.startsWith(prefix)) throw new EvidenceError('invalid_input');
     const key = checkPath(uri.slice(prefix.length));
+    const { maxBytes } = options;
+    if (maxBytes !== undefined && (!Number.isSafeInteger(maxBytes) || maxBytes < 0)) {
+      throw new EvidenceError('invalid_input');
+    }
     try {
       const answer = await this.#client.send(
         new GetObjectCommand({ Bucket: this.#bucket, Key: key }),
       );
       if (!answer.Body) throw new EvidenceError('not_found');
-      return Buffer.from(await answer.Body.transformToByteArray());
+      if (
+        maxBytes !== undefined &&
+        (answer.ContentLength === undefined || answer.ContentLength > maxBytes)
+      ) {
+        // Close the connection without reading the body (a Node.js stream in this SDK).
+        (answer.Body as unknown as { destroy?: () => void }).destroy?.();
+        throw new EvidenceError('too_large');
+      }
+      const body = Buffer.from(await answer.Body.transformToByteArray());
+      if (maxBytes !== undefined && body.length > maxBytes) throw new EvidenceError('too_large');
+      return body;
     } catch (error) {
       throw codeOf(error);
     }

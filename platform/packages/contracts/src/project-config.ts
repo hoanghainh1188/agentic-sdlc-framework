@@ -230,6 +230,13 @@ export interface ProjectConfig {
      */
     readonly metrics_read_roles: readonly ProjectRole[];
     /**
+     * Who may build an intent's Evidence Pack, and who may list, show and export it (task E02,
+     * ADR-M48, QUESTIONS #218; D-02 FR-40, FR-42). Tenant admins always may. The viewer never
+     * (mandatory rule M30): a pack is client-facing evidence and names the approvers.
+     */
+    readonly evidence_build_roles: readonly ProjectRole[];
+    readonly evidence_read_roles: readonly ProjectRole[];
+    /**
      * Pairs of roles one person may not hold together on the project (task B13, ADR-M37,
      * QUESTIONS #154): a grant that would give someone both roles of a pair is refused. Person A
      * and Person B always stay apart (mandatory rule M21).

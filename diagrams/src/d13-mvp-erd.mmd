@@ -27,5 +27,5 @@ erDiagram
     runs ||--o{ run_events : "logs events"
     runs ||--o{ cost_records : "costs"
     intents ||--o{ evidence_items : "has evidence"
-    intents ||--o| evidence_packs : "packaged as"
+    intents ||--o{ evidence_packs : "packaged as (versions)"
     tenants ||--o{ audit_log : "records"

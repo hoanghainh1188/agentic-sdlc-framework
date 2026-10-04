@@ -41,6 +41,8 @@
 //                                                                      QUESTIONS.md #196
 //   M29 the viewer role never reads the gate metrics ................ D-02 FR-12, ADR-M47,
 //                                                                      QUESTIONS.md #206
+//   M30 the viewer role never builds or reads an Evidence Pack ...... D-02 FR-40, FR-42, ADR-M48,
+//                                                                      QUESTIONS.md #218
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -587,6 +589,16 @@ const m29: Rule = (c) =>
     ? [issue('config.rule.viewer_never_reads_metrics', 'access.metrics_read_roles')]
     : [];
 
+// A pack is client-facing evidence and holds the approvers' names (ADR-M48, QUESTIONS #216).
+const m30: Rule = (c) => [
+  ...(c.access.evidence_build_roles.includes('viewer')
+    ? [issue('config.rule.viewer_never_reads_evidence', 'access.evidence_build_roles')]
+    : []),
+  ...(c.access.evidence_read_roles.includes('viewer')
+    ? [issue('config.rule.viewer_never_reads_evidence', 'access.evidence_read_roles')]
+    : []),
+];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -619,6 +631,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M27: m27,
   M28: m28,
   M29: m29,
+  M30: m30,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

@@ -453,6 +453,34 @@ export interface EvidenceItemsTable {
   created_at: CreatedAt;
 }
 
+/**
+ * Evidence Packs (D-05 section 6.6, version 1.30; E02, ADR-M48): one row per build, never changed
+ * except `sealed_at` (E03), `retention_hold` and `purged_at` (E05).
+ */
+export interface EvidencePacksTable {
+  id: Immutable<string>;
+  tenant_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  version: Immutable<number>;
+  content_sha256: Immutable<string>;
+  manifest_uri: Immutable<string>;
+  manifest_sha256: Immutable<string>;
+  /** bigint: `pg` returns int8 as a string. */
+  manifest_size_bytes: ColumnType<string, number, never>;
+  markdown_uri: Immutable<string>;
+  markdown_sha256: Immutable<string>;
+  markdown_size_bytes: ColumnType<string, number, never>;
+  locale: Immutable<string>;
+  disclosure_format: Immutable<DisclosureFormat>;
+  item_count: Immutable<number>;
+  built_by: ColumnType<string | null, string | null, never>;
+  /** Set by E03 at G8; no UPDATE grant yet. */
+  sealed_at: ColumnType<Date | null, never, never>;
+  retention_hold: ColumnType<boolean, never, never>;
+  purged_at: ColumnType<Date | null, never, never>;
+  created_at: CreatedAt;
+}
+
 type Mutable<T> = ColumnType<T, T | undefined, T>;
 type MutableNullable<T> = ColumnType<T | null, T | null | undefined, T | null>;
 
@@ -578,6 +606,7 @@ export interface Database {
   run_events: RunEventsTable;
   cost_records: CostRecordsTable;
   evidence_items: EvidenceItemsTable;
+  evidence_packs: EvidencePacksTable;
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
@@ -955,6 +984,27 @@ export const TABLE_COLUMNS = {
     'purged_at',
     'created_at',
   ]),
+  evidence_packs: columns<EvidencePacksTable>()([
+    'id',
+    'tenant_id',
+    'intent_id',
+    'version',
+    'content_sha256',
+    'manifest_uri',
+    'manifest_sha256',
+    'manifest_size_bytes',
+    'markdown_uri',
+    'markdown_sha256',
+    'markdown_size_bytes',
+    'locale',
+    'disclosure_format',
+    'item_count',
+    'built_by',
+    'sealed_at',
+    'retention_hold',
+    'purged_at',
+    'created_at',
+  ]),
   tenant_role_bindings: columns<TenantRoleBindingsTable>()([
     'id',
     'tenant_id',
@@ -1006,6 +1056,7 @@ export const TENANT_COLUMN = {
   intent_notices: 'tenant_id',
   project_ai_record_versions: 'tenant_id',
   evidence_items: 'tenant_id',
+  evidence_packs: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
@@ -1035,6 +1086,7 @@ export type Agent = Selectable<AgentsTable>;
 export type IntentNotice = Selectable<IntentNoticesTable>;
 export type ProjectAiRecordVersion = Selectable<ProjectAiRecordVersionsTable>;
 export type EvidenceItem = Selectable<EvidenceItemsTable>;
+export type EvidencePack = Selectable<EvidencePacksTable>;
 export type TenantRoleBinding = Selectable<TenantRoleBindingsTable>;
 export type AgentApproval = Selectable<AgentApprovalsTable>;
 

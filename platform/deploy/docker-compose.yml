@@ -514,6 +514,9 @@ services:
         condition: service_healthy
       temporal-namespace:
         condition: service_completed_successfully
+      # The bucket `evidence` with versioning (Evidence Packs, E02).
+      seaweedfs-init:
+        condition: service_completed_successfully
     environment:
       SDLC_API_HOST: 0.0.0.0
       SDLC_API_PORT: '8080'
@@ -522,6 +525,11 @@ services:
       # Wakes the intent workflow after a change (B07, ADR-M30). Plain gRPC on the Compose network.
       SDLC_API_TEMPORAL_ADDRESS: temporal:7233
       SDLC_API_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      # E02 (ADR-M48): Evidence Packs in SeaweedFS with the api's identity from OpenBao
+      # (kv/api/evidence, `openbao:bootstrap api-evidence-credentials`): reads proposals and diffs
+      # to re-check their hashes, reads and writes packs/ only.
+      SDLC_API_EVIDENCE_URL: http://seaweedfs:8333
+      SDLC_API_EVIDENCE_BUCKET: evidence
       # Traces over OTLP to the collector (A08, ADR-M35). Empty: off. Set by up.sh (observability).
       SDLC_OTEL_ENDPOINT: ${SDLC_OTEL_ENDPOINT:-}
       SDLC_OPENBAO_ADDR: http://openbao:8200

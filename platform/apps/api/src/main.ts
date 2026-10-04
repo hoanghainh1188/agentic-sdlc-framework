@@ -15,6 +15,7 @@ import { connectTemporal, TemporalIntentSignals } from '@sdlc/workflow-client';
 
 import { createApp } from './app.js';
 import { connectDatabase } from './database.js';
+import { openEvidenceStore } from './evidence/store.js';
 import { createApiLogger, NestJsonLogger } from './observability/logging.js';
 import { loadSettings, SettingsError } from './settings.js';
 
@@ -43,6 +44,8 @@ async function main(): Promise<void> {
       })
     : undefined;
   if (!gitHost) log.log('warn', 'api.git_host_off', { message: t('api.start.git_host_off') });
+  // The Evidence Pack store (E02, ADR-M48); undefined: the pack endpoints answer 503.
+  const evidence = await openEvidenceStore(settings.evidence, secrets, log);
   // Stored configurations after a change of platform defaults (B13 AC8, ADR-M37 §2.5).
   await checkStoredConfigsAtStart(db, log);
   // Wakes the intent workflow after a change (B07, ADR-M30).
@@ -54,6 +57,7 @@ async function main(): Promise<void> {
     log,
     nestLogger: new NestJsonLogger(log),
     ...(gitHost ? { gitHost } : {}),
+    ...(evidence ? { evidence } : {}),
     ...(temporal ? { intentSignals: new TemporalIntentSignals(temporal.client) } : {}),
   });
   app
@@ -62,6 +66,7 @@ async function main(): Promise<void> {
     .addHook('onClose', async () => {
       await temporal?.close();
       await db.close();
+      evidence?.store.destroy();
       await openbao?.close();
       await tracing?.shutdown();
     });

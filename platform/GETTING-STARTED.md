@@ -342,6 +342,7 @@ Start `core` alone first: `sdlc-api`, `sdlc-worker`, `sdlc-runner` and `litellm-
 |---|---|
 | First set-up, or the secret ID is older than 90 days | `pnpm openbao:bootstrap api-credentials` → `sdlc-api`; `worker-credentials` → `sdlc-worker`; `runner-credentials` → `sdlc-runner`; `litellm-credentials` → `litellm-agent` |
 | Once after the C08 update (pushes need to read the stored diff), or the evidence key may have leaked | `pnpm openbao:bootstrap runner-evidence-credentials` → `sdlc-runner` |
+| Once after the E02 update (Evidence Packs), or the API's evidence key may have leaked | `pnpm openbao:bootstrap api-evidence-credentials` → `sdlc-api` (runbook T11 §5h) |
 | A service log says it cannot log in to OpenBao (`invalid secret id`) | That service's credentials command |
 
 Restart one service: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox restart <service>`.

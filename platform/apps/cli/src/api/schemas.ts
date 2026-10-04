@@ -446,3 +446,48 @@ export type AgentRoundView = z.infer<typeof agentRoundSchema>;
 export const agentDetailSchema = agentSchema.extend({
   rounds: z.array(agentRoundSchema).max(2),
 });
+
+const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
+const packFileSchema = z.object({ uri: ref, sha256, size_bytes: z.number().int().min(0) });
+
+/** An Evidence Pack version (E02, ADR-M48 §2.6). */
+export const evidencePackSchema = z.object({
+  intent: code,
+  id,
+  version: z.number().int().min(1),
+  content_sha256: sha256,
+  manifest: packFileSchema,
+  markdown: packFileSchema,
+  locale: code,
+  disclosure_format: z.enum(['client_format', 'standard_note']),
+  item_count: z.number().int().min(0),
+  built_by: id.nullable(),
+  built_at: time,
+  sealed_at: time.nullable(),
+  retention_hold: z.boolean(),
+  purged_at: time.nullable(),
+});
+export type EvidencePackView = z.infer<typeof evidencePackSchema>;
+
+/** `POST /v1/intents/:intent/evidence-packs` (E02). */
+export const evidenceBuildSchema = z.object({ pack: evidencePackSchema, created: z.boolean() });
+/** `GET /v1/intents/:intent/evidence-packs/:version` (E02). */
+export const evidenceShowSchema = z.object({ pack: evidencePackSchema });
+/** `GET /v1/intents/:intent/evidence-packs` (E02). */
+export const evidenceListSchema = z.object({
+  intent: code,
+  packs: z.array(evidencePackSchema).max(100_000),
+});
+/** `GET /v1/intents/:intent/evidence-packs/:version/manifest|markdown` (E02). */
+export const evidenceFileSchema = z.object({
+  file: z.object({
+    intent_id: id,
+    version: z.number().int().min(1),
+    name: z.enum(['manifest.json', 'pack.md']),
+    media_type: z.enum(['application/json', 'text/markdown']),
+    sha256,
+    size_bytes: z.number().int().min(0),
+    // A pack file is at most a few MB: refuse anything larger.
+    content: z.string().max(64 * 1024 * 1024),
+  }),
+});

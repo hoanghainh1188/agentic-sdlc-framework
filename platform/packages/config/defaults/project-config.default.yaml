@@ -269,6 +269,12 @@ access:
   # how fast the team answers: internal data, so the viewer role never reads them (mandatory rule
   # M29).
   metrics_read_roles: [person_a, person_b, second_approver, pm_brse, governance, admin]
+  # Task E02, ADR-M48, QUESTIONS #218. Who builds (`sdlc evidence build`) and who reads or exports
+  # (`sdlc evidence list|show|export`) the Evidence Pack of an intent of this project (D-02 FR-40,
+  # FR-42). Tenant admins always may. A pack is client-facing evidence and names the approvers, so
+  # the viewer role never builds or reads it (mandatory rule M30).
+  evidence_build_roles: [person_a, person_b, pm_brse, governance, admin]
+  evidence_read_roles: [person_a, person_b, second_approver, pm_brse, governance, admin]
   # Task B13, ADR-M37, QUESTIONS #154. Separation of duties (handbook Ch.5, codes table §5): one
   # person never holds both roles of a pair on the same project. Person A (owner) and Person B
   # (independent reviewer) always stay apart (mandatory rule M21): G1–G3 have no producers

@@ -144,6 +144,9 @@ const UPDATABLE: Record<string, readonly string[]> = {
   project_ai_record_versions: [],
   // C06 session 2b: written once; the purge (E05) will get UPDATE on `purged_at` only.
   evidence_items: [],
+  // E02 (migration 0021): written once; E03 gets UPDATE on `sealed_at`, E05 on `retention_hold`
+  // and `purged_at` (trigger: everything else fixed, SDA14).
+  evidence_packs: [],
   // B13: a tenant role is withdrawn by `revoked_at`, never deleted (trigger: final once set).
   tenant_role_bindings: ['revoked_at'],
   // Append-only (B13 AC7): approvals of the agent register.
@@ -278,7 +281,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // C06: intent_notices → agents; evidence_items → intents, runs (session 2b).
     // B13: tenant_role_bindings → tenants, users; agent_approvals → agents, users.
     // B09: plans → users (submitted_by).
-    expect(fks).toHaveLength(52);
+    // E02: evidence_packs → intents, users (built_by).
+    expect(fks).toHaveLength(54);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {
@@ -329,6 +333,9 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       'public.plans (tenant_id, intent_id, version)',
       'public.gate_decisions (tenant_id, voids_decision_id) WHERE (voids_decision_id IS NOT NULL)',
       'public.agents (tenant_id, agent_key)',
+      // E02: one row per build; one sealed version per intent (E03).
+      'public.evidence_packs (tenant_id, intent_id, version)',
+      'public.evidence_packs (tenant_id, intent_id) WHERE (sealed_at IS NOT NULL)',
     ]) {
       expect(defs, expected).toContain(expected);
     }
