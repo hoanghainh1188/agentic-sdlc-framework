@@ -173,7 +173,7 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
           kind: 'review',
           externalId: fromB.reviewId,
           deciderId: w.t.f.users.b,
-          deciderAccountId: String(PEOPLE.b.gh),
+          deciderAccountIds: [String(PEOPLE.b.gh)],
           pushedHead: HEAD,
           permission: 'pull_requests',
         },
@@ -490,6 +490,68 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
       expect(await runEvents(runId)).toContainEqual(['feedback_unavailable', { reason }]);
     });
 
+    it('review: a token not needed is still revoked; an empty review fails closed', async () => {
+      const { runId, contract, wrappedToken } = await preparedAfterReview();
+      const fake = fakeReader({
+        review: (id) => feedbackOf(id, PEOPLE.b, '  ', { comments: [] }),
+      });
+      await expect(
+        readRunFeedback(w.t.f.scope as unknown as Scope, contract, {
+          reader: fake.reader,
+          unwrapper,
+          wrappedToken,
+        }),
+      ).rejects.toMatchObject({ reason: 'feedback_unavailable' });
+      expect(await runEvents(runId)).toContainEqual([
+        'feedback_unavailable',
+        { reason: 'feedback_empty' },
+      ]);
+      expect(await runEvents(runId)).toContainEqual(['token_revoked', { token: 'feedback' }]);
+    });
+
+    it('a run that answers no request revokes a feedback token it holds, reads nothing', async () => {
+      const { runId, contract, wrappedToken } = await preparedAfterReview();
+      // The request is answered once a later run pushed (here: the contract's run, faked).
+      const other = { ...contract, base_sha: 'f'.repeat(40) };
+      const fake = fakeReader({});
+      await expect(
+        readRunFeedback(w.t.f.scope as unknown as Scope, other, {
+          reader: fake.reader,
+          unwrapper,
+          wrappedToken,
+        }),
+      ).rejects.toMatchObject({ reason: 'feedback_unavailable' });
+      expect(fake.calls).toEqual(['revoke']); // base_mismatch: nothing read, the token revoked
+      expect(await runEvents(runId)).toContainEqual(['token_revoked', { token: 'feedback' }]);
+    });
+
+    it('a decider with two linked accounts may review with either', async () => {
+      const second = { gh: 3092, login: 'bob-work' };
+      await w.t.f.scope.userIdentities.link({
+        user_id: w.t.f.users.b,
+        provider: 'github',
+        external_id: String(second.gh),
+        external_login: second.login,
+      });
+      try {
+        const intent = await toG7();
+        review(second, 'changes_requested');
+        w.t.calls.reviews = w.world.reviews;
+        expect(await step(intent)).toEqual({ outcome: 'run_prepare' });
+        const lookup = await feedbackSourceFor(w.t.f.scope, await intentOf(intent));
+        expect(lookup.kind === 'source' && [...lookup.source.deciderAccountIds].sort()).toEqual(
+          [String(PEOPLE.b.gh), String(second.gh)].sort(),
+        );
+        expect((await startRun(w.t.f.scope, w.t.runDeps, intent.id)).ok).toBe(true);
+      } finally {
+        const identity = await w.t.f.scope.userIdentities.findByExternalId(
+          'github',
+          String(second.gh),
+        );
+        await w.t.f.scope.userIdentities.unlink(identity!.id);
+      }
+    });
+
     it('a refused wrapping token: wrap_token_reused (security route), nothing read', async () => {
       const { runId, contract, wrappedToken } = await preparedAfterReview();
       const fake = fakeReader({});
@@ -552,6 +614,52 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
         truncated: false,
       });
       expect(await tablesContaining(MARKER)).toEqual([]);
+    });
+
+    it('a code-only command gives the agent its reason code, never an empty block', async () => {
+      const intent = await toG7();
+      const current = await intentOf(intent);
+      const result = await handleGitEvent(
+        w.t.f.scope,
+        { registry: w.t.f.registry },
+        { id: w.t.f.target.projectId, provider: 'github' },
+        {
+          kind: 'comment_created',
+          id: 'github:comment:778',
+          source: 'polling',
+          repo: { owner: 'acme', name: 'shop' },
+          occurredAt: w.clock.toISOString(),
+          url: `https://github.com/acme/shop/pull/${String(current.pr_number)}#issuecomment-778`,
+          issueNumber: current.pr_number!,
+          isPullRequest: true,
+          commentId: '778',
+          author: actor(PEOPLE.b),
+          body: '/request-changes G7 tests_insufficient',
+        },
+      );
+      expect(result).toMatchObject({ outcome: 'decided' });
+      expect(await step(intent)).toEqual({ outcome: 'run_prepare' });
+      const started = await startRun(w.t.f.scope, w.t.runDeps, intent.id);
+      if (!started.ok) throw new Error(started.reason);
+      const author: GitActor = actor(PEOPLE.b);
+      const fake = fakeReader({
+        comment: (id) => ({
+          commentId: id,
+          author,
+          body: '/request-changes G7 tests_insufficient',
+        }),
+      });
+      const text = await readRunFeedback(
+        w.t.f.scope as unknown as Scope,
+        await contractOf(started.run.runId),
+        { reader: fake.reader, unwrapper, wrappedToken: started.run.wrappedFeedbackToken! },
+      );
+      expect(fake.calls).toEqual(['comment:778', 'revoke']);
+      expect(text).toEqual({
+        source: 'comment',
+        text: 'Reason code: tests_insufficient',
+        truncated: false,
+      });
     });
   });
 

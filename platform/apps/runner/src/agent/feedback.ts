@@ -27,6 +27,7 @@ import {
 } from '@sdlc/contracts';
 import {
   feedbackSourceFor,
+  parseCommentCommand,
   projectRepoRef,
   requestChangesReason,
   type FeedbackSource,
@@ -60,9 +61,15 @@ export interface FeedbackAccess {
   readonly wrappedToken?: RedactedSecret | undefined;
 }
 
-// C0 controls except tab and line feed, DEL, C1 controls, and Unicode bidirectional controls.
-// eslint-disable-next-line no-control-regex
-const UNSAFE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f؜‎‏‪-‮⁦-⁩]/g;
+// C0 controls except tab and line feed, DEL, C1 controls, bidirectional controls, and invisible
+// characters that can hide text from a person but not from a model: zero-width characters, line
+// and paragraph separators, word joiners and invisible operators, the byte-order mark, and Unicode
+// tag characters (review of E01 PR 2). Written as escapes, so the source holds no invisible text.
+const UNSAFE = new RegExp(
+  '[\\u0000-\\u0008\\u000b-\\u001f\\u007f-\\u009f\\u00ad\\u061c\\u180e\\u200b-\\u200f' +
+    '\\u2028-\\u202f\\u2060-\\u206f\\ufeff\\u{e0000}-\\u{e007f}]',
+  'gu',
+);
 
 /** Cleans and caps a feedback text. Exported for tests. */
 export function capFeedback(raw: string): { readonly text: string; readonly truncated: boolean } {
@@ -83,6 +90,42 @@ export async function readRunFeedback(
   contract: RunContract,
   access: FeedbackAccess,
 ): Promise<ReviewFeedbackText | undefined> {
+  const state = { opened: false };
+  try {
+    return await readFeedback(scope, contract, access, state);
+  } finally {
+    // A token the worker issued but this run never used is revoked too (review of E01 PR 2).
+    if (!state.opened) await discardFeedbackToken(scope, contract.run_id, access);
+  }
+}
+
+/**
+ * Opens and revokes the run's feedback token without reading anything: every exit of a run that
+ * holds one but does not read with it (no request in force, a check failed, the run was killed or
+ * failed before the agent started). Never throws.
+ */
+export async function discardFeedbackToken(
+  scope: TenantScope,
+  runId: string,
+  access: FeedbackAccess,
+): Promise<void> {
+  if (!access.wrappedToken || !access.unwrapper) return;
+  let token: RedactedSecret | undefined;
+  try {
+    token = (await access.unwrapper.unwrap(access.wrappedToken)).token;
+  } catch (error) {
+    if (isRefusedWrapToken(error)) await recordWrapTokenReused(scope, runId, 'feedback');
+    return;
+  }
+  if (token) await revokeAfterUse(access.reader, scope, runId, token, 'feedback');
+}
+
+async function readFeedback(
+  scope: TenantScope,
+  contract: RunContract,
+  access: FeedbackAccess,
+  state: { opened: boolean },
+): Promise<ReviewFeedbackText | undefined> {
   const intent = await scope.intents.getById(contract.intent_id);
   if (!intent) throw await unavailable(scope, contract, 'intent_unknown');
   const lookup = await feedbackSourceFor(scope, intent);
@@ -99,6 +142,7 @@ export async function readRunFeedback(
     throw await unavailable(scope, contract, 'token_missing');
   }
   let token: RedactedSecret;
+  state.opened = true;
   try {
     const unwrapped = (await access.unwrapper.unwrap(access.wrappedToken)).token;
     if (!unwrapped) throw new Error('no token in the wrapping token');
@@ -135,12 +179,13 @@ async function readSource(
   try {
     if (source.kind === 'review') {
       const review = await reader.getReviewFeedback(token, ref, source.prNumber, source.externalId);
-      if (review.reviewer.type !== 'user' || review.reviewer.id !== source.deciderAccountId) {
+      if (review.reviewer.type !== 'user' || !source.deciderAccountIds.includes(review.reviewer.id)) {
         return 'author_mismatch';
       }
       if (review.state !== 'changes_requested' || review.commitSha !== source.pushedHead) {
         return 'review_withdrawn';
       }
+      if (review.body.trim() === '' && review.comments.length === 0) return 'feedback_empty';
       const lines = review.comments.map(
         (c) => `- ${c.path}${c.line === null ? '' : `:${String(c.line)}`}\n  ${c.body.trim()}`,
       );
@@ -152,11 +197,16 @@ async function readSource(
       return { text, comments: review.comments.length };
     }
     const comment = await reader.getIssueComment(token, ref, source.externalId);
-    if (comment.author.type !== 'user' || comment.author.id !== source.deciderAccountId) {
+    if (comment.author.type !== 'user' || !source.deciderAccountIds.includes(comment.author.id)) {
       return 'author_mismatch';
     }
     const reason = requestChangesReason(comment.body, 'G7');
-    return reason === null ? 'comment_changed' : { text: reason, comments: 0 };
+    if (reason === null) return 'comment_changed';
+    // A command with a reason code only (`/request-changes G7 tests_insufficient`): the code is
+    // the feedback (review of E01 PR 2: never an empty block).
+    const parsed = parseCommentCommand(comment.body);
+    const code = parsed.kind === 'gate_decision' ? parsed.reasonCode : null;
+    return { text: reason === '' ? `Reason code: ${code ?? 'other'}` : reason, comments: 0 };
   } catch (error) {
     if (error instanceof GitHostError) return 'git_host_unavailable';
     throw error;

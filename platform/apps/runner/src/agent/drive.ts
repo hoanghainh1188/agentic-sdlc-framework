@@ -59,7 +59,7 @@ import type { Sandbox } from '../sandbox/lifecycle.js';
 import type { RunnerSettings } from '../settings.js';
 import { attachRunner } from './access.js';
 import { AgentRunError } from './errors.js';
-import type { FeedbackReader } from './feedback.js';
+import { discardFeedbackToken, type FeedbackReader } from './feedback.js';
 import { SpendWatch } from './spend.js';
 import { loadAgentTask } from './task.js';
 
@@ -351,23 +351,33 @@ export async function driveAgent(
   const { contract, sandbox } = request;
   const scope = deps.db.forTenant(parseTenantId(contract.tenant_id));
   const run = await scope.runs.getById(contract.run_id);
+  // E01 PR 2: the run's feedback token, revoked on every exit that does not read with it.
+  const feedback = {
+    reader: deps.feedbackReader,
+    unwrapper: deps.unwrapper,
+    wrappedToken: request.wrappedFeedbackToken,
+  };
   // Killed between provisioning and the start (C11): no agent to stop.
-  if (run?.status === 'stopping') return endKilled(deps, scope, contract, undefined);
-  if (run?.status !== 'running') throw new AgentRunError('run_not_running');
+  if (run?.status === 'stopping') {
+    await discardFeedbackToken(scope, contract.run_id, feedback);
+    return endKilled(deps, scope, contract, undefined);
+  }
+  if (run?.status !== 'running') {
+    await discardFeedbackToken(scope, contract.run_id, feedback);
+    throw new AgentRunError('run_not_running');
+  }
   const killRequested = () => isStopping(scope, contract.run_id);
 
   let handle: AgentRunHandle;
   let watch: SpendWatch | undefined;
+  let taskLoading = false;
   try {
     if (!llmReachable(contract, deps.settings.agent.llmBaseUrl)) {
       throw new AgentRunError('model_unreachable');
     }
     watch = await spendWatchFor(deps, scope, contract, request.virtualKey);
-    const task = await loadAgentTask(scope, contract, {
-      reader: deps.feedbackReader,
-      unwrapper: deps.unwrapper,
-      wrappedToken: request.wrappedFeedbackToken,
-    });
+    taskLoading = true; // from here `readRunFeedback` uses or revokes the token
+    const task = await loadAgentTask(scope, contract, feedback);
     const endpoint = await attachRunner(
       deps.docker,
       deps.settings,
@@ -386,6 +396,7 @@ export async function driveAgent(
       workingDir: AGENT_WORKING_DIR,
     });
   } catch (error) {
+    if (!taskLoading) await discardFeedbackToken(scope, contract.run_id, feedback);
     return failRun(deps, scope, contract, failureCode(error));
   }
   await scope.runEvents.append(contract.run_id, 'agent_started', {

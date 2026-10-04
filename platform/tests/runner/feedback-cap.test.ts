@@ -7,10 +7,17 @@ import { capFeedback, REVIEW_FEEDBACK_MAX_CHARS } from '../../apps/runner/src/in
 
 describe('capFeedback (E01 PR 2)', () => {
   it('keeps short text, line feeds and tabs; removes control and bidi characters', () => {
-    expect(capFeedback('a\r\nb\tc\u0007d‮e⁦f')).toEqual({
+    expect(capFeedback('a\r\nb\tc\u0007d\u202ee\u2066f')).toEqual({
       text: 'a\nb\tc d e f',
       truncated: false,
     });
+  });
+
+  it('removes invisible characters that hide text from a person (review of E01 PR 2)', () => {
+    const hidden = String.fromCodePoint(0xe0049, 0xe0067, 0xe006e); // Unicode tag characters
+    expect(capFeedback(`a\u200bb\u200dc\u2060d\ufeffe\u2028f${hidden}g`).text).toBe(
+      'a b c d e f   g',
+    );
   });
 
   it('cuts long text at the cap and says so', () => {

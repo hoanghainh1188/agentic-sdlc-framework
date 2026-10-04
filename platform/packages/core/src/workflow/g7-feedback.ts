@@ -33,8 +33,8 @@ export interface FeedbackSource {
   readonly decisionId: string;
   /** The platform user who decided. */
   readonly deciderId: string;
-  /** That user's linked Git host account (numeric ID): the text's author must be this account. */
-  readonly deciderAccountId: string;
+  /** That user's linked Git host accounts (numeric IDs): the text's author must be one of them. */
+  readonly deciderAccountIds: readonly string[];
   readonly prNumber: number;
   /** The commit the platform pushed and the reviewer reviewed: the next run's base. */
   readonly pushedHead: string;
@@ -99,11 +99,11 @@ export async function feedbackSourceFor(
   if (!match) return unavailable('receipt_unknown');
   const project = await scope.projects.getById(intent.project_id);
   const provider: GitProvider = project?.git_provider ?? 'github';
-  const account = (await scope.userIdentities.listForUser(request.decided_by)).find(
-    (identity) => identity.provider === provider,
-  );
+  const accounts = (await scope.userIdentities.listForUser(request.decided_by))
+    .filter((identity) => identity.provider === provider)
+    .map((identity) => identity.external_id);
   const user = await scope.users.getById(request.decided_by);
-  if (!account || user?.status !== 'active') return unavailable('identity_unlinked');
+  if (accounts.length === 0 || user?.status !== 'active') return unavailable('identity_unlinked');
   const kind = match[1] === 'review' ? 'review' : 'comment';
   // GitHub reads a pull request comment with `pull_requests: read` and an issue comment with
   // `issues: read` (either works for the endpoint); a review needs `pull_requests: read`.
@@ -115,7 +115,7 @@ export async function feedbackSourceFor(
       externalId: match[2]!,
       decisionId: request.id,
       deciderId: request.decided_by,
-      deciderAccountId: account.external_id,
+      deciderAccountIds: accounts,
       prNumber: intent.pr_number,
       pushedHead: pushed.headSha,
       permission: onPullRequest ? 'pull_requests' : 'issues',
@@ -143,7 +143,7 @@ export function reviewStillHolds(
     review?.state !== 'changes_requested' ||
     review.commitSha !== source.pushedHead ||
     review.reviewer.type !== 'user' ||
-    review.reviewer.id !== source.deciderAccountId
+    !source.deciderAccountIds.includes(review.reviewer.id)
   ) {
     return 'review_withdrawn';
   }
