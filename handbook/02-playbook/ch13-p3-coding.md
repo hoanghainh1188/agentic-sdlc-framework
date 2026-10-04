@@ -189,13 +189,14 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 ### 13.10.4. The run
 
 - When G4 is passed or approved, the platform starts the run by itself and posts a comment: **the run starts**. Nobody needs to do anything.
+- The agent gets the spec's location, the files it may change, and, for a plan submitted as a file, the text of each task in the plan (`summary`, `input`, `output`, `definition_of_done`, `escalate_when`, `depends_on`, `checkpoint`). The runner reads that text from the plan file at the submitted commit and checks that it is the approved file; it never stores it. If the file cannot be read, the run fails (Chapter 19 §19.8c).
 - Runs wait in a queue when the server already runs as many agents as it allows (usually one). A run that waits so long that its permission expires gets a new permission, a few times. After that, the platform escalates.
 - When the run ends, the platform posts a comment and continues:
 
 | The run… | What happens next |
 |---|---|
 | finished, or stopped at its budget, time or iteration limit | The intent moves to **G5**, where the platform checks the changed files and the budget (§13.10.5). Before that, the platform reads the agent's work out of the sandbox, stores the full diff against the start commit as evidence, and counts the files outside the plan and the agent instruction files. If it cannot, the run counts as failed |
-| failed, or the runner was lost | The intent is **paused**, and a technical escalation goes to Person B (Chapter 18). When a person decides `resume`, the intent goes back to G4 and a new run starts after G4 |
+| failed, or the runner was lost | The intent is **paused**, and a technical escalation goes to Person B (Chapter 18). When a person decides `resume`, the intent goes back to G4 and a new run starts after G4. `modify` or `roll-back` takes the intent back to G3 (HITL), where the plan can be changed and submitted again (Chapter 18 §18.8b) |
 | finished at High risk (L1, a proposal only) | The platform stores the proposal and **pauses** the intent. Person A takes the proposal forward (see below) |
 | could not start (for example the budget is used up, or the run proposal changed) | The intent is back at **G4**, where the platform decides again |
 
@@ -281,3 +282,4 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 | 0.7 | 2026-10-03 | Claude (task C07, PR 2) | §13.10.5 (new): gate G5 checks and outcomes, back to G3, deciding a G5 escalation; §13.10.4: the budget warning comment during the run |
 | 0.8 | 2026-10-03 | Claude (task C08, PR 1) | §13.10.5: after a push, `resume` starts the new run from the pushed commit (QUESTIONS #134, ADR-M38 §2.6) |
 | 0.9 | 2026-10-03 | Claude (task B09, PR 1) | §13.10.1: the run's tools come from the approved plan (ADR-M40 §2.5) |
+| 0.10 | 2026-10-04 | Claude (task B09, PR 2) | §13.10.4: the agent gets the plan's task text; a failed run: `modify` or `roll-back` → G3 (QUESTIONS #169, #211) |

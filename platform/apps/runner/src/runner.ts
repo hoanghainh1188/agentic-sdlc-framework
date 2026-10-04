@@ -41,6 +41,7 @@ import { reconcileOnStart, sweepOrphans, type ReconcileResult } from './reconcil
 import type { TeardownReason } from './sandbox/lifecycle.js';
 import { storeChanges } from './workspace/changes.js';
 import { storeProposal } from './workspace/export.js';
+import { planFileReader } from './workspace/plan-file.js';
 
 export interface RunnerHooks {
   /** Called after each clean-up (start or sweep); `main` writes the heartbeat file here. */
@@ -172,6 +173,7 @@ export class Runner {
           // E01 PR 2: the feedback of a request for changes, read with the run's own token.
           ...(this.#deps.feedbackReader ? { feedbackReader: this.#deps.feedbackReader } : {}),
           unwrapper: this.#deps.unwrapper,
+          ...this.#planFileFor(contract.run_id),
         },
         request,
       );
@@ -187,6 +189,13 @@ export class Runner {
             : 'failed',
       );
     }
+  }
+
+  /** B09 PR 2: the plan file reader of a run whose clone this process kept. */
+  #planFileFor(runId: string): Pick<AgentDriveDeps, 'planFile'> {
+    const cloneDir = this.#clones.get(runId);
+    if (!cloneDir) return {};
+    return { planFile: planFileReader(cloneDir, this.#deps.settings.git.timeoutMs) };
   }
 
   /** The proposal step of an L1 run whose clone this process kept (C06 session 2b). */

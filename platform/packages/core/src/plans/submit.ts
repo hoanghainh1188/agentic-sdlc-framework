@@ -131,7 +131,9 @@ async function readOnDefaultBranch(
       throw new PlanError('plan_invalid', 'plan cannot be read at head', atHead.cause);
     }
     const parsed = parsePlanFile(atHead.text, intentCode);
-    if (!parsed.ok) throw new PlanError('plan_invalid', 'plan refused', parsed.reason);
+    if (!parsed.ok) {
+      throw new PlanError('plan_invalid', 'plan refused', parsed.reason, undefined, parsed.field);
+    }
     if (commit !== null && commit !== head) {
       const atCommit = await readPlanFile(deps.gitHost, ref, intentCode, commit);
       if (atCommit.kind === 'unreadable' || atCommit.sha256 !== atHead.sha256) {

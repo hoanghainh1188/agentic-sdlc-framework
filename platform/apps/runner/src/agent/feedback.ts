@@ -36,6 +36,7 @@ import {
 
 import { isRefusedWrapToken, recordWrapTokenReused, revokeAfterUse } from '../tokens.js';
 import { AgentRunError } from './errors.js';
+import { capText, cleanText } from './text.js';
 
 /**
  * The cap of the feedback text in the agent's prompt, in characters. About 2,000 tokens: enough for
@@ -61,24 +62,9 @@ export interface FeedbackAccess {
   readonly wrappedToken?: RedactedSecret | undefined;
 }
 
-// C0 controls except tab and line feed, DEL, C1 controls, bidirectional controls, and invisible
-// characters that can hide text from a person but not from a model: zero-width characters, line
-// and paragraph separators, word joiners and invisible operators, the byte-order mark, and Unicode
-// tag characters (review of E01 PR 2). Written as escapes, so the source holds no invisible text.
-const UNSAFE = new RegExp(
-  '[\\u0000-\\u0008\\u000b-\\u001f\\u007f-\\u009f\\u00ad\\u061c\\u180e\\u200b-\\u200f' +
-    '\\u2028-\\u202f\\u2060-\\u206f\\ufeff\\u{e0000}-\\u{e007f}]',
-  'gu',
-);
-
 /** Cleans and caps a feedback text. Exported for tests. */
 export function capFeedback(raw: string): { readonly text: string; readonly truncated: boolean } {
-  const cleaned = raw.replaceAll('\r\n', '\n').replaceAll('\r', '\n').replace(UNSAFE, ' ').trim();
-  if (cleaned.length <= REVIEW_FEEDBACK_MAX_CHARS) return { text: cleaned, truncated: false };
-  let cut = cleaned.slice(0, REVIEW_FEEDBACK_MAX_CHARS - TRUNCATED_NOTE.length);
-  // Never end on half of a surrogate pair.
-  if (/[\uD800-\uDBFF]$/.test(cut)) cut = cut.slice(0, -1);
-  return { text: `${cut}${TRUNCATED_NOTE}`, truncated: true };
+  return capText(cleanText(raw), REVIEW_FEEDBACK_MAX_CHARS, TRUNCATED_NOTE);
 }
 
 /**

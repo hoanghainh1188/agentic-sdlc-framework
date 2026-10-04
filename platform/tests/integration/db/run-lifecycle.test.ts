@@ -6,6 +6,9 @@
 //   (`failed`, a lost runner, contracts that kept expiring), `paused` (`stopped_killed`), back to
 //   G4 (a refused start); the key is revoked by run, at once for a lost runner;
 // - a paused intent goes back to G4 once a person decides `resume` on the run's escalation;
+// - QUESTIONS #211 (B09 PR 2): `modify` or `roll_back` on the escalation of a failed run, whatever
+//   its stop reason, takes the intent back to G3, HITL, G3 approvals voided (`run_returned`); an
+//   expired decision is voided, not acted on;
 // - session 2b: an L1 (High risk) intent runs; its proposal-only end pauses the intent at G4
 //   (`proposal_ready`, no escalation) and it waits for a person (`proposal_review`).
 import { sql } from 'kysely';
@@ -23,7 +26,8 @@ import {
   finishRun,
   startRun,
 } from '../../../packages/core/src/workflow/run-lifecycle.js';
-import { atG4, BASE_1, harness, MODEL, notices, T0, type Harness } from '../g4-harness.js';
+import { returnedFromG5 } from '../../../packages/core/src/workflow/g5-scope.js';
+import { approve, atG4, BASE_1, harness, MODEL, notices, T0, type Harness } from '../g4-harness.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
 const MINUTE = 60_000;
@@ -67,6 +71,7 @@ describeDb('C06 session 2: the run after G4 on PostgreSQL', () => {
   async function runnerEnds(
     runId: string,
     to: 'succeeded' | 'succeeded_proposal_only' | 'failed' | 'stopped_killed' | 'stopped_budget',
+    failedReason = 'agent_error',
   ) {
     const now = new Date();
     await t.f.scope.runs.claimForProvisioning(runId, now);
@@ -80,7 +85,7 @@ describeDb('C06 session 2: the run after G4 on PostgreSQL', () => {
         : {
             stopReason:
               to === 'failed'
-                ? 'agent_error'
+                ? failedReason
                 : to === 'stopped_killed'
                   ? 'killed'
                   : 'max_iterations',
@@ -179,6 +184,97 @@ describeDb('C06 session 2: the run after G4 on PostgreSQL', () => {
     // The old failed run belongs to the earlier round: it is never finished again.
     const again = await startRun(t.f.scope, t.runDeps, intent.id);
     expect(again.ok).toBe(true);
+  });
+
+  /** A run that failed with `stopReason`, finished: the intent is paused at G4 and escalated. */
+  async function failedRun(stopReason: string): Promise<{ intent: Intent; escalationId: string }> {
+    const intent = await running();
+    const started = await startRun(t.f.scope, t.runDeps, intent.id);
+    if (!started.ok) throw new Error('not started');
+    const runId = started.run.runId;
+    if (stopReason === 'runner_lost') {
+      await t.f.scope.runs.claimForProvisioning(runId, new Date());
+      await abandonRun(t.f.scope, t.runDeps, runId);
+    } else {
+      await runnerEnds(runId, 'failed', stopReason);
+    }
+    expect((await t.f.scope.runs.getById(runId))?.stop_reason).toBe(stopReason);
+    expect(await t.settleRuns(intent)).toEqual({ outcome: 'run_ended', runId });
+    await finishRun(t.f.scope, t.runDeps, intent.id, runId);
+    expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G4' });
+    const escalation = (await t.f.scope.escalations.listForIntent(intent.id)).at(-1)!;
+    expect(escalation).toMatchObject({ run_id: runId, route: 'technical' });
+    await acknowledgeEscalation(t.f.scope, { escalationId: escalation.id, actorId: t.f.users.b });
+    return { intent, escalationId: escalation.id };
+  }
+
+  const decideRun = (escalationId: string, decision: 'modify' | 'roll_back' | 'resume') =>
+    decideEscalation(
+      t.f.scope,
+      { escalationId, actorId: t.f.users.b, decision },
+      { now: () => T0 },
+    );
+
+  /** Back at G3, HITL from then on, the G3 approval in force voided, the escalation closed. */
+  async function expectReturnedToG3(intent: Intent, escalationId: string) {
+    expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G3' });
+    expect(await notices(t, intent)).toContain('run_returned');
+    expect(await notices(t, intent)).not.toContain('g7_returned');
+    expect(await returnedFromG5(t.f.scope, intent.id)).toBe(true);
+    const g3 = await t.f.scope.gateDecisions.listForIntent(intent.id, 'G3');
+    expect(g3.at(-1)).toMatchObject({ decision: 'void', reason_code: 'input_mismatch' });
+    expect((await t.f.scope.escalations.getById(escalationId))?.status).toBe('closed');
+  }
+
+  it('#211: task_unavailable → modify → G3 HITL; the plan submitted again and approved → G4', async () => {
+    const { intent, escalationId } = await failedRun('agent_task_unavailable');
+    await decideRun(escalationId, 'modify');
+    await t.settleRuns(intent);
+    await expectReturnedToG3(intent, escalationId);
+    // A person submits the plan again; Person B approves it at G3; G4 decides again by POLICY.
+    await t.f.registry.submitPlan(t.f.scope, intent.id, {
+      plannedFiles: ['apps/api/src/orders/**'],
+      planSha256: 'e'.repeat(64),
+      actorType: 'human',
+      actorId: t.f.users.a,
+    });
+    expect(await t.settleRuns(intent)).toMatchObject({ outcome: 'waiting' });
+    expect(await reload(intent)).toMatchObject({ current_gate: 'G3' });
+    await approve(t, intent, 'G3', 'b');
+    expect(await t.settleRuns(intent)).toEqual({ outcome: 'run_prepare' });
+    expect(await reload(intent)).toMatchObject({ status: 'running', current_gate: 'G4' });
+  });
+
+  it('#211: task_unavailable → resume → G4 (a new run)', async () => {
+    const { intent, escalationId } = await failedRun('agent_task_unavailable');
+    await decideRun(escalationId, 'resume');
+    expect(await t.settleRuns(intent)).toEqual({ outcome: 'run_prepare' });
+    expect(await notices(t, intent)).toContain('run_resumed');
+    expect(await notices(t, intent)).not.toContain('run_returned');
+  });
+
+  it('#211: the rule is general: runner_lost → roll_back → G3 HITL', async () => {
+    const { intent, escalationId } = await failedRun('runner_lost');
+    await decideRun(escalationId, 'roll_back');
+    await t.settleRuns(intent);
+    await expectReturnedToG3(intent, escalationId);
+  });
+
+  it('#211: an expired modify decision is voided, not acted on; the intent stays paused', async () => {
+    const { intent, escalationId } = await failedRun('agent_changes_unavailable');
+    await decideRun(escalationId, 'modify');
+    t.setClock(new Date(T0.getTime() + 365 * 24 * 60 * MINUTE));
+    expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'run_review' });
+    expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G4' });
+    expect(await t.f.scope.escalations.getById(escalationId)).toMatchObject({
+      status: 'acknowledged',
+      decision: null,
+    });
+    const voided = await t.f.scope.audit.listForEntity(escalationId, [
+      'escalation.decision_voided',
+    ]);
+    expect(voided.map((e) => (e.payload as { reason: string }).reason)).toEqual(['expired']);
+    expect(await notices(t, intent)).not.toContain('run_returned');
   });
 
   it('a killed run pauses the intent; finishRun raises no escalation (the kill raised one, C11)', async () => {

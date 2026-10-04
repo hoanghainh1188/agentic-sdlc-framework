@@ -152,14 +152,16 @@ export async function stepPaused(
   if (escalation.status !== 'closed' && String(escalation.decision?.decision) === 'terminate') {
     return terminate(tx, registry, intent, escalation, latest.id, now);
   }
-  // E01 PR 2 (QUESTIONS #191): the run that answered a request for changes at G7 failed because
-  // the request's feedback was gone; `modify` or `roll_back` take the intent back to G3, HITL.
+  // QUESTIONS #211 (B09 PR 2): `modify` or `roll_back` on the escalation of a failed run, whatever
+  // its stop reason, takes the intent back to G3, HITL from then on, as at G5, G6 and G7. Before,
+  // only a run whose G7 feedback was gone (E01 PR 2, QUESTIONS #191) did; every other cause waited
+  // for `run_review` with no way forward but `terminate`.
   if (
     escalation.status !== 'closed' &&
-    latest.stop_reason === FEEDBACK_UNAVAILABLE &&
     G5_RETURN_DECISIONS.includes(String(escalation.decision?.decision))
   ) {
-    return returnToG3(tx, registry, intent, escalation, latest.id, now);
+    const kind = latest.stop_reason === FEEDBACK_UNAVAILABLE ? 'g7_returned' : 'run_returned';
+    return returnToG3(tx, registry, intent, escalation, latest.id, now, kind);
   }
   if (escalation.status !== 'closed') {
     if (!decisionAllows(escalation, 'run_start', now)) {
@@ -236,9 +238,10 @@ async function terminate(
 }
 
 /**
- * `modify` or `roll_back` on the escalation of a run whose G7 feedback was gone (QUESTIONS #191):
- * the decision binds the run's contract and has not expired (FR-17); then back to G3, HITL from
- * then on (`returnedFromG5`), the G3 approvals in force voided.
+ * `modify` or `roll_back` on the escalation of a failed run (QUESTIONS #211; first for a run whose
+ * G7 feedback was gone, QUESTIONS #191): the decision binds the run's contract and has not expired
+ * (FR-17); then back to G3, HITL from then on (`returnedFromG5`), the G3 approvals in force voided.
+ * The caller names the notice: `g7_returned` after the G7 feedback was gone, else `run_returned`.
  */
 async function returnToG3(
   tx: TenantScope,
@@ -247,6 +250,7 @@ async function returnToG3(
   escalation: Escalation,
   runId: string,
   now: Date,
+  noticeKind: 'g7_returned' | 'run_returned',
 ): Promise<IntentStepResult> {
   const contract = await tx.runContracts.getByRunId(runId);
   const check = await revalidateEscalationDecision(
@@ -279,7 +283,7 @@ async function returnToG3(
   if (moved) {
     await tx.intentNotices.record({
       intentId: intent.id,
-      kind: 'g7_returned',
+      kind: noticeKind,
       status: 'in_gate',
       gate: 'G3',
       previousGate: intent.current_gate,

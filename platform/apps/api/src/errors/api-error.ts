@@ -294,7 +294,10 @@ export function planApiError(error: PlanError): ApiError {
     const refusal = error.refusal ? t(PLAN_REFUSAL_MESSAGES[error.refusal], {}, locale) : '-';
     return t(PLAN_ERROR_MESSAGES[error.code], { refusal }, locale);
   };
-  return new ApiError(status, code, error.refusal ?? error.code, undefined, undefined, text);
+  // QUESTIONS #210: the field of a text field that is not text, as a detail (a key path only).
+  const details =
+    error.field === undefined ? undefined : [{ path: `file.${error.field}`, issue: 'not_text' }];
+  return new ApiError(status, code, error.refusal ?? error.code, details, undefined, text);
 }
 
 /** Kill switch refusals (C11, ADR-M42 §2.6). */

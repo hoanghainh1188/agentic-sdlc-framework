@@ -10,7 +10,7 @@ const refused = (type: string, payload: Record<string, unknown>) => () =>
   checkRunEvent(type, payload);
 
 describe('run event payloads', () => {
-  it('declares the C02, C04, C05, C06, C07, C08, E01 and C11 event types (E01 PR 2: feedback; C11 PR 2: loop_detected)', () => {
+  it('declares the C02, C04, C05, C06, C07, C08, E01 and C11 event types (E01 PR 2: feedback; C11 PR 2: loop_detected; B09 PR 2: plan)', () => {
     expect(Object.keys(RUN_EVENT_TYPES)).toEqual([
       'contract_issued',
       'contract_accepted',
@@ -44,6 +44,8 @@ describe('run event payloads', () => {
       'kill_evidence_failed',
       'feedback_read',
       'feedback_unavailable',
+      'plan_read',
+      'plan_unavailable',
     ]);
   });
 
@@ -75,6 +77,17 @@ describe('run event payloads', () => {
       pr_number: 7,
       head_sha: 'e'.repeat(40),
     });
+  });
+
+  it('B09 PR 2: plan_read holds counts and a code, plan_unavailable a code; never plan text', () => {
+    const read = { tasks: 2, chars: 640, truncated: 'no', skipped_fields: 1 };
+    expect(checkRunEvent('plan_read', read)).toEqual(read);
+    expect(refused('plan_read', { ...read, truncated: 'cut at 16000' })).toThrow(DbError);
+    expect(refused('plan_read', { ...read, summary: 'Add the tax' })).toThrow(DbError);
+    expect(checkRunEvent('plan_unavailable', { reason: 'hash_mismatch' })).toEqual({
+      reason: 'hash_mismatch',
+    });
+    expect(refused('plan_unavailable', { reason: 'the file says hi' })).toThrow(DbError);
   });
 
   it('C08 PR 2: ci_checked holds codes, counts and a hash, never a check name', () => {

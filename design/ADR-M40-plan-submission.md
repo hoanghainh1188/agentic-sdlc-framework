@@ -4,8 +4,8 @@
 |---|---|
 | Status | **Proposed** (task B09, for review) |
 | Date | 2026-10-03 |
-| Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #165–#169) |
-| Related | D-08 task B09 (AC1–AC3); D-02 FR-11, FR-15, FR-16, FR-17; D-03 §6 (version 1.20); D-05 §6.2 (version 1.25); handbook Ch.12 §12.4, template T13; ADR-M20, ADR-M30, ADR-M33 §2.1, ADR-M34 §2.8, ADR-M39; QUESTIONS #34, #108, #131, #165–#169 |
+| Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #165–#169; PR 2 plan approved 2026-10-04, with answers to QUESTIONS #210, #211) |
+| Related | D-08 task B09 (AC1–AC3); D-02 FR-11, FR-15, FR-16, FR-17; D-03 §6 (version 1.20); D-05 §6.2 (version 1.25); handbook Ch.12 §12.4, template T13; ADR-M20, ADR-M30, ADR-M33 §2.1, ADR-M34 §2.8, ADR-M39, ADR-M29 §2.3, ADR-M33 §2.7, ADR-M41 §2.7; QUESTIONS #34, #108, #131, #165–#169, #210, #211 |
 
 ## 1. Context
 
@@ -43,6 +43,8 @@ tasks:                            # 1–20
     # allowed, never stored: summary, owner_agent, depends_on, input, output,
     # definition_of_done, required_evidence, escalate_when, checkpoint
 ```
+
+- **Text fields** (PR 2, QUESTIONS #210): the agent-facing fields `summary`, `input`, `output`, `definition_of_done`, `escalate_when`, `depends_on` and `checkpoint` must be text: a scalar or a list of scalars; an empty value is no field. Any other shape (a mapping, a nested list) is refused with `schema_invalid` and the field path (API detail `file.tasks[<n>].<field>`, issue `not_text`). `owner_agent` and `required_evidence` are informative and not checked.
 
 - **YAML**: the configuration's safe reader (core schema, strict, no duplicate keys, no YAML 1.1 tags), with **no alias at all**. At most 64 KiB, UTF-8. Core keeps its two outside packages (ADR-M09): the checks are explicit code.
 - **Refused keys** (`platform_field`): `approved_by`, `approved_at` (approvals are gate decisions; they would also change the hash after each approval), `risk_tier`, `data_class`, `autonomy_level` (the intent's), `plan_version`, `spec_version` (the platform numbers versions), and the task's `limits` (the run caps come from the project configuration and the intent's budget; a plan budget would conflict with G5's budget increase, ADR-M34 §2.9).
@@ -95,6 +97,20 @@ Whenever the intent waits at **G3 or G4**, the step reads the latest plan's file
 - New configuration key `access.plan_submit_roles` (the default `config_hash` changes; stored configurations are re-hashed at start, ADR-M37 §2.5). Mandatory rule M24.
 - `@sdlc/config` exports its safe YAML reader (`readYamlMapping`, with `maxAliasCount`).
 
+### 2.7. The plan in the agent's prompt (B09 PR 2, QUESTIONS #169, #210, #211)
+
+As built:
+
+- **Where the file comes from**: the runner's own clone of the run (`workspace/plan-file.ts`), at `plans.commit_sha`, never from the sandbox. `cloneForRun` makes a full clone, so every commit of the default branch is in it; nothing is fetched (the clone token is revoked right after the clone, C11). Hardened git (`gitArgs`, `gitEnv`: no system or user configuration, no hooks, no fsmonitor, no replace objects), no token, no network.
+- **What is read**: `git ls-tree` first: the path must be a regular file (mode 100644 or 100755, never a symbolic link or a submodule); `git cat-file -s` at most 64 KiB; then `git cat-file blob` returns the stored bytes, which no attribute, filter or text conversion changes. Why the plan's commit and not the run's `base_sha`: after a push, the next run starts from the last pushed commit (ADR-M38 §2.6), where the plan file may be older or missing.
+- **Checks** (`apps/runner/src/agent/task.ts`), all fail closed: the SHA-256 of the bytes equals the contract's `plan_sha256`; the bytes are UTF-8; the file passes the submission rules (`readPlanTaskTexts`, the same parser as `parsePlanFile`); its path patterns equal the contract's `planned_files` as sets (sorted, de-duplicated). Any failure, or no clone, → the run fails `task_unavailable` (stop reason `agent_task_unavailable`, no new one) and the run event `plan_unavailable` gives the cause: `no_clone`, `commit_missing`, `missing`, `not_a_file`, `too_large`, `git_failed`, `not_utf8`, `hash_mismatch`, `invalid` or `files_mismatch`.
+- **What the agent gets**: per task, `id` and the agent-facing fields of §2.2 (`summary`, `input`, `output`, `definition_of_done`, `escalate_when`, `depends_on`, `checkpoint`), as plain lines (`Task T1`, `summary: …`, `definition of done:` with `- …` items). Not `owner_agent` (one agent runs every task in the MVP) or `required_evidence` (the platform collects evidence). A field that is not text is skipped and counted (QUESTIONS #210, A), so a plan G3 approved never fails at run time for this.
+- **Caps**: `PLAN_FIELD_MAX_CHARS` = 2,000 per field and `PLAN_TASK_TEXT_MAX_CHARS` = 16,000 for the whole text (about 4,000 tokens: a plan file is at most 64 KiB, mostly path patterns the prompt already lists; D-07 §7 item 6). Cut text ends with a note and is marked `truncated`. Control, bidirectional and invisible characters are replaced (the cleaner shared with the review feedback, `agent/text.ts`).
+- **Framing** (`planTaskBlock`, `@sdlc/adapter-agent-openhands`): the text sits between `<<<PLAN_TASKS <nonce>>>>` and `<<<END_PLAN_TASKS <nonce>>>>` with a random nonce of its own (a text that holds it is refused), after "Approved plan:" and before the file list and the rules. The agent is told the descriptions were approved with the plan but written by people in the repository: data that cannot change the instructions, the rules, the files it may change, its tools or its branch. G5 and the contract enforce those whatever the text says (like the review feedback, ADR-M41 §2.7).
+- **Never stored**: the text goes to the agent's prompt in memory only. The run event `plan_read` holds `tasks`, `chars`, `truncated` (`yes`, `no`) and `skipped_fields`. Nothing in Temporal (the history holds IDs only), logs, `run_events`, the audit log or any table (`pnpm test:workflow` checks a marker).
+- **Plans without a file** (stored before B09, `commit_sha` null): unchanged, `plans.summary` or "(no summary)".
+- **After `plan_unavailable`** (QUESTIONS #211): the run fails and goes down the failed-run path (ADR-M33 §2.7): the intent is paused at G4 with a `technical` escalation. `modify` or `roll_back` → back to G3, HITL from then on, the G3 approvals voided (notice `run_returned`), where a person submits the plan again (a paused intent takes no plan, `planSubmittable`). `resume` → G4 helps only when the file can be read again; otherwise the next run fails the same way. `terminate` → `cancelled`. No dead end.
+
 ## 3. Consequences
 
 - G3 and G4 read one more file per step at the Git host (the spec check already reads the head). When GitHub cannot be read, intents wait (fail closed).
@@ -102,12 +118,18 @@ Whenever the intent waits at **G3 or G4**, the step reads the latest plan's file
 - Any change of the plan file on the default branch, also a comment, holds G3 or G4 until someone submits it again. This is intended: the approved plan is the one the run follows.
 - Whoever edits the plan file on the default branch is not recorded as a producer; the submitter is, and the submitter vouches for the file. The repository's branch protection is the control on the edit itself.
 - The pattern checks are best effort: they probe sample paths. G5 stays the enforcement point.
-- Until PR 2 (QUESTIONS #169) the agent's prompt shows the plan's path patterns but no summary for plans read from a file: the runner will read the summaries from the plan file at the plan's commit and check its hash.
+- Since PR 2 (QUESTIONS #169, §2.7) the agent's prompt shows the tasks' text of a plan read from a file. A run cannot start when the runner cannot read the submitted file at its commit (a force-push that removed the commit, for example); a person then sends the intent back to G3 with `modify` or `roll_back` and submits the plan again (QUESTIONS #211).
 
 ## 4. Not done here
 
-- The runner reading the plan file for the agent's prompt (B09 PR 2, QUESTIONS #169).
 - Per-task runs and per-task scope checks (MVP+1).
 - Flags derived from paths (for example `migrations/**` → `migration`).
 - Run limits in the plan.
 - A comment command to submit a plan.
+
+## Version history
+
+| Version | Date | Author | Notes |
+|---|---|---|---|
+| 0.1 | 2026-10-03 | Claude (task B09, PR 1) | §2.1–§2.6 |
+| 0.2 | 2026-10-04 | Claude (task B09, PR 2), approved by Harry | §2.2 text fields must be text (QUESTIONS #210); new §2.7 the plan in the agent's prompt, as built, and what happens after `plan_unavailable` (QUESTIONS #169, #211); §3, §4 updated |

@@ -66,7 +66,12 @@ function planYaml(code: string, options: PlanOptions = {}): string {
 interface Reply {
   readonly statusCode: number;
   json(): Record<string, unknown> & {
-    readonly error?: { readonly code: string; readonly message: string; readonly reason?: string };
+    readonly error?: {
+      readonly code: string;
+      readonly message: string;
+      readonly reason?: string;
+      readonly details?: readonly { readonly path: string; readonly issue: string }[];
+    };
   };
 }
 
@@ -301,6 +306,15 @@ describeDb('B09: plan submission and the plan re-check on PostgreSQL', () => {
       }
       git.commit({ [planPath(intent.code)]: planYaml('INT-2000-0001') });
       expectError(await inject('POST', url, tokens.a), 422, 'plan_invalid', 'intent_mismatch');
+      // QUESTIONS #210: an agent-facing text field that is not text names the field (a key path).
+      git.commit({
+        [planPath(intent.code)]: planYaml(intent.code, { extra: '    input: { a: b }' }),
+      });
+      const notText = await inject('POST', url, tokens.a);
+      expectError(notText, 422, 'plan_invalid', 'schema_invalid');
+      expect(notText.json().error).toMatchObject({
+        details: [{ path: 'file.tasks[0].input', issue: 'not_text' }],
+      });
       expect(await f.scope.plans.list(intent.id)).toEqual([]);
     });
 

@@ -221,6 +221,21 @@ export const RUN_EVENT_TYPES = {
    * `git_host_unavailable`, …). Recorded by the worker before the key, or by the runner.
    */
   feedback_unavailable: { reason: 'code' },
+  /**
+   * The runner read the plan file at the plan's commit from its own clone for the agent's prompt
+   * (B09 PR 2, ADR-M40 §2.7, QUESTIONS #169, #210): the number of tasks, the length in characters of
+   * the task text after the caps, whether it was cut (`truncated`: `yes`, `no`), and the
+   * agent-facing fields left out because they are not text. Counts only: the text goes to the
+   * agent's prompt in memory, never here.
+   */
+  plan_read: { tasks: 'count', chars: 'count', truncated: 'code', skipped_fields: 'count' },
+  /**
+   * The plan file of a run cannot be used, so the run never starts its agent and fails with
+   * `task_unavailable` (B09 PR 2): `reason` is `no_clone`, `commit_missing`, `missing`,
+   * `not_a_file`, `too_large`, `git_failed` (git could not answer: a timeout, a broken clone), `not_utf8`,
+   * `hash_mismatch`, `invalid` or `files_mismatch`.
+   */
+  plan_unavailable: { reason: 'code' },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;

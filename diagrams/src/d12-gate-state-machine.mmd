@@ -15,7 +15,7 @@ stateDiagram-v2
     G5 --> Escalated: instruction files / cost cap / iteration or time cap / stalled
     Escalated --> Running: decision = resume (bound, not expired)
     Escalated --> G4: resume after a G5 breach, a failed or a killed run (new run after G4)
-    Escalated --> G3: modify / roll back after a G5 breach or a gone G7 feedback (G3 HITL)
+    Escalated --> G3: modify / roll back after a G5 breach or a failed run (G3 HITL)
     Escalated --> Cancelled: terminate after a G5 breach, a failed or a killed run
     Escalated --> Frozen: no acknowledgement within SLA
     Frozen --> Escalated: backup / governance acknowledges
