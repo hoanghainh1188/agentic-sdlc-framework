@@ -34,6 +34,7 @@ import {
 import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
 import { presentPlanList, presentSubmittedPlan } from '../../apps/api/src/plans/present.js';
 import { presentCostReport } from '../../apps/api/src/cost/present.js';
+import { presentGateMetrics } from '../../apps/api/src/metrics/present.js';
 import { presentKill, presentRunList } from '../../apps/api/src/runs/present.js';
 import { presentLinkedSpec, presentSpecList } from '../../apps/api/src/specs/present.js';
 import { presentEscalation } from '../../apps/api/src/escalations/present.js';
@@ -529,5 +530,59 @@ export function costReportBody(
       lastRecordedAt: options.empty ? null : new Date('2026-10-03T10:05:00.000Z'),
       runsInProgress: 1,
     },
+  });
+}
+
+const NO_WAITS = {
+  count: 0,
+  avgSeconds: null,
+  maxSeconds: null,
+  p50Seconds: null,
+  p90Seconds: null,
+};
+
+/** E06: `GET /v1/metrics/gates` (ADR-M47), from the API's presenter. */
+export function gateMetricsBody(
+  options: { empty?: boolean; truncated?: boolean; tenant?: boolean } = {},
+): Record<string, unknown> {
+  return presentGateMetrics({
+    scope: options.tenant ? { kind: 'tenant' } : { kind: 'project', project: 'pilot' },
+    from: new Date('2026-09-04T00:00:00.000Z'),
+    to: new Date('2026-10-04T00:00:00.000Z'),
+    asOf: new Date('2026-10-04T09:00:00.000Z'),
+    filters: { gate: null, mode: null, riskTier: null },
+    rows: options.empty
+      ? []
+      : [
+          {
+            project: 'pilot',
+            gate: 'G2',
+            firstRound: NO_WAITS,
+            afterChanges: NO_WAITS,
+            autoPassed: 3,
+            open: { count: 0, oldestSeconds: null },
+          },
+          {
+            project: 'pilot',
+            gate: 'G3',
+            firstRound: {
+              count: 4,
+              avgSeconds: 5400,
+              maxSeconds: 93784,
+              p50Seconds: 3600,
+              p90Seconds: 90000,
+            },
+            afterChanges: {
+              count: 1,
+              avgSeconds: 172800,
+              maxSeconds: 172800,
+              p50Seconds: 172800,
+              p90Seconds: 172800,
+            },
+            autoPassed: 0,
+            open: { count: 2, oldestSeconds: 45 },
+          },
+        ],
+    truncated: options.truncated ?? false,
   });
 }

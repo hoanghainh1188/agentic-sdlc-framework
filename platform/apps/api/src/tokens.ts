@@ -11,4 +11,5 @@ export const SPECS = Symbol('SpecsService');
 export const PLANS = Symbol('PlansService');
 export const RUNS = Symbol('RunsService');
 export const COST = Symbol('CostService');
+export const METRICS = Symbol('MetricsService');
 export const INTENT_SIGNALS = Symbol('IntentWorkflowSignals');

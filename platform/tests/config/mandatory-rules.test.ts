@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M28: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M29: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -481,6 +481,14 @@ const CASES: Case[] = [
     yaml: 'access:\n  cost_read_roles: [person_a, viewer]\n',
     key: 'config.rule.viewer_never_reads_cost',
     path: 'access.cost_read_roles',
+  },
+  // M29: the viewer never reads the gate metrics (E06, ADR-M47, QUESTIONS #206).
+  {
+    name: 'viewer may read gate metrics',
+    rule: 'M29',
+    yaml: 'access:\n  metrics_read_roles: [person_a, viewer]\n',
+    key: 'config.rule.viewer_never_reads_metrics',
+    path: 'access.metrics_read_roles',
   },
 ];
 

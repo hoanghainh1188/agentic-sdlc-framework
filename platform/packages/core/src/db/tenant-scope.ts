@@ -12,6 +12,7 @@ import { CostRecordRepository } from './repositories/cost-records.js';
 import { EvidenceItemRepository } from './repositories/evidence-items.js';
 import { EscalationNoticeRepository, EscalationRepository } from './repositories/escalations.js';
 import { GateDecisionRepository } from './repositories/gate-decisions.js';
+import { GateMetricsRepository } from './repositories/gate-metrics.js';
 import { GitEventCursorRepository } from './repositories/git-event-cursors.js';
 import { GitEventReceiptRepository } from './repositories/git-event-receipts.js';
 import { IntentNoticeRepository } from './repositories/intent-notices.js';
@@ -51,6 +52,7 @@ export class TenantScope {
   readonly specRefs: SpecRefRepository;
   readonly plans: PlanRepository;
   readonly gateDecisions: GateDecisionRepository;
+  readonly gateMetrics: GateMetricsRepository;
   readonly runs: RunRepository;
   readonly runContracts: RunContractRepository;
   readonly runEvents: RunEventRepository;
@@ -85,6 +87,7 @@ export class TenantScope {
     this.specRefs = new SpecRefRepository(this.db, this.tenantId);
     this.plans = new PlanRepository(this.db, this.tenantId);
     this.gateDecisions = new GateDecisionRepository(this.db, this.tenantId);
+    this.gateMetrics = new GateMetricsRepository(this.db, this.tenantId);
     this.runs = new RunRepository(this.db, this.tenantId);
     this.runContracts = new RunContractRepository(this.db, this.tenantId);
     this.runEvents = new RunEventRepository(this.db, this.tenantId);

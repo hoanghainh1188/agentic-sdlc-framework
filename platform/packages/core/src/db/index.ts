@@ -23,6 +23,13 @@ export type { AuditEvent } from './repositories/audit-log.js';
 export type { NewCostRecord } from './repositories/cost-records.js';
 export type { NewEvidenceItem } from './repositories/evidence-items.js';
 export type {
+  AutoPassRow,
+  GateMetricsFilter,
+  GateWaitQuery,
+  OpenWaitRow,
+  WaitStatsRow,
+} from './repositories/gate-metrics.js';
+export type {
   EscalationClockUpdate,
   EscalationQuery,
   NewEscalation,

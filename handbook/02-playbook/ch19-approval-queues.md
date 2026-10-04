@@ -225,6 +225,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc ai-record show --project <slug>` | Shows the project AI record |
 | `sdlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
 | `sdlc cost report [--project <slug> \| --intent <INT-…>] [--from <time>] [--to <time>] [--by project\|intent\|model\|status]` | Shows tokens and cost (below) |
+| `sdlc metrics gates [--project <slug>] [--gate G1..G8] [--mode HITL\|HOTL\|AUDIT\|POLICY] [--risk low\|medium\|high\|critical] [--from <time>] [--to <time>]` | Shows how long gates waited for people (below) |
 
 - Gate decisions take **codes only**: a reason code (§19.8b) and, if you want, `--reason-ref` with an `https://` link to a comment that explains it. The platform never stores your words, because its records are kept for years.
 - The rules are the same as for comments (§19.8b): you need the gate's role, you can decide only the gate the intent waits at, and a producer never approves.
@@ -272,6 +273,21 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - The table has one row per project (whole tenant), per intent (one project) or per model (one intent); `--by` chooses another grouping, also `status` (the run's status). Each row and the total show the calls, tokens in, tokens out, cached tokens, cost, wasted tokens and wasted cost. Amounts are USD with 6 decimals. At most 500 rows are shown, largest cost first; the total always covers everything.
 - **Wasted** = tokens and cost of runs that ended failed, cancelled or stopped (budget, scope, time, stalled, killed). Runs that succeeded, and L1 runs that produced a proposal, are not wasted. Runs sent back later by G6 or G7 are not counted as wasted yet.
 - **The numbers are as fresh as the last copy from the model gateway.** The platform copies a run's spend when the run ends. Every report ends with the time of the latest recorded call, the time of the last copy, and the number of runs still in progress, whose cost is not shown yet.
+
+**Reading the gate waiting times.** `sdlc metrics gates` shows how long the gates waited for a person's decision (task E06, `design/ADR-M47-gate-metrics.md`, D-02 FR-12). Use it to see whether the gates slow the team down.
+
+- Who: the whole tenant (no `--project`): tenant admins only. One project: a tenant admin, or a role in the project setting `access.metrics_read_roles` (by default Person A, Person B, the second approver, PM / BrSE, governance and admin). The viewer role never may.
+- When: the same time formats as the cost report. `--from` is included, `--to` is excluded. Without them, the last 30 days until now. At most 366 days; a bad range is refused with 400 and exit code 2. The range selects the decisions by the time they were recorded.
+- What one row shows, per project and gate:
+  - **first round**: the decisions people made (approve, reject, request changes) with no request for changes before them at the same gate in the same visit. This is the time the gate waited for a person.
+  - **after changes**: the decisions after a request for changes at the same gate. The time still counts from the moment the intent entered the gate, so it includes the time the producer spent on the changes.
+  - For each: the number of decisions, the average, the median, the 90th percentile (P90) and the maximum.
+  - **Passed by the platform**: HOTL and AUDIT passes at G1–G3, G7 and G8. They are counted, never mixed into the times.
+  - **At the gate now** and **Oldest**: the intents waiting at the gate now, and the longest wait. Every gate is shown; at G4 to G6 an intent may wait for a run or for CI, not for a person. The range and `--mode` do not apply to them.
+- **Wall-clock time**, not working hours: a gate entered on Friday evening and approved on Monday morning waited the whole weekend.
+- Decisions the platform makes by itself (G4 policy checks, G5 and G6) never count. A block of a passed gate never counts. Each approval of a dual approval counts.
+- The report never shows who decided: it is about the gates, not about people.
+- `--gate`, `--mode` (the oversight mode of the decision) and `--risk` (the intent's risk tier) narrow the rows. At most 500 rows are shown.
 
 **When a command fails.** The message says why. The exit code tells scripts what happened:
 
@@ -375,3 +391,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.8 | 2026-10-03 | Claude (task B09, PR 1) | §19.8c: `sdlc plan submit|list|show`; the plan file, its rules, who submits, the re-check at G3–G4 (ADR-M40) |
 | 0.9 | 2026-10-03 | Claude (task C11, PR 1) | §19.8b, §19.8c: `/kill` and `sdlc run list|kill` point to Chapter 18 §18.8d (ADR-M42) |
 | 0.10 | 2026-10-04 | Claude (task E04) | §19.8c: `sdlc cost report`: who, the range, the grouping, wasted tokens, freshness (ADR-M45) |
+| 0.11 | 2026-10-04 | Claude (task E06) | §19.8c: `sdlc metrics gates`: who, the range, first round and after changes, platform passes, intents at the gate now, wall-clock time (ADR-M47) |
