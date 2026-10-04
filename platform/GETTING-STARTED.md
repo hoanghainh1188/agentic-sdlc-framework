@@ -320,6 +320,57 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
    The numeric GitHub ID comes from `gh api users/<login> --jq .id`. Nobody gives a role to themselves through the API: a role for yourself comes from a second tenant admin (`pnpm sdlc admin tenant-admin grant --user <email>`), or from the operator on the server (`pnpm sdlc ops role grant --tenant internal --project pilot --email you@example.com --role person_a`, with `SDLC_DB_URL`).
 6. Replace the bootstrap token with your own: `pnpm sdlc token create --name laptop-you`, log in again with it (`pnpm sdlc login`), then revoke the bootstrap token (`pnpm sdlc token list`, `pnpm sdlc token revoke --id <ID>`).
 
+## Step 13. Restart the dev stack after a break (dev)
+
+Use this after a reboot, after Docker Desktop restarted, or when `sdlc-api` and `sdlc-worker` keep restarting with "Cannot reach OpenBao". It assumes Steps 11 and 12 were done once on this machine. Run every command **yourself, in the macOS Terminal**, from the repo root: some ask for key shares or tokens at a hidden prompt, and these never go through a chat tool.
+
+| # | Do | Check |
+|---|---|---|
+| 1 | Start the infrastructure: `platform/deploy/scripts/up.sh core` | The script ends without an error (it waits until the services are healthy) |
+| 2 | `pnpm openbao:bootstrap status` | Says `sealed` after every restart (runbook T11 §4) |
+| 3 | `pnpm openbao:bootstrap unseal`: type key shares at the hidden prompt until it is unsealed (on a dev machine you hold all the throw-away shares) | `status` says `unsealed` |
+| 4 | Apply new migrations, if `main` has new ones: `SDLC_DB_MIGRATION_URL="postgres://platform:<PLATFORM_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm db:migrate` (the password is in `platform/deploy/.env`) | `pnpm db:status` (same variable) lists no pending migration |
+| 5 | Start the rest: `platform/deploy/scripts/up.sh core models platform sandbox` (add `observability` for Langfuse) | The script ends without an error |
+| 6 | `curl -s http://127.0.0.1:8090/health/ready` | Ready |
+| 7 | `pnpm sdlc whoami` (if the login was removed: `pnpm sdlc login --api-url http://127.0.0.1:8090`) | Shows your user |
+
+Start `core` alone first: `sdlc-api`, `sdlc-worker`, `sdlc-runner` and `litellm-agent` cannot become healthy while OpenBao is sealed, so `up.sh` with those profiles would wait until it times out.
+
+**The credentials commands are NOT needed after a plain restart.** The AppRole secret IDs stay in the services' volumes and live 90 days (`APPROLE_SECRET_ID_TTL`); the processes log in again by themselves. Run a credentials command only in these cases (each one asks for an admin token, runbook T11 §5.1, and prints no secret):
+
+| When | Command (then restart that service) |
+|---|---|
+| First set-up, or the secret ID is older than 90 days | `pnpm openbao:bootstrap api-credentials` → `sdlc-api`; `worker-credentials` → `sdlc-worker`; `runner-credentials` → `sdlc-runner`; `litellm-credentials` → `litellm-agent` |
+| Once after the C08 update (pushes need to read the stored diff), or the evidence key may have leaked | `pnpm openbao:bootstrap runner-evidence-credentials` → `sdlc-runner` |
+| A service log says it cannot log in to OpenBao (`invalid secret id`) | That service's credentials command |
+
+Restart one service: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox restart <service>`.
+
+To stop everything and keep the data: `pnpm compose:down`. If you do not need the platform for a while, stop it this way: a sealed OpenBao makes `sdlc-api` and `sdlc-worker` restart every minute.
+
+## Step 14. Prepare the pilot repo for live tests (dev)
+
+Live tests run the platform against the real `harryforge/pilot-order-inventory` with the test GitHub App. They never run in CI. Do these once; each line says where the details are.
+
+| # | What | How | Check |
+|---|---|---|---|
+| 1 | Test App permissions | App settings (Step 11): Contents **read and write**, Pull requests **read and write**, Code scanning alerts **read**, Issues read and write, Checks, Commit statuses and Metadata read. Then accept the new permissions on the installation (organization settings → GitHub Apps → Configure) | `gh api /orgs/harryforge/installations --jq '.installations[]\|select(.app_slug=="harryforge-sdlc-dev")\|.permissions'` |
+| 2 | The pilot project, its team and AI record | Step 12 item 5; `pnpm sdlc ai-record set …` (handbook Ch.19 §19.8b). Person A and Person B are two different people with two GitHub accounts | `pnpm sdlc admin config show --project pilot`, `pnpm sdlc ai-record show --project pilot` |
+| 3 | The project configuration | `pnpm sdlc admin config show --project pilot` gives the version; write the settings that differ from the defaults into a YAML file outside the repo, then `pnpm sdlc admin config set --project pilot --file <file> --expected-version <version>` (handbook Ch.19 §19.8d). For the pilot: `verification.required_checks: [ci-ok]` (G6 waits only for the pilot's `ci-ok`, handbook Ch.14), `sandbox.image` (Step 14 item 4) and `run.agent_key` (item 5) | `config show` prints the new version and values |
+| 4 | The sandbox image | `pnpm sandbox-image:build node24` prints the reference by digest; on Docker Desktop use `platform/sandbox-images/build.sh node24 --no-push` (runbook T11 §5g). Put it in `sandbox.image` | The reference ends in `@sha256:…` |
+| 5 | A registered, active agent | `pnpm sdlc admin agent register …`, then the approvals (handbook Ch.20 §20.5b). Its `instructions_ref` points at the pilot's `AGENTS.md` | `pnpm sdlc admin agent show <key>` says `active` |
+| 6 | A model | A provider key in OpenBao (runbook T11 §5d), or on a dev machine the local Ollama model `gpt-oss:20b` (QUESTIONS #78). One real run with an API model is needed before the trial M-E (QUESTIONS #81) | `curl -s -H "Authorization: Bearer <master key>" http://127.0.0.1:4000/v1/models` lists it (run in the terminal; never paste the key) |
+
+The live tests (each needs the test App's private key file, kept outside the repo):
+
+```bash
+SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm exec vitest run --config vitest.integration.config.ts platform/tests/integration/github
+SDLC_SANDBOX_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm test:sandbox-live
+pnpm test:agent-real
+```
+
+The first includes the publish test (C08: push and pull request on the pilot); the second clones the pilot into a real sandbox; the third runs the agent with the local Ollama model (CLAUDE.md, "OpenHands adapter").
+
 ## Sending handbook comments
 
 Any format works. To make changes fast, one line per comment is ideal:
