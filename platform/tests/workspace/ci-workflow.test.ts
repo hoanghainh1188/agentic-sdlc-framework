@@ -219,6 +219,19 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(scan).toContain('git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "$@"');
   });
 
+  it('C09: the sandbox image job runs the pilot suite, also when the gate steps or the worker change', () => {
+    const steps = job('sandbox-image').steps.map((s) => s.run ?? '');
+    expect(steps.indexOf('pnpm test:pilot')).toBeGreaterThan(steps.indexOf('pnpm test:agent'));
+    const scan = runText('scan');
+    const paths = scan.slice(scan.indexOf('decide_heavy run_sandbox_image')).split('\n\n')[0]!;
+    for (const p of [
+      'platform/packages/core/src/workflow/',
+      'platform/apps/worker/',
+      'platform/tests/integration/pilot/',
+    ])
+      expect(paths.split(/\s+/)).toContain(p);
+  });
+
   it('heavy jobs run on the weekly schedule and on demand, never on the daily run or a draft (ADR-M25 §2.9)', () => {
     const scan = runText('scan');
     expect(scan).toMatch(/workflow_dispatch \]; then\s*all=true/);

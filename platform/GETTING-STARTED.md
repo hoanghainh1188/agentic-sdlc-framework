@@ -361,6 +361,7 @@ Live tests run the platform against the real `harryforge/pilot-order-inventory` 
 | 4 | The sandbox image | `pnpm sandbox-image:build node24` prints the reference by digest; on Docker Desktop use `platform/sandbox-images/build.sh node24 --no-push` (runbook T11 §5g). Put it in `sandbox.image` | The reference ends in `@sha256:…` |
 | 5 | A registered, active agent | `pnpm sdlc admin agent register …`, then the approvals (handbook Ch.20 §20.5b). Its `instructions_ref` points at the pilot's `AGENTS.md` | `pnpm sdlc admin agent show <key>` says `active` |
 | 6 | A model | A provider key in OpenBao (runbook T11 §5d), or on a dev machine the local Ollama model `gpt-oss:20b` (QUESTIONS #78). One real run with an API model is needed before the trial M-E (QUESTIONS #81) | `curl -s -H "Authorization: Bearer <master key>" http://127.0.0.1:4000/v1/models` lists it (run in the terminal; never paste the key) |
+| 7 | The plan file of the C09 live test (QUESTIONS #230) | Once a year: open a pull request on the pilot that adds `.sdlc/plans/INT-<UTC year>-0001.yaml` with the content of `platform/tests/integration/pilot/fixtures/live-plan.yaml` (change the year in `intent_id` too), let `ci-ok` pass and merge it yourself. The App and the platform never merge | `gh api repos/harryforge/pilot-order-inventory/contents/.sdlc/plans/INT-2026-0001.yaml --jq .path` |
 
 The live tests (each needs the test App's private key file, kept outside the repo):
 
@@ -368,9 +369,10 @@ The live tests (each needs the test App's private key file, kept outside the rep
 SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm exec vitest run --config vitest.integration.config.ts platform/tests/integration/github
 SDLC_SANDBOX_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm test:sandbox-live
 pnpm test:agent-real
+SDLC_PILOT_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm test:pilot-live
 ```
 
-The first includes the publish test (C08: push and pull request on the pilot); the second clones the pilot into a real sandbox; the third runs the agent with the local Ollama model (CLAUDE.md, "OpenHands adapter").
+The first includes the publish test (C08: push and pull request on the pilot); the second clones the pilot into a real sandbox; the third runs the agent with the local Ollama model (CLAUDE.md, "OpenHands adapter"). The fourth (C09) runs T01 from G1 to G7 on the pilot in this process: a throw-away database, the Temporal test server, a real node24 sandbox with the stub model (no model key; needs Docker and item 7, not the dev stack of Step 13), a real push, a real pull request and the pilot's real `ci-ok`; then it checks that `main` refuses a push (N6), closes the pull request and deletes the branch. It takes 15–30 minutes (the pilot's CI). Optional: `SDLC_SANDBOX_IMAGE` (skips the image build), `SDLC_PILOT_LIVE_CI_TIMEOUT_MINUTES` (default 30).
 
 ## Sending handbook comments
 

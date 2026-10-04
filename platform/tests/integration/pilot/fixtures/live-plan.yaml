@@ -1,0 +1,11 @@
+# The plan of the C09 live test (template T13, schema version 1). Fixed, fictional text.
+# Harry merges it once on harryforge/pilot-order-inventory as `.sdlc/plans/INT-2026-0001.yaml`
+# (QUESTIONS #230): a throw-away tenant's first intent is always INT-<UTC year>-0001.
+# The task text is the stub model's script marker: the agent appends one line to a notes file.
+plan:
+  intent_id: INT-2026-0001
+tasks:
+  - id: T1
+    summary: 'C09 live test of the SDLC platform. [stub:append]'
+    allowed_paths: [apps/web/src/features/products/**]
+    tools: [file_editor, terminal]
