@@ -268,20 +268,24 @@ describeDb('B09: plan submission and the plan re-check on PostgreSQL', () => {
       expect((await inject('POST', url, tokens.a)).statusCode).toBe(201);
     });
 
-    it('a commit must hold the same file as the head of the default branch (409 otherwise)', async () => {
+    it('a commit must hold the same file as the head (409 otherwise); the head is stored (#212)', async () => {
       const intent = await atG2();
       const old = writePlan(intent, { paths: ['apps/api/src/**'] });
       const same = writePlan(intent);
-      git.commit({ 'README.md': '# shop\n' }); // the head moves, the plan file stays
+      const head = git.commit({ 'README.md': '# shop\n' }); // the head moves, the plan file stays
       const url = `/v1/intents/${intent.code}/plans`;
       expectError(
         await inject('POST', url, tokens.a, { commit_sha: old }),
         409,
         'plan_not_on_default_branch',
       );
+      // QUESTIONS #212: an older commit with the same content is accepted, but the stored commit
+      // is the head the platform read, so the runner always finds it in its clone.
       const reply = await inject('POST', url, tokens.a, { commit_sha: same });
       expect(reply.statusCode).toBe(201);
-      expect(reply.json()).toMatchObject({ commit_sha: same });
+      expect(same).not.toBe(head);
+      expect(reply.json()).toMatchObject({ commit_sha: head });
+      expect((await f.scope.plans.latest(intent.id))?.commit_sha).toBe(head);
     });
 
     it('a refused file → 422 plan_invalid with the reason; nothing is stored', async () => {

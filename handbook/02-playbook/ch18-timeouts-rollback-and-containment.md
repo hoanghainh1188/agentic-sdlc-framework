@@ -204,7 +204,7 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 - Just before acting, the platform checks the decision again. If the decision has expired, or the plan or input changed, the decision is voided and the escalation waits for a new decision.
 - The platform closes the escalation after it has acted on the decision.
 
-**After a failed run** (task B09 PR 2, QUESTIONS #211). A run that failed (the agent reported an error, the runner was lost, the platform could not check its changes or read its plan file) pauses the intent at G4 with a technical escalation to Person B. The decisions do this:
+**After a failed or killed run** (task B09 PR 2, QUESTIONS #211). A run that failed (the agent reported an error, the runner was lost, the platform could not check its changes or read its plan file), or that someone stopped with the kill switch (§18.8d), pauses the intent at G4 with a technical escalation to Person B. The decisions do this:
 
 | Decision | What happens |
 |---|---|

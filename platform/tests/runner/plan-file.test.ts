@@ -91,10 +91,21 @@ describe('readPlanBlob', () => {
   });
 
   it('git that cannot answer (killed at its timeout): git_failed, never commit_missing', async () => {
-    expect(await readPlanBlob(root, commit, FILE, 1)).toEqual({
-      kind: 'unreadable',
-      cause: 'git_failed',
-    });
+    // A fake `git` first on PATH that never answers (`exec`, so the timeout's signal kills it and
+    // nothing keeps the pipe open): deterministic, whatever the machine's speed.
+    const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-git-'));
+    fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\nexec sleep 60\n', { mode: 0o755 });
+    const original = process.env.PATH;
+    process.env.PATH = `${bin}${path.delimiter}${original ?? ''}`;
+    try {
+      expect(await readPlanBlob(root, commit, FILE, 300)).toEqual({
+        kind: 'unreadable',
+        cause: 'git_failed',
+      });
+    } finally {
+      process.env.PATH = original;
+      fs.rmSync(bin, { recursive: true, force: true });
+    }
   });
 
   it('refuses anything but a plan path and a commit SHA before git runs', async () => {

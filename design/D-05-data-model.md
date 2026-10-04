@@ -373,7 +373,7 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 | plan_sha256 | char(64) | Version 1.25: for a plan read from a file, the SHA-256 of the file's bytes |
 | proposed_by_type | actor_type | `human` or `agent` |
 | change_flags | change_flag[] | Declared in the plan file and approved with it at G3: Person B checks them (version 1.25, QUESTIONS #166; was "set by Person A / B at G3"); drive forced HITL (G3) and dual approval (G7) |
-| commit_sha | char(40) null | Version 1.25 (B09): the commit the plan file was read at |
+| commit_sha | char(40) null | Version 1.25 (B09): the commit the plan file was read at: the head of the default branch at submission, also when the caller named an older commit with the same file (version 1.31, QUESTIONS #212) |
 | allowed_tools | text[] null | Version 1.25: the agent tools the plan's tasks list (`file_editor`, `task_tracker`, `terminal`); G4 gives the run the agent's registered tools among them. Null: the agent's registered tools |
 | submitted_by | uuid FK users null | Version 1.25: the person who submitted the plan file, a producer of the plan at G3 (FR-11) |
 
@@ -775,4 +775,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.28 | 2026-10-04 | Claude (task E01, PR 2), approved by Harry | §6.2 notice kind `g7_changes_requested` moves the intent to G4; §6.4 run events `feedback_read`, `feedback_unavailable`, token `feedback`, stop reason `agent_feedback_unavailable` (ADR-M41 §2.7, QUESTIONS #179, #190, #191). No migration |
 | 1.29 | 2026-10-04 | Claude (task C11, PR 2), approved by Harry | §6.4 stop reasons `loop_detected`, `no_progress`; run event `loop_detected` (ADR-M42 §2.7, QUESTIONS #184). No migration |
 | 1.30 | 2026-10-04 | Claude (task E02), approved by Harry | §4 ERD (D13): an intent has many pack versions; §6.6 `evidence_packs` as built: one row per build (versions), content hash, file sizes, locale, disclosure format, builder, one sealed version, trigger `SDA14`; the files hold approver names and are purged with the evidence (migration `0021-evidence-packs`, ADR-M48, QUESTIONS #215–#219) |
-| 1.31 | 2026-10-04 | Claude (task B09, PR 2), approved by Harry | §6.2 notice kind `run_returned`; §6.4 run events `plan_read`, `plan_unavailable` (ADR-M40 §2.7, QUESTIONS #169, #210, #211). No migration |
+| 1.31 | 2026-10-04 | Claude (task B09, PR 2), approved by Harry | §6.2 notice kind `run_returned`, `plans.commit_sha` is the head read at submission (QUESTIONS #212); §6.4 run events `plan_read`, `plan_unavailable` (ADR-M40 §2.7, QUESTIONS #169, #210–#212). No migration |

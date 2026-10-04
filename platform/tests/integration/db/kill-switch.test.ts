@@ -5,7 +5,7 @@
 //   kill changes nothing; a run that ended otherwise is refused;
 // - the kill raises its escalation at once (technical, `run.kill_escalation`), records the run
 //   event, the audit event (IDs only) and the status notice; the intent is then paused at G4,
-//   `resume` starts a new round, `terminate` closes it;
+//   `resume` starts a new round, `terminate` closes it, `modify` / `roll_back` → G3 HITL (#211);
 // - a lost runner ends a `stopping` run `stopped_killed`; the worker revokes the key of a killed
 //   run at once; the database keeps a kill a kill (migration 0020);
 // - `/kill` on the issue: a person with a kill role stops the run; an account that is not linked
@@ -32,6 +32,7 @@ import {
   finishRun,
   startRun,
 } from '../../../packages/core/src/workflow/run-lifecycle.js';
+import { returnedFromG5 } from '../../../packages/core/src/workflow/g5-scope.js';
 import { atG4, BASE_1, harness, MODEL, notices, T0, type Harness } from '../g4-harness.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
@@ -332,6 +333,18 @@ describeDb('C11: the kill switch on PostgreSQL', () => {
       expect((await scope().escalations.getById(escalationId))?.status).toBe('closed');
       const [last] = (await scope().intentNotices.listForIntent(intent.id)).slice(-1);
       expect(last).toMatchObject({ kind: 'terminated', gate: 'G4', status: 'cancelled' });
+    });
+
+    it('#211: modify after a kill → G3, HITL, the G3 approvals voided (no endless wait)', async () => {
+      const { intent, escalationId } = await killedAndPaused();
+      await decideEscalation(scope(), { escalationId, actorId: t.f.users.b, decision: 'modify' });
+      await t.settleRuns(intent);
+      expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G3' });
+      expect(await notices(t, intent)).toContain('run_returned');
+      expect(await returnedFromG5(scope(), intent.id)).toBe(true);
+      const g3 = await scope().gateDecisions.listForIntent(intent.id, 'G3');
+      expect(g3.at(-1)).toMatchObject({ decision: 'void', reason_code: 'input_mismatch' });
+      expect((await scope().escalations.getById(escalationId))?.status).toBe('closed');
     });
 
     it('the reconcile list holds the intent while its current run is being killed, not after', async () => {

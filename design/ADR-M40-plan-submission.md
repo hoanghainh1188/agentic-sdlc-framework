@@ -4,8 +4,8 @@
 |---|---|
 | Status | **Proposed** (task B09, for review) |
 | Date | 2026-10-03 |
-| Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #165–#169; PR 2 plan approved 2026-10-04, with answers to QUESTIONS #210, #211) |
-| Related | D-08 task B09 (AC1–AC3); D-02 FR-11, FR-15, FR-16, FR-17; D-03 §6 (version 1.20); D-05 §6.2 (version 1.25); handbook Ch.12 §12.4, template T13; ADR-M20, ADR-M30, ADR-M33 §2.1, ADR-M34 §2.8, ADR-M39, ADR-M29 §2.3, ADR-M33 §2.7, ADR-M41 §2.7; QUESTIONS #34, #108, #131, #165–#169, #210, #211 |
+| Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #165–#169; PR 2 plan approved 2026-10-04, with answers to QUESTIONS #210–#212) |
+| Related | D-08 task B09 (AC1–AC3); D-02 FR-11, FR-15, FR-16, FR-17; D-03 §6 (version 1.20); D-05 §6.2 (version 1.25); handbook Ch.12 §12.4, template T13; ADR-M20, ADR-M30, ADR-M33 §2.1, ADR-M34 §2.8, ADR-M39, ADR-M29 §2.3, ADR-M33 §2.7, ADR-M41 §2.7; QUESTIONS #34, #108, #131, #165–#169, #210–#212 |
 
 ## 1. Context
 
@@ -62,7 +62,7 @@ tasks:                            # 1–20
 - **Who**: a role in project configuration `access.plan_submit_roles` (default `[person_a]`). Mandatory rule **M24**: `viewer` is never in the list. No role on the project → 404 `intent_not_found`; a read role only → 403 `forbidden`.
 - **The submitter is a producer of the plan** (FR-11): `plans.submitted_by`; `decideGate` passes the submitters of the intent's plans as G3 producers, so the policy engine refuses their approval (`producer`). Person A submits, Person B approves.
 - **When**: the intent is `draft` or waits at G1–G4; otherwise 409 `plan_submit_not_allowed`. A plan submitted at G4 takes the intent back to G3 at the next step (§2.4).
-- **How** (`submitPlanFromGitHost`, `@sdlc/core` `plans/`): read the head of the default branch and the file there; parse and check it; with `commit_sha`, the file at that commit must be the same file (otherwise 409 `plan_not_on_default_branch`); under the intent lock, check the state and the role again and store a new version (`plans.submit` with `file`: `commit_sha`, `allowed_tools`, `submitted_by`, no summary). The same file again stores nothing new. The API wakes the intent's workflow.
+- **How** (`submitPlanFromGitHost`, `@sdlc/core` `plans/`): read the head of the default branch and the file there; parse and check it; with `commit_sha`, the file at that commit must be the same file (otherwise 409 `plan_not_on_default_branch`); the stored `commit_sha` is always the head the platform read, never the given commit (PR 2, QUESTIONS #212: the runner reads the plan file at the stored commit from its clone, which holds every default-branch commit); under the intent lock, check the state and the role again and store a new version (`plans.submit` with `file`: `commit_sha`, `allowed_tools`, `submitted_by`, no summary). The same file again stores nothing new. The API wakes the intent's workflow.
 - **Errors**: a refused file → 422 `plan_invalid` with the reason (`missing`, `not_a_file`, `too_large`, `not_utf8`, `yaml_invalid`, `schema_invalid`, `intent_mismatch`, `platform_field`, `unknown_tool`, `invalid_pattern`, `pattern_too_broad`, `protected_path`, `too_many_paths`); a Git host failure → 503 `git_host_unavailable`. Texts from the catalog (`plan.error.*`, `plan.refusal.*`, `api.error.*`).
 - **Audit**: `plan.submitted` gains `commit_sha`. Never the path, the file list or text.
 - The api already holds the GitHub App key for the spec (ADR-M39 §2.2); no new secret.
@@ -101,7 +101,7 @@ Whenever the intent waits at **G3 or G4**, the step reads the latest plan's file
 
 As built:
 
-- **Where the file comes from**: the runner's own clone of the run (`workspace/plan-file.ts`), at `plans.commit_sha`, never from the sandbox. `cloneForRun` makes a full clone, so every commit of the default branch is in it; nothing is fetched (the clone token is revoked right after the clone, C11). Hardened git (`gitArgs`, `gitEnv`: no system or user configuration, no hooks, no fsmonitor, no replace objects), no token, no network.
+- **Where the file comes from**: the runner's own clone of the run (`workspace/plan-file.ts`), at `plans.commit_sha` (the head of the default branch at submission, QUESTIONS #212), never from the sandbox. `cloneForRun` makes a full clone, so every commit of the default branch is in it; nothing is fetched (the clone token is revoked right after the clone, C11). Hardened git (`gitArgs`, `gitEnv`: no system or user configuration, no hooks, no fsmonitor, no replace objects), no token, no network.
 - **What is read**: `git ls-tree` first: the path must be a regular file (mode 100644 or 100755, never a symbolic link or a submodule); `git cat-file -s` at most 64 KiB; then `git cat-file blob` returns the stored bytes, which no attribute, filter or text conversion changes. Why the plan's commit and not the run's `base_sha`: after a push, the next run starts from the last pushed commit (ADR-M38 §2.6), where the plan file may be older or missing.
 - **Checks** (`apps/runner/src/agent/task.ts`), all fail closed: the SHA-256 of the bytes equals the contract's `plan_sha256`; the bytes are UTF-8; the file passes the submission rules (`readPlanTaskTexts`, the same parser as `parsePlanFile`); its path patterns equal the contract's `planned_files` as sets (sorted, de-duplicated). Any failure, or no clone, → the run fails `task_unavailable` (stop reason `agent_task_unavailable`, no new one) and the run event `plan_unavailable` gives the cause: `no_clone`, `commit_missing`, `missing`, `not_a_file`, `too_large`, `git_failed`, `not_utf8`, `hash_mismatch`, `invalid` or `files_mismatch`.
 - **What the agent gets**: per task, `id` and the agent-facing fields of §2.2 (`summary`, `input`, `output`, `definition_of_done`, `escalate_when`, `depends_on`, `checkpoint`), as plain lines (`Task T1`, `summary: …`, `definition of done:` with `- …` items). Not `owner_agent` (one agent runs every task in the MVP) or `required_evidence` (the platform collects evidence). A field that is not text is skipped and counted (QUESTIONS #210, A), so a plan G3 approved never fails at run time for this.
@@ -118,7 +118,7 @@ As built:
 - Any change of the plan file on the default branch, also a comment, holds G3 or G4 until someone submits it again. This is intended: the approved plan is the one the run follows.
 - Whoever edits the plan file on the default branch is not recorded as a producer; the submitter is, and the submitter vouches for the file. The repository's branch protection is the control on the edit itself.
 - The pattern checks are best effort: they probe sample paths. G5 stays the enforcement point.
-- Since PR 2 (QUESTIONS #169, §2.7) the agent's prompt shows the tasks' text of a plan read from a file. A run cannot start when the runner cannot read the submitted file at its commit (a force-push that removed the commit, for example); a person then sends the intent back to G3 with `modify` or `roll_back` and submits the plan again (QUESTIONS #211).
+- Since PR 2 (QUESTIONS #169, §2.7) the agent's prompt shows the tasks' text of a plan read from a file. A run cannot start when the runner cannot read the submitted file at its commit (a force-push of the default branch that removed the commit, for example; since QUESTIONS #212 the stored commit is always a default-branch head); a person then sends the intent back to G3 with `modify` or `roll_back` and submits the plan again (QUESTIONS #211).
 
 ## 4. Not done here
 
@@ -132,4 +132,4 @@ As built:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task B09, PR 1) | §2.1–§2.6 |
-| 0.2 | 2026-10-04 | Claude (task B09, PR 2), approved by Harry | §2.2 text fields must be text (QUESTIONS #210); new §2.7 the plan in the agent's prompt, as built, and what happens after `plan_unavailable` (QUESTIONS #169, #211); §3, §4 updated |
+| 0.2 | 2026-10-04 | Claude (task B09, PR 2), approved by Harry | §2.2 text fields must be text (QUESTIONS #210); new §2.7 the plan in the agent's prompt, as built, and what happens after `plan_unavailable` (QUESTIONS #169, #211); §2.3 the stored commit is the head the platform read (QUESTIONS #212); §3, §4 updated |
