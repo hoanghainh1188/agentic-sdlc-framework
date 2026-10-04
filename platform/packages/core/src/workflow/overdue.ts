@@ -24,7 +24,7 @@ import { raiseEscalation } from '../escalation/raise.js';
 import type { Registry } from '../registry/registry.js';
 
 /** Gates that wait for a person with a deadline: G1–G3 (B07) and G4 when HITL (C06). */
-export type HumanGate = Extract<GateCode, 'G1' | 'G2' | 'G3' | 'G4' | 'G5' | 'G6' | 'G7'>;
+export type HumanGate = Extract<GateCode, 'G1' | 'G2' | 'G3' | 'G4' | 'G5' | 'G6' | 'G7' | 'G8'>;
 
 /** Statuses of an escalation that is not closed. */
 const NOT_CLOSED = ['open', 'acknowledged', 'resolved'] as const;
@@ -65,7 +65,14 @@ export interface OverdueInput {
   /** The version a decision on the escalation is bound to (the gate's input, or the intent). */
   readonly subject: {
     readonly kind:
-      'intent' | 'spec' | 'plan' | 'run_contract' | 'g5_input' | 'g6_input' | 'g7_input';
+      | 'intent'
+      | 'spec'
+      | 'plan'
+      | 'run_contract'
+      | 'g5_input'
+      | 'g6_input'
+      | 'g7_input'
+      | 'g8_input';
     readonly sha256: string;
   };
   /**

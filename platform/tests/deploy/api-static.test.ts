@@ -112,14 +112,19 @@ describe('sdlc-api service', () => {
     });
     const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
     expect(bootstrap).toMatch(/^ {2}api-evidence-credentials\) cmd_api_evidence_credentials ;;$/m);
-    const fn = /^cmd_api_evidence_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
+    expect(bootstrap).toMatch(
+      /^cmd_api_evidence_credentials\(\) \{ pack_evidence_credentials api sdlcapiev sdlc-api; \}$/m,
+    );
+    // E03: the api and the worker share the helper (one identity each).
+    const fn = /^pack_evidence_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
     // Read proposals and diffs (the hash re-check), read and write packs; nothing else.
     expect(fn).toContain(
       '-actions Read:evidence/proposals/*,Read:evidence/diffs/*,Read:evidence/packs/*,Write:evidence/packs/* -apply',
     );
-    expect(fn).toContain('echo "s3.configure -user api-evidence -delete -apply" |');
+    expect(fn).toContain('echo "s3.configure -user $identity -delete -apply" |');
+    expect(fn).toContain('identity="$role-evidence"');
     expect(fn).toMatch(/compose exec -T seaweedfs \$weed >\/dev\/null 2>&1/);
-    expect(fn).toContain('bao kv put -mount=kv api/evidence - >/dev/null');
+    expect(fn).toContain('bao kv put -mount=kv "$1/evidence" - >/dev/null');
     expect(fn).not.toContain('s3.config.show');
     // The AppRole "api" reads kv/data/api/* already: the credential needs no policy change.
     const policy = readDeployFile('openbao/bootstrap/policies/api.hcl');

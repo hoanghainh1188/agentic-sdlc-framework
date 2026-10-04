@@ -600,6 +600,7 @@ export function evidencePackBody(version = 1, sealed = false): Record<string, un
     intent_id: INTENT_ID,
     version,
     content_sha256: 'c'.repeat(64),
+    release_sha256: 'c'.repeat(64),
     manifest_uri: uri('manifest.json'),
     manifest_sha256: 'a'.repeat(64),
     manifest_size_bytes: '2048',

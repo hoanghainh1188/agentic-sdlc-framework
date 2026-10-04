@@ -216,6 +216,9 @@ importers:
 
   platform/apps/worker:
     dependencies:
+      '@sdlc/adapter-evidence-s3':
+        specifier: workspace:*
+        version: link:../../packages/adapters/evidence-s3
       '@sdlc/adapter-git-github':
         specifier: workspace:*
         version: link:../../packages/adapters/git-github

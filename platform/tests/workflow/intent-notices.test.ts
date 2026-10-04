@@ -19,7 +19,7 @@ const view = {
 describe('B07: gate status comments', () => {
   it('every notice kind has a catalog text', () => {
     for (const kind of INTENT_NOTICE_KINDS) {
-      for (const gate of ['G1', 'G2', 'G3', 'G4'] as const) {
+      for (const gate of ['G1', 'G2', 'G3', 'G4', 'G7', 'G8'] as const) {
         expect(t(intentNoticeKey({ kind, gate }))).not.toBe(intentNoticeKey({ kind, gate }));
       }
     }
@@ -112,5 +112,30 @@ describe('B07: gate status comments', () => {
       { ...view, deciders: [], mentions: [] },
     );
     expect(body).toContain(t('escalation.notice.nobody'));
+  });
+
+  it('E03: the G8 review asks Person B to approve the release; the client note only for client_format', () => {
+    const notice = { id: '41', kind: 'g8_review_needed', gate: 'G8', previous_gate: 'G8' } as const;
+    const standard = renderIntentNotice(notice, { ...view, deciders: [] });
+    expect(standard).toContain('`/approve G8`');
+    expect(standard).toContain('`/reject G8 <reason>`');
+    expect(standard).not.toContain('Client disclosure');
+    const client = renderIntentNotice(notice, {
+      ...view,
+      deciders: [],
+      clientRecordRef: 'https://docs.example.com/ai-record',
+    });
+    expect(client).toContain('Client disclosure');
+    expect(client).toContain('https://docs.example.com/ai-record');
+  });
+
+  it('E03: release, a request for changes at G8 and terminate at G8 have their own texts', () => {
+    expect(intentNoticeKey({ kind: 'released', gate: 'G8' })).toBe('intent.status.released');
+    expect(intentNoticeKey({ kind: 'terminated', gate: 'G8' })).toBe('intent.status.g8_terminated');
+    const body = renderIntentNotice(
+      { id: '42', kind: 'g8_changes_requested', gate: 'G8', previous_gate: 'G8' },
+      view,
+    );
+    expect(body).toContain('a fix needs a new intent');
   });
 });

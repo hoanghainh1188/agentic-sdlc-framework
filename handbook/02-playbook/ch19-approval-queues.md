@@ -115,7 +115,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 | `/reject G3 <reason>` | A rejection. The reason is required |
 | `/request-changes G3 <reason>` | A request for changes. The reason is required |
 
-- Gates G1, G2 and G3 can be decided by comment; G4 and G5 when they wait for a person (Chapter 13 §13.10); G6 when CI passed and it waits for Person B, or within its block window (Chapter 14 §14.10.2). G7 and G8 come later.
+- Gates G1, G2 and G3 can be decided by comment; G4 and G5 when they wait for a person (Chapter 13 §13.10); G6 when CI passed and it waits for Person B, or within its block window (Chapter 14 §14.10.2); G7 by `/reject G7` and `/request-changes G7` only (approve with a pull request review, Chapter 15 §15.10.1); G8, the release, when it waits for Person B (Chapter 15 §15.10.3).
 - The reason may start with a reason code: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `ai_record_missing`, `data_class_not_allowed`, `expired`, `input_mismatch`, `scope_mismatch`, `other`. A code other than `other` may stand alone: `/reject G2 spec_unclear` is accepted. `other` alone is not a reason: `/reject G2 other` without text is refused. Without a code, the platform records `other`, and you must write a sentence. Example: `/reject G2 spec_unclear AC2 does not say which warehouse`.
 - The reason text stays in your comment. The platform stores only the reason code and a link to the comment, because its records are kept for years and can never be edited. Write the reason so that it can stay on GitHub, and do not put personal or client data in it.
 - Only new comments count. **Editing a comment never changes a decision.** To change your mind, write a new comment.
@@ -227,7 +227,8 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc cost report [--project <slug> \| --intent <INT-…>] [--from <time>] [--to <time>] [--by project\|intent\|model\|status]` | Shows tokens and cost (below) |
 | `sdlc metrics gates [--project <slug>] [--gate G1..G8] [--mode HITL\|HOTL\|AUDIT\|POLICY] [--risk low\|medium\|high\|critical] [--from <time>] [--to <time>]` | Shows how long gates waited for people (below) |
 | `sdlc evidence build <INT-…>` | Builds a new version of the intent's Evidence Pack, or returns the latest one when nothing changed: Chapter 15 §15.10.2 |
-| `sdlc evidence list <INT-…>` / `sdlc evidence show <INT-…> [--version <n>]` | Lists the pack's versions / shows one (default: the latest) |
+| `sdlc evidence list <INT-…>` / `sdlc evidence show <INT-…> [--version <n>]` | Lists the pack's versions / shows one (default: the latest), with its release SHA-256 (what a G8 approval is bound to) |
+| `sdlc gate approve G8 <INT-…>` / `sdlc gate reject G8 <INT-…> --reason-code <code>` | Approves or rejects the release at G8 (Person B; at Critical risk also the second approver). The platform seals the pack and closes the intent: Chapter 15 §15.10.3 |
 | `sdlc evidence export <INT-…> [--version <n>] [--manifest] [--output <file>]` | Prints or saves the readable pack (`pack.md`), or the manifest with `--manifest`, after checking its SHA-256; `--output` never overwrites a file |
 
 - Gate decisions take **codes only**: a reason code (§19.8b) and, if you want, `--reason-ref` with an `https://` link to a comment that explains it. The platform never stores your words, because its records are kept for years.
@@ -399,3 +400,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.11 | 2026-10-04 | Claude (task E06) | §19.8c: `sdlc metrics gates`: who, the range, first round and after changes, platform passes, intents at the gate now, wall-clock time (ADR-M47) |
 | 0.12 | 2026-10-04 | Claude (task E02) | §19.8c: `sdlc evidence build\|list\|show\|export` (ADR-M48) |
 | 0.13 | 2026-10-04 | Claude (task B09, PR 2) | §19.8c: plan text fields must be text (`schema_invalid` with the field); the agent reads the task text from the submitted plan file; the recorded commit is the head read (QUESTIONS #169, #210, #212) |
+| 0.14 | 2026-10-04 | Claude (task E03) | §19.8b: G7 and G8 by comment; §19.8c: `sdlc gate approve\|reject G8`, the release SHA-256 in `sdlc evidence show` (ADR-M49) |

@@ -567,6 +567,9 @@ services:
         condition: service_healthy
       temporal-namespace:
         condition: service_completed_successfully
+      # The bucket `evidence` with versioning (G8's release pack, E03).
+      seaweedfs-init:
+        condition: service_completed_successfully
     environment:
       SDLC_WORKER_DB_HOST: postgres
       SDLC_WORKER_DB_NAME: platform
@@ -586,6 +589,11 @@ services:
       SDLC_WORKER_COST_SECRET_ID_FILE: /run/sdlc/cost-approle/secret_id
       SDLC_WORKER_LITELLM_URL: http://litellm:4000
       SDLC_WORKER_RUN_EGRESS: litellm:4000,npm-proxy:4873
+      # E03 (ADR-M49): G8's release pack in SeaweedFS with the worker's identity from OpenBao
+      # (kv/worker/evidence, `openbao:bootstrap worker-evidence-credentials`): reads proposals and
+      # diffs to re-check their hashes, reads and writes packs/ only. Without it intents wait at G8.
+      SDLC_WORKER_EVIDENCE_URL: http://seaweedfs:8333
+      SDLC_WORKER_EVIDENCE_BUCKET: evidence
     volumes:
       - worker-approle:/run/sdlc/approle
       - worker-cost-approle:/run/sdlc/cost-approle

@@ -474,11 +474,16 @@ export interface EvidencePacksTable {
   disclosure_format: Immutable<DisclosureFormat>;
   item_count: Immutable<number>;
   built_by: ColumnType<string | null, string | null, never>;
-  /** Set by E03 at G8; no UPDATE grant yet. */
-  sealed_at: ColumnType<Date | null, never, never>;
+  /** Set once by G8 (E03, migration 0022); one sealed version per intent. */
+  sealed_at: ColumnType<Date | null, never, Date>;
   retention_hold: ColumnType<boolean, never, never>;
   purged_at: ColumnType<Date | null, never, never>;
   created_at: CreatedAt;
+  /**
+   * E03 (migration 0022, ADR-M49 §2.2): the SHA-256 of the manifest content without the G8 parts;
+   * G8 approvals are bound to it. Null for packs built before E03.
+   */
+  release_sha256: ColumnType<string | null, string | null, never>;
 }
 
 type Mutable<T> = ColumnType<T, T | undefined, T>;
@@ -1004,6 +1009,7 @@ export const TABLE_COLUMNS = {
     'retention_hold',
     'purged_at',
     'created_at',
+    'release_sha256',
   ]),
   tenant_role_bindings: columns<TenantRoleBindingsTable>()([
     'id',

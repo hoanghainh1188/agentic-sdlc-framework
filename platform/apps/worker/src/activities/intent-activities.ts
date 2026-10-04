@@ -2,10 +2,11 @@
 // run in the worker process with the database and the registry; the workflow only sees their
 // coded results. The run activities return IDs, codes and two single-use OpenBao wrapping tokens:
 // never a raw token, a virtual key, its ID or client data (ADR-M30 §2.1, QUESTIONS #112).
-import type { IntentStepResult, IntentWorkflowRef } from '@sdlc/contracts';
+import type { EvidenceStore, IntentStepResult, IntentWorkflowRef } from '@sdlc/contracts';
 import {
   abandonPublish,
   abandonRun,
+  buildReleasePack,
   finishPublish,
   finishRun,
   parseTenantId,
@@ -18,8 +19,10 @@ import {
   type G7Deps,
   type SpecGitHost,
   type PlatformDatabase,
+  type PlatformLogger,
   type PublishDeps,
   type Registry,
+  type ReleasePackOutcome,
   type RunDeps,
 } from '@sdlc/core';
 
@@ -65,6 +68,18 @@ export interface IntentActivities {
     runId: string,
     reason: 'runner_lost' | 'worker_failed',
   ): Promise<void>;
+  /**
+   * E03 (ADR-M49 §2.1): build the release pack of an intent at G8 (core `buildReleasePack`): every
+   * stored evidence file is read back and checked. Returns a code only.
+   */
+  buildReleasePack(ref: IntentWorkflowRef): Promise<ReleasePackOutcome>;
+}
+
+/** E03: the worker's evidence store (its identity `worker-evidence`, ADR-M49 §2.2). */
+export interface ReleaseDeps {
+  readonly store: EvidenceStore;
+  /** Largest evidence file read back (`SDLC_WORKER_EVIDENCE_MAX_ITEM_MB`). */
+  readonly maxItemBytes: number;
 }
 
 export interface IntentActivityDeps {
@@ -85,6 +100,10 @@ export interface IntentActivityDeps {
   readonly g6?: G6Deps;
   /** What G7 reads from the Git host (E01). Without it the intent waits at G7. */
   readonly g7?: G7Deps;
+  /** E03: the evidence store for G8's release pack. Without it the intent waits at G8. */
+  readonly releases?: ReleaseDeps;
+  /** E03: why a release pack could not be built (codes only). */
+  readonly logger?: PlatformLogger;
 }
 
 /** Thrown by a run activity when the worker was started without run support. */
@@ -114,6 +133,7 @@ export function createIntentActivities(deps: IntentActivityDeps): IntentActiviti
           ...(deps.publish ? { publish: true } : {}),
           ...(deps.g6 ? { g6: deps.g6 } : {}),
           ...(deps.g7 ? { g7: deps.g7 } : {}),
+          ...(deps.releases ? { releases: true } : {}),
         },
         ref.intentId,
       ),
@@ -147,5 +167,19 @@ export function createIntentActivities(deps: IntentActivityDeps): IntentActiviti
       return result.ok ? { ok: true } : { ok: false, reason: result.reason };
     },
     abandonPublish: (ref, runId, reason) => abandonPublish(scope(ref), ref.intentId, runId, reason),
+    async buildReleasePack(ref) {
+      if (!deps.releases) return 'unavailable';
+      return buildReleasePack(
+        scope(ref),
+        {
+          registry: deps.registry,
+          store: deps.releases.store,
+          maxItemBytes: deps.releases.maxItemBytes,
+          now: () => deps.registry.now(),
+          ...(deps.logger ? { log: deps.logger } : {}),
+        },
+        ref.intentId,
+      );
+    },
   };
 }

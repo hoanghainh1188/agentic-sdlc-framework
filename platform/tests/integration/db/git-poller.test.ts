@@ -372,7 +372,7 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       for (const code of GATE_REASON_CODES) expect(text).toContain(code);
     });
 
-    it('answers unlinked, unsupported, not-current gates and missing input; stays silent on other comments', async () => {
+    it('answers unlinked, not-current gates and missing input; stays silent on other comments', async () => {
       await newIntent(12);
       // QUESTIONS #68 option A (B07): a second open intent on the same issue is refused, so a
       // comment always names exactly one intent.
@@ -380,6 +380,7 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       await newIntent(13, 'G2');
       const unlinked = post(99, '/approve G1');
       const onPull = post(11, '/approve G1', user(GH.a, 'harry'), { pull: true });
+      // E03: every gate G1–G8 is decided by a command now; G8 only when the intent waits there.
       const unsupported = post(13, '/approve G8');
       const noSpec = post(13, '/approve G2');
       const notCurrent = post(13, '/approve G3');
@@ -388,12 +389,12 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       expect(await receipt(unlinked)).toMatchObject({ reply_code: 'intent_not_linked' });
       // A pull request comment matches `pr_number`, not `issue_number`.
       expect(await receipt(onPull)).toMatchObject({ reply_code: 'intent_not_linked' });
-      expect(await receipt(unsupported)).toMatchObject({ reply_code: 'gate_not_supported' });
+      expect(await receipt(unsupported)).toMatchObject({ reply_code: 'gate_not_current' });
       expect(await receipt(noSpec)).toMatchObject({ reply_code: 'gate_input_missing' });
       expect(await receipt(notCurrent)).toMatchObject({ reply_code: 'gate_not_current' });
       expect(await receipt(chat)).toBeUndefined();
       expect(replies(13)).toEqual([
-        expect.stringContaining(t('comment.reply.gate_not_supported', { gate: 'G8' })),
+        expect.stringContaining(t('comment.reply.gate_not_current', { gate: 'G8' })),
         expect.stringContaining(t('comment.reply.gate_input_missing', { gate: 'G2' })),
         expect.stringContaining(t('comment.reply.gate_not_current', { gate: 'G3' })),
       ]);

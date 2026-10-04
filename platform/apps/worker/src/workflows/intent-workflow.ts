@@ -105,6 +105,13 @@ const { executeRun } = proxyActivities<RunnerActivities>({
   cancellationType: ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
 });
 
+// E03 (ADR-M49 §2.1): the release pack reads every stored evidence file back (minutes). One
+// attempt: the step asks again when it is still needed (the build is idempotent).
+const { buildReleasePack } = proxyActivities<IntentActivities>({
+  startToCloseTimeout: '15 minutes',
+  retry: { maximumAttempts: 1 },
+});
+
 // C08: one push = one attempt (clone, apply, push; minutes, not hours).
 const { publishRun } = proxyActivities<RunnerActivities>({
   taskQueue: RUNNER_TASK_QUEUE,
@@ -143,6 +150,11 @@ export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
         if (!(await drivePublish(ref, result))) await sleep(RUN_ACTIVITY_RETRY_MS);
         continue;
       }
+      if (result.outcome === 'build_pack') {
+        moves += 1;
+        if (!(await driveReleasePack(ref))) await sleep(RUN_ACTIVITY_RETRY_MS);
+        continue;
+      }
     }
     moves = 0;
     const wakeInMs = result.outcome === 'waiting' ? result.wakeInMs : undefined;
@@ -156,6 +168,18 @@ export async function intentWorkflow(ref: IntentWorkflowRef): Promise<string> {
     if (workflowInfo().continueAsNewSuggested) {
       await continueAsNew<typeof intentWorkflow>(ref);
     }
+  }
+}
+
+/**
+ * E03: builds the release pack at G8. False when the store could not be used or the activity
+ * failed: the workflow waits a little and asks the step again.
+ */
+async function driveReleasePack(ref: IntentWorkflowRef): Promise<boolean> {
+  try {
+    return (await buildReleasePack(ref)) !== 'unavailable';
+  } catch {
+    return false;
   }
 }
 

@@ -456,6 +456,7 @@ export const evidencePackSchema = z.object({
   id,
   version: z.number().int().min(1),
   content_sha256: sha256,
+  release_sha256: sha256.nullable(),
   manifest: packFileSchema,
   markdown: packFileSchema,
   locale: code,
