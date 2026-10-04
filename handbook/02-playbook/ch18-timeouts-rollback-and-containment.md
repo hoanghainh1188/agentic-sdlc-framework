@@ -204,6 +204,16 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 - Just before acting, the platform checks the decision again. If the decision has expired, or the plan or input changed, the decision is voided and the escalation waits for a new decision.
 - The platform closes the escalation after it has acted on the decision.
 
+**After a failed or killed run** (task B09 PR 2, QUESTIONS #211). A run that failed (the agent reported an error, the runner was lost, the platform could not check its changes or read its plan file), or that someone stopped with the kill switch (§18.8d), pauses the intent at G4 with a technical escalation to Person B. The decisions do this:
+
+| Decision | What happens |
+|---|---|
+| `resume` | The intent goes back to G4; a new run starts after G4 is decided again. Choose it when the cause is gone (for example the runner is back). If the run answered a review's request for changes and that review was withdrawn, the intent goes back to G7 when the pull request still shows the same commit |
+| `modify` or `roll-back` | The intent goes back to **G3**. G3 is now HITL at every risk tier, and the earlier G3 approval no longer counts. Change the plan and submit it again (`sdlc plan submit`), or approve the same plan again. Choose it when the cause is in the plan, for example when the platform could not read the submitted plan file (`plan_unavailable`) |
+| `terminate` | The intent is closed (`cancelled`) |
+
+The issue gets a status comment for each of these (`run_resumed`, `run_returned`, `terminated`).
+
 **A G5 breach: resume with more budget** (Chapter 13 §13.10.5). When a run stopped at its cost limit, Person A can let the next run spend more. Names in `actions` replace the defaults, so name **both** actions:
 
 ```http
@@ -271,6 +281,7 @@ Use the kill switch when an agent run must stop **now**: it does something it sh
 **Afterwards.** Review the run with the escalation (§18.8b): the run's events, its diff, the logs and traces of §18.8c. Then decide:
 
 - `/decide resume` (or `sdlc escalation decide … resume`): the intent goes back to G4, and a new run starts after G4 is decided again;
+- `/decide modify` or `/decide roll-back`: the intent goes back to G3, HITL (§18.8b, after a failed run);
 - `/decide terminate`: the intent is closed (`cancelled`).
 
 **Good to know.**
@@ -376,3 +387,4 @@ Track:
 | 0.7 | 2026-10-03 | Claude (task C07, PR 2) | §18.8b: resume a G5 breach with more budget (the request body, `run_start` and `budget_increase`; ADR-M34 §2.9) |
 | 0.8 | 2026-10-03 | Claude (task C11, PR 1) | §18.8d platform usage: the kill switch (`/kill`, `sdlc run kill`, `sdlc ops run kill`, who, what happens, afterwards; ADR-M42) |
 | 0.9 | 2026-10-04 | Claude (task C11, PR 2) | §18.8d: loop detection (`loop_detected`, `no_progress`), telling a false `no_progress` from a real stall, raising the window (rule M27; ADR-M42 §2.7) |
+| 0.10 | 2026-10-04 | Claude (task B09, PR 2) | §18.8b: the decisions after a failed run (`modify` / `roll-back` → G3 HITL for every cause); §18.8d: the same after a kill (QUESTIONS #211) |

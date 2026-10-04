@@ -6,7 +6,17 @@ export {
   planErrorMessage,
   type PlanErrorCode,
 } from './errors.js';
-export { parsePlanFile, type ParsedPlan, type PlanParse } from './parse.js';
+export {
+  PLAN_AGENT_TEXT_FIELDS,
+  parsePlanFile,
+  readPlanTaskTexts,
+  type ParsedPlan,
+  type PlanAgentTextField,
+  type PlanParse,
+  type PlanTaskText,
+  type PlanTaskTextField,
+  type PlanTaskTextsRead,
+} from './parse.js';
 export { readPlanFile, type PlanFileRead } from './read.js';
 export {
   PLAN_DIR,

@@ -2,7 +2,8 @@
 //
 // 1. the run must be `running` (provisioned by `provisionRun`);
 // 2. LiteLLM must be on the contract's egress list (the agent reaches models only there, FR-50);
-// 3. load the task: the contract's plan and the intent's spec (AC2);
+// 3. load the task: the contract's plan and the intent's spec (AC2); a plan read from a file
+//    gives its tasks' text, read from the run's clone at the plan's commit (B09 PR 2);
 // 4. join the run's network and start the agent with the contract's caps  → `agent_started`;
 // 5. poll the agent. The iteration cap is the agent's own (`max_iterations`); the time cap is the
 //    runner's: at `max_duration_min` it interrupts the agent, waits the grace period, and otherwise
@@ -64,6 +65,7 @@ import {
 import type { DockerClient } from '../docker/client.js';
 import type { Sandbox } from '../sandbox/lifecycle.js';
 import type { RunnerSettings } from '../settings.js';
+import type { PlanFileReader } from '../workspace/plan-file.js';
 import { attachRunner } from './access.js';
 import { AgentRunError } from './errors.js';
 import { discardFeedbackToken, type FeedbackReader } from './feedback.js';
@@ -122,6 +124,11 @@ export interface AgentDriveDeps {
    */
   readonly feedbackReader?: FeedbackReader;
   readonly unwrapper?: SecretUnwrapper;
+  /**
+   * B09 PR 2 (ADR-M40 §2.7): reads the plan file at the plan's commit from the run's kept clone.
+   * Without it a run whose plan was read from a file fails (`task_unavailable`, `no_clone`).
+   */
+  readonly planFile?: PlanFileReader;
 }
 
 export interface AgentRunRequest {
@@ -405,7 +412,7 @@ export async function driveAgent(
     ({ config } = await loadEffectiveConfig(scope.projectConfigs, contract.project_id));
     watch = spendWatchFor(deps, scope, contract, request.virtualKey, config);
     taskLoading = true; // from here `readRunFeedback` uses or revokes the token
-    const task = await loadAgentTask(scope, contract, feedback);
+    const task = await loadAgentTask(scope, contract, feedback, deps.planFile);
     const endpoint = await attachRunner(
       deps.docker,
       deps.settings,

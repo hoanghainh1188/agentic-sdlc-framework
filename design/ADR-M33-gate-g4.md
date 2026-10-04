@@ -117,6 +117,15 @@ lost runner  → abandonRun    revoke the key at once, the run fails (runner_los
 - A failed or lost run does **not** go straight to G5 (D-03 §6: "Stopped → Escalated: always reviewed"). The escalation: trigger `unusual_behaviour`, route `technical`, severity and response level from config `run.failed_run_escalation` (default `high` / `pause`; new mandatory rule **M20**: the level is `pause`, `contain` or `incident`, so the intent stays frozen until a person decides). Packet: `run_contract` with the contract hash, the run and the agent; the person who allowed the run (`triggered_by`) is a producer.
 - **A lost runner:** the heartbeat timeout fails the activity; the workflow calls `abandonRun`, which **revokes the run's key at once** (Harry: not at its expiry), ends the run `failed` / `runner_lost` and records `run_abandoned`. The sandbox is removed by the runner: on the activity's cancel if it is still alive, otherwise by its clean-up at start and its sweep.
 - **Back from `paused`:** the step moves the intent to `in_gate G4` (notice `run_resumed`) once the run's escalation is closed, or a person decided `resume` for this run's contract (re-checked with `revalidateEscalationDecision`, then closed). G4 is then decided again and a new round starts. A killed run waits (`run_review`) until C11 adds its escalation.
+- **The decisions on a failed run's escalation** (QUESTIONS #211, B09 PR 2; before, `modify` and `roll_back` acted only after the G7 feedback was gone, #191, and every other cause waited for `run_review` with no way forward but `terminate`):
+
+  | Decision (bound to the run's contract, not expired) | The intent goes to |
+  |---|---|
+  | `resume` | `in_gate G4` (notice `run_resumed`), a new round. After the G7 feedback was gone (`agent_feedback_unavailable`): back to G7 when the pull request still shows the pushed commit (ADR-M41 §2.7) |
+  | `modify`, `roll_back` | `in_gate G3`, HITL from then on (`returnedFromG5`), the G3 approvals in force voided (`input_mismatch`), the escalation closed. Notice `run_returned`; `g7_returned` after the G7 feedback was gone. For every stop reason (`agent_task_unavailable`, `runner_lost`, `agent_error`, `agent_changes_unavailable`, …) and for a killed run (C11: its escalation, raised at the kill, is decided the same way), as G5, G6 and G7 escalations already do |
+  | `terminate` | `cancelled` (C11) |
+
+  An expired decision, or one bound to another contract, is voided (`escalation.decision_voided`), never acted on: the escalation goes back to `acknowledged` and the intent waits (`run_review`).
 
 ### 2.8. Where the rules live
 
@@ -221,3 +230,4 @@ Adding the default key `run.agent_key` changes the effective `config_hash` of ev
 | 0.1 | 2026-09-27 | Claude (task C06, session 1) | First version: §2.1–§2.5 built; §2.6–§2.7 planned for session 2 |
 | 0.2 | 2026-09-27 | Claude (task C06, session 2a) | §2.4 check 7 includes the tenant's monthly budget; §2.6 the handoff as built (a cancel stops the agent before the sandbox is removed) (the round from the database, no run twice, the re-check after signing, what the history holds, L1 waits); §2.7 how a run ends, lost runs, back from `paused`; §2.9 session 2b plan with Harry's conditions |
 | 0.3 | 2026-09-27 | Claude (task C06, session 2b) | §2.6 L1 no longer waits; §2.7 `succeeded_proposal_only` → `paused` (`proposal_ready`); §2.9 SeaweedFS and `@aws-sdk/client-s3` checks, as built, remaining gaps; §4 consequences of 2b |
+| 0.4 | 2026-10-04 | Claude (task B09, PR 2), approved by Harry | §2.7 the decisions on a failed run's escalation: `modify` and `roll_back` → G3 HITL for every stop reason and after a kill (QUESTIONS #211) |

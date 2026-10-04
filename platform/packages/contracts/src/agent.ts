@@ -52,8 +52,16 @@ export interface AgentTask {
   };
   /** The plan approved at G3. `plannedFiles` equals the contract's `planned_files`. */
   readonly plan: {
+    /** `plans.summary`: empty for a plan read from a file (B09). */
     readonly summary: string;
     readonly plannedFiles: readonly string[];
+    /**
+     * B09 PR 2 (ADR-M40 §2.7, QUESTIONS #169): the task text of a plan read from a file, read by
+     * the runner from the file at the plan's commit in its own clone, hash checked against the
+     * contract's `plan_sha256`, cleaned and capped. Written by people in the repository and
+     * approved at G3, but untrusted in the prompt: the adapter delimits it. In memory only.
+     */
+    readonly taskText?: PlanTaskTextBlock;
   };
   /**
    * C08 PR 2 (QUESTIONS #158): this run follows a CI failure at G6 (a retry). The agent gets a
@@ -67,6 +75,15 @@ export interface AgentTask {
    * rules, the files or the tools. In memory only: never in Temporal, logs, run events or tables.
    */
   readonly reviewFeedback?: ReviewFeedbackText;
+}
+
+/** The task text of a plan file, rendered and capped by the runner (`PLAN_TASK_TEXT_MAX_CHARS`). */
+export interface PlanTaskTextBlock {
+  readonly text: string;
+  /** Number of tasks in the plan. */
+  readonly tasks: number;
+  /** True when the runner cut a field or the whole text at its cap. */
+  readonly truncated: boolean;
 }
 
 /** The text of a request for changes, capped by the runner (`REVIEW_FEEDBACK_MAX_CHARS`). */

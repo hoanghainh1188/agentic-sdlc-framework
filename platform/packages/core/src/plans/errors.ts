@@ -28,6 +28,11 @@ export class PlanError extends Error {
     message: string,
     readonly refusal?: PlanRefusal,
     readonly gitHostCode?: GitHostErrorCode,
+    /**
+     * The field of a refused file, when known (`tasks[2].summary`, QUESTIONS #210): the file's
+     * fixed keys and task positions only, never its text.
+     */
+    readonly field?: string,
   ) {
     super(message);
   }

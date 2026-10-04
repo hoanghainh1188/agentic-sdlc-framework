@@ -1,4 +1,4 @@
-// Migration 0022: gate G8 (design/D-05 section 6.6, version 1.31; D-08 E03; design/ADR-M49;
+// Migration 0022: gate G8 (design/D-05 section 6.6, version 1.32; D-08 E03; design/ADR-M49;
 // QUESTIONS #220–#222). Rules for every migration: see the header of 0001-tenancy.ts and
 // design/ADR-M09.
 //

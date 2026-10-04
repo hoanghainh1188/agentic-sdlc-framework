@@ -50,22 +50,15 @@ export async function returnedFromG5(scope: TenantScope, intentId: string): Prom
   ) {
     return true;
   }
-  // E01 PR 2 (QUESTIONS #191): `modify` or `roll_back` on the escalation of a run whose G7
-  // feedback was gone took the intent back to G3 the same way.
-  for (const e of escalations) {
-    if (
-      e.status !== 'closed' ||
-      e.packet.gate !== 'G4' ||
-      e.run_id === null ||
-      !G5_RETURN_DECISIONS.includes(String(e.decision?.decision))
-    ) {
-      continue;
-    }
-    if ((await scope.runs.getById(e.run_id))?.stop_reason === 'agent_feedback_unavailable') {
-      return true;
-    }
-  }
-  return false;
+  // QUESTIONS #211 (first E01 PR 2, #191): `modify` or `roll_back` on the escalation of a failed
+  // run took the intent back to G3 the same way.
+  return escalations.some(
+    (e) =>
+      e.status === 'closed' &&
+      e.packet.gate === 'G4' &&
+      e.run_id !== null &&
+      G5_RETURN_DECISIONS.includes(String(e.decision?.decision)),
+  );
 }
 
 /** The hashes of the plans that a run of the intent went outside of. */

@@ -138,6 +138,8 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.merged';
     case 'run_killed':
       return 'intent.status.run_killed';
+    case 'run_returned':
+      return 'intent.status.run_returned';
     case 'g8_review_needed':
       return 'intent.status.g8_review_needed';
     case 'g8_changes_requested':

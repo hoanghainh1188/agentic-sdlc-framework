@@ -31,6 +31,7 @@ export {
   buildTaskMessage,
   CI_FAILED_INSTRUCTION,
   feedbackBlock,
+  planTaskBlock,
   checkTask,
   INSTRUCTIONS_FILE,
   toolsOf,
