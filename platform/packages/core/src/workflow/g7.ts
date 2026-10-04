@@ -54,7 +54,7 @@ import {
   type G7Merger,
   type G7Reading,
 } from './g7-facts.js';
-import { recordReviews, voidStaleReviewApprovals } from './g7-reviews.js';
+import { isReviewReceipt, recordReviews, voidStaleReviewApprovals } from './g7-reviews.js';
 import { gateHistory } from './gate-history.js';
 import { hotlBlockWindowOpenUntil } from './hotl.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
@@ -195,8 +195,10 @@ export async function stepG7(
 /**
  * The request for changes in force at G7 for this input, or null. A request from a review holds
  * only while that review is still its reviewer's latest decision on the pushed commit (a dismissed
- * or replaced review no longer holds G7); a request from a command holds when it is the latest
- * since the intent entered G7.
+ * or replaced review no longer holds G7); a request from a command (a `/request-changes G7`
+ * comment, whose receipt is a comment's, or the API before QUESTIONS #190) holds when it is the
+ * latest since the intent entered G7. Only a `github:review:` receipt makes a request a review's
+ * (fix to E01 PR 1: a comment's receipt was taken for a review's, so the request never held).
  */
 async function activeChangesRequest(
   tx: TenantScope,
@@ -210,7 +212,7 @@ async function activeChangesRequest(
   );
   for (const request of requests.reverse()) {
     const receipt = await tx.gitEventReceipts.findByDecision(request.id);
-    if (receipt === undefined) {
+    if (receipt === undefined || !isReviewReceipt(receipt.event_id)) {
       if (request.id === history.latestChangesRequest) return request.id;
       continue;
     }

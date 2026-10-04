@@ -71,6 +71,7 @@ The G7 input hash binds every G7 decision and escalation (FR-17): the run, its p
 - `/reject G7` → back to **G3**, HITL from then on (as G6 with no retry left, ADR-M38 §2.7); the G3 approvals in force are voided. The pull request stays open; the next run continues from the pushed commit (QUESTIONS #134; no force-push). D-03 §6 and diagram D12 show G7 → G3.
 - A request for changes (a review or a command) holds G7 in PR 1 (`g7_changes_requested`, notice to Person A). A request from a review holds only while that review is still its reviewer's latest decision on the pushed commit: a dismissed review, or a later approval by the same person, releases G7. While a request holds, G7 never passes, even if the pull request is merged.
 - The gate deadline (`oversight.hitl_gate_deadline`, FR-12) raises one overdue escalation per clock start (subject `g7_input`, ADR-M30 §2.9), until the merge.
+- Fixed in E01 PR 2: a request is a review's only when its receipt's event ID starts with `github:review:`; a `/request-changes G7` comment also has a receipt (`github:comment:<id>`) and follows the command rule (the latest request since the entry). PR 1 took every receipt for a review's, so a comment's request was skipped and G7 could pass at the merge.
 
 ### 2.7. PR 2: a request for changes starts a new run (QUESTIONS #179)
 

@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 
 import { REVIEW_FEEDBACK_MAX_CHARS, readRunFeedback } from '../../../apps/runner/src/index.js';
 import type {
+  GitActor,
   IssueCommentText,
   RedactedSecret,
   RepoRef,
@@ -29,6 +30,7 @@ import type {
   RunContract,
 } from '../../../packages/contracts/src/index.js';
 import { decideGate } from '../../../packages/core/src/commands/gate-command.js';
+import { handleGitEvent } from '../../../packages/core/src/commands/git-event-handler.js';
 import type { Intent } from '../../../packages/core/src/db/schema.js';
 import { feedbackSourceFor } from '../../../packages/core/src/workflow/g7-feedback.js';
 import { finishPublish } from '../../../packages/core/src/workflow/publish.js';
@@ -77,7 +79,7 @@ const unwrapper = {
 
 describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQL', () => {
   const w = g7World();
-  const { later, reload, step, review, receipt, g7Decisions, toG7 } = w;
+  const { later, reload, step, review, merge, receipt, g7Decisions, toG7 } = w;
 
   /** The second run after G4: provisioned, succeeded, pushed at `head`; back at G7. */
   async function runAndPush(intent: Intent, head: string): Promise<string> {
@@ -297,7 +299,112 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
     });
   });
 
-  describe('#190: the API and the CLI', () => {
+  describe('comment commands (#190 decision)', () => {
+    let commentId = 900;
+    async function comment(
+      intent: Intent,
+      on: 'pull_request' | 'issue',
+      body: string,
+      who: { gh: number; login: string } = PEOPLE.b,
+      outcome = 'decided',
+    ) {
+      commentId += 1;
+      const current = await intentOf(intent);
+      const issueNumber = on === 'pull_request' ? current.pr_number! : current.issue_number!;
+      const result = await handleGitEvent(
+        w.t.f.scope,
+        { registry: w.t.f.registry },
+        { id: w.t.f.target.projectId, provider: 'github' },
+        {
+          kind: 'comment_created',
+          id: `github:comment:${String(commentId)}`,
+          source: 'polling',
+          repo: { owner: 'acme', name: 'shop' },
+          occurredAt: w.clock.toISOString(),
+          url: `https://github.com/acme/shop/issues/${String(issueNumber)}#issuecomment-${String(commentId)}`,
+          issueNumber,
+          isPullRequest: on === 'pull_request',
+          commentId: String(commentId),
+          author: actor(who),
+          body,
+        },
+      );
+      expect(result).toMatchObject({ outcome });
+      return String(commentId);
+    }
+
+    it.each([
+      ['pull_request', 'pull_requests'],
+      ['issue', 'issues'],
+    ] as const)('a comment on the %s → token %s:read', async (on, permission) => {
+      const intent = await toG7();
+      const id = await comment(intent, on, `/request-changes G7 ${MARKER} fix the totals`);
+      expect(await step(intent)).toEqual({ outcome: 'run_prepare' });
+      expect(await feedbackSourceFor(w.t.f.scope, await intentOf(intent))).toMatchObject({
+        kind: 'source',
+        source: { kind: 'comment', externalId: id, permission },
+      });
+      const tokensBefore = w.t.calls.tokens!.length;
+      const started = await startRun(w.t.f.scope, w.t.runDeps, intent.id);
+      expect(started.ok).toBe(true);
+      expect(w.t.calls.tokens!.slice(tokensBefore)).toEqual([
+        'contents:read',
+        `${permission}:read`,
+      ]);
+      // The command's text stays on the Git host: no table holds it.
+      expect(await tablesContaining(MARKER)).toEqual([]);
+    });
+
+    // Fix to E01 PR 1: a comment's receipt was taken for a review's, so its request never held G7.
+    it('regression (a): approvals complete, a comment request, the step reads → G4, never G8', async () => {
+      const intent = await toG7();
+      review(CAROL, 'approved');
+      expect(await step(intent)).toMatchObject({ reason: 'g7_merge' });
+      await comment(intent, 'pull_request', '/request-changes G7 tests_insufficient');
+      expect(await step(intent)).toEqual({ outcome: 'run_prepare' });
+      expect(await intentOf(intent)).toMatchObject({ status: 'running', current_gate: 'G4' });
+      merge(PEOPLE.b); // a merge now changes nothing at G7: the intent is at G4
+      expect(await intentOf(intent)).toMatchObject({ current_gate: 'G4' });
+    });
+
+    it('regression (a): approvals complete, a comment request, then a merge before the step → merged_before_approval', async () => {
+      const intent = await toG7();
+      review(CAROL, 'approved');
+      expect(await step(intent)).toMatchObject({ reason: 'g7_merge' });
+      await comment(intent, 'pull_request', '/request-changes G7 tests_insufficient');
+      merge(PEOPLE.b); // Person B merges the pushed commit before G7 reads the request
+      await step(intent);
+      expect(await intentOf(intent)).toMatchObject({ status: 'paused', current_gate: 'G7' });
+      expect((await g7Decisions(intent)).at(-1)).toEqual([
+        'fail',
+        'merged_before_approval',
+        'workflow',
+      ]);
+      const escalation = (await w.t.f.scope.escalations.listForIntent(intent.id)).at(-1)!;
+      expect(escalation).toMatchObject({ route: 'security' });
+      expect(await notices(w.t, intent)).not.toContain('merged');
+    });
+
+    it.each([
+      ['a producer (the creator)', PEOPLE.a],
+      ['a person without the role', VIEWER],
+    ])('regression (c): a comment request by %s is refused and starts nothing', async (_n, who) => {
+      const intent = await toG7();
+      await comment(
+        intent,
+        'pull_request',
+        '/request-changes G7 tests_insufficient',
+        who,
+        'refused',
+      );
+      expect(await g7Decisions(intent)).toEqual([]);
+      expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'g7_decision' });
+      expect(await intentOf(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G7' });
+      expect(await feedbackSourceFor(w.t.f.scope, await intentOf(intent))).toEqual({
+        kind: 'none',
+      });
+    });
+
     it('the API and the CLI cannot request changes at G7 (g7_feedback_on_git_host)', async () => {
       const intent = await toG7();
       await expect(
@@ -398,6 +505,53 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
       ).rejects.toMatchObject({ reason: 'feedback_unavailable' });
       expect(fake.calls).toEqual([]);
       expect(await runEvents(runId)).toContainEqual(['wrap_token_reused', { token: 'feedback' }]);
+    });
+
+    it('regression (b): a comment request → G4, and the run reads that comment by its ID', async () => {
+      const intent = await toG7();
+      const current = await intentOf(intent);
+      const result = await handleGitEvent(
+        w.t.f.scope,
+        { registry: w.t.f.registry },
+        { id: w.t.f.target.projectId, provider: 'github' },
+        {
+          kind: 'comment_created',
+          id: 'github:comment:777',
+          source: 'polling',
+          repo: { owner: 'acme', name: 'shop' },
+          occurredAt: w.clock.toISOString(),
+          url: `https://github.com/acme/shop/pull/${String(current.pr_number)}#issuecomment-777`,
+          issueNumber: current.pr_number!,
+          isPullRequest: true,
+          commentId: '777',
+          author: actor(PEOPLE.b),
+          body: '/request-changes G7 tests_insufficient',
+        },
+      );
+      expect(result).toMatchObject({ outcome: 'decided' });
+      expect(await step(intent)).toEqual({ outcome: 'run_prepare' });
+      const started = await startRun(w.t.f.scope, w.t.runDeps, intent.id);
+      if (!started.ok) throw new Error(started.reason);
+      const author: GitActor = actor(PEOPLE.b);
+      const fake = fakeReader({
+        comment: (id) => ({
+          commentId: id,
+          author,
+          body: `/request-changes G7 tests_insufficient add a test for ${MARKER}\nand the 8% rate`,
+        }),
+      });
+      const text = await readRunFeedback(
+        w.t.f.scope as unknown as Scope,
+        await contractOf(started.run.runId),
+        { reader: fake.reader, unwrapper, wrappedToken: started.run.wrappedFeedbackToken! },
+      );
+      expect(fake.calls).toEqual(['comment:777', 'revoke']);
+      expect(text).toEqual({
+        source: 'comment',
+        text: `add a test for ${MARKER}\nand the 8% rate`,
+        truncated: false,
+      });
+      expect(await tablesContaining(MARKER)).toEqual([]);
     });
   });
 
