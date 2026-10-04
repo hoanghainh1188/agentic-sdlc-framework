@@ -37,12 +37,12 @@
 
 | Milestone | Content | Tasks | Sizes |
 |---|---|---|---|
-| M-A | Foundation: infrastructure, security, audit | 11 | S×6 · M×5 |
+| M-A | Foundation: infrastructure, security, audit | 12 | S×7 · M×5 |
 | M-B | Intent + G1–G3 | 13 | S×4 · M×8 · L×1 |
 | M-0 | Sample pilot repo (separate repo, right before M-C) | 4 | S×1 · M×2 · L×1 |
 | M-C | Run + G4–G6 | 12 | S×3 · M×8 · L×1 |
-| M-D | G7–G8 + evidence + cost | 7 | S×4 · M×3 |
-| **Total** | | **47** | |
+| M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
+| **Total** | | **49** | |
 
 ### Order and dependencies between milestones
 
@@ -221,6 +221,21 @@ flowchart LR
 - [ ] AC5: ADR-M19 §2.5 and the deploy README describe the real behaviour; runbook T11 shows `docker compose exec` for admin work
 
 > Note: Small. Must be merged before A10 (TLS on the same listener)
+
+#### A12. Close the unauthenticated SeaweedFS filer and volume access
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | A02 | NFR-03 | platform/deploy/docker-compose.yml, platform/deploy/seaweedfs/*, platform/tests/integration/*, handbook/03-templates/T11-openbao-runbook.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: No process other than SeaweedFS itself can read, write or delete evidence through the filer API (port 8888), the volume servers or the master without authentication (for example filer and volume JWT signing in `security.toml`, or ports bound to the container only); the S3 API with the per-process identities keeps working
+- [ ] AC2: Live test on the pinned SeaweedFS: from another container on the `sdlc` network, a filer GET, an HTTP DELETE and a direct volume read of an evidence object are refused, and a locked version (E05 object lock, legal hold) cannot be deleted by any path except the purge identity's S3 bypass
+- [ ] AC3: Admin work (`weed shell`) runs only inside the seaweedfs container (`docker compose exec`); runbook T11 updated; no secret is printed
+- [ ] AC4: A static test fails if a compose change makes the filer, volume or master ports reachable without authentication again
+
+> Note: Found by E05 (QUESTIONS #239, ADR-M51 gap 5): today every container on the `sdlc` network (api, worker, runner, LiteLLM, Langfuse, Temporal) can read or delete all evidence through the filer at seaweedfs:8888 with no authentication, bypassing object lock and legal hold; sandboxes are not on that network. Must be done before the trial M-E, before any real client data, so E07 depends on it
 
 
 ### M-B — Intent + G1–G3
@@ -718,11 +733,26 @@ flowchart LR
 
 - [ ] AC1: `sdlc metrics gates`: average / maximum waiting time per gate, per project
 
+#### E08. Purge a project's data from Langfuse
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | E05 | FR-44 | platform/apps/worker (retention), platform/deploy (Langfuse key in OpenBao), handbook/03-templates/T11-openbao-runbook.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: Spike on the pinned Langfuse v4 (`events_only`): how to delete a project's traces and observations by their `tenant:` and `project:` labels; record the result in an ADR (the legacy traces API answers 404 in this mode)
+- [ ] AC2: The Langfuse project key lives in OpenBao, readable only by the process that purges (today only the otel-collector holds it, in `.env`)
+- [ ] AC3: When E05 purges an archived project, its Langfuse data is deleted too; `project.purged` records `langfuse: purged` instead of `manual`; Langfuse data past `evidence_retention_days` is deleted the same way
+- [ ] AC4: Live test in `pnpm test:observability`: a project's traces are gone after the purge, another project's traces stay
+
+> Note: Found by E05 (QUESTIONS #238): LiteLLM's traces in Langfuse carry prompts and responses (client data, ADR-M35); OSS self-hosted Langfuse has no automatic retention. Until E08, `project.purged` says `langfuse: manual` and runbook T11 lists the manual steps
+
 #### E07. MVP definition-of-done check
 
 | Size | Depends on | Requirements | Code area |
 |---|---|---|---|
-| M | E03, E04, E05, C09, B13, C12 | D-02 section 10 | platform/tests/integration/*, README |
+| M | E03, E04, E05, C09, B13, C12, A12 | D-02 section 10 | platform/tests/integration/*, README |
 
 **Acceptance criteria**
 
@@ -799,4 +829,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.15 | 2026-10-04 | Claude, approved by Harry | New task C12: the scheduled spend sync of ADR-M24 §2.5, which was never built (QUESTIONS #197, ADR-M45); E07 depends on C12; E07 note: plan the MVP+1 user interface after M-E |
 | 1.16 | 2026-10-04 | Claude (task E02), approved by Harry | E03 note: seal one version of the pack, the disclosure check, how the worker builds the pack (open); E05 note: purge the pack files of every version, keep the rows, sweep unreferenced files (ADR-M48, QUESTIONS #215–#217) |
 | 1.17 | 2026-10-04 | Claude (task E03), approved by Harry | E03 note: done (release hash, `worker-evidence`), MVP+1 `release.environment` and the PM/BrSE disclosure confirmation; C12 note: late cost records void G8 approvals; E05 note: the worker identity, pack versions at G8 (ADR-M49, QUESTIONS #220–#222) |
+| 1.18 | 2026-10-04 | Claude, approved by Harry | New tasks A12 (close the unauthenticated SeaweedFS filer and volume access, QUESTIONS #239; E07 depends on it) and E08 (purge the Langfuse data of a project, QUESTIONS #238), both found by E05 |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
