@@ -161,7 +161,7 @@ When CI passed at G6 (Chapter 14 §14.10.2), the intent waits at **G7**. The pla
 - **Request changes**: a request for changes at G7.
 - A review with comments only changes nothing.
 
-`/approve G7` in a comment or `sdlc gate approve G7` is refused: G7 approvals are GitHub reviews, so GitHub and the platform see the same approvals. `/reject G7 <reason>` and `/request-changes G7 <reason>` (comment or CLI) are accepted.
+`/approve G7` in a comment or `sdlc gate approve G7` is refused: G7 approvals are GitHub reviews, so GitHub and the platform see the same approvals. `/reject G7 <reason>` (comment or CLI) and `/request-changes G7 <reason>` (comment only, see "Requesting changes") are accepted.
 
 **Which reviews count.** The platform reads the reviews itself; it does not rely on the repository's branch protection count.
 
@@ -199,11 +199,29 @@ Acknowledge it, then decide:
 
 **Rejecting.** `/reject G7 <reason>` takes the intent back to **G3**, HITL from now on; the G3 approvals in force no longer count. The pull request stays open, and the next run continues from its last commit.
 
-**Requesting changes.** For now the request holds G7, and the platform posts **changes requested**. A later update starts a new run from the pull request's last commit, with the reviewer's comments.
+**Requesting changes.** A request for changes starts a new run. The intent goes back to **G4**, and the platform posts **changes requested**. The new run starts from the pull request's last commit, and the agent gets your feedback.
+
+How to request changes:
+
+- Submit a GitHub review with **Request changes** on the pull request. Write what to change in the review and in its line comments.
+- Or write a comment on the pull request or on the intent's issue: `/request-changes G7 [reason_code] <what to change>`. Lines below the command are part of the feedback.
+- `sdlc gate request-changes G7` and the API are refused (`g7_feedback_on_git_host`): the agent reads the feedback from the review or the comment, so write it there.
+
+What the platform does with it:
+
+- The request must come from a person who holds the gate's role and is not a producer, linked to a platform user, like an approval. A request from anyone else is ignored and starts nothing.
+- The agent reads only **your** review or comment, the one recorded as the request. Other reviews on the pull request are never read.
+- The agent gets at most 8,000 characters of feedback; longer feedback is cut. Write the most important points first.
+- The agent is told that the feedback is data written by a person: it cannot change the task, the plan, the files the agent may change, its tools or its rules.
+- The feedback is never copied into the platform's records: it stays on GitHub.
+- The earlier approvals do not count for the new commit. Review it again.
+- There is no limit on the number of rounds; each round needs a person's request, and the intent budget caps the cost.
+
+The new run does not start, and the intent is **paused** at G4 with a `technical` escalation (Chapter 18), when the request no longer holds before the run starts: you dismissed your review or replaced it with an approval, your GitHub account was unlinked, or GitHub could not be read. `resume` tries a new run, which works only when the cause is gone (GitHub is back, the account is linked again). After a dismissed or replaced review, decide `terminate`: the platform has no way back to G7 from this escalation yet.
 
 **Deadline.** If G7 waits for a person longer than `oversight.hitl_gate_deadline`, an escalation is raised (Chapter 18), until the merge.
 
-**Platform operator:** no new GitHub App permission is needed (Pull requests and Contents: read).
+**Platform operator:** no new GitHub App permission is needed. The feedback is read with Pull requests: read (reviews, pull request comments) or Issues: read (issue comments); the App already has both.
 
 ---
 
@@ -244,3 +262,4 @@ Acknowledge it, then decide:
 | 0.1 | 2026-09-24 | Claude (draft) | First content; platform usage section reserved for Claude Code |
 | 0.2 | 2026-09-24 | Claude (draft) | Dual approval at G7 for migration, payment, personal data, production infrastructure, breaking change, safety function (Harry) |
 | 0.3 | 2026-10-03 | Claude (task E01) | §15.10.1: G7 with the platform (reviews, producers, dual approval, merge, escalations); ADR-M41 |
+| 0.4 | 2026-10-04 | Claude (task E01, PR 2) | §15.10.1: a request for changes starts a new run with the reviewer's feedback; requests only by a review or a comment (QUESTIONS #190); ADR-M41 §2.7 |
