@@ -18,6 +18,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "clean": "tsc -b --clean",
     "test:compose": "SDLC_COMPOSE_IT=1 vitest run --config vitest.integration.config.ts platform/tests/integration/deploy",
+    "test:seaweedfs": "SDLC_COMPOSE_IT=1 vitest run --config vitest.integration.config.ts platform/tests/integration/deploy/seaweedfs-access.test.ts",
     "test:db": "platform/deploy/scripts/test-db.sh",
     "test:workflow": "tsc -b platform/apps/worker && SDLC_WORKFLOW_TEST=1 SDLC_TEMPORAL_TEST_SERVER=\"$(platform/deploy/scripts/temporal-test-server.sh)\" SDLC_TEST_DB_DIR=platform/tests/integration/workflow platform/deploy/scripts/test-db.sh",
     "test:workflow-compose": "tsc -b platform/apps/worker && SDLC_WORKFLOW_COMPOSE_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/workflow/compose-smoke.test.ts platform/deploy/scripts/test-db.sh",

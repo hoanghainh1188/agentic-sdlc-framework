@@ -345,7 +345,7 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
    ```bash
    pnpm openbao:bootstrap runner-evidence-credentials
    ```
-   Without it the runner still starts (log line `runner.evidence_missing`), but every High-risk run fails when it tries to store its proposal, and every other run fails at its end (`agent_changes_unavailable`): no run reaches G5 without its stored diff. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys.
+   Without it the runner still starts (log line `runner.evidence_missing`), but every High-risk run fails when it tries to store its proposal, and every other run fails at its end (`agent_changes_unavailable`): no run reaches G5 without its stored diff. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys. Admin work in SeaweedFS: section 5k.
 4. Start: `pnpm compose:sandbox` (profiles `core` and `sandbox`). It also starts the npm package proxy (`npm-proxy`, Verdaccio) and the local image registry (`registry`).
 5. Check: `docker compose … ps sdlc-runner` shows `healthy`. The runner's log has one line with `"event":"runner.started"`.
 
@@ -397,7 +397,7 @@ So the API can now read client code (proposals and diffs). It reads one file at 
 3. Restart the API: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile platform restart sdlc-api`.
 4. Check: the API's log has no line with `api.evidence_missing`. `sdlc evidence build <INT-…>` on an intent you may build answers with a version.
 
-Without it the API still starts (log line `api.evidence_missing`), but `sdlc evidence build` and `sdlc evidence export` answer `evidence_unavailable`. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys.
+Without it the API still starts (log line `api.evidence_missing`), but `sdlc evidence build` and `sdlc evidence export` answer `evidence_unavailable`. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys. Admin work in SeaweedFS: section 5k.
 
 ### Rotation
 
@@ -447,7 +447,7 @@ It has **no `Read`**: it never sees a file's content.
 
 **The lock.** `seaweedfs-init` turns on object lock for the bucket `evidence`: mode GOVERNANCE, 180 days by default (`SEAWEEDFS_LOCKED_BUCKETS=evidence:GOVERNANCE:180`). From then on no writer (runner, API, worker) can delete a version during its first 180 days. Only `worker-purge` can bypass the lock, and only for an archived project or a pack file without a row. A legal hold (set for a held intent) refuses even that. The lock cannot be turned off again.
 
-> Known gap (QUESTIONS #239, follow-up task): the SeaweedFS filer API on port 8888 of the Compose network has no authentication and skips the lock. Until it is fixed, treat every container on the network `sdlc` as able to delete evidence.
+> The filer API that once skipped the lock (QUESTIONS #239) is closed since task A12: only the S3 API is reachable on the Compose network (section 5k).
 
 ### First set-up
 
@@ -488,6 +488,26 @@ The loop starts in `report` mode: it counts what it would purge and deletes noth
 | What | Steps |
 |---|---|
 | The purge key (`worker-purge`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap worker-purge-credentials`, then restart `sdlc-worker`. The old key stops working at once; a pass that runs at that moment fails and the next one tries again |
+
+## 5k. SeaweedFS admin work
+
+Since task A12 (`design/ADR-M52-seaweedfs-internal-access.md`) only the S3 API of SeaweedFS (port 8333) is reachable on the Compose network. The master, the volume server and the filer listen on `127.0.0.1` inside the container `seaweedfs`, and they need JWT keys. No other container, and no host process, can reach them.
+
+**The keys.** `platform/deploy/seaweedfs/start.sh` makes four new random keys at every start and writes them to `/etc/seaweedfs/security.toml` inside the container (mode 600). They are kept nowhere else: not in `.env`, not in OpenBao. A restart rotates them; nothing to do. If the script cannot write them, SeaweedFS does not start: the container log has a line `seaweedfs-start: …`. Fix the cause (usually a read-only or full file system) and start it again. Never copy the file or print it.
+
+**Admin commands** run only inside the container, with the master at `127.0.0.1`:
+
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core exec seaweedfs weed shell -master=127.0.0.1:9333
+```
+
+- The service name `seaweedfs` as the master address does not work any more: the master does not listen on the network.
+- The `*-credentials` commands of `pnpm openbao:bootstrap` do this for you.
+- Never run `s3.config.show`, or `s3.configure` without `-apply`: they print the keys.
+- `weed shell` inside the container can delete anything, locked files too (`fs.rm`). Use it only for the commands of this runbook, and record each use in the operations log.
+- `seaweedfs-init` runs in the network namespace of `seaweedfs` (Compose `network_mode: service:seaweedfs`). Never give another service that setting.
+
+**After the A12 update:** run `pnpm compose:core` once. It recreates `seaweedfs` with the new settings and runs `seaweedfs-init` again. Existing data stays readable; the identities are kept.
 
 ## 6. Daily snapshot backup
 
@@ -650,3 +670,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.19 | 2026-10-04 | Claude Code (task E02) | Section 5h: `api-evidence-credentials` (SeaweedFS identity `api-evidence` at `kv/api/evidence`: reads proposals and diffs, reads and writes packs), rotation; troubleshooting rows `evidence_unavailable` and failed hash checks (ADR-M48). Tested with throw-away keys (`pnpm test:openbao`) |
 | 0.20 | 2026-10-04 | Claude Code (task E03) | Section 5i: `worker-evidence-credentials` (SeaweedFS identity `worker-evidence` at `kv/worker/evidence`, the same rights as `api-evidence`), rotation (ADR-M49). Tested with throw-away keys (`pnpm test:openbao`) |
 | 0.21 | 2026-10-04 | Claude Code (task E05, PR 1) | Section 5j: `worker-purge-credentials` (SeaweedFS identity `worker-purge` at `kv/worker/purge`: delete, bypass, legal hold and lock on the evidence prefixes, list, no read), the GOVERNANCE lock on `evidence`, from `report` to `purge`, archived projects, the manual Langfuse deletion, rotation (ADR-M51) |
+| 0.22 | 2026-10-04 | Claude Code (task A12) | New section 5k: SeaweedFS admin work only inside the container (`-master=127.0.0.1:9333`), the JWT keys made at each start, a failed start; section 5j: the filer gap is closed (ADR-M52, QUESTIONS #239, #245, #246). Tested with throw-away keys (`pnpm test:seaweedfs`, `pnpm test:openbao`) |

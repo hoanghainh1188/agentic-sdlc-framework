@@ -65,7 +65,7 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 | Temporal (gRPC) | 7233 | Namespace `default`; closed workflows kept 30 days |
 | Temporal UI | 8080 | |
 | LiteLLM | 4000 | Models only with the profile `models` (keys from OpenBao). Without it: no models, development keys from `.env` |
-| SeaweedFS S3 | 8333 | Anonymous access denied |
+| SeaweedFS S3 | 8333 | Anonymous access denied. The only SeaweedFS port reachable from outside its container (A12) |
 | Langfuse | 3000 | `observability` profile only |
 | API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI |
 | Sandbox image registry | 5050 | `sandbox` profile only. **Always 127.0.0.1** (not `SDLC_BIND_ADDR`): it has no authentication. Not 5000: macOS uses it |
@@ -73,6 +73,8 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 Valkey, ClickHouse, the Langfuse worker, the OpenTelemetry Collector, **OpenBao**, the runner, the socket proxy and the npm proxy publish no port.
 
 OpenBao is reachable only on the Compose network (`design/QUESTIONS.md` #27, task A11). The platform processes run in Compose and use `http://openbao:8200`. Key holders and admins work inside the container with `pnpm openbao:bootstrap …` or `docker compose … exec openbao …` (runbook T11). There is no host port for `curl`.
+
+SeaweedFS (task A12, `design/ADR-M52-seaweedfs-internal-access.md`): only the S3 API (8333) listens on the Compose network; every platform process uses it with its own identity. The master, volume server and filer listen on `127.0.0.1` inside the container and need JWT keys that `seaweedfs/start.sh` makes at every start (kept nowhere else; no keys, no start). Admin work: `docker compose … exec seaweedfs weed shell -master=127.0.0.1:9333` (runbook T11 §5k). `seaweedfs-init` runs in the container's network namespace.
 
 ## Platform database roles
 

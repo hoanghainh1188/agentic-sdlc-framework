@@ -43,7 +43,7 @@ What existed before E05:
 | GOVERNANCE + `BypassGovernanceRetention:<prefix>/*` | Writers are refused, even with the bypass header; only the identity with the action (and the admin) deletes early |
 | Legal hold (`PutObjectLegalHold`) | Refuses deletion even after the retention ends and even with the bypass |
 | `@aws-sdk/client-s3` 3.1141.0 | `DeleteObject` with `VersionId` and bypass, `PutObjectLegalHold`, `Get`/`PutObjectRetention`, `ListObjectVersions` all work against it |
-| The filer API (`seaweedfs:8888`) | **Skips the lock**: see gap 5 (§4) |
+| The filer API (`seaweedfs:8888`) | **Skipped the lock**: see gap 5 (§4), closed by ADR-M52 (A12): the filer listens on 127.0.0.1 inside the container only |
 
 **Decision (Harry, plan approval):**
 
@@ -174,11 +174,12 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
 
 ## 4. Consequences and gaps
 
-- **Gap 5 (QUESTIONS #239, new): the filer API skips the lock.** Checked live on 4.48:
+- **Gap 5 (QUESTIONS #239): the filer API skipped the lock. Closed by ADR-M52.** Checked live on 4.48:
   - a plain HTTP `DELETE` on `seaweedfs:8888`, and `weed shell fs.rm`, delete a version that has a COMPLIANCE lock and a legal hold;
   - an HTTP `GET` from another container reads any file.
   - The filer has no authentication, and every container on the network `sdlc` reaches it. So any process there (api, worker, runner, LiteLLM, Langfuse, Temporal…) can read or delete all evidence, bypassing the S3 identities and the lock. Sandboxes are not on that network.
   - Not fixed in E05: task A12, before the trial M-E (for example filer JWT signing in `security.toml`, or a filer bound to its own container, with a live test).
+  - **Closed by ADR-M52 (task A12, 2026-10-04):** the master, volume server and filer listen on 127.0.0.1 inside the container only, and need JWT keys made at each start; the S3 gateway's gRPC port (QUESTIONS #245) needs the filer key. A live test proves every path refused.
 - **Gap 3 stays:** the `.env` admin identity can bypass GOVERNANCE.
 - **Gap 4 stays:** the S3 secrets sit in the filer store on disk.
 - **The worker holds one more credential** (`worker-purge`). It can delete evidence after its lock, and bypass the lock under the three prefixes. It cannot read.
@@ -203,3 +204,4 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
 | 0.1 | 2026-10-04 | Claude (task E05, PR 1) | First version: lock, purge, holds, archive, guard, report mode (AC1–AC3). PR 2 adds the daily audit anchor (AC4) |
 | 0.2 | 2026-10-04 | Claude (task E05, PR 1) | After the code review: the archive purge is scheduled first (`project.purge_scheduled`), the guard counts every due row, the re-check reads project and configuration again, the orphan sweep needs two sightings and a cap; known limits |
 | 0.3 | 2026-10-04 | Claude (task E05, PR 1) | §4: open items for M-F (an un-archive command; who may release a hold), after Harry's review |
+| 0.4 | 2026-10-04 | Claude (task A12) | §2.1 and §4: gap 5 closed by ADR-M52 |
