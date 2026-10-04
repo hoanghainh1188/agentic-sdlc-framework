@@ -64,6 +64,19 @@ export async function lastPushedHead(
   return null;
 }
 
+/**
+ * The intent's last run that the platform pushed (E01 PR 2, QUESTIONS #191): the run G7 reviews.
+ * The same as the latest run, except after a run that answered a request for changes failed
+ * before it pushed and a `resume` took the intent back to G7.
+ */
+export async function lastPushedRun(tx: TenantScope, intentId: string): Promise<Run | undefined> {
+  const runs = await tx.runs.listForIntent(intentId);
+  for (const run of [...runs].reverse()) {
+    if ((await publishState(tx, run.id)).pushed) return run;
+  }
+  return undefined;
+}
+
 /** The intent's latest run (the run G5 passed when the intent waits at G6). */
 export async function latestRun(tx: TenantScope, intentId: string): Promise<Run | undefined> {
   return (await tx.runs.listForIntent(intentId)).at(-1);

@@ -54,9 +54,15 @@ import {
 } from '../escalation/decide.js';
 import { raiseEscalation } from '../escalation/raise.js';
 import { failedRunRoute } from '../kill/kill-run.js';
+import { G5_RETURN_DECISIONS } from './g5-scope.js';
 import type { Registry } from '../registry/registry.js';
 import { G4_OPERATOR_ROLES } from './g4.js';
-import { prepareRun, type PrepareRunDeps, type PrepareRunResult } from './prepare-run.js';
+import {
+  FEEDBACK_UNAVAILABLE,
+  prepareRun,
+  type PrepareRunDeps,
+  type PrepareRunResult,
+} from './prepare-run.js';
 import { isFinalRun, roundRuns } from './run-round.js';
 
 /** Run statuses that go to G5 (C07 decides what happens next). */
@@ -146,6 +152,15 @@ export async function stepPaused(
   if (escalation.status !== 'closed' && String(escalation.decision?.decision) === 'terminate') {
     return terminate(tx, registry, intent, escalation, latest.id, now);
   }
+  // E01 PR 2 (QUESTIONS #191): the run that answered a request for changes at G7 failed because
+  // the request's feedback was gone; `modify` or `roll_back` take the intent back to G3, HITL.
+  if (
+    escalation.status !== 'closed' &&
+    latest.stop_reason === FEEDBACK_UNAVAILABLE &&
+    G5_RETURN_DECISIONS.includes(String(escalation.decision?.decision))
+  ) {
+    return returnToG3(tx, registry, intent, escalation, latest.id, now);
+  }
   if (escalation.status !== 'closed') {
     if (!decisionAllows(escalation, 'run_start', now)) {
       return { outcome: 'waiting', reason: 'run_review' };
@@ -215,6 +230,61 @@ async function terminate(
       previousGate: intent.current_gate,
       decisionId: null,
       audienceRoles: [],
+    });
+  }
+  return { outcome: 'moved' };
+}
+
+/**
+ * `modify` or `roll_back` on the escalation of a run whose G7 feedback was gone (QUESTIONS #191):
+ * the decision binds the run's contract and has not expired (FR-17); then back to G3, HITL from
+ * then on (`returnedFromG5`), the G3 approvals in force voided.
+ */
+async function returnToG3(
+  tx: TenantScope,
+  registry: Registry,
+  intent: Intent,
+  escalation: Escalation,
+  runId: string,
+  now: Date,
+): Promise<IntentStepResult> {
+  const contract = await tx.runContracts.getByRunId(runId);
+  const check = await revalidateEscalationDecision(
+    tx,
+    {
+      escalationId: escalation.id,
+      subjectSha256: contract?.contract_sha256 ?? '',
+      action: 'gate_advance',
+    },
+    { now: () => now },
+  );
+  if (!check.valid && check.reason !== 'scope_mismatch') {
+    return { outcome: 'waiting', reason: 'run_review' };
+  }
+  await closeEscalation(
+    tx,
+    { escalationId: escalation.id, closedBy: { type: 'system' } },
+    { now: () => now },
+  );
+  await registry.voidApprovals(tx, {
+    intentId: intent.id,
+    gate: 'G3',
+    reasonCode: 'input_mismatch',
+  });
+  const moved = await tx.intents.moveState(intent.id, {
+    from: { status: intent.status, currentGate: intent.current_gate },
+    to: { status: 'in_gate', currentGate: 'G3' },
+    at: now,
+  });
+  if (moved) {
+    await tx.intentNotices.record({
+      intentId: intent.id,
+      kind: 'g7_returned',
+      status: 'in_gate',
+      gate: 'G3',
+      previousGate: intent.current_gate,
+      decisionId: null,
+      audienceRoles: ['person_b'],
     });
   }
   return { outcome: 'moved' };

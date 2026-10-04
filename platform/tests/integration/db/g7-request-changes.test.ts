@@ -32,12 +32,13 @@ import type {
 import { decideGate } from '../../../packages/core/src/commands/gate-command.js';
 import { handleGitEvent } from '../../../packages/core/src/commands/git-event-handler.js';
 import type { Intent } from '../../../packages/core/src/db/schema.js';
+import { returnedFromG5 } from '../../../packages/core/src/workflow/g5-scope.js';
 import { feedbackSourceFor } from '../../../packages/core/src/workflow/g7-feedback.js';
 import { finishPublish } from '../../../packages/core/src/workflow/publish.js';
 import { finishRun, startRun } from '../../../packages/core/src/workflow/run-lifecycle.js';
 import { BASE_1, notices, Secret } from '../g4-harness.js';
 import { PEOPLE } from '../workflow/fixture.js';
-import { actor, CAROL, DAY, g7World, HEAD, STRANGER, VIEWER } from './g7-world.js';
+import { actor, CAROL, DAY, g7World, HEAD, OTHER, STRANGER, VIEWER } from './g7-world.js';
 import { describeDb, tamper } from './helpers.js';
 
 const HEAD_2 = 'c'.repeat(40);
@@ -79,7 +80,7 @@ const unwrapper = {
 
 describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQL', () => {
   const w = g7World();
-  const { later, reload, step, review, merge, receipt, g7Decisions, toG7 } = w;
+  const { later, reload, step, review, merge, receipt, g7Decisions, toG7, decideOn } = w;
 
   /** The second run after G4: provisioned, succeeded, pushed at `head`; back at G7. */
   async function runAndPush(intent: Intent, head: string): Promise<string> {
@@ -253,6 +254,56 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
       expect(await step(intent)).toEqual({ outcome: 'run_prepare' });
       w.t.calls.reviews = [{ ...fromB, state: 'dismissed' }];
       await expectNoRun(intent, 'review_withdrawn');
+    });
+
+    /** Person B's review dismissed after the move to G4: the run fails, paused at G4. */
+    async function dismissedAtG4(): Promise<Intent> {
+      const intent = await toG7();
+      const fromB = review(PEOPLE.b, 'changes_requested');
+      expect(await step(intent)).toEqual({ outcome: 'run_prepare' });
+      w.t.calls.reviews = [{ ...fromB, state: 'dismissed' }];
+      w.world.reviews = [{ ...fromB, state: 'dismissed' }];
+      await expectNoRun(intent, 'review_withdrawn');
+      return intent;
+    }
+
+    it('#191: resume, the pull request still shows the pushed commit → back to G7, waits for reviews', async () => {
+      const intent = await dismissedAtG4();
+      await decideOn(intent, 'resume');
+      expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'g7_decision' });
+      expect(await intentOf(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G7' });
+      expect(await notices(w.t, intent)).toContain('g7_resumed');
+      // The normal G7 rules on the same commit: a new approval by Person B → ready to merge.
+      review(PEOPLE.b, 'approved');
+      expect(await step(intent)).toMatchObject({ reason: 'g7_merge' });
+    });
+
+    it('#191: resume, the head moved → back to G4 (a new run), as for any failed run', async () => {
+      const intent = await dismissedAtG4();
+      w.world.head = OTHER;
+      await decideOn(intent, 'resume');
+      await step(intent);
+      expect(await intentOf(intent)).toMatchObject({ current_gate: 'G4' });
+      expect(await notices(w.t, intent)).toContain('run_resumed');
+      expect(await notices(w.t, intent)).not.toContain('g7_resumed');
+    });
+
+    it('#191: terminate → cancelled', async () => {
+      const intent = await dismissedAtG4();
+      await decideOn(intent, 'terminate');
+      await step(intent);
+      expect(await intentOf(intent)).toMatchObject({ status: 'cancelled', current_gate: 'G4' });
+    });
+
+    it('#191: roll_back → G3, HITL from then on; G3 approvals voided', async () => {
+      const intent = await dismissedAtG4();
+      await decideOn(intent, 'roll_back');
+      await step(intent);
+      expect(await intentOf(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G3' });
+      expect(await notices(w.t, intent)).toContain('g7_returned');
+      expect(await returnedFromG5(w.t.f.scope, intent.id)).toBe(true);
+      const g3 = await w.t.f.scope.gateDecisions.listForIntent(intent.id, 'G3');
+      expect(g3.at(-1)?.decision).toBe('void');
     });
 
     it('the review was replaced by an approval after the move to G4', async () => {

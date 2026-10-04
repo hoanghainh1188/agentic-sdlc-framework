@@ -179,7 +179,10 @@ async function readSource(
   try {
     if (source.kind === 'review') {
       const review = await reader.getReviewFeedback(token, ref, source.prNumber, source.externalId);
-      if (review.reviewer.type !== 'user' || !source.deciderAccountIds.includes(review.reviewer.id)) {
+      if (
+        review.reviewer.type !== 'user' ||
+        !source.deciderAccountIds.includes(review.reviewer.id)
+      ) {
         return 'author_mismatch';
       }
       if (review.state !== 'changes_requested' || review.commitSha !== source.pushedHead) {

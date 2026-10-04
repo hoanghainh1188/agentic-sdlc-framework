@@ -25,7 +25,7 @@ import type {
 import type { Intent, Run } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { projectRepoRef } from './g4-proposal.js';
-import { latestRun, publishState } from './publish-state.js';
+import { lastPushedRun, publishState } from './publish-state.js';
 
 /** What G7 reads outside the database (the worker wires the Git host in; tests pass fakes). */
 export interface G7Deps {
@@ -65,7 +65,7 @@ export async function readG7(
   deps: G7Deps,
   intent: Intent,
 ): Promise<G7Reading | null> {
-  const run = await latestRun(scope, intent.id);
+  const run = await lastPushedRun(scope, intent.id);
   if (!run || intent.pr_number === null) return null;
   const { pushed } = await publishState(scope, run.id);
   const project = await scope.projects.getById(intent.project_id);
@@ -137,7 +137,7 @@ export interface G7Facts {
 
 /** The G7 facts of the intent's last run from the database, or null before its pull request. */
 export async function gatherG7Facts(scope: TenantScope, intent: Intent): Promise<G7Facts | null> {
-  const run = await latestRun(scope, intent.id);
+  const run = await lastPushedRun(scope, intent.id);
   if (run?.status !== 'succeeded' || intent.pr_number === null) return null;
   const pushed = (await scope.runEvents.list(run.id))
     .filter((e) => e.event_type === 'branch_pushed')

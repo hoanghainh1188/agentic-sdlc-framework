@@ -62,7 +62,7 @@ import {
   sentBackForInput,
   type EarlierBlock,
 } from './hotl.js';
-import { gatherG4Facts, type G4Deps, type G4Facts } from './g4-proposal.js';
+import { gatherG4Facts, projectRepoRef, type G4Deps, type G4Facts } from './g4-proposal.js';
 import {
   checkSpec,
   gatherSpecFacts,
@@ -79,6 +79,8 @@ import { stepG7, stepPausedG7 } from './g7.js';
 import { readG7, type G7Deps, type G7Reading } from './g7-facts.js';
 import { refusedPlanHashes, returnedFromG5 } from './g5-scope.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
+import { FEEDBACK_UNAVAILABLE } from './prepare-run.js';
+import { lastPushedHead } from './publish-state.js';
 import { moveTo, moveToRunning, stepPaused, stepRunning } from './run-lifecycle.js';
 import { waitedSeconds } from './waited.js';
 
@@ -233,6 +235,10 @@ export async function stepIntent(
       }
     }
   }
+  // E01 PR 2 (QUESTIONS #191): a run that answered a request for changes failed because the
+  // feedback was gone; `resume` goes back to G7 when the pull request still shows the pushed
+  // commit. Read before the lock.
+  const resumeHead = await readResumeHead(scope, deps, intentId);
   return scope.transaction(async (tx) => {
     const intent = await tx.intents.lockAndGet(intentId);
     if (!intent) throw new WorkflowError('intent_not_found', `intent ${intentId} not found`);
@@ -252,6 +258,8 @@ export async function stepIntent(
       if (intent.status === 'paused') {
         const paused = await stepPaused(tx, deps.registry, intent);
         if (paused !== 'resume') return paused;
+        const back = await resumeAtG7(tx, deps.registry, intent, resumeHead);
+        if (back !== null) return back;
         await moveTo(tx, deps.registry, intent, 'in_gate', 'G4', 'run_resumed');
         return moved;
       }
@@ -643,6 +651,72 @@ async function move(
     previousGate: intent.current_gate,
     decisionId,
     audienceRoles: await audienceFor(tx, policy, updated, to, kind, intent.current_gate),
+  });
+  return moved;
+}
+
+/** The pull request as the `resume` of a feedback-failed run sees it (QUESTIONS #191). */
+type ResumeHead = { readonly open: boolean; readonly headSha: string } | 'unavailable' | null;
+
+/** Null unless the intent is paused at G4 after a run failed for its G7 feedback. */
+async function readResumeHead(
+  scope: TenantScope,
+  deps: StepDeps,
+  intentId: string,
+): Promise<ResumeHead> {
+  if (!deps.g7 || !deps.startRuns) return null;
+  const peek = await scope.intents.getById(intentId);
+  if (peek?.status !== 'paused' || peek.current_gate !== 'G4' || peek.pr_number === null) {
+    return null;
+  }
+  const latest = (await scope.runs.listForIntent(intentId)).at(-1);
+  if (latest?.stop_reason !== FEEDBACK_UNAVAILABLE) return null;
+  const project = await scope.projects.getById(peek.project_id);
+  const ref = project ? projectRepoRef(project) : undefined;
+  if (!ref) return null;
+  try {
+    const pr = await deps.g7.gitHost.getPullRequest(ref, peek.pr_number);
+    return { open: pr.state === 'open' && !pr.merged, headSha: pr.headSha };
+  } catch (error) {
+    if (!(error instanceof GitHostError)) throw error;
+    return 'unavailable';
+  }
+}
+
+/**
+ * QUESTIONS #191: after `resume` on the escalation of a run that failed because the feedback of
+ * its request for changes was gone, the intent goes back to G7 when the pull request is open and
+ * still shows the commit the platform pushed last; G7 then waits for reviews of that commit. A
+ * moved head, a closed pull request, or another failure: null (back to G4, as for any failed
+ * run). A Git host that cannot be read: wait and read again (the escalation is closed already).
+ */
+async function resumeAtG7(
+  tx: TenantScope,
+  registry: Registry,
+  intent: Intent,
+  head: ResumeHead,
+): Promise<IntentStepResult | null> {
+  const latest = (await tx.runs.listForIntent(intent.id)).at(-1);
+  if (latest?.stop_reason !== FEEDBACK_UNAVAILABLE || head === null) return null;
+  if (head === 'unavailable') {
+    return { outcome: 'waiting', reason: 'git_host_unavailable', wakeInMs: 60_000 };
+  }
+  const pushed = await lastPushedHead(tx, intent.id);
+  if (!head.open || pushed === null || head.headSha !== pushed) return null;
+  const updated = await tx.intents.moveState(intent.id, {
+    from: { status: intent.status, currentGate: intent.current_gate },
+    to: { status: 'in_gate', currentGate: 'G7' },
+    at: registry.now(),
+  });
+  if (!updated) throw new Error(`resume: intent ${intent.id} moved under its lock`);
+  await tx.intentNotices.record({
+    intentId: intent.id,
+    kind: 'g7_resumed',
+    status: 'in_gate',
+    gate: 'G7',
+    previousGate: 'G4',
+    decisionId: null,
+    audienceRoles: ['person_b'],
   });
   return moved;
 }

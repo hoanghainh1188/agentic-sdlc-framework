@@ -217,7 +217,13 @@ What the platform does with it:
 - The earlier approvals do not count for the new commit. Review it again.
 - There is no limit on the number of rounds; each round needs a person's request, and the intent budget caps the cost.
 
-The new run does not start, and the intent is **paused** at G4 with a `technical` escalation (Chapter 18), when the request no longer holds before the run starts: you dismissed your review or replaced it with an approval, your GitHub account was unlinked, or GitHub could not be read. `resume` tries a new run, which works only when the cause is gone (GitHub is back, the account is linked again). After a dismissed or replaced review, decide `terminate`: the platform has no way back to G7 from this escalation yet.
+The new run does not start, and the intent is **paused** at G4 with a `technical` escalation (Chapter 18), when the request no longer holds before the run starts: you dismissed your review or replaced it with an approval, your GitHub account was unlinked, or GitHub could not be read. Acknowledge it, then decide:
+
+| Decision | What happens |
+|---|---|
+| `resume` | If the pull request is open and still shows the commit the platform pushed, the intent goes back to **G7**: review that commit again (approve, or request changes again). If the pull request shows another commit or is closed, the intent goes to **G4** for a new run |
+| `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on |
+| `terminate` | The intent is closed (`cancelled`) |
 
 **Deadline.** If G7 waits for a person longer than `oversight.hitl_gate_deadline`, an escalation is raised (Chapter 18), until the merge.
 
@@ -262,4 +268,4 @@ The new run does not start, and the intent is **paused** at G4 with a `technical
 | 0.1 | 2026-09-24 | Claude (draft) | First content; platform usage section reserved for Claude Code |
 | 0.2 | 2026-09-24 | Claude (draft) | Dual approval at G7 for migration, payment, personal data, production infrastructure, breaking change, safety function (Harry) |
 | 0.3 | 2026-10-03 | Claude (task E01) | §15.10.1: G7 with the platform (reviews, producers, dual approval, merge, escalations); ADR-M41 |
-| 0.4 | 2026-10-04 | Claude (task E01, PR 2) | §15.10.1: a request for changes starts a new run with the reviewer's feedback; requests only by a review or a comment (QUESTIONS #190); ADR-M41 §2.7 |
+| 0.4 | 2026-10-04 | Claude (task E01, PR 2) | §15.10.1: a request for changes starts a new run with the reviewer's feedback; requests only by a review or a comment (QUESTIONS #190); the decisions when the feedback is gone (#191); ADR-M41 §2.7 |
