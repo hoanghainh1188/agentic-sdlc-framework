@@ -39,6 +39,7 @@ export {
 export {
   prepareRun,
   type PrepareRunDeps,
+  FEEDBACK_UNAVAILABLE,
   type PrepareRunRefusal,
   type PrepareRunResult,
   type PreparedRun,
@@ -104,4 +105,11 @@ export {
   type G7Reading,
 } from './g7-facts.js';
 export { stepG7, stepPausedG7, type G7Check } from './g7.js';
+export {
+  feedbackSourceFor,
+  reviewStillHolds,
+  type FeedbackLookup,
+  type FeedbackSource,
+  type FeedbackUnavailable,
+} from './g7-feedback.js';
 export { recordReviews, voidStaleReviewApprovals } from './g7-reviews.js';

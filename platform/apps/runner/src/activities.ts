@@ -48,7 +48,8 @@ export interface ActivityContextLike {
 
 export interface RunnerActivityDeps {
   readonly db: PlatformDatabase;
-  readonly runner: Pick<Runner, 'provision' | 'runAgent' | 'release'>;
+  readonly runner: Pick<Runner, 'provision' | 'runAgent' | 'release'> &
+    Partial<Pick<Runner, 'discardFeedbackToken'>>;
   readonly unwrapper: SecretUnwrapper;
   /** Default: `Context.current()`. */
   readonly context?: () => ActivityContextLike;
@@ -120,8 +121,20 @@ async function execute(
   input: ExecuteRunInput,
 ): Promise<ExecuteRunResult> {
   const scope = deps.db.forTenant(parseTenantId(input.tenantId));
+  // E01 PR 2 (review): a feedback token the run will not read with is revoked.
+  const discardFeedback = async () => {
+    if (input.wrappedFeedbackToken === undefined) return;
+    await deps.runner.discardFeedbackToken?.(
+      input.tenantId,
+      input.runId,
+      new Redacted(input.wrappedFeedbackToken),
+    );
+  };
   const stored = await scope.runContracts.getByRunId(input.runId);
-  if (!stored) return { outcome: 'refused', reason: 'unknown_contract' };
+  if (!stored) {
+    await discardFeedback();
+    return { outcome: 'refused', reason: 'unknown_contract' };
+  }
   const provisioned = await deps.runner.provision(
     {
       envelope: { contract: stored.contract_json, signature: stored.signature },
@@ -129,7 +142,10 @@ async function execute(
     },
     ctx.cancellationSignal,
   );
-  if (!provisioned.ok) return { outcome: 'refused', reason: provisioned.reason };
+  if (!provisioned.ok) {
+    await discardFeedback();
+    return { outcome: 'refused', reason: provisioned.reason };
+  }
   const { contract, sandbox } = provisioned;
   let virtualKey;
   try {
@@ -143,6 +159,7 @@ async function execute(
   }
   const killed = (await scope.runs.getById(input.runId))?.status === 'stopping';
   if (!virtualKey || ctx.cancellationSignal.aborted || killed) {
+    await discardFeedback();
     await deps.runner.release(input.tenantId, input.runId, virtualKey ? 'killed' : 'failed');
     const now = new Date();
     // A run being killed ends as killed (C11, migration 0020); otherwise it fails. One update.
@@ -161,6 +178,10 @@ async function execute(
       model: input.modelRef,
       virtualKey,
       signal: ctx.cancellationSignal,
+      // E01 PR 2: a wrapping token only; the runner reads the feedback text in memory.
+      ...(input.wrappedFeedbackToken === undefined
+        ? {}
+        : { wrappedFeedbackToken: new Redacted(input.wrappedFeedbackToken) }),
     });
   }
   const run = await scope.runs.getById(input.runId);

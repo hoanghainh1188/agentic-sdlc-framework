@@ -29,6 +29,7 @@ export {
   DECISION_WORDS,
   ESCALATION_VERBS,
   parseCommentCommand,
+  requestChangesReason,
   type CommentSyntaxProblem,
   type CommentVerb,
   type ParsedComment,

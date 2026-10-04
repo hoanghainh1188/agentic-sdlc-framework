@@ -6,6 +6,7 @@ import type { AgentTask, RunContract } from '@sdlc/contracts';
 import type { TenantScope } from '@sdlc/core';
 
 import { AgentRunError } from './errors.js';
+import { readRunFeedback, type FeedbackAccess } from './feedback.js';
 
 /**
  * C08 PR 2 (QUESTIONS #158): the intent's last G6 decision is a `fail ci_failed`, so this run is a
@@ -16,7 +17,14 @@ async function followsCiFailure(scope: TenantScope, intentId: string): Promise<b
   return last?.decision === 'fail' && last.reason_code === 'ci_failed';
 }
 
-export async function loadAgentTask(scope: TenantScope, contract: RunContract): Promise<AgentTask> {
+export async function loadAgentTask(
+  scope: TenantScope,
+  contract: RunContract,
+  feedback: FeedbackAccess = {},
+): Promise<AgentTask> {
+  // E01 PR 2: the feedback of a request for changes at G7, read before the agent starts. Throws
+  // `feedback_unavailable` itself (fail closed).
+  const reviewFeedback = await readRunFeedback(scope, contract, feedback);
   try {
     const plan = (await scope.plans.list(contract.intent_id)).find(
       (p) => p.id === contract.plan_id,
@@ -40,6 +48,7 @@ export async function loadAgentTask(scope: TenantScope, contract: RunContract): 
       },
       plan: { summary: plan.summary, plannedFiles: [...planned] },
       ...((await followsCiFailure(scope, contract.intent_id)) ? { ciFailed: true } : {}),
+      ...(reviewFeedback ? { reviewFeedback } : {}),
     };
   } catch (error) {
     if (error instanceof AgentRunError) throw error;

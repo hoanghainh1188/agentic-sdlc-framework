@@ -104,6 +104,10 @@ function harness(
         calls.push(`release:${reason}`);
         return Promise.resolve();
       },
+      discardFeedbackToken: (_tenant, _run, wrapped) => {
+        calls.push(`discard:${wrapped.reveal()}`);
+        return Promise.resolve();
+      },
     },
     unwrapper: {
       unwrap: (token) =>
@@ -167,6 +171,18 @@ describe('executeRun', () => {
       reason: 'expired',
     });
     expect(h.calls).toEqual(['provision:vault:v1:x']);
+  });
+
+  it('E01 PR 2 (review): a refused run revokes its feedback token; a run that starts passes it on', async () => {
+    const refused = harness({ provisionOk: false });
+    await refused.activities.executeRun({ ...refused.input, wrappedFeedbackToken: 'wrap-fb' });
+    expect(refused.calls).toEqual(['provision:vault:v1:x', 'discard:wrap-fb']);
+    const killed = harness({ unwrapDown: true });
+    await killed.activities.executeRun({ ...killed.input, wrappedFeedbackToken: 'wrap-fb' });
+    expect(killed.calls).toContain('discard:wrap-fb');
+    const ok = harness();
+    await ok.activities.executeRun({ ...ok.input, wrappedFeedbackToken: 'wrap-fb' });
+    expect(ok.calls).not.toContain('discard:wrap-fb'); // the agent's task load uses or revokes it
   });
 
   it('an unknown run is refused without touching Docker', async () => {

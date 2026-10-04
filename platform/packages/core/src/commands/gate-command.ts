@@ -67,6 +67,15 @@ export async function decideGate(
   if (gate === 'G7' && command.decision === 'approve') {
     throw new CommandError('g7_use_pr_review', `${intent.code}: approve G7 with a PR review`);
   }
+  // E01 PR 2 (QUESTIONS #190): a request for changes at G7 starts a new run that reads the
+  // feedback of the review or comment that recorded it, by its ID; the API and the CLI have no
+  // text the runner may read, so they never send one.
+  if (gate === 'G7' && command.decision === 'request_changes' && command.source === 'cli') {
+    throw new CommandError(
+      'g7_feedback_on_git_host',
+      `${intent.code}: request changes at G7 with a PR review or a comment`,
+    );
+  }
   // D3 (B07 session 2): the gate advance at G1–G3 has no scope, nor the run start at G4 (C06), so an approval with one is refused
   // here instead of being recorded and then voided (`scope_mismatch`, which stays as a safeguard).
   if (command.decision === 'approve' && normalizeScope(command.scope) !== null) {

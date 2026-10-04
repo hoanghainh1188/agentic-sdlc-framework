@@ -8,7 +8,9 @@ export type AgentRunFailure =
   | 'task_unavailable' // the plan or the spec of the run cannot be loaded, or they differ
   | 'run_not_running' // the run is not `running` (not provisioned, or stopped meanwhile)
   | 'proposal_unavailable' // an L1 run finished, but this runner cannot store proposals (C06)
-  | 'proposal_failed'; // the proposal could not be computed or stored (C06, ADR-M33 §2.9)
+  | 'proposal_failed' // the proposal could not be computed or stored (C06, ADR-M33 §2.9)
+  // the feedback of the request for changes the run answers cannot be read or used (E01 PR 2)
+  | 'feedback_unavailable';
 
 export class AgentRunError extends RunnerError {
   constructor(readonly reason: AgentRunFailure) {

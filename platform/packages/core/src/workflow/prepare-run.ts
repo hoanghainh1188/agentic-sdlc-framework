@@ -16,6 +16,13 @@
 //    own token) and hand both secrets over as single-use OpenBao wrapping tokens that live as long
 //    as the contract is valid (QUESTIONS #44, #112). Only the wrapping tokens and IDs travel on:
 //    no secret, no client data in the Temporal history (ADR-M30 §2.1).
+// 6. (E01 PR 2, ADR-M41 §2.7, QUESTIONS #179) when the run answers a request for changes at G7,
+//    re-check its source before any secret (`g7-feedback.ts`): the review must still be its
+//    reviewer's latest decision on the pushed commit, and the decider still linked. Otherwise the
+//    run ends `failed` (`agent_feedback_unavailable`) before its key, token or sandbox exist, and
+//    the intent is paused with a `technical` escalation like any failed run (Harry, E01 PR 2
+//    plan). When it holds, a third token that may only read pull requests (or issues, for a
+//    command on the intent's issue) is wrapped for the runner, which reads the text with it.
 // If anything fails after the contract, the key is revoked and the run is cancelled
 // (`prepare_failed`), so no run waits in `queued` with a live key.
 import {
@@ -33,6 +40,13 @@ import type { Registry } from '../registry/registry.js';
 import { issueRunContract } from '../run-contract/issue.js';
 import { gatherG4Facts, projectRepoRef, type G4Deps, type RunProposal } from './g4-proposal.js';
 import { evaluateG4, g4Decided } from './g4.js';
+import {
+  feedbackSourceFor,
+  reviewStillHolds,
+  type FeedbackLookup,
+  type FeedbackSource,
+  type FeedbackUnavailable,
+} from './g7-feedback.js';
 import { isFinalRun, roundRuns } from './run-round.js';
 
 export interface PrepareRunDeps {
@@ -40,7 +54,7 @@ export interface PrepareRunDeps {
   readonly g4: G4Deps;
   readonly signer: RunContractSigner;
   readonly costController: Pick<CostController, 'issueRunKey' | 'endRun'>;
-  readonly gitHost: Pick<GitHostAdapter, 'issueShortLivedToken'>;
+  readonly gitHost: Pick<GitHostAdapter, 'issueShortLivedToken' | 'getReviews'>;
   readonly wrapper: SecretWrapper;
   /** Services the sandbox may reach, as `alias:port` (deployment settings, ADR-M25 §2.2). */
   readonly egressAllowlist: readonly string[];
@@ -59,7 +73,13 @@ export type PrepareRunRefusal =
    * A run of this round is already under way (session 2, ADR-M33 §2.6): a retried or concurrent
    * call never issues a second run, contract, token or key.
    */
-  | 'run_exists';
+  | 'run_exists'
+  /**
+   * E01 PR 2: the request for changes the run answers no longer holds (a review dismissed or
+   * replaced, the decider unlinked) or cannot be checked. The run ended `failed` before any secret
+   * was issued; the workflow finishes it like a failed run (paused, escalation).
+   */
+  | 'feedback_unavailable';
 
 export interface PreparedRun {
   readonly runId: string;
@@ -74,6 +94,11 @@ export interface PreparedRun {
   readonly wrappedGitToken: RedactedSecret;
   /** Single-use wrapping token around `{ key }`, the run's LiteLLM virtual key. */
   readonly wrappedVirtualKey: RedactedSecret;
+  /**
+   * E01 PR 2: single-use wrapping token around `{ token }`, a token that may only read pull
+   * requests (or issues), when the run answers a request for changes at G7.
+   */
+  readonly wrappedFeedbackToken?: RedactedSecret;
   readonly warnings: readonly 'recertification_overdue'[];
 }
 
@@ -101,6 +126,7 @@ export async function prepareRun(
   const peek = await scope.intents.getById(intentId);
   if (!peek || !isAtG4(peek)) return { ok: false, reason: 'not_at_g4' };
   const facts = await gatherG4Facts(scope, deps.g4, peek);
+  const feedback = await checkFeedback(scope, deps.gitHost, peek);
 
   const checked = await scope.transaction(async (tx): Promise<Checked | PrepareRunRefusal> => {
     const intent = await tx.intents.lockAndGet(intentId);
@@ -163,6 +189,10 @@ export async function prepareRun(
     await cancel(scope, deps.registry, runId, 'not_decided');
     return { ok: false, reason: 'not_decided' };
   }
+  if (feedback.kind === 'unavailable') {
+    await failForFeedback(scope, deps.registry, runId, feedback.reason);
+    return { ok: false, reason: 'feedback_unavailable' };
+  }
   if (checked.ownerWarning) await warnOwner(scope, deps.registry, intentId, checked.agent, runId);
 
   let key;
@@ -202,6 +232,10 @@ export async function prepareRun(
     const ttlSeconds = checked.validityMinutes * SECONDS_PER_MINUTE;
     const wrappedGitToken = await deps.wrapper.wrap({ token: token.token }, { ttlSeconds });
     const wrappedVirtualKey = await deps.wrapper.wrap({ key: key.key.key }, { ttlSeconds });
+    const wrappedFeedbackToken =
+      feedback.kind === 'source'
+        ? await wrapFeedbackToken(deps, ref, feedback.source, ttlSeconds)
+        : undefined;
     return {
       ok: true,
       run: {
@@ -213,6 +247,7 @@ export async function prepareRun(
         keyIssuedAt,
         wrappedGitToken,
         wrappedVirtualKey,
+        ...(wrappedFeedbackToken ? { wrappedFeedbackToken } : {}),
         warnings: checked.ownerWarning ? ['recertification_overdue'] : [],
       },
     };
@@ -271,4 +306,67 @@ async function cancel(scope: TenantScope, registry: Registry, runId: string, sto
     stopReason,
     finishedAt: now,
   });
+}
+
+/**
+ * The request for changes the run answers, re-checked on the Git host for a review (before the
+ * intent lock: no HTTP call under it). A Git host that cannot be read fails closed.
+ */
+async function checkFeedback(
+  scope: TenantScope,
+  gitHost: PrepareRunDeps['gitHost'],
+  intent: Parameters<typeof feedbackSourceFor>[1],
+): Promise<FeedbackLookup> {
+  const lookup = await feedbackSourceFor(scope, intent);
+  if (lookup.kind !== 'source' || lookup.source.kind !== 'review') return lookup;
+  const project = await scope.projects.getById(intent.project_id);
+  const ref = project ? projectRepoRef(project) : undefined;
+  if (!ref) return { kind: 'unavailable', reason: 'git_host_unavailable' };
+  let reviews;
+  try {
+    reviews = await gitHost.getReviews(ref, lookup.source.prNumber);
+  } catch (error) {
+    if (error instanceof GitHostError) {
+      return { kind: 'unavailable', reason: 'git_host_unavailable' };
+    }
+    throw error;
+  }
+  const withdrawn = reviewStillHolds(lookup.source, reviews);
+  return withdrawn === null ? lookup : { kind: 'unavailable', reason: withdrawn };
+}
+
+/** Ends a queued run `failed` before any secret exists (E01 PR 2): no key, no token, no sandbox. */
+async function failForFeedback(
+  scope: TenantScope,
+  registry: Registry,
+  runId: string,
+  reason: FeedbackUnavailable,
+): Promise<void> {
+  const now = registry.now();
+  await scope.transaction(async (tx) => {
+    const ended = await tx.runs.transition(runId, {
+      from: ['queued'],
+      to: 'failed',
+      now,
+      stopReason: FEEDBACK_UNAVAILABLE,
+      finishedAt: now,
+    });
+    if (ended) await tx.runEvents.append(runId, 'feedback_unavailable', { reason });
+  });
+}
+
+/** The stop reason of a run whose request for changes cannot be read (worker or runner). */
+export const FEEDBACK_UNAVAILABLE = 'agent_feedback_unavailable';
+
+/** A token that may only read where the feedback lives, wrapped for the runner (single use). */
+async function wrapFeedbackToken(
+  deps: PrepareRunDeps,
+  ref: NonNullable<ReturnType<typeof projectRepoRef>>,
+  source: FeedbackSource,
+  ttlSeconds: number,
+): Promise<RedactedSecret> {
+  const token = await deps.gitHost.issueShortLivedToken(ref, {
+    permissions: { [source.permission]: 'read' },
+  });
+  return deps.wrapper.wrap({ token: token.token }, { ttlSeconds });
 }

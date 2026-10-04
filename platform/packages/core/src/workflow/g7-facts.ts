@@ -25,7 +25,7 @@ import type {
 import type { Intent, Run } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { projectRepoRef } from './g4-proposal.js';
-import { latestRun, publishState } from './publish-state.js';
+import { lastPushedRun, publishState } from './publish-state.js';
 
 /** What G7 reads outside the database (the worker wires the Git host in; tests pass fakes). */
 export interface G7Deps {
@@ -65,7 +65,7 @@ export async function readG7(
   deps: G7Deps,
   intent: Intent,
 ): Promise<G7Reading | null> {
-  const run = await latestRun(scope, intent.id);
+  const run = await lastPushedRun(scope, intent.id);
   if (!run || intent.pr_number === null) return null;
   const { pushed } = await publishState(scope, run.id);
   const project = await scope.projects.getById(intent.project_id);
@@ -137,26 +137,41 @@ export interface G7Facts {
 
 /** The G7 facts of the intent's last run from the database, or null before its pull request. */
 export async function gatherG7Facts(scope: TenantScope, intent: Intent): Promise<G7Facts | null> {
-  const run = await latestRun(scope, intent.id);
+  const run = await lastPushedRun(scope, intent.id);
   if (run?.status !== 'succeeded' || intent.pr_number === null) return null;
   const pushed = (await scope.runEvents.list(run.id))
     .filter((e) => e.event_type === 'branch_pushed')
     .at(-1);
   if (!pushed || typeof pushed.payload.head_sha !== 'string') return null;
   const pushedHead = pushed.payload.head_sha;
-  const flags = [...((await scope.plans.latest(intent.id))?.change_flags ?? [])].sort();
   return {
     run,
     pushedHead,
     prNumber: intent.pr_number,
-    inputSha256: sha256({
-      v: 1,
-      run_id: run.id,
-      pr_number: intent.pr_number,
-      head_sha: pushedHead,
-      change_flags: flags,
-    }),
+    inputSha256: await g7InputSha256(scope, intent.id, run.id, intent.pr_number, pushedHead),
   };
+}
+
+/**
+ * The G7 input hash of a pushed run (ADR-M41 §2.3): the run, its pull request, the pushed commit
+ * and the change flags of the plan. Also used after G7 (E01 PR 2, `g7-feedback.ts`): a request for
+ * changes bound to the last pushed run's input is the one the next run answers.
+ */
+export async function g7InputSha256(
+  scope: TenantScope,
+  intentId: string,
+  runId: string,
+  prNumber: number,
+  pushedHead: string,
+): Promise<string> {
+  const flags = [...((await scope.plans.latest(intentId))?.change_flags ?? [])].sort();
+  return sha256({
+    v: 1,
+    run_id: runId,
+    pr_number: prNumber,
+    head_sha: pushedHead,
+    change_flags: flags,
+  });
 }
 
 /**

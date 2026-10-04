@@ -54,9 +54,15 @@ import {
 } from '../escalation/decide.js';
 import { raiseEscalation } from '../escalation/raise.js';
 import { failedRunRoute } from '../kill/kill-run.js';
+import { G5_RETURN_DECISIONS } from './g5-scope.js';
 import type { Registry } from '../registry/registry.js';
 import { G4_OPERATOR_ROLES } from './g4.js';
-import { prepareRun, type PrepareRunDeps, type PrepareRunResult } from './prepare-run.js';
+import {
+  FEEDBACK_UNAVAILABLE,
+  prepareRun,
+  type PrepareRunDeps,
+  type PrepareRunResult,
+} from './prepare-run.js';
 import { isFinalRun, roundRuns } from './run-round.js';
 
 /** Run statuses that go to G5 (C07 decides what happens next). */
@@ -146,6 +152,15 @@ export async function stepPaused(
   if (escalation.status !== 'closed' && String(escalation.decision?.decision) === 'terminate') {
     return terminate(tx, registry, intent, escalation, latest.id, now);
   }
+  // E01 PR 2 (QUESTIONS #191): the run that answered a request for changes at G7 failed because
+  // the request's feedback was gone; `modify` or `roll_back` take the intent back to G3, HITL.
+  if (
+    escalation.status !== 'closed' &&
+    latest.stop_reason === FEEDBACK_UNAVAILABLE &&
+    G5_RETURN_DECISIONS.includes(String(escalation.decision?.decision))
+  ) {
+    return returnToG3(tx, registry, intent, escalation, latest.id, now);
+  }
   if (escalation.status !== 'closed') {
     if (!decisionAllows(escalation, 'run_start', now)) {
       return { outcome: 'waiting', reason: 'run_review' };
@@ -220,13 +235,70 @@ async function terminate(
   return { outcome: 'moved' };
 }
 
+/**
+ * `modify` or `roll_back` on the escalation of a run whose G7 feedback was gone (QUESTIONS #191):
+ * the decision binds the run's contract and has not expired (FR-17); then back to G3, HITL from
+ * then on (`returnedFromG5`), the G3 approvals in force voided.
+ */
+async function returnToG3(
+  tx: TenantScope,
+  registry: Registry,
+  intent: Intent,
+  escalation: Escalation,
+  runId: string,
+  now: Date,
+): Promise<IntentStepResult> {
+  const contract = await tx.runContracts.getByRunId(runId);
+  const check = await revalidateEscalationDecision(
+    tx,
+    {
+      escalationId: escalation.id,
+      subjectSha256: contract?.contract_sha256 ?? '',
+      action: 'gate_advance',
+    },
+    { now: () => now },
+  );
+  if (!check.valid && check.reason !== 'scope_mismatch') {
+    return { outcome: 'waiting', reason: 'run_review' };
+  }
+  await closeEscalation(
+    tx,
+    { escalationId: escalation.id, closedBy: { type: 'system' } },
+    { now: () => now },
+  );
+  await registry.voidApprovals(tx, {
+    intentId: intent.id,
+    gate: 'G3',
+    reasonCode: 'input_mismatch',
+  });
+  const moved = await tx.intents.moveState(intent.id, {
+    from: { status: intent.status, currentGate: intent.current_gate },
+    to: { status: 'in_gate', currentGate: 'G3' },
+    at: now,
+  });
+  if (moved) {
+    await tx.intentNotices.record({
+      intentId: intent.id,
+      kind: 'g7_returned',
+      status: 'in_gate',
+      gate: 'G3',
+      previousGate: intent.current_gate,
+      decisionId: null,
+      audienceRoles: ['person_b'],
+    });
+  }
+  return { outcome: 'moved' };
+}
+
 export interface RunDeps extends PrepareRunDeps {
   readonly costController: PrepareRunDeps['costController'] & Pick<CostController, 'endRunKey'>;
 }
 
 /**
  * Prepares the round's next run (`prepareRun`). A refusal takes the intent back to `in_gate G4`,
- * where G4 is decided again, except `run_exists` (a run of this round is already under way).
+ * where G4 is decided again, except `run_exists` (a run of this round is already under way) and
+ * `feedback_unavailable` (E01 PR 2: the run already ended `failed`, so the next step finishes it
+ * like any failed run: paused, escalation).
  */
 export async function startRun(
   scope: TenantScope,
@@ -234,7 +306,12 @@ export async function startRun(
   intentId: string,
 ): Promise<PrepareRunResult> {
   const result = await prepareRun(scope, deps, intentId);
-  if (!result.ok && result.reason !== 'run_exists' && result.reason !== 'not_at_g4') {
+  if (
+    !result.ok &&
+    result.reason !== 'run_exists' &&
+    result.reason !== 'not_at_g4' &&
+    result.reason !== 'feedback_unavailable'
+  ) {
     await scope.transaction(async (tx) => {
       const intent = await tx.intents.lockAndGet(intentId);
       if (intent?.status !== 'running' || intent.current_gate !== 'G4') return;

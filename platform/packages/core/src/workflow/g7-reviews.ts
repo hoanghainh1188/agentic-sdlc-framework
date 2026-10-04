@@ -26,6 +26,15 @@ import { waitedSeconds } from './waited.js';
 
 const GATE = { gate: 'G7' } as const;
 
+/**
+ * True for the receipt of a pull request review (`github:review:<id>`). A comment command's
+ * receipt (`github:comment:<id>`) is not one: its decision follows the command rules (fix to E01
+ * PR 1, review of PR 2).
+ */
+export function isReviewReceipt(eventId: string): boolean {
+  return eventId.startsWith('github:review:');
+}
+
 export interface ReviewContext {
   readonly intent: Intent;
   readonly provider: GitProvider;
@@ -127,7 +136,8 @@ export async function voidStaleReviewApprovals(
 ): Promise<void> {
   for (const approval of await tx.gateDecisions.currentApprovalsFor(intent.id, 'G7')) {
     const receipt = await tx.gitEventReceipts.findByDecision(approval.id);
-    if (!receipt) continue;
+    // Only approvals recorded from a review are bound to that review.
+    if (!receipt || !isReviewReceipt(receipt.event_id)) continue;
     const review = reviews.find((r) => r.eventId === receipt.event_id);
     if (review?.state === 'approved' && review.commitSha === headSha) continue;
     await registry.voidApproval(tx, {

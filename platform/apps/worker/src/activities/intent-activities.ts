@@ -30,6 +30,8 @@ export type PrepareRunActivityResult =
       readonly modelRef: string;
       readonly wrappedGitToken: string;
       readonly wrappedVirtualKey: string;
+      /** E01 PR 2: the single-use wrapping token of the feedback token (never the token). */
+      readonly wrappedFeedbackToken?: string;
     }
   | { readonly ok: false; readonly reason: string };
 
@@ -124,6 +126,9 @@ export function createIntentActivities(deps: IntentActivityDeps): IntentActiviti
         modelRef: result.run.modelRef,
         wrappedGitToken: result.run.wrappedGitToken.reveal(),
         wrappedVirtualKey: result.run.wrappedVirtualKey.reveal(),
+        ...(result.run.wrappedFeedbackToken
+          ? { wrappedFeedbackToken: result.run.wrappedFeedbackToken.reveal() }
+          : {}),
       };
     },
     finishRun: (ref, runId) => finishRun(scope(ref), runs(), ref.intentId, runId),

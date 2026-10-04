@@ -26,6 +26,7 @@ import {
   type AgentRunRequest,
   type AgentRunResult,
 } from './agent/drive.js';
+import { discardFeedbackToken } from './agent/feedback.js';
 import { RunnerError } from './errors.js';
 import { HeldRuns } from './held.js';
 import { SlotPool, type Slot } from './pool.js';
@@ -134,6 +135,22 @@ export class Runner {
    * frees the slot, whatever happened. The run's virtual key is the caller's to revoke
    * (`CostController.endRun`).
    */
+  /**
+   * E01 PR 2 (review): revokes a run's feedback token that the run will not use (provisioning
+   * refused, the run killed or failed before the agent started). Never throws.
+   */
+  async discardFeedbackToken(
+    tenantId: string,
+    runId: string,
+    wrappedToken: RedactedSecret,
+  ): Promise<void> {
+    await discardFeedbackToken(this.#deps.db.forTenant(parseTenantId(tenantId)), runId, {
+      reader: this.#deps.feedbackReader,
+      unwrapper: this.#deps.unwrapper,
+      wrappedToken,
+    });
+  }
+
   async runAgent(request: AgentRunRequest): Promise<AgentRunResult> {
     const adapter = this.#agent.adapter;
     if (!adapter) throw new RunnerError('runner.agent_not_configured');
@@ -152,6 +169,9 @@ export class Runner {
           ...this.#changesFor(contract.run_id),
           ...(this.#agent.spendReader ? { spendReader: this.#agent.spendReader } : {}),
           ...(this.#agent.keyRevoked ? { keyRevoked: this.#agent.keyRevoked } : {}),
+          // E01 PR 2: the feedback of a request for changes, read with the run's own token.
+          ...(this.#deps.feedbackReader ? { feedbackReader: this.#deps.feedbackReader } : {}),
+          unwrapper: this.#deps.unwrapper,
         },
         request,
       );

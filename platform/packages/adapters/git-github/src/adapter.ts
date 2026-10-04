@@ -8,10 +8,13 @@ import type {
   GitActor,
   GitEvent,
   GitHostAdapter,
+  IssueCommentText,
   NewPullRequest,
   PullRequestInfo,
   RedactedSecret,
   ReviewDecision,
+  ReviewFeedback,
+  ReviewLineComment,
   SecurityFindings,
   Severity,
   RepoRef,
@@ -28,6 +31,7 @@ import {
   bool,
   checkNumber,
   checkRepo,
+  id,
   int,
   isSha,
   obj,
@@ -61,6 +65,17 @@ const FAILED: ReadonlySet<string> = new Set([
   'stale',
 ]);
 const LIST_PAGES = 30;
+/**
+ * Line comments read with a review's feedback (E01 PR 2): one page. The runner caps the text at
+ * `REVIEW_FEEDBACK_MAX_CHARS` anyway, so more comments would only be cut.
+ */
+export const MAX_REVIEW_FEEDBACK_COMMENTS = 50;
+const REVIEW_FEEDBACK_STATES: Readonly<Record<string, ReviewFeedback['state']>> = {
+  APPROVED: 'approved',
+  CHANGES_REQUESTED: 'changes_requested',
+  COMMENTED: 'commented',
+  DISMISSED: 'dismissed',
+};
 /** Errors that mean "findings unknown" for code scanning (not an outage). */
 const UNKNOWN_FINDINGS: ReadonlySet<string> = new Set(['forbidden', 'rejected']);
 
@@ -443,6 +458,80 @@ export class GitHubAdapter implements GitHostAdapter {
     }
   }
 
+  /**
+   * One review and its line comments (task E01 PR 2, ADR-M41 §2.7), read with the caller's token
+   * (`pull_requests: read`): the runner holds no App key. One page of line comments at most. The
+   * texts are returned to the caller only; nothing is logged or cached.
+   */
+  async getReviewFeedback(
+    token: RedactedSecret,
+    ref: RepoRef,
+    pr: number,
+    reviewId: string,
+  ): Promise<ReviewFeedback> {
+    const base = repoPath(ref);
+    checkNumber(pr, 'pr');
+    const review = checkObjectId(reviewId, 'review_id');
+    const auth = bearer(token);
+    const res = await this.#http.json('GET', `${base}/pulls/${pr}/reviews/${review}`, { auth });
+    const r = obj(res.body, 'review');
+    const state = REVIEW_FEEDBACK_STATES[str(r.state, 'review.state').toUpperCase()];
+    if (!state || id(r.id, 'review.id') !== review) {
+      throw new GitHostError('invalid_response', { field: 'review' });
+    }
+    const list = await this.#http.json('GET', `${base}/pulls/${pr}/reviews/${review}/comments`, {
+      auth,
+      query: { per_page: MAX_REVIEW_FEEDBACK_COMMENTS },
+    });
+    const items = arr(list.body, 'review.comments');
+    const comments: ReviewLineComment[] = items
+      .slice(0, MAX_REVIEW_FEEDBACK_COMMENTS)
+      .map((item) => {
+        const c = obj(item, 'review.comment');
+        const line = c.line ?? c.original_line;
+        return {
+          path: str(c.path, 'review.comment.path'),
+          line: line === null || line === undefined ? null : int(line, 'review.comment.line'),
+          body: optStr(c.body, 'review.comment.body') ?? '',
+        };
+      });
+    return {
+      reviewId: review,
+      reviewer: actor(r.user, 'review.user'),
+      state,
+      commitSha: sha(r.commit_id, 'review.commit_id'),
+      body: optStr(r.body, 'review.body') ?? '',
+      comments,
+      commentsTruncated: list.next !== null || items.length > MAX_REVIEW_FEEDBACK_COMMENTS,
+    };
+  }
+
+  /**
+   * One comment of an issue or a pull request (task E01 PR 2: a `/request-changes G7` command),
+   * read with the caller's token: `issues: read` or `pull_requests: read`, as GitHub accepts either
+   * for this endpoint. Nothing is logged or cached.
+   */
+  async getIssueComment(
+    token: RedactedSecret,
+    ref: RepoRef,
+    commentId: string,
+  ): Promise<IssueCommentText> {
+    const base = repoPath(ref);
+    const comment = checkObjectId(commentId, 'comment_id');
+    const res = await this.#http.json('GET', `${base}/issues/comments/${comment}`, {
+      auth: bearer(token),
+    });
+    const c = obj(res.body, 'comment');
+    if (id(c.id, 'comment.id') !== comment) {
+      throw new GitHostError('invalid_response', { field: 'comment.id' });
+    }
+    return {
+      commentId: comment,
+      author: actor(c.user, 'comment.user'),
+      body: optStr(c.body, 'comment.body') ?? '',
+    };
+  }
+
   async listEventsSince(
     ref: RepoRef,
     cursor: EventCursor,
@@ -556,4 +645,21 @@ function encodeFilePath(path: string): string {
     throw new GitHostError('invalid_input', { field: 'path' });
   }
   return segments.map(encodeURIComponent).join('/');
+}
+
+/** A GitHub object ID given by the caller: a positive decimal number, no leading zero. */
+function checkObjectId(value: string, field: string): string {
+  if (typeof value !== 'string' || !/^[1-9][0-9]{0,18}$/.test(value)) {
+    throw new GitHostError('invalid_input', { field });
+  }
+  return value;
+}
+
+/** The `Authorization` value of a caller's token. The value is never logged (`GitHubHttp`). */
+function bearer(token: RedactedSecret): string {
+  const value = token?.reveal();
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new GitHostError('invalid_input', { field: 'token' });
+  }
+  return `Bearer ${value}`;
 }
