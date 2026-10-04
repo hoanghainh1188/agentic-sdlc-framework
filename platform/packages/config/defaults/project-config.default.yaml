@@ -216,7 +216,9 @@ model_routing:
     prohibited: []
 
 retention:
-  # D-05 §10.1; D-02 FR-44.
+  # D-05 §10.1; D-02 FR-44. Days the evidence files of an intent are kept after it ended (task
+  # E05, ADR-M51). Between 180 and 3650 (mandatory rule M31, QUESTIONS #236); held evidence is
+  # kept longer (`sdlc admin evidence hold`).
   evidence_retention_days: 180
 
 github:
@@ -275,6 +277,10 @@ access:
   # the viewer role never builds or reads it (mandatory rule M30).
   evidence_build_roles: [person_a, person_b, pm_brse, governance, admin]
   evidence_read_roles: [person_a, person_b, second_approver, pm_brse, governance, admin]
+  # Task E05, ADR-M51, QUESTIONS #235. Who puts an intent's evidence on hold, and releases the
+  # hold (`sdlc admin evidence hold|release`): held evidence is never purged (a dispute, an
+  # incident, a client request). Tenant admins always may. Never the viewer (mandatory rule M32).
+  evidence_hold_roles: [governance, admin]
   # Task B13, ADR-M37, QUESTIONS #154. Separation of duties (handbook Ch.5, codes table §5): one
   # person never holds both roles of a pair on the same project. Person A (owner) and Person B
   # (independent reviewer) always stay apart (mandatory rule M21): G1–G3 have no producers

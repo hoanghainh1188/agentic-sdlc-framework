@@ -63,8 +63,27 @@ export const AUDIT_ACTIONS = {
   'project.created': { entityType: 'project', fields: { git_provider: 'code' } },
   /** A project's name, repository or default branch changed (B13). Never the values. */
   'project.updated': { entityType: 'project', fields: {} },
-  /** A project was archived (B13). Purging its evidence and client data is E05 (FR-44). */
+  /**
+   * A project was archived (B13). Its evidence files are purged after the archive grace period by
+   * the retention loop (E05, FR-44, ADR-M51); its time starts that period.
+   */
   'project.archived': { entityType: 'project', fields: {} },
+  /**
+   * The retention loop purged every evidence file of an archived project that is not held (E05,
+   * FR-44, ADR-M51): counts of rows. Written once per project. `langfuse` is `manual` in the MVP:
+   * the project's traces in Langfuse are deleted by hand (runbook T11 §5j, QUESTIONS #238).
+   */
+  /**
+   * The retention loop, in `purge` mode, scheduled the purge of an archived project (E05, ADR-M51
+   * §2.6): its evidence is purged `grace_days` after the later of this event and the archive.
+   * Written once per archive, so a project archived before the purge was turned on still gets the
+   * whole grace period, visible in the audit log.
+   */
+  'project.purge_scheduled': { entityType: 'project', fields: { grace_days: 'count' } },
+  'project.purged': {
+    entityType: 'project',
+    fields: { intents: 'count', purged: 'count', held: 'count', langfuse: 'code' },
+  },
   /** A user's name or e-mail address changed (B13). Never the values. */
   'user.updated': { entityType: 'user', fields: {} },
   /** A user was disabled: their tokens stop working at once (B13). */
@@ -446,6 +465,37 @@ export const AUDIT_ACTIONS = {
       release_sha256: 'sha256',
     },
   },
+  /**
+   * The retention loop deleted every stored version of an evidence file (E05, ADR-M51). The intent
+   * is the entity. `kind` `proposal`, `diff` or `pack` (with `pack_id` and `pack_version`, both
+   * files); `cause` `retention` or `archive`; `versions` how many versions and delete markers were
+   * deleted. The row and its hashes stay (D-05 §10.1).
+   */
+  'evidence.purged': {
+    entityType: 'intent',
+    fields: {
+      item_id: 'uuid?',
+      pack_id: 'uuid?',
+      pack_version: 'version?',
+      kind: 'code',
+      sha256: 'sha256',
+      markdown_sha256: 'sha256?',
+      versions: 'count',
+      cause: 'code',
+    },
+  },
+  /**
+   * The retention loop deleted the files of a pack version without a row (a build that failed
+   * after its upload; E05, ADR-M48 §2.7, ADR-M51). IDs from the file path and counts only.
+   */
+  'evidence.orphan_swept': {
+    entityType: 'intent',
+    fields: { pack_id: 'uuid', files: 'count', versions: 'count' },
+  },
+  /** A person put an intent's evidence on hold (E05, QUESTIONS #235): never purged until released. */
+  'evidence.hold_set': { entityType: 'intent', fields: { hold_id: 'uuid' } },
+  /** A person released the hold on an intent's evidence (E05, QUESTIONS #235). */
+  'evidence.hold_released': { entityType: 'intent', fields: { hold_id: 'uuid' } },
   /**
    * G8 stopped (E03, ADR-M49 §2.5): `check` `evidence_hash_mismatch` or `evidence_missing` (a
    * stored evidence file failed its re-check while the release pack was built). The intent is

@@ -448,9 +448,11 @@ export interface EvidenceItemsTable {
   sha256: Immutable<string>;
   /** bigint: `pg` returns int8 as a string. */
   size_bytes: ColumnType<string, number, never>;
-  /** Set by the purge (E05); the row and the hash stay. */
-  purged_at: ColumnType<Date | null, never, never>;
+  /** Set once by the purge (E05, migration 0023); the row and the hash stay. */
+  purged_at: ColumnType<Date | null, never, Date>;
   created_at: CreatedAt;
+  /** E05 (migration 0023): how far the loop moved the files' object lock forward; only grows. */
+  lock_extended_until: ColumnType<Date | null, never, Date>;
 }
 
 /**
@@ -476,14 +478,37 @@ export interface EvidencePacksTable {
   built_by: ColumnType<string | null, string | null, never>;
   /** Set once by G8 (E03, migration 0022); one sealed version per intent. */
   sealed_at: ColumnType<Date | null, never, Date>;
+  /** Not used: holds are per intent in `evidence_holds` (E05, QUESTIONS #235). */
   retention_hold: ColumnType<boolean, never, never>;
-  purged_at: ColumnType<Date | null, never, never>;
+  /** Set once by the purge (E05, migration 0023). */
+  purged_at: ColumnType<Date | null, never, Date>;
   created_at: CreatedAt;
   /**
    * E03 (migration 0022, ADR-M49 §2.2): the SHA-256 of the manifest content without the G8 parts;
    * G8 approvals are bound to it. Null for packs built before E03.
    */
   release_sha256: ColumnType<string | null, string | null, never>;
+  /** E05 (migration 0023): how far the loop moved the files' object lock forward; only grows. */
+  lock_extended_until: ColumnType<Date | null, never, Date>;
+}
+
+/**
+ * A hold on one intent's evidence (E05, migration 0023, QUESTIONS #235): never purged while
+ * active; its files carry a legal hold. Rows are never deleted.
+ */
+export interface EvidenceHoldsTable {
+  id: Generated<string>;
+  tenant_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  held_by: Immutable<string>;
+  reason_ref: ColumnType<string | null, string | null, never>;
+  /** The loop set the legal hold on the intent's files created before this time; only grows. */
+  applied_at: ColumnType<Date | null, never, Date>;
+  released_at: ColumnType<Date | null, never, Date>;
+  released_by: ColumnType<string | null, never, string>;
+  /** The loop took the legal hold off the files after the release; set once. */
+  release_applied_at: ColumnType<Date | null, never, Date>;
+  created_at: CreatedAt;
 }
 
 type Mutable<T> = ColumnType<T, T | undefined, T>;
@@ -612,6 +637,7 @@ export interface Database {
   cost_records: CostRecordsTable;
   evidence_items: EvidenceItemsTable;
   evidence_packs: EvidencePacksTable;
+  evidence_holds: EvidenceHoldsTable;
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
@@ -988,6 +1014,7 @@ export const TABLE_COLUMNS = {
     'size_bytes',
     'purged_at',
     'created_at',
+    'lock_extended_until',
   ]),
   evidence_packs: columns<EvidencePacksTable>()([
     'id',
@@ -1010,6 +1037,19 @@ export const TABLE_COLUMNS = {
     'purged_at',
     'created_at',
     'release_sha256',
+    'lock_extended_until',
+  ]),
+  evidence_holds: columns<EvidenceHoldsTable>()([
+    'id',
+    'tenant_id',
+    'intent_id',
+    'held_by',
+    'reason_ref',
+    'applied_at',
+    'released_at',
+    'released_by',
+    'release_applied_at',
+    'created_at',
   ]),
   tenant_role_bindings: columns<TenantRoleBindingsTable>()([
     'id',
@@ -1063,6 +1103,7 @@ export const TENANT_COLUMN = {
   project_ai_record_versions: 'tenant_id',
   evidence_items: 'tenant_id',
   evidence_packs: 'tenant_id',
+  evidence_holds: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
@@ -1093,6 +1134,7 @@ export type IntentNotice = Selectable<IntentNoticesTable>;
 export type ProjectAiRecordVersion = Selectable<ProjectAiRecordVersionsTable>;
 export type EvidenceItem = Selectable<EvidenceItemsTable>;
 export type EvidencePack = Selectable<EvidencePacksTable>;
+export type EvidenceHold = Selectable<EvidenceHoldsTable>;
 export type TenantRoleBinding = Selectable<TenantRoleBindingsTable>;
 export type AgentApproval = Selectable<AgentApprovalsTable>;
 

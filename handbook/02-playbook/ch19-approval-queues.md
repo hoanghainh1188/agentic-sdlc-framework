@@ -341,7 +341,8 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 
 | Command | Does |
 |---|---|
-| `sdlc admin project list`, `show`, `update`, `archive` | An archived project takes no new roles or configuration |
+| `sdlc admin project list`, `show`, `update`, `archive` | An archived project takes no new roles or configuration. An archive is refused while the project has open intents (`project_has_open_intents`): finish or cancel them first. About 7 days after the archive the platform deletes the project's evidence files, except held ones (below). There is no un-archive command |
+| `sdlc admin evidence hold <INT-…> [--ref <https link>]`, `release <INT-…>`, `show <INT-…>` | Puts an intent's evidence on hold: the platform keeps its evidence files until the hold is released, also past the retention and after an archive. For a dispute, an incident or a client request. Tenant admins, or the roles in `access.evidence_hold_roles` (by default governance and admin; never viewer). Write the reason where it can be edited and give its link with `--ref`: the platform keeps no text |
 | `sdlc admin user list`, `show`, `update`, `disable`, `enable --user <id or email>` | A disabled person's tokens stop working at once |
 | `sdlc admin identity list [--all]`, `unlink --user <id or email> --id <identity ID>` | `--all` also shows unlinked accounts |
 | `sdlc admin role list --project <slug> [--all]`, `revoke --project <slug> --id <role ID>` | `--all` also shows revoked roles |
@@ -351,7 +352,9 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | `sdlc admin agent …` | The agent register, Chapter 20 §20.5b |
 | `sdlc audit verify` | Checks your tenant's audit log (exit code 1 when a record was changed) |
 
-**Operator commands on the server.** The platform operator keeps a few commands that work straight on the database, for the first person of a tenant and for when the API is down: `sdlc ops bootstrap`, `sdlc ops token …`, `sdlc ops audit verify`, `sdlc ops tenant-admin …`, `sdlc ops role grant|revoke` (for a team with only one admin), `sdlc ops ai-record …`, and `sdlc ops agent show|list|suspend|quarantine`. They are recorded in the audit log as done by the platform.
+**Operator commands on the server.** The platform operator keeps a few commands that work straight on the database, for the first person of a tenant and for when the API is down: `sdlc ops bootstrap`, `sdlc ops token …`, `sdlc ops audit verify`, `sdlc ops tenant-admin …`, `sdlc ops role grant|revoke` (for a team with only one admin), `sdlc ops ai-record …`, `sdlc ops agent show|list|suspend|quarantine`, and `sdlc ops retention report --tenant <slug>` (counts only: per project, the evidence files stored, due for deletion, held, purged; runbook T11 §5j). They are recorded in the audit log as done by the platform.
+
+**How long evidence is kept.** Evidence files (the agent's changes, the Evidence Packs) are kept `retention.evidence_retention_days` after the intent ends: 180 days by default, never less, at most 3650 (mandatory rule M31). The intent's records in the platform (decisions, hashes, the audit log) are never deleted. The platform starts deleting only when the operator turns it on (runbook T11 §5j).
 
 - When the platform is upgraded and its default settings change, it checks every stored project configuration when it starts. A configuration nobody changed is saved again with the new defaults, and the audit log shows it as a change by the platform. A configuration that was changed outside the platform, or that the new defaults make invalid, is not used: the project stops until an admin saves a configuration again.
 
@@ -402,3 +405,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.13 | 2026-10-04 | Claude (task B09, PR 2) | §19.8c: plan text fields must be text (`schema_invalid` with the field); the agent reads the task text from the submitted plan file; the recorded commit is the head read (QUESTIONS #169, #210, #212) |
 | 0.14 | 2026-10-04 | Claude (task E03) | §19.8b: G7 and G8 by comment; §19.8c: `sdlc gate approve\|reject G8`, the release SHA-256 in `sdlc evidence show` (ADR-M49) |
 | 0.15 | 2026-10-04 | Claude (task C12) | §19.8c: freshness: spend is copied every few minutes and when a run ends (ADR-M24 §2.5) |
+| 0.16 | 2026-10-04 | Claude (task E05, PR 1) | §19.8d: archive refused with open intents and evidence deleted after a grace period, `sdlc admin evidence hold\|release\|show`, `sdlc ops retention report`, how long evidence is kept (ADR-M51) |

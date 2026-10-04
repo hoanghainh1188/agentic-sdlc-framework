@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M30: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M32: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -504,6 +504,29 @@ const CASES: Case[] = [
     yaml: 'access:\n  evidence_read_roles: [person_a, viewer]\n',
     key: 'config.rule.viewer_never_reads_evidence',
     path: 'access.evidence_read_roles',
+  },
+  // M31: evidence is kept between 180 and 3650 days (E05, ADR-M51, QUESTIONS #236).
+  {
+    name: 'evidence retention below 180 days',
+    rule: 'M31',
+    yaml: 'retention:\n  evidence_retention_days: 179\n',
+    key: 'config.rule.evidence_retention_bounds',
+    path: 'retention.evidence_retention_days',
+  },
+  {
+    name: 'evidence retention above 3650 days',
+    rule: 'M31',
+    yaml: 'retention:\n  evidence_retention_days: 3651\n',
+    key: 'config.rule.evidence_retention_bounds',
+    path: 'retention.evidence_retention_days',
+  },
+  // M32: the viewer never puts evidence on hold (E05, ADR-M51, QUESTIONS #235).
+  {
+    name: 'viewer may hold evidence',
+    rule: 'M32',
+    yaml: 'access:\n  evidence_hold_roles: [governance, viewer]\n',
+    key: 'config.rule.viewer_never_holds_evidence',
+    path: 'access.evidence_hold_roles',
   },
 ];
 

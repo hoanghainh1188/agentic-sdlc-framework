@@ -19,3 +19,4 @@ export * from './specs/index.js';
 export * from './plans/index.js';
 export * from './kill/index.js';
 export * from './metrics/index.js';
+export * from './retention/index.js';

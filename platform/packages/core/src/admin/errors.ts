@@ -17,6 +17,11 @@ export type AdminErrorCode =
   | 'role_binding_not_found'
   /** The project is archived: no new roles or configuration. */
   | 'project_archived'
+  /**
+   * The project has open intents: they are finished first (E05, QUESTIONS #237), so the purge of
+   * an archived project never meets an intent that could still change.
+   */
+  | 'project_has_open_intents'
   /** The user is disabled: no new roles, tokens or identities. */
   | 'user_not_active'
   /** A person tried to grant a role to themselves, or to disable themselves (QUESTIONS #151). */

@@ -430,6 +430,65 @@ Without it the worker still starts (log line `worker.evidence_missing`), but int
 |---|---|
 | The worker's evidence key (`worker-evidence`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap worker-evidence-credentials`, then restart `sdlc-worker`. The old key stops working at once; a build that runs at that moment fails, and the workflow tries again a minute later |
 
+## 5j. Evidence retention: the purge identity and the lock
+
+The worker deletes evidence files whose retention is over, and those of archived projects (task E05, `design/ADR-M51-evidence-retention.md`, D-02 FR-44). It uses its own SeaweedFS identity `worker-purge`, stored at `kv/worker/purge`. The AppRole `worker` already reads `kv/data/worker/*`, so `configure` needs no change.
+
+**What the identity may do:**
+
+| Right | Where | Why |
+|---|---|---|
+| `Write` (which includes delete in SeaweedFS) | `evidence/proposals/*`, `evidence/diffs/*`, `evidence/packs/*` | delete every version of a file whose retention is over |
+| `BypassGovernanceRetention` | the same three prefixes | delete young files of an archived project, and pack files without a row |
+| `PutObjectLegalHold`, `PutObjectRetention`, `GetObjectRetention` | the same three prefixes | holds; move the lock forward for projects that keep evidence longer |
+| `List` | the bucket `evidence` | find versions and pack files without a row |
+
+It has **no `Read`**: it never sees a file's content.
+
+**The lock.** `seaweedfs-init` turns on object lock for the bucket `evidence`: mode GOVERNANCE, 180 days by default (`SEAWEEDFS_LOCKED_BUCKETS=evidence:GOVERNANCE:180`). From then on no writer (runner, API, worker) can delete a version during its first 180 days. Only `worker-purge` can bypass the lock, and only for an archived project or a pack file without a row. A legal hold (set for a held intent) refuses even that. The lock cannot be turned off again.
+
+> Known gap (QUESTIONS #239, follow-up task): the SeaweedFS filer API on port 8888 of the Compose network has no authentication and skips the lock. Until it is fixed, treat every container on the network `sdlc` as able to delete evidence.
+
+### First set-up
+
+1. OpenBao is initialised, unsealed and configured (sections 3 and 4); SeaweedFS runs, and `seaweedfs-init` ran after the update (`pnpm compose:core`). Its log ends with `bucket evidence locked (GOVERNANCE, 180 days)`.
+2. Create the identity (asks for an admin token, hidden; prints no secret):
+   ```bash
+   pnpm openbao:bootstrap worker-purge-credentials
+   ```
+   Record it in the operations log (identity `worker-purge`, date, reason; not the keys).
+3. Restart the worker: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile platform restart sdlc-worker`.
+4. Check: the worker's log has a line `worker.retention_pass` every hour, with `mode: report`. It has no line `worker.retention_missing`.
+
+### From `report` to `purge`
+
+The loop starts in `report` mode: it counts what it would purge and deletes nothing. Deleting cannot be undone.
+
+1. Read the report for each tenant on the server:
+   ```bash
+   SDLC_DB_URL=<platform_app URL> pnpm sdlc ops retention report --tenant <slug>
+   ```
+   For each project it shows the retention days, how many files are stored, due now, held, of open intents, and purged.
+2. Compare it with what you expect (the projects' `evidence_retention_days`, the holds).
+3. Set `SDLC_WORKER_RETENTION_MODE=purge` in `platform/deploy/.env` and restart `sdlc-worker`. Record it in the operations log.
+4. If the log shows `retention.guard_tripped`, the loop refused to purge a large share of a tenant at once (default: more than 20 % of its files, and more than 20 files). Check the report again. If it is right, raise `SDLC_WORKER_RETENTION_GUARD_PERCENT` for one pass, then set it back.
+
+### Archived projects and Langfuse
+
+- **Archiving.** A tenant admin archives a project with `sdlc admin project archive --project <slug>`. It is refused while the project has open intents. The first pass in `purge` mode after the archive schedules the purge (audit `project.purge_scheduled`, log `retention.archive_purge_scheduled`); the worker purges the project's evidence files `SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS` (default 7) later. A project archived before you turned on `purge` gets the same 7 days from then. Held intents stay. When nothing is left, the audit log gets `project.purged`.
+- **A mistaken archive.** There is no un-archive command. Within the grace period, set `projects.status` back to `active` on the server with the owner role, and record it in the operations log.
+- **Langfuse traces are not deleted by the platform** (QUESTIONS #238; `project.purged` has `langfuse: manual`). After `project.purged`:
+  1. Sign in to Langfuse as the admin account (profile `observability`).
+  2. Filter the traces by the tags `tenant:<tenant ID>` and `project:<project ID>`.
+  3. Delete them. Langfuse's trace deletion takes the trace IDs; the API is `DELETE /api/public/traces` with the project key from `.env`, on the server, never from a chat tool.
+  4. Record the date and the number of traces in the operations log.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| The purge key (`worker-purge`, every 90 days or when it may have leaked) | `pnpm openbao:bootstrap worker-purge-credentials`, then restart `sdlc-worker`. The old key stops working at once; a pass that runs at that moment fails and the next one tries again |
+
 ## 6. Daily snapshot backup
 
 > Commands only. The procedure is tested in the recovery drill of task A10, which also adds the backup script.
@@ -590,3 +649,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.18 | 2026-10-03 | Claude Code (task C08, PR 1) | Section 5g step 3b: the identity `runner-evidence` also reads run diffs (`Read:evidence/diffs/*`), which the push applies; run the command again once after the update (ADR-M38 §2.2, QUESTIONS #155). Tested with throw-away keys (`pnpm test:runner-compose`) |
 | 0.19 | 2026-10-04 | Claude Code (task E02) | Section 5h: `api-evidence-credentials` (SeaweedFS identity `api-evidence` at `kv/api/evidence`: reads proposals and diffs, reads and writes packs), rotation; troubleshooting rows `evidence_unavailable` and failed hash checks (ADR-M48). Tested with throw-away keys (`pnpm test:openbao`) |
 | 0.20 | 2026-10-04 | Claude Code (task E03) | Section 5i: `worker-evidence-credentials` (SeaweedFS identity `worker-evidence` at `kv/worker/evidence`, the same rights as `api-evidence`), rotation (ADR-M49). Tested with throw-away keys (`pnpm test:openbao`) |
+| 0.21 | 2026-10-04 | Claude Code (task E05, PR 1) | Section 5j: `worker-purge-credentials` (SeaweedFS identity `worker-purge` at `kv/worker/purge`: delete, bypass, legal hold and lock on the evidence prefixes, list, no read), the GOVERNANCE lock on `evidence`, from `report` to `purge`, archived projects, the manual Langfuse deletion, rotation (ADR-M51) |

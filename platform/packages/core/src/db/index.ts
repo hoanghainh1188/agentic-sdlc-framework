@@ -24,6 +24,13 @@ export type { AuditEvent } from './repositories/audit-log.js';
 export type { NewCostRecord } from './repositories/cost-records.js';
 export type { NewEvidenceItem } from './repositories/evidence-items.js';
 export type { NewEvidencePack, StoredPackFile } from './repositories/evidence-packs.js';
+export type { NewEvidenceHold } from './repositories/evidence-holds.js';
+export type {
+  LockSelection,
+  PurgeSelection,
+  RetentionRow,
+  RetentionRowKind,
+} from './repositories/retention.js';
 export type {
   AutoPassRow,
   GateMetricsFilter,
@@ -77,6 +84,7 @@ export type {
   CostRecordRow,
   Escalation,
   EvidenceItem,
+  EvidenceHold,
   EvidencePack,
   EscalationNotice,
   GateDecisionRow,

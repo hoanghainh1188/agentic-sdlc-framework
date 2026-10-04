@@ -70,3 +70,45 @@ export class EvidenceError extends Error {
     super(`evidence.${code}`);
   }
 }
+
+/** A key of the evidence store, newest version first (task E05, the orphan sweep). */
+export interface EvidenceKeyInfo {
+  /** `s3://<bucket>/<key>`. */
+  readonly uri: string;
+  /** Time of the key's newest version or delete marker. */
+  readonly lastModified: Date;
+}
+
+export interface EvidenceKeyPage {
+  readonly keys: readonly EvidenceKeyInfo[];
+  /** Pass back as `after` for the next page; null at the end. */
+  readonly next: string | null;
+}
+
+/**
+ * Retention of evidence files (task E05, design/ADR-M51; D-05 §10.1, D-02 FR-44). Used only by
+ * the worker's retention loop, with its own identity `worker-purge`: no read, no new files.
+ *
+ * - The bucket `evidence` is versioned and carries a GOVERNANCE object lock (180 days by default):
+ *   no writer can delete a locked version. Only this identity may delete one early, and only with
+ *   `bypassLock` (an archived project, an orphan pack file). A legal hold blocks even that.
+ * - Calls name one file by its URI; a URI outside the store's bucket or prefixes is refused
+ *   (`EvidenceError('invalid_input')`). A refusal by the lock or the hold is `forbidden`.
+ */
+export interface EvidenceRetentionStore {
+  /**
+   * Deletes every version and every delete marker of exactly this key. Returns how many were
+   * deleted (0 when the key has none left). Fails `forbidden` when one version is locked or held;
+   * versions deleted before the refusal stay deleted.
+   */
+  deleteAllVersions(uri: string, options: { readonly bypassLock: boolean }): Promise<number>;
+  /** Sets (`on`) or removes the legal hold on every version of the key. Returns the count. */
+  setLegalHold(uri: string, on: boolean): Promise<number>;
+  /**
+   * Moves the object lock of every version of the key to at least `until`; never shortens one.
+   * Returns how many versions changed.
+   */
+  extendLock(uri: string, until: Date): Promise<number>;
+  /** Keys under `prefix` (one of the store's prefixes), at most `limit`, in key order. */
+  listKeys(prefix: string, after: string | null, limit: number): Promise<EvidenceKeyPage>;
+}

@@ -67,6 +67,13 @@ Commands:
                        identity "worker-evidence" with the same four rights (E03, ADR-M49). The
                        old key stops working. Prints no secret. Run it again to rotate, then
                        restart sdlc-worker.
+  worker-purge-credentials
+                       The worker's evidence retention loop (E05, ADR-M51): kv/worker/purge, the
+                       identity "worker-purge": List:evidence, and on evidence/proposals/*,
+                       evidence/diffs/*, evidence/packs/*: Write (delete), BypassGovernanceRetention,
+                       PutObjectLegalHold, PutObjectRetention, GetObjectRetention. No read. The old
+                       key stops working. Prints no secret. Run it again to rotate, then restart
+                       sdlc-worker.
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -112,7 +119,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -429,26 +436,26 @@ cmd_runner_evidence_credentials() {
   say "kv/runner/evidence stored; SeaweedFS identity runner-evidence (Write:evidence/proposals/*, Write:evidence/diffs/*, Read:evidence/diffs/*) applied; restart sdlc-runner to use it"
 }
 
-# The SeaweedFS identities that build Evidence Packs: the api's (E02, ADR-M48 §2.2) and the
-# worker's for G8's release pack (E03, ADR-M49 §2.2). Each reads proposals and diffs to re-check
-# their hashes (a deliberate widening: read only, those two prefixes) and reads and writes packs/.
-# Same handling of the keys as the runner's identity above: made inside the openbao container,
-# stored at kv/<role>/evidence (JSON on stdin), piped to `weed shell` on its stdin, its output
-# discarded; the old identity is deleted first, so a rotation leaves one key. The AppRoles "api"
-# and "worker" already read kv/data/<role>/*: no policy change.
-# pack_evidence_credentials <role: api | worker> <access key prefix, 9 characters> <service>
-pack_evidence_credentials() {
+# SeaweedFS identities of the platform processes, made the same way: the keys are made inside the
+# openbao container, stored at kv/<role>/<name> (JSON on stdin), piped to `weed shell` on its
+# stdin, its output discarded; the old identity is deleted first, so a rotation leaves one key.
+# The AppRoles "api" and "worker" already read kv/data/<role>/*: no policy change.
+# s3_credentials <role: api | worker> <kv name> <access key prefix, 9 characters> <actions> <service>
+# The identity is "<role>-<kv name>".
+s3_credentials() {
   role="$1"
-  key_prefix="$2"
-  service="$3"
-  identity="$role-evidence"
+  name="$2"
+  key_prefix="$3"
+  actions="$4"
+  service="$5"
+  identity="$role-$name"
   require_unsealed
   token="$(read_secret 'Admin or root token (hidden)')"
   [ -n "$token" ] || fail "no token given"
   weed="weed shell -master=seaweedfs:9333"
   kv_version() {
     printf '%s\n' "$token" | bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
-      bao read -field=current_version "kv/metadata/$1/evidence" 2>/dev/null || echo 0' sh "$role"
+      bao read -field=current_version "kv/metadata/$1/$2" 2>/dev/null || echo 0' sh "$role" "$name"
   }
   before="$(kv_version)"
   echo "s3.configure -user $identity -delete -apply" |
@@ -456,22 +463,44 @@ pack_evidence_credentials() {
   printf '%s\n' "$token" |
     bao_exec sh -c 'set -e
       IFS= read -r BAO_TOKEN && export BAO_TOKEN
-      access="$2$(od -An -N10 -tx1 /dev/urandom | tr -d " \n")"
+      access="$3$(od -An -N10 -tx1 /dev/urandom | tr -d " \n")"
       secret="$(od -An -N30 -tx1 /dev/urandom | tr -d " \n")"
       [ "${#access}" -eq 29 ] || exit 1
       [ "${#secret}" -eq 60 ] || exit 1
       printf "{\"access_key\":\"%s\",\"secret_key\":\"%s\"}" "$access" "$secret" |
-        bao kv put -mount=kv "$1/evidence" - >/dev/null
-      printf "s3.configure -user %s-evidence -access_key %s -secret_key %s -actions Read:evidence/proposals/*,Read:evidence/diffs/*,Read:evidence/packs/*,Write:evidence/packs/* -apply\n" "$1" "$access" "$secret"' \
-      sh "$role" "$key_prefix" |
+        bao kv put -mount=kv "$1/$2" - >/dev/null
+      printf "s3.configure -user %s-%s -access_key %s -secret_key %s -actions %s -apply\n" "$1" "$2" "$access" "$secret" "$4"' \
+      sh "$role" "$name" "$key_prefix" "$actions" |
     compose exec -T seaweedfs $weed >/dev/null 2>&1 ||
-    fail "could not create the $role evidence credentials (token valid? OpenBao configured? SeaweedFS running?)"
+    fail "could not create the $identity credentials (token valid? OpenBao configured? SeaweedFS running?)"
   [ "$(kv_version)" = "$((before + 1))" ] ||
-    fail "kv/$role/evidence was not stored (token valid? OpenBao configured?); run the command again"
+    fail "kv/$role/$name was not stored (token valid? OpenBao configured?); run the command again"
   echo "s3.configure" | compose exec -T seaweedfs sh -c "$weed 2>/dev/null | grep -q '\"name\": *\"$identity\"'" ||
     fail "SeaweedFS has no identity $identity; run the command again"
-  say "kv/$role/evidence stored; SeaweedFS identity $identity (Read:evidence/proposals/*, Read:evidence/diffs/*, Read:evidence/packs/*, Write:evidence/packs/*) applied; restart $service to use it"
+  say "kv/$role/$name stored; SeaweedFS identity $identity ($actions) applied; restart $service to use it"
 }
+
+# The SeaweedFS identities that build Evidence Packs: the api's (E02, ADR-M48 §2.2) and the
+# worker's for G8's release pack (E03, ADR-M49 §2.2). Each reads proposals and diffs to re-check
+# their hashes (a deliberate widening: read only, those two prefixes) and reads and writes packs/.
+# pack_evidence_credentials <role: api | worker> <access key prefix, 9 characters> <service>
+pack_evidence_credentials() {
+  s3_credentials "$1" evidence "$2" \
+    'Read:evidence/proposals/*,Read:evidence/diffs/*,Read:evidence/packs/*,Write:evidence/packs/*' "$3"
+}
+
+# The worker's purge identity (E05, ADR-M51 §2.3): deletes every version of evidence files whose
+# retention is over (SeaweedFS `Write` includes delete), lists the bucket (versions, the orphan
+# sweep), bypasses the GOVERNANCE lock (archived projects, orphan pack files), and sets legal holds
+# and locks. It never reads a file. Stored at kv/worker/purge.
+PURGE_ACTIONS=''
+for prefix in proposals diffs packs; do
+  for action in Write BypassGovernanceRetention PutObjectLegalHold PutObjectRetention GetObjectRetention; do
+    PURGE_ACTIONS="$PURGE_ACTIONS,$action:evidence/$prefix/*"
+  done
+done
+PURGE_ACTIONS="List:evidence$PURGE_ACTIONS"
+cmd_worker_purge_credentials() { s3_credentials worker purge sdlcwrkpg "$PURGE_ACTIONS" sdlc-worker; }
 
 cmd_api_evidence_credentials() { pack_evidence_credentials api sdlcapiev sdlc-api; }
 cmd_worker_evidence_credentials() { pack_evidence_credentials worker sdlcwrkev sdlc-worker; }
@@ -489,4 +518,5 @@ case "$command" in
   runner-evidence-credentials) cmd_runner_evidence_credentials ;;
   api-evidence-credentials) cmd_api_evidence_credentials ;;
   worker-evidence-credentials) cmd_worker_evidence_credentials ;;
+  worker-purge-credentials) cmd_worker_purge_credentials ;;
 esac

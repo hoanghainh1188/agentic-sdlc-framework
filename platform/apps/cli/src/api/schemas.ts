@@ -492,3 +492,22 @@ export const evidenceFileSchema = z.object({
     content: z.string().max(64 * 1024 * 1024),
   }),
 });
+
+/** An evidence hold (E05, ADR-M51, QUESTIONS #235): IDs, times and the optional link. */
+export const evidenceHoldSchema = z.object({
+  id,
+  held_by: id,
+  reason_ref: ref.nullable(),
+  created_at: time,
+  released_at: time.nullable(),
+  released_by: id.nullable(),
+});
+export type EvidenceHoldView = z.infer<typeof evidenceHoldSchema>;
+/** `PUT` and `DELETE /v1/intents/:intent/evidence-hold` (E05). */
+export const evidenceHoldChangeSchema = z.object({ hold: evidenceHoldSchema });
+/** `GET /v1/intents/:intent/evidence-hold` (E05). */
+export const evidenceHoldListSchema = z.object({
+  intent: code,
+  active: evidenceHoldSchema.nullable(),
+  history: z.array(evidenceHoldSchema).max(10_000),
+});

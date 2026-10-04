@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M29 and their sources:
+// Rule ids M1–M32 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -43,6 +43,9 @@
 //                                                                      QUESTIONS.md #206
 //   M30 the viewer role never builds or reads an Evidence Pack ...... D-02 FR-40, FR-42, ADR-M48,
 //                                                                      QUESTIONS.md #218
+//   M31 evidence_retention_days between 180 and 3650 ................. D-05 §10.1, D-02 FR-44,
+//                                                                      ADR-M51, QUESTIONS.md #236
+//   M32 the viewer role never puts evidence on hold .................. ADR-M51, QUESTIONS.md #235
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -94,6 +97,15 @@ export const MAX_STOP_PERCENT = 100;
 export const MAX_IDENTICAL_TOOL_CALLS = 3;
 /** Rule M27: a stalled agent is stopped after at most this many silent minutes ([Proposal], #184). */
 export const MAX_NO_PROGRESS_WINDOW_MINUTES = 30;
+
+/**
+ * Bounds of `retention.evidence_retention_days` (rule M31, task E05, ADR-M51, QUESTIONS #236).
+ * The floor equals the default retention of the object lock on the bucket `evidence` and the
+ * purge's own minimum (`MIN_EVIDENCE_AGE_DAYS` in `@sdlc/core`): lowering it needs a handbook
+ * change first.
+ */
+export const MIN_EVIDENCE_RETENTION_DAYS = 180;
+export const MAX_EVIDENCE_RETENTION_DAYS = 3650;
 
 /**
  * Calendar floor for M11. SLA clocks are compared in the project's own calendar, so a shrunken
@@ -599,6 +611,23 @@ const m30: Rule = (c) => [
     : []),
 ];
 
+const m31: Rule = (c) => {
+  const days = c.retention.evidence_retention_days;
+  return days < MIN_EVIDENCE_RETENTION_DAYS || days > MAX_EVIDENCE_RETENTION_DAYS
+    ? [
+        issue('config.rule.evidence_retention_bounds', 'retention.evidence_retention_days', {
+          minimum: MIN_EVIDENCE_RETENTION_DAYS,
+          maximum: MAX_EVIDENCE_RETENTION_DAYS,
+        }),
+      ]
+    : [];
+};
+
+const m32: Rule = (c) =>
+  c.access.evidence_hold_roles.includes('viewer')
+    ? [issue('config.rule.viewer_never_holds_evidence', 'access.evidence_hold_roles')]
+    : [];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -632,6 +661,8 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M28: m28,
   M29: m29,
   M30: m30,
+  M31: m31,
+  M32: m32,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

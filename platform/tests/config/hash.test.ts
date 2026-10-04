@@ -9,9 +9,9 @@ import { loadValid } from './helpers';
 
 /**
  * Pinned hash of the shipped default configuration. It changes only when a default value changes.
- * Update it in the same PR as the default change, after review (C06: `run.agent_key`; session 2: `run.contract_attempts_max`, `run.failed_run_escalation`; C07: `run.g5_breach_escalation`; B08: `access.spec_link_roles`; C08: `verification`; B09: `access.plan_submit_roles`; C11: `access.kill_roles`, `run.kill_escalation`; E04: `access.cost_read_roles`; E06: `access.metrics_read_roles`; E02: `access.evidence_build_roles`, `access.evidence_read_roles`).
+ * Update it in the same PR as the default change, after review (C06: `run.agent_key`; session 2: `run.contract_attempts_max`, `run.failed_run_escalation`; C07: `run.g5_breach_escalation`; B08: `access.spec_link_roles`; C08: `verification`; B09: `access.plan_submit_roles`; C11: `access.kill_roles`, `run.kill_escalation`; E04: `access.cost_read_roles`; E06: `access.metrics_read_roles`; E02: `access.evidence_build_roles`, `access.evidence_read_roles`; E05: `access.evidence_hold_roles`).
  */
-const DEFAULT_CONFIG_HASH = '3d53c12a70957d0e03b2c9e551c67f0632872bfc54400a67b96b524670624df2';
+const DEFAULT_CONFIG_HASH = 'eaf695d4f2c7ce738cda61a0e9beb93e4dfc271d9492485f15b4d6fe3ba4ee3f';
 
 describe('config_hash (AC3)', () => {
   it('is the pinned value for the default configuration', () => {
@@ -28,12 +28,12 @@ describe('config_hash (AC3)', () => {
 
   it('does not change with comments, whitespace, key order, quoting or flow style', () => {
     const a = loadValid(
-      'budget:\n  warn_percent: 70\n  stop_percent: 90\nretention:\n  evidence_retention_days: 90\n',
+      'budget:\n  warn_percent: 70\n  stop_percent: 90\nretention:\n  evidence_retention_days: 365\n',
     );
     const b = loadValid(
       [
         '# Same settings, written differently.',
-        'retention: { evidence_retention_days: 90 }   # shorter retention',
+        'retention: { evidence_retention_days: 365 }   # longer retention',
         '',
         'budget:',
         '    stop_percent: 90',
