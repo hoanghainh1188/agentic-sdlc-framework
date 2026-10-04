@@ -73,6 +73,8 @@ export function disclosureText(
   facts: DisclosureFacts,
   locale: string,
   escape: (value: string) => string = (value) => value,
+  /** For the AI record link, which must stay whole (a code span in Markdown). */
+  escapeLink: (value: string) => string = escape,
 ): string[] {
   const none = t('evidence.md.none', {}, locale);
   const standard = t(
@@ -91,7 +93,7 @@ export function disclosureText(
     standard,
     t(
       'evidence.disclosure.client_format',
-      { record_ref: facts.record_ref ? escape(facts.record_ref) : none },
+      { record_ref: facts.record_ref ? escapeLink(facts.record_ref) : none },
       locale,
     ),
   ];

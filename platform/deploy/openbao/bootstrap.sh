@@ -446,7 +446,8 @@ cmd_api_evidence_credentials() {
       IFS= read -r BAO_TOKEN && export BAO_TOKEN
       access="sdlcapiev$(od -An -N10 -tx1 /dev/urandom | tr -d " \n")"
       secret="$(od -An -N30 -tx1 /dev/urandom | tr -d " \n")"
-      [ "${#access}" -eq 29 ] && [ "${#secret}" -eq 60 ]
+      [ "${#access}" -eq 29 ] || exit 1
+      [ "${#secret}" -eq 60 ] || exit 1
       printf "{\"access_key\":\"%s\",\"secret_key\":\"%s\"}" "$access" "$secret" |
         bao kv put -mount=kv api/evidence - >/dev/null
       printf "s3.configure -user api-evidence -access_key %s -secret_key %s -actions Read:evidence/proposals/*,Read:evidence/diffs/*,Read:evidence/packs/*,Write:evidence/packs/* -apply\n" "$access" "$secret"' |

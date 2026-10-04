@@ -12,23 +12,30 @@ import { disclosureFacts, disclosureText } from './disclosure.js';
 import { PACK_RUN_EVENTS, planFilePath, type PackBuildInfo, type PackSource } from './manifest.js';
 
 const MAX_TEXT = 120;
+/** Codes, hashes and links (an `https://` reference is at most 512 characters). */
+const MAX_CODE = 600;
+
+/** Cuts a value to `max` characters and marks the cut. */
+function cut(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
 // C0/C1 controls, bidirectional controls and isolates, zero-width characters, BOM.
 const INVISIBLE = new RegExp(
   // eslint-disable-next-line no-control-regex -- control characters are what it removes
-  '[\\u0000-\\u001f\\u007f-\\u009f\\u200b-\\u200f\\u202a-\\u202e\\u2060-\\u2069\\ufeff]',
+  '[\\u0000-\\u001f\\u007f-\\u009f\\u00ad\\u061c\\u180e\\u200b-\\u200f\\u2028-\\u202e\\u2060-\\u2069\\ufeff]',
   'g',
 );
 const MARKDOWN = /[\\`*_{}[\]()<>#+\-.!|~&"']/g;
 
 /** Plain text that is safe anywhere in a Markdown table or paragraph. */
 export function mdText(value: string): string {
-  const clean = value.replace(INVISIBLE, ' ').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT);
+  const clean = cut(value.replace(INVISIBLE, ' ').replace(/\s+/g, ' ').trim(), MAX_TEXT);
   return clean.replace(MARKDOWN, (c) => `\\${c}`);
 }
 
 /** A code, ID or hash as a code span; anything with a backtick falls back to escaped text. */
 export function mdCode(value: string): string {
-  const clean = value.replace(INVISIBLE, '').slice(0, MAX_TEXT * 4);
+  const clean = cut(value.replace(INVISIBLE, ''), MAX_CODE);
   return clean.includes('`') || clean.includes('|') ? mdText(clean) : `\`${clean}\``;
 }
 
@@ -113,7 +120,7 @@ export function renderPackMarkdown(input: MarkdownInput): string {
     ),
     `## ${l('evidence.md.section.disclosure')}`,
     '',
-    ...disclosureText(facts, locale, mdText).flatMap((p) => [p, '']),
+    ...disclosureText(facts, locale, mdText, mdCode).flatMap((p) => [p, '']),
     ...(facts.client_text_required ? [l('evidence.md.client_text_required'), ''] : []),
     `## ${l('evidence.md.section.spec')}`,
     '',

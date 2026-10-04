@@ -28,7 +28,7 @@ What existed before E02:
   - `s3://evidence/packs/<tenant>/<intent>/<pack id>/manifest.json`
   - `s3://evidence/packs/<tenant>/<intent>/<pack id>/pack.md`
 - Then one row in `evidence_packs` takes the next version: unique (tenant, intent, version). A concurrent build retries with the next version, at most 3 times.
-- **Same content, same version.** `content_sha256` is the SHA-256 of the RFC 8785 canonical manifest content, without the build's own fields (pack ID, version, time, builder). When it equals the latest version's, the build returns that version (`created: false`, HTTP 200) and stores nothing.
+- **Same content, same version.** `content_sha256` is the SHA-256 of the RFC 8785 canonical manifest content, without the build's own fields (pack ID, version, time, builder). When it equals the latest version's, the build returns that version (`created: false`, HTTP 200) and stores nothing. A purged latest version (E05) is never handed out again: the same content then gets a new version.
 - **Sealing.** At most one version per intent is sealed (partial unique index). After that, no new build (`evidence_pack_sealed`, 409).
 - **Meaning change (D-05 1.30).** `evidence_packs` holds versions, no longer one row per intent. The table is migration `0021-evidence-packs`.
   - Columns: ID, intent, version, content hash, both files' URI, SHA-256 and size, locale, disclosure format, item count, builder (null for the platform), `sealed_at`, `retention_hold`, `purged_at`.
@@ -62,7 +62,7 @@ What existed before E02:
   - `hash_mismatch` or `size_mismatch` → `evidence_hash_mismatch`
   - a missing object → `evidence_missing`
   - larger than the per-item cap → `evidence_too_large`
-- **Fail closed.** Any failure stops the build before anything is stored. Each mismatch or missing object appends one audit event `evidence.check_failed` (item ID, kind, reason): a possible tampering signal. An oversized row is a setting, not tampering, and is not audited.
+- **Fail closed.** Any failure stops the build before anything is stored. Each mismatch or missing object appends one audit event `evidence.check_failed` (item ID, kind, reason): a possible tampering signal. An oversized row is a setting, not tampering, and is not audited. A failure whose reason equals the item's latest recorded failure adds no new row, so repeated builds cannot flood the audit log (kept at least 2 years).
 - Purged items (E05) are listed with their hash and `check: purged`, and are not read.
 - Reading a pack file back (`GET …/:version/manifest|markdown`) re-checks that file's hash and size. A failure is audited as `evidence.pack_check_failed` and refused.
 

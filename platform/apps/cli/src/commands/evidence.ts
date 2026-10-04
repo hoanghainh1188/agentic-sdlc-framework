@@ -166,7 +166,7 @@ async function exportPack(args: readonly string[], ctx: CliContext): Promise<num
       say(ctx, 'cli.evidence.exported', {
         name: body.file.name,
         version: body.file.version,
-        path: output,
+        path: clean(output),
         sha256: body.file.sha256,
       });
     } else {

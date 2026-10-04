@@ -109,8 +109,18 @@ async function verifyItems(
     else verified.push({ item, check: 'verified' });
   }
   if (failures.length === 0) return verified;
-  // An oversized row is a setting, not tampering: only real mismatches are audited.
-  const audited = failures.filter((failure) => failure.reason !== 'too_large');
+  // An oversized row is a setting, not tampering: only real mismatches are audited, and only
+  // when the item's latest recorded failure had another reason (repeated builds add no rows).
+  const audited: typeof failures = [];
+  for (const failure of failures) {
+    if (failure.reason === 'too_large') continue;
+    const last = (await scope.audit.listForEntity(failure.item.id, ['evidence.check_failed'])).at(
+      -1,
+    );
+    if ((last?.payload as { reason?: string } | undefined)?.reason !== failure.reason) {
+      audited.push(failure);
+    }
+  }
   await scope.transaction(async (tx) => {
     for (const { item, reason } of audited) {
       await tx.audit.append({
@@ -262,7 +272,8 @@ export async function buildEvidencePack(
   const contentHash = contentSha256(content);
   for (let attempt = 1; attempt <= BUILD_ATTEMPTS; attempt += 1) {
     const latest = await scope.evidencePacks.latest(intent.id);
-    if (latest && latest.content_sha256 === contentHash) {
+    // A purged version (E05) is never handed out again: the same content gets a new version.
+    if (latest && latest.purged_at === null && latest.content_sha256 === contentHash) {
       return { intentCode: intent.code, pack: latest, created: false };
     }
     try {

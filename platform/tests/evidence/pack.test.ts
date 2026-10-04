@@ -421,6 +421,11 @@ describe('E02 Markdown (AC4, QUESTIONS #216)', () => {
   it('mdText and mdCode make any value safe', () => {
     expect(mdText('a\nb\u0000c')).toBe('a b c');
     expect(mdText('x'.repeat(500))).toHaveLength(120);
+    expect(mdText('x'.repeat(500)).endsWith('…')).toBe(true);
+    expect(mdText('a\u061cb\u00adc\u2028d')).toBe('a b c d');
+    // A 512-character link stays whole.
+    const link = `https://docs.example.com/${'p'.repeat(487)}`;
+    expect(mdCode(link)).toBe(`\`${link}\``);
     expect(mdCode('abc')).toBe('`abc`');
     expect(mdCode('a`b')).toBe('a\\`b');
     expect(mdCode('a|b')).toBe('a\\|b');
@@ -429,6 +434,6 @@ describe('E02 Markdown (AC4, QUESTIONS #216)', () => {
   it('client_format adds the line that the client text is still needed', () => {
     const md = renderPackMarkdown({ source: source('client_format'), build, names, locale: 'en' });
     expect(md).toContain("The client's own disclosure note is still needed");
-    expect(md).toContain('https://docs\\.example\\.com/ai\\-record');
+    expect(md).toContain('`https://docs.example.com/ai-record`');
   });
 });

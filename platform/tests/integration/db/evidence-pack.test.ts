@@ -295,7 +295,7 @@ describeDb('E02: Evidence Packs on PostgreSQL', () => {
       expect(two.body.pack.version).toBe(2);
       expect(await rowCount()).toBe(2);
       const md = await call('GET', `${packs()}/2/markdown`, 'a');
-      expect(md.body.file.content).toContain('https://docs\\.example\\.test/project/ai\\-record');
+      expect(md.body.file.content).toContain('`https://docs.example.test/project/ai-record`');
       const manifest = manifestOf(
         (await call('GET', `${packs()}/2/manifest`, 'a')).body.file.content,
       );
@@ -326,6 +326,11 @@ describeDb('E02: Evidence Packs on PostgreSQL', () => {
       expect(await rowCount()).toBe(2);
       const failed = await w.t.f.scope.audit.listForEntity(item.id, ['evidence.check_failed']);
       expect(failed.at(-1)?.payload).toMatchObject({ kind: 'diff', reason: 'hash_mismatch' });
+      // The same failure again adds no audit row (the log is kept for years).
+      expect((await call('POST', packs(), 'a')).body.error.code).toBe('evidence_hash_mismatch');
+      expect(
+        await w.t.f.scope.audit.listForEntity(item.id, ['evidence.check_failed']),
+      ).toHaveLength(failed.length);
 
       store.objects.delete(diffKey);
       const missing = await call('POST', packs(), 'a');
