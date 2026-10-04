@@ -29,6 +29,10 @@ export const WORKER_ENV = {
   costMasterKeyPath: 'SDLC_WORKER_COST_MASTER_KEY_PATH',
   litellmUrl: 'SDLC_WORKER_LITELLM_URL',
   runEgress: 'SDLC_WORKER_RUN_EGRESS',
+  costSyncIntervalSeconds: 'SDLC_WORKER_COST_SYNC_INTERVAL_SECONDS',
+  costSyncLookbackMinutes: 'SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES',
+  costSyncCatchUpMinutes: 'SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES',
+  costSyncSettleMinutes: 'SDLC_WORKER_COST_SYNC_SETTLE_MINUTES',
   evidenceUrl: 'SDLC_WORKER_EVIDENCE_URL',
   evidenceBucket: 'SDLC_WORKER_EVIDENCE_BUCKET',
   evidenceSecretPath: 'SDLC_WORKER_EVIDENCE_SECRET_PATH',
@@ -104,6 +108,12 @@ const schema = z.object({
     .string()
     .regex(/^[a-z][a-z0-9-]*:[0-9]{1,5}(,[a-z][a-z0-9-]*:[0-9]{1,5})*$/)
     .default('litellm:4000,npm-proxy:4873'),
+  // C12 (ADR-M24 §2.5): the scheduled spend sync. LiteLLM writes spend logs in batches, so each
+  // pass reads back over a look-back window; the first pass after a start reads the catch-up window.
+  [WORKER_ENV.costSyncIntervalSeconds]: z.coerce.number().int().min(30).max(3600).default(300),
+  [WORKER_ENV.costSyncLookbackMinutes]: z.coerce.number().int().min(10).max(1440).default(120),
+  [WORKER_ENV.costSyncCatchUpMinutes]: z.coerce.number().int().min(10).max(10_080).default(1440),
+  [WORKER_ENV.costSyncSettleMinutes]: z.coerce.number().int().min(5).max(1440).default(30),
   // E03 (ADR-M49 §2.2): the evidence store for G8's release pack, SeaweedFS's S3 API on the
   // Compose network; `off`: intents wait at G8. An origin only.
   [WORKER_ENV.evidenceUrl]: z
@@ -171,6 +181,18 @@ export interface WorkerRunSettings {
   readonly egressAllowlist: readonly string[];
 }
 
+/** C12: the scheduled spend sync (ADR-M24 §2.5). Technical settings, all in milliseconds. */
+export interface CostSyncSettings {
+  /** Time between two passes. */
+  readonly intervalMs: number;
+  /** Each pass syncs at least the calls of this window before now. */
+  readonly lookbackMs: number;
+  /** The first pass after a start, and the oldest a retry reaches back. */
+  readonly catchUpMs: number;
+  /** Runs that ended within this window are synced again from their start. */
+  readonly settleMs: number;
+}
+
 export interface WorkerSettings {
   readonly database: WorkerDatabase;
   readonly githubApiUrl: string;
@@ -195,6 +217,8 @@ export interface WorkerSettings {
   readonly workflowBundle: string | null;
   /** C06 session 2: agent runs (G4, the handoff to the runner); null: G4 waits. */
   readonly runs: WorkerRunSettings | null;
+  /** C12: the scheduled spend sync; it runs when `runs` is set (the cost-controller AppRole). */
+  readonly costSync: CostSyncSettings;
   /** E03: the evidence store for G8's release pack; null: `SDLC_WORKER_EVIDENCE_URL=off`. */
   readonly evidence: WorkerEvidenceSettings | null;
 }
@@ -246,6 +270,16 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
       roleId === undefined ? WORKER_ENV.costRoleIdFile : WORKER_ENV.costSecretIdFile,
     );
   }
+  const intervalSeconds = v[WORKER_ENV.costSyncIntervalSeconds];
+  const lookbackMinutes = v[WORKER_ENV.costSyncLookbackMinutes];
+  const catchUpMinutes = v[WORKER_ENV.costSyncCatchUpMinutes];
+  // Two passes at least inside every window, so one failed pass loses nothing.
+  if (lookbackMinutes * 60 < 2 * intervalSeconds) {
+    throw new SettingsError('worker.settings.invalid', WORKER_ENV.costSyncLookbackMinutes);
+  }
+  if (catchUpMinutes < lookbackMinutes) {
+    throw new SettingsError('worker.settings.invalid', WORKER_ENV.costSyncCatchUpMinutes);
+  }
   let database: WorkerDatabase;
   if (dev) {
     const url = v[WORKER_ENV.devDbUrl];
@@ -289,6 +323,12 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
             litellmUrl: v[WORKER_ENV.litellmUrl],
             egressAllowlist: v[WORKER_ENV.runEgress].split(','),
           },
+    costSync: {
+      intervalMs: intervalSeconds * 1000,
+      lookbackMs: lookbackMinutes * 60_000,
+      catchUpMs: catchUpMinutes * 60_000,
+      settleMs: v[WORKER_ENV.costSyncSettleMinutes] * 60_000,
+    },
     evidence:
       v[WORKER_ENV.evidenceUrl] === 'off'
         ? null

@@ -2,8 +2,8 @@
 // Ch.19 §19.8c). The whole tenant needs a tenant admin; `--project` or `--intent` needs a role in
 // project config `access.cost_read_roles` (never `viewer`). The range is half-open UTC
 // [--from, --to); default: the current UTC month. Money is printed as the API sends it (decimal
-// strings), never through a JavaScript number. Spend is synced when each run ends, so every report
-// ends with the freshness notice (QUESTIONS #197).
+// strings), never through a JavaScript number. Spend is synced every few minutes and when each run
+// ends (C12), so every report ends with the freshness notice (QUESTIONS #197).
 import { t, type MessageKey } from '@sdlc/messages';
 
 import { costReportSchema, type CostAmountsView, type CostReportView } from '../api/schemas.js';

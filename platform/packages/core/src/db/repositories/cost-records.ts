@@ -254,8 +254,8 @@ export class CostRecordRepository extends TenantRepository {
   }
 
   /**
-   * Runs of the scope in one of `statuses` (the runs still in progress): their spend is synced when
-   * they end (ADR-M24 §2.5, QUESTIONS #197), so a report does not show it yet.
+   * Runs of the scope in one of `statuses` (the runs still in progress): their spend is synced every
+   * few minutes (C12, ADR-M24 §2.5), so a report may not show the latest calls yet.
    */
   async countRuns(
     scope: { projectId?: string; intentId?: string },

@@ -38,12 +38,17 @@ export interface LiteLLMGatewayOptions {
   readonly timeoutMs?: number;
   /** Spend rows per page; default 100. */
   readonly pageSize?: number;
+  /** Pages `listSpend` reads at most (default 1000). For tests only. */
+  readonly maxPages?: number;
   /** For tests only. */
   readonly fetch?: typeof fetch;
 }
 
 const HASHED_KEY = /^[0-9a-f]{64}$/;
-/** LiteLLM caps the number of rows it counts; paging stops there (ADR-M24 §2.2). */
+/**
+ * LiteLLM caps the number of rows it counts; paging stops there (ADR-M24 §2.2). A range with more
+ * pages fails with `truncated` (C12): the worker syncs in slices.
+ */
 const MAX_PAGES = 1000;
 
 /** A virtual key that does not show up in logs, errors or JSON. */
@@ -96,6 +101,7 @@ export class LiteLLMGateway implements ModelGateway {
   readonly #masterKey: RedactedSecret;
   readonly #timeoutMs: number;
   readonly #pageSize: number;
+  readonly #maxPages: number;
   readonly #fetch: typeof fetch;
 
   constructor(options: LiteLLMGatewayOptions) {
@@ -103,6 +109,7 @@ export class LiteLLMGateway implements ModelGateway {
     this.#masterKey = options.masterKey;
     this.#timeoutMs = options.timeoutMs ?? 15_000;
     this.#pageSize = options.pageSize ?? 100;
+    this.#maxPages = options.maxPages ?? MAX_PAGES;
     this.#fetch = options.fetch ?? fetch;
   }
 
@@ -221,7 +228,8 @@ export class LiteLLMGateway implements ModelGateway {
     const end = new Date(Math.ceil(range.to.getTime() / 1000) * 1000);
     const records: SpendRecord[] = [];
     let unreadable = 0;
-    for (let page = 1; page <= MAX_PAGES; page++) {
+    let complete = false;
+    for (let page = 1; page <= this.#maxPages; page++) {
       const answer = (await this.#request('GET', '/spend/logs/v2', {
         query: {
           start_date: spendLogTime(start),
@@ -245,7 +253,14 @@ export class LiteLLMGateway implements ModelGateway {
       if (!Number.isInteger(answer.total_pages)) {
         throw new GatewayError('unexpected_response', 'LiteLLM /spend/logs/v2: no total_pages');
       }
-      if (page >= (answer.total_pages as number)) break;
+      if (page >= (answer.total_pages as number)) {
+        complete = true;
+        break;
+      }
+    }
+    // Never return part of the range as if it were all of it (C12): the caller retries smaller.
+    if (!complete) {
+      throw new GatewayError('truncated', 'LiteLLM /spend/logs/v2: more pages than the page cap');
     }
     return {
       records: records

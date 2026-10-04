@@ -415,7 +415,8 @@ cmd_runner_evidence_credentials() {
       IFS= read -r BAO_TOKEN && export BAO_TOKEN
       access="sdlcrunner$(od -An -N10 -tx1 /dev/urandom | tr -d " \n")"
       secret="$(od -An -N30 -tx1 /dev/urandom | tr -d " \n")"
-      [ "${#access}" -eq 30 ] && [ "${#secret}" -eq 60 ]
+      [ "${#access}" -eq 30 ] || exit 1
+      [ "${#secret}" -eq 60 ] || exit 1
       printf "{\"access_key\":\"%s\",\"secret_key\":\"%s\"}" "$access" "$secret" |
         bao kv put -mount=kv runner/evidence - >/dev/null
       printf "s3.configure -user runner-evidence -access_key %s -secret_key %s -actions Write:evidence/proposals/*,Write:evidence/diffs/*,Read:evidence/diffs/* -apply\n" "$access" "$secret"' |

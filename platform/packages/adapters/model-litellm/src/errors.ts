@@ -9,6 +9,8 @@ export type GatewayErrorCode =
   | 'unreachable'
   /** The answer is not the JSON shape this adapter expects (a LiteLLM version change). */
   | 'unexpected_response'
+  /** More spend pages than the page cap: the range is not complete (C12). Sync smaller ranges. */
+  | 'truncated'
   /** An input the adapter refuses before calling LiteLLM; `field` says which. */
   | 'invalid_input';
 

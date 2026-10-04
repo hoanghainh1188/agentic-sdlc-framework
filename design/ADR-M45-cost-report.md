@@ -60,6 +60,8 @@ The report reads `cost_records` as synced. It shows:
 
 The CLI prints a notice on every report: spend is copied from the gateway when each run ends. The scheduled sync of ADR-M24 §2.5 (a look-back window, because LiteLLM writes spend logs in batches) is a separate worker task (Harry adds it to the backlog); E04 does not change the worker.
 
+C12 (2026-10-04, QUESTIONS #225) built that scheduled sync (ADR-M24 §2.5 version 0.2): spend is copied every 5 minutes by default and when each run ends, so a run in progress shows its spend so far. The notice now says so; the freshness fields are unchanged.
+
 ### 2.6. Where the code lives
 
 | Part | Where |

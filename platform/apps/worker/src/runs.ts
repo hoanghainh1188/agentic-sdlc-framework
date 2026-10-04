@@ -30,6 +30,8 @@ export interface WorkerRuns {
   readonly publish: PublishDeps;
   /** C08 PR 2: what G6 reads from CI. */
   readonly g6: G6Deps;
+  /** C12: the scheduled spend sync uses the same Cost Controller (ADR-M24 §2.5). */
+  readonly costController: CostController;
   close(): Promise<void>;
 }
 
@@ -81,6 +83,7 @@ export async function createWorkerRuns(options: {
       },
       publish: { registry: options.registry, gitHost: options.gitHost, wrapper: options.wrapper },
       g6: { gitHost: options.gitHost },
+      costController,
       close: () => cost.close(),
     };
   } catch (error) {

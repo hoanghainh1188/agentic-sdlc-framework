@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Entry point of the worker process (task B06, design/ADR-M27). It runs the GitHub poller, the
 // escalation clock loop (B11, ADR-M28), and the Temporal worker of the intent workflow with its
-// reconcile loop (B07, ADR-M30). Settings come from the environment, the database password and the
+// reconcile loop (B07, ADR-M30), and the scheduled spend sync (C12). Settings come from the environment, the database password and the
 // GitHub App key from OpenBao (AppRole `worker`).
 // Tracing starts first (A08, ADR-M35): `./telemetry.js` must stay the first import.
 import { tracing, tracingEndpointValid } from './telemetry.js';
@@ -31,6 +31,7 @@ import {
 
 import { connectDatabase } from './database.js';
 import { createIntentActivities } from './activities/intent-activities.js';
+import { CostSyncLoop } from './cost-sync-loop.js';
 import { openWorkerEvidence } from './evidence-store.js';
 import { EscalationLoop } from './escalation-loop.js';
 import { jsonLogger } from './logger.js';
@@ -161,6 +162,19 @@ async function main(): Promise<void> {
     batchSize: settings.escalationBatch,
   });
   escalations.start(settings.escalationTickMs);
+  // The scheduled spend sync (C12, ADR-M24 §2.5): needs the Cost Controller, so the cost AppRole.
+  const costSync = workerRuns
+    ? new CostSyncLoop({
+        sync: (range) => workerRuns.costController.syncSpend(range),
+        earliestStartOfRunsEndedSince: (since) => db.system.earliestStartOfRunsEndedSince(since),
+        withLock: (fn) => db.system.withSpendSyncLock(fn),
+        now: () => new Date(),
+        logger,
+        settings: settings.costSync,
+      })
+    : undefined;
+  if (costSync) costSync.start();
+  else logger.log('warn', 'worker.cost_sync_off', { message: t('worker.start.cost_sync_off') });
   const reconcile = settings.temporal
     ? new ReconcileLoop({
         listOpen: (limit, after) => db.system.listOpenIntents(limit, after),
@@ -178,7 +192,13 @@ async function main(): Promise<void> {
   });
 
   const shutdown = (): void => {
-    void Promise.all([loop.stop(), escalations.stop(), reconcile?.stop(), intentWorker?.shutdown()])
+    void Promise.all([
+      loop.stop(),
+      escalations.stop(),
+      reconcile?.stop(),
+      costSync?.stop(),
+      intentWorker?.shutdown(),
+    ])
       .then(() =>
         Promise.all([
           db.close(),

@@ -5,7 +5,7 @@
 | Status | **Proposed** (task C03, PR for review) |
 | Date | 2026-09-26 |
 | Decided by | Harry (plan approved 2026-09-26, with answers D1–D5 and two additions) |
-| Related | D-08 task C03; D-02 FR-50, FR-51; D-03 sections 7.4, 8.2, 10; D-05 sections 6.5, 7.2; D-07 sections 3–6; ADR-M10 §4.2, ADR-M17, ADR-M19, ADR-M21, ADR-M09; QUESTIONS #1, #4, #14, #17 |
+| Related | D-08 tasks C03, C12; D-02 FR-50, FR-51; D-03 sections 7.4, 8.2, 10; D-05 sections 6.5, 7.2; D-07 sections 3–6; ADR-M10 §4.2, ADR-M17, ADR-M19, ADR-M21, ADR-M09; QUESTIONS #1, #4, #14, #17, #197, #225 |
 
 ## 1. Context
 
@@ -73,7 +73,15 @@ The seven D-07 labels, with the values of the D-07 examples: tenant slug, projec
 - `CostController.syncSpend({from, to})` reads the gateway's call records and the model list, finds tenant and run from the labels, checks that the intent code and project slug match the run, and inserts with `ON CONFLICT (tenant_id, source_ref) DO NOTHING`. Running it again on the same range inserts nothing.
 - A call that cannot be recorded is counted by reason (`no_usage`, `unlabelled`, `unknown_tenant`, `unknown_run`, `label_mismatch`, `unknown_model`, `invalid_record`, `unreadable`) and logged; the reasons that lose cost data are logged as a warning. A gateway row the adapter cannot read (for example a negative cost) is counted as `unreadable`; it never stops the sync of the other rows. An answer without `total_pages` is an error, so paging never stops early without notice. A label for one tenant never finds a run of another tenant.
 - `endRun` revokes the key first, then syncs once.
-- **Scheduling belongs to the worker** (B07 / C07): a Temporal schedule that calls `syncSpend` with a look-back window, because LiteLLM writes spend logs in batches.
+- ~~Scheduling belongs to the worker (B07 / C07): a Temporal schedule that calls `syncSpend` with a look-back window, because LiteLLM writes spend logs in batches.~~ **Changed in version 0.2 (task C12, QUESTIONS #197, #225):** scheduling is a plain loop in the worker process (`CostSyncLoop`, `apps/worker/src/cost-sync-loop.ts`), like the GitHub poller and the escalation clocks (ADR-M27, ADR-M28), not a Temporal schedule. As built:
+  - **When:** one pass at start, then every `SDLC_WORKER_COST_SYNC_INTERVAL_SECONDS` (default 300, 30–3600) after the previous pass ended. The run-end sync (`endRun`, `endRunKey`, also after a kill) stays.
+  - **Range:** each pass syncs `[from, now)`. Normally `from = now − SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES` (default 120, 10–1440, at least two intervals): calls LiteLLM writes late, in batches, are recorded by a later pass. The first pass after a start reads `SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES` back (default 1440, from the look-back up to 10080): the time the worker was down.
+  - **Once more after each run ends:** `from` also reaches back to the start of every run, of any tenant, that ended within `SDLC_WORKER_COST_SYNC_SETTLE_MINUTES` (default 30, 5–1440; `SystemScope.earliestStartOfRunsEndedSince`), never further than the catch-up window. So a run longer than the look-back is read whole once more within one interval after it ends. A run in progress shows its spend within one interval.
+  - **Slices and the page cap:** the range is read in slices of 60 minutes, oldest first. `listSpend` fails with `truncated` when a range has more pages than its cap (1000 pages): it never returns part of a range as if it were all of it.
+  - **Failures (D-08 C12 AC3):** a slice that fails (gateway down, `truncated`, database error) fails the pass; the slices before it are recorded. The next pass starts at the failed slice, however old, but never earlier than `now − catch_up`. A range cut at that limit is logged as `worker.cost_sync_gap` with `uncovered_minutes`: an operator must sync that range by hand (open item below). Each pass logs `worker.cost_synced` (window, slices, seen, inserted, duplicates, `skipped_<reason>` counts) or `worker.cost_sync_failed` (an error code, slices done). The loop never throws and never stops the worker or a run.
+  - **One sync at a time:** `SystemScope.withSpendSyncLock` takes a session advisory lock (`pg_try_advisory_lock`) on one reserved connection, without waiting; a second process skips the pass (`worker.cost_sync_busy`). A process that dies releases the lock with its session. Inside one process, passes never overlap.
+  - **Who:** the loop uses the worker's Cost Controller, so it runs only when the `cost-controller` AppRole is delivered (ADR-M33 §2.5). Without it the worker logs `worker.cost_sync_off` and starts no runs either.
+  - **Late records and G8 (E03):** cost records that arrive after an Evidence Pack was built change its content and so the G8 `release_sha256`, which voids a G8 approval. With the run-end sync and a pass at most one interval after the run ends, a run's records are complete long before G8: G5's block window, G6 CI and a G7 review and merge come between. Only a gateway outage across the G8 decision can void it, and then asking G8 again is the right result: the pack must show the real cost. G8 is not changed.
 
 ### 2.6. `cost_records` (migration `0005-cost-records`)
 
@@ -100,7 +108,8 @@ Same responsibilities. Differences:
 
 | Item | Where |
 |---|---|
-| Schedule `syncSpend` in the worker | B07 / C07 |
+| ~~Schedule `syncSpend` in the worker~~ Done (C12, §2.5) | C12 |
+| A manual spend sync for an operator after `worker.cost_sync_gap` (a range older than the catch-up window): no command yet; meanwhile raise `SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES` (at most 10080) and restart the worker | Later operator task |
 | G5 budget checks from `cost_records` (80 % warn, 100 % stop) | C07 |
 | Kill switch revokes the virtual key | C11 (uses `revokeKey`) |
 | LiteLLM traces to Langfuse (`langfuse_otel`) | A08, QUESTIONS #4 (open) |
@@ -132,3 +141,4 @@ Same responsibilities. Differences:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-26 | Claude (task C03) | First version |
+| 0.2 | 2026-10-04 | Claude (task C12), approved by Harry | §2.5: the scheduled sync as built: a worker loop instead of a Temporal schedule, look-back and catch-up windows, runs that just ended, slices, `truncated`, failures and the gap warning, the lock, G8; §3: open items (QUESTIONS #197, #225) |
