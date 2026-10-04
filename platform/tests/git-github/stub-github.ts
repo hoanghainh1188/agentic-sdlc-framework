@@ -76,6 +76,8 @@ export class StubGitHub {
   now = new Date('2026-09-26T08:00:00.000Z');
   tokenLifetimeMs = 60 * 60 * 1000;
   #routes = new Map<string, Handler>();
+  /** C09: answers requests no exact route matches (path patterns), before the 404. */
+  fallback: Handler | undefined;
   #server: http.Server;
   #tokenCounter = 0;
   address = '';
@@ -148,7 +150,7 @@ export class StubGitHub {
       return this.issueToken(req.body as Record<string, unknown>);
     }
     if (!this.#validToken(auth)) return { status: 401, body: { message: 'Bad credentials' } };
-    const handler = this.#routes.get(`${req.method} ${req.path}`);
+    const handler = this.#routes.get(`${req.method} ${req.path}`) ?? this.fallback;
     return handler ? handler(req) : { status: 404, body: { message: 'Not Found' } };
   }
 
