@@ -154,6 +154,45 @@ export const killResultSchema = z.object({
   escalation: id.nullable(),
 });
 
+/** Token sums: strings of digits (task E04, ADR-M45 §2.4). */
+const tokenSum = z.string().regex(/^[0-9]{1,20}$/);
+/** Money: a decimal string with 6 decimals, never a JSON number (D-05 D6). */
+const usd6 = z.string().regex(/^[0-9]{1,15}\.[0-9]{6}$/);
+
+const costAmountsSchema = z.object({
+  calls: z.number().int().min(0),
+  input_tokens: tokenSum,
+  output_tokens: tokenSum,
+  cached_input_tokens: tokenSum,
+  cost_usd: usd6,
+  wasted_tokens: tokenSum,
+  wasted_cost_usd: usd6,
+});
+export type CostAmountsView = z.infer<typeof costAmountsSchema>;
+
+/** `GET /v1/cost/report` (E04, ADR-M45 §2.4). */
+export const costReportSchema = z.object({
+  report: z.object({
+    scope: z.object({
+      kind: z.enum(['tenant', 'project', 'intent']),
+      project: code.optional(),
+      intent: code.optional(),
+    }),
+    from: time,
+    to: time,
+    group_by: z.enum(['project', 'intent', 'model', 'status']),
+    totals: costAmountsSchema,
+    rows: z.array(costAmountsSchema.extend({ key: z.string().max(128).nullable() })).max(500),
+    truncated: z.boolean(),
+    freshness: z.object({
+      latest_call_at: time.nullable(),
+      last_recorded_at: time.nullable(),
+      runs_in_progress: z.number().int().min(0),
+    }),
+  }),
+});
+export type CostReportView = z.infer<typeof costReportSchema>['report'];
+
 /** `GET /v1/intents/:intent/specs` (B08). */
 export const specListSchema = z.object({
   intent: code,

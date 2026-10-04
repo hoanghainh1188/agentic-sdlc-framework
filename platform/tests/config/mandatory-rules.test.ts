@@ -1,5 +1,5 @@
 // D-08 A05 AC2: validation refuses configurations that loosen mandatory rules, with clear messages
-// from the message catalog. Rules M1–M26: platform/packages/config/src/mandatory-rules.ts.
+// from the message catalog. Rules M1–M26 and M28: platform/packages/config/src/mandatory-rules.ts.
 import { formatIssue, MANDATORY_RULES } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 
@@ -465,6 +465,14 @@ const CASES: Case[] = [
     yaml: 'run:\n  kill_escalation: { severity: high, response_level: notify }\n',
     key: 'config.rule.kill_escalation_freezes',
     path: 'run.kill_escalation.response_level',
+  },
+  // M28: the viewer never reads the cost report (E04, ADR-M45, QUESTIONS #196).
+  {
+    name: 'viewer may read cost',
+    rule: 'M28',
+    yaml: 'access:\n  cost_read_roles: [person_a, viewer]\n',
+    key: 'config.rule.viewer_never_reads_cost',
+    path: 'access.cost_read_roles',
   },
 ];
 

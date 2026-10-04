@@ -27,6 +27,8 @@ import { MeController } from './me/me.controller.js';
 import { MeTokensController } from './me/tokens.controller.js';
 import { PlansController } from './plans/plans.controller.js';
 import { PlansService } from './plans/plans.service.js';
+import { CostController } from './cost/cost.controller.js';
+import { CostService } from './cost/cost.service.js';
 import { RunsController } from './runs/runs.controller.js';
 import { RunsService } from './runs/runs.service.js';
 import { SpecsController } from './specs/specs.controller.js';
@@ -42,6 +44,7 @@ import {
   INTENTS,
   PLANS,
   RUNS,
+  COST,
   REGISTRY,
   SETTINGS,
   SPECS,
@@ -89,6 +92,7 @@ class ApiModule {
         SpecsController,
         PlansController,
         RunsController,
+        CostController,
         EscalationsController,
         AiRecordsController,
         AdminProjectsController,
@@ -136,6 +140,7 @@ class ApiModule {
           useFactory: (registry: Registry) => new RunsService(registry, signals, wakeLogger),
           inject: [REGISTRY],
         },
+        { provide: COST, useValue: new CostService(now) },
         { provide: AI_RECORDS, useValue: new AiRecordsService(signals, wakeLogger, now) },
         {
           provide: APP_GUARD,
