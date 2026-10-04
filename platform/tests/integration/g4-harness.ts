@@ -6,7 +6,11 @@ import crypto from 'node:crypto';
 
 import { loadProjectConfig } from '@sdlc/config';
 
-import { GitHostError, type RedactedSecret } from '../../packages/contracts/src/index.js';
+import {
+  GitHostError,
+  type RedactedSecret,
+  type ReviewDecision,
+} from '../../packages/contracts/src/index.js';
 import { decideGate } from '../../packages/core/src/commands/gate-command.js';
 import type { CostError } from '../../packages/core/src/cost/errors.js';
 import type { Intent } from '../../packages/core/src/db/schema.js';
@@ -99,7 +103,13 @@ export async function harness(db: TestDatabase): Promise<Harness> {
     tenantMonthlyBudget: () => Promise.resolve(world.tenantBudget),
   };
   let configVersion = 0;
-  const calls: RunCalls = { keys: [], revoked: [], wrapped: [], refuseKey: undefined };
+  const calls: RunCalls = {
+    keys: [],
+    revoked: [],
+    wrapped: [],
+    refuseKey: undefined,
+    tokens: [],
+  };
   const t: Harness = {
     f,
     world,
@@ -225,6 +235,12 @@ export interface RunCalls {
   readonly revoked: string[];
   readonly wrapped: string[][];
   refuseKey: CostError | undefined;
+  /** E01 PR 2: the permissions of every token issued, in order. */
+  readonly tokens?: string[];
+  /** E01 PR 2: what `getReviews` answers in `prepareRun` (default: none). */
+  reviews?: readonly ReviewDecision[];
+  /** E01 PR 2: `getReviews` fails with this error. */
+  reviewsError?: Error;
 }
 
 export function fakeRunDeps(f: WorkflowFixture, g4: G4Deps, calls: RunCalls): RunDeps {
@@ -253,13 +269,23 @@ export function fakeRunDeps(f: WorkflowFixture, g4: G4Deps, calls: RunCalls): Ru
       },
     },
     gitHost: {
-      issueShortLivedToken: (repo, scope) =>
-        Promise.resolve({
+      issueShortLivedToken: (repo, scope) => {
+        calls.tokens?.push(
+          Object.entries(scope.permissions)
+            .map(([k, v]) => `${k}:${String(v)}`)
+            .join(','),
+        );
+        return Promise.resolve({
           token: new Secret('ghs_token'),
           expiresAt: T0.toISOString(),
           repo,
           permissions: scope.permissions,
-        }),
+        });
+      },
+      getReviews: () =>
+        calls.reviewsError
+          ? Promise.reject(calls.reviewsError)
+          : Promise.resolve([...(calls.reviews ?? [])]),
     },
     wrapper: {
       wrap: (fields, options) => {

@@ -134,6 +134,37 @@ export interface ReviewDecision {
 }
 
 /**
+ * One pull request review with its text (task E01 PR 2, ADR-M41 §2.7, QUESTIONS #179): read by the
+ * runner, by the review's ID, with a token that may only read pull requests. The texts are client
+ * data: in memory only, never logged or stored.
+ */
+export interface ReviewFeedback {
+  readonly reviewId: string;
+  readonly reviewer: GitActor;
+  readonly state: 'approved' | 'changes_requested' | 'dismissed' | 'commented';
+  /** The commit the reviewer reviewed. */
+  readonly commitSha: string;
+  readonly body: string;
+  /** The review's line comments, in the host's order: at most one page (`commentsTruncated`). */
+  readonly comments: readonly ReviewLineComment[];
+  readonly commentsTruncated: boolean;
+}
+
+export interface ReviewLineComment {
+  readonly path: string;
+  /** The line in the reviewed file, or null when the comment is on the whole file. */
+  readonly line: number | null;
+  readonly body: string;
+}
+
+/** One issue or pull request comment with its text (E01 PR 2: a `/request-changes G7` command). */
+export interface IssueCommentText {
+  readonly commentId: string;
+  readonly author: GitActor;
+  readonly body: string;
+}
+
+/**
  * The authors of a pull request's commits (task E01, AC2): Git host accounts by numeric ID, and
  * how many commits have an author without an account (an e-mail address only). Never names or
  * e-mail addresses.
@@ -284,6 +315,25 @@ export interface GitHostAdapter {
    * unknown. Uses a token of its own that may read code-scanning alerts.
    */
   getSecurityFindings(ref: RepoRef, pr: number): Promise<SecurityFindings>;
+  /**
+   * One review and its line comments, read with `token` (task E01 PR 2, ADR-M41 §2.7): a token of
+   * `issueShortLivedToken` with `pull_requests: read`, so the runner needs no App key. Never logged.
+   */
+  getReviewFeedback(
+    token: RedactedSecret,
+    ref: RepoRef,
+    pr: number,
+    reviewId: string,
+  ): Promise<ReviewFeedback>;
+  /**
+   * One comment of an issue or a pull request, read with `token` (task E01 PR 2): `issues: read`
+   * for a comment on an issue, `pull_requests: read` for one on a pull request. Never logged.
+   */
+  getIssueComment(
+    token: RedactedSecret,
+    ref: RepoRef,
+    commentId: string,
+  ): Promise<IssueCommentText>;
   /** MVP: polling. Pass `INITIAL_EVENT_CURSOR` for a project that has never been polled. */
   listEventsSince(
     ref: RepoRef,

@@ -3,9 +3,10 @@
 // long-running activity per run, with heartbeats. Its slots are the runner's sandbox limit, so
 // extra runs wait in Temporal (D-03 §10.1).
 //
-// Activity inputs and results stay in the Temporal history, so they hold IDs, codes and the two
-// single-use OpenBao wrapping tokens only (their time to live is the contract's validity). Never a
-// raw token, a virtual key, a key ID or client data.
+// Activity inputs and results stay in the Temporal history, so they hold IDs, codes and single-use
+// OpenBao wrapping tokens only (their time to live is the contract's validity): the run's GitHub
+// token, its virtual key and, after a request for changes at G7, the feedback token (E01 PR 2).
+// Never a raw token, a virtual key, a key ID, feedback text or other client data.
 
 /** Temporal task queue of the runner (ADR-M25 §2.7). */
 export const RUNNER_TASK_QUEUE = 'sdlc-runner';
@@ -19,6 +20,13 @@ export interface ExecuteRunInput {
   readonly wrappedGitToken: string;
   /** Single-use wrapping token around `{ key }`: the run's LiteLLM virtual key (QUESTIONS #112). */
   readonly wrappedVirtualKey: string;
+  /**
+   * E01 PR 2 (ADR-M41 §2.7, QUESTIONS #179): single-use wrapping token around `{ token }`, a
+   * single-repository GitHub token that may only read pull requests (or issues, for a command on
+   * the intent's issue). Present when the run answers a request for changes at G7; the runner reads
+   * the recorded review or comment with it, in memory only, then revokes it.
+   */
+  readonly wrappedFeedbackToken?: string;
 }
 
 export type ExecuteRunResult =

@@ -327,6 +327,8 @@ interface GitHostAdapter {
   openPullRequest(ref: RepoRef, input: NewPullRequest): Promise<PullRequestInfo>;
   findOpenPullRequest(ref: RepoRef, head: string, base: string): Promise<PullRequestInfo | null>;
   getSecurityFindings(ref: RepoRef, pr: number): Promise<SecurityFindings>;
+  getReviewFeedback(token: RedactedSecret, ref: RepoRef, pr: number, reviewId: string): Promise<ReviewFeedback>;
+  getIssueComment(token: RedactedSecret, ref: RepoRef, commentId: string): Promise<IssueCommentText>;
   listEventsSince(ref: RepoRef, cursor: EventCursor): Promise<{ events: GitEvent[]; next: EventCursor }>; // MVP: polling
   verifyWebhook(headers: Record<string, string>, rawBody: Buffer): GitEvent; // enabled later
 }

@@ -161,6 +161,10 @@ async function execute(
       model: input.modelRef,
       virtualKey,
       signal: ctx.cancellationSignal,
+      // E01 PR 2: a wrapping token only; the runner reads the feedback text in memory.
+      ...(input.wrappedFeedbackToken === undefined
+        ? {}
+        : { wrappedFeedbackToken: new Redacted(input.wrappedFeedbackToken) }),
     });
   }
   const run = await scope.runs.getById(input.runId);

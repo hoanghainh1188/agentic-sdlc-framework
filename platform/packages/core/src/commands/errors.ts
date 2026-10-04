@@ -26,6 +26,12 @@ export type CommandErrorCode =
    * `/reject G7` and `/request-changes G7` are accepted.
    */
   | 'g7_use_pr_review'
+  /**
+   * A request for changes at G7 from the API or the CLI (task E01 PR 2, QUESTIONS #190): the next
+   * run reads the reviewer's feedback from the review or comment that recorded the request, so it
+   * is sent as a GitHub review (**Request changes**) or a `/request-changes G7` comment.
+   */
+  | 'g7_feedback_on_git_host'
   /** Unknown intent, or an intent of a project the actor cannot read. */
   | 'intent_not_found'
   /** Unknown project, or a project the actor has no role on. */

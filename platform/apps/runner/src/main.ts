@@ -139,7 +139,8 @@ async function main(): Promise<void> {
       settings,
       verifier: openbao.transit(),
       unwrapper: openbao.wrapping(),
-      ...(tokenRevoker ? { tokenRevoker } : {}),
+      // E01 PR 2: the same token-only adapter reads a request's feedback with the run's token.
+      ...(tokenRevoker ? { tokenRevoker, feedbackReader: tokenRevoker } : {}),
     },
     {
       onCleanUp: (kind, result) => {

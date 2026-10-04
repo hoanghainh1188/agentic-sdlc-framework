@@ -451,13 +451,16 @@ export function refusalReply(
 ): Reply | undefined {
   if (error instanceof CommandError) {
     // `project_not_found` cannot happen here (the project is the polled one); same text as no role.
-    // `scope_not_allowed` cannot happen either: a comment never carries a scope.
+    // `scope_not_allowed` cannot happen either: a comment never carries a scope, and
+    // `g7_feedback_on_git_host` is the API's refusal (E01 PR 2, QUESTIONS #190).
     const code =
       error.code === 'project_not_found'
         ? 'intent_not_found'
         : error.code === 'scope_not_allowed'
           ? 'decision_not_allowed'
-          : error.code;
+          : error.code === 'g7_feedback_on_git_host'
+            ? 'failed'
+            : error.code;
     return { code, params: gate };
   }
   if (error instanceof RegistryError) {

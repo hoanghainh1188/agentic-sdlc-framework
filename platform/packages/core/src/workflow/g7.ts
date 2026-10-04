@@ -7,8 +7,9 @@
 //   1. the reading is recorded (`g7_checked`), and the reviews of the pushed commit become gate
 //      decisions (`g7-reviews.ts`): approvals bound to the G7 input, requests for changes from a
 //      holder of the gate's role who is not a producer; stale review approvals are voided (FR-17);
-//   2. a person's rejection takes the intent back to G3, HITL from then on (#178); a request for
-//      changes holds G7 (PR 1; PR 2 starts a new run after G4, #179);
+//   2. a person's rejection takes the intent back to G3, HITL from then on (#178); a valid request
+//      for changes takes it to G4 (PR 2, #179): a new run from the pushed commit, which gets the
+//      reviewer's feedback (`g7-feedback.ts`); no retry limit (each round needs a person);
 //   3. the pull request closed without a merge, or showing another commit than the platform
 //      pushed → `paused` at G7 and a `technical` escalation;
 //   4. merged: with the pushed commit, by a person who is not a producer, after enough valid
@@ -161,12 +162,13 @@ export async function stepG7(
     if (!accepted) return stop(tx, registry, policy, intent, facts, 'merged_before_approval');
   }
   if (request !== null) {
-    // PR 1: the request holds G7 (PR 2 starts a new run after G4, QUESTIONS #179).
-    await closeGateOverdue(tx, registry, intent.id, 'G7');
-    if (!(await tx.intentNotices.existsForDecision(request))) {
-      await notice(tx, intent, 'g7_changes_requested', ['person_a'], request);
-    }
-    return wait('g7_changes_requested');
+    // PR 2 (QUESTIONS #179): a new run from the pushed commit, like a G6 retry; no retry limit
+    // (each round needs a person's request; the intent budget caps the cost). The next run makes
+    // another G7 input, so the approvals of this one no longer count.
+    return move(tx, registry, intent, { status: 'in_gate', gate: 'G4' }, 'g7_changes_requested', {
+      decisionId: request,
+      audience: G4_OPERATOR_ROLES,
+    });
   }
 
   const overdue = await checkGateOverdue(tx, registry, {
@@ -538,7 +540,7 @@ async function move(
   tx: TenantScope,
   registry: Registry,
   intent: Intent,
-  to: { readonly status: IntentStatus; readonly gate: 'G3' | 'G7' | 'G8' },
+  to: { readonly status: IntentStatus; readonly gate: 'G3' | 'G4' | 'G7' | 'G8' },
   kind: IntentNoticeKind,
   notice_: { readonly decisionId: string | null; readonly audience: readonly ProjectRole[] },
 ): Promise<IntentStepResult> {

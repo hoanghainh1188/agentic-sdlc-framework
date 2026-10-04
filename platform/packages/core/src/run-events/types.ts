@@ -183,14 +183,15 @@ export const RUN_EVENT_TYPES = {
   kill_requested: { previous_status: 'code', source: 'code' },
   /**
    * The runner revoked a short-lived GitHub token right after its use (C11, ADR-M42 §2.4): `token`
-   * is `clone` or `push`. `token_revoke_failed` gives a `GitHostErrorCode`; the token then expires
+   * is `clone`, `push` or (E01 PR 2) `feedback`. `token_revoke_failed` gives a `GitHostErrorCode`; the token then expires
    * by itself within the hour.
    */
   token_revoked: { token: 'code' },
   token_revoke_failed: { token: 'code', reason: 'code' },
   /**
    * A single-use wrapping token of the run was already used when the runner opened it (C11,
-   * ADR-M38 §2.3, ADR-M42 §2.5): `token` is `clone`, `push` or `virtual_key`. Someone else may
+   * ADR-M38 §2.3, ADR-M42 §2.5): `token` is `clone`, `push`, `virtual_key` or (E01 PR 2)
+   * `feedback`. Someone else may
    * hold the secret: the run fails and its escalation goes to the security route.
    */
   wrap_token_reused: { token: 'code' },
@@ -199,6 +200,19 @@ export const RUN_EVENT_TYPES = {
    * best-effort and never delays the kill. `reason` is a code (`timeout`, `unavailable`, …).
    */
   kill_evidence_failed: { reason: 'code' },
+  /**
+   * The runner read the feedback of the request for changes the run answers (E01 PR 2, ADR-M41
+   * §2.7, QUESTIONS #179): `source` is `review` or `comment`; the text's length in characters
+   * after the cap, whether it was cut (`truncated`: `yes`, `no`) and the review's line comments.
+   * Counts only: the text itself goes to the agent's prompt in memory, never here.
+   */
+  feedback_read: { source: 'code', chars: 'count', truncated: 'code', comments: 'count' },
+  /**
+   * The feedback of the request for changes cannot be used, so the run never starts its agent
+   * (E01 PR 2): `reason` is a code (`review_withdrawn`, `identity_unlinked`, `author_mismatch`,
+   * `git_host_unavailable`, …). Recorded by the worker before the key, or by the runner.
+   */
+  feedback_unavailable: { reason: 'code' },
 } as const satisfies Readonly<Record<string, Readonly<Record<string, RunEventFieldSpec>>>>;
 
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;

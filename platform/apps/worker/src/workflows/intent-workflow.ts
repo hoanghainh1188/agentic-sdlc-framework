@@ -205,6 +205,10 @@ async function executeKillable(
       modelRef: prepared.modelRef,
       wrappedGitToken: prepared.wrappedGitToken,
       wrappedVirtualKey: prepared.wrappedVirtualKey,
+      // E01 PR 2: a wrapping token only; the feedback text never enters the history.
+      ...(prepared.wrappedFeedbackToken === undefined
+        ? {}
+        : { wrappedFeedbackToken: prepared.wrappedFeedbackToken }),
     }),
   );
   const markSettled = () => {

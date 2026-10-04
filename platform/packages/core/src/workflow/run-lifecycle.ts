@@ -226,7 +226,9 @@ export interface RunDeps extends PrepareRunDeps {
 
 /**
  * Prepares the round's next run (`prepareRun`). A refusal takes the intent back to `in_gate G4`,
- * where G4 is decided again, except `run_exists` (a run of this round is already under way).
+ * where G4 is decided again, except `run_exists` (a run of this round is already under way) and
+ * `feedback_unavailable` (E01 PR 2: the run already ended `failed`, so the next step finishes it
+ * like any failed run: paused, escalation).
  */
 export async function startRun(
   scope: TenantScope,
@@ -234,7 +236,12 @@ export async function startRun(
   intentId: string,
 ): Promise<PrepareRunResult> {
   const result = await prepareRun(scope, deps, intentId);
-  if (!result.ok && result.reason !== 'run_exists' && result.reason !== 'not_at_g4') {
+  if (
+    !result.ok &&
+    result.reason !== 'run_exists' &&
+    result.reason !== 'not_at_g4' &&
+    result.reason !== 'feedback_unavailable'
+  ) {
     await scope.transaction(async (tx) => {
       const intent = await tx.intents.lockAndGet(intentId);
       if (intent?.status !== 'running' || intent.current_gate !== 'G4') return;

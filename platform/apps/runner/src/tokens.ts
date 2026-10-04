@@ -15,7 +15,7 @@ import { SecretsError } from '@sdlc/secrets';
 /** What the runner needs from the Git host adapter: no App key (`GitHubAdapter` token-only). */
 export type GitTokenRevoker = Pick<GitHostAdapter, 'revokeShortLivedToken'>;
 
-export type RunToken = 'clone' | 'push';
+export type RunToken = 'clone' | 'push' | 'feedback';
 
 /** Revokes `token` and records the outcome as a run event. Never throws. */
 export async function revokeAfterUse(

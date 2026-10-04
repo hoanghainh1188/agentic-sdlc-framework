@@ -60,6 +60,22 @@ export interface AgentTask {
    * fixed instruction to run the project's checks and fix them; never CI logs or check names.
    */
   readonly ciFailed?: boolean;
+  /**
+   * E01 PR 2 (ADR-M41 §2.7, QUESTIONS #179): the feedback of the request for changes at G7 this run
+   * answers, read by the runner from the Git host at run start. Untrusted text written by a person:
+   * the adapter puts it in a delimited block and tells the agent it cannot change the task, the
+   * rules, the files or the tools. In memory only: never in Temporal, logs, run events or tables.
+   */
+  readonly reviewFeedback?: ReviewFeedbackText;
+}
+
+/** The text of a request for changes, capped by the runner (`REVIEW_FEEDBACK_MAX_CHARS`). */
+export interface ReviewFeedbackText {
+  /** `review`: a pull request review and its line comments; `comment`: a `/request-changes G7`. */
+  readonly source: 'review' | 'comment';
+  readonly text: string;
+  /** True when the runner cut the text at the cap. */
+  readonly truncated: boolean;
 }
 
 export interface StartAgentRun {

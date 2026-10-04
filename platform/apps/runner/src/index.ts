@@ -33,6 +33,13 @@ export {
 } from './agent/spend.js';
 export { AGENT_ERROR_MESSAGES, agentErrorMessage } from './agent/messages.js';
 export { loadAgentTask } from './agent/task.js';
+export {
+  capFeedback,
+  readRunFeedback,
+  REVIEW_FEEDBACK_MAX_CHARS,
+  type FeedbackAccess,
+  type FeedbackReader,
+} from './agent/feedback.js';
 export { assertSafeNetworkConnect } from './docker/guard.js';
 export { RunnerError, type RunnerErrorKey } from './errors.js';
 export { HeldRuns } from './held.js';

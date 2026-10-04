@@ -144,19 +144,34 @@ export async function gatherG7Facts(scope: TenantScope, intent: Intent): Promise
     .at(-1);
   if (!pushed || typeof pushed.payload.head_sha !== 'string') return null;
   const pushedHead = pushed.payload.head_sha;
-  const flags = [...((await scope.plans.latest(intent.id))?.change_flags ?? [])].sort();
   return {
     run,
     pushedHead,
     prNumber: intent.pr_number,
-    inputSha256: sha256({
-      v: 1,
-      run_id: run.id,
-      pr_number: intent.pr_number,
-      head_sha: pushedHead,
-      change_flags: flags,
-    }),
+    inputSha256: await g7InputSha256(scope, intent.id, run.id, intent.pr_number, pushedHead),
   };
+}
+
+/**
+ * The G7 input hash of a pushed run (ADR-M41 §2.3): the run, its pull request, the pushed commit
+ * and the change flags of the plan. Also used after G7 (E01 PR 2, `g7-feedback.ts`): a request for
+ * changes bound to the last pushed run's input is the one the next run answers.
+ */
+export async function g7InputSha256(
+  scope: TenantScope,
+  intentId: string,
+  runId: string,
+  prNumber: number,
+  pushedHead: string,
+): Promise<string> {
+  const flags = [...((await scope.plans.latest(intentId))?.change_flags ?? [])].sort();
+  return sha256({
+    v: 1,
+    run_id: runId,
+    pr_number: prNumber,
+    head_sha: pushedHead,
+    change_flags: flags,
+  });
 }
 
 /**

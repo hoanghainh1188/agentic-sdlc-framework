@@ -152,6 +152,9 @@ export class Runner {
           ...this.#changesFor(contract.run_id),
           ...(this.#agent.spendReader ? { spendReader: this.#agent.spendReader } : {}),
           ...(this.#agent.keyRevoked ? { keyRevoked: this.#agent.keyRevoked } : {}),
+          // E01 PR 2: the feedback of a request for changes, read with the run's own token.
+          ...(this.#deps.feedbackReader ? { feedbackReader: this.#deps.feedbackReader } : {}),
+          unwrapper: this.#deps.unwrapper,
         },
         request,
       );

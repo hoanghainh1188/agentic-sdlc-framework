@@ -469,6 +469,7 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
               repo,
               permissions: scope.permissions,
             }),
+          getReviews: () => Promise.resolve([]),
         },
         wrapper: {
           wrap: (fields, options) => {

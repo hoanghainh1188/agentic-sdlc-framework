@@ -43,6 +43,7 @@ import {
   type RunContract,
   type RunKeySpendReader,
   type RunStatus,
+  type SecretUnwrapper,
 } from '@sdlc/contracts';
 import {
   KILLED,
@@ -58,6 +59,7 @@ import type { Sandbox } from '../sandbox/lifecycle.js';
 import type { RunnerSettings } from '../settings.js';
 import { attachRunner } from './access.js';
 import { AgentRunError } from './errors.js';
+import type { FeedbackReader } from './feedback.js';
 import { SpendWatch } from './spend.js';
 import { loadAgentTask } from './task.js';
 
@@ -105,6 +107,13 @@ export interface AgentDriveDeps {
    * is stored only after that. Without it no diff is stored for a killed run.
    */
   readonly keyRevoked?: (key: RedactedSecret) => Promise<boolean>;
+  /**
+   * E01 PR 2: reads the feedback of a request for changes with the run's feedback token, and
+   * opens its wrapping token. Without them a run that answers a request fails
+   * (`feedback_unavailable`).
+   */
+  readonly feedbackReader?: FeedbackReader;
+  readonly unwrapper?: SecretUnwrapper;
 }
 
 export interface AgentRunRequest {
@@ -121,6 +130,8 @@ export interface AgentRunRequest {
    * teardown while the agent is being driven.
    */
   readonly signal?: AbortSignal;
+  /** E01 PR 2: the single-use wrapping token of the run's feedback token, when it has one. */
+  readonly wrappedFeedbackToken?: RedactedSecret;
 }
 
 /** How the agent run ended (run event `agent_finished`). */
@@ -352,7 +363,11 @@ export async function driveAgent(
       throw new AgentRunError('model_unreachable');
     }
     watch = await spendWatchFor(deps, scope, contract, request.virtualKey);
-    const task = await loadAgentTask(scope, contract);
+    const task = await loadAgentTask(scope, contract, {
+      reader: deps.feedbackReader,
+      unwrapper: deps.unwrapper,
+      wrappedToken: request.wrappedFeedbackToken,
+    });
     const endpoint = await attachRunner(
       deps.docker,
       deps.settings,

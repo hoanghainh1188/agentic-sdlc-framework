@@ -10,7 +10,7 @@ const refused = (type: string, payload: Record<string, unknown>) => () =>
   checkRunEvent(type, payload);
 
 describe('run event payloads', () => {
-  it('declares the C02, C04, C05, C06, C07, C08, E01 and C11 event types', () => {
+  it('declares the C02, C04, C05, C06, C07, C08, E01 and C11 event types (E01 PR 2: feedback)', () => {
     expect(Object.keys(RUN_EVENT_TYPES)).toEqual([
       'contract_issued',
       'contract_accepted',
@@ -41,6 +41,8 @@ describe('run event payloads', () => {
       'token_revoke_failed',
       'wrap_token_reused',
       'kill_evidence_failed',
+      'feedback_read',
+      'feedback_unavailable',
     ]);
   });
 

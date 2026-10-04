@@ -162,6 +162,31 @@ export function parseCommentCommand(body: string): ParsedComment {
   };
 }
 
+/**
+ * The reason text of a `/request-changes G<gate>` comment (task E01 PR 2, ADR-M41 §2.7): the rest
+ * of the command line after the gate and the optional reason code, then the lines below it. Null
+ * when the comment is not that command (for example, edited since). The text is untrusted client
+ * data: the runner hands it to the agent in memory only.
+ */
+export function requestChangesReason(body: string, gate: GateCode): string | null {
+  const parsed = parseCommentCommand(body);
+  if (
+    parsed.kind !== 'gate_decision' ||
+    parsed.decision !== 'request_changes' ||
+    parsed.gate !== gate
+  ) {
+    return null;
+  }
+  const lines = body.replaceAll('\r\n', '\n').replaceAll('\r', '\n').split('\n');
+  const first = lines.findIndex((line) => line.trim() !== '');
+  const words = (COMMAND_LINE.exec(lines[first]!.trim())?.[2] ?? '')
+    .split(/[ \t]+/)
+    .filter((word) => word !== '')
+    .slice(1);
+  const reasonWords = reasonCodeOf(words[0]) === undefined ? words : words.slice(1);
+  return [reasonWords.join(' '), ...lines.slice(first + 1)].join('\n').trim();
+}
+
 /** `/ack [ESC-…]` and `/decide [ESC-…] <decision> [reason_code] [reason]` (B11, ADR-M28 §2.7). */
 function parseEscalationCommand(
   verb: EscalationCommentVerb,

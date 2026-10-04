@@ -58,6 +58,7 @@ import {
   revokeAfterUse,
   type GitTokenRevoker,
 } from './tokens.js';
+import type { FeedbackReader } from './agent/feedback.js';
 import { CloneError, cloneForRun } from './workspace/git.js';
 import { packDirectory } from './workspace/tar.js';
 
@@ -80,6 +81,11 @@ export interface RunnerDeps {
    * expires by itself (development, tests).
    */
   readonly tokenRevoker?: GitTokenRevoker;
+  /**
+   * E01 PR 2: reads the feedback of a request for changes with the run's own feedback token (the
+   * token-only GitHub adapter, like `tokenRevoker`). Without it such a run fails.
+   */
+  readonly feedbackReader?: FeedbackReader;
 }
 
 export interface ProvisionRequest {
