@@ -38,7 +38,13 @@ export {
   type SpendState,
 } from './agent/spend.js';
 export { AGENT_ERROR_MESSAGES, agentErrorMessage } from './agent/messages.js';
-export { loadAgentTask } from './agent/task.js';
+export {
+  loadAgentTask,
+  PLAN_FIELD_MAX_CHARS,
+  PLAN_TASK_TEXT_MAX_CHARS,
+  renderPlanTasks,
+} from './agent/task.js';
+export { capText, cleanText } from './agent/text.js';
 export {
   capFeedback,
   readRunFeedback,
@@ -132,6 +138,13 @@ export {
   type CheckedChanges,
 } from './workspace/changes.js';
 export { IgnoreChecker } from './workspace/ignore.js';
+export {
+  planFileReader,
+  readPlanBlob,
+  type PlanBlobFailure,
+  type PlanBlobRead,
+  type PlanFileReader,
+} from './workspace/plan-file.js';
 export {
   publishRun,
   type PublishDeps,

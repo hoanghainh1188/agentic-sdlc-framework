@@ -137,6 +137,8 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.merged';
     case 'run_killed':
       return 'intent.status.run_killed';
+    case 'run_returned':
+      return 'intent.status.run_returned';
     default:
       return notice.gate !== null && isCommandGate(notice.gate)
         ? 'intent.status.advanced'

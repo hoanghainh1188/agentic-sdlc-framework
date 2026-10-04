@@ -80,6 +80,8 @@ export const INTENT_NOTICE_KINDS = [
   'merged',
   // C11 (ADR-M42): a person used the kill switch on the intent's run; an escalation was raised.
   'run_killed',
+  // QUESTIONS #211 (B09 PR 2): `modify` or `roll_back` on the escalation of a failed run → G3, HITL.
+  'run_returned',
 ] as const;
 export type IntentNoticeKind = (typeof INTENT_NOTICE_KINDS)[number];
 

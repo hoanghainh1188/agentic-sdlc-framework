@@ -9,6 +9,7 @@
 //   takes it back to G3 at the next step (`plan-check.ts`).
 // - What: the plan is the file at the head of the project's default branch, like the spec
 //   (ADR-M39 §2.1). The commit is optional; a given commit must hold the same file as the head.
+//   The stored commit is always the head the platform read (QUESTIONS #212).
 // - Submitting the same file again changes nothing (the latest version is returned).
 import { GitHostError, type ProjectRole } from '@sdlc/contracts';
 
@@ -112,7 +113,10 @@ export async function submitPlanFromGitHost(
       plannedFiles: read.plan.plannedFiles,
       planSha256: read.sha256,
       changeFlags: read.plan.changeFlags,
-      file: { commitSha: commit ?? read.head, allowedTools: read.plan.allowedTools },
+      // QUESTIONS #212: the commit the platform read, the head of the default branch, never the
+      // caller's `commit` (which only has to hold the same file): the runner reads the plan file
+      // at this commit from its clone (ADR-M40 §2.7), and every default-branch commit is there.
+      file: { commitSha: read.head, allowedTools: read.plan.allowedTools },
     });
   });
 }
@@ -131,7 +135,9 @@ async function readOnDefaultBranch(
       throw new PlanError('plan_invalid', 'plan cannot be read at head', atHead.cause);
     }
     const parsed = parsePlanFile(atHead.text, intentCode);
-    if (!parsed.ok) throw new PlanError('plan_invalid', 'plan refused', parsed.reason);
+    if (!parsed.ok) {
+      throw new PlanError('plan_invalid', 'plan refused', parsed.reason, undefined, parsed.field);
+    }
     if (commit !== null && commit !== head) {
       const atCommit = await readPlanFile(deps.gitHost, ref, intentCode, commit);
       if (atCommit.kind === 'unreadable' || atCommit.sha256 !== atHead.sha256) {
