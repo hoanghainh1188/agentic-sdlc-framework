@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M26 and their sources:
+// Rule ids M1–M26 and M28 (M27 is reserved for C11 PR 2) and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -35,6 +35,8 @@
 //                                                                      QUESTIONS.md #180
 //   M26 a kill freezes the intent (pause or higher) .................. D-03 §6.5, ADR-M42,
 //                                                                      QUESTIONS.md #181
+//   M28 the viewer role never reads the cost report ................. D-07 §5, ADR-M45,
+//                                                                      QUESTIONS.md #196
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -560,6 +562,11 @@ const m26: Rule = (c) =>
         }),
       ];
 
+const m28: Rule = (c) =>
+  c.access.cost_read_roles.includes('viewer')
+    ? [issue('config.rule.viewer_never_reads_cost', 'access.cost_read_roles')]
+    : [];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -589,6 +596,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M24: m24,
   M25: m25,
   M26: m26,
+  M28: m28,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

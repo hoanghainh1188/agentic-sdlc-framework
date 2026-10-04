@@ -33,6 +33,7 @@ import {
 } from '../../apps/api/src/admin/present.js';
 import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
 import { presentPlanList, presentSubmittedPlan } from '../../apps/api/src/plans/present.js';
+import { presentCostReport } from '../../apps/api/src/cost/present.js';
 import { presentKill, presentRunList } from '../../apps/api/src/runs/present.js';
 import { presentLinkedSpec, presentSpecList } from '../../apps/api/src/specs/present.js';
 import { presentEscalation } from '../../apps/api/src/escalations/present.js';
@@ -485,4 +486,48 @@ export function roundBody(completed = false): Record<string, unknown> {
     3,
     AT,
   );
+}
+
+const COST_A = {
+  calls: 3,
+  inputTokens: '1200',
+  outputTokens: '300',
+  cachedInputTokens: '100',
+  costUsd: '0.300000',
+  wastedTokens: '500',
+  wastedCostUsd: '0.100000',
+};
+
+/** E04: `GET /v1/cost/report` (ADR-M45 §2.4), from the API's presenter. */
+export function costReportBody(
+  options: { empty?: boolean; truncated?: boolean } = {},
+): Record<string, unknown> {
+  const zero = {
+    calls: 0,
+    inputTokens: '0',
+    outputTokens: '0',
+    cachedInputTokens: '0',
+    costUsd: '0.000000',
+    wastedTokens: '0',
+    wastedCostUsd: '0.000000',
+  };
+  return presentCostReport({
+    scope: { kind: 'project', project: 'pilot' },
+    from: new Date('2026-10-01T00:00:00.000Z'),
+    to: new Date('2026-10-04T00:00:00.000Z'),
+    groupBy: 'intent',
+    totals: options.empty ? zero : COST_A,
+    rows: options.empty
+      ? []
+      : [
+          { key: 'INT-2026-0007', ...COST_A, calls: 2 },
+          { key: null, ...COST_A, calls: 1, wastedTokens: '0', wastedCostUsd: '0.000000' },
+        ],
+    truncated: options.truncated ?? false,
+    freshness: {
+      latestCallAt: options.empty ? null : new Date('2026-10-03T10:00:00.000Z'),
+      lastRecordedAt: options.empty ? null : new Date('2026-10-03T10:05:00.000Z'),
+      runsInProgress: 1,
+    },
+  });
 }
