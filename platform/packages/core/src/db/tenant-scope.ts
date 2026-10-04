@@ -10,6 +10,7 @@ import { ApiTokenRepository } from './repositories/api-tokens.js';
 import { AuditLogRepository } from './repositories/audit-log.js';
 import { CostRecordRepository } from './repositories/cost-records.js';
 import { EvidenceItemRepository } from './repositories/evidence-items.js';
+import { EvidencePackRepository } from './repositories/evidence-packs.js';
 import { EscalationNoticeRepository, EscalationRepository } from './repositories/escalations.js';
 import { GateDecisionRepository } from './repositories/gate-decisions.js';
 import { GateMetricsRepository } from './repositories/gate-metrics.js';
@@ -58,6 +59,7 @@ export class TenantScope {
   readonly runEvents: RunEventRepository;
   readonly costRecords: CostRecordRepository;
   readonly evidenceItems: EvidenceItemRepository;
+  readonly evidencePacks: EvidencePackRepository;
   readonly escalations: EscalationRepository;
   readonly escalationNotices: EscalationNoticeRepository;
   readonly agents: AgentRepository;
@@ -93,6 +95,7 @@ export class TenantScope {
     this.runEvents = new RunEventRepository(this.db, this.tenantId);
     this.costRecords = new CostRecordRepository(this.db, this.tenantId);
     this.evidenceItems = new EvidenceItemRepository(this.db, this.tenantId);
+    this.evidencePacks = new EvidencePackRepository(this.db, this.tenantId);
     this.escalations = new EscalationRepository(this.db, this.tenantId);
     this.escalationNotices = new EscalationNoticeRepository(this.db, this.tenantId);
     this.agents = new AgentRepository(this.db, this.tenantId);

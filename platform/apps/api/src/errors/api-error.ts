@@ -15,6 +15,7 @@ import {
   SpecError,
   DbError,
   EscalationError,
+  EvidencePackError,
   RegistryError,
   TenantGuardError,
   type AdminErrorCode,
@@ -22,6 +23,7 @@ import {
   type KillErrorCode,
   type DbErrorCode,
   type EscalationErrorCode,
+  type EvidencePackErrorCode,
   type RegistryErrorCode,
 } from '@sdlc/core';
 import { t, type MessageKey } from '@sdlc/messages';
@@ -64,6 +66,14 @@ export const API_ERROR_CODES = [
   'run_not_found',
   'run_not_active',
   'no_active_run',
+  'ai_record_missing',
+  'evidence_pack_sealed',
+  'evidence_pack_not_found',
+  'evidence_pack_purged',
+  'evidence_hash_mismatch',
+  'evidence_missing',
+  'evidence_too_large',
+  'evidence_unavailable',
   'user_not_found',
   'identity_not_found',
   'token_not_found',
@@ -121,6 +131,14 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   run_not_found: 'api.error.run_not_found',
   run_not_active: 'api.error.run_not_active',
   no_active_run: 'api.error.no_active_run',
+  ai_record_missing: 'api.error.ai_record_missing',
+  evidence_pack_sealed: 'api.error.evidence_pack_sealed',
+  evidence_pack_not_found: 'api.error.evidence_pack_not_found',
+  evidence_pack_purged: 'api.error.evidence_pack_purged',
+  evidence_hash_mismatch: 'api.error.evidence_hash_mismatch',
+  evidence_missing: 'api.error.evidence_missing',
+  evidence_too_large: 'api.error.evidence_too_large',
+  evidence_unavailable: 'api.error.evidence_unavailable',
   user_not_found: 'api.error.user_not_found',
   identity_not_found: 'api.error.identity_not_found',
   token_not_found: 'api.error.token_not_found',
@@ -305,11 +323,28 @@ const KILL: Readonly<Record<KillErrorCode, [number, ApiErrorCode]>> = {
   no_active_run: [409, 'no_active_run'],
 };
 
+/**
+ * Evidence Pack refusals (E02, ADR-M48 §2.6). A stored file that fails its re-check is a 409:
+ * the platform refuses to build or serve a pack it cannot prove.
+ */
+const EVIDENCE: Readonly<Record<EvidencePackErrorCode, [number, ApiErrorCode]>> = {
+  ai_record_missing: [409, 'ai_record_missing'],
+  pack_sealed: [409, 'evidence_pack_sealed'],
+  pack_not_found: [404, 'evidence_pack_not_found'],
+  pack_purged: [410, 'evidence_pack_purged'],
+  evidence_hash_mismatch: [409, 'evidence_hash_mismatch'],
+  evidence_missing: [409, 'evidence_missing'],
+  evidence_too_large: [409, 'evidence_too_large'],
+  evidence_unavailable: [503, 'evidence_unavailable'],
+  pack_conflict: [409, 'conflict'],
+};
+
 /** Maps any thrown value to an `ApiError`. Unknown errors become `internal` (500). */
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
   if (error instanceof KillError) return new ApiError(...KILL[error.code]);
+  if (error instanceof EvidencePackError) return new ApiError(...EVIDENCE[error.code]);
   if (error instanceof SpecError) return specApiError(error);
   if (error instanceof PlanError) return planApiError(error);
   if (error instanceof AgentRegisterError) return agentApiError(error, '-');

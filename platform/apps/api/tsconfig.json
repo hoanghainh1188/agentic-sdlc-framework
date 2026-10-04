@@ -13,6 +13,7 @@
     { "path": "../../packages/core" },
     { "path": "../../packages/secrets" },
     { "path": "../../packages/workflow-client" },
+    { "path": "../../packages/adapters/evidence-s3" },
     { "path": "../../packages/adapters/git-github" },
     { "path": "../../packages/adapters/policy-simple" },
     { "path": "../../packages/telemetry" }

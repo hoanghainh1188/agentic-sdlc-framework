@@ -161,6 +161,39 @@ describeDb('B13 AC8: stored configurations after a change of platform defaults',
     ]);
   });
 
+  it('E02: a configuration stored before the `access.evidence_*_roles` keys existed is re-hashed and loads', async () => {
+    // Before E02 the default configuration's hash was the one E06 pinned
+    // (platform/tests/config/hash.test.ts); E02 added `evidence_build_roles` and `evidence_read_roles`.
+    const PRE_E02_DEFAULT_HASH = '8389110fc9e9f326420f5b095cad79644199580afa19a185db41dffe8c052319';
+    const yaml = 'budget:\n  warn_percent: 80\n';
+    const { projectId } = await stored(yaml);
+    const current = (await scope.projectConfigs.get(projectId))!.config_hash;
+    expect(current).not.toBe(PRE_E02_DEFAULT_HASH);
+    await tamper(t0.name, `UPDATE project_configs SET config_hash = $1 WHERE project_id = $2`, [
+      PRE_E02_DEFAULT_HASH,
+      projectId,
+    ]);
+    expect(await refusal(projectId)).toBe('config_defaults_drift');
+    expect(await outcomeOf(projectId)).toMatchObject({ outcome: 'rehashed', version: 2 });
+    const { config, configHash } = await loadEffectiveConfig(scope.projectConfigs, projectId);
+    expect(configHash).toBe(current);
+    expect(config.access.evidence_build_roles).toEqual([
+      'person_a',
+      'person_b',
+      'pm_brse',
+      'governance',
+      'admin',
+    ]);
+    expect(config.access.evidence_read_roles).toEqual([
+      'person_a',
+      'person_b',
+      'second_approver',
+      'pm_brse',
+      'governance',
+      'admin',
+    ]);
+  });
+
   it('leaves a YAML changed outside the platform refused', async () => {
     const { projectId } = await stored();
     await tamper(t0.name, `UPDATE project_configs SET config_yaml = $1 WHERE project_id = $2`, [

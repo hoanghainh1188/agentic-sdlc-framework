@@ -22,6 +22,7 @@ export type { AgentQuery, AgentUpdate, NewAgent } from './repositories/agents.js
 export type { AuditEvent } from './repositories/audit-log.js';
 export type { NewCostRecord } from './repositories/cost-records.js';
 export type { NewEvidenceItem } from './repositories/evidence-items.js';
+export type { NewEvidencePack, StoredPackFile } from './repositories/evidence-packs.js';
 export type {
   AutoPassRow,
   GateMetricsFilter,
@@ -75,6 +76,7 @@ export type {
   CostRecordRow,
   Escalation,
   EvidenceItem,
+  EvidencePack,
   EscalationNotice,
   GateDecisionRow,
   GitEventCursor,

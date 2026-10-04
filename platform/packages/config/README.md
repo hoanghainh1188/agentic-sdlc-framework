@@ -55,13 +55,14 @@ escalation:
 | `access.plan_submit_roles` | Who may submit an intent's plan file through the API (B09, ADR-M40). The submitter never approves G3. Default: `person_a` |
 | `access.kill_roles` | Who may stop a run with the kill switch (C11, ADR-M42). Default and minimum: `person_a`, `person_b`, `governance` |
 | `access.cost_read_roles` | Who may read the cost report of a project or intent (E04, ADR-M45). Default: `person_a`, `person_b`, `pm_brse`, `governance`, `admin`; tenant admins always may; never `viewer` (M28) |
+| `access.evidence_build_roles`, `access.evidence_read_roles` | Who may build, and who may list, show and export, an intent's Evidence Pack (E02, ADR-M48). Defaults: `person_a`, `person_b`, `pm_brse`, `governance`, `admin` (build); the same and `second_approver` (read); tenant admins always may; never `viewer` (M30) |
 | `access.metrics_read_roles` | Who may read the gate waiting-time metrics of a project (E06, ADR-M47). Default: `person_a`, `person_b`, `second_approver`, `pm_brse`, `governance`, `admin`; tenant admins always may; never `viewer` (M29) |
 
 Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `working_hours`, `working_days` (working calendar; one working day = the working hours). Deadlines may also be `{ kind: end_of_working_day }` or `{ kind: next_planned_work }` (no clock).
 
 ## Mandatory rules
 
-A project may tighten anything. It may **not** loosen these (rules M1–M29; sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
+A project may tighten anything. It may **not** loosen these (rules M1–M30; sources in [`src/mandatory-rules.ts`](src/mandatory-rules.ts)):
 
 | Rule | What |
 |---|---|
@@ -92,6 +93,7 @@ A project may tighten anything. It may **not** loosen these (rules M1–M29; sou
 | M27 | `run.loop_detection.no_progress_window_minutes` ≤ 30 (C11 PR 2, D-02 FR-35, ADR-M42 §2.7) |
 | M28 | `access.cost_read_roles` never holds `viewer` (E04, ADR-M45) |
 | M29 | `access.metrics_read_roles` never holds `viewer` (E06, ADR-M47) |
+| M30 | `access.evidence_build_roles` and `access.evidence_read_roles` never hold `viewer` (E02, ADR-M48) |
 
 Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. A Run Contract validity above 60 minutes, a run cap above the default and a no-progress window under 5 minutes (`run.loop_detection.no_progress_window_minutes`: a long silent command may stop a healthy run) also give a warning. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 

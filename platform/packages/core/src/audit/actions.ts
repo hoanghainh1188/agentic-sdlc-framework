@@ -404,6 +404,34 @@ export const AUDIT_ACTIONS = {
     entityType: 'agent',
     fields: { agent_key: 'code', run_id: 'uuid?' },
   },
+  /**
+   * An intent's Evidence Pack was built (E02, ADR-M48). The pack is the entity. Hashes and the
+   * version only: never the pack's content, which names the approvers.
+   */
+  'evidence.pack_built': {
+    entityType: 'evidence_pack',
+    fields: {
+      intent_id: 'uuid',
+      version: 'version',
+      content_sha256: 'sha256',
+      manifest_sha256: 'sha256',
+      markdown_sha256: 'sha256',
+    },
+  },
+  /**
+   * A stored evidence file failed its re-check while a pack was built (E02, ADR-M33 §2.9 gap 2):
+   * `reason` `hash_mismatch`, `size_mismatch`, `missing` or `too_large`. A possible tampering
+   * signal. The evidence item is the entity.
+   */
+  'evidence.check_failed': {
+    entityType: 'evidence_item',
+    fields: { intent_id: 'uuid', kind: 'code', reason: 'code' },
+  },
+  /** A stored pack file failed its re-check when it was read (E02): `file` `manifest` or `markdown`. */
+  'evidence.pack_check_failed': {
+    entityType: 'evidence_pack',
+    fields: { intent_id: 'uuid', version: 'version', file: 'code', reason: 'code' },
+  },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

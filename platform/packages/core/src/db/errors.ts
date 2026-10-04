@@ -64,6 +64,7 @@ const PG_ERROR_CODES: Record<string, DbErrorCode> = {
   SDA11: 'immutable', // a revoked tenant role or an unlinked identity (migration 0014)
   SDA12: 'immutable', // an intent budget that would go down (migration 0015)
   SDA13: 'immutable', // a stopping run that would not end stopped_killed, or killed_by changed (0020)
+  SDA14: 'immutable', // an evidence pack's fixed columns, or sealed_at / purged_at changed (0021)
 };
 
 /** Maps a PostgreSQL error to a DbError; anything else is rethrown unchanged. */
