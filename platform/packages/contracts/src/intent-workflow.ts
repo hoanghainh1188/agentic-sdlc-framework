@@ -79,7 +79,13 @@ export type IntentStepResult =
    * or finds the pull request (`finishPublish`). `open_pr`: the branch is pushed; only
    * `finishPublish` is left.
    */
-  | { readonly outcome: 'publish'; readonly runId: string; readonly step: 'push' | 'open_pr' };
+  | { readonly outcome: 'publish'; readonly runId: string; readonly step: 'push' | 'open_pr' }
+  /**
+   * E03 (ADR-M49 §2.1): the intent waits at G8 and its Evidence Pack is missing or out of date.
+   * The workflow calls the worker activity `buildReleasePack` (minutes: every stored evidence file
+   * is read back and checked), then steps again.
+   */
+  | { readonly outcome: 'build_pack' };
 
 export type IntentWaitReason =
   /** The gate needs a person's decision. */
@@ -184,5 +190,17 @@ export type IntentWaitReason =
    * passed); the intent is paused at G7 until a person decides on the escalation.
    */
   | 'g7_review'
+  /**
+   * E03 (ADR-M49): G8 waits for the release approval of Person B (and the second approver at
+   * Critical risk), bound to the pack's release hash (`/approve G8`).
+   */
+  | 'g8_decision'
+  /**
+   * E03: G8 stopped (a stored evidence file failed its re-check); the intent is paused at G8 until
+   * a person decides on the `security` escalation.
+   */
+  | 'g8_review'
+  /** E03: the worker cannot build Evidence Packs (no evidence store, or it cannot be reached). */
+  | 'evidence_unavailable'
   /** A status that the workflow does not move (`paused`, `blocked`, `running`). */
   | 'not_in_gate';

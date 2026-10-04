@@ -5,6 +5,9 @@
 //
 // `content_sha256` is the SHA-256 of the canonical content without `build` (the pack ID, version,
 // time and builder), so a build whose content did not change returns the existing version.
+// `release_sha256` (E03, ADR-M49 §2.2) is the same hash of the content without the G8 parts: the
+// G8 gate decisions and the escalations raised at G8. G8 approvals are bound to it, so a new G8
+// approval makes a new pack version without voiding the approvals given before it.
 import { createHash } from 'node:crypto';
 
 import { canonicalJson } from '@sdlc/config';
@@ -220,6 +223,20 @@ export function buildManifestContent(source: PackSource): Record<string, unknown
   };
 }
 
+/** The source without the G8 parts (ADR-M49 §2.2): what a G8 approval is bound to. */
+export function withoutG8(source: PackSource): PackSource {
+  return {
+    ...source,
+    decisions: source.decisions.filter((d) => d.gate !== 'G8'),
+    escalations: source.escalations.filter((e) => e.packet.gate !== 'G8'),
+  };
+}
+
+/** The release hash of a source: the content hash without the G8 parts. */
+export function releaseSha256(source: PackSource): string {
+  return contentSha256(buildManifestContent(withoutG8(source)));
+}
+
 export function contentSha256(content: Record<string, unknown>): string {
   return createHash('sha256').update(canonicalJson(content), 'utf8').digest('hex');
 }
@@ -230,6 +247,7 @@ export interface PackBuildInfo {
   readonly builtAt: Date;
   readonly builtBy: string | null;
   readonly contentSha256: string;
+  readonly releaseSha256: string;
 }
 
 /** The stored manifest: the content and the build's own fields, canonical JSON in UTF-8. */
@@ -243,6 +261,7 @@ export function manifestBytes(content: Record<string, unknown>, build: PackBuild
         built_at: build.builtAt.toISOString(),
         built_by: build.builtBy,
         content_sha256: build.contentSha256,
+        release_sha256: build.releaseSha256,
       },
     }),
     'utf8',

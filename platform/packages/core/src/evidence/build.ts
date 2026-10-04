@@ -10,6 +10,10 @@
 //   against its row (ADR-M33 §2.9 gap 2). Any mismatch, missing or oversized file fails the build
 //   closed: nothing is stored, and each failure is audited (`evidence.check_failed`).
 // - Files are read one at a time, capped at `maxItemBytes`, never logged or kept.
+// - E03 (ADR-M49 §2.2): every build also stores `release_sha256`, the content hash without the G8
+//   parts; G8 approvals are bound to it. `currentPackHashes` recomputes both hashes from the
+//   database alone (no file is read), so G8 can tell under the intent lock whether the latest
+//   version is still current.
 import { createHash, randomUUID } from 'node:crypto';
 
 import { EvidenceError, type EvidenceStore } from '@sdlc/contracts';
@@ -17,7 +21,7 @@ import { DEFAULT_LOCALE } from '@sdlc/messages';
 
 import { toCostAmounts, WASTED_RUN_STATUSES } from '../cost/report.js';
 import { DbError } from '../db/errors.js';
-import type { Agent, EvidenceItem, EvidencePack, RunEventRow } from '../db/schema.js';
+import type { Agent, EvidenceItem, EvidencePack, Intent, RunEventRow } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { resolveEvidenceSubject, type EvidenceActor, type EvidenceSubject } from './access.js';
 import { EvidencePackError } from './errors.js';
@@ -26,6 +30,7 @@ import {
   buildManifestContent,
   contentSha256,
   manifestBytes,
+  releaseSha256,
   type PackSource,
   type VerifiedItem,
 } from './manifest.js';
@@ -139,11 +144,16 @@ async function verifyItems(
   );
 }
 
+/**
+ * The pack's data. With `verify`, every stored evidence file is read back and checked (a build);
+ * without it, unpurged items count as `verified` (the hash check of G8 under the intent lock,
+ * right after a build that checked them).
+ */
 async function loadSource(
   scope: TenantScope,
   actor: EvidenceActor,
   { intent, project }: EvidenceSubject,
-  deps: EvidenceBuildDeps,
+  verify: { readonly deps: EvidenceBuildDeps } | null,
 ): Promise<PackSource> {
   const aiRecord = await scope.projectAiRecords.get(project.id);
   if (!aiRecord) throw new EvidencePackError('ai_record_missing', 'the project has no AI record');
@@ -169,7 +179,12 @@ async function loadSource(
       if (agent) agents.set(agent.id, agent);
     }
   }
-  const verified = await verifyItems(scope, actor, intent.id, items, deps);
+  const verified = verify
+    ? await verifyItems(scope, actor, intent.id, items, verify.deps)
+    : items.map((item): VerifiedItem => ({
+        item,
+        check: item.purged_at === null ? 'verified' : 'purged',
+      }));
   return {
     intent,
     project,
@@ -201,9 +216,10 @@ async function storePack(
   actor: EvidenceActor,
   source: PackSource,
   content: Record<string, unknown>,
-  contentHash: string,
+  hashes: PackHashes,
   deps: EvidenceBuildDeps,
 ): Promise<EvidencePack> {
+  const contentHash = hashes.contentSha256;
   const { intent } = source;
   const locale = deps.locale ?? DEFAULT_LOCALE;
   const names = await approverNames(scope, source);
@@ -215,6 +231,7 @@ async function storePack(
     builtAt: deps.now(),
     builtBy,
     contentSha256: contentHash,
+    releaseSha256: hashes.releaseSha256,
   };
   const manifest = manifestBytes(content, build);
   const markdown = Buffer.from(renderPackMarkdown({ source, build, names, locale }), 'utf8');
@@ -231,6 +248,7 @@ async function storePack(
       intentId: intent.id,
       version: build.version,
       contentSha256: contentHash,
+      releaseSha256: hashes.releaseSha256,
       manifest: storedManifest,
       markdown: storedMarkdown,
       locale,
@@ -267,17 +285,21 @@ export async function buildEvidencePack(
   if (await scope.evidencePacks.isSealed(intent.id)) {
     throw new EvidencePackError('pack_sealed', 'a version of the pack is sealed');
   }
-  const source = await loadSource(scope, actor, subject, deps);
+  const source = await loadSource(scope, actor, subject, { deps });
   const content = buildManifestContent(source);
-  const contentHash = contentSha256(content);
+  const hashes: PackHashes = {
+    contentSha256: contentSha256(content),
+    releaseSha256: releaseSha256(source),
+  };
   for (let attempt = 1; attempt <= BUILD_ATTEMPTS; attempt += 1) {
     const latest = await scope.evidencePacks.latest(intent.id);
     // A purged version (E05) is never handed out again: the same content gets a new version.
-    if (latest && latest.purged_at === null && latest.content_sha256 === contentHash) {
+    // A version built before E03 has no release hash: G8 needs one, so it gets a new version.
+    if (isCurrent(latest, hashes)) {
       return { intentCode: intent.code, pack: latest, created: false };
     }
     try {
-      const pack = await storePack(scope, actor, source, content, contentHash, deps);
+      const pack = await storePack(scope, actor, source, content, hashes, deps);
       return { intentCode: intent.code, pack, created: true };
     } catch (error) {
       // A concurrent build took the version: try the next one (its files stay unreferenced).
@@ -285,6 +307,39 @@ export async function buildEvidencePack(
     }
   }
   throw new EvidencePackError('pack_conflict', 'concurrent builds took every version tried');
+}
+
+export interface PackHashes {
+  readonly contentSha256: string;
+  readonly releaseSha256: string;
+}
+
+/** Whether `pack` is the current version for these hashes (not purged, same content). */
+export function isCurrent(
+  pack: EvidencePack | undefined,
+  hashes: PackHashes,
+): pack is EvidencePack {
+  return (
+    pack !== undefined &&
+    pack.purged_at === null &&
+    pack.content_sha256 === hashes.contentSha256 &&
+    pack.release_sha256 === hashes.releaseSha256
+  );
+}
+
+/**
+ * The hashes a build of the intent's pack would have now, from the database alone (E03, ADR-M49
+ * §2.1): no evidence file is read. Throws `EvidencePackError('ai_record_missing')` without a
+ * project AI record.
+ */
+export async function currentPackHashes(scope: TenantScope, intent: Intent): Promise<PackHashes> {
+  const project = await scope.projects.getById(intent.project_id);
+  if (!project) throw new Error(`intent ${intent.id}: project not found`);
+  const source = await loadSource(scope, { type: 'system' }, { intent, project }, null);
+  return {
+    contentSha256: contentSha256(buildManifestContent(source)),
+    releaseSha256: releaseSha256(source),
+  };
 }
 
 export interface EvidencePackList {

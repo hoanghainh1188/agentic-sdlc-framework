@@ -22,6 +22,9 @@
       "path": "../../packages/secrets"
     },
     {
+      "path": "../../packages/adapters/evidence-s3"
+    },
+    {
       "path": "../../packages/adapters/git-github"
     },
     {

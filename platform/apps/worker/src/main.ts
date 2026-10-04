@@ -32,6 +32,7 @@ import {
 import { connectDatabase } from './database.js';
 import { createIntentActivities } from './activities/intent-activities.js';
 import { CostSyncLoop } from './cost-sync-loop.js';
+import { openWorkerEvidence } from './evidence-store.js';
 import { EscalationLoop } from './escalation-loop.js';
 import { jsonLogger } from './logger.js';
 import { PollerLoop } from './poller-loop.js';
@@ -82,6 +83,11 @@ async function main(): Promise<void> {
     logger.log('warn', 'worker.runs_off', { message: t('worker.start.runs_off') });
   }
 
+  // G8 (E03, ADR-M49 §2.2): the release pack needs the worker's own evidence store identity.
+  const releases = settings.temporal
+    ? await openWorkerEvidence(settings.evidence, secrets, logger)
+    : undefined;
+
   // The intent workflow (B07, ADR-M30): Temporal worker, wake signals and the reconcile loop.
   let temporal: TemporalClient | undefined;
   let intentWorker: IntentWorkerHandle | undefined;
@@ -99,6 +105,7 @@ async function main(): Promise<void> {
         specs: { gitHost },
         // E01 (ADR-M41): G7 reads the pull request and its reviews; it needs no run capability.
         g7: { gitHost },
+        ...(releases ? { releases, logger } : {}),
         ...(workerRuns
           ? {
               g4: workerRuns.g4,

@@ -66,6 +66,8 @@ export const ESCALATION_SUBJECT_KINDS = [
   'g6_input',
   // E01 (ADR-M41): the G7 input of a run (its pushed head, pull request, approved plan's flags).
   'g7_input',
+  // E03 (ADR-M49): the G8 input of an intent (its merged run, merge commit, release hash).
+  'g8_input',
 ] as const;
 export type EscalationSubjectKind = (typeof ESCALATION_SUBJECT_KINDS)[number];
 

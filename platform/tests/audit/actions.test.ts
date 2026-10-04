@@ -99,6 +99,8 @@ describe('checkAuditEvent', () => {
       uuid: SOME_ID,
       sha256: HASH,
       version: Number.MAX_SAFE_INTEGER,
+      count: Number.MAX_SAFE_INTEGER,
+      decimal: '999999999999.999999',
       code: 'X'.repeat(64),
     };
     for (const [action, spec] of Object.entries(AUDIT_ACTIONS)) {
@@ -169,5 +171,45 @@ describe('optional audit fields (ADR-M20)', () => {
     ]) {
       expect(fields).not.toContain(forbidden);
     }
+  });
+});
+
+describe('E03: the `count` kind and the G8 actions (ADR-M49)', () => {
+  const closed = {
+    pack_id: SOME_ID,
+    pack_version: 2,
+    release_sha256: HASH,
+    lead_time_seconds: 0,
+    runs: 1,
+    g7_change_requests: 0,
+    cost_usd: '0.012000',
+    input_tokens: '1000',
+    output_tokens: '200',
+  };
+
+  it('`intent.closed` takes counts of 0 or more; never a negative, a fraction or a string', () => {
+    expect(checkAuditEvent('intent.closed', SOME_ID, closed).payload).toEqual(closed);
+    for (const bad of [-1, 1.5, '3']) {
+      expect(() =>
+        checkAuditEvent('intent.closed', SOME_ID, { ...closed, lead_time_seconds: bad }),
+      ).toThrow();
+    }
+  });
+
+  it('`evidence.pack_sealed` and `gate.g8_check_failed` hold IDs, versions, hashes and codes', () => {
+    expect(() =>
+      checkAuditEvent('evidence.pack_sealed', SOME_ID, {
+        intent_id: SOME_ID,
+        version: 1,
+        content_sha256: HASH,
+        release_sha256: HASH,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      checkAuditEvent('gate.g8_check_failed', SOME_ID, {
+        check: 'evidence_hash_mismatch',
+        escalation_id: SOME_ID,
+      }),
+    ).not.toThrow();
   });
 });

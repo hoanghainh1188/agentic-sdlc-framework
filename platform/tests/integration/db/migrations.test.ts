@@ -144,9 +144,9 @@ const UPDATABLE: Record<string, readonly string[]> = {
   project_ai_record_versions: [],
   // C06 session 2b: written once; the purge (E05) will get UPDATE on `purged_at` only.
   evidence_items: [],
-  // E02 (migration 0021): written once; E03 gets UPDATE on `sealed_at`, E05 on `retention_hold`
-  // and `purged_at` (trigger: everything else fixed, SDA14).
-  evidence_packs: [],
+  // E02 (migration 0021): written once; E03 (migration 0022) seals one version, E05 gets
+  // `retention_hold` and `purged_at` (trigger: everything else fixed, SDA14).
+  evidence_packs: ['sealed_at'],
   // B13: a tenant role is withdrawn by `revoked_at`, never deleted (trigger: final once set).
   tenant_role_bindings: ['revoked_at'],
   // Append-only (B13 AC7): approvals of the agent register.

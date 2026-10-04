@@ -9,7 +9,9 @@
 //   (`runner_lost`); the next attempt pushes;
 // - repeated failures stop the push: paused at G6 with a `technical` escalation (QUESTIONS #156);
 // - E01 (ADR-M41): CI passes → G7; Person B's review of the pushed commit and Person B's merge
-//   → G8; the history replays.
+//   → G8; the history replays;
+// - E03 (ADR-M49): at G8 the workflow builds the release pack (`buildReleasePack`), Person B
+//   approves the release, the pack is sealed and the intent ends `done`; the history replays.
 // The runner here is a fake activity worker; the real push is tested in `publish-run.test.ts`.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -36,10 +38,12 @@ import {
   type PublishRunInput,
   type PublishRunResult,
 } from '../../../packages/contracts/src/run-activity.js';
+import { decideGate } from '../../../packages/core/src/commands/gate-command.js';
 import type { Intent } from '../../../packages/core/src/db/schema.js';
 import type { PublishDeps } from '../../../packages/core/src/workflow/publish.js';
 import { TemporalIntentSignals } from '../../../packages/workflow-client/src/index.js';
 import { createTestDatabase, describeDb, type TestDatabase } from '../db/helpers.js';
+import { MemoryEvidenceStore } from '../db/memory-evidence-store.js';
 import { atG4, harness, Secret, T0, type Harness } from '../g4-harness.js';
 import { PEOPLE } from './fixture.js';
 
@@ -72,6 +76,7 @@ describeWorkflow(
     let db: TestDatabase;
     let t: Harness;
     let env: TestWorkflowEnvironment;
+    const evidence = new MemoryEvidenceStore();
     let bundlePath: string;
     let signals: TemporalIntentSignals;
     let intentWorker: IntentWorkerHandle | undefined;
@@ -250,6 +255,8 @@ describeWorkflow(
               getCommitAuthors: () => Promise.resolve({ accounts: [], withoutAccount: 1 }),
             },
           },
+          // E03: the worker's evidence store for G8's release pack.
+          releases: { store: evidence, maxItemBytes: 1024 * 1024 },
         }),
       });
       runnerWorker = await Worker.create({
@@ -376,6 +383,26 @@ describeWorkflow(
       await signals.wake(ref(intent));
       const merged = await until(intent, (i) => i.current_gate === 'G8');
       expect(merged).toMatchObject({ status: 'in_gate', current_gate: 'G8' });
+      // E03: the workflow builds the release pack; Person B approves; sealed; done.
+      await waitFor(
+        () => t.f.scope.evidencePacks.listForIntent(intent.id),
+        (packs) => packs.length > 0,
+      );
+      await decideGate(t.f.registry, t.f.scope, {
+        intent: await t.reload(intent),
+        gate: 'G8',
+        decision: 'approve',
+        actorId: t.f.users.b,
+        source: 'cli',
+      });
+      await signals.wake(ref(intent));
+      const done = await until(intent, (i) => i.status === 'done');
+      expect(done).toMatchObject({ status: 'done', current_gate: 'G8' });
+      const sealed = (await t.f.scope.evidencePacks.listForIntent(intent.id)).filter(
+        (p) => p.sealed_at !== null,
+      );
+      expect(sealed).toHaveLength(1);
+      expect(evidence.puts).toBeGreaterThanOrEqual(4); // two versions: before and after the approval
       const history = await env.client.workflow
         .getHandle(intentWorkflowId(ref(intent)))
         .fetchHistory();

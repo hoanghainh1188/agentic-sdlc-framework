@@ -26,7 +26,9 @@ import {
   manifestBytes,
   mdCode,
   mdText,
+  releaseSha256,
   renderPackMarkdown,
+  withoutG8,
   type PackSource,
 } from '../../packages/core/src/evidence/index.js';
 import { describe, expect, it } from 'vitest';
@@ -262,6 +264,7 @@ const build = {
   builtAt: T,
   builtBy: ID(10),
   contentSha256: SHA('0'),
+  releaseSha256: SHA('1'),
 };
 
 describe('E02 manifest (AC1, AC3)', () => {
@@ -435,5 +438,60 @@ describe('E02 Markdown (AC4, QUESTIONS #216)', () => {
     const md = renderPackMarkdown({ source: source('client_format'), build, names, locale: 'en' });
     expect(md).toContain("The client's own disclosure note is still needed");
     expect(md).toContain('`https://docs.example.com/ai-record`');
+  });
+});
+
+describe('E03 release hash (ADR-M49 §2.2): what a G8 approval is bound to', () => {
+  const withG8 = (base: PackSource): PackSource => ({
+    ...base,
+    decisions: [...base.decisions, decision(7, 'G8', 'approve', { approver_role: 'person_b' })],
+    escalations: [
+      ...base.escalations,
+      {
+        ...base.escalations[0]!,
+        id: ID(71),
+        code: 'ESC-2026-0002',
+        packet: { subject_kind: 'g8_input', subject_sha256: SHA('c'), gate: 'G8' },
+      },
+    ],
+  });
+
+  it('ignores the G8 decisions and escalations; the content hash does not', () => {
+    const base = source();
+    const later = withG8(base);
+    expect(releaseSha256(later)).toBe(releaseSha256(base));
+    expect(contentSha256(buildManifestContent(later))).not.toBe(
+      contentSha256(buildManifestContent(base)),
+    );
+    expect(withoutG8(later).decisions.map((d) => d.gate)).not.toContain('G8');
+  });
+
+  it('changes with everything before G8: a decision, the disclosure facts, the evidence', () => {
+    const base = source();
+    const hash = releaseSha256(base);
+    expect(
+      releaseSha256({ ...base, decisions: [...base.decisions, decision(8, 'G6', 'pass')] }),
+    ).not.toBe(hash);
+    // The disclosure format and the AI record's link are bound (QUESTIONS #222).
+    expect(releaseSha256(source('client_format'))).not.toBe(hash);
+    const otherRef = source('client_format');
+    expect(
+      releaseSha256({
+        ...otherRef,
+        aiRecord: { ...otherRef.aiRecord, record_ref: 'https://example.com/other' },
+      }),
+    ).not.toBe(releaseSha256(otherRef));
+    expect(releaseSha256({ ...base, items: [] })).not.toBe(hash);
+  });
+
+  it('is in the manifest build fields and the Markdown', () => {
+    const manifest = JSON.parse(
+      manifestBytes(buildManifestContent(source()), build).toString(),
+    ) as {
+      build: Record<string, unknown>;
+    };
+    expect(manifest.build.release_sha256).toBe(build.releaseSha256);
+    const md = renderPackMarkdown({ source: source(), build, names: new Map(), locale: 'en' });
+    expect(md).toContain(build.releaseSha256);
   });
 });
