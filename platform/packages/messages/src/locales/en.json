@@ -715,5 +715,15 @@
   "api.error.evidence_hash_mismatch": "A stored evidence file does not match its recorded SHA-256 or size. Nothing was built or returned; the platform recorded the failure in the audit log.",
   "api.error.evidence_missing": "A stored evidence file is missing from the evidence store. Nothing was built or returned; the platform recorded the failure in the audit log.",
   "api.error.evidence_too_large": "A stored evidence file is larger than this server reads. Ask the operator about SDLC_API_EVIDENCE_MAX_ITEM_MB.",
-  "api.error.evidence_unavailable": "The evidence store cannot be reached from this server. Try again later, or ask the operator (openbao:bootstrap api-evidence-credentials)."
+  "api.error.evidence_unavailable": "The evidence store cannot be reached from this server. Try again later, or ask the operator (openbao:bootstrap api-evidence-credentials).",
+  "cli.evidence.usage": "Usage (build: the roles in access.evidence_build_roles, by default Person A, Person B, PM / BrSE, governance and admin; read: access.evidence_read_roles, the same and the second approver; tenant admins always; never viewer):\n  sdlc evidence build <INT-…> [--json]\n  sdlc evidence list <INT-…> [--json]\n  sdlc evidence show <INT-…> [--version <n>] [--json]\n  sdlc evidence export <INT-…> [--version <n>] [--manifest] [--output <file>]\n  build makes a new version only when the recorded data changed. export prints the Markdown file (or the JSON manifest with --manifest) after checking its SHA-256; --output saves it to a new file (mode 600, never overwritten). Default version: the latest.",
+  "cli.evidence.built": "{intent}: Evidence Pack version {version} built.",
+  "cli.evidence.unchanged": "{intent}: nothing changed since Evidence Pack version {version}; no new version.",
+  "cli.evidence.pack": "{intent} version {version}: built {built_at}, disclosure format {format}, {items} evidence file(s) checked, sealed {sealed}.",
+  "cli.evidence.file": "  {name}  SHA-256 {sha256}",
+  "cli.evidence.row": "v{version}  {built_at}  {format}  files {items}  sealed {sealed}  pack.md {sha256}",
+  "cli.evidence.none": "{intent} has no Evidence Pack yet. Build one with: sdlc evidence build {intent}",
+  "cli.evidence.hash_mismatch": "The {name} received does not match the SHA-256 the platform recorded. Nothing was saved.",
+  "cli.evidence.write_failed": "Could not write {path} ({code}). The file must not exist yet.",
+  "cli.evidence.exported": "{name} of version {version} saved to {path} (SHA-256 {sha256})."
 }

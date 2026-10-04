@@ -1,6 +1,8 @@
 // API response bodies for the CLI tests (B04 AC3), built with the API's own presenters, so the
 // mocked API cannot drift from the real one: a presenter change that breaks the CLI's response
 // schemas fails these tests.
+import { createHash } from 'node:crypto';
+
 import type {
   Agent,
   AgentApproval,
@@ -34,6 +36,7 @@ import {
 import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
 import { presentPlanList, presentSubmittedPlan } from '../../apps/api/src/plans/present.js';
 import { presentCostReport } from '../../apps/api/src/cost/present.js';
+import { presentPack } from '../../apps/api/src/evidence/present.js';
 import { presentGateMetrics } from '../../apps/api/src/metrics/present.js';
 import { presentKill, presentRunList } from '../../apps/api/src/runs/present.js';
 import { presentLinkedSpec, presentSpecList } from '../../apps/api/src/specs/present.js';
@@ -585,4 +588,46 @@ export function gateMetricsBody(
         ],
     truncated: options.truncated ?? false,
   });
+}
+
+/** E02: one Evidence Pack version (ADR-M48 §2.6), from the API's presenter. */
+export function evidencePackBody(version = 1, sealed = false): Record<string, unknown> {
+  const uri = (name: string) =>
+    `s3://evidence/packs/${TENANT}/${INTENT_ID}/00000000-0000-4000-8000-00000000000${String(version)}/${name}`;
+  return presentPack('INT-2026-0007', {
+    id: `00000000-0000-4000-8000-00000000000${String(version)}`,
+    tenant_id: TENANT,
+    intent_id: INTENT_ID,
+    version,
+    content_sha256: 'c'.repeat(64),
+    manifest_uri: uri('manifest.json'),
+    manifest_sha256: 'a'.repeat(64),
+    manifest_size_bytes: '2048',
+    markdown_uri: uri('pack.md'),
+    markdown_sha256: 'b'.repeat(64),
+    markdown_size_bytes: '4096',
+    locale: 'en',
+    disclosure_format: 'standard_note',
+    item_count: 2,
+    built_by: USER,
+    sealed_at: sealed ? new Date('2026-10-05T00:00:00.000Z') : null,
+    retention_hold: false,
+    purged_at: null,
+    created_at: new Date('2026-10-04T09:00:00.000Z'),
+  });
+}
+
+/** E02: a pack file as `GET …/evidence-packs/:version/:file` returns it. */
+export function evidenceFileBody(content: string, sha256?: string): Record<string, unknown> {
+  return {
+    file: {
+      intent_id: INTENT_ID,
+      version: 1,
+      name: 'pack.md',
+      media_type: 'text/markdown',
+      sha256: sha256 ?? createHash('sha256').update(content, 'utf8').digest('hex'),
+      size_bytes: Buffer.byteLength(content),
+      content,
+    },
+  };
 }
