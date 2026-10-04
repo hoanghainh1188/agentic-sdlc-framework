@@ -234,6 +234,13 @@ t("C11","M-C","Kill switch and loop detection","M",["C04","C05","C03","B11"],"FR
  ["`sdlc run kill <run>` and a comment command; allowed for Person A, Person B, governance",
   "Stops the sandbox, revokes the GitHub token and the LiteLLM virtual key; run ends `stopped_killed`; opens an escalation; under 5 minutes end to end (test)",
   "Loop detection: more than 3 identical consecutive tool calls, or no progress in the window → `stopped_stalled`"])
+t("C12","M-C","Scheduled spend sync","S",["C03","C06"],"FR-51, FR-52, FR-53",
+ "platform/apps/worker (schedule), platform/packages/core/cost/*",
+ ["The worker calls `CostController.syncSpend` on a schedule (settings `SDLC_WORKER_COST_SYNC_*`: interval, look-back window) and once more shortly after each run ends, as ADR-M24 §2.5 says; nothing is double-counted (`ON CONFLICT (tenant_id, source_ref) DO NOTHING`)",
+  "Calls LiteLLM writes to its spend log after a run ended are recorded; a run in progress shows its spend in `sdlc cost report` within one interval",
+  "A failed or partial sync is logged with its reason counts and retried on the next pass; it never stops the worker or a run",
+  "Tests: `pnpm test` (schedule, window, settings), `pnpm test:db` (late spend log rows recorded once, a running run's spend appears), `pnpm test:litellm` if the gateway path changes"],
+ "Found by E04 (QUESTIONS #197, ADR-M45 §2.5): `syncSpend` runs only once, when a run ends (`endRunKey`), so late spend logs are lost and running runs show no cost. Needed for D-02 §10 item 6 (every model call has a cost), so E07 depends on it. Changes the worker: one runner/worker session at a time")
 t("E01","M-D","Gate G7: review + merge","M",["C08"],"FR-11, FR-16, FR-17",
  "platform/apps/worker (G7), PR review poller",
  ["G7 passes when the PR has valid approvals under branch protection, bound to the reviewed commit",
@@ -266,7 +273,7 @@ t("E05","M-D","Retention jobs + audit anchoring","S",["E02","A07"],"FR-44",
  "Object lock for evidence (ADR-M33 §2.9 gap 1, Harry's review of PR #112: not in C06): SeaweedFS can lock objects (COMPLIANCE, even the admin cannot delete a locked version), but only on a bucket created with lock enabled, and the lock period is set per bucket or per object, while retention is per project (`evidence_retention_days`) and `retention_hold` must be able to keep an object longer. Decide how they meet (for example a lock per object at write time equal to the project's retention, and legal hold for `retention_hold`) before the purge job deletes anything; the runner's proposal identity can delete under `proposals/` until then Langfuse holds client data: LiteLLM's traces carry prompts and responses (D-05 §2, D-07; ADR-M35 §2.5, §4). Project archive (FR-44) and retention must also purge the project's Langfuse data (traces tagged with its `tenant:` and `project:` labels)")
 t("E06","M-D","Gate waiting-time metrics","S",["B07"],"FR-12","platform/apps/cli",
  ["`sdlc metrics gates`: average / maximum waiting time per gate, per project"])
-t("E07","M-D","MVP definition-of-done check","M",["E03","E04","E05","C09","B13"],"D-02 section 10","platform/tests/integration/*, README",
+t("E07","M-D","MVP definition-of-done check","M",["E03","E04","E05","C09","B13","C12"],"D-02 section 10","platform/tests/integration/*, README",
  ["One intent goes through G1 → G8 on the sample repo","All criteria in D-02 section 10 (including 5b–5d) are met",
   "README explains a fresh deployment with Docker Compose",
   "QUESTIONS #81 is resolved: one real run with an API model has passed before the trial M-E"])
@@ -423,6 +430,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.12 | 2026-09-30 | Claude (task A08), approved by Harry | E05 note: project archive and retention also purge the project's Langfuse data (prompts and responses are client data; ADR-M35) |
 | 1.13 | 2026-10-03 | Claude (task C07, PR 2), approved by Harry | C08 note: after a G5 `resume` the next run continues from the pushed `agent/INT-...` branch; wait for the G5 block window (QUESTIONS #134, ADR-M34 §2.9) |
 | 1.14 | 2026-10-03 | Claude (task B09, PR 1), approved by Harry | B09 note: two PRs; E01 note: the change flags of the plan G3 approved (ADR-M40, QUESTIONS #165–#169) |
+| 1.15 | 2026-10-04 | Claude, approved by Harry | New task C12: the scheduled spend sync of ADR-M24 §2.5, which was never built (QUESTIONS #197, ADR-M45); E07 depends on C12 |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))

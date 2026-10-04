@@ -40,9 +40,9 @@
 | M-A | Foundation: infrastructure, security, audit | 11 | S×6 · M×5 |
 | M-B | Intent + G1–G3 | 13 | S×4 · M×8 · L×1 |
 | M-0 | Sample pilot repo (separate repo, right before M-C) | 4 | S×1 · M×2 · L×1 |
-| M-C | Run + G4–G6 | 11 | S×2 · M×8 · L×1 |
+| M-C | Run + G4–G6 | 12 | S×3 · M×8 · L×1 |
 | M-D | G7–G8 + evidence + cost | 7 | S×4 · M×3 |
-| **Total** | | **46** | |
+| **Total** | | **47** | |
 
 ### Order and dependencies between milestones
 
@@ -619,6 +619,21 @@ flowchart LR
 - [ ] AC2: Stops the sandbox, revokes the GitHub token and the LiteLLM virtual key; run ends `stopped_killed`; opens an escalation; under 5 minutes end to end (test)
 - [ ] AC3: Loop detection: more than 3 identical consecutive tool calls, or no progress in the window → `stopped_stalled`
 
+#### C12. Scheduled spend sync
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | C03, C06 | FR-51, FR-52, FR-53 | platform/apps/worker (schedule), platform/packages/core/cost/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: The worker calls `CostController.syncSpend` on a schedule (settings `SDLC_WORKER_COST_SYNC_*`: interval, look-back window) and once more shortly after each run ends, as ADR-M24 §2.5 says; nothing is double-counted (`ON CONFLICT (tenant_id, source_ref) DO NOTHING`)
+- [ ] AC2: Calls LiteLLM writes to its spend log after a run ended are recorded; a run in progress shows its spend in `sdlc cost report` within one interval
+- [ ] AC3: A failed or partial sync is logged with its reason counts and retried on the next pass; it never stops the worker or a run
+- [ ] AC4: Tests: `pnpm test` (schedule, window, settings), `pnpm test:db` (late spend log rows recorded once, a running run's spend appears), `pnpm test:litellm` if the gateway path changes
+
+> Note: Found by E04 (QUESTIONS #197, ADR-M45 §2.5): `syncSpend` runs only once, when a run ends (`endRunKey`), so late spend logs are lost and running runs show no cost. Needed for D-02 §10 item 6 (every model call has a cost), so E07 depends on it. Changes the worker: one runner/worker session at a time
+
 
 ### M-D — G7–G8 + evidence + cost
 
@@ -705,7 +720,7 @@ flowchart LR
 
 | Size | Depends on | Requirements | Code area |
 |---|---|---|---|
-| M | E03, E04, E05, C09, B13 | D-02 section 10 | platform/tests/integration/*, README |
+| M | E03, E04, E05, C09, B13, C12 | D-02 section 10 | platform/tests/integration/*, README |
 
 **Acceptance criteria**
 
@@ -777,4 +792,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.12 | 2026-09-30 | Claude (task A08), approved by Harry | E05 note: project archive and retention also purge the project's Langfuse data (prompts and responses are client data; ADR-M35) |
 | 1.13 | 2026-10-03 | Claude (task C07, PR 2), approved by Harry | C08 note: after a G5 `resume` the next run continues from the pushed `agent/INT-...` branch; wait for the G5 block window (QUESTIONS #134, ADR-M34 §2.9) |
 | 1.14 | 2026-10-03 | Claude (task B09, PR 1), approved by Harry | B09 note: two PRs; E01 note: the change flags of the plan G3 approved (ADR-M40, QUESTIONS #165–#169) |
+| 1.15 | 2026-10-04 | Claude, approved by Harry | New task C12: the scheduled spend sync of ADR-M24 §2.5, which was never built (QUESTIONS #197, ADR-M45); E07 depends on C12 |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
