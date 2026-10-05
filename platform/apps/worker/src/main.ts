@@ -15,6 +15,7 @@ import { GitHostError, type IntentWorkflowSignals } from '@sdlc/contracts';
 import {
   advanceEscalation,
   checkStoredConfigsAtStart,
+  runAnchorPass,
   runRetentionPass,
   gitHostErrorMessage,
   loadEffectiveConfig,
@@ -39,6 +40,7 @@ import { EscalationLoop } from './escalation-loop.js';
 import { jsonLogger } from './logger.js';
 import { PollerLoop } from './poller-loop.js';
 import { ReconcileLoop } from './reconcile-loop.js';
+import { openAnchorStore } from './anchor-store.js';
 import { RetentionLoop } from './retention-loop.js';
 import { openRetentionStore } from './retention-store.js';
 import { createWorkerRuns, type WorkerRuns } from './runs.js';
@@ -183,33 +185,56 @@ async function main(): Promise<void> {
   const retentionStore = await openRetentionStore(settings.retention, secrets, logger);
   // Pack IDs found without a row, kept across passes: deleted only when seen twice.
   const orphanSuspects = new Set<string>();
+  // The daily audit anchor (E05 PR 2, ADR-M51 §2.9): its own identity `worker-anchor`, in the
+  // same loop, before the retention steps. The loop runs with either identity.
+  const anchorStore = await openAnchorStore(settings.anchor, secrets, logger);
+  // Tenant ID → the UTC date it was anchored and checked: once per tenant and day per process.
+  const anchoredOn = new Map<string, string>();
+  const retentionSettings = retentionStore ? settings.retention : null;
+  const loopIntervalMs = retentionSettings?.intervalMs ?? settings.anchor?.intervalMs;
   const retention =
-    retentionStore && settings.retention
+    loopIntervalMs !== undefined && (retentionSettings || anchorStore)
       ? new RetentionLoop({
-          pass: (orphanCursor) =>
-            runRetentionPass(
-              {
-                db,
-                store: retentionStore,
-                logger,
-                now: () => new Date(),
-                orphanSuspects,
-                settings: {
-                  mode: settings.retention!.mode,
-                  bucket: settings.retention!.bucket,
-                  batch: settings.retention!.batch,
-                  guardPercent: settings.retention!.guardPercent,
-                  guardFloor: settings.retention!.guardFloor,
-                  archiveGraceDays: settings.retention!.archiveGraceDays,
-                  orphanGraceHours: settings.retention!.orphanGraceHours,
-                },
-              },
-              orphanCursor,
-            ),
+          ...(anchorStore
+            ? {
+                anchor: () =>
+                  runAnchorPass({
+                    db,
+                    store: anchorStore,
+                    logger,
+                    now: () => new Date(),
+                    anchoredOn,
+                  }),
+              }
+            : {}),
+          ...(retentionSettings && retentionStore
+            ? {
+                pass: (orphanCursor: string | null) =>
+                  runRetentionPass(
+                    {
+                      db,
+                      store: retentionStore,
+                      logger,
+                      now: () => new Date(),
+                      orphanSuspects,
+                      settings: {
+                        mode: retentionSettings.mode,
+                        bucket: retentionSettings.bucket,
+                        batch: retentionSettings.batch,
+                        guardPercent: retentionSettings.guardPercent,
+                        guardFloor: retentionSettings.guardFloor,
+                        archiveGraceDays: retentionSettings.archiveGraceDays,
+                        orphanGraceHours: retentionSettings.orphanGraceHours,
+                      },
+                    },
+                    orphanCursor,
+                  ),
+              }
+            : {}),
           withLock: (fn) => db.system.withRetentionLock(fn),
           logger,
-          mode: settings.retention.mode,
-          intervalMs: settings.retention.intervalMs,
+          mode: retentionSettings?.mode ?? 'report',
+          intervalMs: loopIntervalMs,
         })
       : undefined;
   retention?.start();
@@ -238,7 +263,10 @@ async function main(): Promise<void> {
       retention?.stop(),
       intentWorker?.shutdown(),
     ])
-      .then(() => retentionStore?.destroy())
+      .then(() => {
+        retentionStore?.destroy();
+        anchorStore?.destroy();
+      })
       .then(() =>
         Promise.all([
           db.close(),

@@ -5,3 +5,9 @@ export {
   S3RetentionStore,
   type S3RetentionStoreOptions,
 } from './retention.js';
+export {
+  AUDIT_ANCHOR_KEY,
+  MAX_ANCHOR_VERSIONS,
+  S3AuditAnchorStore,
+  type S3AuditAnchorStoreOptions,
+} from './anchor.js';

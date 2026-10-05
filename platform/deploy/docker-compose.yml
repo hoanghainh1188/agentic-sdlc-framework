@@ -332,13 +332,15 @@ services:
       seaweedfs:
         condition: service_healthy
     environment:
-      SEAWEEDFS_BUCKETS: evidence langfuse
+      SEAWEEDFS_BUCKETS: evidence langfuse audit-anchors
       # A plain delete keeps the older versions (C06 session 2b, ADR-M33 §2.9).
-      SEAWEEDFS_VERSIONED_BUCKETS: evidence
+      SEAWEEDFS_VERSIONED_BUCKETS: evidence audit-anchors
       # E05 (ADR-M51): object lock on `evidence`, GOVERNANCE, every new version locked 180 days.
       # No writer can delete a locked version; only the purge identity (`worker-purge`) may bypass
       # it. The days equal rule M31's floor; never lower them without a handbook change.
-      SEAWEEDFS_LOCKED_BUCKETS: evidence:GOVERNANCE:180
+      # E05 PR 2 (ADR-M51 §2.9): `audit-anchors`, COMPLIANCE, 731 days: nobody can delete an audit
+      # anchor or shorten its lock through S3, the admin included. Never lower or change the mode.
+      SEAWEEDFS_LOCKED_BUCKETS: evidence:GOVERNANCE:180 audit-anchors:COMPLIANCE:731
       # The admin identity sets the lock's default retention through the S3 API (on curl's stdin).
       SEAWEEDFS_S3_ACCESS_KEY: ${SEAWEEDFS_S3_ACCESS_KEY:?set SEAWEEDFS_S3_ACCESS_KEY in .env}
       SEAWEEDFS_S3_SECRET_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?set SEAWEEDFS_S3_SECRET_KEY in .env}
@@ -608,6 +610,11 @@ services:
       SDLC_WORKER_RETENTION_BUCKET: evidence
       SDLC_WORKER_RETENTION_MODE: ${SDLC_WORKER_RETENTION_MODE:-report}
       SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS: ${SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS:-7}
+      # E05 PR 2 (ADR-M51 §2.9): the daily audit anchor in `audit-anchors` with its own identity
+      # `worker-anchor` (kv/worker/anchor, `openbao:bootstrap worker-anchor-credentials`).
+      # Without the credential: no anchors.
+      SDLC_WORKER_ANCHOR_URL: http://seaweedfs:8333
+      SDLC_WORKER_ANCHOR_BUCKET: audit-anchors
     volumes:
       - worker-approle:/run/sdlc/approle
       - worker-cost-approle:/run/sdlc/cost-approle

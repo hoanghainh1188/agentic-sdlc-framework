@@ -13,4 +13,5 @@ export * from './agent.js';
 export * from './agent-instructions.js';
 export * from './intent-workflow.js';
 export * from './run-activity.js';
+export * from './audit-anchor.js';
 export * from './evidence.js';
