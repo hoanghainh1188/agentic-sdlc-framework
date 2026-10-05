@@ -128,3 +128,43 @@ export async function issueRun(
   );
   return issued.envelope.contract.run_id;
 }
+
+/**
+ * Another project of the seeded tenant with one intent, plan and queued run (task E08: the Langfuse
+ * purge of one project leaves another project's traces).
+ */
+export async function seedOtherProject(
+  seeded: SeededRun,
+  options: Pick<SeedOptions, 'models' | 'now'> & { readonly slug: string },
+): Promise<{ projectId: string; intentId: string; intentCode: string; runId: string }> {
+  const registry = new Registry({
+    policyFactory: (config) => createSimplePolicyEngine({ config }),
+    now: () => options.now,
+  });
+  const project = await seeded.scope.projects.create({
+    slug: options.slug,
+    name: options.slug,
+    git_provider: 'github',
+    repo_full_name: `org/${options.slug}`,
+  });
+  const intent = await registry.createIntent(seeded.scope, {
+    projectId: project.id,
+    title: 'Count stock',
+    createdBy: seeded.personA,
+    riskTier: 'low',
+    dataClass: 'internal',
+    budgetUsd: '10',
+  });
+  const plan = await registry.submitPlan(seeded.scope, intent.id, {
+    plannedFiles: ['apps/**'],
+    planSha256: 'b'.repeat(64),
+    actorType: 'human',
+    actorId: seeded.personA,
+  });
+  const runId = await issueRun(
+    seeded.scope,
+    { intentId: intent.id, planId: plan.id, personA: seeded.personA, agentId: seeded.agentId },
+    options,
+  );
+  return { projectId: project.id, intentId: intent.id, intentCode: intent.code, runId };
+}

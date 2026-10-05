@@ -13,6 +13,7 @@
     { "path": "platform/packages/adapters/agent-openhands" },
     { "path": "platform/packages/adapters/model-litellm" },
     { "path": "platform/packages/adapters/evidence-s3" },
+    { "path": "platform/packages/adapters/traces-langfuse" },
     { "path": "platform/packages/adapters/policy-simple" },
     { "path": "platform/apps/api" },
     { "path": "platform/apps/worker" },

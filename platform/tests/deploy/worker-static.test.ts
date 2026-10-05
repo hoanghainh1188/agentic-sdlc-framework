@@ -197,4 +197,55 @@ describe('sdlc-worker service', () => {
       'GetObjectRetention:audit-anchors',
     ]);
   });
+
+  it('E08: the Langfuse purge is off unless set, and holds no key in the environment', () => {
+    expect(worker.environment).toMatchObject({
+      SDLC_WORKER_LANGFUSE_URL: '${SDLC_WORKER_LANGFUSE_URL:-off}',
+      SDLC_WORKER_LANGFUSE_PROJECT_ID: '${LANGFUSE_INIT_PROJECT_ID:-sdlc-platform}',
+      SDLC_WORKER_LANGFUSE_CLICKHOUSE_URL: 'http://clickhouse:8123',
+      SDLC_WORKER_LANGFUSE_RAW_URL: 'http://seaweedfs:8333',
+      SDLC_WORKER_LANGFUSE_RAW_BUCKET: 'langfuse',
+      SDLC_WORKER_LANGFUSE_RAW_MAX_AGE_HOURS: '${SDLC_WORKER_LANGFUSE_RAW_MAX_AGE_HOURS:-24}',
+    });
+    // Its key, the ClickHouse password and the S3 key come from OpenBao (kv/worker/langfuse).
+    expect(JSON.stringify(worker.environment)).not.toMatch(
+      /LANGFUSE_(PUBLIC|SECRET)|CLICKHOUSE_PASSWORD/,
+    );
+  });
+
+  it('E08: ClickHouse lets its admin user create sdlc_purge (access management)', () => {
+    const clickhouse = compose.services.clickhouse as unknown as {
+      environment: Record<string, string>;
+    };
+    expect(clickhouse.environment.CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT).toBe('1');
+  });
+
+  it('E08: worker-langfuse-credentials: List and delete under events/otel only, ALTER DELETE only', () => {
+    const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
+    expect(bootstrap).toMatch(
+      /^ {2}worker-langfuse-credentials\) cmd_worker_langfuse_credentials ;;$/m,
+    );
+    expect(/^LANGFUSE_RAW_ACTIONS='([^']*)'$/m.exec(bootstrap)?.[1]?.split(',')).toEqual([
+      'List:langfuse',
+      'Write:langfuse/events/otel/*',
+    ]);
+    const command =
+      /^cmd_worker_langfuse_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
+    expect(command).not.toBe('');
+    // Never a read action, never another bucket or prefix.
+    expect(command).not.toMatch(/Read:/);
+    // The exact grants, checked after they are applied.
+    const grants = [...command.matchAll(/GRANT ([A-Z ]+) ON (\S+) TO sdlc_purge/g)].map((m) =>
+      [m[1], m[2]].join(' '),
+    );
+    expect(new Set(grants)).toEqual(
+      new Set(['ALTER DELETE default.events_full', 'ALTER DELETE default.events_core']),
+    );
+    expect(command).toContain('REVOKE ALL ON *.* FROM sdlc_purge');
+    // Secrets go through pipes: never a clickhouse-client password argument or a host file.
+    expect(command).not.toMatch(/--password/);
+    expect(command).toContain('bao kv put -mount=kv worker/langfuse -');
+    // The Langfuse key is read like a token, never from an argument.
+    expect(command).toMatch(/lf_secret="\$\(read_secret /);
+  });
 });

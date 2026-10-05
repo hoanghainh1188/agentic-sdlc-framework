@@ -35,6 +35,9 @@ importers:
       '@sdlc/adapter-policy-simple':
         specifier: workspace:*
         version: link:platform/packages/adapters/policy-simple
+      '@sdlc/adapter-traces-langfuse':
+        specifier: workspace:*
+        version: link:platform/packages/adapters/traces-langfuse
       '@sdlc/config':
         specifier: workspace:*
         version: link:platform/packages/config
@@ -228,6 +231,9 @@ importers:
       '@sdlc/adapter-policy-simple':
         specifier: workspace:*
         version: link:../../packages/adapters/policy-simple
+      '@sdlc/adapter-traces-langfuse':
+        specifier: workspace:*
+        version: link:../../packages/adapters/traces-langfuse
       '@sdlc/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -293,6 +299,12 @@ importers:
         version: link:../../contracts
 
   platform/packages/adapters/policy-simple:
+    dependencies:
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+
+  platform/packages/adapters/traces-langfuse:
     dependencies:
       '@sdlc/contracts':
         specifier: workspace:*

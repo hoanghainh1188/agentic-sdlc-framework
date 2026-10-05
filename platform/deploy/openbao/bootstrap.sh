@@ -79,6 +79,15 @@ Commands:
                        the identity "worker-anchor": Write, Read, List and GetObjectRetention on
                        the bucket audit-anchors (object lock COMPLIANCE) only. The old key stops
                        working. Prints no secret. Run it again to rotate, then restart sdlc-worker.
+  worker-langfuse-credentials
+                       The worker's Langfuse purge (E08, ADR-M53): asks for the worker's own Langfuse
+                       project key (made once in the Langfuse UI; public key, then secret key, hidden)
+                       and stores it at kv/worker/langfuse with a new password of the ClickHouse user
+                       "sdlc_purge" (only ALTER DELETE on events_full and events_core) and a new key
+                       of the SeaweedFS identity "worker-langfuse" (List:langfuse and
+                       Write:langfuse/events/otel/*, no read). Needs the profile observability. The
+                       old ClickHouse password and S3 key stop working. Prints no secret. Run it
+                       again to rotate, then restart sdlc-worker (runbook T11 section 5m).
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -124,7 +133,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -513,6 +522,86 @@ cmd_worker_purge_credentials() { s3_credentials worker purge sdlcwrkpg "$PURGE_A
 ANCHOR_ACTIONS='Write:audit-anchors,Read:audit-anchors,List:audit-anchors,GetObjectRetention:audit-anchors'
 cmd_worker_anchor_credentials() { s3_credentials worker anchor sdlcwrkan "$ANCHOR_ACTIONS" sdlc-worker; }
 
+# The worker's Langfuse purge (E08, ADR-M53 §2.3). One entry, kv/worker/langfuse:
+# - the worker's own Langfuse project key, made by an operator in the Langfuse UI (runbook T11
+#   §5m), read from a hidden prompt (or stdin) and passed to the openbao container on stdin;
+# - a new password of the ClickHouse user `sdlc_purge`: only ALTER DELETE on the two event tables
+#   (APPLY DELETED MASK needs it; it reads nothing). The SQL goes to clickhouse-client on stdin;
+#   clickhouse-client reads the admin user from the container's environment, and ClickHouse masks
+#   the password in its query log (checked live);
+# - a new key of the SeaweedFS identity `worker-langfuse`: List on the bucket `langfuse`, Write
+#   (delete) under `langfuse/events/otel/*` only, never Read.
+# Every secret is made inside the openbao container and goes through pipes only.
+LANGFUSE_RAW_ACTIONS='List:langfuse,Write:langfuse/events/otel/*'
+cmd_worker_langfuse_credentials() {
+  require_unsealed
+  token="$(read_secret 'Admin or root token (hidden)')"
+  [ -n "$token" ] || fail "no token given"
+  lf_public="$(read_secret "The worker's Langfuse public key (pk-lf-...)")"
+  lf_secret="$(read_secret "The worker's Langfuse secret key (sk-lf-..., hidden)")"
+  case "$lf_public" in pk-lf-*) ;; *) fail "the public key must start with pk-lf-" ;; esac
+  case "$lf_secret" in sk-lf-*) ;; *) fail "the secret key must start with sk-lf-" ;; esac
+  case "$lf_public$lf_secret" in *[!A-Za-z0-9-]*) fail "the Langfuse key has unexpected characters" ;; esac
+  ch_admin='clickhouse-client --multiquery'
+  compose exec -T clickhouse sh -c "echo 'SELECT 1' | $ch_admin" </dev/null >/dev/null 2>&1 ||
+    fail "ClickHouse is not reachable; start the profile observability first (pnpm compose:obs)"
+  weed="weed shell -master=127.0.0.1:9333"
+  kv_version() {
+    printf '%s\n' "$token" | bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
+      bao read -field=current_version kv/metadata/worker/langfuse 2>/dev/null || echo 0'
+  }
+  before="$(kv_version)"
+  printf '%s\n%s\n%s\n' "$token" "$lf_public" "$lf_secret" |
+    bao_exec sh -c 'set -e
+      IFS= read -r BAO_TOKEN && export BAO_TOKEN
+      IFS= read -r public && IFS= read -r secret
+      access="sdlcwrklf$(od -An -N10 -tx1 /dev/urandom | tr -d " \n")"
+      s3secret="$(od -An -N30 -tx1 /dev/urandom | tr -d " \n")"
+      chpw="$(od -An -N24 -tx1 /dev/urandom | tr -d " \n")"
+      [ "${#access}" -eq 29 ] || exit 1
+      [ "${#s3secret}" -eq 60 ] || exit 1
+      [ "${#chpw}" -eq 48 ] || exit 1
+      printf "{\"langfuse_public_key\":\"%s\",\"langfuse_secret_key\":\"%s\",\"clickhouse_password\":\"%s\",\"access_key\":\"%s\",\"secret_key\":\"%s\"}" \
+        "$public" "$secret" "$chpw" "$access" "$s3secret" |
+        bao kv put -mount=kv worker/langfuse - >/dev/null' ||
+    fail "could not store kv/worker/langfuse (token valid? OpenBao configured?)"
+  [ "$(kv_version)" = "$((before + 1))" ] ||
+    fail "kv/worker/langfuse was not stored (token valid? OpenBao configured?); run the command again"
+  # The SeaweedFS identity: the old one first, so a rotation leaves one key.
+  echo "s3.configure -user worker-langfuse -delete -apply" |
+    compose exec -T seaweedfs $weed >/dev/null 2>&1 || true
+  printf '%s\n' "$token" |
+    bao_exec sh -c 'set -e
+      IFS= read -r BAO_TOKEN && export BAO_TOKEN
+      access="$(bao kv get -mount=kv -field=access_key worker/langfuse)"
+      secret="$(bao kv get -mount=kv -field=secret_key worker/langfuse)"
+      printf "s3.configure -user worker-langfuse -access_key %s -secret_key %s -actions %s -apply\n" "$access" "$secret" "$1"' \
+      sh "$LANGFUSE_RAW_ACTIONS" |
+    compose exec -T seaweedfs $weed >/dev/null 2>&1 ||
+    fail "could not apply the SeaweedFS identity worker-langfuse; run the command again"
+  echo "s3.configure" | compose exec -T seaweedfs sh -c "$weed 2>/dev/null | grep -q '\"name\": *\"worker-langfuse\"'" ||
+    fail "SeaweedFS has no identity worker-langfuse; run the command again"
+  # The ClickHouse user: created once, its password replaced on every run, its grants exact.
+  printf '%s\n' "$token" |
+    bao_exec sh -c 'set -e
+      IFS= read -r BAO_TOKEN && export BAO_TOKEN
+      pw="$(bao kv get -mount=kv -field=clickhouse_password worker/langfuse)"
+      printf "CREATE USER IF NOT EXISTS sdlc_purge IDENTIFIED WITH sha256_password BY '"'"'%s'"'"';\n" "$pw"
+      printf "ALTER USER sdlc_purge IDENTIFIED WITH sha256_password BY '"'"'%s'"'"';\n" "$pw"
+      printf "REVOKE ALL ON *.* FROM sdlc_purge;\n"
+      printf "GRANT ALTER DELETE ON default.events_full TO sdlc_purge;\n"
+      printf "GRANT ALTER DELETE ON default.events_core TO sdlc_purge;\n"' |
+    compose exec -T clickhouse sh -c "$ch_admin" >/dev/null 2>&1 ||
+    fail "could not create the ClickHouse user sdlc_purge (CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT on? ClickHouse restarted after the update?)"
+  grants="$(compose exec -T clickhouse sh -c "echo 'SHOW GRANTS FOR sdlc_purge' | $ch_admin" </dev/null 2>/dev/null)" ||
+    fail "could not read the grants of sdlc_purge; run the command again"
+  [ "$(printf '%s\n' "$grants" | grep -c .)" -eq 2 ] &&
+    printf '%s\n' "$grants" | grep -qx 'GRANT ALTER DELETE ON default.events_full TO sdlc_purge' &&
+    printf '%s\n' "$grants" | grep -qx 'GRANT ALTER DELETE ON default.events_core TO sdlc_purge' ||
+    fail "the ClickHouse user sdlc_purge has unexpected grants; run the command again"
+  say "kv/worker/langfuse stored (the worker's Langfuse key); SeaweedFS identity worker-langfuse ($LANGFUSE_RAW_ACTIONS) and ClickHouse user sdlc_purge (ALTER DELETE on events_full, events_core) applied; restart sdlc-worker to use them"
+}
+
 cmd_api_evidence_credentials() { pack_evidence_credentials api sdlcapiev sdlc-api; }
 cmd_worker_evidence_credentials() { pack_evidence_credentials worker sdlcwrkev sdlc-worker; }
 
@@ -531,4 +620,5 @@ case "$command" in
   worker-evidence-credentials) cmd_worker_evidence_credentials ;;
   worker-purge-credentials) cmd_worker_purge_credentials ;;
   worker-anchor-credentials) cmd_worker_anchor_credentials ;;
+  worker-langfuse-credentials) cmd_worker_langfuse_credentials ;;
 esac

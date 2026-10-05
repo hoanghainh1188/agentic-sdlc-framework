@@ -9,7 +9,8 @@
 //   trigger checks here for the new tables).
 // - AC3: an archive with open intents is refused; after the grace period (6 days kept, 8 days
 //   purged) the evidence of an archived project is purged with the lock bypass, held intents kept,
-//   `project.purged` once with `langfuse: manual`.
+//   `project.purged` once with `langfuse: not_deployed` (no Langfuse purge; E08,
+//   langfuse-purge.test.ts).
 // - Holds: who (rule M32), the legal hold set and taken off in the store, released once.
 // - Tenants: a pass never touches another tenant's files; a URI outside the tenant is refused.
 // - The orphan sweep under `packs/`.
@@ -551,7 +552,8 @@ describeDb('E05 PR 1: evidence retention on PostgreSQL', () => {
         intents: 2,
         purged: 2,
         held: 1,
-        langfuse: 'manual',
+        // E08 (ADR-M53): the pass has no Langfuse purge here.
+        langfuse: 'not_deployed',
       });
       const causes = (await auditOf(w, done.id))
         .filter((e) => e.action === 'evidence.purged')

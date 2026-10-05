@@ -57,17 +57,27 @@ describe('otel-collector service', () => {
     ]);
   });
 
-  it('holds the Langfuse project key; no other platform service does', () => {
+  it('holds the Langfuse project key; no other platform service has one in its environment', () => {
     expect(collector.environment).toEqual({
       LANGFUSE_PUBLIC_KEY:
         '${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:?set LANGFUSE_INIT_PROJECT_PUBLIC_KEY in .env}',
       LANGFUSE_SECRET_KEY:
         '${LANGFUSE_INIT_PROJECT_SECRET_KEY:?set LANGFUSE_INIT_PROJECT_SECRET_KEY in .env}',
     });
-    for (const name of ['litellm', 'litellm-agent', 'sdlc-api', 'sdlc-worker', 'sdlc-runner']) {
+    for (const name of ['litellm', 'litellm-agent', 'sdlc-api', 'sdlc-runner']) {
       expect(JSON.stringify(compose.services[name]?.environment ?? {}), name).not.toMatch(
         /LANGFUSE/,
       );
+    }
+    // E08 (ADR-M53): the worker has the Langfuse purge settings (URLs, bucket, age), never a key:
+    // its own key comes from OpenBao (kv/worker/langfuse).
+    const worker = compose.services['sdlc-worker']?.environment ?? {};
+    for (const [key, value] of Object.entries(worker)) {
+      if (!/LANGFUSE/.test(key)) continue;
+      expect(key).toMatch(
+        /^SDLC_WORKER_LANGFUSE_(URL|PROJECT_ID|CLICKHOUSE_URL|RAW_URL|RAW_BUCKET|RAW_MAX_AGE_HOURS)$/,
+      );
+      expect(String(value)).not.toMatch(/KEY|SECRET|PASSWORD/);
     }
   });
 });
@@ -119,7 +129,14 @@ describe('SDLC_OTEL_ENDPOINT', () => {
     // `$(...)`), then stops the script.
     fs.writeFileSync(
       path.join(tmp, 'docker'),
-      '#!/bin/sh\necho "otel=${SDLC_OTEL_ENDPOINT:-unset}" >&2\nexit 3\n',
+      [
+        '#!/bin/sh',
+        // E08: `docker volume ls` (Langfuse's ClickHouse volume) answers FAKE_VOLUME.
+        'if [ "$1" = volume ]; then [ -n "${FAKE_VOLUME:-}" ] && echo "$FAKE_VOLUME"; exit 0; fi',
+        'echo "otel=${SDLC_OTEL_ENDPOINT:-unset} langfuse=${SDLC_WORKER_LANGFUSE_URL:-unset}" >&2',
+        'exit 3',
+        '',
+      ].join('\n'),
       { mode: 0o755 },
     );
     const run = (profiles: string[], envFile: string, env: Record<string, string> = {}) => {
@@ -139,6 +156,37 @@ describe('SDLC_OTEL_ENDPOINT', () => {
 
     it('stays off without observability', () => {
       expect(run(['core', 'platform'], 'SDLC_OTEL_ENDPOINT=\n')).toContain('otel=unset');
+    });
+
+    it("E08: turns the worker's Langfuse purge on with observability, keeps a set value", () => {
+      expect(run(['core', 'observability', 'platform'], '')).toContain(
+        'langfuse=http://langfuse-web:3000',
+      );
+      expect(run(['core', 'platform'], '')).toContain('langfuse=unset');
+      expect(
+        run(['core', 'observability'], 'SDLC_WORKER_LANGFUSE_URL=http://file:3000\n'),
+      ).toContain('langfuse=unset');
+      expect(run(['core', 'observability'], '', { SDLC_WORKER_LANGFUSE_URL: 'off' })).toContain(
+        'langfuse=off',
+      );
+    });
+
+    it("E08: keeps the Langfuse purge on when Langfuse's ClickHouse volume exists", () => {
+      const out = run(['core', 'platform'], 'COMPOSE_PROJECT_NAME=sdlc\n', {
+        FAKE_VOLUME: 'sdlc_clickhouse-data',
+      });
+      expect(out).toContain('langfuse=http://langfuse-web:3000');
+      // The project's own ClickHouse volume, by its Compose labels.
+      const upScript = fs.readFileSync(path.join(deployDir, 'scripts/up.sh'), 'utf8');
+      expect(upScript).toContain('--filter "label=com.docker.compose.project=${project:-deploy}"');
+      expect(upScript).toContain('--filter label=com.docker.compose.volume=clickhouse-data');
+      // Without the volume it stays off; an explicit value always wins.
+      expect(run(['core', 'platform'], 'COMPOSE_PROJECT_NAME=sdlc\n')).toContain('langfuse=unset');
+      expect(
+        run(['core', 'platform'], 'SDLC_WORKER_LANGFUSE_URL=off\n', {
+          FAKE_VOLUME: 'sdlc_clickhouse-data',
+        }),
+      ).toContain('langfuse=unset');
     });
 
     it('keeps a value from the environment or the env file', () => {

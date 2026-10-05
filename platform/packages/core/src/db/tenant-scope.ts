@@ -19,6 +19,7 @@ import { GitEventCursorRepository } from './repositories/git-event-cursors.js';
 import { GitEventReceiptRepository } from './repositories/git-event-receipts.js';
 import { IntentNoticeRepository } from './repositories/intent-notices.js';
 import { IntentRepository } from './repositories/intents.js';
+import { LangfusePurgeRepository } from './repositories/langfuse-purges.js';
 import { PlanRepository } from './repositories/plans.js';
 import { ProjectAiRecordRepository } from './repositories/project-ai-records.js';
 import { ProjectConfigRepository } from './repositories/project-configs.js';
@@ -64,6 +65,7 @@ export class TenantScope {
   readonly evidencePacks: EvidencePackRepository;
   readonly evidenceHolds: EvidenceHoldRepository;
   readonly retention: RetentionRepository;
+  readonly langfusePurges: LangfusePurgeRepository;
   readonly escalations: EscalationRepository;
   readonly escalationNotices: EscalationNoticeRepository;
   readonly agents: AgentRepository;
@@ -102,6 +104,7 @@ export class TenantScope {
     this.evidencePacks = new EvidencePackRepository(this.db, this.tenantId);
     this.evidenceHolds = new EvidenceHoldRepository(this.db, this.tenantId);
     this.retention = new RetentionRepository(this.db, this.tenantId);
+    this.langfusePurges = new LangfusePurgeRepository(this.db, this.tenantId);
     this.escalations = new EscalationRepository(this.db, this.tenantId);
     this.escalationNotices = new EscalationNoticeRepository(this.db, this.tenantId);
     this.agents = new AgentRepository(this.db, this.tenantId);

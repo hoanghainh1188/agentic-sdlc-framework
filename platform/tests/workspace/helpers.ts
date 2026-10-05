@@ -35,6 +35,7 @@ export const EXPECTED_PACKAGES: readonly WorkspacePackage[] = [
   { dir: 'platform/packages/adapters/agent-openhands', name: '@sdlc/adapter-agent-openhands' },
   { dir: 'platform/packages/adapters/model-litellm', name: '@sdlc/adapter-model-litellm' },
   { dir: 'platform/packages/adapters/evidence-s3', name: '@sdlc/adapter-evidence-s3' },
+  { dir: 'platform/packages/adapters/traces-langfuse', name: '@sdlc/adapter-traces-langfuse' },
   { dir: 'platform/packages/adapters/policy-simple', name: '@sdlc/adapter-policy-simple' },
 ];
 
