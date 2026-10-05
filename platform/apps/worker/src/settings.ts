@@ -47,6 +47,9 @@ export const WORKER_ENV = {
   retentionGuardFloor: 'SDLC_WORKER_RETENTION_GUARD_FLOOR',
   retentionArchiveGraceDays: 'SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS',
   retentionOrphanGraceHours: 'SDLC_WORKER_RETENTION_ORPHAN_GRACE_HOURS',
+  anchorUrl: 'SDLC_WORKER_ANCHOR_URL',
+  anchorBucket: 'SDLC_WORKER_ANCHOR_BUCKET',
+  anchorSecretPath: 'SDLC_WORKER_ANCHOR_SECRET_PATH',
   devMode: 'SDLC_WORKER_DEV_MODE',
   devDbUrl: 'SDLC_WORKER_DEV_DB_URL',
 } as const;
@@ -165,6 +168,21 @@ const schema = z.object({
   // Days after `project.archived` before its evidence is purged: a mistaken archive is noticed first.
   [WORKER_ENV.retentionArchiveGraceDays]: z.coerce.number().int().min(1).max(365).default(7),
   [WORKER_ENV.retentionOrphanGraceHours]: z.coerce.number().int().min(24).max(720).default(24),
+  // E05 PR 2 (ADR-M51 §2.9): the daily audit anchor with the identity `worker-anchor`
+  // (`kv/worker/anchor`) in the bucket `audit-anchors` (COMPLIANCE). `off`: no anchors. It runs in
+  // the retention loop, at its interval.
+  [WORKER_ENV.anchorUrl]: z
+    .string()
+    .refine((v) => v === 'off' || isOrigin(v))
+    .default('http://seaweedfs:8333'),
+  [WORKER_ENV.anchorBucket]: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .default('audit-anchors'),
+  [WORKER_ENV.anchorSecretPath]: z
+    .string()
+    .regex(/^worker\/[A-Za-z0-9_.-]+$/)
+    .default('worker/anchor'),
   [WORKER_ENV.devMode]: z.enum(['', '0', '1']).default(''),
   [WORKER_ENV.devDbUrl]: z.string().optional(),
   NODE_ENV: z.string().optional(),
@@ -200,6 +218,15 @@ export interface WorkerRetentionSettings {
   readonly guardFloor: number;
   readonly archiveGraceDays: number;
   readonly orphanGraceHours: number;
+}
+
+/** E05 PR 2: the daily audit anchor (ADR-M51 §2.9). */
+export interface WorkerAnchorSettings {
+  readonly url: string;
+  readonly bucket: string;
+  readonly secretPath: string;
+  /** The retention loop's interval: the anchor pass runs in it. */
+  readonly intervalMs: number;
 }
 
 /** E03: the worker's evidence store (ADR-M49 §2.2). */
@@ -271,6 +298,8 @@ export interface WorkerSettings {
   readonly evidence: WorkerEvidenceSettings | null;
   /** E05: the retention loop; null: `SDLC_WORKER_RETENTION_URL=off`. */
   readonly retention: WorkerRetentionSettings | null;
+  /** E05 PR 2: the daily audit anchor; null: `SDLC_WORKER_ANCHOR_URL=off`. */
+  readonly anchor: WorkerAnchorSettings | null;
 }
 
 export type WorkerSettingsKey =
@@ -402,6 +431,15 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
             guardFloor: v[WORKER_ENV.retentionGuardFloor],
             archiveGraceDays: v[WORKER_ENV.retentionArchiveGraceDays],
             orphanGraceHours: v[WORKER_ENV.retentionOrphanGraceHours],
+          },
+    anchor:
+      v[WORKER_ENV.anchorUrl] === 'off'
+        ? null
+        : {
+            url: new URL(v[WORKER_ENV.anchorUrl]).origin,
+            bucket: v[WORKER_ENV.anchorBucket],
+            secretPath: v[WORKER_ENV.anchorSecretPath],
+            intervalMs: v[WORKER_ENV.retentionIntervalMinutes] * 60_000,
           },
   };
 }

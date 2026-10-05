@@ -89,4 +89,90 @@ describe('E05: the retention loop', () => {
     loop.start();
     await loop.stop();
   });
+
+  it('E05 PR 2: runs the anchor pass first, under the same lock', async () => {
+    const order: string[] = [];
+    const logs: { level: string; event: string; fields: Record<string, unknown> }[] = [];
+    const loop = new RetentionLoop({
+      anchor: () => {
+        order.push('anchor');
+        return Promise.resolve({ ...anchorCounts });
+      },
+      pass: () => {
+        order.push('pass');
+        return Promise.resolve({ ...counts, orphanCursor: null });
+      },
+      withLock: async (fn) => {
+        order.push('lock');
+        return { ran: true, value: await fn() };
+      },
+      logger: { log: (level, event, fields = {}) => logs.push({ level, event, fields }) },
+      mode: 'purge',
+      intervalMs: 60_000,
+    });
+    const pass = await loop.tick();
+    expect(order).toEqual(['lock', 'anchor', 'pass']);
+    expect(pass).toMatchObject({ outcome: 'done', anchors: { written: 2 } });
+    expect(logs.find((l) => l.event === 'worker.anchor_pass')?.fields).toMatchObject({
+      written: 2,
+    });
+  });
+
+  it('E05 PR 2: runs with the anchor identity only, and a failed anchor pass never stops the purge', async () => {
+    const onlyAnchor = new RetentionLoop({
+      anchor: () => Promise.resolve({ ...anchorCounts }),
+      withLock: async (fn) => ({ ran: true, value: await fn() }),
+      logger: { log: () => undefined },
+      mode: 'report',
+      intervalMs: 60_000,
+    });
+    expect(await onlyAnchor.tick()).toMatchObject({ outcome: 'done', result: null });
+
+    const logs: { level: string; event: string; fields: Record<string, unknown> }[] = [];
+    let purged = false;
+    const loop = new RetentionLoop({
+      anchor: () => Promise.reject(Object.assign(new Error('secret text'), { code: 'boom' })),
+      pass: () => {
+        purged = true;
+        return Promise.resolve({ ...counts, orphanCursor: null });
+      },
+      withLock: async (fn) => ({ ran: true, value: await fn() }),
+      logger: { log: (level, event, fields = {}) => logs.push({ level, event, fields }) },
+      mode: 'purge',
+      intervalMs: 60_000,
+    });
+    expect(await loop.tick()).toMatchObject({ outcome: 'done', anchors: null });
+    expect(purged).toBe(true);
+    expect(logs[0]).toEqual({
+      level: 'error',
+      event: 'worker.anchor_pass_failed',
+      fields: { error: 'boom' },
+    });
+    expect(JSON.stringify(logs)).not.toContain('secret text');
+  });
+
+  it('E05 PR 2: a mismatch makes the anchor pass line a warning', async () => {
+    const logs: { level: string; event: string }[] = [];
+    const loop = new RetentionLoop({
+      anchor: () => Promise.resolve({ ...anchorCounts, mismatched: 1 }),
+      withLock: async (fn) => ({ ran: true, value: await fn() }),
+      logger: { log: (level, event) => logs.push({ level, event }) },
+      mode: 'report',
+      intervalMs: 60_000,
+    });
+    await loop.tick();
+    expect(logs).toEqual([{ level: 'warn', event: 'worker.anchor_pass' }]);
+  });
 });
+
+const anchorCounts = {
+  tenants: 2,
+  skipped: 0,
+  written: 2,
+  exists: 0,
+  empty: 0,
+  checked: 4,
+  mismatched: 0,
+  unlocked: 0,
+  failed: 0,
+};

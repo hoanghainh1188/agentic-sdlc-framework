@@ -21,3 +21,18 @@ export {
   type ChainState,
   type StoredChainRecord,
 } from './hash-chain.js';
+export {
+  ANCHOR_MIN_LOCK_DAYS,
+  ANCHOR_MISMATCH_REASONS,
+  anchorBytes,
+  anchorDate,
+  anchorKey,
+  anchorLockHolds,
+  compareAnchor,
+  dateOfAnchorKey,
+  MAX_ANCHOR_BYTES,
+  parseAnchor,
+  type AnchorMismatchReason,
+  type AuditAnchor,
+} from './anchor.js';
+export { runAnchorPass, type AnchorPassDeps, type AnchorPassResult } from './anchor-pass.js';

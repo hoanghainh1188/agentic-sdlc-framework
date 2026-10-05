@@ -135,7 +135,9 @@ describe('sdlc-worker service', () => {
     const init = compose.services['seaweedfs-init'] as unknown as {
       environment: Record<string, string>;
     };
-    expect(init.environment.SEAWEEDFS_LOCKED_BUCKETS).toBe('evidence:GOVERNANCE:180');
+    expect(init.environment.SEAWEEDFS_LOCKED_BUCKETS?.split(' ')).toContain(
+      'evidence:GOVERNANCE:180',
+    );
     const script = readDeployFile('seaweedfs/create-buckets.sh');
     expect(script).toContain('s3.bucket.lock -name $bucket -enable');
     // The admin keys reach curl on stdin, never as arguments.
@@ -162,5 +164,37 @@ describe('sdlc-worker service', () => {
     expect(dockerfile).toMatch(/^USER node$/m);
     expect(dockerfile).toContain('pnpm --filter @sdlc/worker deploy --legacy --prod /out');
     expect(dockerfile).not.toMatch(/ARG .*(PASSWORD|TOKEN|SECRET)|ENV .*(PASSWORD|TOKEN|SECRET)/);
+  });
+
+  it('E05 PR 2: the bucket audit-anchors is versioned and locked COMPLIANCE for 731 days', () => {
+    const init = compose.services['seaweedfs-init'] as unknown as {
+      environment: Record<string, string>;
+    };
+    expect(init.environment.SEAWEEDFS_BUCKETS?.split(' ')).toContain('audit-anchors');
+    expect(init.environment.SEAWEEDFS_VERSIONED_BUCKETS?.split(' ')).toContain('audit-anchors');
+    expect(init.environment.SEAWEEDFS_LOCKED_BUCKETS?.split(' ')).toEqual([
+      'evidence:GOVERNANCE:180',
+      'audit-anchors:COMPLIANCE:731',
+    ]);
+  });
+
+  it('E05 PR 2: writes the daily audit anchor with its own identity, on audit-anchors only', () => {
+    expect(worker.environment).toMatchObject({
+      SDLC_WORKER_ANCHOR_URL: 'http://seaweedfs:8333',
+      SDLC_WORKER_ANCHOR_BUCKET: 'audit-anchors',
+    });
+    const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
+    expect(bootstrap).toMatch(
+      /^ {2}worker-anchor-credentials\) cmd_worker_anchor_credentials ;;$/m,
+    );
+    expect(bootstrap).toMatch(
+      /^cmd_worker_anchor_credentials\(\) \{ s3_credentials worker anchor sdlcwrkan "\$ANCHOR_ACTIONS" sdlc-worker; \}$/m,
+    );
+    expect(/^ANCHOR_ACTIONS='([^']*)'$/m.exec(bootstrap)?.[1]?.split(',')).toEqual([
+      'Write:audit-anchors',
+      'Read:audit-anchors',
+      'List:audit-anchors',
+      'GetObjectRetention:audit-anchors',
+    ]);
   });
 });

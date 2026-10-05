@@ -5,7 +5,7 @@
 | Status | **Proposed** (task A12, for review) |
 | Date | 2026-10-04 |
 | Decided by | Harry (plan approved 2026-10-04, with answers to QUESTIONS #239, #245, #246) |
-| Related | D-08 task A12 (AC1–AC4); D-03 §9, §10; ADR-M12 (SeaweedFS); ADR-M17 (Compose); ADR-M33 §2.9 (gaps 3, 4); ADR-M51 §4 (gap 5, closed by this ADR); handbook T11 §5g–§5j; QUESTIONS #239, #245, #246 |
+| Related | D-08 task A12 (AC1–AC4); D-03 §9, §10 (version 1.30); ADR-M12 (SeaweedFS); ADR-M17 (Compose); ADR-M33 §2.9 (gaps 3, 4); ADR-M51 §4 (gap 5, closed by this ADR); handbook T11 §5g–§5j, §5l; QUESTIONS #239, #245, #246 |
 
 ## 1. Context
 

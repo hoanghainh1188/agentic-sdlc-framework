@@ -166,6 +166,11 @@ describe('safeLogFields', () => {
     'source',
     'service',
     'tracing',
+    // E05 PR 2: the daily audit anchor logs the anchored hash (D-05 §7.4 "operations log").
+    'hash',
+    'hash_version',
+    'seq',
+    'date',
   ])('keeps the field %s', (name) => {
     expect(safeLogFields({ [name]: 'v' }).fields).toEqual({ [name]: 'v' });
   });

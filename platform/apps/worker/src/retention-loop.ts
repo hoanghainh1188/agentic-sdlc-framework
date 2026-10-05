@@ -8,13 +8,23 @@
 //   run in both modes: they only protect evidence.
 // - The orphan sweep goes through `packs/` one page per pass and starts again at the end.
 // - The loop never throws: a failed pass is logged and the next one tries again.
-import type { RetentionPassDeps, RetentionPassResult, SpendSyncLockResult } from '@sdlc/core';
+// - E05 PR 2 (ADR-M51 §2.9): each pass first runs the daily audit anchor (`runAnchorPass`, core),
+//   under the same lock. The loop runs when either identity is there (`worker-purge`,
+//   `worker-anchor`); each part only with its own. A failed anchor pass never stops the purge.
+import type {
+  AnchorPassResult,
+  RetentionPassDeps,
+  RetentionPassResult,
+  SpendSyncLockResult,
+} from '@sdlc/core';
 
 import type { WorkerLogger } from './logger.js';
 
 export interface RetentionLoopDeps {
-  /** `runRetentionPass` (core) bound to its dependencies. */
-  pass(orphanCursor: string | null): Promise<RetentionPassResult>;
+  /** `runAnchorPass` (core) bound to its dependencies; absent without `worker-anchor`. */
+  readonly anchor?: () => Promise<AnchorPassResult>;
+  /** `runRetentionPass` (core) bound to its dependencies; absent without `worker-purge`. */
+  readonly pass?: (orphanCursor: string | null) => Promise<RetentionPassResult>;
   /** `SystemScope.withRetentionLock`. */
   withLock<T>(fn: () => Promise<T>): Promise<SpendSyncLockResult<T>>;
   readonly logger: WorkerLogger;
@@ -23,7 +33,12 @@ export interface RetentionLoopDeps {
 }
 
 export type RetentionLoopPass =
-  | { readonly outcome: 'done'; readonly result: RetentionPassResult }
+  | {
+      readonly outcome: 'done';
+      /** Null when the part did not run (no identity) or failed (logged). */
+      readonly anchors: AnchorPassResult | null;
+      readonly result: RetentionPassResult | null;
+    }
   | { readonly outcome: 'busy' }
   | { readonly outcome: 'failed' };
 
@@ -45,24 +60,44 @@ export class RetentionLoop {
     this.#deps = deps;
   }
 
-  /** One pass. Never throws. */
+  /** One pass: anchors first, then the retention steps. Never throws. */
   async tick(): Promise<RetentionLoopPass> {
     try {
-      const locked = await this.#deps.withLock(() => this.#deps.pass(this.#orphanCursor));
+      const locked = await this.#deps.withLock(async () => ({
+        anchors: await this.#anchors(),
+        result: this.#deps.pass ? await this.#deps.pass(this.#orphanCursor) : null,
+      }));
       if (!locked.ran) {
         this.#deps.logger.log('info', 'worker.retention_busy', {});
         return { outcome: 'busy' };
       }
-      const { orphanCursor, ...counts } = locked.value;
-      this.#orphanCursor = orphanCursor;
-      this.#deps.logger.log(counts.failed > 0 ? 'warn' : 'info', 'worker.retention_pass', {
-        mode: this.#deps.mode,
-        ...counts,
-      });
-      return { outcome: 'done', result: locked.value };
+      const { anchors, result } = locked.value;
+      if (result) {
+        const { orphanCursor, ...counts } = result;
+        this.#orphanCursor = orphanCursor;
+        this.#deps.logger.log(counts.failed > 0 ? 'warn' : 'info', 'worker.retention_pass', {
+          mode: this.#deps.mode,
+          ...counts,
+        });
+      }
+      return { outcome: 'done', anchors, result };
     } catch (error) {
       this.#deps.logger.log('error', 'worker.retention_failed', { error: errorCode(error) });
       return { outcome: 'failed' };
+    }
+  }
+
+  /** The anchor pass; a failure is logged and never stops the retention steps. */
+  async #anchors(): Promise<AnchorPassResult | null> {
+    if (!this.#deps.anchor) return null;
+    try {
+      const counts = await this.#deps.anchor();
+      const bad = counts.failed + counts.mismatched + counts.unlocked > 0;
+      this.#deps.logger.log(bad ? 'warn' : 'info', 'worker.anchor_pass', { ...counts });
+      return counts;
+    } catch (error) {
+      this.#deps.logger.log('error', 'worker.anchor_pass_failed', { error: errorCode(error) });
+      return null;
     }
   }
 

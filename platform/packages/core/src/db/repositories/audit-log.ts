@@ -45,6 +45,13 @@ export interface AuditEvent<A extends AuditAction = AuditAction> {
   readonly occurredAt?: Date;
 }
 
+/** The last row of a tenant's chain (E05 PR 2). */
+export interface AuditChainHead {
+  readonly seq: number;
+  readonly hash: string;
+  readonly hashVersion: number;
+}
+
 export class AuditLogRepository extends TenantRepository {
   /**
    * Appends one event to the tenant's chain. Runs inside the caller's transaction when there is
@@ -73,6 +80,45 @@ export class AuditLogRepository extends TenantRepository {
         .orderBy('seq')
         .execute(),
     );
+  }
+
+  /**
+   * The tenant's last committed row: what the daily audit anchor records (E05 PR 2, D-05 §7.4).
+   * Null when the tenant has no audit row yet.
+   */
+  async latest(): Promise<AuditChainHead | null> {
+    const row = await this.run(
+      this.db
+        .selectFrom('audit_log')
+        .select(['seq', 'hash', 'hash_version'])
+        .where('tenant_id', '=', this.tenantId)
+        .orderBy('seq', 'desc')
+        .limit(1)
+        .executeTakeFirst(),
+    );
+    return row ? { seq: toSeq(row.seq), hash: row.hash, hashVersion: row.hash_version } : null;
+  }
+
+  /**
+   * The stored `hash` of each of these rows, by `seq` (E05 PR 2: the anchors are compared with
+   * them). A `seq` without a row is missing from the map. In pages of `VERIFY_BATCH_SIZE`.
+   */
+  async hashesAt(seqs: readonly number[]): Promise<Map<number, string>> {
+    const wanted = [...new Set(seqs)].filter((seq) => Number.isSafeInteger(seq) && seq > 0);
+    const found = new Map<number, string>();
+    for (let i = 0; i < wanted.length; i += VERIFY_BATCH_SIZE) {
+      const page = wanted.slice(i, i + VERIFY_BATCH_SIZE).map(String);
+      const rows = await this.run(
+        this.db
+          .selectFrom('audit_log')
+          .select(['seq', 'hash'])
+          .where('tenant_id', '=', this.tenantId)
+          .where('seq', 'in', page)
+          .execute(),
+      );
+      for (const row of rows) found.set(toSeq(row.seq), row.hash);
+    }
+    return found;
   }
 
   /** Reads the tenant's chain in `seq` order and checks it (D-05 section 7.3, FR-41). */

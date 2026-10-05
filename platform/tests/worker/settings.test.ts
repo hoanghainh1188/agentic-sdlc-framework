@@ -50,7 +50,39 @@ describe('worker settings', () => {
         archiveGraceDays: 7,
         orphanGraceHours: 24,
       },
+      anchor: {
+        url: 'http://seaweedfs:8333',
+        bucket: 'audit-anchors',
+        secretPath: 'worker/anchor',
+        intervalMs: 3_600_000,
+      },
     });
+  });
+
+  it('E05 PR 2: the audit anchor (an origin, the worker KV path, the loop interval; off)', () => {
+    expect(
+      loadSettings({
+        SDLC_WORKER_ANCHOR_URL: 'http://store:9000',
+        SDLC_WORKER_ANCHOR_BUCKET: 'anchors-test',
+        SDLC_WORKER_ANCHOR_SECRET_PATH: 'worker/anchor-2',
+        SDLC_WORKER_RETENTION_URL: 'off',
+        SDLC_WORKER_RETENTION_INTERVAL_MINUTES: '15',
+      }).anchor,
+    ).toEqual({
+      url: 'http://store:9000',
+      bucket: 'anchors-test',
+      secretPath: 'worker/anchor-2',
+      intervalMs: 900_000,
+    });
+    expect(loadSettings({ SDLC_WORKER_ANCHOR_URL: 'off' }).anchor).toBeNull();
+    for (const [name, value] of [
+      ['SDLC_WORKER_ANCHOR_URL', 'http://store:9000/path'],
+      ['SDLC_WORKER_ANCHOR_URL', 'http://user:pw@store:9000'],
+      ['SDLC_WORKER_ANCHOR_BUCKET', 'Bad_Bucket'],
+      ['SDLC_WORKER_ANCHOR_SECRET_PATH', 'api/anchor'],
+    ] as const) {
+      expect(() => loadSettings({ [name]: value })).toThrow(SettingsError);
+    }
   });
 
   it('C12: the spend sync window holds two passes at least and the catch-up covers the look-back', () => {
