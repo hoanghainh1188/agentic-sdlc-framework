@@ -412,7 +412,7 @@ cmd_runner_evidence_credentials() {
   require_unsealed
   token="$(read_secret 'Admin or root token (hidden)')"
   [ -n "$token" ] || fail "no token given"
-  weed="weed shell -master=seaweedfs:9333"
+  weed="weed shell -master=127.0.0.1:9333"
   # The KV version (no secret) tells whether the new key pair was stored: `weed shell` exits 0 even
   # when it received nothing.
   kv_version() {
@@ -457,7 +457,7 @@ s3_credentials() {
   require_unsealed
   token="$(read_secret 'Admin or root token (hidden)')"
   [ -n "$token" ] || fail "no token given"
-  weed="weed shell -master=seaweedfs:9333"
+  weed="weed shell -master=127.0.0.1:9333"
   kv_version() {
     printf '%s\n' "$token" | bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
       bao read -field=current_version "kv/metadata/$1/$2" 2>/dev/null || echo 0' sh "$role" "$name"

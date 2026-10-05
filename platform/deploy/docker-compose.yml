@@ -302,17 +302,29 @@ services:
       # One S3 admin identity, read by SeaweedFS from these variables.
       AWS_ACCESS_KEY_ID: ${SEAWEEDFS_S3_ACCESS_KEY:?set SEAWEEDFS_S3_ACCESS_KEY in .env}
       AWS_SECRET_ACCESS_KEY: ${SEAWEEDFS_S3_SECRET_KEY:?set SEAWEEDFS_S3_SECRET_KEY in .env}
+    # A12 (design/ADR-M52): start.sh writes four JWT signing keys made at this start (filer and
+    # volume, write and read) to /etc/seaweedfs/security.toml, then runs the image's entrypoint.
+    # It fails closed: no keys, no SeaweedFS.
+    entrypoint: [/bin/sh, /scripts/start.sh]
+    # A12: the master, volume and filer (HTTP and gRPC) listen on 127.0.0.1 only; nothing else on
+    # the network reaches them. The S3 API (8333, and its gRPC 18333, which SeaweedFS cannot bind
+    # apart) is the only way in; the filer key refuses unauthenticated calls on 18333. Iceberg and
+    # Lance are off. Admin work: `docker compose exec seaweedfs weed shell -master=127.0.0.1:9333`.
     command:
       - server
       - -dir=/data
-      - -ip=seaweedfs
-      - -ip.bind=0.0.0.0
+      - -ip=127.0.0.1
+      - -ip.bind=127.0.0.1
+      - -s3.ip.bind=0.0.0.0
       - -master.volumeSizeLimitMB=${SEAWEEDFS_VOLUME_SIZE_LIMIT_MB:-1024}
       - -volume.max=0
       - -s3
       - -s3.port=8333
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
     volumes:
       - seaweedfs-data:/data
+      - ./seaweedfs/start.sh:/scripts/start.sh:ro
     ports:
       - ${SDLC_BIND_ADDR:-127.0.0.1}:${SEAWEEDFS_S3_HOST_PORT:-8333}:8333
     healthcheck:
@@ -327,7 +339,9 @@ services:
     image: chrislusf/seaweedfs:4.48
     profiles: [core, observability]
     restart: 'no'
-    networks: [sdlc]
+    # A12 (ADR-M52): the master and the filer listen on 127.0.0.1 inside the seaweedfs container,
+    # so the init job shares its network namespace. No other service may do this.
+    network_mode: service:seaweedfs
     depends_on:
       seaweedfs:
         condition: service_healthy

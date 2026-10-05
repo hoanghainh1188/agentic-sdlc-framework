@@ -11,13 +11,15 @@
 # BypassGovernanceRetention may). SeaweedFS 4.48 enables the lock on an existing versioned bucket
 # (checked live), so the existing bucket `evidence` keeps its name. A locked bucket cannot leave
 # versioning or the lock again.
+# Runs in the network namespace of the seaweedfs container (A12, design/ADR-M52): the master and the
+# filer listen on 127.0.0.1 only, so every address here is 127.0.0.1.
 # Safe to re-run: existing buckets are kept; enabling versioning or the lock again changes nothing.
 set -eu
 
 : "${SEAWEEDFS_BUCKETS:?}"
 
 tries=0
-until echo "cluster.check" | weed shell -master=seaweedfs:9333 >/dev/null 2>&1; do
+until echo "cluster.check" | weed shell -master=127.0.0.1:9333 >/dev/null 2>&1; do
   tries=$((tries + 1))
   if [ "$tries" -ge 60 ]; then
     echo "seaweedfs-init: master not reachable after 120 s" >&2
@@ -26,19 +28,19 @@ until echo "cluster.check" | weed shell -master=seaweedfs:9333 >/dev/null 2>&1; 
   sleep 2
 done
 
-existing="$(echo "s3.bucket.list" | weed shell -master=seaweedfs:9333 2>/dev/null || true)"
+existing="$(echo "s3.bucket.list" | weed shell -master=127.0.0.1:9333 2>/dev/null || true)"
 for bucket in $SEAWEEDFS_BUCKETS; do
   if echo "$existing" | grep -qw "$bucket"; then
     echo "seaweedfs-init: bucket $bucket exists"
   else
-    echo "s3.bucket.create -name $bucket" | weed shell -master=seaweedfs:9333
+    echo "s3.bucket.create -name $bucket" | weed shell -master=127.0.0.1:9333
     echo "seaweedfs-init: bucket $bucket created"
   fi
 done
 
 for bucket in ${SEAWEEDFS_VERSIONED_BUCKETS:-}; do
-  echo "s3.bucket.versioning -name $bucket -enable" | weed shell -master=seaweedfs:9333 >/dev/null
-  state="$(echo "s3.bucket.versioning -name $bucket" | weed shell -master=seaweedfs:9333 2>/dev/null)"
+  echo "s3.bucket.versioning -name $bucket -enable" | weed shell -master=127.0.0.1:9333 >/dev/null
+  state="$(echo "s3.bucket.versioning -name $bucket" | weed shell -master=127.0.0.1:9333 2>/dev/null)"
   case "$state" in
     *'Versioning: Enabled'*) echo "seaweedfs-init: bucket $bucket versioned" ;;
     *)
@@ -69,13 +71,13 @@ for entry in ${SEAWEEDFS_LOCKED_BUCKETS:-}; do
       exit 1
       ;;
   esac
-  echo "s3.bucket.lock -name $bucket -enable" | weed shell -master=seaweedfs:9333 >/dev/null
+  echo "s3.bucket.lock -name $bucket -enable" | weed shell -master=127.0.0.1:9333 >/dev/null
   body="<ObjectLockConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><ObjectLockEnabled>Enabled</ObjectLockEnabled><Rule><DefaultRetention><Mode>$mode</Mode><Days>$days</Days></DefaultRetention></Rule></ObjectLockConfiguration>"
   md5="$(printf '%s' "$body" | md5sum | cut -d' ' -f1 | xxd -r -p | base64)"
   s3_admin -X PUT -H "Content-MD5: $md5" -H 'Content-Type: application/xml' --data-binary "$body" \
-    "http://seaweedfs:8333/$bucket?object-lock" -o /dev/null ||
+    "http://127.0.0.1:8333/$bucket?object-lock" -o /dev/null ||
     { echo "seaweedfs-init: the lock of bucket $bucket could not be set" >&2; exit 1; }
-  state="$(s3_admin "http://seaweedfs:8333/$bucket?object-lock" 2>/dev/null || true)"
+  state="$(s3_admin "http://127.0.0.1:8333/$bucket?object-lock" 2>/dev/null || true)"
   case "$state" in
     *"<Mode>$mode</Mode><Days>$days</Days>"*) echo "seaweedfs-init: bucket $bucket locked ($mode, $days days)" ;;
     *)

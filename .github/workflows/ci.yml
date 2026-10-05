@@ -120,7 +120,7 @@ jobs:
           # tests need Docker.
           decide_heavy run_compose "Compose integration job" \
             "platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner, the intent workflow or a live test" \
-            platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts
+            platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts platform/tests/integration/deploy/seaweedfs-access.test.ts
 
           # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
           # C09: the gate steps and the worker too, which the pilot suite runs with the real runner.
@@ -274,6 +274,9 @@ jobs:
       # A03, A04: OpenBao bootstrap and the OpenBao client, each on its own throw-away Compose
       # project (throw-away test keys, never printed). Separate from the core stack above.
       - run: pnpm test:openbao
+      # A12: SeaweedFS's filer, volume server and master unreachable from another container, the S3
+      # gRPC port refuses unauthenticated IAM calls, start.sh fails closed; own throw-away project.
+      - run: pnpm test:seaweedfs
       # C03: LiteLLM with keys from OpenBao (profile "models") and the Cost Controller, on its own
       # throw-away Compose project with a stub model (throw-away test keys, never printed).
       - run: pnpm test:litellm
