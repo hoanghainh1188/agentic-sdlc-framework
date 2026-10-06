@@ -73,15 +73,15 @@ Red: always approved by a person (HITL). Orange: oversight depends on risk. Blue
 
 | Milestone | Content | Status |
 |---|---|---|
-| M-A | Foundation: monorepo, Docker Compose, OpenBao, database, audit, CI, backups | ⬜ |
-| M-B | Intent + G1–G3 | ⬜ |
-| M-0 | Sample repo (right before M-C) | ⬜ |
-| M-C | Run + OpenHands + G4–G6 | ⬜ |
-| M-D | G7–G8 + Evidence Pack + cost report | ⬜ |
-| M-E | Trial of T01–T10 on the sample repo; collect data | ⬜ |
+| M-A | Foundation: monorepo, Docker Compose, OpenBao, database, audit, CI, backups | ✅ except A10 (TLS, backups, measurement: waits for the infrastructure operator) |
+| M-B | Intent + G1–G3 | ✅ |
+| M-0 | Sample repo (right before M-C) | ✅ |
+| M-C | Run + OpenHands + G4–G6 | ✅ |
+| M-D | G7–G8 + Evidence Pack + cost report | ✅ |
+| M-E | Trial of T01–T10 on the sample repo; collect data | ⬜ Waits for one real API-model run (QUESTIONS #81) |
 | M-F | Adjust, then trial on a real internal tool | ⬜ |
 
-All 44 tasks: [design/D-08-mvp-backlog.md](design/D-08-mvp-backlog.md).
+All 49 tasks: [design/D-08-mvp-backlog.md](design/D-08-mvp-backlog.md). The MVP definition-of-done check, criterion by criterion with the test that proves each one: [design/MVP-DONE.md](design/MVP-DONE.md).
 
 ---
 
@@ -153,7 +153,9 @@ Diagrams: [diagrams/README.md](diagrams/README.md).
 
 **Writing the handbook:** follow the 9-section structure, source tags, the codes table and the writing style (section 8). Handbook changes also go through pull requests.
 
-**Coding the platform:** no code yet. Follow **[platform/GETTING-STARTED.md](platform/GETTING-STARTED.md)**: push to GitHub, create issues, give task A01 to Claude Code. Then:
+**Deploying the platform:** follow [platform/deploy/README.md, "Fresh deployment (operator)"](platform/deploy/README.md#fresh-deployment-operator): from an empty checkout to the first intent at G1 with Docker Compose. `pnpm test:fresh-deploy` runs the same steps with throw-away keys.
+
+**Coding the platform:** follow **[platform/GETTING-STARTED.md](platform/GETTING-STARTED.md)**: push to GitHub, create issues, give each task to Claude Code. Then:
 
 1. Read `CLAUDE.md`.
 2. Take the next task in D-08 (starting with **A01**).

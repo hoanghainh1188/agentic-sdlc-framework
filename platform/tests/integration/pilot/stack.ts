@@ -42,8 +42,16 @@ import { NODE_IMAGE } from '../agent/helpers.js';
 import { docker, dockerSocket, quietly } from '../runner/live-helpers.js';
 import { buildSandboxImage } from '../sandbox-image/helpers.js';
 import { repoRoot } from '../../workspace/helpers.js';
-import { OWNER, REPO_PATH, Stack, waitFor } from '../workflow/g1-g3/stack.js';
-import { BareRepo, MemoryBucket, MODEL, REPO_FULL, StubGateway } from './world.js';
+import {
+  OWNER,
+  PEOPLE,
+  REPO_PATH,
+  Stack,
+  waitFor,
+  type Person,
+  type StackOptions,
+} from '../workflow/g1-g3/stack.js';
+import { BareRepo, MemoryBucket, MODEL, REPO_FULL, StubGateway, type StubCall } from './world.js';
 
 /** The pilot commit the fixtures were copied from (`fixtures/`). */
 export const PILOT_COMMIT = 'b9d7d739226700327cd1118395cb21be529346e6';
@@ -83,6 +91,8 @@ export interface PilotOptions {
     readonly gitHost: GitHubAdapter;
     readonly repoFullName: string;
     readonly agentsMd: string;
+    /** E07 live G8: Person B's real GitHub account (reviews and merges the pull request). */
+    readonly githubAccounts?: StackOptions['githubAccounts'];
   };
 }
 
@@ -90,7 +100,14 @@ interface PullState {
   readonly number: number;
   readonly head: string;
   state: 'open' | 'closed';
+  /** E07: the reviews submitted on the pull request (GitHub REST shape). */
+  readonly reviews: object[];
+  /** E07: set when a person merged it on the Git host. */
+  merged?: { readonly sha: string; readonly by: Person; readonly at: string };
 }
+
+/** E07: the release pack reads stored evidence back up to this size (worker default 256 MB). */
+const RELEASE_MAX_ITEM_BYTES = 256 * 1024 * 1024;
 
 export type CiResult = 'pending' | 'success' | 'failure';
 
@@ -144,11 +161,17 @@ export class PilotStack extends Stack {
     };
     const workerBao = bao();
     const runnerBao = bao();
-    this.gateway = new StubGateway((method, body) => this.#modelAdmin(method, body));
+    this.gateway = new StubGateway(
+      (method, body) => this.#modelAdmin(method, body),
+      () => this.#modelCalls(),
+    );
 
     await this.start({
       ...(live
-        ? { live: { gitHost: live.gitHost, repoFullName: live.repoFullName } }
+        ? {
+            live: { gitHost: live.gitHost, repoFullName: live.repoFullName },
+            ...(live.githubAccounts ? { githubAccounts: live.githubAccounts } : {}),
+          }
         : { repo: this.repo }),
       clock: 'real',
       projectConfig: this.#projectConfig(options.config ?? ''),
@@ -176,6 +199,9 @@ export class PilotStack extends Stack {
           publish: { registry, gitHost, wrapper: workerBao.wrapping() },
           g6: { gitHost },
           g7: { gitHost },
+          // E03 / E07: the worker's evidence store for G8's release pack (`packs/`; it reads the
+          // stored proposals and diffs back to check them).
+          releases: { store: this.bucket.store('packs/'), maxItemBytes: RELEASE_MAX_ITEM_BYTES },
         } as unknown as Partial<IntentActivityDeps>;
       },
     });
@@ -309,6 +335,20 @@ export class PilotStack extends Stack {
         await new Promise((resolve) => setTimeout(resolve, 200));
       }
     }
+  }
+
+  /** E07: every call the stub model counted for a registered run key. */
+  async #modelCalls(): Promise<readonly StubCall[]> {
+    const res = await fetch(`${this.#modelUrl}/test/calls`, {
+      headers: { authorization: `Bearer ${this.#adminKey}` },
+    });
+    if (!res.ok) throw new Error(`stub model: HTTP ${String(res.status)}`);
+    return ((await res.json()) as { calls: StubCall[] }).calls;
+  }
+
+  /** E07: how many calls the stub model counted for the registered run keys. */
+  async modelCallCount(): Promise<number> {
+    return (await this.#modelCalls()).length;
   }
 
   /** The stub model's log lines (`stub:call:…`, `stub:check:…`, never a content). */
@@ -452,11 +492,19 @@ export class PilotStack extends Stack {
     });
     stub.on('POST', `${REPO_PATH}/pulls`, (req) => {
       const body = req.body as { head: string; base: string };
-      const pull: PullState = { number: 300 + this.#pulls.length, head: body.head, state: 'open' };
+      const pull: PullState = {
+        number: 300 + this.#pulls.length,
+        head: body.head,
+        state: 'open',
+        reviews: [],
+      };
       this.#pulls.push(pull);
       stub.on('GET', prPath(pull.number), () => ({ body: this.#pullJson(pull) }));
-      stub.on('GET', `${prPath(pull.number)}/reviews`, { body: [] });
-      stub.on('GET', `${prPath(pull.number)}/commits`, { body: [] });
+      stub.on('GET', `${prPath(pull.number)}/reviews`, () => ({ body: pull.reviews }));
+      // The agent branch has one commit, by `sdlc-agent`: no GitHub account (QUESTIONS #80).
+      stub.on('GET', `${prPath(pull.number)}/commits`, () => ({
+        body: [{ sha: this.repo.head(pull.head), author: null }],
+      }));
       return { status: 201, body: this.#pullJson(pull) };
     });
     stub.on('GET', `${REPO_PATH}/code-scanning/alerts`, { body: [] });
@@ -514,16 +562,57 @@ export class PilotStack extends Stack {
       user: { id: 9100, login: 'harryforge-sdlc-dev[bot]', type: 'Bot', node_id: 'B_9100' },
       head: { sha: this.repo.head(p.head), ref: p.head },
       base: { sha: this.repo.head(), ref: 'main' },
-      merged_at: null,
-      closed_at: null,
-      merge_commit_sha: null,
-      merged_by: null,
+      merged_at: p.merged?.at ?? null,
+      closed_at: p.merged?.at ?? null,
+      merge_commit_sha: p.merged?.sha ?? null,
+      merged_by: p.merged ? ghUser(p.merged.by) : null,
       changed_files: 1,
       updated_at: now,
       created_at: now,
       title: 'fixed',
       body: 'fixed',
     };
+  }
+
+  /**
+   * E07: `who` submits a review of the pull request's current head on GitHub (`APPROVED` or
+   * `CHANGES_REQUESTED`), then the poller runs (the `review_submitted` wake).
+   */
+  async review(
+    intent: Pick<Intent, 'pr_number'>,
+    who: Person,
+    state: 'APPROVED' | 'CHANGES_REQUESTED',
+  ): Promise<void> {
+    const pull = this.#pull(intent);
+    pull.reviews.push({
+      id: 8100 + pull.reviews.length,
+      user: ghUser(who),
+      state,
+      commit_id: this.repo.head(pull.head),
+      submitted_at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      html_url: `https://github.com/${REPO_FULL}/pull/${String(pull.number)}#review`,
+    });
+    await this.poll();
+  }
+
+  /**
+   * E07: `who` merges the pull request on the Git host (a merge commit on `main`), as a person
+   * does on GitHub; then the poller runs (the `pull_request_closed` wake). The platform never
+   * merges: the suite checks that it never called a merge endpoint.
+   */
+  async mergeAsPerson(intent: Pick<Intent, 'pr_number'>, who: Person): Promise<string> {
+    const pull = this.#pull(intent);
+    const sha = this.repo.merge(pull.head);
+    pull.state = 'closed';
+    pull.merged = { sha, by: who, at: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z') };
+    await this.poll();
+    return sha;
+  }
+
+  #pull(intent: Pick<Intent, 'pr_number'>): PullState {
+    const pull = this.#pulls.find((p) => p.number === intent.pr_number);
+    if (!pull) throw new Error('no pull request');
+    return pull;
   }
 
   /** Bodies of the pull requests the platform opened. */
@@ -651,6 +740,12 @@ export class PilotStack extends Stack {
   }
 }
 
+/** A person's GitHub account as the REST API shows it (numeric ID, PEOPLE). */
+function ghUser(who: Person) {
+  const p = PEOPLE[who];
+  return { id: p.gh, login: p.login, type: 'User', node_id: `U_${String(p.gh)}` };
+}
+
 const FINAL = new Set([
   'succeeded',
   'succeeded_proposal_only',
@@ -674,5 +769,5 @@ export async function waitLong<T>(read: () => Promise<T>, ok: (value: T) => bool
   }
 }
 
-export { MODEL, sha256 } from './world.js';
+export { MODEL, sha256, STUB_PRICE_USD } from './world.js';
 export { waitFor };

@@ -474,7 +474,7 @@ describe.skipIf(!enabled)(
       it('a model outside the key list is refused', async () => {
         const s = await seed();
         const issued = await issue(s);
-        expect(await chat(issued.key.key.reveal(), 'claude-haiku-4-5')).not.toBe(200);
+        expect(await chat(issued.key.key.reveal(), 'claude-haiku-4-5-20251001')).not.toBe(200);
       });
 
       it('the tenant team has the monthly budget, reset each UTC calendar month', async () => {

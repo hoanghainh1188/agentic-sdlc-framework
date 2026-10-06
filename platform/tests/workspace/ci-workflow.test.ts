@@ -232,6 +232,17 @@ describe('AC2: integration job runs the Compose core profile', () => {
       expect(paths.split(/\s+/)).toContain(p);
   });
 
+  it('E07: the fresh deployment job runs on the weekly schedule and on demand only, and cleans up', () => {
+    expect(job('scan').outputs?.run_fresh_deploy).toBeDefined();
+    expect(runText('scan')).toContain('echo "run_fresh_deploy=$all" >> "$GITHUB_OUTPUT"');
+    expect(job('fresh-deploy').needs).toEqual(['scan', 'checks']);
+    expect(job('fresh-deploy').if).toBe("needs.scan.outputs.run_fresh_deploy == 'true'");
+    const steps = job('fresh-deploy').steps;
+    expect(steps.map((s) => s.run ?? '')).toContain('pnpm test:fresh-deploy');
+    expect(steps.at(-1)).toMatchObject({ if: 'always()' });
+    expect(job('ci-ok').needs).toContain('fresh-deploy');
+  });
+
   it('heavy jobs run on the weekly schedule and on demand, never on the daily run or a draft (ADR-M25 §2.9)', () => {
     const scan = runText('scan');
     expect(scan).toMatch(/workflow_dispatch \]; then\s*all=true/);

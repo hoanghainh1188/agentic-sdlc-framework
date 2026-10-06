@@ -70,7 +70,7 @@ Preconditions:
 - the operations log (section 10) is open.
 
 Steps:
-1. The operator starts the stack: `pnpm compose:core`. `pnpm openbao:bootstrap status` must say `uninitialised`.
+1. The operator starts OpenBao, PostgreSQL and SeaweedFS only: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs` (the evidence credentials commands of sections 5g–5k create SeaweedFS identities). Not `pnpm compose:core`: on the server `.env` holds no LiteLLM keys (section 5d), so LiteLLM stays unhealthy until the profile `models` runs, and `up.sh core` stops with an error (found by `pnpm test:fresh-deploy`, task E07). The whole stack starts later, after section 5d (`platform/deploy/README.md`, "Fresh deployment", step 7). `pnpm openbao:bootstrap status` must say `uninitialised`.
 2. All three key holders are present. The operator runs `pnpm openbao:bootstrap init` in a terminal on the server. The script refuses to run if its output is redirected or piped.
 3. Each key holder copies **only their own share** into their password manager, and writes it on paper for their envelope. The operator does not copy any share.
 4. The operator notes the **initial root token** only long enough for step 6. It is not stored anywhere.
@@ -269,6 +269,17 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
   sh -c 'read -rs BAO_TOKEN && export BAO_TOKEN && bao kv put -mount=kv litellm/providers/ollama api_base=http://host.docker.internal:11434'
 ```
 Pull the model first on the machine (`ollama pull gpt-oss:20b`, a local tag, never a `:cloud` model). Never on the internal server: it has no GPU.
+
+**The real API-model run** (task E07, `design/QUESTIONS.md` #81: one real run with an API model before the trial M-E). On a development machine, in the macOS Terminal (never through a chat tool):
+
+1. Store the Anthropic key at `kv/litellm/providers/anthropic` (step 2 above, the value at the hidden prompt). The key needs a spend limit at the provider; the run itself is capped at USD 1.00.
+2. Restart the sidecar and LiteLLM so the model appears: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models restart litellm-agent litellm`. The gateway name is `claude-haiku-4-5-20251001` (the name carries the model version, `design/QUESTIONS.md` #93).
+3. With the dev stack running (`pnpm compose:models`, GETTING-STARTED Step 13), run:
+   ```bash
+   SDLC_AGENT_API_REPORT=~/sdlc-agent-api-report.json pnpm test:agent-api
+   ```
+   The test needs Docker. It reads the LiteLLM master key once from the configuration the sidecar rendered (in memory only, never printed); the provider key never leaves LiteLLM. One agent task on a fixture repository (no client data), a virtual key with the seven labels and a cap of USD 1.00, then the spend synced into `cost_records`. It passes when the agent finishes, every LiteLLM spend-log row of the run has the seven labels and a cost above 0, `cost_records` matches it, the spend is within the cap, and the key is refused after the run.
+4. The report file holds the numbers (time, calls, tokens in, out and cached, cost). They go into `design/MVP-DONE.md` §3; then #81 is closed.
 
 A model appears in LiteLLM only when its provider has a key in `kv/litellm/providers/`. The list of models is in `platform/deploy/litellm/config.ctmpl`. To add a model, change that file in a reviewed pull request: every model declares `provider_type` (`api` or `self_hosted`), and a self-hosted model declares a cost per token above 0, because LiteLLM skips budget checks for a model that costs 0 (`design/D-07-model-and-token-management.md` section 3). Then restart LiteLLM.
 
@@ -791,3 +802,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.22 | 2026-10-04 | Claude Code (task E05, PR 2) | Section 5k: the daily audit anchor (bucket `audit-anchors`, COMPLIANCE 731 days; `worker-anchor-credentials`: SeaweedFS identity `worker-anchor` at `kv/worker/anchor`), what to do on `worker.audit_anchor_mismatch` and `worker.audit_anchor_unlocked`, rotation (ADR-M51 §2.9). Tested with throw-away keys (`pnpm test:openbao`) |
 | 0.23 | 2026-10-04 | Claude Code (task A12) | New section 5l: SeaweedFS admin work only inside the container (`-master=127.0.0.1:9333`), the JWT keys made at each start, a failed start; section 5j: the filer gap is closed (ADR-M52, QUESTIONS #239, #245, #246). Tested with throw-away keys (`pnpm test:seaweedfs`, `pnpm test:openbao`) |
 | 0.24 | 2026-10-05 | Claude Code (task E08) | Section 5j: the Langfuse purge in the loop, its log lines, deleting traces by hand (by run tags), `APPLY DELETED MASK`; new section 5m: the worker's Langfuse purge, `kv/worker/langfuse` (the worker's own Langfuse key made in the UI, the ClickHouse user `sdlc_purge`, the SeaweedFS identity `worker-langfuse`), `worker-langfuse-credentials`, turning it on, rotation (ADR-M53) |
+| 0.25 | 2026-10-05 | Claude Code (task E07) | Section 3.2 step 1: on the server, start only `openbao`, `postgres` and `seaweedfs` before the initialisation (`up.sh core` fails while `.env` holds no LiteLLM keys; found by `pnpm test:fresh-deploy`). Section 5d: the real API-model run (`pnpm test:agent-api`, QUESTIONS #81); the Anthropic gateway name is `claude-haiku-4-5-20251001` (QUESTIONS #93) |
