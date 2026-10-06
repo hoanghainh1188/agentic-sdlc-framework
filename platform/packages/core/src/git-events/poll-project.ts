@@ -57,9 +57,10 @@ export interface PollLogger {
   ): void;
 }
 
-export interface PollDeps extends GitEventHandlerDeps {
+export interface PollDeps extends Omit<GitEventHandlerDeps, 'now'> {
   readonly db: { forTenant(tenantId: TenantId): TenantScope };
   readonly gitHost: GitHostAdapter;
+  /** The poller's clock, also passed to the handler (escalation commands). Default: `new Date()`. */
   readonly now?: () => Date;
   readonly logger?: PollLogger;
   /** A reply is given up after this many failed posts. Default 5. */

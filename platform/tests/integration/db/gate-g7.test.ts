@@ -319,7 +319,7 @@ describeDb('E01: gate G7, review and merge, on PostgreSQL', () => {
       url: 'https://github.com/acme/shop/pull/1',
     };
     const project = { id: w.t.f.target.projectId, provider: 'github' as const };
-    const deps = { registry: w.t.f.registry };
+    const deps = { registry: w.t.f.registry, now: () => w.t.f.registry.now() };
     expect(
       await handleGitEvent(w.t.f.scope, deps, project, {
         ...base,

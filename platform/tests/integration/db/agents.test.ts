@@ -28,6 +28,7 @@ import {
 } from '../../../packages/core/src/agents/index.js';
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
 import type { TenantScope } from '../../../packages/core/src/db/tenant-scope.js';
+import { LATER_WALL_CLOCK, withWallClock } from '../wall-clock.js';
 import { createTestDatabase, describeDb, urlFor, type TestDatabase } from './helpers.js';
 
 const SHA = (c: string) => c.repeat(64);
@@ -484,54 +485,62 @@ describeDb('C10: the agent register on PostgreSQL', () => {
 
     // B13 (QUESTIONS #153, ADR-M37 §2.8): registering and activating go through the API; the
     // operator keeps show, list, suspend and quarantine (`sdlc ops agent …`).
-    it('lists, shows and suspends on the server', async () => {
-      const s = await seed();
-      await active(s);
+    // The CLI rightly reads the real clock for `overdue`: the agent is activated on the real day,
+    // so the test passes whatever the date (with NOW it broke 3 months after 2026-09-27).
+    it.each([
+      ['the real date', null],
+      ['2027-06-01', LATER_WALL_CLOCK],
+    ] as const)('lists, shows and suspends on the server, wall clock %s', async (_, wallClock) =>
+      withWallClock(wallClock, async () => {
+        const s = await seed();
+        const agent = await registerAgent(s.scope, base(s));
+        await changeAgentStatus(s.scope, agent.agent_key, { to: 'active', now: new Date() });
 
-      const listed = await cli(['ops', 'agent', 'list', '--tenant', s.slug, '--json']);
-      const [row] = JSON.parse(listed.out) as Record<string, unknown>[];
-      expect(row).toMatchObject({ key: 'coder-openhands', status: 'active', overdue: false });
-      expect((await cli(['ops', 'agent', 'list', '--tenant', s.slug, '--overdue'])).out).toBe(
-        t('cli.admin.agent.none'),
-      );
+        const listed = await cli(['ops', 'agent', 'list', '--tenant', s.slug, '--json']);
+        const [row] = JSON.parse(listed.out) as Record<string, unknown>[];
+        expect(row).toMatchObject({ key: 'coder-openhands', status: 'active', overdue: false });
+        expect((await cli(['ops', 'agent', 'list', '--tenant', s.slug, '--overdue'])).out).toBe(
+          t('cli.admin.agent.none'),
+        );
 
-      const shown = await cli([
-        'ops',
-        'agent',
-        'show',
-        '--tenant',
-        s.slug,
-        '--key',
-        'coder-openhands',
-      ]);
-      expect(shown.code).toBe(EXIT.ok);
-      expect(shown.out).toContain(MODEL);
-      expect(shown.out).not.toMatch(/\{[a-z_]+\}/);
+        const shown = await cli([
+          'ops',
+          'agent',
+          'show',
+          '--tenant',
+          s.slug,
+          '--key',
+          'coder-openhands',
+        ]);
+        expect(shown.code).toBe(EXIT.ok);
+        expect(shown.out).toContain(MODEL);
+        expect(shown.out).not.toMatch(/\{[a-z_]+\}/);
 
-      const noReason = await cli([
-        'ops',
-        'agent',
-        'suspend',
-        '--tenant',
-        s.slug,
-        '--key',
-        'coder-openhands',
-      ]);
-      expect(noReason).toMatchObject({ code: EXIT.usage, err: t('cli.admin.agent.usage') });
-      const suspended = await cli([
-        'ops',
-        'agent',
-        'suspend',
-        '--tenant',
-        s.slug,
-        '--key',
-        'coder-openhands',
-        '--reason',
-        'incident',
-      ]);
-      expect(suspended.code).toBe(EXIT.ok);
-      expect((await s.scope.agents.getByKey('coder-openhands'))?.status).toBe('suspended');
-    });
+        const noReason = await cli([
+          'ops',
+          'agent',
+          'suspend',
+          '--tenant',
+          s.slug,
+          '--key',
+          'coder-openhands',
+        ]);
+        expect(noReason).toMatchObject({ code: EXIT.usage, err: t('cli.admin.agent.usage') });
+        const suspended = await cli([
+          'ops',
+          'agent',
+          'suspend',
+          '--tenant',
+          s.slug,
+          '--key',
+          'coder-openhands',
+          '--reason',
+          'incident',
+        ]);
+        expect(suspended.code).toBe(EXIT.ok);
+        expect((await s.scope.agents.getByKey('coder-openhands'))?.status).toBe('suspended');
+      }),
+    );
 
     it('renders refusals from the catalog and lists overdue agents', async () => {
       const s = await seed();

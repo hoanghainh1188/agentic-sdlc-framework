@@ -129,6 +129,8 @@ describeDb('C08 PR 1: the push and the pull request at G6, on PostgreSQL', () =>
   });
 
   const reload = (intent: Intent) => t.reload(intent);
+  /** The escalation actions on the test clock (the registry's). */
+  const clockDeps = { now: () => t.f.registry.now() };
   const step = async (intent: Intent) => {
     for (let i = 0; i < 12; i += 1) {
       const result = await stepIntent(
@@ -190,12 +192,20 @@ describeDb('C08 PR 1: the push and the pull request at G6, on PostgreSQL', () =>
 
   async function decide(intent: Intent, decision: 'resume' | 'modify' | 'terminate') {
     const escalation = (await t.f.scope.escalations.listForIntent(intent.id)).at(-1)!;
-    await acknowledgeEscalation(t.f.scope, { escalationId: escalation.id, actorId: t.f.users.b });
-    await decideEscalation(t.f.scope, {
-      escalationId: escalation.id,
-      actorId: t.f.users.b,
-      decision,
-    });
+    await acknowledgeEscalation(
+      t.f.scope,
+      { escalationId: escalation.id, actorId: t.f.users.b },
+      clockDeps,
+    );
+    await decideEscalation(
+      t.f.scope,
+      {
+        escalationId: escalation.id,
+        actorId: t.f.users.b,
+        decision,
+      },
+      clockDeps,
+    );
   }
 
   it('waits for the G5 block window, then pushes, opens the pull request and waits for CI', async () => {

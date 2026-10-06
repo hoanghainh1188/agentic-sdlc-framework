@@ -364,7 +364,7 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
       const issueNumber = on === 'pull_request' ? current.pr_number! : current.issue_number!;
       const result = await handleGitEvent(
         w.t.f.scope,
-        { registry: w.t.f.registry },
+        { registry: w.t.f.registry, now: () => w.t.f.registry.now() },
         { id: w.t.f.target.projectId, provider: 'github' },
         {
           kind: 'comment_created',
@@ -625,7 +625,7 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
       const current = await intentOf(intent);
       const result = await handleGitEvent(
         w.t.f.scope,
-        { registry: w.t.f.registry },
+        { registry: w.t.f.registry, now: () => w.t.f.registry.now() },
         { id: w.t.f.target.projectId, provider: 'github' },
         {
           kind: 'comment_created',
@@ -672,7 +672,7 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
       const current = await intentOf(intent);
       const result = await handleGitEvent(
         w.t.f.scope,
-        { registry: w.t.f.registry },
+        { registry: w.t.f.registry, now: () => w.t.f.registry.now() },
         { id: w.t.f.target.projectId, provider: 'github' },
         {
           kind: 'comment_created',
