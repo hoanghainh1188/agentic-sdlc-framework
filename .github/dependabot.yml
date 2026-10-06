@@ -31,6 +31,10 @@ updates:
       # like a minor update. Stay on the LTS line: patch updates only (ADR-M17).
       - dependency-name: 'clickhouse/clickhouse-server'
         update-types: ['version-update:semver-minor']
+      # Images the platform builds itself (sdlc-api, sdlc-worker, sdlc-runner,
+      # sdlc-otel-collector) exist on no registry: looking them up on Docker Hub fails
+      # every run (private_source_authentication_failure).
+      - dependency-name: 'sdlc-*'
     groups:
       # temporalio/server and temporalio/admin-tools must stay on the same version.
       temporal:

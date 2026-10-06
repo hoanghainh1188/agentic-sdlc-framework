@@ -386,6 +386,34 @@ describe('Dependabot and CODEOWNERS', () => {
     expect(compose?.groups?.['deploy-images']?.patterns).toEqual(['*']);
   });
 
+  it('Dependabot skips the images the platform builds itself (they are on no registry)', () => {
+    type Ignore = { 'dependency-name': string; 'update-types'?: string[] };
+    const config = readYaml<{
+      updates: { 'package-ecosystem': string; ignore?: Ignore[] }[];
+    }>('.github/dependabot.yml');
+    const compose = config.updates.find((u) => u['package-ecosystem'] === 'docker-compose');
+    const local = (compose?.ignore ?? []).find((i) => i['dependency-name'] === 'sdlc-*');
+    expect(local).toBeDefined();
+    expect(local?.['update-types']).toBeUndefined();
+    const deployDir = path.join(root, 'platform/deploy');
+    const images = fs
+      .readdirSync(deployDir)
+      .filter((file) => /\.ya?ml$/.test(file))
+      .flatMap((file) =>
+        [
+          ...fs.readFileSync(path.join(deployDir, file), 'utf8').matchAll(/^\s*image:\s*(\S+)/gm),
+        ].map((m) => m[1] ?? ''),
+      );
+    // The images built from this repo (no registry path) all match the ignore rule.
+    const built = images.filter((image) => image.startsWith('sdlc-'));
+    expect(built.map((image) => image.split(':')[0]).sort()).toEqual([
+      'sdlc-api',
+      'sdlc-otel-collector',
+      'sdlc-runner',
+      'sdlc-worker',
+    ]);
+  });
+
   it('CODEOWNERS has a default owner and names only known owners', () => {
     const rules = fs
       .readFileSync(path.join(root, '.github/CODEOWNERS'), 'utf8')
