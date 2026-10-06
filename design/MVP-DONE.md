@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.3 |
+| Version | 0.4 |
 | Date | 2026-10-06 |
-| Status | **Draft** (task E07). AC4 prepared, waiting for the API-model run (QUESTIONS #81) |
+| Status | **Draft** (task E07). AC4 prepared, waiting for the API-model run, now before M-F (QUESTIONS #81) |
 | Readers | Leadership, tech lead, Claude Code |
 | Related documents | D-02 §10 (the criteria), D-08 task E07, D-09 §7 and §10, QUESTIONS #81 |
 
@@ -29,10 +29,10 @@ Where a test runs: **CI** = every pull request that changes its paths, plus the 
 | 5b | Separation of duties, forced HITL at G3, dual approval at G7, approval expiry | `workflow/g1-g3/n4-n5.test.ts` (N5; an expired approval is void); `workflow/g1-g3/happy-path.test.ts` (N8: a Low-risk plan flagged `migration` makes G3 HITL); `db/gate-g7.test.ts` ("migration: Person B alone is not enough", N9); `db/gate-g8.test.ts` (Critical: second approver) | CI | Met |
 | 5c | An unanswered escalation freezes the work and moves to the backup owner, then governance | `workflow/g1-g3/n7-escalation.test.ts` (N7); `db/escalations.test.ts` | CI | Met |
 | 5d | The kill switch stops a run and revokes its credentials within 5 minutes | `pilot/kill-loop.test.ts` (a live run: sandbox, network, volume and key gone; prints `c09:kill_to_clean_up_ms`); `integration/runner/provision.test.ts` (measured on real Docker); `db/kill-switch.test.ts` | CI | Met |
-| 6 | Every model call has all labels and a cost | `integration/litellm/litellm-live.test.ts` (the real LiteLLM: seven labels on the key and on every call; spend synced into `cost_records`, nothing twice); `db/cost-sync.test.ts` (C12); on the G1 → G8 path: one cost record per model call, with the run's labels (`t01-n6`); with a real API model: `agent/agent-api.test.ts` (`pnpm test:agent-api`: every LiteLLM spend-log row of the run has the seven labels and a cost above 0, and matches `cost_records`) | CI; owner | Met in CI with the real LiteLLM and a stub model; the API-model check waits for #81 |
+| 6 | Every model call has all labels and a cost | `integration/litellm/litellm-live.test.ts` (the real LiteLLM: seven labels on the key and on every call; spend synced into `cost_records`, nothing twice); `db/cost-sync.test.ts` (C12); on the G1 → G8 path: one cost record per model call, with the run's labels (`t01-n6`); with a real API model: `agent/agent-api.test.ts` (`pnpm test:agent-api`: every LiteLLM spend-log row of the run has the seven labels and a cost above 0, and matches `cost_records`) | CI; owner | Met in CI with the real LiteLLM and a stub model; the API-model check waits for #81 (before M-F) |
 | 7 | Everything runs from `docker compose up` following the README | `platform/deploy/README.md`, section "Fresh deployment (operator)"; `integration/deploy/fresh-deploy.test.ts` (`pnpm test:fresh-deploy`) follows it on a throw-away Compose project with every server profile, to the first intent at G1; `platform/tests/deploy/fresh-deploy-readme.test.ts` keeps the README and the code in step | Weekly; CI (static) | Met (development machine with throw-away keys); the server needs A10 |
 
-D-08 E07 AC4 (QUESTIONS #81): **prepared, waiting for the run.** `pnpm test:agent-api` runs one real task with `claude-haiku-4-5-20251001` through the development stack's LiteLLM, with the key from OpenBao (runbook T11 §5d), at most USD 1.00. The owner runs it in a terminal once the key exists; a follow-up pull request adds its numbers to §3 and closes issue #45.
+D-08 E07 AC4 (QUESTIONS #81): **prepared, waiting for the run, now before M-F.** The trial M-E runs with the local model `gpt-oss:20b` (Harry, 2026-10-06; `design/M-E-TRIAL-PLAN.md` D6). `pnpm test:agent-api` runs one real task with `claude-haiku-4-5-20251001` through the development stack's LiteLLM, with the key from OpenBao (runbook T11 §5d), at most USD 1.00. The owner runs it in a terminal once the key exists; a follow-up pull request adds its numbers to §3 and closes issue #45.
 
 ## 3. Numbers measured so far
 
@@ -49,7 +49,7 @@ D-08 E07 AC4 (QUESTIONS #81): **prepared, waiting for the run.** `pnpm test:agen
 
 | Item | Owner | Blocks |
 |---|---|---|
-| QUESTIONS #81: one real run with an API model (`pnpm test:agent-api`) | Owner (the key in OpenBao, T11 §5d) | The trial M-E; issue #45 |
+| QUESTIONS #81: one real run with an API model (`pnpm test:agent-api`) | Owner (an API key in OpenBao, T11 §5d) | M-F (the trial on a real internal tool); issue #45. Not the trial M-E, which runs with the local model |
 | The live G1 → G8 run on the real pilot (`SDLC_PILOT_LIVE_G8=1 pnpm test:pilot-live`): the plan file merged on the pilot, a second GitHub account for Person B, the dev stack running (GETTING-STARTED Steps 13–14) | Owner | Nothing in the MVP; it is the first real G1 → G8 on GitHub |
 | A10: internal CA and TLS on OpenBao, backup and restore drill, resource measurement | Infrastructure operator | The real deployment on the internal server |
 | MVP+1 user interface scope (web UI, dashboard; D-02 §4.2), written from the trial data after M-E | Claude, for the owner's approval | Nothing in the MVP (D-08 E07 note) |
@@ -79,3 +79,4 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 | 0.1 | 2026-10-05 | Claude (task E07) | First version: criteria and evidence, numbers so far, open items. AC4 prepared |
 | 0.2 | 2026-10-06 | Claude (coordinator), approved by Harry | §5 Kept for later: items decided during the MVP for A10, M-F, MVP+1 and the handbook |
 | 0.3 | 2026-10-06 | Claude (coordinator), approved by Harry | §5: upgrade of the deploy images (issue #177); header version and date fixed |
+| 0.4 | 2026-10-06 | Claude (coordinator), approved by Harry | §2, §4: the API-model run (QUESTIONS #81) is needed before M-F; the trial M-E runs with the local model |

@@ -78,8 +78,8 @@ Red: always approved by a person (HITL). Orange: oversight depends on risk. Blue
 | M-0 | Sample repo (right before M-C) | ✅ |
 | M-C | Run + OpenHands + G4–G6 | ✅ |
 | M-D | G7–G8 + Evidence Pack + cost report | ✅ |
-| M-E | Trial of T01–T10 on the sample repo; collect data | ⬜ Waits for one real API-model run (QUESTIONS #81) |
-| M-F | Adjust, then trial on a real internal tool | ⬜ |
+| M-E | Trial of T01–T10 on the sample repo; collect data | ⬜ Ready to start with the local model `gpt-oss:20b`; waits for Person B (`design/M-E-TRIAL-PLAN.md`) |
+| M-F | Adjust, then trial on a real internal tool | ⬜ One real API-model run first (QUESTIONS #81) |
 
 All 49 tasks: [design/D-08-mvp-backlog.md](design/D-08-mvp-backlog.md). The MVP definition-of-done check, criterion by criterion with the test that proves each one: [design/MVP-DONE.md](design/MVP-DONE.md).
 

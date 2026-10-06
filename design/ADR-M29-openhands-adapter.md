@@ -156,7 +156,7 @@ These are technical settings, not handbook rules.
 | Item | Where |
 |---|---|
 | Real-model run (local Ollama, `gpt-oss:20b`), numbers recorded; D-02, D-07, ADR-M10 wording | Done in session 2 (§2.9, ADR-M10 §3) |
-| One API-model run before M-E | QUESTIONS #81 |
+| One API-model run before M-F (changed from M-E, 2026-10-06) | QUESTIONS #81 |
 | Status for the iteration cap: accepted (`stopped_budget` / `max_iterations`) | QUESTIONS #82, C07 |
 | Temporal activity around `runAgent`; the virtual key per run; contract caps from config | C06 |
 | G5 checks on the changed files and spend | C07 |
@@ -183,3 +183,4 @@ These are technical settings, not handbook rules.
 | 0.1 | 2026-09-27 | Claude (task C05, session 1) | First version |
 | 0.2 | 2026-09-27 | Claude (task C05, session 1 review) | §2.4: iteration cap status accepted (QUESTIONS #82); §2.5: recomputation outside the sandbox tracked in D-08 1.7 (C07, C08) |
 | 0.3 | 2026-09-27 | Claude (task C05, session 2) | §2.9: the real-model run with a local Ollama model, the LiteLLM entry, reasoning effort and context at the gateway, `pnpm test:agent-real`; open items done |
+| 0.4 | 2026-10-06 | Claude (coordinator), approved by Harry | Open items: the API-model run before M-F (QUESTIONS #81) |

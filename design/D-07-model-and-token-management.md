@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.4 |
+| Version | 0.5 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24); 0.4 approved by Harry on 2026-09-27 in the C05 session 2 plan (Ollama on developer machines; QUESTIONS #78) |
+| Status | **Approved** (Harry, 2026-09-24); 0.4 approved by Harry on 2026-09-27 in the C05 session 2 plan (Ollama on developer machines; QUESTIONS #78); 0.5 approved by Harry on 2026-10-06 (the trial M-E on the local model; QUESTIONS #81) |
 | Readers | Leadership (sections 1, 2, 7, 9), tech lead / architect (all) |
 | Related decisions | Fully self-hosted. Models: **both API and self-hosted** |
 
@@ -64,7 +64,7 @@ SVG version: [d9-token-flow-gateway.svg](../diagrams/svg/d9-token-flow-gateway.s
 | Component | Choice | Type | Why |
 |---|---|---|---|
 | LLM gateway | **LiteLLM Proxy** | Reuse (open source) | OpenAI-compatible gateway in front of 100+ providers. Virtual keys, spend tracking and budgets per key/team, rate limits, routing and fallback |
-| Self-hosted models (developer machines only) | **Ollama** (MIT), local tags only | Reuse | A local model on a developer's machine (for example `gpt-oss:20b`, Apache-2.0) proves the agent path without an API key (C05, QUESTIONS #78). Never on the internal server (no GPU) and never an Ollama `:cloud` model (those send data to ollama.com). Same rules as any self-hosted model: through LiteLLM, `provider_type: self_hosted`, an internal cost above 0 |
+| Self-hosted models (developer machines only) | **Ollama** (MIT), local tags only | Reuse | A local model on a developer's machine (for example `gpt-oss:20b`, Apache-2.0) proves the agent path without an API key (C05, QUESTIONS #78) and runs the trial M-E on the fictional sample repo (QUESTIONS #81). Never on the internal server (no GPU) and never an Ollama `:cloud` model (those send data to ollama.com). Same rules as any self-hosted model: through LiteLLM, `provider_type: self_hosted`, an internal cost above 0 |
 | Self-hosted models | **vLLM** | Reuse (Apache 2.0) | The most widely used serving engine, with an OpenAI-compatible API. Has prefix caching (reuses identical prompt prefixes) |
 | Observability | Langfuse + OpenTelemetry | Reuse | Chosen in D-01. WeKnora also integrates with Langfuse |
 | Cost Controller | **Build** (inside the Run Manager) | Build | Links cost to intent, run and gate G1–G8. The gateway does not know these concepts |
@@ -88,7 +88,7 @@ SVG version: [d9-token-flow-gateway.svg](../diagrams/svg/d9-token-flow-gateway.s
 |---|---|
 | `public`, `internal` | API or self-hosted |
 | `client_confidential` (client **allows** API use) | API (business account, data not used for training) or self-hosted |
-| `client_restricted` (client **does not allow** data to leave) | **Self-hosted only** (vLLM on company infrastructure; a developer's Ollama model is for fixtures and proofs only, never for client data) |
+| `client_restricted` (client **does not allow** data to leave) | **Self-hosted only** (vLLM on company infrastructure; a developer's Ollama model is for fixtures, proofs and the trial M-E on the fictional sample repo only, never for client data) |
 | `prohibited` | No model |
 
 Within the allowed set, route by difficulty:
@@ -243,3 +243,4 @@ Note: prices and features change often. Check again before budgeting.
 | 0.2 | 2026-09-24 | Claude (draft) | After review: the 5 `data_class` values of D-05; Valkey instead of Redis |
 | 0.3 | 2026-09-24 | Claude | Translated into English. Content unchanged |
 | 0.4 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §3: Ollama on developer machines only, local tags, same gateway, routing and internal-cost rules; §4: never for client data (QUESTIONS #78) |
+| 0.5 | 2026-10-06 | Claude (coordinator), approved by Harry | §3, §4: the trial M-E runs with the local Ollama model on the fictional sample repo; the API-model run moves to before M-F (QUESTIONS #81) |
