@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.1 |
+| Version | 1.2 |
 | Date | 2026-10-06 |
-| Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed |
+| Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed; D6 (the local model, QUESTIONS #81) |
 | Readers | Harry, the trial team (Person A, Person B, second approver), Claude Code |
 | Related documents | D-02 §2, §10, §13.3 (milestones M-E, M-F); D-09 §7 (tasks T01–T10, scenarios N1–N10); `design/MVP-DONE.md`; `platform/GETTING-STARTED.md` Steps 11–14 |
 
@@ -21,7 +21,8 @@
 
 | In | Out |
 |---|---|
-| T01–T10 on the sample repo, with the API model | Real client code or data (M-F, step C) |
+| T01–T10 on the sample repo, with the local model `gpt-oss:20b` (decision D6) | Real client code or data (M-F, step C) |
+| | The API model: one run before M-F (QUESTIONS #81) |
 | The trial team working through comments, reviews and the CLI | A web UI (MVP+1, written from this trial's data) |
 | Numbers from the platform (`sdlc metrics gates`, `sdlc cost report`, evidence packs, audit) and a short manual log | Changing gates, budgets or rules during the trial (M-F) |
 | Scenarios N1–N10 when they happen naturally | Forcing every unhappy scenario again (they are proven by tests: `design/MVP-DONE.md` §2) |
@@ -30,12 +31,12 @@
 
 | # | Item | Who | How to check |
 |---|---|---|---|
-| 1 | QUESTIONS #81: one real run with the API model has passed; issue 45 closed | Owner | `pnpm test:agent-api` report; the follow-up PR merged |
+| 1 | The local model (decision D6): `ollama pull gpt-oss:20b` on the owner's machine, its entry in OpenBao (`kv/litellm/providers/ollama`, runbook T11 §5d), and one real run passed | Owner | LiteLLM lists `gpt-oss-20b`; `pnpm test:agent-real` passes |
 | 2 | The live G1 → G8 run on the real pilot has passed once | Owner + Person B | `SDLC_PILOT_LIVE_G8=1 pnpm test:pilot-live` |
 | 3 | The platform runs on the chosen environment (decision D1) with every credentials command | Owner | GETTING-STARTED Step 13; `curl …/health/ready`; `sdlc whoami` |
 | 4 | Tenant, project `pilot`, the team's users, linked GitHub identities (numeric IDs) and roles | Owner (tenant admin) | `sdlc admin role list --project pilot` |
 | 5 | The pilot's AI record (data class `internal`; the repo is fictional) | Person A or PM/BrSE | `sdlc ai-record show --project pilot` |
-| 6 | The agent registered and active, `model_ref` = `claude-haiku-4-5-20251001`, instructions = the pilot's `AGENTS.md` | Owner + Person B (approvals) | `sdlc admin agent show <key>` |
+| 6 | The agent registered and active, `model_ref` = `gpt-oss-20b` (decision D6), instructions = the pilot's `AGENTS.md` | Owner + Person B (approvals) | `sdlc admin agent show <key>` |
 | 7 | The project configuration (section 6) uploaded | Owner | `sdlc admin config show --project pilot` |
 | 8 | The sandbox image built and pinned (`sandbox.image`) | Owner | GETTING-STARTED Step 14 item 4 |
 | 9 | The trial budget set: USD 30 in total (decision D3) | Owner | `budget.*` in the configuration; the tenant's monthly budget |
@@ -119,7 +120,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 
 `design/M-E-REPORT.md`, written by Claude from section 7 and reviewed by Harry:
 
-1. Summary: did the 8-gate flow work, and was it too heavy?
+1. Summary: did the 8-gate flow work, and was it too heavy? Say that the agent used the local model (D6): its quality and cost are not those of an API model.
 2. Per task: path, lead time, runs, cost, wasted cost, requests for changes, quality.
 3. Per gate: waiting time (first round, after changes), auto-passed share, overdue escalations.
 4. Totals: tokens, cost, the share of PRs that needed changes.
@@ -145,6 +146,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | D3 | The trial budget | A total cap of USD 30 for T01–T10, plus the defaults per intent (10) and per run (2) |
 | D4 | Unhappy scenarios | Record N1–N10 when they happen; do not force them (tests already prove them) |
 | D5 | Time frame | Harry decides; phases 1–2 first, a short review, then phases 3–5 |
+| D6 | Which model? (QUESTIONS #81, 2026-10-06) | The local Ollama model `gpt-oss:20b` on the owner's machine: there is no API key yet, and the pilot is fictional. The report marks quality and cost numbers as the local model's (internal cost per token, D-07 §3; not API prices). One run with an API model passes before M-F. On a 24 GB machine, run without the profile `observability` (the model needs about 14 GB) |
 
 ## Version history
 
@@ -153,3 +155,4 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | 0.1 | 2026-10-06 | Claude (coordinator) | Draft for Harry's approval |
 | 1.0 | 2026-10-06 | Claude (coordinator), approved by Harry | D1–D5 approved as proposed; the trial budget cap is USD 30 |
 | 1.1 | 2026-10-06 | Claude (coordinator), approved by Harry | §3 item 11: the trial team reads `platform/USER-GUIDE.md` and logs in |
+| 1.2 | 2026-10-06 | Claude (coordinator), approved by Harry | D6: the trial runs with the local model `gpt-oss:20b`; §2 scope, §3 items 1 and 6, §8 (QUESTIONS #81) |

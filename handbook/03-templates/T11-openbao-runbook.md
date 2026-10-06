@@ -270,7 +270,7 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 ```
 Pull the model first on the machine (`ollama pull gpt-oss:20b`, a local tag, never a `:cloud` model). Never on the internal server: it has no GPU.
 
-**The real API-model run** (task E07, `design/QUESTIONS.md` #81: one real run with an API model before the trial M-E). On a development machine, in the macOS Terminal (never through a chat tool):
+**The real API-model run** (task E07, `design/QUESTIONS.md` #81: one real run with an API model before M-F; the trial M-E runs with the local Ollama model). On a development machine, in the macOS Terminal (never through a chat tool):
 
 1. Store the Anthropic key at `kv/litellm/providers/anthropic` (step 2 above, the value at the hidden prompt). The key needs a spend limit at the provider; the run itself is capped at USD 1.00.
 2. Restart the sidecar and LiteLLM so the model appears: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models restart litellm-agent litellm`. The gateway name is `claude-haiku-4-5-20251001` (the name carries the model version, `design/QUESTIONS.md` #93).
@@ -803,3 +803,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.23 | 2026-10-04 | Claude Code (task A12) | New section 5l: SeaweedFS admin work only inside the container (`-master=127.0.0.1:9333`), the JWT keys made at each start, a failed start; section 5j: the filer gap is closed (ADR-M52, QUESTIONS #239, #245, #246). Tested with throw-away keys (`pnpm test:seaweedfs`, `pnpm test:openbao`) |
 | 0.24 | 2026-10-05 | Claude Code (task E08) | Section 5j: the Langfuse purge in the loop, its log lines, deleting traces by hand (by run tags), `APPLY DELETED MASK`; new section 5m: the worker's Langfuse purge, `kv/worker/langfuse` (the worker's own Langfuse key made in the UI, the ClickHouse user `sdlc_purge`, the SeaweedFS identity `worker-langfuse`), `worker-langfuse-credentials`, turning it on, rotation (ADR-M53) |
 | 0.25 | 2026-10-05 | Claude Code (task E07) | Section 3.2 step 1: on the server, start only `openbao`, `postgres` and `seaweedfs` before the initialisation (`up.sh core` fails while `.env` holds no LiteLLM keys; found by `pnpm test:fresh-deploy`). Section 5d: the real API-model run (`pnpm test:agent-api`, QUESTIONS #81); the Anthropic gateway name is `claude-haiku-4-5-20251001` (QUESTIONS #93) |
+| 0.26 | 2026-10-06 | Claude Code (coordinator) | Section 5d: the API-model run is needed before M-F; the trial M-E runs with the local Ollama model (QUESTIONS #81) |

@@ -21,7 +21,7 @@ All sources were accessed on 2026-09-25.
 - **Proven with the stub model:** OpenHands Agent Server `1.48.0` can be controlled from Node.js over REST. Every model call goes through LiteLLM on a per-run virtual key with the seven labels. The sandbox has no route out except LiteLLM, drops all capabilities and runs with a read-only root filesystem. The kill switch, the budget block and loop detection work.
 - **Condition:** one real run with a real model must pass before C05 is done (section 3, QUESTIONS.md #15). The stub model returns scripted tool calls; it does not show how a real model uses the tools, how many tokens a task costs, or how much memory a real run needs.
   - Originally: Claude on a company API key. No company key is planned, so the condition was changed (Harry, 2026-09-27, QUESTIONS #78): one real run through LiteLLM with a **local Ollama model on a developer machine** (`gpt-oss:20b`). Met in C05 session 2.
-  - What the local run does not show: Claude-level quality, real API token cost, behaviour on the internal server (which has no GPU and is not a target for this model). One API-model run is still needed before the trial M-E (QUESTIONS #81).
+  - What the local run does not show: Claude-level quality, real API token cost, behaviour on the internal server (which has no GPU and is not a target for this model). One API-model run is still needed before M-F (QUESTIONS #81; until 2026-10-06: before the trial M-E, which now runs with the local model).
 
 ### 2.1. Pinned image and licence
 
@@ -175,3 +175,4 @@ With the default of 1–2 concurrent runs, reserve about 2 GiB per sandbox (the 
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task C01) | First version |
 | 0.2 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §2: the condition is one real run with a local Ollama model (QUESTIONS #78); §3: two runs with `gpt-oss:20b` passed, numbers recorded; API-model run before M-E (QUESTIONS #81) |
+| 0.3 | 2026-10-06 | Claude (coordinator), approved by Harry | §2: the API-model run is needed before M-F, not before M-E (QUESTIONS #81) |
