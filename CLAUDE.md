@@ -61,7 +61,7 @@ Handbook and platform must stay consistent: same codes, same names for gates, au
 
 ## Documentation rules
 - Design docs in `design/` are APPROVED. Do not change their meaning silently. If code must differ from a design doc: stop, add the question to `design/QUESTIONS.md`, and wait. Approved changes go in a separate PR with a short ADR.
-- D-08 and its CSV are generated: edit `scripts/generate-backlog.py`, then run it. Never edit the generated files by hand. Then sync the open GitHub issues: `python3 scripts/create-issues.py --repo harryforge/agentic-sdlc-framework --update` (try `--dry-run` first).
+- D-08 and its CSV are generated: edit `scripts/generate-backlog.py`, then run it. Never edit the generated files by hand. Then sync the open GitHub issues: `python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework --update` (try `--dry-run` first).
 - Diagrams D9–D13 mirror Mermaid blocks in design docs: if you change one, update the other. After editing a `.mmd`, run `pnpm diagrams:render` and commit the SVG in the same PR (CI only checks it; `diagrams/README.md`).
 - Handbook split: policies and generic process chapters are written outside Claude Code. **You own** the handbook parts that describe platform behaviour: Ch.13–16 and Ch.18–20 usage sections (CLI, `/approve` commands, config, troubleshooting) and runbooks (e.g. T11 OpenBao). When a task changes user-visible behaviour, update the matching handbook chapter in the same PR.
 - Keep `CHANGELOG.md` updated for notable changes. Fill the `## Commands` section below once commands exist (A01, A02).
