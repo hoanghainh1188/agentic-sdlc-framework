@@ -9,8 +9,9 @@
 // through a chat tool), on a machine where the dev stack runs with `pnpm compose:models`
 // (GETTING-STARTED Step 13). No key is read from the environment or a file: the test reads the
 // LiteLLM master key once from the configuration the sidecar rendered into LiteLLM's tmpfs
-// (`docker exec <litellm> cat /run/litellm/config.yaml`), keeps it in memory as `Redacted`, and
-// never prints it. The provider key never leaves LiteLLM.
+// (`readRenderedMasterKey`, ./litellm-master-key.ts: in memory as `Redacted`, the configuration
+// never logged or kept, errors with fixed texts only; unit test agent/litellm-master-key.test.ts).
+// The provider key never leaves LiteLLM.
 //
 // Settings: SDLC_AGENT_API_LITELLM_URL (default http://127.0.0.1:4000), SDLC_AGENT_API_LITELLM_CONTAINER
 // (default: the running Compose service `litellm`), SDLC_SANDBOX_IMAGE (skips the node24 build),
@@ -38,6 +39,7 @@ import { createTestDatabase, type TestDatabase } from '../db/helpers.js';
 import { docker, dockerSocket, quietly } from '../runner/live-helpers';
 import { buildSandboxImage } from '../sandbox-image/helpers';
 import { changesStep, startAgentRun } from './helpers';
+import { readRenderedMasterKey } from './litellm-master-key';
 
 const enabled = process.env.SDLC_AGENT_API_TEST === '1' && !!process.env.SDLC_TEST_DATABASE_URL;
 /** The gateway name of the Anthropic entry in config.ctmpl (QUESTIONS #93: it carries the version). */
@@ -72,22 +74,6 @@ function litellmContainer(): string {
   return found[0]!;
 }
 
-/**
- * The master key from the configuration LiteLLM runs with (rendered by the OpenBao Agent sidecar
- * into tmpfs). The text is parsed in memory; nothing is printed or written. An error names the
- * cause only, never a value.
- */
-function masterKeyOf(container: string): Redacted {
-  const config = docker('exec', container, 'cat', '/run/litellm/config.yaml');
-  const value = /^\s*master_key:\s*"?(sk-[^"\s]+)"?\s*$/m.exec(config)?.[1];
-  if (!value) {
-    throw new Error(
-      'LiteLLM runs without a rendered master key: start the dev stack with the profile `models`',
-    );
-  }
-  return new Redacted(value);
-}
-
 describe.skipIf(!enabled)(`E07 AC4: a real run with the API model ${MODEL} (QUESTIONS #81)`, () => {
   let t: TestDatabase;
   let image: string;
@@ -101,7 +87,7 @@ describe.skipIf(!enabled)(`E07 AC4: a real run with the API model ${MODEL} (QUES
     container = litellmContainer();
     gateway = new LiteLLMGateway({
       baseUrl: LITELLM_URL,
-      masterKey: masterKeyOf(container),
+      masterKey: readRenderedMasterKey(container),
       timeoutMs: 60_000,
     });
     // The API model is served only when its provider key is in OpenBao (T11 §5d).
