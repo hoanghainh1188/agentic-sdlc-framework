@@ -139,12 +139,23 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 
 ### Storing a secret
 
-With an admin token (hidden input, the value is read from stdin):
+With an admin token (hidden input, the value is read from stdin). The command asks for each value by name and ends with `stored` or `FAILED`; a silent failure is easy to miss behind hidden prompts:
 
 ```bash
 docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao \
-  sh -c 'read -rs BAO_TOKEN && export BAO_TOKEN && read -rs VALUE && printf %s "$VALUE" | bao kv put -mount=kv cost-controller/litellm-master-key value=-'
+  sh -c 'printf "Admin token (hidden): "; read -rs BAO_TOKEN; echo; export BAO_TOKEN; printf "Value (hidden): "; read -rs VALUE; echo; printf %s "$VALUE" | bao kv put -mount=kv cost-controller/litellm-master-key value=- >/dev/null && echo stored || echo FAILED'
 ```
+
+A value nobody needs to know (the LiteLLM master key and salt key) is better made at random inside the container, so it never appears on a screen or a clipboard:
+
+```bash
+{ printf 'Admin token (hidden): ' >&2; read -rs t && echo >&2 && printf '%s\n' "$t"; } | \
+  docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T openbao \
+  sh -c 'read -r BAO_TOKEN && export BAO_TOKEN && bao kv put -mount=kv cost-controller/litellm-master-key value="sk-$(head -c 24 /dev/urandom | od -An -tx1 | tr -d " \n")" >/dev/null && echo stored || echo FAILED'
+unset t
+```
+
+The salt key the same way at `litellm/salt-key`, without the `sk-` prefix (GETTING-STARTED Step 11b part 4 does both). Never change the salt key after LiteLLM's first start (section 5d).
 
 | Secret | Path | Read by |
 |---|---|---|
@@ -253,7 +264,7 @@ LiteLLM (the model gateway) gets its keys from OpenBao through a sidecar: an Ope
    - one model provider key per provider at `kv/litellm/providers/<provider>`, field `api_key`:
      ```bash
      docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao \
-       sh -c 'read -rs BAO_TOKEN && export BAO_TOKEN && read -rs VALUE && printf %s "$VALUE" | bao kv put -mount=kv litellm/providers/anthropic api_key=-'
+       sh -c 'printf "Admin token (hidden): "; read -rs BAO_TOKEN; echo; export BAO_TOKEN; printf "Provider API key (hidden): "; read -rs VALUE; echo; printf %s "$VALUE" | bao kv put -mount=kv litellm/providers/anthropic api_key=- >/dev/null && echo stored || echo FAILED'
      ```
 3. Deliver the sidecar's AppRole credentials. The command asks for an admin token (hidden), issues a new secret ID and writes it with the role ID into the sidecar's volume. It prints no secret:
    ```bash
@@ -804,3 +815,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.24 | 2026-10-05 | Claude Code (task E08) | Section 5j: the Langfuse purge in the loop, its log lines, deleting traces by hand (by run tags), `APPLY DELETED MASK`; new section 5m: the worker's Langfuse purge, `kv/worker/langfuse` (the worker's own Langfuse key made in the UI, the ClickHouse user `sdlc_purge`, the SeaweedFS identity `worker-langfuse`), `worker-langfuse-credentials`, turning it on, rotation (ADR-M53) |
 | 0.25 | 2026-10-05 | Claude Code (task E07) | Section 3.2 step 1: on the server, start only `openbao`, `postgres` and `seaweedfs` before the initialisation (`up.sh core` fails while `.env` holds no LiteLLM keys; found by `pnpm test:fresh-deploy`). Section 5d: the real API-model run (`pnpm test:agent-api`, QUESTIONS #81); the Anthropic gateway name is `claude-haiku-4-5-20251001` (QUESTIONS #93) |
 | 0.26 | 2026-10-06 | Claude Code (coordinator) | Section 5d: the API-model run is needed before M-F; the trial M-E runs with the local Ollama model (QUESTIONS #81) |
+| 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |

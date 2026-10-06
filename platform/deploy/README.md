@@ -52,7 +52,14 @@ pnpm openbao:bootstrap unseal     # 2 shares at the hidden prompt
 pnpm openbao:bootstrap configure  # root token at the hidden prompt; KV, Transit, every AppRole
 ```
 
-Details and key custody: runbook T11 §3 and §4. Make an admin token for the next two steps (T11 §5.1).
+Details and key custody: runbook T11 §3 and §4. `configure` revokes the root token, so make a new one from two shares, then an admin token for the next two steps (T11 §5.1):
+
+```bash
+pnpm openbao:bootstrap root-token
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao sh -c 'read -rs BAO_TOKEN && export BAO_TOKEN && bao token create -role=platform-admin -field=token'
+```
+
+The admin token lives one hour and cannot be renewed: do steps 4 and 5 in one go, and make a new token when a command answers `permission denied`. On a development machine, GETTING-STARTED Step 11b has every command of steps 3–7 with its check.
 
 ### 4. Shared secrets
 
@@ -61,6 +68,8 @@ With the admin token, store (runbook T11 §5b and §5d; each value is read at a 
 - the GitHub App's `client_id` and `private_key` at `kv/shared/github-app` (T11 §5b);
 - the LiteLLM master key at `kv/cost-controller/litellm-master-key` (field `value`, starts with `sk-`) and the salt key at `kv/litellm/salt-key` (T11 §5d);
 - one key per model provider at `kv/litellm/providers/<provider>`, field `api_key` (T11 §5d). The models are listed in `litellm/config.ctmpl`.
+
+The commands in T11 §5b and §5d end with `stored` or `FAILED`; the master key and the salt key can be made at random inside the container, so nobody sees them (T11 §5b).
 
 ### 5. Credentials of every process
 
@@ -95,7 +104,7 @@ platform/deploy/scripts/up.sh core models platform sandbox
 curl -s http://127.0.0.1:8090/health/ready
 ```
 
-This starts everything else of `core` too. The script waits until every service is healthy.
+This starts everything else of `core` too. The script waits until every service is healthy. Then check that no process lacks a credential: the logs of `sdlc-api`, `sdlc-worker` and `sdlc-runner` must have no `…_missing` event (GETTING-STARTED Step 11b part 7). A missing one names the credentials command to run again.
 
 Optional, Langfuse (section [Logs and traces](#logs-and-traces-a08)): add `observability` to the `up.sh` call. Then create the worker's own Langfuse key in the Langfuse UI and deliver the worker's purge credentials (runbook T11 §5m), so the retention loop can delete a purged project's traces:
 

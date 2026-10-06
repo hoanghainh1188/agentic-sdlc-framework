@@ -287,11 +287,118 @@ SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=~/.config/sdlc-secrets/github-
   SDLC_TEST_DB_DIR=platform/tests/integration/github pnpm test:db
 ```
 
+## Step 11b. Set up the dev stack from scratch (dev)
+
+Use this on a new machine, or when the Docker volumes of the project `sdlc` are gone (`docker volume ls | grep '^sdlc_'` shows nothing). After a plain restart, use Step 13 instead. It follows `platform/deploy/README.md` "Fresh deployment (operator)", with the commands and checks of a development machine. It takes about 30 minutes; Step 11 (the GitHub App and its key file) comes first.
+
+**Where to run what.**
+
+- 🧑 **The owner, in the macOS Terminal app** (a separate window). These steps print key shares or tokens, or ask for them at a hidden prompt. Never run them in a chat tool, and never in the terminal pane of the Claude desktop app: Claude can read that pane, and a chat keeps everything it shows.
+- 🤖 **Claude Code may run** the steps marked so: they read or print no secret.
+- **Never run `docker volume prune` or `docker system prune --volumes`** on a machine with a dev stack: they delete OpenBao, PostgreSQL and SeaweedFS data, and you start again here. Remove volumes only with `pnpm compose:down` plus `-v`, on purpose.
+
+### 1. Prepare (🤖)
+
+| # | Do | Check |
+|---|---|---|
+| 1 | `pnpm install && pnpm build` on the latest `main` | No error |
+| 2 | `pnpm compose:env` when `platform/deploy/.env` does not exist. When it exists, list the variables it lacks (names only, never values): `comm -13 <(grep -oE '^[A-Z_]+=' platform/deploy/.env \| sort) <(grep -oE '^[A-Z_]+=' platform/deploy/.env.example \| sort)` | Most listed variables have defaults. `SDLC_DOCKER_GID` must be set: `0` on Docker Desktop for macOS, the group of `/var/run/docker.sock` on Linux (runbook T11 §5g) |
+| 3 | Build the platform images from the current code. `up.sh` never rebuilds an image that exists: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile platform --profile sandbox build sdlc-api sdlc-worker sdlc-runner` | `docker images` shows `sdlc-api`, `sdlc-worker`, `sdlc-runner` created just now |
+
+### 2. OpenBao (🧑, Terminal app)
+
+Have your password manager open: `init` prints three key shares and a root token **once**. On a development machine they are throw-away keys; you hold all three.
+
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs
+pnpm openbao:bootstrap init
+pnpm openbao:bootstrap unseal
+pnpm openbao:bootstrap configure
+pnpm openbao:bootstrap status
+```
+
+`unseal` asks for two shares, `configure` for the root token (hidden prompts). `configure` ends with `the root token is revoked`; `status` says `unsealed`.
+
+### 3. Admin token (🧑, Terminal app)
+
+`configure` revoked the root token, so make a new one from two shares first, then the admin token (runbook T11 §5.1):
+
+```bash
+pnpm openbao:bootstrap root-token
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao \
+  sh -c 'read -rs BAO_TOKEN && export BAO_TOKEN && bao token create -role=platform-admin -field=token'
+```
+
+The second command asks for the root token at a hidden prompt and prints the admin token. **It lives one hour** and cannot be renewed: do parts 4 and 5 in one go. When a command answers `permission denied` or `FAILED`, the token has probably expired: make a new one and run that command again.
+
+### 4. Shared secrets (🧑, Terminal app, admin token)
+
+Each block asks for the admin token at a hidden prompt and ends with `stored`, or `FAILED`. None prints a secret.
+
+The GitHub App (Step 11; the key is read from its file, runbook T11 §5b.1):
+
+```bash
+KEY_FILE="$HOME/.config/sdlc-secrets/github-app-dev.pem"
+CLIENT_ID=Iv23liQtMQBwNyVYZuJt
+{ printf 'Admin token (hidden): ' >&2; read -rs t && echo >&2 && printf '%s\n%s\n' "$t" "$CLIENT_ID" && cat "$KEY_FILE"; } | \
+  docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T openbao \
+  sh -c 'read -r BAO_TOKEN && read -r CLIENT_ID && export BAO_TOKEN && bao kv put -mount=kv shared/github-app client_id="$CLIENT_ID" private_key=- >/dev/null && echo stored || echo FAILED'
+unset t
+```
+
+The LiteLLM master key and salt key, made at random inside the container, so nobody sees them (runbook T11 §5d). Never change the salt key later:
+
+```bash
+for entry in cost-controller/litellm-master-key:sk- litellm/salt-key:; do
+  { printf 'Admin token (hidden): ' >&2; read -rs t && echo >&2 && printf '%s\n' "$t"; } | \
+    docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T openbao \
+    sh -c 'read -r BAO_TOKEN && export BAO_TOKEN && bao kv put -mount=kv "${1%%:*}" value="${1#*:}$(head -c 24 /dev/urandom | od -An -tx1 | tr -d " \n")" >/dev/null && echo stored || echo FAILED' sh "$entry"
+done
+unset t
+```
+
+A model. On a development machine, the local Ollama model (`ollama pull gpt-oss:20b` first; QUESTIONS #78, #81):
+
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao \
+  sh -c 'printf "Admin token (hidden): "; read -rs BAO_TOKEN; echo; export BAO_TOKEN; bao kv put -mount=kv litellm/providers/ollama api_base=http://host.docker.internal:11434 >/dev/null && echo stored || echo FAILED'
+```
+
+An API model, when a key exists (for example Anthropic, with a spend limit at the provider; the key starts with `sk-ant-api03-`):
+
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao \
+  sh -c 'printf "Admin token (hidden): "; read -rs BAO_TOKEN; echo; export BAO_TOKEN; printf "Provider API key (hidden): "; read -rs VALUE; echo; printf %s "$VALUE" | bao kv put -mount=kv litellm/providers/anthropic api_key=- >/dev/null && echo stored || echo FAILED'
+```
+
+### 5. Credentials of every process (🧑, Terminal app, admin token)
+
+The nine commands of `platform/deploy/README.md` "Fresh deployment", step 5: `litellm-credentials`, `api-credentials`, `worker-credentials`, `runner-credentials`, `runner-evidence-credentials`, `api-evidence-credentials`, `worker-evidence-credentials`, `worker-purge-credentials`, `worker-anchor-credentials`, each as `pnpm openbao:bootstrap <command>`. Each asks for the admin token and ends with a line that names what it stored. Skip `worker-langfuse-credentials` unless you run the profile `observability` (runbook T11 §5m).
+
+### 6. Database and start (🤖)
+
+```bash
+SDLC_DB_MIGRATION_URL="postgres://platform:$(grep '^PLATFORM_DB_PASSWORD=' platform/deploy/.env | cut -d= -f2-)@127.0.0.1:5432/platform" pnpm db:migrate
+platform/deploy/scripts/up.sh core models platform sandbox
+```
+
+The password goes from `.env` into the command without being printed. `up.sh` ends with `all services healthy`.
+
+### 7. Check (🤖)
+
+| Check | Command | Expected |
+|---|---|---|
+| The API | `curl -s http://127.0.0.1:8090/health/ready` | `{"status":"ok"}` |
+| No missing credential | `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile platform --profile sandbox logs sdlc-api sdlc-worker sdlc-runner \| grep -oE '"event":"[a-z_.]+_missing"' \| sort -u` | Nothing. A line such as `worker.evidence_missing` names the credentials command to run again (part 5), then restart that service |
+| The models | `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models exec -T litellm sh -c 'grep -E "model_name:" /run/litellm/config.yaml \| sed -E "s/.*model_name:[[:space:]]*//"'` (names only) | Every model whose provider entry you stored. A missing one: the entry is not in OpenBao (part 4), or `litellm-agent` and `litellm` need a restart |
+
+`worker.cost_sync_failed` with `unreachable` right after the start is normal: the worker started before LiteLLM was ready, and the next pass (5 minutes) syncs. Then continue with Step 12 item 2 (the database is migrated and the API is running).
+
 ## Step 12. Start the API and create the first admin (dev)
 
 The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people with personal API tokens. Run the commands below yourself, in a terminal: they print a token **once**. Never run them through a chat tool, and never paste the token anywhere except your password manager.
 
-1. OpenBao is initialised, unsealed and configured (runbook T11 sections 3 and 4). Deliver the API's credentials, then start it:
+1. OpenBao is initialised, unsealed and configured (runbook T11 sections 3 and 4; on a new machine, Step 11b does all of item 1). Deliver the API's credentials, then start it:
    ```bash
    pnpm openbao:bootstrap api-credentials
    pnpm compose:platform
@@ -322,7 +429,7 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
 
 ## Step 13. Restart the dev stack after a break (dev)
 
-Use this after a reboot, after Docker Desktop restarted, or when `sdlc-api` and `sdlc-worker` keep restarting with "Cannot reach OpenBao". It assumes Steps 11 and 12 were done once on this machine. Run every command **yourself, in the macOS Terminal**, from the repo root: some ask for key shares or tokens at a hidden prompt, and these never go through a chat tool.
+Use this after a reboot, after Docker Desktop restarted, or when `sdlc-api` and `sdlc-worker` keep restarting with "Cannot reach OpenBao". It assumes Steps 11, 11b and 12 were done once on this machine; when the `sdlc_*` Docker volumes are gone, use Step 11b instead. Run every command **yourself, in the macOS Terminal app**, from the repo root: some ask for key shares or tokens at a hidden prompt, and these never go through a chat tool or the terminal pane of the Claude desktop app.
 
 | # | Do | Check |
 |---|---|---|
@@ -330,7 +437,7 @@ Use this after a reboot, after Docker Desktop restarted, or when `sdlc-api` and 
 | 2 | `pnpm openbao:bootstrap status` | Says `sealed` after every restart (runbook T11 §4) |
 | 3 | `pnpm openbao:bootstrap unseal`: type key shares at the hidden prompt until it is unsealed (on a dev machine you hold all the throw-away shares) | `status` says `unsealed` |
 | 4 | Apply new migrations, if `main` has new ones: `SDLC_DB_MIGRATION_URL="postgres://platform:<PLATFORM_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm db:migrate` (the password is in `platform/deploy/.env`) | `pnpm db:status` (same variable) lists no pending migration |
-| 5 | Start the rest: `platform/deploy/scripts/up.sh core models platform sandbox` (add `observability` for Langfuse) | The script ends without an error |
+| 5 | When `main` has new code since the last start, rebuild the platform images and add new `.env` variables first (Step 11b part 1, items 2–3). Then start the rest: `platform/deploy/scripts/up.sh core models platform sandbox` (add `observability` for Langfuse) | The script ends without an error; Step 11b part 7 shows no missing credential |
 | 6 | `curl -s http://127.0.0.1:8090/health/ready` | Ready |
 | 7 | `pnpm sdlc whoami` (if the login was removed: `pnpm sdlc login --api-url http://127.0.0.1:8090`) | Shows your user |
 
