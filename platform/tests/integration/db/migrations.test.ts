@@ -156,6 +156,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
   tenant_role_bindings: ['revoked_at'],
   // Append-only (B13 AC7): approvals of the agent register.
   agent_approvals: [],
+  // E08 (migration 0024, QUESTIONS #253): a request again until confirmed once (trigger SDA17).
+  langfuse_purges: ['traces', 'attempts', 'last_requested_at', 'confirmed_at'],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -288,7 +290,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // B09: plans → users (submitted_by).
     // E02: evidence_packs → intents, users (built_by).
     // E05: evidence_holds → intents, users ×2 (held_by, released_by).
-    expect(fks).toHaveLength(57);
+    // E08: langfuse_purges → intents.
+    expect(fks).toHaveLength(58);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

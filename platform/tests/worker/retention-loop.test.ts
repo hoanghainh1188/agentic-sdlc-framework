@@ -20,6 +20,14 @@ const counts = {
   archivesScheduled: 0,
   orphansFound: 0,
   orphansSwept: 0,
+  langfuseDue: 1,
+  langfuseRequested: 1,
+  langfuseConfirmed: 0,
+  langfuseMismatched: 0,
+  langfuseGuardTripped: 0,
+  langfuseRawFound: 3,
+  langfuseRawSwept: 3,
+  langfuseCompacted: 0,
 };
 
 function harness() {

@@ -32,6 +32,11 @@ export type {
   RetentionRowKind,
 } from './repositories/retention.js';
 export type {
+  LangfuseCandidate,
+  LangfusePurgeCause,
+  LangfusePurgeRow,
+} from './repositories/langfuse-purges.js';
+export type {
   AutoPassRow,
   GateMetricsFilter,
   GateWaitQuery,

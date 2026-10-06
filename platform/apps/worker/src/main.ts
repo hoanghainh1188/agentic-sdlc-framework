@@ -41,6 +41,7 @@ import { jsonLogger } from './logger.js';
 import { PollerLoop } from './poller-loop.js';
 import { ReconcileLoop } from './reconcile-loop.js';
 import { openAnchorStore } from './anchor-store.js';
+import { openLangfusePurge } from './langfuse-store.js';
 import { RetentionLoop } from './retention-loop.js';
 import { openRetentionStore } from './retention-store.js';
 import { createWorkerRuns, type WorkerRuns } from './runs.js';
@@ -190,6 +191,18 @@ async function main(): Promise<void> {
   const anchorStore = await openAnchorStore(settings.anchor, secrets, logger);
   // Tenant ID → the UTC date it was anchored and checked: once per tenant and day per process.
   const anchoredOn = new Map<string, string>();
+  // The Langfuse purge (E08, ADR-M53), a step of the retention pass: its own entry
+  // `kv/worker/langfuse`. The compaction state lives as long as the process.
+  const langfuse = await openLangfusePurge(
+    settings.langfuse,
+    secrets,
+    logger,
+    { maskOwed: false, maskedOn: null },
+    {
+      percent: settings.retention?.guardPercent ?? 20,
+      floor: settings.retention?.guardFloor ?? 20,
+    },
+  );
   const retentionSettings = retentionStore ? settings.retention : null;
   const loopIntervalMs = retentionSettings?.intervalMs ?? settings.anchor?.intervalMs;
   const retention =
@@ -217,6 +230,7 @@ async function main(): Promise<void> {
                       logger,
                       now: () => new Date(),
                       orphanSuspects,
+                      langfuse: langfuse.deps,
                       settings: {
                         mode: retentionSettings.mode,
                         bucket: retentionSettings.bucket,
@@ -266,6 +280,7 @@ async function main(): Promise<void> {
       .then(() => {
         retentionStore?.destroy();
         anchorStore?.destroy();
+        langfuse.destroy();
       })
       .then(() =>
         Promise.all([

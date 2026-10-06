@@ -26,14 +26,34 @@ env_file="${SDLC_ENV_FILE:-$deploy_dir/.env}"
 # Tracing (A08, design/ADR-M35 §2.4): with the profile observability, the platform processes and
 # LiteLLM send traces to the collector, unless SDLC_OTEL_ENDPOINT is set in the environment or the
 # env file. The profiles that use it (platform, models) must be started in the same call.
+# The Langfuse purge (E08, design/ADR-M53): with the profile observability, or when Langfuse's
+# ClickHouse volume exists, the worker purges the traces of purged intents in Langfuse, unless
+# SDLC_WORKER_LANGFUSE_URL is set elsewhere.
 case " $* " in
   *" observability "*)
     if [ -z "${SDLC_OTEL_ENDPOINT:-}" ] && ! grep -Eq '^SDLC_OTEL_ENDPOINT=.+' "$env_file"; then
       SDLC_OTEL_ENDPOINT=http://otel-collector:4318
       export SDLC_OTEL_ENDPOINT
     fi
+    langfuse_on=yes
+    ;;
+  *)
+    # Without observability in this call, Langfuse may still hold traces from an earlier start:
+    # its ClickHouse volume exists. Then the worker keeps purging (or waits until Langfuse runs),
+    # and never records `not_deployed` for data that is still there (review of E08).
+    project="$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' "$env_file" | tail -n 1)"
+    if [ -n "$(docker volume ls -q \
+      --filter "label=com.docker.compose.project=${project:-deploy}" \
+      --filter label=com.docker.compose.volume=clickhouse-data 2>/dev/null || true)" ]; then
+      langfuse_on=yes
+    fi
     ;;
 esac
+if [ "${langfuse_on:-no}" = yes ] && [ -z "${SDLC_WORKER_LANGFUSE_URL:-}" ] &&
+  ! grep -Eq '^SDLC_WORKER_LANGFUSE_URL=.+' "$env_file"; then
+  SDLC_WORKER_LANGFUSE_URL=http://langfuse-web:3000
+  export SDLC_WORKER_LANGFUSE_URL
+fi
 
 set -- $(for p in "$@"; do printf -- '--profile %s ' "$p"; done)
 compose() { docker compose -f "$deploy_dir/docker-compose.yml" --env-file "$env_file" "$@"; }

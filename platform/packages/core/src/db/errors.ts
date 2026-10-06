@@ -67,6 +67,7 @@ const PG_ERROR_CODES: Record<string, DbErrorCode> = {
   SDA14: 'immutable', // an evidence pack's fixed columns, or sealed_at / purged_at changed (0021)
   SDA15: 'immutable', // an evidence item's fixed columns, purged_at changed, a lock moved back (0023)
   SDA16: 'immutable', // an evidence hold's fixed columns, or a release changed (0023)
+  SDA17: 'immutable', // a Langfuse purge's fixed columns, or a confirmed purge changed (0024)
 };
 
 /** Maps a PostgreSQL error to a DbError; anything else is rethrown unchanged. */

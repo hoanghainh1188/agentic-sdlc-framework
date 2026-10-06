@@ -77,7 +77,7 @@ Red: always approved by a person (HITL). Orange: oversight depends on risk. Blue
 | M-B | Intent + G1–G3 | ✅ |
 | M-0 | Sample repo (right before M-C) | ✅ |
 | M-C | Run + OpenHands + G4–G6 | ✅ |
-| M-D | G7–G8 + Evidence Pack + cost report | ✅ except E08 (Langfuse purge) |
+| M-D | G7–G8 + Evidence Pack + cost report | ✅ |
 | M-E | Trial of T01–T10 on the sample repo; collect data | ⬜ Waits for one real API-model run (QUESTIONS #81) |
 | M-F | Adjust, then trial on a real internal tool | ⬜ |
 

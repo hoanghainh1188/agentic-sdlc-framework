@@ -1,0 +1,15 @@
+{
+  "name": "@sdlc/adapter-traces-langfuse",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Model-call trace store adapter: Langfuse v4 (public API) and its ClickHouse. See design/ADR-M53.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@sdlc/contracts": "workspace:*"
+  }
+}

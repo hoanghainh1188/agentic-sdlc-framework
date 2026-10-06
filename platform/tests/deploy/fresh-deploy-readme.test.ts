@@ -28,9 +28,9 @@ const liveTest = fs.readFileSync(
   'utf8',
 );
 
-/** The command lines of the section's code blocks, with `\` continuations joined. */
-function commandLines(): string[] {
-  const blocks = [...section.matchAll(/```bash\n([\s\S]*?)```/g)].map((m) => m[1]!);
+/** The command lines of the code blocks of `text` (default: the section), `\` lines joined. */
+function commandLines(text = section): string[] {
+  const blocks = [...text.matchAll(/```bash\n([\s\S]*?)```/g)].map((m) => m[1]!);
   return blocks
     .join('\n')
     .replace(/\\\n\s*/g, ' ')
@@ -90,8 +90,8 @@ describe('E07: README "Fresh deployment (operator)"', () => {
     expect(liveTest).toContain("'up', '-d', '--wait', 'openbao', 'postgres', 'seaweedfs'");
   });
 
-  it('the live test runs every credentials command the README names', () => {
-    const named = commandLines()
+  it('the live test runs every credentials command of step 5 (step 7 adds the optional Langfuse one)', () => {
+    const named = commandLines(section.slice(section.indexOf('### 5.'), section.indexOf('### 6.')))
       .map((line) => /pnpm openbao:bootstrap ([a-z-]+-credentials)/.exec(line)?.[1])
       .filter((name): name is string => name !== undefined);
     for (const name of named) expect(liveTest, name).toContain(`'${name}'`);

@@ -95,7 +95,13 @@ platform/deploy/scripts/up.sh core models platform sandbox
 curl -s http://127.0.0.1:8090/health/ready
 ```
 
-This starts everything else of `core` too. Add `observability` for Langfuse (section [Logs and traces](#logs-and-traces-a08)). The script waits until every service is healthy. The worker's retention loop starts in `report` mode: it deletes nothing (runbook T11 §5j).
+This starts everything else of `core` too. The script waits until every service is healthy.
+
+Optional, Langfuse (section [Logs and traces](#logs-and-traces-a08)): add `observability` to the `up.sh` call. Then create the worker's own Langfuse key in the Langfuse UI and deliver the worker's purge credentials (runbook T11 §5m), so the retention loop can delete a purged project's traces:
+
+```bash
+pnpm openbao:bootstrap worker-langfuse-credentials  # T11 §5m (needs the profile observability)
+``` The worker's retention loop starts in `report` mode: it deletes nothing (runbook T11 §5j).
 
 ### 8. The tenant and its first admin
 

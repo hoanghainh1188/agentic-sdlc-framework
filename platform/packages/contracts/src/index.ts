@@ -15,3 +15,4 @@ export * from './intent-workflow.js';
 export * from './run-activity.js';
 export * from './audit-anchor.js';
 export * from './evidence.js';
+export * from './llm-traces.js';

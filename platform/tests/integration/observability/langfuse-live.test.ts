@@ -5,6 +5,12 @@
 // Also: a span from a platform process (service `sdlc-api`) reaches Langfuse through the same
 // collector (AC2's pipeline), and the collector is not reachable from the host.
 //
+// D-08 E08 AC4 (design/ADR-M53): `openbao:bootstrap worker-langfuse-credentials` (with the init
+// key, QUESTIONS #252), model calls of two projects of one tenant, one project archived, the
+// retention pass with the worker's own stores: the archived project's traces are gone from
+// Langfuse and from ClickHouse's disk (`apply_deleted_mask=0`), the other project's stay; the raw
+// OTLP files are swept; `project.purged` records `langfuse: purged`; the identities' limits.
+//
 // Needs Docker. Skipped unless SDLC_OBSERVABILITY_TEST=1. Run with: pnpm test:observability
 // Own throw-away Compose project (own name, ports, subnet, random env file), removed afterwards.
 // A stub model stands in for a provider: no provider key. Keys and tokens are THROW-AWAY TEST
@@ -15,17 +21,38 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client,
+  S3ServiceException,
+} from '@aws-sdk/client-s3';
+import { S3RetentionStore } from '@sdlc/adapter-evidence-s3';
+import { LangfuseTraceStore } from '@sdlc/adapter-traces-langfuse';
 import { LiteLLMGateway } from '@sdlc/adapter-model-litellm';
-import { COST_LABEL_NAMES, type CostLabels } from '@sdlc/contracts';
+import {
+  COST_LABEL_NAMES,
+  EvidenceError,
+  type CostLabels,
+  type EvidenceRetentionStore,
+} from '@sdlc/contracts';
 import { Redacted } from '@sdlc/secrets';
+import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { archiveProject } from '../../../packages/core/src/admin/projects.js';
 import { CostController } from '../../../packages/core/src/cost/index.js';
 import { createKysely } from '../../../packages/core/src/db/connection.js';
 import { migrateToLatest } from '../../../packages/core/src/db/migrator.js';
 import { PlatformDatabase } from '../../../packages/core/src/db/platform-database.js';
 import { deployDir, parseEnvFile, root } from '../../deploy/compose';
-import { seedRun } from '../cost-seed';
+import {
+  runRetentionPass,
+  type RetentionPassResult,
+} from '../../../packages/core/src/retention/pass.js';
+import type { LangfusePurgeState } from '../../../packages/core/src/retention/langfuse-pass.js';
+import { seedOtherProject, seedRun } from '../cost-seed';
 import { isolateEnv } from '../throwaway-compose';
 
 const enabled = process.env.SDLC_OBSERVABILITY_TEST === '1';
@@ -93,6 +120,10 @@ describe.skipIf(!enabled)(
 
     let db: PlatformDatabase;
     let controller: CostController;
+    let envMap: Map<string, string>;
+    let ownerUrl = '';
+    const chProxyName = `${project}-chproxy`;
+    const clickhouseUrl = `http://127.0.0.1:${8123 + PORT_OFFSET}`;
 
     const run = (cmd: string, args: string[], input = '', env: NodeJS.ProcessEnv = {}): Result => {
       const r = spawnSync(cmd, args, {
@@ -184,6 +215,7 @@ describe.skipIf(!enabled)(
         .replace(/^SDLC_OTEL_ENDPOINT=.*$/m, 'SDLC_OTEL_ENDPOINT=http://otel-collector:4318');
       fs.writeFileSync(envFile, text, { mode: 0o600 });
       const env = parseEnvFile(text);
+      envMap = env;
       langfuseAuth = keep(
         Buffer.from(
           `${env.get('LANGFUSE_INIT_PROJECT_PUBLIC_KEY')!}:${env.get('LANGFUSE_INIT_PROJECT_SECRET_KEY')!}`,
@@ -255,10 +287,9 @@ describe.skipIf(!enabled)(
 
       const pgUrl = (user: string, password: string) =>
         `postgresql://${user}:${encodeURIComponent(password)}@127.0.0.1:${5432 + PORT_OFFSET}/platform`;
-      const owner = createKysely({
-        connectionString: pgUrl('platform', env.get('PLATFORM_DB_PASSWORD')!),
-        maxConnections: 1,
-      });
+      ownerUrl = pgUrl('platform', env.get('PLATFORM_DB_PASSWORD')!);
+      keep(env.get('PLATFORM_DB_PASSWORD')!);
+      const owner = createKysely({ connectionString: ownerUrl, maxConnections: 1 });
       const { error } = await migrateToLatest(owner);
       await owner.destroy();
       if (error) throw new Error('migration failed', { cause: error });
@@ -277,7 +308,7 @@ describe.skipIf(!enabled)(
       await db?.close();
       // Debugging only: keep the throw-away stack (remove it with `docker compose -p <project> down -v`).
       if (process.env.SDLC_OBSERVABILITY_KEEP === '1') return;
-      run('docker', ['rm', '-f', stubName]);
+      run('docker', ['rm', '-f', stubName, chProxyName]);
       compose('', ...PROFILES, 'down', '--volumes', '--remove-orphans');
       fs.rmSync(tmp, { recursive: true, force: true });
     }, SETUP_TIMEOUT_MS);
@@ -385,6 +416,260 @@ describe.skipIf(!enabled)(
       }[];
       expect(Object.keys(inspect[0]!.HostConfig.PortBindings ?? {})).toEqual([]);
       expect(Object.keys(inspect[0]!.NetworkSettings.Networks)).toEqual([network]);
+    });
+
+    it("E08 AC4: the purge deletes one project's traces, on disk too; another project's stay", async () => {
+      // The worker's credentials, made by the real command. The test uses Langfuse's init key as
+      // the worker's key (QUESTIONS #252); on a server it is a second key made in the UI.
+      const publicKey = envMap.get('LANGFUSE_INIT_PROJECT_PUBLIC_KEY')!;
+      const secretKey = envMap.get('LANGFUSE_INIT_PROJECT_SECRET_KEY')!;
+      const boot = ok(
+        bootstrapCmd(['worker-langfuse-credentials'], `${rootToken}\n${publicKey}\n${secretKey}\n`),
+        'worker-langfuse-credentials',
+      );
+      const entry = JSON.parse(admin('bao kv get -format=json -mount=kv worker/langfuse')) as {
+        data: { data: Record<string, string> };
+      };
+      const fields = entry.data.data;
+      for (const value of Object.values(fields)) keep(value);
+      // Prints no secret.
+      for (const value of Object.values(fields))
+        expect(boot.stdout + boot.stderr).not.toContain(value);
+      expect(Object.keys(fields).sort()).toEqual([
+        'access_key',
+        'clickhouse_password',
+        'langfuse_public_key',
+        'langfuse_secret_key',
+        'secret_key',
+      ]);
+
+      // ClickHouse has no host port: a small TCP relay on the throw-away network, for the test only.
+      ok(
+        run('docker', [
+          'run',
+          '-d',
+          '--name',
+          chProxyName,
+          '--network',
+          network,
+          '-p',
+          `127.0.0.1:${8123 + PORT_OFFSET}:8123`,
+          NODE_IMAGE,
+          'node',
+          '-e',
+          "const n=require('net');n.createServer(c=>{const s=n.connect(8123,'clickhouse');c.pipe(s).pipe(c);c.on('error',()=>s.destroy());s.on('error',()=>c.destroy())}).listen(8123)",
+        ]),
+        'start the ClickHouse relay',
+      );
+      const clickhouse = async (user: string, password: string, query: string) => {
+        const r = await fetch(`${clickhouseUrl}/?mutations_sync=1`, {
+          method: 'POST',
+          headers: { 'x-clickhouse-user': user, 'x-clickhouse-key': password },
+          body: query,
+        });
+        return { status: r.status, text: (await r.text()).trim() };
+      };
+      for (let i = 0; ; i++) {
+        const ping = await fetch(`${clickhouseUrl}/ping`).catch(() => undefined);
+        if (ping?.ok) break;
+        if (i >= 30) throw new Error('the ClickHouse relay does not answer');
+        await sleep(1000);
+      }
+
+      // The identities' limits. sdlc_purge reads nothing.
+      expect(
+        (
+          await clickhouse(
+            'sdlc_purge',
+            fields.clickhouse_password!,
+            'SELECT count() FROM default.events_full',
+          )
+        ).status,
+      ).not.toBe(200);
+      const s3Endpoint = `http://127.0.0.1:${envMap.get('SEAWEEDFS_S3_HOST_PORT')!}`;
+      const s3 = new S3Client({
+        endpoint: s3Endpoint,
+        region: 'us-east-1',
+        forcePathStyle: true,
+        credentials: { accessKeyId: fields.access_key!, secretAccessKey: fields.secret_key! },
+      });
+      const refused = async (send: () => Promise<unknown>) => {
+        const error = await send().then(
+          () => undefined,
+          (e: unknown) => e,
+        );
+        expect(error).toBeInstanceOf(S3ServiceException);
+        expect((error as S3ServiceException).$metadata.httpStatusCode).toBe(403);
+      };
+
+      // Two projects of one tenant make model calls through LiteLLM.
+      const a = await seedRun(db, { slug: 'obs-lf', models: [MODEL], now });
+      await a.scope.tenantRoles.grant({ user_id: a.personA, role: 'tenant_admin' });
+      const b = await seedOtherProject(a, { slug: 'warehouse', models: [MODEL], now });
+      const traceOf: Record<string, string> = {};
+      for (const runId of [a.runId, b.runId]) {
+        const issued = await controller.issueRunKey({
+          tenantId: a.scope.tenantId,
+          runId,
+          gate: 'G4',
+          agent: 'coder-openhands',
+        });
+        const response = await fetch(`${litellmUrl}/v1/chat/completions`, {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${issued.key.key.reveal()}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ model: MODEL, messages: [{ role: 'user', content: 'hello' }] }),
+        });
+        await response.text();
+        expect(response.status).toBe(200);
+        const generation = await waitForObservation(
+          (o) =>
+            o.type === 'GENERATION' &&
+            Array.isArray(o.metadata?.[TRACE_TAGS]) &&
+            (o.metadata[TRACE_TAGS] as unknown[]).includes(`run_id:${runId}`),
+        );
+        traceOf[runId] = generation.traceId;
+      }
+      const onDisk = async (traceId: string) => {
+        let total = 0;
+        for (const table of ['events_full', 'events_core']) {
+          const r = await clickhouse(
+            'langfuse',
+            envMap.get('CLICKHOUSE_PASSWORD')!,
+            `SELECT count() FROM default.${table} WHERE trace_id = '${traceId}' SETTINGS apply_deleted_mask = 0`,
+          );
+          expect(r.status).toBe(200);
+          total += Number(r.text);
+        }
+        return total;
+      };
+      expect(await onDisk(traceOf[a.runId]!)).toBeGreaterThan(0);
+
+      // Raw OTLP files: the worker's identity may list them, never read one, never touch another
+      // prefix or bucket.
+      const rawStore = new S3RetentionStore({
+        endpoint: s3Endpoint,
+        bucket: 'langfuse',
+        prefixes: ['events/otel/'],
+        accessKeyId: new Redacted(fields.access_key!),
+        secretAccessKey: new Redacted(fields.secret_key!),
+      });
+      const rawBefore = await rawStore.listKeys('events/otel/', null, 1000);
+      expect(rawBefore.keys.length).toBeGreaterThan(0);
+      const rawKey = rawBefore.keys[0]!.uri.slice('s3://langfuse/'.length);
+      await refused(() => s3.send(new GetObjectCommand({ Bucket: 'langfuse', Key: rawKey })));
+      await refused(() => s3.send(new DeleteObjectCommand({ Bucket: 'langfuse', Key: 'media/x' })));
+      await refused(() => s3.send(new ListObjectsV2Command({ Bucket: 'evidence' })));
+
+      // Both intents end; the first project is archived.
+      const ended = new Date(Date.now() - 86_400_000);
+      const owner = createKysely({ connectionString: ownerUrl, maxConnections: 1 });
+      await sql`UPDATE intents SET status = 'done', current_gate = NULL, gate_entered_at = NULL,
+        updated_at = ${ended} WHERE id IN (${a.intentId}, ${b.intentId})`.execute(owner);
+      await owner.destroy();
+      await archiveProject(a.scope, { type: 'human', userId: a.personA }, 'shop');
+      const archivedAt = new Date(
+        (await a.scope.audit.listForEntity(a.projectId)).find(
+          (e) => e.action === 'project.archived',
+        )!.occurred_at,
+      );
+      const day = (n: number) => new Date(archivedAt.getTime() + n * 86_400_000);
+
+      const noEvidence: EvidenceRetentionStore = {
+        listKeys: () => Promise.resolve({ keys: [], next: null }),
+        deleteAllVersions: () => Promise.reject(new EvidenceError('forbidden')),
+        setLegalHold: () => Promise.reject(new EvidenceError('forbidden')),
+        extendLock: () => Promise.reject(new EvidenceError('forbidden')),
+      };
+      const state: LangfusePurgeState = { maskOwed: false, maskedOn: null };
+      const store = new LangfuseTraceStore({
+        url: langfuseUrl,
+        publicKey: new Redacted(fields.langfuse_public_key!),
+        secretKey: new Redacted(fields.langfuse_secret_key!),
+        clickhouse: {
+          url: clickhouseUrl,
+          user: 'sdlc_purge',
+          password: new Redacted(fields.clickhouse_password!),
+        },
+      });
+      const logs: string[] = [];
+      const pass = (at: Date): Promise<RetentionPassResult> =>
+        runRetentionPass(
+          {
+            db,
+            store: noEvidence,
+            logger: {
+              log: (level, event, f = {}) => logs.push(JSON.stringify({ level, event, ...f })),
+            },
+            now: () => at,
+            settings: {
+              mode: 'purge',
+              bucket: 'evidence',
+              batch: 200,
+              guardPercent: 100,
+              guardFloor: 1000,
+              archiveGraceDays: 7,
+              orphanGraceHours: 24,
+            },
+            langfuse: {
+              status: 'on',
+              store,
+              rawStore,
+              rawPrefix: 'events/otel/',
+              settings: {
+                batch: 50,
+                rawMaxAgeHours: 24,
+                rawBatch: 1000,
+                // The project Langfuse creates at start (LANGFUSE_INIT_PROJECT_ID).
+                projectId: 'sdlc-platform',
+                guardPercent: 100,
+                guardFloor: 1000,
+              },
+              state,
+            },
+          },
+          null,
+        );
+
+      await pass(day(0)); // schedules the archive purge
+      const requested = await pass(day(8));
+      expect(requested.langfuseRequested).toBe(1);
+      // Langfuse deletes asynchronously: pass again until the purge is confirmed (bounded).
+      let compacted = 0;
+      for (let i = 1; ; i++) {
+        const result = await pass(new Date(day(8).getTime() + i * 60_000));
+        compacted += result.langfuseCompacted;
+        if ((await a.scope.langfusePurges.get(a.intentId))?.confirmedAt) break;
+        if (i >= 45)
+          throw new Error(`the Langfuse purge was not confirmed: ${redact(logs.join('\n'))}`);
+        await sleep(2000);
+      }
+      expect(compacted).toBe(1);
+      expect(logs.join('\n')).toContain('retention.langfuse_compacted');
+
+      // The archived project's trace is gone from Langfuse and from ClickHouse's disk.
+      expect(await store.findTraces({ tags: [`run_id:${a.runId}`], max: 10 })).toEqual([]);
+      expect(await onDisk(traceOf[a.runId]!)).toBe(0);
+      // The other project's trace stays.
+      expect(
+        (await store.findTraces({ tags: [`run_id:${b.runId}`], max: 10 })).map((t) => t.traceId),
+      ).toEqual([traceOf[b.runId]]);
+      expect(await onDisk(traceOf[b.runId]!)).toBeGreaterThan(0);
+      // The raw OTLP files older than 24 hours (every tenant) are swept.
+      expect((await rawStore.listKeys('events/otel/', null, 1000)).keys).toEqual([]);
+      // project.purged records the Langfuse purge.
+      const purged = (await a.scope.audit.listForEntity(a.projectId)).filter(
+        (e) => e.action === 'project.purged',
+      );
+      expect(purged.map((e) => e.payload)).toEqual([
+        { intents: 1, purged: 0, held: 0, langfuse: 'purged' },
+      ]);
+      // No secret in a log line.
+      for (const value of Object.values(fields)) expect(logs.join('\n')).not.toContain(value);
+      rawStore.destroy();
+      s3.destroy();
     });
   },
 );

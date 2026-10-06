@@ -52,7 +52,6 @@ D-08 E07 AC4 (QUESTIONS #81): **prepared, waiting for the run.** `pnpm test:agen
 | QUESTIONS #81: one real run with an API model (`pnpm test:agent-api`) | Owner (the key in OpenBao, T11 §5d) | The trial M-E; issue #45 |
 | The live G1 → G8 run on the real pilot (`SDLC_PILOT_LIVE_G8=1 pnpm test:pilot-live`): the plan file merged on the pilot, a second GitHub account for Person B, the dev stack running (GETTING-STARTED Steps 13–14) | Owner | Nothing in the MVP; it is the first real G1 → G8 on GitHub |
 | A10: internal CA and TLS on OpenBao, backup and restore drill, resource measurement | Infrastructure operator | The real deployment on the internal server |
-| E08: purge a project's data from Langfuse | Its own session | Nothing in the MVP (`project.purged` says `langfuse: manual` until then) |
 | MVP+1 user interface scope (web UI, dashboard; D-02 §4.2), written from the trial data after M-E | Claude, for the owner's approval | Nothing in the MVP (D-08 E07 note) |
 
 ## Version history

@@ -56,7 +56,68 @@ describe('worker settings', () => {
         secretPath: 'worker/anchor',
         intervalMs: 3_600_000,
       },
+      // E08: off unless up.sh (profile observability) or .env sets it.
+      langfuse: null,
     });
+  });
+
+  it('E08: the Langfuse purge (origins, the worker KV path, limits; off by default)', () => {
+    expect(
+      loadSettings({
+        SDLC_WORKER_LANGFUSE_URL: 'http://langfuse-web:3000',
+        SDLC_WORKER_LANGFUSE_RAW_MAX_AGE_HOURS: '1',
+      }).langfuse,
+    ).toEqual({
+      url: 'http://langfuse-web:3000',
+      secretPath: 'worker/langfuse',
+      projectId: 'sdlc-platform',
+      clickhouseUrl: 'http://clickhouse:8123',
+      batch: 50,
+      rawUrl: 'http://seaweedfs:8333',
+      rawBucket: 'langfuse',
+      rawMaxAgeHours: 1,
+      rawBatch: 2000,
+    });
+    expect(
+      loadSettings({
+        SDLC_WORKER_LANGFUSE_URL: 'https://lf.example:8443',
+        SDLC_WORKER_LANGFUSE_SECRET_PATH: 'worker/langfuse-2',
+        SDLC_WORKER_LANGFUSE_PROJECT_ID: 'other-project',
+        SDLC_WORKER_LANGFUSE_CLICKHOUSE_URL: 'http://ch:8123',
+        SDLC_WORKER_LANGFUSE_BATCH: '10',
+        SDLC_WORKER_LANGFUSE_RAW_URL: 'http://store:9000',
+        SDLC_WORKER_LANGFUSE_RAW_BUCKET: 'lf-test',
+        SDLC_WORKER_LANGFUSE_RAW_BATCH: '5',
+      }).langfuse,
+    ).toMatchObject({
+      url: 'https://lf.example:8443',
+      secretPath: 'worker/langfuse-2',
+      projectId: 'other-project',
+      clickhouseUrl: 'http://ch:8123',
+      batch: 10,
+      rawUrl: 'http://store:9000',
+      rawBucket: 'lf-test',
+      rawMaxAgeHours: 24,
+      rawBatch: 5,
+    });
+    expect(loadSettings({ SDLC_WORKER_LANGFUSE_URL: 'off' }).langfuse).toBeNull();
+    for (const [name, value] of [
+      ['SDLC_WORKER_LANGFUSE_URL', 'http://langfuse-web:3000/path'],
+      ['SDLC_WORKER_LANGFUSE_URL', 'http://user:pw@langfuse-web:3000'],
+      ['SDLC_WORKER_LANGFUSE_CLICKHOUSE_URL', 'http://ch:8123/?user=x'],
+      ['SDLC_WORKER_LANGFUSE_SECRET_PATH', 'api/langfuse'],
+      ['SDLC_WORKER_LANGFUSE_RAW_MAX_AGE_HOURS', '0'],
+      ['SDLC_WORKER_LANGFUSE_RAW_MAX_AGE_HOURS', '721'],
+      ['SDLC_WORKER_LANGFUSE_RAW_BATCH', '0'],
+      ['SDLC_WORKER_LANGFUSE_BATCH', '1001'],
+      ['SDLC_WORKER_LANGFUSE_RAW_BUCKET', 'Bad_Bucket'],
+      ['SDLC_WORKER_LANGFUSE_PROJECT_ID', 'a b'],
+    ] as const) {
+      expect(
+        () => loadSettings({ SDLC_WORKER_LANGFUSE_URL: 'http://langfuse-web:3000', [name]: value }),
+        `${name}=${value}`,
+      ).toThrow(SettingsError);
+    }
   });
 
   it('E05 PR 2: the audit anchor (an origin, the worker KV path, the loop interval; off)', () => {

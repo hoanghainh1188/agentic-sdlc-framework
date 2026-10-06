@@ -511,6 +511,23 @@ export interface EvidenceHoldsTable {
   created_at: CreatedAt;
 }
 
+/**
+ * The Langfuse purge of one intent (E08, migration 0024, ADR-M53): requested, then confirmed once
+ * on a later pass when its traces are gone. Codes, counts and times only.
+ */
+export interface LangfusePurgesTable {
+  tenant_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  cause: Immutable<'retention' | 'archive'>;
+  /** Traces found by the last request. */
+  traces: ColumnType<number, number, number>;
+  attempts: ColumnType<number, number | undefined, number>;
+  requested_at: Immutable<Date>;
+  last_requested_at: ColumnType<Date, Date, Date>;
+  confirmed_at: ColumnType<Date | null, Date | null | undefined, Date>;
+  created_at: CreatedAt;
+}
+
 type Mutable<T> = ColumnType<T, T | undefined, T>;
 type MutableNullable<T> = ColumnType<T | null, T | null | undefined, T | null>;
 
@@ -638,6 +655,7 @@ export interface Database {
   evidence_items: EvidenceItemsTable;
   evidence_packs: EvidencePacksTable;
   evidence_holds: EvidenceHoldsTable;
+  langfuse_purges: LangfusePurgesTable;
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
@@ -1051,6 +1069,17 @@ export const TABLE_COLUMNS = {
     'release_applied_at',
     'created_at',
   ]),
+  langfuse_purges: columns<LangfusePurgesTable>()([
+    'tenant_id',
+    'intent_id',
+    'cause',
+    'traces',
+    'attempts',
+    'requested_at',
+    'last_requested_at',
+    'confirmed_at',
+    'created_at',
+  ]),
   tenant_role_bindings: columns<TenantRoleBindingsTable>()([
     'id',
     'tenant_id',
@@ -1104,6 +1133,7 @@ export const TENANT_COLUMN = {
   evidence_items: 'tenant_id',
   evidence_packs: 'tenant_id',
   evidence_holds: 'tenant_id',
+  langfuse_purges: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };

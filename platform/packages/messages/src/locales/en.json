@@ -598,6 +598,8 @@
   "worker.start.retention_missing": "The worker's purge credential is not in OpenBao (pnpm openbao:bootstrap worker-purge-credentials): evidence files are not purged, and holds and locks are not applied in the store.",
   "worker.start.anchor_off": "SDLC_WORKER_ANCHOR_URL=off: no daily audit anchor is written or checked.",
   "worker.start.anchor_missing": "The worker's anchor credential is not in OpenBao (pnpm openbao:bootstrap worker-anchor-credentials): no daily audit anchor is written or checked.",
+  "worker.start.langfuse_off": "SDLC_WORKER_LANGFUSE_URL=off: Langfuse is treated as not deployed. No model-call traces are purged, and project.purged records langfuse: not_deployed.",
+  "worker.start.langfuse_missing": "The worker's Langfuse credential is not in OpenBao (pnpm openbao:bootstrap worker-langfuse-credentials): no model-call traces are purged, and archived projects wait for it.",
   "worker.start.evidence_off": "SDLC_WORKER_EVIDENCE_URL=off: the worker builds no release packs. Intents wait at G8.",
   "worker.start.evidence_missing": "The worker's evidence credential is not in OpenBao: the worker builds no release packs, and intents wait at G8. Run: pnpm openbao:bootstrap worker-evidence-credentials.",
   "worker.start.runs_off": "Agent runs are off: the cost-controller AppRole files are not set. Intents wait at G4.",

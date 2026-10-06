@@ -401,6 +401,10 @@ services:
       CLICKHOUSE_DB: default
       CLICKHOUSE_USER: langfuse
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
+      # E08 (ADR-M53 §2.3): the user `langfuse` (already the owner of every Langfuse table) may
+      # create users, so `openbao:bootstrap worker-langfuse-credentials` can make `sdlc_purge`
+      # (only ALTER DELETE on events_full and events_core, for APPLY DELETED MASK).
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - clickhouse-logs:/var/log/clickhouse-server
@@ -629,6 +633,17 @@ services:
       # Without the credential: no anchors.
       SDLC_WORKER_ANCHOR_URL: http://seaweedfs:8333
       SDLC_WORKER_ANCHOR_BUCKET: audit-anchors
+      # E08 (ADR-M53): the Langfuse purge in the retention loop with kv/worker/langfuse
+      # (`openbao:bootstrap worker-langfuse-credentials`). `off` = Langfuse not deployed
+      # (`project.purged` records `not_deployed`); up.sh sets http://langfuse-web:3000 with the
+      # profile observability, or when Langfuse's ClickHouse volume exists (data may be there).
+      SDLC_WORKER_LANGFUSE_URL: ${SDLC_WORKER_LANGFUSE_URL:-off}
+      # The Langfuse project the collector writes to: the worker's key must belong to it.
+      SDLC_WORKER_LANGFUSE_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-sdlc-platform}
+      SDLC_WORKER_LANGFUSE_CLICKHOUSE_URL: http://clickhouse:8123
+      SDLC_WORKER_LANGFUSE_RAW_URL: http://seaweedfs:8333
+      SDLC_WORKER_LANGFUSE_RAW_BUCKET: langfuse
+      SDLC_WORKER_LANGFUSE_RAW_MAX_AGE_HOURS: ${SDLC_WORKER_LANGFUSE_RAW_MAX_AGE_HOURS:-24}
     volumes:
       - worker-approle:/run/sdlc/approle
       - worker-cost-approle:/run/sdlc/cost-approle
