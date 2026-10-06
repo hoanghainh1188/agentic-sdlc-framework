@@ -466,7 +466,7 @@ services:
         ]
 
   langfuse-web:
-    image: langfuse/langfuse:4.47.0
+    image: langfuse/langfuse:4.50.0
     profiles: [observability]
     restart: unless-stopped
     networks: [sdlc]
