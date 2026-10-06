@@ -33,7 +33,7 @@ async function main(): Promise<void> {
     settings.database.kind === 'openbao' ? OpenBaoClient.fromEnv(process.env, log) : undefined;
   await openbao?.assertReady();
   const secrets = openbao?.kv();
-  const db = await connectDatabase(settings, secrets);
+  const db = await connectDatabase(settings, secrets, log);
   const gitHost = secrets
     ? new GitHubAdapter({
         secrets,

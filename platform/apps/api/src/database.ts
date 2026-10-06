@@ -3,7 +3,7 @@
 // B08 (ADR-M39 §2.2): the OpenBao client stays open, because the GitHub adapter of the spec
 // endpoints reads the App key again from time to time (ADR-M23 §2.2). Dev mode takes a URL.
 import type { SecretReader } from '@sdlc/contracts';
-import { PlatformDatabase } from '@sdlc/core';
+import { logIdleDbErrors, PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 
 import { DB_USER, type ApiSettings } from './settings.js';
 
@@ -16,12 +16,15 @@ export const DB_PASSWORD_FIELD = 'password';
 export async function connectDatabase(
   settings: ApiSettings,
   secrets: SecretReader | undefined,
+  logger: PlatformLogger,
 ): Promise<PlatformDatabase> {
+  const onIdleError = logIdleDbErrors(logger);
   const db = settings.database;
   if (db.kind === 'dev_url') {
     return PlatformDatabase.connect({
       connectionString: db.url,
       applicationName: APPLICATION_NAME,
+      onIdleError,
     });
   }
   if (!secrets) throw new Error('OpenBao is required outside dev mode');
@@ -34,5 +37,6 @@ export async function connectDatabase(
   return PlatformDatabase.connect({
     connectionString: url.toString(),
     applicationName: APPLICATION_NAME,
+    onIdleError,
   });
 }
