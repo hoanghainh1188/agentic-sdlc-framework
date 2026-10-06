@@ -6,7 +6,9 @@
 #
 # Actions minutes (GitHub Free: 2,000 per month for the whole organization). GitHub bills every
 # job rounded up to a whole minute, so short checks share one job (`scan`). A push to main runs
-# nothing: the pull request already ran every check, and the daily run checks main again.
+# nothing: the pull request already ran every check. The daily run only scans (new CVEs); the
+# weekly run runs every job on main. The repository moved to the personal account hoanghainh1188
+# on 2026-10-06 (its own 2,000 minutes per month).
 name: ci
 
 on:
@@ -15,7 +17,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   schedule:
     # Keep these two strings equal to DAILY_CRON and WEEKLY_CRON below.
-    - cron: '0 18 * * 1-6' # daily, 03:00 JST: new CVEs; checks and db when main changed
+    - cron: '0 18 * * 1-6' # daily, 03:00 JST: the scan job only (new CVEs)
     - cron: '0 18 * * 0' # weekly, Monday 03:00 JST: every job, including the heavy ones
   workflow_dispatch: # every job
 
@@ -56,6 +58,8 @@ jobs:
     timeout-minutes: 15
     outputs:
       run_checks: ${{ steps.decide.outputs.run_checks }}
+      run_db: ${{ steps.decide.outputs.run_db }}
+      run_pilot: ${{ steps.decide.outputs.run_pilot }}
       run_compose: ${{ steps.decide.outputs.run_compose }}
       run_sandbox_image: ${{ steps.decide.outputs.run_sandbox_image }}
       run_fresh_deploy: ${{ steps.decide.outputs.run_fresh_deploy }}
@@ -82,14 +86,26 @@ jobs:
             daily=true
           fi
 
-          # checks and db: every pull request. The daily run skips them when main has no commit
-          # in the last 25 hours (the pull requests already ran them on that code).
-          checks=true; reason="always, except on a daily run without changes on main"
-          if [ "$daily" = true ] && [ -z "$(git log -1 --since='25 hours ago' --format=%H HEAD)" ]; then
-            checks=false; reason="daily run and main unchanged in the last 25 hours"
+          # checks: every pull request, weekly and manual runs. The daily run only scans: the pull
+          # requests already ran the checks on that code, and the weekly run checks main again.
+          checks=true; reason="every pull request, weekly and manual runs"
+          if [ "$daily" = true ]; then
+            checks=false; reason="daily run: the scan job only"
           fi
           echo "run_checks=$checks" >> "$GITHUB_OUTPUT"
-          echo "checks and db jobs: run=$checks ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "checks job: run=$checks ($reason)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # db: like checks, except a pull request that changes documentation only (Markdown, the
+          # design docs, the handbook, diagrams, the backlog CSV): no DB or workflow test reads them.
+          db=$checks; dbwhy="$reason"
+          if [ "$checks" = true ] && [ "$EVENT_NAME" = pull_request ] \
+            && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null \
+            && [ -z "$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
+              | grep -vE '\.(md|mmd|svg|csv)$|^(design|handbook|diagrams|_review)/' || true)" ]; then
+            db=false; dbwhy="documentation only"
+          fi
+          echo "run_db=$db" >> "$GITHUB_OUTPUT"
+          echo "db job: run=$db ($dbwhy)" | tee -a "$GITHUB_STEP_SUMMARY"
 
           # Heavy jobs: pull requests that change their paths (not while a draft), weekly and
           # manual runs. They also wait for the checks job to pass.
@@ -124,10 +140,15 @@ jobs:
             platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts platform/tests/integration/deploy/seaweedfs-access.test.ts
 
           # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
-          # C09: the gate steps and the worker too, which the pilot suite runs with the real runner.
           decide_heavy run_sandbox_image "Sandbox image job" \
-            "a sandbox image, the runner, the agent adapter, the package proxy, the gate steps, the worker or a live test" \
-            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/ platform/packages/core/src/workflow/ platform/apps/worker/ platform/tests/integration/pilot/ platform/tests/integration/workflow/g1-g3/
+            "a sandbox image, the runner, the agent adapter, the package proxy or a live test" \
+            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/
+
+          # C09: the pilot suite (G1–G8 with the real runner, about 7 minutes) runs on weekly and
+          # manual runs only. After a pull request that changes the gate steps, the worker or the
+          # pilot suite, run it by hand: gh workflow run ci --ref <branch>.
+          echo "run_pilot=$all" >> "$GITHUB_OUTPUT"
+          echo "Pilot suite (in the sandbox image job): run=$all (weekly and manual runs only)" | tee -a "$GITHUB_STEP_SUMMARY"
 
           # E07 (D-08 E07 AC3): the fresh deployment that follows platform/deploy/README.md. The
           # longest job: weekly and manual runs only, never on a pull request.
@@ -374,7 +395,9 @@ jobs:
       # C09 (D-08 C09 AC1–AC5): G1–G6 on the sample repository's shape with the real runner, the
       # node24 sandbox and the Agent Server (stub model), the intent workflow on the Temporal test
       # server, a local Git host that protects main, and a throw-away PostgreSQL. One file at a time.
-      - run: pnpm test:pilot
+      # Weekly and manual runs only (Actions minutes).
+      - if: needs.scan.outputs.run_pilot == 'true'
+        run: pnpm test:pilot
       - name: Remove the image archive
         if: always()
         run: rm -f "$RUNNER_TEMP/node24.tar"
@@ -411,8 +434,9 @@ jobs:
     # script as Compose). Runs on every PR: DB code changes outside platform/deploy/ too.
     name: integration (database)
     needs: scan
-    # Same condition as checks: only the daily run on an unchanged main skips it.
-    if: ${{ !cancelled() && needs.scan.outputs.run_checks != 'false' }}
+    # Like checks, but a documentation-only pull request skips it. != 'false': runs when scan
+    # could not decide.
+    if: ${{ !cancelled() && needs.scan.outputs.run_db != 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:

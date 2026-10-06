@@ -74,7 +74,7 @@ describe('AC1: lint, type check and unit tests run on every PR', () => {
     expect(ciEnv.WEEKLY_CRON).toBe('0 18 * * 0'); // never on the same day as the daily run
   });
 
-  it('checks runs on every pull request; only a daily run on an unchanged main skips it', () => {
+  it('checks runs on every pull request, weekly and manual run; the daily run only scans', () => {
     const condition = "${{ !cancelled() && needs.scan.outputs.run_checks != 'false' }}";
     expect(job('checks').needs).toBe('scan');
     expect(job('checks').if).toBe(condition);
@@ -83,9 +83,7 @@ describe('AC1: lint, type check and unit tests run on every PR', () => {
     // The only line that sets run_checks to false is guarded by the daily run.
     const falseLines = scan.split('\n').filter((line) => line.includes('checks=false'));
     expect(falseLines).toHaveLength(1);
-    expect(scan).toMatch(
-      /if \[ "\$daily" = true \] && \[ -z "\$\(git log -1 --since='25 hours ago'[^\n]*\n\s*checks=false;/,
-    );
+    expect(scan).toMatch(/if \[ "\$daily" = true \]; then\s*checks=false;/);
     expect(scan).toMatch(/elif \[ "\$EVENT_NAME" = schedule \]; then\s*daily=true/);
   });
 
@@ -219,17 +217,20 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(scan).toContain('git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- "$@"');
   });
 
-  it('C09: the sandbox image job runs the pilot suite, also when the gate steps or the worker change', () => {
-    const steps = job('sandbox-image').steps.map((s) => s.run ?? '');
-    expect(steps.indexOf('pnpm test:pilot')).toBeGreaterThan(steps.indexOf('pnpm test:agent'));
+  it('C09: the sandbox image job runs the pilot suite on weekly and manual runs only (minutes)', () => {
+    const steps = job('sandbox-image').steps;
+    const runs = steps.map((s) => s.run ?? '');
+    const pilot = runs.indexOf('pnpm test:pilot');
+    expect(pilot).toBeGreaterThan(runs.indexOf('pnpm test:agent'));
+    expect(steps[pilot]).toMatchObject({ if: "needs.scan.outputs.run_pilot == 'true'" });
+    expect(job('scan').outputs?.run_pilot).toBeDefined();
     const scan = runText('scan');
+    expect(scan).toContain('echo "run_pilot=$all" >> "$GITHUB_OUTPUT"');
+    // The gate steps and the worker no longer start the sandbox image job on a pull request.
     const paths = scan.slice(scan.indexOf('decide_heavy run_sandbox_image')).split('\n\n')[0]!;
-    for (const p of [
-      'platform/packages/core/src/workflow/',
-      'platform/apps/worker/',
-      'platform/tests/integration/pilot/',
-    ])
-      expect(paths.split(/\s+/)).toContain(p);
+    for (const p of ['platform/packages/core/src/workflow/', 'platform/apps/worker/'])
+      expect(paths.split(/\s+/)).not.toContain(p);
+    expect(paths.split(/\s+/)).toContain('platform/apps/runner/');
   });
 
   it('E07: the fresh deployment job runs on the weekly schedule and on demand only, and cleans up', () => {
@@ -266,9 +267,18 @@ describe('AC2: integration job runs the Compose core profile', () => {
 });
 
 describe('A06: database integration job', () => {
-  it('runs the DB tests on every PR (same condition as checks), and ci-ok waits for it', () => {
+  it('runs the DB tests like checks, except on a documentation-only PR, and ci-ok waits for it', () => {
     expect(job('db').needs).toBe('scan');
-    expect(job('db').if).toBe(job('checks').if);
+    expect(job('db').if).toBe("${{ !cancelled() && needs.scan.outputs.run_db != 'false' }}");
+    expect(job('scan').outputs?.run_db).toBeDefined();
+    const scan = runText('scan');
+    expect(scan).toContain('db=$checks;');
+    expect(scan).toContain(
+      String.raw`grep -vE '\.(md|mmd|svg|csv)$|^(design|handbook|diagrams|_review)/'`,
+    );
+    // Only a pull request with a known base and documentation-only changes skips it.
+    expect(scan).toMatch(/\[ "\$EVENT_NAME" = pull_request \]/);
+    expect(scan.split('\n').filter((line) => line.includes('db=false'))).toHaveLength(1);
     expect(runText('db')).toContain('pnpm test:db');
     expect(job('ci-ok').needs).toContain('db');
   });
