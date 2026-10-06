@@ -57,6 +57,8 @@ describeDb('C06 session 2: the run after G4 on PostgreSQL', () => {
   });
 
   const reload = (intent: Intent) => t.reload(intent);
+  /** The escalation actions on the test clock (the registry's). */
+  const clockDeps = { now: () => t.f.registry.now() };
   const runs = (intent: Intent) => t.f.scope.runs.listForIntent(intent.id);
 
   /** A Medium intent at `running` with no run yet. */
@@ -171,12 +173,20 @@ describeDb('C06 session 2: the run after G4 on PostgreSQL', () => {
     expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'run_review' });
 
     // Person B (technical route) acknowledges and decides `resume` for this run's contract.
-    await acknowledgeEscalation(t.f.scope, { escalationId: escalation!.id, actorId: t.f.users.b });
-    await decideEscalation(t.f.scope, {
-      escalationId: escalation!.id,
-      actorId: t.f.users.b,
-      decision: 'resume',
-    });
+    await acknowledgeEscalation(
+      t.f.scope,
+      { escalationId: escalation!.id, actorId: t.f.users.b },
+      clockDeps,
+    );
+    await decideEscalation(
+      t.f.scope,
+      {
+        escalationId: escalation!.id,
+        actorId: t.f.users.b,
+        decision: 'resume',
+      },
+      clockDeps,
+    );
     // Back at G4, decided again by POLICY, and running with a new round.
     expect(await t.settleRuns(intent)).toEqual({ outcome: 'run_prepare' });
     expect(await notices(t, intent)).toContain('run_resumed');
@@ -204,7 +214,11 @@ describeDb('C06 session 2: the run after G4 on PostgreSQL', () => {
     expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G4' });
     const escalation = (await t.f.scope.escalations.listForIntent(intent.id)).at(-1)!;
     expect(escalation).toMatchObject({ run_id: runId, route: 'technical' });
-    await acknowledgeEscalation(t.f.scope, { escalationId: escalation.id, actorId: t.f.users.b });
+    await acknowledgeEscalation(
+      t.f.scope,
+      { escalationId: escalation.id, actorId: t.f.users.b },
+      clockDeps,
+    );
     return { intent, escalationId: escalation.id };
   }
 

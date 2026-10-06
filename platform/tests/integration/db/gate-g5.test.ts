@@ -37,6 +37,7 @@ import {
   T0,
   type Harness,
 } from '../g4-harness.js';
+import { LATER_WALL_CLOCK, withWallClock } from '../wall-clock.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
 const DAY = 24 * HOUR;
@@ -156,16 +157,24 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
     extra: { actions?: ('run_start' | 'budget_increase')[]; budgetIncreaseUsd?: string } = {},
   ) {
     const escalation = await g5Escalation(intent);
-    await acknowledgeEscalation(t.f.scope, {
-      escalationId: escalation.id,
-      actorId: t.f.users[who],
-    });
-    await decideEscalation(t.f.scope, {
-      escalationId: escalation.id,
-      actorId: t.f.users[who],
-      decision,
-      ...extra,
-    });
+    await acknowledgeEscalation(
+      t.f.scope,
+      {
+        escalationId: escalation.id,
+        actorId: t.f.users[who],
+      },
+      clockDeps,
+    );
+    await decideEscalation(
+      t.f.scope,
+      {
+        escalationId: escalation.id,
+        actorId: t.f.users[who],
+        decision,
+        ...extra,
+      },
+      clockDeps,
+    );
     return escalation;
   }
 
@@ -384,41 +393,50 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
       });
     });
 
-    it('an expired decision is voided; a decision on another result is voided (FR-17)', async () => {
-      const intent = await atG4(t, 'medium');
-      const runId = await runToG5(intent, { status: 'stopped_budget', reason: 'max_budget' });
-      await t.settleRuns(intent);
-      const escalation = await decide(intent, 'a', 'resume');
-      t.setClock(new Date(T0.getTime() + 15 * DAY)); // approval_expiry: 7 working days
-      expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'g5_review' });
-      expect((await t.f.scope.escalations.getById(escalation.id))?.status).toBe('acknowledged');
+    // The test clock decides; the real date never does (a decision once expired on the wall
+    // clock and this test broke after 2026-10-06).
+    it.each([
+      ['the real date', null],
+      ['2027-06-01', LATER_WALL_CLOCK],
+    ] as const)(
+      'an expired decision is voided; a decision on another result is voided (FR-17), wall clock %s',
+      async (_, wallClock) =>
+        withWallClock(wallClock, async () => {
+          const intent = await atG4(t, 'medium');
+          const runId = await runToG5(intent, { status: 'stopped_budget', reason: 'max_budget' });
+          await t.settleRuns(intent);
+          const escalation = await decide(intent, 'a', 'resume');
+          t.setClock(new Date(T0.getTime() + 15 * DAY)); // approval_expiry: 7 working days
+          expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'g5_review' });
+          expect((await t.f.scope.escalations.getById(escalation.id))?.status).toBe('acknowledged');
 
-      // A late spend sync changes the G5 input: the new decision is voided, the escalation
-      // closed, and G5 raises a new escalation bound to the new input.
-      await decideEscalation(
-        t.f.scope,
-        { escalationId: escalation.id, actorId: t.f.users.a, decision: 'resume' },
-        clockDeps,
-      );
-      await spend(intent, runId, '0.01');
-      expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'g5_review' });
-      const voided = await t.f.scope.audit.listForEntity(escalation.id, [
-        'escalation.decision_voided',
-      ]);
-      expect(voided.map((e) => (e.payload as { reason: string }).reason)).toEqual([
-        'expired',
-        'input_mismatch',
-      ]);
-      expect((await t.f.scope.escalations.getById(escalation.id))?.status).toBe('closed');
-      const latest = await g5Escalation(intent);
-      expect(latest.id).not.toBe(escalation.id);
-      expect(latest.packet.subject_sha256).not.toBe(escalation.packet.subject_sha256);
-      expect(await g5(intent)).toEqual([
-        ['fail', 'budget_exceeded', 'HOTL'],
-        ['fail', 'budget_exceeded', 'HOTL'],
-      ]);
-      expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G5' });
-    });
+          // A late spend sync changes the G5 input: the new decision is voided, the escalation
+          // closed, and G5 raises a new escalation bound to the new input.
+          await decideEscalation(
+            t.f.scope,
+            { escalationId: escalation.id, actorId: t.f.users.a, decision: 'resume' },
+            clockDeps,
+          );
+          await spend(intent, runId, '0.01');
+          expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'g5_review' });
+          const voided = await t.f.scope.audit.listForEntity(escalation.id, [
+            'escalation.decision_voided',
+          ]);
+          expect(voided.map((e) => (e.payload as { reason: string }).reason)).toEqual([
+            'expired',
+            'input_mismatch',
+          ]);
+          expect((await t.f.scope.escalations.getById(escalation.id))?.status).toBe('closed');
+          const latest = await g5Escalation(intent);
+          expect(latest.id).not.toBe(escalation.id);
+          expect(latest.packet.subject_sha256).not.toBe(escalation.packet.subject_sha256);
+          expect(await g5(intent)).toEqual([
+            ['fail', 'budget_exceeded', 'HOTL'],
+            ['fail', 'budget_exceeded', 'HOTL'],
+          ]);
+          expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G5' });
+        }),
+    );
 
     it('decision A: modify → G3, HITL from now on, the same plan may be approved', async () => {
       const intent = await atG4(t, 'medium');
