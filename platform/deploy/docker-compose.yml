@@ -270,7 +270,7 @@ services:
   # OpenBao. Needs OpenBao unsealed and configured, and its AppRole credentials delivered
   # (`openbao/bootstrap.sh litellm-credentials`, runbook T11).
   litellm-agent:
-    image: openbao/openbao:2.6.3
+    image: openbao/openbao:2.7.1
     profiles: [models]
     restart: unless-stopped
     networks: [sdlc]
@@ -363,7 +363,7 @@ services:
     entrypoint: [/bin/sh, /scripts/create-buckets.sh]
 
   openbao:
-    image: openbao/openbao:2.6.3
+    image: openbao/openbao:2.7.1
     profiles: [core, observability]
     restart: unless-stopped
     networks: [sdlc]
