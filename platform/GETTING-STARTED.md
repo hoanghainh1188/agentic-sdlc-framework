@@ -30,7 +30,7 @@ Building the platform is **internal work** with no client data, so Claude Code m
 ## Step 1. Create the repo on GitHub and push
 
 1. Create a **private** repository `agentic-sdlc-framework`. Do not add a README, licence or `.gitignore` (the repo already has them).
-   - Current repository: `github.com/harryforge/agentic-sdlc-framework`, organization `harryforge` on the **GitHub Free** plan (Harry, 2026-09-24). Suggested mitigations: two-factor authentication for all members; a second trusted owner; an offline mirror (`git clone --mirror`); move to a company-controlled organization before any client or sales use.
+   - Current repository: `github.com/hoanghainh1188/agentic-sdlc-framework`, personal account on the **GitHub Free** plan (moved from the organization `harryforge` on 2026-10-06; Harry). The sample repo and the test GitHub App stay in `harryforge`. Suggested mitigations: two-factor authentication for all members; a second trusted owner; an offline mirror (`git clone --mirror`); move to a company-controlled organization before any client or sales use.
 2. Unzip, copy the folder where you want it, and push **one initial commit** (the repository history starts here):
 
 ```bash
@@ -41,7 +41,7 @@ git init
 git add .
 git commit -m "Initial commit: handbook v1.0 (in review), design v1.0 (approved)"
 git branch -M main
-git remote add origin git@github.com:harryforge/agentic-sdlc-framework.git
+git remote add origin git@github.com:hoanghainh1188/agentic-sdlc-framework.git
 git push -u origin main
 
 # mark the approved design on this first commit
@@ -80,10 +80,10 @@ Do this **after** the first push, so protection does not block it.
 
 ```bash
 # Dry run: shows what would be created, creates nothing
-python3 scripts/create-issues.py --repo harryforge/agentic-sdlc-framework --dry-run
+python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework --dry-run
 
 # Create: 5 milestones (M-A, M-B, M-0, M-C, M-D), labels, 49 issues
-python3 scripts/create-issues.py --repo harryforge/agentic-sdlc-framework
+python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework
 ```
 
 - Safe to run again: issues that already exist (same `[ID] ` title prefix) are skipped.
@@ -229,7 +229,7 @@ Done once by the repo owner in the browser. Claude must never read or handle the
 | Field | Value |
 |---|---|
 | GitHub App name | `harryforge-sdlc-dev` |
-| Homepage URL | `https://github.com/harryforge/agentic-sdlc-framework` |
+| Homepage URL | `https://github.com/hoanghainh1188/agentic-sdlc-framework` (any URL works; the App was created with the old one) |
 | Callback URL | empty |
 | Webhook → Active | **off** (the MVP polls, QUESTIONS #43, ADR-M11) |
 | Where can this App be installed | Only on this account |
