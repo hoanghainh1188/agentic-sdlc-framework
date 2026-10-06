@@ -69,17 +69,19 @@ export const AUDIT_ACTIONS = {
    */
   'project.archived': { entityType: 'project', fields: {} },
   /**
-   * The retention loop purged every evidence file of an archived project that is not held (E05,
-   * FR-44, ADR-M51): counts of rows. Written once per project. `langfuse` is `manual` in the MVP:
-   * the project's traces in Langfuse are deleted by hand (runbook T11 §5j, QUESTIONS #238).
-   */
-  /**
    * The retention loop, in `purge` mode, scheduled the purge of an archived project (E05, ADR-M51
    * §2.6): its evidence is purged `grace_days` after the later of this event and the archive.
    * Written once per archive, so a project archived before the purge was turned on still gets the
    * whole grace period, visible in the audit log.
    */
   'project.purge_scheduled': { entityType: 'project', fields: { grace_days: 'count' } },
+  /**
+   * The retention loop purged every evidence file of an archived project that is not held (E05,
+   * FR-44, ADR-M51): counts of rows. Written once per project. `langfuse` (E08, ADR-M53): `purged`
+   * (every finished, not held intent's traces are confirmed deleted), `not_deployed` (the worker's
+   * Langfuse purge is off: `SDLC_WORKER_LANGFUSE_URL=off`), or `manual` in events written before
+   * E08 (runbook T11 §5j).
+   */
   'project.purged': {
     entityType: 'project',
     fields: { intents: 'count', purged: 'count', held: 'count', langfuse: 'code' },
@@ -501,6 +503,23 @@ export const AUDIT_ACTIONS = {
   'audit.anchor_mismatch': {
     entityType: 'tenant',
     fields: { checked: 'count', mismatched: 'count', reason: 'code', first_seq: 'count?' },
+  },
+  /**
+   * The retention loop asked Langfuse to delete the intent's model-call traces (E08, ADR-M53):
+   * the traces it found by the intent's run tags, all checked. Langfuse deletes asynchronously;
+   * `langfuse.purged` follows on a later pass. Counts and codes only, never a trace ID or a tag.
+   */
+  'langfuse.purge_requested': {
+    entityType: 'intent',
+    fields: { traces: 'count', attempt: 'count', cause: 'code' },
+  },
+  /**
+   * The intent's traces are no longer found in Langfuse (E08, ADR-M53): the purge is confirmed.
+   * `traces` is what the last request found (0: the intent had none).
+   */
+  'langfuse.purged': {
+    entityType: 'intent',
+    fields: { traces: 'count', attempts: 'count', cause: 'code' },
   },
   /** A person put an intent's evidence on hold (E05, QUESTIONS #235): never purged until released. */
   'evidence.hold_set': { entityType: 'intent', fields: { hold_id: 'uuid' } },

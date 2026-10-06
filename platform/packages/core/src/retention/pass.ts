@@ -24,9 +24,15 @@ import type { TenantId } from '../db/tenant-id.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import type { PlatformLogger } from '../observability/logger.js';
 import { loadEffectiveConfig } from '../registry/effective-config.js';
+import { archiveDueFor } from './archive.js';
+import {
+  langfuseFinish,
+  langfuseStart,
+  langfuseTenantPass,
+  type LangfusePurgeDeps,
+} from './langfuse-pass.js';
 import {
   addDays,
-  archivePurgeDue,
   BUCKET_LOCK_DAYS,
   guardTrips,
   LOCK_EXTENSION_MARGIN_DAYS,
@@ -35,6 +41,8 @@ import {
   retentionCutoff,
   type PurgeCause,
 } from './rules.js';
+
+export { archiveTimes } from './archive.js';
 
 export type RetentionMode = 'report' | 'purge';
 
@@ -64,6 +72,10 @@ export interface RetentionPassDeps {
    * (review of E05 PR 1); without this set the sweep only counts.
    */
   readonly orphanSuspects?: Set<string>;
+  /**
+   * E08 (ADR-M53): the Langfuse purge. Absent: `not_deployed` (`project.purged` records it).
+   */
+  readonly langfuse?: LangfusePurgeDeps;
 }
 
 export interface RetentionCounts {
@@ -82,6 +94,21 @@ export interface RetentionCounts {
   archivesScheduled: number;
   orphansFound: number;
   orphansSwept: number;
+  /** E08: intents whose Langfuse traces may be purged (in `report` mode: what would be). */
+  langfuseDue: number;
+  /** E08: delete requests sent to Langfuse. */
+  langfuseRequested: number;
+  /** E08: purges confirmed (the intent's traces are no longer found). */
+  langfuseConfirmed: number;
+  /** E08: traces whose tags do not match their intent: nothing of that intent is deleted. */
+  langfuseMismatched: number;
+  /** E08: intents with more traces than the per-intent guard allows. */
+  langfuseGuardTripped: number;
+  /** E08: raw OTLP files older than the maximum age (in `report` mode: what would be swept). */
+  langfuseRawFound: number;
+  langfuseRawSwept: number;
+  /** E08: ClickHouse compactions (`APPLY DELETED MASK`). */
+  langfuseCompacted: number;
 }
 
 export interface RetentionPassResult extends RetentionCounts {
@@ -110,6 +137,14 @@ const emptyCounts = (): RetentionCounts => ({
   archivesScheduled: 0,
   orphansFound: 0,
   orphansSwept: 0,
+  langfuseDue: 0,
+  langfuseRequested: 0,
+  langfuseConfirmed: 0,
+  langfuseMismatched: 0,
+  langfuseGuardTripped: 0,
+  langfuseRawFound: 0,
+  langfuseRawSwept: 0,
+  langfuseCompacted: 0,
 });
 
 /** A code for logs, never an error message. */
@@ -127,9 +162,11 @@ export async function runRetentionPass(
   orphanCursor: string | null,
 ): Promise<RetentionPassResult> {
   const counts = emptyCounts();
+  // E08: the Langfuse key must belong to the expected project before any Langfuse step.
+  await langfuseStart(deps);
   for (const tenant of await deps.db.system.listTenants()) {
     try {
-      await tenantPass(deps, deps.db.forTenant(tenant.id as TenantId), counts);
+      await tenantPass(deps, deps.db.forTenant(tenant.id as TenantId), tenant.slug, counts);
     } catch (error) {
       counts.failed += 1;
       deps.logger.log('error', 'retention.tenant_failed', {
@@ -145,6 +182,7 @@ export async function runRetentionPass(
     counts.failed += 1;
     deps.logger.log('error', 'retention.orphans_failed', { error: errorCode(error) });
   }
+  await langfuseFinish(deps, counts);
   return { ...counts, orphanCursor: next };
 }
 
@@ -163,6 +201,7 @@ interface ProjectPlan {
 async function tenantPass(
   deps: RetentionPassDeps,
   scope: TenantScope,
+  tenantSlug: string,
   counts: RetentionCounts,
 ): Promise<void> {
   await applyHolds(deps, scope, counts);
@@ -186,6 +225,7 @@ async function tenantPass(
   }
   const forRetention = candidates.filter((c) => c.cause === 'retention');
   let selected = candidates;
+  let guardTripped = false;
   // The guard counts every row due for retention, not only this pass's batch, so a bug that makes
   // every row due trips it even when the batch is small.
   const dueForRetention = forRetention.length > 0 ? retentionDue.value : 0;
@@ -197,6 +237,7 @@ async function tenantPass(
     })
   ) {
     counts.guardTripped += 1;
+    guardTripped = true;
     deps.logger.log('warn', 'retention.guard_tripped', {
       tenant_id: scope.tenantId,
       candidates: dueForRetention,
@@ -206,6 +247,10 @@ async function tenantPass(
   counts.eligible += selected.length;
   if (deps.settings.mode === 'purge') {
     for (const candidate of selected) await purgeOne(deps, scope, candidate, counts);
+  }
+  // E08 (ADR-M53): the intents' Langfuse traces, before an archived project can be complete.
+  await langfuseTenantPass(deps, scope, tenantSlug, counts, guardTripped);
+  if (deps.settings.mode === 'purge') {
     for (const project of archived) await completeArchive(deps, scope, project.id, counts);
   }
 }
@@ -259,64 +304,6 @@ async function projectPass(
     if (decision.purge) candidates.push({ row, cause: decision.cause, retentionDays, archiveDue });
   }
   return { candidates, archiveDue, retentionDue };
-}
-
-/**
- * Whether an archived project's evidence may be purged. The grace period runs from the later of
- * the archive (`project.archived`) and the time the loop, in `purge` mode, first scheduled the
- * purge (`project.purge_scheduled`, written once per archive). So a project archived before the
- * purge was turned on (or before E05) still gets the full grace period from the first `purge`
- * pass, with an audit event and a log line an operator can see (review of E05 PR 1).
- */
-async function archiveDueFor(
-  deps: RetentionPassDeps,
-  scope: TenantScope,
-  projectId: string,
-  now: Date,
-  counts: RetentionCounts,
-): Promise<boolean> {
-  const { archivedAt, scheduledAt } = await archiveTimes(scope, projectId);
-  if (archivedAt === null) return false;
-  if (scheduledAt === null) {
-    if (deps.settings.mode !== 'purge') return false;
-    await scope.audit.append({
-      action: 'project.purge_scheduled',
-      actorType: 'system',
-      actorId: null,
-      entityId: projectId,
-      payload: { grace_days: deps.settings.archiveGraceDays },
-      occurredAt: now,
-    });
-    counts.archivesScheduled += 1;
-    deps.logger.log('warn', 'retention.archive_purge_scheduled', {
-      tenant_id: scope.tenantId,
-      project_id: projectId,
-      grace_days: deps.settings.archiveGraceDays,
-    });
-    return false;
-  }
-  const start = archivedAt > scheduledAt ? archivedAt : scheduledAt;
-  return archivePurgeDue(now, start, deps.settings.archiveGraceDays);
-}
-
-/** The latest archive of a project and the purge scheduled after it (null when none). */
-export async function archiveTimes(
-  scope: TenantScope,
-  projectId: string,
-): Promise<{ archivedAt: Date | null; scheduledAt: Date | null }> {
-  const events = await scope.audit.listForEntity(projectId, [
-    'project.archived',
-    'project.purge_scheduled',
-  ]);
-  const archived = events.filter((e) => e.action === 'project.archived').at(-1);
-  if (!archived) return { archivedAt: null, scheduledAt: null };
-  const scheduled = events
-    .filter((e) => e.action === 'project.purge_scheduled' && Number(e.seq) > Number(archived.seq))
-    .at(-1);
-  return {
-    archivedAt: new Date(archived.occurred_at),
-    scheduledAt: scheduled ? new Date(scheduled.occurred_at) : null,
-  };
 }
 
 /** Every URI must be in the bucket, under one of the evidence prefixes, in this tenant's folder. */
@@ -512,6 +499,8 @@ async function completeArchive(
   try {
     const tally = await scope.retention.projectCounts(projectId);
     if (tally.remaining > 0 || tally.open > 0) return;
+    const langfuse = await langfuseOutcome(deps, scope, projectId);
+    if (langfuse === 'wait') return;
     await scope.transaction(async (tx) => {
       const done = await tx.audit.listForEntity(projectId, ['project.purged']);
       if (done.length > 0) return;
@@ -524,8 +513,9 @@ async function completeArchive(
           intents: tally.intents,
           purged: tally.purged,
           held: tally.held,
-          // QUESTIONS #238: the project's Langfuse traces are deleted by hand (runbook T11 §5j).
-          langfuse: 'manual',
+          // E08 (ADR-M53): every finished, not held intent's traces are confirmed deleted, or the
+          // worker's Langfuse purge is off.
+          langfuse,
         },
       });
       counts.projectsPurged += 1;
@@ -544,6 +534,28 @@ async function completeArchive(
       error: errorCode(error),
     });
   }
+}
+
+/**
+ * What `project.purged` records about Langfuse, or `wait`: Langfuse is configured but its purge
+ * cannot run (no credential), or some finished, not held intent's traces are not confirmed
+ * deleted yet. The project is complete only when Langfuse is too (FR-44, ADR-M53 §2.6).
+ */
+async function langfuseOutcome(
+  deps: RetentionPassDeps,
+  scope: TenantScope,
+  projectId: string,
+): Promise<'purged' | 'not_deployed' | 'wait'> {
+  const langfuse = deps.langfuse ?? { status: 'not_deployed' as const };
+  if (langfuse.status === 'not_deployed') return 'not_deployed';
+  if (langfuse.status === 'unavailable') {
+    deps.logger.log('warn', 'retention.project_purge_waits_langfuse', {
+      tenant_id: scope.tenantId,
+      project_id: projectId,
+    });
+    return 'wait';
+  }
+  return (await scope.langfusePurges.unconfirmedCount(projectId)) > 0 ? 'wait' : 'purged';
 }
 
 /** One page of pack files; files without a row and older than the grace are deleted (`purge`). */

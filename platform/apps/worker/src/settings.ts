@@ -50,6 +50,15 @@ export const WORKER_ENV = {
   anchorUrl: 'SDLC_WORKER_ANCHOR_URL',
   anchorBucket: 'SDLC_WORKER_ANCHOR_BUCKET',
   anchorSecretPath: 'SDLC_WORKER_ANCHOR_SECRET_PATH',
+  langfuseUrl: 'SDLC_WORKER_LANGFUSE_URL',
+  langfuseSecretPath: 'SDLC_WORKER_LANGFUSE_SECRET_PATH',
+  langfuseProjectId: 'SDLC_WORKER_LANGFUSE_PROJECT_ID',
+  langfuseClickhouseUrl: 'SDLC_WORKER_LANGFUSE_CLICKHOUSE_URL',
+  langfuseBatch: 'SDLC_WORKER_LANGFUSE_BATCH',
+  langfuseRawUrl: 'SDLC_WORKER_LANGFUSE_RAW_URL',
+  langfuseRawBucket: 'SDLC_WORKER_LANGFUSE_RAW_BUCKET',
+  langfuseRawMaxAgeHours: 'SDLC_WORKER_LANGFUSE_RAW_MAX_AGE_HOURS',
+  langfuseRawBatch: 'SDLC_WORKER_LANGFUSE_RAW_BATCH',
   devMode: 'SDLC_WORKER_DEV_MODE',
   devDbUrl: 'SDLC_WORKER_DEV_DB_URL',
 } as const;
@@ -183,6 +192,42 @@ const schema = z.object({
     .string()
     .regex(/^worker\/[A-Za-z0-9_.-]+$/)
     .default('worker/anchor'),
+  // E08 (ADR-M53): the Langfuse purge in the retention loop, with `kv/worker/langfuse` (the
+  // worker's own Langfuse key, the ClickHouse user `sdlc_purge`, the SeaweedFS identity
+  // `worker-langfuse`). `off` (default): Langfuse is not deployed; `project.purged` records
+  // `not_deployed`. up.sh sets it with the profile observability.
+  [WORKER_ENV.langfuseUrl]: z
+    .string()
+    .refine((v) => v === 'off' || isOrigin(v))
+    .default('off'),
+  [WORKER_ENV.langfuseSecretPath]: z
+    .string()
+    .regex(/^worker\/[A-Za-z0-9_.-]+$/)
+    .default('worker/langfuse'),
+  // The Langfuse project the collector writes to (`LANGFUSE_INIT_PROJECT_ID`): the worker's key must
+  // belong to it, or no Langfuse step runs (an empty answer of another project proves nothing).
+  [WORKER_ENV.langfuseProjectId]: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/)
+    .default('sdlc-platform'),
+  [WORKER_ENV.langfuseClickhouseUrl]: z
+    .string()
+    .refine((v) => isOrigin(v))
+    .default('http://clickhouse:8123'),
+  // Intents per project and pass whose traces are selected, at most.
+  [WORKER_ENV.langfuseBatch]: z.coerce.number().int().min(1).max(1000).default(50),
+  // The raw OTLP files Langfuse keeps in SeaweedFS (bucket `langfuse`, `events/otel/`): swept for
+  // every tenant when older than the maximum age (D1, QUESTIONS #250). At most `_RAW_BATCH` per pass.
+  [WORKER_ENV.langfuseRawUrl]: z
+    .string()
+    .refine((v) => isOrigin(v))
+    .default('http://seaweedfs:8333'),
+  [WORKER_ENV.langfuseRawBucket]: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+    .default('langfuse'),
+  [WORKER_ENV.langfuseRawMaxAgeHours]: z.coerce.number().int().min(1).max(720).default(24),
+  [WORKER_ENV.langfuseRawBatch]: z.coerce.number().int().min(1).max(20_000).default(2000),
   [WORKER_ENV.devMode]: z.enum(['', '0', '1']).default(''),
   [WORKER_ENV.devDbUrl]: z.string().optional(),
   NODE_ENV: z.string().optional(),
@@ -227,6 +272,19 @@ export interface WorkerAnchorSettings {
   readonly secretPath: string;
   /** The retention loop's interval: the anchor pass runs in it. */
   readonly intervalMs: number;
+}
+
+/** E08: the Langfuse purge in the retention loop (ADR-M53). */
+export interface WorkerLangfuseSettings {
+  readonly url: string;
+  readonly secretPath: string;
+  readonly projectId: string;
+  readonly clickhouseUrl: string;
+  readonly batch: number;
+  readonly rawUrl: string;
+  readonly rawBucket: string;
+  readonly rawMaxAgeHours: number;
+  readonly rawBatch: number;
 }
 
 /** E03: the worker's evidence store (ADR-M49 §2.2). */
@@ -300,6 +358,8 @@ export interface WorkerSettings {
   readonly retention: WorkerRetentionSettings | null;
   /** E05 PR 2: the daily audit anchor; null: `SDLC_WORKER_ANCHOR_URL=off`. */
   readonly anchor: WorkerAnchorSettings | null;
+  /** E08: the Langfuse purge; null: `SDLC_WORKER_LANGFUSE_URL=off` (not deployed). */
+  readonly langfuse: WorkerLangfuseSettings | null;
 }
 
 export type WorkerSettingsKey =
@@ -440,6 +500,20 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
             bucket: v[WORKER_ENV.anchorBucket],
             secretPath: v[WORKER_ENV.anchorSecretPath],
             intervalMs: v[WORKER_ENV.retentionIntervalMinutes] * 60_000,
+          },
+    langfuse:
+      v[WORKER_ENV.langfuseUrl] === 'off'
+        ? null
+        : {
+            url: new URL(v[WORKER_ENV.langfuseUrl]).origin,
+            secretPath: v[WORKER_ENV.langfuseSecretPath],
+            projectId: v[WORKER_ENV.langfuseProjectId],
+            clickhouseUrl: new URL(v[WORKER_ENV.langfuseClickhouseUrl]).origin,
+            batch: v[WORKER_ENV.langfuseBatch],
+            rawUrl: new URL(v[WORKER_ENV.langfuseRawUrl]).origin,
+            rawBucket: v[WORKER_ENV.langfuseRawBucket],
+            rawMaxAgeHours: v[WORKER_ENV.langfuseRawMaxAgeHours],
+            rawBatch: v[WORKER_ENV.langfuseRawBatch],
           },
   };
 }

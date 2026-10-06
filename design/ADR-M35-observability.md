@@ -96,7 +96,7 @@ All pinned to exact versions (Apache-2.0): `@opentelemetry/api` 1.9.1, `@opentel
 ## 4. Follow-ups
 
 - **The Langfuse project key moves to OpenBao** with the real server (task A10): the collector then gets it through an OpenBao Agent sidecar, like LiteLLM (D2). Until then the key is in the collector's environment (`docker inspect`, `/proc/1/environ`), like the other `.env` infrastructure secrets (ADR-M17).
-- **Langfuse holds client data** (prompts and responses, D3). Project archive (FR-44) and retention must also purge the project's Langfuse data: note added to task E05 (`scripts/generate-backlog.py`).
+- **Langfuse holds client data** (prompts and responses, D3). Project archive (FR-44) and retention must also purge the project's Langfuse data: note added to task E05 (`scripts/generate-backlog.py`). Done in E08 (ADR-M53): the worker deletes an intent's traces with its own Langfuse key (`kv/worker/langfuse`), sweeps the raw OTLP files and compacts ClickHouse. The collector keeps its own key (above).
 - Runner traces (the agent run as spans) and spans for the background loops: later, with the same interceptor and `startTracing`.
 - Trace context from the api to the workflow (Temporal headers): later; the IDs already join the api's and the worker's lines.
 
@@ -123,3 +123,4 @@ All pinned to exact versions (Apache-2.0): `@opentelemetry/api` 1.9.1, `@opentel
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-30 | Claude (task A08) | First version |
+| 0.2 | 2026-10-05 | Claude (task E08) | §4: the Langfuse purge is done by ADR-M53; the worker has its own Langfuse key |

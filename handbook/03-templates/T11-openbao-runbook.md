@@ -477,10 +477,18 @@ The loop starts in `report` mode: it counts what it would purge and deletes noth
 
 - **Archiving.** A tenant admin archives a project with `sdlc admin project archive --project <slug>`. It is refused while the project has open intents. The first pass in `purge` mode after the archive schedules the purge (audit `project.purge_scheduled`, log `retention.archive_purge_scheduled`); the worker purges the project's evidence files `SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS` (default 7) later. A project archived before you turned on `purge` gets the same 7 days from then. Held intents stay. When nothing is left, the audit log gets `project.purged`.
 - **A mistaken archive.** There is no un-archive command. Within the grace period, set `projects.status` back to `active` on the server with the owner role, and record it in the operations log.
-- **Langfuse traces are not deleted by the platform** (QUESTIONS #238; `project.purged` has `langfuse: manual`). After `project.purged`:
-  1. Sign in to Langfuse as the admin account (profile `observability`).
-  2. Filter the traces by the tags `tenant:<tenant ID>` and `project:<project ID>`.
-  3. Delete them. Langfuse's trace deletion takes the trace IDs; the API is `DELETE /api/public/traces` with the project key from `.env`, on the server, never from a chat tool.
+- **Langfuse** (task E08, `design/ADR-M53-langfuse-purge.md`). The same loop deletes the model-call traces of the intents it purges, by the same rules (open and held intents never), when the worker's Langfuse purge is on (section 5m). Langfuse deletes a few seconds later; the next pass confirms (`langfuse.purged` in the audit log). An archived project gets `project.purged` only after every finished, not held intent is confirmed, with `langfuse: purged`. With `SDLC_WORKER_LANGFUSE_URL=off` it records `langfuse: not_deployed`.
+- **What the log says.**
+  - `retention.langfuse_tag_mismatch`: a trace found by an intent's run tags carries another tenant, project or intent tag. Nothing of that intent is deleted, and its purge waits. Look at the trace in the Langfuse UI (filter by the tag `run_id:<run ID>`; the run IDs are in `sdlc run list <INT>`). If the trace is the intent's, delete it by hand as below; the next pass confirms.
+  - `retention.langfuse_guard_tripped`: one intent has more than 5,000 traces. Check it the same way; delete by hand if right.
+  - `retention.langfuse_purge_pending`: Langfuse still shows traces after a request. Check that `langfuse-worker` runs.
+  - `retention.langfuse_failed`, `retention.project_purge_waits_langfuse`: Langfuse cannot be reached, or the worker has no Langfuse credential (section 5m).
+  - `retention.langfuse_project_mismatch`: the worker's Langfuse key belongs to another Langfuse project. Nothing is purged in Langfuse until it is fixed (section 5m step 1).
+  - `retention.langfuse_tenant_guard_tripped`: too many intents of a tenant are due at once (the evidence guard settings). Check `pnpm sdlc ops retention report`; raise `SDLC_WORKER_RETENTION_GUARD_PERCENT` for one pass if right.
+- **Deleting traces by hand** (the cases above, or `project.purged` events from before E08 with `langfuse: manual`): on the server, never from a chat tool.
+  1. In the Langfuse UI, filter the traces by the tag `run_id:<run ID>` of each run of the intent (or `tenant:<tenant slug>` and `project:<project slug>`), and check them.
+  2. Delete them in the UI, or with `DELETE /api/public/traces` and the worker's Langfuse key.
+  3. Remove the deleted rows from disk: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile observability exec clickhouse sh -c "echo 'ALTER TABLE default.events_full APPLY DELETED MASK; ALTER TABLE default.events_core APPLY DELETED MASK' | clickhouse-client --multiquery"`.
   4. Record the date and the number of traces in the operations log.
 
 ### Rotation
@@ -576,6 +584,48 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 - `seaweedfs-init` runs in the network namespace of `seaweedfs` (Compose `network_mode: service:seaweedfs`). Never give another service that setting.
 
 **After the A12 update:** run `pnpm compose:core` once. It recreates `seaweedfs` with the new settings and runs `seaweedfs-init` again. Existing data stays readable; the identities are kept.
+
+## 5m. The worker's Langfuse purge
+
+The worker's retention loop (section 5j) also deletes the model-call traces of purged intents in Langfuse (task E08, `design/ADR-M53-langfuse-purge.md`). The traces hold prompts and responses: client data.
+
+**What it does, per pass, in `purge` mode:**
+- asks Langfuse to delete the traces of each due intent, found by the intent's run tags and checked tag by tag; confirms on a later pass;
+- deletes Langfuse's raw OTLP files (`langfuse/events/otel/…` in SeaweedFS) older than `SDLC_WORKER_LANGFUSE_RAW_MAX_AGE_HOURS` (24), **for every tenant**: one file holds a whole batch of several tenants, so they cannot be deleted per project. Langfuse cannot replay older files any more (a repair tool we do not use);
+- after a pass that confirmed deleted traces, at most once a day, removes the deleted rows from ClickHouse's disk (`APPLY DELETED MASK`; log `retention.langfuse_compacted` with its duration).
+
+In `report` mode it only counts (`langfuseDue`, `langfuseRawFound` in `worker.retention_pass`).
+
+**The credentials**, one OpenBao entry `kv/worker/langfuse`, read only by the `worker` AppRole:
+
+| Part | Rights | Made by |
+|---|---|---|
+| The worker's own Langfuse project key | Langfuse OSS keys have no scopes: it could also read prompts and send traces. The worker never asks for prompts | You, once, in the Langfuse UI |
+| ClickHouse user `sdlc_purge` | `ALTER DELETE` on `default.events_full` and `default.events_core` only (`APPLY DELETED MASK` needs it). It reads nothing, but could delete every row of the two tables | The command below |
+| SeaweedFS identity `worker-langfuse` | `List:langfuse`, `Write:langfuse/events/otel/*` (delete); never read | The command below |
+
+The collector keeps its own key (Langfuse's init key in `.env`).
+
+### First set-up
+
+Needs the profiles `core` and `observability` running, and OpenBao unsealed. Run it in a terminal on the server, never through a chat tool.
+
+1. **Make the worker's Langfuse key.** Sign in to Langfuse (`http://127.0.0.1:${LANGFUSE_HOST_PORT}`, the admin account of `.env`). Open the project "Agentic SDLC platform" → Settings → API keys → Create new API key. Name it `sdlc-worker-purge`. Keep the window open: the secret key is shown once.
+2. **Store it and make the other two credentials:**
+   ```bash
+   pnpm openbao:bootstrap worker-langfuse-credentials
+   ```
+   It asks for an admin token, the public key (`pk-lf-…`) and the secret key (`sk-lf-…`), all hidden. It stores `kv/worker/langfuse`, applies the SeaweedFS identity and the ClickHouse user, checks both, and prints no secret. Then close the Langfuse window.
+   - On a server updated from before E08, restart ClickHouse once first (`pnpm compose:obs`): the setting `CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT` lets the command make the user.
+3. **Turn it on.** Set `SDLC_WORKER_LANGFUSE_URL=http://langfuse-web:3000` in `platform/deploy/.env`. (`up.sh` also sets it when `observability` is in the same call or Langfuse's ClickHouse volume exists: Langfuse's data stays in its volumes when the profile is off.) Restart `sdlc-worker`. The start log has no `worker.langfuse_missing`; the first pass logs no `retention.langfuse_project_mismatch` (the key must belong to the project "Agentic SDLC platform", `LANGFUSE_INIT_PROJECT_ID`).
+4. Record the date in the operations log.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| The ClickHouse password and the S3 key (every 90 days, or when they may have leaked) | Make a new Langfuse key as in step 1, run `pnpm openbao:bootstrap worker-langfuse-credentials`, restart `sdlc-worker`, then delete the old Langfuse key in the UI. The old password and S3 key stop working at once |
+| The Langfuse key only (it may have leaked) | The same steps; delete the old key in the Langfuse UI at once |
 
 ## 6. Daily snapshot backup
 
@@ -740,3 +790,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.21 | 2026-10-04 | Claude Code (task E05, PR 1) | Section 5j: `worker-purge-credentials` (SeaweedFS identity `worker-purge` at `kv/worker/purge`: delete, bypass, legal hold and lock on the evidence prefixes, list, no read), the GOVERNANCE lock on `evidence`, from `report` to `purge`, archived projects, the manual Langfuse deletion, rotation (ADR-M51) |
 | 0.22 | 2026-10-04 | Claude Code (task E05, PR 2) | Section 5k: the daily audit anchor (bucket `audit-anchors`, COMPLIANCE 731 days; `worker-anchor-credentials`: SeaweedFS identity `worker-anchor` at `kv/worker/anchor`), what to do on `worker.audit_anchor_mismatch` and `worker.audit_anchor_unlocked`, rotation (ADR-M51 §2.9). Tested with throw-away keys (`pnpm test:openbao`) |
 | 0.23 | 2026-10-04 | Claude Code (task A12) | New section 5l: SeaweedFS admin work only inside the container (`-master=127.0.0.1:9333`), the JWT keys made at each start, a failed start; section 5j: the filer gap is closed (ADR-M52, QUESTIONS #239, #245, #246). Tested with throw-away keys (`pnpm test:seaweedfs`, `pnpm test:openbao`) |
+| 0.24 | 2026-10-05 | Claude Code (task E08) | Section 5j: the Langfuse purge in the loop, its log lines, deleting traces by hand (by run tags), `APPLY DELETED MASK`; new section 5m: the worker's Langfuse purge, `kv/worker/langfuse` (the worker's own Langfuse key made in the UI, the ClickHouse user `sdlc_purge`, the SeaweedFS identity `worker-langfuse`), `worker-langfuse-credentials`, turning it on, rotation (ADR-M53) |

@@ -18,6 +18,7 @@ const SOURCE_ADAPTERS = [
   'model-litellm',
   'agent-openhands',
   'evidence-s3',
+  'traces-langfuse',
 ];
 
 export default defineConfig({

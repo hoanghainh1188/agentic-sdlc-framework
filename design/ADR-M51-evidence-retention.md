@@ -132,14 +132,14 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
   - So a project archived before E05, or while the loop ran in `report` mode, still gets the whole grace period from the moment the purge is turned on, and the operator sees it coming.
   - `report` mode never schedules; the report shows such a project as not due.
 - **What is purged:** every finished, not held intent's evidence of the project, with the lock bypass (`cause: archive`). Held intents stay and are counted.
-- **`project.purged`:** written once, when nothing purgeable is left, with the counts (`intents`, `purged`, `held`) and `langfuse: manual`.
+- **`project.purged`:** written once, when nothing purgeable is left, with the counts (`intents`, `purged`, `held`) and `langfuse`. Before E08 the value was `manual`; since E08 (ADR-M53 §2.7) the event waits until the project's Langfuse traces are confirmed deleted and records `purged`, or `not_deployed` when the worker's Langfuse purge is off.
 - **"Stored client material" in the platform = the evidence files:**
   - proposals and diffs (client code);
   - pack files (approver names).
   - The database holds codes, IDs and hashes only.
   - LiteLLM's spend logs do not keep prompts (`store_prompts_in_spend_logs` is not set).
   - Temporal holds IDs only.
-- **Langfuse** holds prompts and responses (ADR-M35). It is **not** purged in E05 (QUESTIONS #238): the runbook (T11 §5j) gives the manual steps, and a follow-up task (E08) will build it.
+- **Langfuse** holds prompts and responses (ADR-M35). It was not purged in E05 (QUESTIONS #238). **Closed by E08 (ADR-M53):** the same pass deletes the intents' traces in Langfuse by the same rules, sweeps Langfuse's raw OTLP files and removes deleted rows from ClickHouse's disk.
 - **Open item: there is no un-archive in the MVP.** A mistaken archive is undone only within the grace period, by a database change on the server. An `unarchive` command is not built.
 
 ### 2.7. The orphan sweep (ADR-M48 §2.7)
@@ -160,8 +160,9 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
   1. holds;
   2. lock moves;
   3. the purge (guard first; counts only in `report`);
-  4. archive completion.
-  Then the orphan sweep.
+  4. the Langfuse traces of the due intents (E08, ADR-M53);
+  5. archive completion.
+  Then the orphan sweep, and the Langfuse raw file sweep and compaction (E08).
 - **Failures:** a failed row, project or tenant is logged by its code and counted; the next pass retries. The loop never throws.
 - **Operator report:** `pnpm sdlc ops retention report --tenant <slug> [--json]`. Counts only, from the database: per project, stored, due now, held, open, purged.
 
@@ -243,7 +244,7 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
   - the S3 deletes run inside the database transaction that holds the intent lock: a slow store delays hold commands on that intent;
   - the session advisory lock is lost if its connection drops mid-pass (as C12); the per-row intent lock still serialises deletes;
   - any role in `access.evidence_hold_roles` may release a hold someone else set; the audit log records who.
-- **Langfuse is not purged** (QUESTIONS #238, E08).
+- ~~**Langfuse is not purged**~~ (QUESTIONS #238): closed by E08 (ADR-M53).
 - **Open items for M-F** (Harry, review of PR 1):
   - an un-archive command (today a mistaken archive is undone only within the grace period, by a database change on the server);
   - whether a hold must be released by a different person than the one who set it.
@@ -257,3 +258,4 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
 | 0.3 | 2026-10-04 | Claude (task E05, PR 1) | §4: open items for M-F (an un-archive command; who may release a hold), after Harry's review |
 | 0.4 | 2026-10-04 | Claude (task E05, PR 2) | §2.9: the daily audit anchor (AC4): the live check of COMPLIANCE on SeaweedFS 4.48, the bucket `audit-anchors`, the identity `worker-anchor`, check then write once per tenant and UTC day, the mismatch reasons, the lock check, the later optimisation; §3: two alternatives |
 | 0.5 | 2026-10-04 | Claude (task A12) | §2.1 and §4: gap 5 closed by ADR-M52 |
+| 0.6 | 2026-10-05 | Claude (task E08) | §2.6, §2.8 and §4: the Langfuse purge is a step of the pass; `project.purged` waits for it (`purged`, `not_deployed`); the open item closed by ADR-M53 |
