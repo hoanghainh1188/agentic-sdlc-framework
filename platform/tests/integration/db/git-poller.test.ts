@@ -547,7 +547,7 @@ describeDb('B06: GitHub poller and comment commands on PostgreSQL', () => {
       };
       const handled = await handleGitEvent(
         seeded.scope,
-        { registry },
+        { registry, now: () => registry.now() },
         { id: seeded.target.projectId, provider: 'github' },
         replay,
       );

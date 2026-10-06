@@ -83,6 +83,8 @@ describeDb('C11: the kill switch on PostgreSQL', () => {
 
   const scope = () => t.f.scope;
   const reload = (intent: Intent) => t.reload(intent);
+  /** The escalation actions on the test clock (the registry's). */
+  const clockDeps = { now: () => t.f.registry.now() };
   const human = (id: string): KillActor => ({ type: 'human', id });
   const kill = (runId: string, actor: KillActor = human(t.f.users.b)) =>
     requestRunKill(scope(), { now: () => T0 }, { runId, actor, source: 'api' });
@@ -306,13 +308,21 @@ describeDb('C11: the kill switch on PostgreSQL', () => {
       expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G4' });
       expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'run_review' });
       // Person B (technical route) acknowledges.
-      await acknowledgeEscalation(scope(), { escalationId: escalationId!, actorId: t.f.users.b });
+      await acknowledgeEscalation(
+        scope(),
+        { escalationId: escalationId!, actorId: t.f.users.b },
+        clockDeps,
+      );
       return { intent, runId, escalationId: escalationId! };
     }
 
     it('resume → back to G4 and a new round', async () => {
       const { intent, escalationId } = await killedAndPaused();
-      await decideEscalation(scope(), { escalationId, actorId: t.f.users.b, decision: 'resume' });
+      await decideEscalation(
+        scope(),
+        { escalationId, actorId: t.f.users.b, decision: 'resume' },
+        clockDeps,
+      );
       expect(await t.settleRuns(intent)).toEqual({ outcome: 'run_prepare' });
       expect(await notices(t, intent)).toContain('run_resumed');
       expect((await scope().escalations.getById(escalationId))?.status).toBe('closed');
@@ -320,11 +330,15 @@ describeDb('C11: the kill switch on PostgreSQL', () => {
 
     it('terminate → the intent is closed (cancelled)', async () => {
       const { intent, escalationId } = await killedAndPaused();
-      await decideEscalation(scope(), {
-        escalationId,
-        actorId: t.f.users.b,
-        decision: 'terminate',
-      });
+      await decideEscalation(
+        scope(),
+        {
+          escalationId,
+          actorId: t.f.users.b,
+          decision: 'terminate',
+        },
+        clockDeps,
+      );
       expect(await t.settleRuns(intent)).toMatchObject({
         outcome: 'finished',
         status: 'cancelled',
@@ -337,7 +351,11 @@ describeDb('C11: the kill switch on PostgreSQL', () => {
 
     it('#211: modify after a kill → G3, HITL, the G3 approvals voided (no endless wait)', async () => {
       const { intent, escalationId } = await killedAndPaused();
-      await decideEscalation(scope(), { escalationId, actorId: t.f.users.b, decision: 'modify' });
+      await decideEscalation(
+        scope(),
+        { escalationId, actorId: t.f.users.b, decision: 'modify' },
+        clockDeps,
+      );
       await t.settleRuns(intent);
       expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G3' });
       expect(await notices(t, intent)).toContain('run_returned');

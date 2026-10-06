@@ -106,6 +106,14 @@ function now(deps: EscalationDeps): Date {
   return deps.now ? deps.now() : new Date();
 }
 
+/**
+ * The clock of a decision and its expiry (FR-17). Required, never a `new Date()` default: the
+ * expiry a decision stores and the check before the action must read the same clock.
+ */
+export interface EscalationClock {
+  readonly now: () => Date;
+}
+
 interface Locked {
   readonly row: Escalation;
   readonly projectId: string;
@@ -145,9 +153,9 @@ function assertNotFinished(row: Escalation): void {
 export async function acknowledgeEscalation(
   scope: TenantScope,
   input: AcknowledgeInput,
-  deps: EscalationDeps = {},
+  clock: EscalationClock,
 ): Promise<Escalation> {
-  const at = now(deps);
+  const at = clock.now();
   return await scope.transaction(async (tx) => {
     const locked = await lockOpen(tx, input.escalationId);
     const { row } = locked;
@@ -182,9 +190,9 @@ export async function acknowledgeEscalation(
 export async function decideEscalation(
   scope: TenantScope,
   input: DecideInput,
-  deps: EscalationDeps = {},
+  clock: EscalationClock,
 ): Promise<Escalation> {
-  const at = now(deps);
+  const at = clock.now();
   if (input.reasonRef != null && !HTTPS_REF.test(input.reasonRef)) {
     throw new EscalationError('decision_not_allowed', 'reason_ref must be an https link');
   }
@@ -339,9 +347,9 @@ export function decisionAllows(escalation: Escalation, action: string, at: Date)
 export async function revalidateEscalationDecision(
   scope: TenantScope,
   input: RevalidateInput,
-  deps: EscalationDeps = {},
+  clock: EscalationClock,
 ): Promise<RevalidateResult> {
-  const at = now(deps);
+  const at = clock.now();
   return await scope.transaction(async (tx) => {
     const { row, config } = await lockOpen(tx, input.escalationId);
     if (row.status !== 'resolved' || row.decision === null) {

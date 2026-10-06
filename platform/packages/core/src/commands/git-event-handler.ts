@@ -107,8 +107,8 @@ export interface GitEventProject {
 export interface GitEventHandlerDeps {
   /** The registry with the apps' policy factory (`createSimplePolicyEngine`). */
   readonly registry: Registry;
-  /** Clock of escalation commands (decision expiry). Default: `new Date()`. */
-  readonly now?: () => Date;
+  /** Clock of escalation commands (decision expiry, FR-17). Required: no `new Date()` default. */
+  readonly now: () => Date;
 }
 
 export interface HandledGitEvent {
@@ -320,7 +320,7 @@ async function handleEscalationCommand(
 ): Promise<HandledGitEvent> {
   const found = await findEscalation(tx, intent, command.code);
   if (typeof found === 'string') return record('refused', { reply: { code: found, params } });
-  const clock = deps.now ? { now: deps.now } : {};
+  const clock = { now: deps.now };
   try {
     await tx.savepoint((sp) =>
       command.kind === 'escalation_ack'
