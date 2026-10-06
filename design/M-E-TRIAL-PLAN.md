@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.0 |
+| Version | 1.1 |
 | Date | 2026-10-06 |
 | Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed |
 | Readers | Harry, the trial team (Person A, Person B, second approver), Claude Code |
@@ -40,6 +40,7 @@
 | 8 | The sandbox image built and pinned (`sandbox.image`) | Owner | GETTING-STARTED Step 14 item 4 |
 | 9 | The trial budget set: USD 30 in total (decision D3) | Owner | `budget.*` in the configuration; the tenant's monthly budget |
 | 10 | The manual log ready (section 7.2) | Person A | A shared sheet with the columns of section 7.2 |
+| 11 | Every member of the trial team has read `platform/USER-GUIDE.md` and logged in (`sdlc whoami`) | Each member | `sdlc whoami` shows the roles |
 
 ## 4. People and roles
 
@@ -151,3 +152,4 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 |---|---|---|---|
 | 0.1 | 2026-10-06 | Claude (coordinator) | Draft for Harry's approval |
 | 1.0 | 2026-10-06 | Claude (coordinator), approved by Harry | D1–D5 approved as proposed; the trial budget cap is USD 30 |
+| 1.1 | 2026-10-06 | Claude (coordinator), approved by Harry | §3 item 11: the trial team reads `platform/USER-GUIDE.md` and logs in |
