@@ -224,7 +224,7 @@ services:
       test: [CMD-SHELL, 'REDISCLI_AUTH="$$VALKEY_PASSWORD" valkey-cli ping | grep -q PONG']
 
   litellm:
-    image: ghcr.io/berriai/litellm:v1.102.1
+    image: ghcr.io/berriai/litellm:v1.104.0
     profiles: [core, observability]
     restart: unless-stopped
     networks: [sdlc]
