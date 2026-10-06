@@ -2,8 +2,8 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.1 |
-| Date | 2026-10-05 |
+| Version | 0.3 |
+| Date | 2026-10-06 |
 | Status | **Draft** (task E07). AC4 prepared, waiting for the API-model run (QUESTIONS #81) |
 | Readers | Leadership, tech lead, Claude Code |
 | Related documents | D-02 §10 (the criteria), D-08 task E07, D-09 §7 and §10, QUESTIONS #81 |
@@ -66,6 +66,7 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 | Every intent needs a merged pull request with its plan file before G3 (the plan is a file on the protected default branch) | QUESTIONS #230 (C09) | M-F, from the trial's waiting times |
 | Redone runs (sent back by G6 or G7) do not count as wasted tokens in the cost report | ADR-M45 §2.3 (E04) | M-F |
 | No manual spend-sync command; a gap longer than the catch-up window is only logged (`worker.cost_sync_gap`) | ADR-M24 §3 (C12) | M-F |
+| Upgrade the deploy images (LiteLLM, OpenBao, ClickHouse, Langfuse). With LiteLLM v1.104.0, 5 of 18 `pnpm test:litellm` tests fail: a budget block answers 422 instead of 429, and spend is computed differently. LiteLLM in its own PR with adapter and test changes; the others checked with `pnpm test:openbao`, `pnpm test:observability` and on the dev stack. The trial runs on the pinned versions | Dependabot PR #175 (closed), issue #177 | M-F |
 | A per-project `release.environment` and the non-production HOTL path at G8; an explicit PM/BrSE confirmation of the client's own disclosure note | QUESTIONS #220, #222 (E03) | MVP+1 |
 | The MVP+1 user interface scope (web UI, dashboard), written from the trial data | D-02 §4.2, D-08 E07 note | After M-E |
 | Template T13 differs from the plan schema v1 (platform fields, `change_flags`, tool names) | B09 PR 2 (#150) | Handbook authors |
@@ -77,3 +78,4 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 |---|---|---|---|
 | 0.1 | 2026-10-05 | Claude (task E07) | First version: criteria and evidence, numbers so far, open items. AC4 prepared |
 | 0.2 | 2026-10-06 | Claude (coordinator), approved by Harry | §5 Kept for later: items decided during the MVP for A10, M-F, MVP+1 and the handbook |
+| 0.3 | 2026-10-06 | Claude (coordinator), approved by Harry | §5: upgrade of the deploy images (issue #177); header version and date fixed |
