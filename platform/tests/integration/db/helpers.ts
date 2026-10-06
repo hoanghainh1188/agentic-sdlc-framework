@@ -4,6 +4,7 @@
 // The superuser connects with `-c role=…`, so every check runs with the privileges of
 // `platform` (owner, migrations) or `platform_app` (application), never as superuser.
 import { randomBytes } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { Kysely } from 'kysely';
 import pg from 'pg';
 import { describe } from 'vitest';
@@ -80,9 +81,33 @@ export async function createTestDatabase(): Promise<TestDatabase> {
     async drop() {
       await Promise.all([owner.destroy(), appRaw.destroy(), app.close()]);
       if (!TEST_DB_NAME.test(name)) throw new Error(`refusing to drop ${name}`);
-      await admin((client) => client.query(`DROP DATABASE ${name} WITH (FORCE)`));
+      await admin(async (client) => {
+        await waitForDisconnect(client, name);
+        await client.query(`DROP DATABASE ${name} WITH (FORCE)`);
+      });
     },
   };
+}
+
+const DISCONNECT_WAIT_MS = 5_000;
+const DISCONNECT_POLL_MS = 20;
+
+/**
+ * Waits until the database has no connections left. `pool.end()` resolves before its clients'
+ * sockets are closed; if `DROP … WITH (FORCE)` terminates such a closing connection, PostgreSQL
+ * sends it 57P01 and the pool (no `'error'` listener) raises an unhandled error. FORCE stays as
+ * the fallback after the wait.
+ */
+async function waitForDisconnect(client: pg.Client, name: string): Promise<void> {
+  const deadline = Date.now() + DISCONNECT_WAIT_MS;
+  for (;;) {
+    const { rows } = await client.query<{ n: number }>(
+      'SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = $1',
+      [name],
+    );
+    if (rows[0]!.n === 0 || Date.now() >= deadline) return;
+    await sleep(DISCONNECT_POLL_MS);
+  }
 }
 
 /**
