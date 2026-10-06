@@ -63,7 +63,7 @@ t("A10","M-A","Resource measurement + backup / restore drill + internal CA / TLS
   "Restore drill succeeds on a test machine; OpenBao unsealed with 2 shares",
   "Record RAM/CPU/disk usage for the core and observability profiles",
   "Runbook T11 written in full"],
- "Done together with the infrastructure operator")
+ "Done together with the infrastructure operator. Also before the real server: the runner in its own VM or rootless Docker (ADR-M25 §2.5); ClickHouse's `langfuse` user has access management since E08, so Langfuse itself could create ClickHouse users: turn it off after `sdlc_purge` exists, or create that user from a separate admin account (ADR-M53)")
 t("A11","M-A","Stop publishing the OpenBao port on the host","S",["A04"],"—",
  "platform/deploy/docker-compose.yml, platform/deploy/.env.example, platform/deploy/README.md, platform/tests/integration/*, design/ADR-M19",
  ["The openbao service publishes no port on the host (QUESTIONS #27, option A); OPENBAO_HOST_PORT removed",
@@ -451,6 +451,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.17 | 2026-10-04 | Claude (task E03), approved by Harry | E03 note: done (release hash, `worker-evidence`), MVP+1 `release.environment` and the PM/BrSE disclosure confirmation; C12 note: late cost records void G8 approvals; E05 note: the worker identity, pack versions at G8 (ADR-M49, QUESTIONS #220–#222) |
 | 1.18 | 2026-10-04 | Claude, approved by Harry | New tasks A12 (close the unauthenticated SeaweedFS filer and volume access, QUESTIONS #239; E07 depends on it) and E08 (purge the Langfuse data of a project, QUESTIONS #238), both found by E05 |
 | 1.19 | 2026-10-04 | Claude (task E05, PR 1), approved by Harry | E05 AC1: holds per intent (`evidence_holds`); E05 note: two PRs, the lock, the purge, holds, archive grace, what is not in E05 (ADR-M51, QUESTIONS #235–#239) |
+| 1.20 | 2026-10-06 | Claude, approved by Harry | A10 note: the runner VM or rootless Docker, ClickHouse access management (ADR-M25 §2.5, ADR-M53) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
 """)
 open('design/D-08-mvp-backlog.md','w').write("\n".join(o))

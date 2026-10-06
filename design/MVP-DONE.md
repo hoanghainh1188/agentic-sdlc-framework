@@ -54,8 +54,26 @@ D-08 E07 AC4 (QUESTIONS #81): **prepared, waiting for the run.** `pnpm test:agen
 | A10: internal CA and TLS on OpenBao, backup and restore drill, resource measurement | Infrastructure operator | The real deployment on the internal server |
 | MVP+1 user interface scope (web UI, dashboard; D-02 §4.2), written from the trial data after M-E | Claude, for the owner's approval | Nothing in the MVP (D-08 E07 note) |
 
+## 5. Kept for later
+
+Decisions taken during the MVP that left a known item for a later milestone. Each has its source.
+
+| Item | Source | When |
+|---|---|---|
+| ClickHouse's `langfuse` user has access management (needed to create `sdlc_purge`), so Langfuse itself could create ClickHouse users. Turn it off after `sdlc_purge` exists, or create the user from a separate admin account | ADR-M53 (E08) | A10, before the real server |
+| An un-archive command for projects (today a mistaken archive is undone only during the grace period, by a database change on the server) | ADR-M51 §2.6 (E05) | M-F |
+| Whether a retention hold must be released by a different person than the one who set it | ADR-M51 (E05) | M-F |
+| Every intent needs a merged pull request with its plan file before G3 (the plan is a file on the protected default branch) | QUESTIONS #230 (C09) | M-F, from the trial's waiting times |
+| Redone runs (sent back by G6 or G7) do not count as wasted tokens in the cost report | ADR-M45 §2.3 (E04) | M-F |
+| No manual spend-sync command; a gap longer than the catch-up window is only logged (`worker.cost_sync_gap`) | ADR-M24 §3 (C12) | M-F |
+| A per-project `release.environment` and the non-production HOTL path at G8; an explicit PM/BrSE confirmation of the client's own disclosure note | QUESTIONS #220, #222 (E03) | MVP+1 |
+| The MVP+1 user interface scope (web UI, dashboard), written from the trial data | D-02 §4.2, D-08 E07 note | After M-E |
+| Template T13 differs from the plan schema v1 (platform fields, `change_flags`, tool names) | B09 PR 2 (#150) | Handbook authors |
+| Who owns the project AI record: D-02 §3 and handbook Ch.2 §2.5 differ | QUESTIONS #103 | Docs follow-up |
+
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-05 | Claude (task E07) | First version: criteria and evidence, numbers so far, open items. AC4 prepared |
+| 0.2 | 2026-10-06 | Claude (coordinator), approved by Harry | §5 Kept for later: items decided during the MVP for A10, M-F, MVP+1 and the handbook |
