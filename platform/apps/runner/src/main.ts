@@ -12,7 +12,7 @@ import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { S3EvidenceStore } from '@sdlc/adapter-evidence-s3';
 import { GitHubAdapter } from '@sdlc/adapter-git-github';
 import { LiteLLMKeySpendReader } from '@sdlc/adapter-model-litellm';
-import { createJsonLogger, PlatformDatabase, withLogContext } from '@sdlc/core';
+import { createJsonLogger, logIdleDbErrors, PlatformDatabase, withLogContext } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OpenBaoClient, SecretsError } from '@sdlc/secrets';
 import { activityTracingInterceptor } from '@sdlc/telemetry';
@@ -65,6 +65,7 @@ async function connectDatabase(
   return PlatformDatabase.connect({
     connectionString: url.toString(),
     applicationName: APPLICATION_NAME,
+    onIdleError: logIdleDbErrors(logger),
   });
 }
 

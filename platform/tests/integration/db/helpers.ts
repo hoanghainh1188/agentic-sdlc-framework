@@ -95,8 +95,8 @@ const DISCONNECT_POLL_MS = 20;
 /**
  * Waits until the database has no connections left. `pool.end()` resolves before its clients'
  * sockets are closed; if `DROP … WITH (FORCE)` terminates such a closing connection, PostgreSQL
- * sends it 57P01 and the pool (no `'error'` listener) raises an unhandled error. FORCE stays as
- * the fallback after the wait.
+ * sends it 57P01. `createPool` listens for that error now, but the wait keeps the teardown quiet
+ * and `pg.Client`s made directly in tests have no listener. FORCE stays as the fallback.
  */
 async function waitForDisconnect(client: pg.Client, name: string): Promise<void> {
   const deadline = Date.now() + DISCONNECT_WAIT_MS;

@@ -62,7 +62,7 @@ async function main(): Promise<void> {
   const openbao = OpenBaoClient.fromEnv(process.env, logger);
   await openbao.assertReady();
   const secrets = openbao.kv();
-  const db = await connectDatabase(settings, secrets);
+  const db = await connectDatabase(settings, secrets, logger);
   // Stored configurations after a change of platform defaults (B13 AC8, ADR-M37 §2.5).
   await checkStoredConfigsAtStart(db, logger);
   const gitHost = new GitHubAdapter({ secrets, apiUrl: settings.githubApiUrl, logger });

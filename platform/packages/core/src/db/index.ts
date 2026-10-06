@@ -1,5 +1,5 @@
 // Data access layer (design/D-05, design/ADR-M09-database-tooling.md).
-export type { DatabaseConfig } from './connection.js';
+export { logIdleDbErrors, type DatabaseConfig } from './connection.js';
 export {
   DbError,
   TenantGuardError,

@@ -1,7 +1,7 @@
 // Connects the worker to the platform database as `platform_app` (task B06, ADR-M27 §2.5). The
 // password is read once from OpenBao with the `worker` AppRole (`kv/worker/database`, written by
 // `openbao:bootstrap worker-credentials`). Dev mode takes a URL instead.
-import { PlatformDatabase } from '@sdlc/core';
+import { logIdleDbErrors, PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 import type { SecretReader } from '@sdlc/contracts';
 
 import { DB_USER, type WorkerSettings } from './settings.js';
@@ -14,12 +14,15 @@ export const DB_PASSWORD_FIELD = 'password';
 export async function connectDatabase(
   settings: WorkerSettings,
   secrets: SecretReader,
+  logger: PlatformLogger,
 ): Promise<PlatformDatabase> {
+  const onIdleError = logIdleDbErrors(logger);
   const db = settings.database;
   if (db.kind === 'dev_url') {
     return PlatformDatabase.connect({
       connectionString: db.url,
       applicationName: APPLICATION_NAME,
+      onIdleError,
     });
   }
   const entry = await secrets.read(db.secretPath);
@@ -31,5 +34,6 @@ export async function connectDatabase(
   return PlatformDatabase.connect({
     connectionString: url.toString(),
     applicationName: APPLICATION_NAME,
+    onIdleError,
   });
 }
