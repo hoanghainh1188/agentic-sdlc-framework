@@ -115,6 +115,13 @@ export interface StackOptions {
    * Intents then get no issue, so the platform posts nothing on the (public) repository.
    */
   readonly live?: { readonly gitHost: ActivityContext['gitHost']; readonly repoFullName: string };
+  /**
+   * E07 live G8 test: real GitHub accounts linked instead of PEOPLE's (numeric ID and login), for
+   * example Person B, who reviews and merges the pull request on the real pilot.
+   */
+  readonly githubAccounts?: Partial<
+    Record<Person, { readonly gh: number; readonly login: string }>
+  >;
 }
 
 /** B10's repository: files in memory, served by the stub at each commit. */
@@ -597,7 +604,8 @@ export class Stack {
       '0',
     ]);
 
-    for (const [person, p] of Object.entries(PEOPLE) as [Person, (typeof PEOPLE)[Person]][]) {
+    for (const [person, fixture] of Object.entries(PEOPLE) as [Person, (typeof PEOPLE)[Person]][]) {
+      const p = { ...fixture, ...options.githubAccounts?.[person] };
       const email = `${person}@acme.test`;
       const created = await this.cliJson<{ id: string }>('admin', [
         'admin',

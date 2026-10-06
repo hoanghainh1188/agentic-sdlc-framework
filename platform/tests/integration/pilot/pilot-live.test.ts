@@ -14,10 +14,18 @@
 //    `contents: write` token is refused by the real branch protection.
 // 3. Clean-up: the pull request is closed and the branch deleted (also left-overs of an earlier
 //    run, at the start).
+// E07 (D-08 E07 AC1), with SDLC_PILOT_LIVE_G8=1: after N6 the test does NOT close the pull request.
+// It prints what Person B must do and waits (deterministic poll, SDLC_PILOT_LIVE_MERGE_TIMEOUT_MINUTES,
+// default 60) until Person B, with their own GitHub account, approved the pull request and merged
+// it on GitHub: a person merges, never the platform or the App. Then G8: the worker builds the
+// release pack, Person B approves the release (CLI), the pack is sealed, the intent is `done`, and
+// `sdlc audit verify` passes. The merged change is one fixed, fictional line appended to
+// `docs/live-test/RUNS.md` (the plan allows `docs/live-test/**` only; never application code).
 // Prerequisite (QUESTIONS #230): the plan file `.sdlc/plans/INT-<UTC year>-0001.yaml` on `main`,
 // merged once by a person (content: `fixtures/live-plan.yaml`). The intents get no issue, so the
 // platform posts no comment on the public repository; the pull request's text is codes only.
-// Settings file (JSON, outside the repo): { "client_id", "private_key_file", "repo" }.
+// Settings file (JSON, outside the repo): { "client_id", "private_key_file", "repo" }, and for the
+// G8 path also "person_b_github_id" (the numeric ID of Person B's account) and "person_b_login".
 // Optional: SDLC_SANDBOX_IMAGE (skips the build), SDLC_PILOT_LIVE_CI_TIMEOUT_MINUTES (default 30).
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
@@ -31,10 +39,14 @@ import { describe, expect, it } from 'vitest';
 
 import { authEnv, cloneForPush, pushCommit } from '../../../apps/runner/src/index.js';
 import { repoRoot } from '../../workspace/helpers';
-import { PilotStack, SPECS, T01_PATHS, waitLong } from './stack.js';
+import { PilotStack, SPECS, waitLong } from './stack.js';
 
 const execFileAsync = promisify(execFile);
 const PILOT = 'harryforge/pilot-order-inventory';
+/** The plan's only path pattern (`fixtures/live-plan.yaml`): never the application code. */
+const LIVE_PATHS = ['docs/live-test/**'];
+const LIVE_FILE = 'docs/live-test/RUNS.md';
+const withG8 = process.env.SDLC_PILOT_LIVE_G8 === '1';
 const enabled =
   process.env.SDLC_PILOT_LIVE_TEST === '1' &&
   Boolean(process.env.SDLC_GITHUB_TEST_APP_FILE) &&
@@ -53,6 +65,22 @@ interface LiveSettings {
   client_id: string;
   private_key_file: string;
   repo: string;
+  /** E07 live G8: Person B's own GitHub account (numeric ID, as on `GET /users/<login>`). */
+  person_b_github_id?: number;
+  person_b_login?: string;
+}
+
+/** Person B's account from the settings file; the G8 path refuses to start without it. */
+function personB(settings: LiveSettings): { gh: number; login: string } {
+  const gh = settings.person_b_github_id;
+  const login = settings.person_b_login;
+  if (!Number.isSafeInteger(gh) || (gh ?? 0) <= 0 || typeof login !== 'string' || login === '') {
+    throw new Error(
+      'SDLC_PILOT_LIVE_G8=1 needs "person_b_github_id" (a number) and "person_b_login" in the ' +
+        'settings file (GETTING-STARTED Step 14)',
+    );
+  }
+  return { gh: gh!, login };
 }
 
 async function api(token: string, method: string, route: string, body?: unknown) {
@@ -70,12 +98,13 @@ async function api(token: string, method: string, route: string, body?: unknown)
   return { status: res.status, json: text ? (JSON.parse(text) as unknown) : {} };
 }
 
-describe.skipIf(!enabled)('C09 live: T01 to G7 and N6 on the real pilot (test App only)', () => {
-  it('T01 goes G1 → G6 on the real pilot, then N6; everything is cleaned up', async () => {
+describe.skipIf(!enabled)('C09 and E07 live: T01 on the real pilot (test App only)', () => {
+  it('T01 goes G1 → G6 on the real pilot, then N6; with SDLC_PILOT_LIVE_G8=1 on to G8', async () => {
     const settings = JSON.parse(
       fs.readFileSync(outsideRepo(process.env.SDLC_GITHUB_TEST_APP_FILE!), 'utf8'),
     ) as LiveSettings;
     if (settings.repo !== PILOT) throw new Error(`the live test runs on ${PILOT} only`);
+    const b = withG8 ? personB(settings) : undefined;
     const pem = fs.readFileSync(outsideRepo(settings.private_key_file), 'utf8');
     const secrets: SecretReader = {
       read: () =>
@@ -101,7 +130,12 @@ describe.skipIf(!enabled)('C09 live: T01 to G7 and N6 on the real pilot (test Ap
     const main = await adapter.getBranchHead(ref, 'main');
     const planFile = `.sdlc/plans/${code}.yaml`;
     const plan = await adapter.getFileAtCommit(ref, planFile, main).catch(() => null);
-    if (plan === null || !plan.includes(`intent_id: ${code}`) || !plan.includes('[stub:append]')) {
+    if (
+      plan === null ||
+      !plan.includes(`intent_id: ${code}`) ||
+      !plan.includes('[stub:live]') ||
+      !plan.includes('docs/live-test/**')
+    ) {
       throw new Error(
         `${planFile} is missing on ${PILOT} main or has another content (a new year needs a new ` +
           'file): merge platform/tests/integration/pilot/fixtures/live-plan.yaml there with the ' +
@@ -126,7 +160,14 @@ describe.skipIf(!enabled)('C09 live: T01 to G7 and N6 on the real pilot (test Ap
     const s = new PilotStack();
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-c09-live-'));
     try {
-      await s.startPilot({ live: { gitHost: adapter, repoFullName: PILOT, agentsMd } });
+      await s.startPilot({
+        live: {
+          gitHost: adapter,
+          repoFullName: PILOT,
+          agentsMd,
+          ...(b ? { githubAccounts: { b } } : {}),
+        },
+      });
       const intent = await s.createIntent('low');
       expect(intent.code, 'a throw-away tenant starts at 0001').toBe(code);
       await s.atGate(intent, 'G1');
@@ -135,7 +176,7 @@ describe.skipIf(!enabled)('C09 live: T01 to G7 and N6 on the real pilot (test Ap
       await s.cliJson('a', ['spec', 'link', code, '--path', SPECS.T01]);
       await s.cliJson('a', ['plan', 'submit', code]);
       const submitted = await s.scope.plans.latest(intent.id);
-      expect(submitted?.planned_files).toEqual(T01_PATHS);
+      expect(submitted?.planned_files).toEqual(LIVE_PATHS);
 
       const run = await s.runEnded(intent);
       expect(run).toMatchObject({ status: 'succeeded' });
@@ -228,6 +269,56 @@ describe.skipIf(!enabled)('C09 live: T01 to G7 and N6 on the real pilot (test Ap
         ),
       ).rejects.toThrow(/protected branch/i);
       expect(await adapter.getBranchHead(ref, 'main')).toBe(main);
+
+      if (b) {
+        // E07: a person merges on GitHub; the test only waits for it (never merges itself).
+        process.stdout.write(
+          [
+            '',
+            `e07-live: Person B (${b.login}), please now, on GitHub:`,
+            `  1. review https://github.com/${PILOT}/pull/${String(linked.pr_number)} and approve it;`,
+            '  2. merge it (merge commit or squash), with the same account.',
+            `e07-live: waiting up to ${process.env.SDLC_PILOT_LIVE_MERGE_TIMEOUT_MINUTES ?? '60'} minutes for the merge…`,
+            '',
+          ].join('\n'),
+        );
+        const mergeMinutes = Number(process.env.SDLC_PILOT_LIVE_MERGE_TIMEOUT_MINUTES ?? '60');
+        const mergeDeadline = Date.now() + mergeMinutes * 60_000;
+        for (;;) {
+          await s.poll();
+          const now = await s.reload(intent);
+          if (now.current_gate !== 'G7' || now.status !== 'in_gate') break;
+          if (Date.now() > mergeDeadline) {
+            throw new Error(`no merge within ${String(mergeMinutes)} min`);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 15_000));
+        }
+        const atG8 = await s.reload(intent);
+        process.stdout.write(`e07-live: ${atG8.status} ${String(atG8.current_gate)}\n`);
+        expect(atG8, 'Person B must approve, then merge (G7)').toMatchObject({
+          status: 'in_gate',
+          current_gate: 'G8',
+        });
+        const merged = await adapter.getBranchHead(ref, 'main');
+        expect(await adapter.getFileAtCommit(ref, LIVE_FILE, merged)).toContain('fictional');
+
+        await waitLong(
+          () => s.noticeKinds(intent),
+          (kinds) => kinds.includes('g8_review_needed'),
+        );
+        await s.approve('b', 'G8', intent);
+        const done = await s.until(intent, 'done');
+        expect(done).toMatchObject({ status: 'done', current_gate: 'G8' });
+        const sealed = (await s.scope.evidencePacks.listForIntent(intent.id)).filter(
+          (p) => p.sealed_at !== null,
+        );
+        expect(sealed).toHaveLength(1);
+        const chain = await s.cliJson<{ ok: boolean }>('admin', ['audit', 'verify']);
+        expect(chain.ok).toBe(true);
+        process.stdout.write(
+          `e07-live: ${intent.code} done; pack version ${String(sealed[0]!.version)} sealed\n`,
+        );
+      }
     } finally {
       await cleanUp();
       await s.stopPilot();

@@ -21,7 +21,8 @@ model_list:
 {{- if in $providers "anthropic" }}
 {{- with secret "kv/data/litellm/providers/anthropic" }}
   # Small current Claude model (ADR-M10 section 3). Prices from LiteLLM's built-in price list.
-  - model_name: claude-haiku-4-5
+  # The gateway name carries the model version (QUESTIONS #93): the agent register's `model_ref`.
+  - model_name: claude-haiku-4-5-20251001
     litellm_params:
       model: anthropic/claude-haiku-4-5-20251001
       api_key: {{ .Data.data.api_key | toJSON }}

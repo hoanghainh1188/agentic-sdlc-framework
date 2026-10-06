@@ -14,10 +14,15 @@
 //                run (also a retry from the pushed commit) has a change inside the pilot plan
 //   [stub:count]  C09: a different terminal command at every step, one reply a second, forever, so
 //                the spend grows and loop detection never fires (budget warning and stop, N3)
+//   [stub:live]   E07: appends one fixed, fictional line to LIVE_FILE (`docs/live-test/`), then
+//                finishes: the live G1 → G8 test on the real pilot, which a person merges, never
+//                touches the application code
 // C09: with STUB_ADMIN_KEY set, the test registers and revokes run keys (`POST`/`DELETE
 // /test/keys`, like the Cost Controller at LiteLLM), and `GET /key/info` answers a key's spend
 // (STUB_PRICE_USD per call) and cap, as LiteLLM does for the runner's spend check. A revoked or
 // unknown key gets 401; a key at its cap gets 400, as LiteLLM refuses it.
+// E07: `GET /test/calls` (admin key) lists every counted call of a registered key (`key`, `n`,
+// `at`), so the test's gateway returns one spend record per call, like LiteLLM's spend log.
 // It logs `stub:check:<name>:<yes|no>` for what the first request contained, never the content.
 import http from 'node:http';
 
@@ -29,9 +34,13 @@ if (expected.length < 16 && ADMIN_KEY.length < 16) {
 const CANARY = process.env.STUB_AGENTS_CANARY ?? '';
 const PRICE = Number(process.env.STUB_PRICE_USD ?? '0.01');
 const NOTES_FILE = '/workspace/apps/web/src/features/products/NOTES.md';
+const LIVE_FILE = '/workspace/docs/live-test/RUNS.md';
+const LIVE_LINE = 'One live test run of the SDLC platform (fictional text, no meaning).';
 
 /** C09: the run keys the test registered: key → { maxBudget, calls, revoked }. */
 const keys = new Map();
+/** E07: every counted call of a registered key, in order. */
+const callLog = [];
 const bearer = (req) => /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1] ?? '';
 const spendOf = (entry) => Math.round(entry.calls * PRICE * 1e6) / 1e6;
 
@@ -90,7 +99,7 @@ function call(request, step, name, args) {
 function reply(request) {
   const first = textOf(request.messages.find((m) => m.role === 'user')?.content);
   const script =
-    ['loop', 'slow', 'repeat', 'silent', 'append', 'count'].find((name) =>
+    ['loop', 'slow', 'repeat', 'silent', 'append', 'count', 'live'].find((name) =>
       first.includes(`[stub:${name}]`),
     ) ?? 'edit';
   const step = request.messages.filter((m) => m.role === 'assistant').length;
@@ -104,6 +113,11 @@ function reply(request) {
   if (script === 'append' && step === 0) {
     const dir = NOTES_FILE.slice(0, NOTES_FILE.lastIndexOf('/'));
     const command = `mkdir -p ${dir} && printf 'C09 stub note.\\n' >> ${NOTES_FILE}`;
+    return { delayMs, toolCalls: [call(request, step, 'terminal', { command })] };
+  }
+  if (script === 'live' && step === 0) {
+    const dir = LIVE_FILE.slice(0, LIVE_FILE.lastIndexOf('/'));
+    const command = `mkdir -p ${dir} && printf '${LIVE_LINE}\\n' >> ${LIVE_FILE}`;
     return { delayMs, toolCalls: [call(request, step, 'terminal', { command })] };
   }
   if (script === 'loop' || script === 'repeat')
@@ -131,6 +145,12 @@ function send(res, status, body) {
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, calls });
   if (req.url === '/test/keys' && ADMIN_KEY.length >= 16) return adminKeys(req, res);
+  if (req.method === 'GET' && req.url === '/test/calls' && ADMIN_KEY.length >= 16) {
+    if (req.headers.authorization !== `Bearer ${ADMIN_KEY}`) {
+      return send(res, 401, { error: { message: 'wrong admin key' } });
+    }
+    return send(res, 200, { calls: callLog });
+  }
   if (req.method === 'GET' && req.url === '/key/info') {
     const entry = keys.get(bearer(req));
     if (!entry || entry.revoked) return send(res, 401, { error: { message: 'invalid key' } });
@@ -152,7 +172,10 @@ const server = http.createServer((req, res) => {
     console.log('stub:refused:budget');
     return send(res, 400, { error: { message: 'budget exceeded', type: 'budget_exceeded' } });
   }
-  if (entry) entry.calls += 1;
+  if (entry) {
+    entry.calls += 1;
+    callLog.push({ key: bearer(req), n: entry.calls, at: new Date().toISOString() });
+  }
   let raw = '';
   req.on('data', (chunk) => (raw += chunk));
   req.on('end', async () => {

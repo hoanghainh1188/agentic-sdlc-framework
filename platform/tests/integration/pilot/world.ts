@@ -10,8 +10,10 @@ import path from 'node:path';
 import {
   EvidenceError,
   type EvidenceGetOptions,
+  type CostLabels,
   type EvidenceStore,
   type ModelGateway,
+  type SpendRecord,
   type StoredEvidence,
 } from '../../../packages/contracts/src/index.js';
 import { Redacted } from '../../../packages/secrets/src/index.js';
@@ -129,6 +131,30 @@ export class BareRepo implements RepoBackend {
     });
   }
 
+  /**
+   * E07: a person merges the agent branch into `main` on the Git host (a merge commit with the
+   * branch's tree, `main` and the branch head as parents). The platform never merges.
+   */
+  merge(branch: string): string {
+    const main = this.head()!;
+    const head = this.head(branch);
+    if (!head) throw new Error(`no branch ${branch}`);
+    const tree = this.#git('rev-parse', `${head}^{tree}`);
+    const commit = this.#git(
+      'commit-tree',
+      tree,
+      '-p',
+      main,
+      '-p',
+      head,
+      '-m',
+      `Merge ${branch} (a person, E07 test)`,
+    );
+    this.#git('update-ref', 'refs/heads/main', commit, main);
+    for (const file of this.changedPaths(head)) this.#routeFile(file);
+    return commit;
+  }
+
   commit(changes: Readonly<Record<string, string | null>>): string {
     const index = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-c09-index-')), 'index');
     const env = { ...GIT_ENV, GIT_INDEX_FILE: index };
@@ -196,17 +222,35 @@ export class MemoryBucket {
 
 // --- The model gateway -------------------------------------------------------------------------
 
+/** One counted call of a run key at the stub model (`GET /test/calls`). */
+export interface StubCall {
+  readonly key: string;
+  readonly n: number;
+  readonly at: string;
+}
+
+/** The stub model's price per call (`STUB_PRICE_USD`, default of stub-model.mjs). */
+export const STUB_PRICE_USD = '0.010000';
+
 /**
  * The gateway the real Cost Controller uses: each run key is registered at the stub model with
- * its cap (as LiteLLM keeps it) and revoked there. No spend log: cost records are C03's and C12's.
+ * its cap (as LiteLLM keeps it) and revoked there. E07: `listSpend` returns one record per call
+ * the stub model counted, with the labels of the key the call used (as LiteLLM's spend log does
+ * with the key's metadata), so the run-end sync (C12) writes `cost_records` like in production.
  */
 export class StubGateway implements ModelGateway {
   readonly revokedRuns: string[] = [];
   readonly #keys = new Map<string, string>(); // run ID → key
+  readonly #labels = new Map<string, CostLabels>(); // key → labels
   readonly #admin: (method: 'POST' | 'DELETE', body: object) => Promise<void>;
+  readonly #calls: () => Promise<readonly StubCall[]>;
 
-  constructor(admin: (method: 'POST' | 'DELETE', body: object) => Promise<void>) {
+  constructor(
+    admin: (method: 'POST' | 'DELETE', body: object) => Promise<void>,
+    calls: () => Promise<readonly StubCall[]> = () => Promise.resolve([]),
+  ) {
     this.#admin = admin;
+    this.#calls = calls;
   }
 
   ensureTenantBudget(): ReturnType<ModelGateway['ensureTenantBudget']> {
@@ -219,6 +263,7 @@ export class StubGateway implements ModelGateway {
     const key = `sk-c09-${crypto.randomBytes(16).toString('hex')}`;
     await this.#admin('POST', { key, max_budget: Number(input.maxBudgetUsd) });
     this.#keys.set(input.runId, key);
+    this.#labels.set(key, input.labels);
     return {
       keyId: `key-${input.runId}`,
       key: new Redacted(key),
@@ -244,7 +289,27 @@ export class StubGateway implements ModelGateway {
     return Promise.resolve([{ model: MODEL, providerType: 'api' }]);
   }
 
-  listSpend(): ReturnType<ModelGateway['listSpend']> {
-    return Promise.resolve({ records: [], unreadable: 0 });
+  async listSpend(range: {
+    readonly from: Date;
+    readonly to: Date;
+  }): ReturnType<ModelGateway['listSpend']> {
+    const records: SpendRecord[] = [];
+    for (const call of await this.#calls()) {
+      const at = new Date(call.at);
+      const labels = this.#labels.get(call.key);
+      if (!labels || at < range.from || at >= range.to) continue;
+      records.push({
+        sourceRef: `stub-${sha256(call.key).slice(0, 16)}-${String(call.n)}`,
+        model: MODEL,
+        status: 'success',
+        inputTokens: 1000,
+        outputTokens: 100,
+        cachedInputTokens: 0,
+        costUsd: STUB_PRICE_USD,
+        occurredAt: at,
+        labels,
+      });
+    }
+    return { records, unreadable: 0 };
   }
 }

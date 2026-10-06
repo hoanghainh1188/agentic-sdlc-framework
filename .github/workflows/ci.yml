@@ -58,6 +58,7 @@ jobs:
       run_checks: ${{ steps.decide.outputs.run_checks }}
       run_compose: ${{ steps.decide.outputs.run_compose }}
       run_sandbox_image: ${{ steps.decide.outputs.run_sandbox_image }}
+      run_fresh_deploy: ${{ steps.decide.outputs.run_fresh_deploy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -127,6 +128,11 @@ jobs:
           decide_heavy run_sandbox_image "Sandbox image job" \
             "a sandbox image, the runner, the agent adapter, the package proxy, the gate steps, the worker or a live test" \
             platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/ platform/packages/core/src/workflow/ platform/apps/worker/ platform/tests/integration/pilot/ platform/tests/integration/workflow/g1-g3/
+
+          # E07 (D-08 E07 AC3): the fresh deployment that follows platform/deploy/README.md. The
+          # longest job: weekly and manual runs only, never on a pull request.
+          echo "run_fresh_deploy=$all" >> "$GITHUB_OUTPUT"
+          echo "Fresh deployment job: run=$all (weekly and manual runs only)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Diagrams: every SVG carries the SHA-256 of its Mermaid source (scripts/diagrams.py). The
       # author renders with `pnpm diagrams:render` and commits the SVG; CI never commits.
@@ -373,6 +379,33 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/node24.tar"
 
+  fresh-deploy:
+    # E07 (D-08 E07 AC3): follows the README section "Fresh deployment (operator)" on a throw-away
+    # Compose project with every server profile (core, models, platform, sandbox), from an empty
+    # env file to the first intent at G1. Throw-away keys only, never printed; no GitHub secrets.
+    name: fresh deployment (README)
+    needs: [scan, checks]
+    if: needs.scan.outputs.run_fresh_deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (reads packageManager)
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:fresh-deploy
+      - name: Stop and remove every throw-away Compose project
+        if: always()
+        run: |
+          for p in $(docker compose ls -a -q | grep '^sdlcfresh' || true); do
+            docker compose -p "$p" down --volumes --remove-orphans || true
+          done
+
   db:
     # Task A06: migrations and tenant isolation on a throw-away PostgreSQL (same image and init
     # script as Compose). Runs on every PR: DB code changes outside platform/deploy/ too.
@@ -406,7 +439,7 @@ jobs:
 
   ci-ok:
     name: ci-ok
-    needs: [scan, checks, compose, sandbox-image, db]
+    needs: [scan, checks, compose, sandbox-image, fresh-deploy, db]
     # The summary for pull requests (the future required check). Scheduled runs need no summary:
     # a failed job there already marks the run red.
     if: ${{ always() && github.event_name != 'schedule' }}

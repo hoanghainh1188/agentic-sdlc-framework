@@ -20,6 +20,157 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 - OpenSSL 3.x as `openssl` on the `PATH` (for `init-env.sh` and the TLS tests of `@sdlc/secrets`). On macOS, `/usr/bin/openssl` is LibreSSL, and the TLS tests stop with a message when they find it: install OpenSSL 3 (`brew install openssl@3`) and put it first (`export PATH="$(brew --prefix openssl@3)/bin:$PATH"`).
 - Node.js 24 + pnpm 10 only for the `pnpm` shortcuts and tests. The shell scripts work without them.
 
+## Fresh deployment (operator)
+
+How to bring up the whole platform on a new machine with Docker Compose, from an empty checkout to the first intent at G1 (D-08 E07 AC3). Run every step **yourself, in a terminal, from the repo root**. Several steps print or ask for key shares, tokens or keys at a hidden prompt: never run them through a chat tool, and never paste their output anywhere except your password manager. `pnpm test:fresh-deploy` runs the same steps on a throw-away Compose project with throw-away keys (section [Tests](#tests)).
+
+After the first deployment, use [GETTING-STARTED Step 13](../GETTING-STARTED.md#step-13-restart-the-dev-stack-after-a-break-dev) to restart the stack after a break, and [Step 14](../GETTING-STARTED.md#step-14-prepare-the-pilot-repo-for-live-tests-dev) for the live tests on the pilot repository.
+
+### 1. Prerequisites
+
+- The [Requirements](#requirements) above (Docker Compose v2.24+, Node.js 24, pnpm 10 with `corepack enable`, OpenSSL 3).
+- A GitHub App installed on the project's repository only, and its private key in a file outside the repo ([GETTING-STARTED Step 11](../GETTING-STARTED.md#step-11-create-the-github-app-devtest)).
+- On the internal server: the three OpenBao key holders are named and TLS is in place (runbook T11 §3.2, task A10). Until then, use this procedure on a development machine with throw-away keys only.
+- `pnpm install` and `pnpm build`.
+
+### 2. Settings file
+
+```bash
+pnpm compose:env
+```
+
+It creates `platform/deploy/.env` with random passwords (mode 600, never overwritten). It also fills `SDLC_DOCKER_GID`, the group ID of the Docker socket: check it on the server (runbook T11 §5g). On the server, leave `LITELLM_MASTER_KEY` and `LITELLM_SALT_KEY` empty (runbook T11 §5d).
+
+### 3. OpenBao
+
+Start only OpenBao, PostgreSQL and SeaweedFS (the credentials commands of step 5 create SeaweedFS identities). The whole `core` profile cannot be healthy yet: on the server, LiteLLM gets its keys from OpenBao (profile `models`, step 7), and `.env` holds none.
+
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs
+pnpm openbao:bootstrap init       # 3 key shares and a root token, printed ONCE to the terminal
+pnpm openbao:bootstrap unseal     # 2 shares at the hidden prompt
+pnpm openbao:bootstrap configure  # root token at the hidden prompt; KV, Transit, every AppRole
+```
+
+Details and key custody: runbook T11 §3 and §4. Make an admin token for the next two steps (T11 §5.1).
+
+### 4. Shared secrets
+
+With the admin token, store (runbook T11 §5b and §5d; each value is read at a hidden prompt or from a file, never typed into a command line):
+
+- the GitHub App's `client_id` and `private_key` at `kv/shared/github-app` (T11 §5b);
+- the LiteLLM master key at `kv/cost-controller/litellm-master-key` (field `value`, starts with `sk-`) and the salt key at `kv/litellm/salt-key` (T11 §5d);
+- one key per model provider at `kv/litellm/providers/<provider>`, field `api_key` (T11 §5d). The models are listed in `litellm/config.ctmpl`.
+
+### 5. Credentials of every process
+
+Each command asks for the admin token, delivers one AppRole's role ID and a new secret ID into the service's volume, and prints no secret:
+
+```bash
+pnpm openbao:bootstrap litellm-credentials          # T11 §5d
+pnpm openbao:bootstrap api-credentials              # T11 §5e
+pnpm openbao:bootstrap worker-credentials           # T11 §5f (AppRoles worker and cost-controller)
+pnpm openbao:bootstrap runner-credentials           # T11 §5g
+pnpm openbao:bootstrap runner-evidence-credentials  # T11 §5g (L1 proposals, run diffs)
+pnpm openbao:bootstrap api-evidence-credentials     # T11 §5h (Evidence Packs)
+pnpm openbao:bootstrap worker-evidence-credentials  # T11 §5i (G8 release packs)
+pnpm openbao:bootstrap worker-purge-credentials     # T11 §5j (evidence retention)
+pnpm openbao:bootstrap worker-anchor-credentials    # T11 §5k (daily audit anchor)
+```
+
+Record each one in the operations log (role, date, reason; never the secret ID).
+
+### 6. Database
+
+```bash
+SDLC_DB_MIGRATION_URL="postgres://platform:<PLATFORM_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm db:migrate
+```
+
+The password is in `platform/deploy/.env`. `pnpm db:status` (same variable) lists no pending migration.
+
+### 7. Start the platform
+
+```bash
+platform/deploy/scripts/up.sh core models platform sandbox
+curl -s http://127.0.0.1:8090/health/ready
+```
+
+This starts everything else of `core` too. Add `observability` for Langfuse (section [Logs and traces](#logs-and-traces-a08)). The script waits until every service is healthy. The worker's retention loop starts in `report` mode: it deletes nothing (runbook T11 §5j).
+
+### 8. The tenant and its first admin
+
+```bash
+export SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform"
+pnpm sdlc ops bootstrap --tenant <slug> --tenant-name "<name>" --email <you> --name "<your name>"
+pnpm sdlc login --api-url http://127.0.0.1:8090
+```
+
+The token is printed once (section [First admin and API tokens](#first-admin-and-api-tokens-task-b03)); `sdlc login` reads it at a hidden prompt. From here on, everything goes through the API.
+
+### 9. The project and its team
+
+```bash
+pnpm sdlc admin project create --slug <project> --name "<name>" --repo <owner/name>
+pnpm sdlc admin user create --email <person-a> --name "<name>"
+pnpm sdlc admin identity link --user <person-a> --github-id <numeric ID> --github-login <login>
+pnpm sdlc admin role grant --project <project> --user <person-a> --role person_a
+pnpm sdlc admin token issue --user <person-a> --name <token-name>
+```
+
+Do the same for Person B (`--role person_b`) and every other role you need (handbook Ch.19 §19.8d). Person A and Person B are always two different people with two GitHub accounts. The numeric ID comes from `gh api users/<login> --jq .id`. Each person replaces the issued token with their own (`sdlc token create`, then `sdlc token revoke`).
+
+### 10. The sandbox image
+
+```bash
+pnpm sandbox-image:build node24
+```
+
+It prints the image reference by digest (`…@sha256:…`) for the project configuration (runbook T11 §5g; on Docker Desktop add `--no-push`).
+
+### 11. The agent
+
+```bash
+pnpm sdlc admin agent register --key <agent-key> --version 1.0.0 --owner <person-a> \
+  --model <gateway model with version> --instructions AGENTS.md@<label> \
+  --instructions-file <the repository's AGENTS.md> --tools file_editor,terminal \
+  --max-autonomy L2 --environments sandbox
+```
+
+Then the agent's owner (`--as owner`) and Person B (`--as person_b`) each run `pnpm sdlc admin agent approve --key <agent-key> --purpose activate` (handbook Ch.20 §20.5b). The model is a gateway model name from `litellm/config.ctmpl`, for example `claude-haiku-4-5-20251001`.
+
+### 12. The project configuration
+
+`pnpm sdlc admin config show --project <project>` gives the version. Write the settings that differ from the defaults into a YAML file outside the repo, at least:
+
+```yaml
+run:
+  agent_key: <agent-key>
+sandbox:
+  image: <the reference of step 10>
+verification:
+  required_checks: [<the repository's required CI check>]
+```
+
+Then `pnpm sdlc admin config set --project <project> --file <file> --expected-version <version>` (handbook Ch.19 §19.8d).
+
+### 13. The project AI record
+
+Person A (or the PM/BrSE) records the client's consent (handbook Ch.2 §2.5, template T7):
+
+```bash
+pnpm sdlc ai-record set --project <project> --expected-version 0 --ai-allowed yes \
+  --classes public,internal --prod-logs no --disclosure standard_note
+```
+
+### 14. The first intent
+
+```bash
+pnpm sdlc intent create --project <project> --title "<title>" --risk low --data-class internal
+pnpm sdlc intent show <INT-YYYY-NNNN>
+```
+
+The intent is `in_gate` at `G1`: Person A approves it with `pnpm sdlc gate approve G1 <INT-…>` or `/approve G1` on its issue (handbook Ch.19 §19.8c).
+
 ## Start and stop
 
 Run from the repo root.
@@ -233,4 +384,5 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 | `pnpm test:runner-compose` | The `sdlc-runner` container in the profile `sandbox` on a throw-away Compose project: `runner-credentials`, socket proxy, clean-up at start, health check, no secret in the container. About 1 minute | Yes |
 | `pnpm test:sandbox-image` | Builds the sandbox image `node24` and runs it hardened with the real Verdaccio: Node 24, pnpm through corepack and the proxy, no other way out. Needs internet | Yes |
 | `pnpm test:observability` | A08 AC3: `core + models + observability` on a throw-away Compose project (ports +27000) with a stub model and throw-away OpenBao keys. One model call through LiteLLM must give a Langfuse trace with all seven labels; a span of a platform process must reach Langfuse through the collector; the collector has no host port. About 2 minutes | Yes |
+| `pnpm test:fresh-deploy` | E07 AC3: follows the section [Fresh deployment](#fresh-deployment-operator) on a throw-away Compose project (ports +31000, throw-away keys): `compose:env`, OpenBao init, unseal and configure, the shared secrets, every credentials command, the migrations, `up.sh core models platform sandbox`, `ops bootstrap`, the team, the sandbox image, the agent, the configuration, the AI record and the first intent at G1, then `sdlc audit verify`. CI: weekly and manual runs only. Prints `e07:fresh_deploy_seconds` | Yes |
 | `pnpm test:compose` | Starts `core`, then `core + observability`, with a throw-away env file, its own project name and ports shifted by 20000. Checks health, databases, namespace, buckets, Valkey policy, OpenBao state, Langfuse sign-up and trace upload. Removes everything afterwards. Takes about 2–5 minutes | Yes |

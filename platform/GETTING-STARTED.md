@@ -360,8 +360,9 @@ Live tests run the platform against the real `harryforge/pilot-order-inventory` 
 | 3 | The project configuration | `pnpm sdlc admin config show --project pilot` gives the version; write the settings that differ from the defaults into a YAML file outside the repo, then `pnpm sdlc admin config set --project pilot --file <file> --expected-version <version>` (handbook Ch.19 §19.8d). For the pilot: `verification.required_checks: [ci-ok]` (G6 waits only for the pilot's `ci-ok`, handbook Ch.14), `sandbox.image` (Step 14 item 4) and `run.agent_key` (item 5) | `config show` prints the new version and values |
 | 4 | The sandbox image | `pnpm sandbox-image:build node24` prints the reference by digest; on Docker Desktop use `platform/sandbox-images/build.sh node24 --no-push` (runbook T11 §5g). Put it in `sandbox.image` | The reference ends in `@sha256:…` |
 | 5 | A registered, active agent | `pnpm sdlc admin agent register …`, then the approvals (handbook Ch.20 §20.5b). Its `instructions_ref` points at the pilot's `AGENTS.md` | `pnpm sdlc admin agent show <key>` says `active` |
-| 6 | A model | A provider key in OpenBao (runbook T11 §5d), or on a dev machine the local Ollama model `gpt-oss:20b` (QUESTIONS #78). One real run with an API model is needed before the trial M-E (QUESTIONS #81) | `curl -s -H "Authorization: Bearer <master key>" http://127.0.0.1:4000/v1/models` lists it (run in the terminal; never paste the key) |
-| 7 | The plan file of the C09 live test (QUESTIONS #230) | Once a year: open a pull request on the pilot that adds `.sdlc/plans/INT-<UTC year>-0001.yaml` with the content of `platform/tests/integration/pilot/fixtures/live-plan.yaml` (change the year in `intent_id` too), let `ci-ok` pass and merge it yourself. The App and the platform never merge | `gh api repos/harryforge/pilot-order-inventory/contents/.sdlc/plans/INT-2026-0001.yaml --jq .path` |
+| 6 | A model | A provider key in OpenBao (runbook T11 §5d), or on a dev machine the local Ollama model `gpt-oss:20b` (QUESTIONS #78). One real run with an API model is needed before the trial M-E (QUESTIONS #81): `pnpm test:agent-api` (runbook T11 §5d, "The real API-model run") | `curl -s -H "Authorization: Bearer <master key>" http://127.0.0.1:4000/v1/models` lists it (run in the terminal; never paste the key) |
+| 7 | The plan file of the C09 / E07 live test (QUESTIONS #230) | Once a year: open a pull request on the pilot that adds `.sdlc/plans/INT-<UTC year>-0001.yaml` with the content of `platform/tests/integration/pilot/fixtures/live-plan.yaml` (change the year in `intent_id` too), let `ci-ok` pass and merge it yourself. The App and the platform never merge. The plan allows `docs/live-test/**` only: a live run never changes the application code. A file merged before E07 (`allowed_paths: [apps/web/src/features/products/**]`, `[stub:append]`) must be replaced by the new content | `gh api repos/harryforge/pilot-order-inventory/contents/.sdlc/plans/INT-2026-0001.yaml --jq .path` |
+| 8 | Person B's GitHub account (E07 live G8 only) | A second person with their own GitHub account and write access to the pilot (they review and merge). Add to the settings file of the test App (Step 11 item 7): `"person_b_github_id": <numeric ID>` (`gh api users/<login> --jq .id`) and `"person_b_login": "<login>"` | `gh api repos/harryforge/pilot-order-inventory/collaborators/<login>/permission --jq .permission` says `write` or more |
 
 The live tests (each needs the test App's private key file, kept outside the repo):
 
@@ -370,9 +371,18 @@ SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm e
 SDLC_SANDBOX_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm test:sandbox-live
 pnpm test:agent-real
 SDLC_PILOT_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm test:pilot-live
+SDLC_PILOT_LIVE_TEST=1 SDLC_PILOT_LIVE_G8=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm test:pilot-live
 ```
 
 The first includes the publish test (C08: push and pull request on the pilot); the second clones the pilot into a real sandbox; the third runs the agent with the local Ollama model (CLAUDE.md, "OpenHands adapter"). The fourth (C09) runs T01 from G1 to G7 on the pilot in this process: a throw-away database, the Temporal test server, a real node24 sandbox with the stub model (no model key; needs Docker and item 7, not the dev stack of Step 13), a real push, a real pull request and the pilot's real `ci-ok`; then it checks that `main` refuses a push (N6), closes the pull request and deletes the branch. It takes 15–30 minutes (the pilot's CI). Optional: `SDLC_SANDBOX_IMAGE` (skips the image build), `SDLC_PILOT_LIVE_CI_TIMEOUT_MINUTES` (default 30).
+
+The fifth (E07, D-08 E07 AC1) is the same run taken on to G8; it needs items 7 and 8. After N6 it does **not** close the pull request. It prints the pull request's link and waits (`SDLC_PILOT_LIVE_MERGE_TIMEOUT_MINUTES`, default 60) for a person:
+
+1. Person B opens the pull request on GitHub with their own account, reviews it and approves it.
+2. Person B merges it (merge commit or squash). Only Person B: the platform counts a merge by a producer, a bot or an account it does not know as a merge before approval (security escalation). The App and the platform never merge.
+3. The test sees the merge on its next poll. The worker builds the release pack, Person B's user approves G8 through the CLI, the pack is sealed, the intent ends `done`, and `sdlc audit verify` passes. The test prints `e07-live: INT-… done`.
+
+The merged change is one fixed, fictional line appended to `docs/live-test/RUNS.md` on the pilot's `main`. Each live G8 run adds one more line there; nothing under `apps/` changes, so the pilot stays clean for the T01–T10 trials. Do not revert it.
 
 ## Sending handbook comments
 
