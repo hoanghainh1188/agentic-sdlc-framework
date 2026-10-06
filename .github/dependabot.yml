@@ -1,14 +1,19 @@
 # Dependabot version updates (task A09). Keeps the SHA-pinned actions and the
 # Compose images current. Pinning images by digest comes later (A02 review).
+# Monthly, and one grouped PR per ecosystem (2026-10-06): every PR runs CI, and an image PR
+# starts the heavy compose job, so fewer PRs use fewer Actions minutes.
 version: 2
 updates:
   # Actions: every update, including major versions, is reviewed by hand (see PR #57).
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
       prefix: chore
+    groups:
+      actions:
+        patterns: ['*']
 
   # Compose images: patch and minor updates only. A major version (for example
   # PostgreSQL 17 -> 18, Valkey 8 -> 9) is a planned upgrade task with its own tests,
@@ -16,7 +21,7 @@ updates:
   - package-ecosystem: docker-compose
     directory: /platform/deploy
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
       prefix: chore
     ignore:
@@ -30,3 +35,7 @@ updates:
       # temporalio/server and temporalio/admin-tools must stay on the same version.
       temporal:
         patterns: ['temporalio/*']
+      # Every other image in one PR (one compose job). A dependency joins the first group that
+      # matches, so Temporal keeps its own group above.
+      deploy-images:
+        patterns: ['*']
