@@ -351,7 +351,7 @@ describe('AC3: Gitleaks, Semgrep and Trivy run and block critical findings', () 
 });
 
 describe('Dependabot and CODEOWNERS', () => {
-  it('Dependabot updates GitHub Actions and Compose images weekly', () => {
+  it('Dependabot updates GitHub Actions and Compose images monthly (Actions minutes)', () => {
     const config = readYaml<{
       updates: { 'package-ecosystem': string; schedule: { interval: string } }[];
     }>('.github/dependabot.yml');
@@ -359,7 +359,7 @@ describe('Dependabot and CODEOWNERS', () => {
       'docker-compose',
       'github-actions',
     ]);
-    for (const update of config.updates) expect(update.schedule.interval).toBe('weekly');
+    for (const update of config.updates) expect(update.schedule.interval).toBe('monthly');
   });
 
   it('Dependabot never proposes major image updates, keeps ClickHouse on its LTS line and groups Temporal', () => {
@@ -381,6 +381,9 @@ describe('Dependabot and CODEOWNERS', () => {
     expect(ignored('clickhouse/clickhouse-server', 'version-update:semver-minor')).toBe(true);
     const patterns = Object.values(compose?.groups ?? {}).flatMap((g) => g.patterns);
     expect(patterns).toContain('temporalio/*');
+    // Temporal first (a dependency joins the first matching group), then every other image.
+    expect(Object.keys(compose?.groups ?? {})).toEqual(['temporal', 'deploy-images']);
+    expect(compose?.groups?.['deploy-images']?.patterns).toEqual(['*']);
   });
 
   it('CODEOWNERS has a default owner and names only known owners', () => {
