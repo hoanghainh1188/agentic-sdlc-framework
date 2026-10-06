@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.1 |
+| Version | 1.0 |
 | Date | 2026-10-06 |
-| Status | **Draft**, for Harry's approval |
+| Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed |
 | Readers | Harry, the trial team (Person A, Person B, second approver), Claude Code |
 | Related documents | D-02 §2, §10, §13.3 (milestones M-E, M-F); D-09 §7 (tasks T01–T10, scenarios N1–N10); `design/MVP-DONE.md`; `platform/GETTING-STARTED.md` Steps 11–14 |
 
@@ -38,7 +38,7 @@
 | 6 | The agent registered and active, `model_ref` = `claude-haiku-4-5-20251001`, instructions = the pilot's `AGENTS.md` | Owner + Person B (approvals) | `sdlc admin agent show <key>` |
 | 7 | The project configuration (section 6) uploaded | Owner | `sdlc admin config show --project pilot` |
 | 8 | The sandbox image built and pinned (`sandbox.image`) | Owner | GETTING-STARTED Step 14 item 4 |
-| 9 | The trial budget set (decision D3) | Owner | `budget.*` in the configuration; the tenant's monthly budget |
+| 9 | The trial budget set: USD 30 in total (decision D3) | Owner | `budget.*` in the configuration; the tenant's monthly budget |
 | 10 | The manual log ready (section 7.2) | Person A | A shared sheet with the columns of section 7.2 |
 
 ## 4. People and roles
@@ -135,13 +135,13 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | Anything that looks like real client data | Never: the pilot is fictional; stop and remove it |
 | The audit chain breaks (`sdlc audit verify`) | Stop the trial |
 
-## 10. Decisions for Harry
+## 10. Decisions (approved by Harry, 2026-10-06)
 
-| # | Question | Proposal |
+| # | Question | Decision |
 |---|---|---|
 | D1 | Where does the trial run? | The owner's development machine, with the dev stack. The pilot is fictional, so A10 (TLS, backup on the internal server) is not needed for M-E. The internal server comes with M-F, before real client code |
-| D2 | Who are Person A, Person B, the second approver? | Two different people at least; Harry as governance |
-| D3 | The trial budget | A total cap for T01–T10 (for example USD 30), plus the defaults per intent (10) and per run (2) |
+| D2 | Who are Person A, Person B, the second approver? | Two different people at least; Harry as governance. Names recorded in the manual log before phase 1 |
+| D3 | The trial budget | A total cap of USD 30 for T01–T10, plus the defaults per intent (10) and per run (2) |
 | D4 | Unhappy scenarios | Record N1–N10 when they happen; do not force them (tests already prove them) |
 | D5 | Time frame | Harry decides; phases 1–2 first, a short review, then phases 3–5 |
 
@@ -150,3 +150,4 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-06 | Claude (coordinator) | Draft for Harry's approval |
+| 1.0 | 2026-10-06 | Claude (coordinator), approved by Harry | D1–D5 approved as proposed; the trial budget cap is USD 30 |
