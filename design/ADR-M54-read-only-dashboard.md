@@ -55,7 +55,7 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
 - G8: the latest plan's change flags, production (QUESTIONS #220);
 - POLICY at G4 (Low, Medium) has no roles: the platform decides.
 
-**What `waiting_for` says, and what it does not.** It is the oversight of the current gate: who decides it (HITL: the approver roles and how many approvals; HOTL or AUDIT: the roles told, the platform passes it when its conditions hold; POLICY: the platform). It does **not** say whether a platform check holds the gate right now: a failed G4 check, a spec that cannot be read, a plan to submit again, a missing evidence credential at G8, a merge still to come at G7, or a freezing escalation. Those are the workflow's waiting reasons; copying them into the API would be a second resolution, which this ADR refuses. The dashboard therefore labels the field "decided by", shows `freezes_intent` from the escalations, and links to the issue, where the workflow's status comments explain a hold. Exposing the workflow's last waiting reason is an open question for Harry (ADR-M54 §4).
+**What `waiting_for` says, and what it does not.** It is the oversight of the current gate: who decides it (HITL: the approver roles and how many approvals; HOTL or AUDIT: the roles told, the platform passes it when its conditions hold; POLICY: the platform). It does **not** say whether a platform check holds the gate right now: a failed G4 check, a spec that cannot be read, a plan to submit again, a missing evidence credential at G8, a merge still to come at G7, or a freezing escalation. Those are the workflow's waiting reasons; copying them into the API would be a second resolution, which this ADR refuses. The dashboard therefore labels the field "decided by", shows `freezes_intent` from the escalations, and links to the issue, where the workflow's status comments explain a hold. Exposing the workflow's last waiting reason comes in a later task (Harry, 2026-10-07; §4).
 
 `waiting_for` is null when the intent is not `in_gate`, when the stored configuration is refused (the workflow stops too), and **at G6 before CI passed**: the workflow resolves G6's oversight only after CI passed; before that it waits for CI, not for a person. Tests: a unit test of every special case, a static test that no step calls `oversightMode` itself, and database tests that compare `waiting_for` with what the workflow does in the G4 (POLICY, HITL), G5 → G3, G6 (CI pending, findings unknown) and G7 (dual approval) tests.
 
@@ -96,11 +96,12 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
   - the token stays in the browser's memory while the tab is open; anyone at the unlocked screen can read the pages (sign out, lock the screen);
   - a role or a configuration changed after an escalation was raised: the roles shown are those of the configuration in force, as the clock uses them, not those at the raise;
   - `plan-check.ts` and `spec-check.ts` still resolve the oversight of G3 and G2 for their notice audiences without the shared function (QUESTIONS #264); `waiting_for` does not depend on them;
-  - `waiting_for` names who decides the current gate, not whether a platform check holds it (§2.4); the workflow's last waiting reason (for example `g4_refused`, `plan_resubmit_needed`, `evidence_unavailable`) is not in the API. Whether to expose it, read from what the workflow recorded, is open (to ask Harry: the U01 question block #260–#264 is used up);
+  - `waiting_for` names who decides the current gate, not whether a platform check holds it (§2.4); the workflow's last waiting reason (for example `g4_refused`, `plan_resubmit_needed`, `evidence_unavailable`) is not in the API. Harry decided (2026-10-07) that a later task exposes it, read from what the workflow recorded; the coordinator adds the task to the backlog and gives it a question number (the U01 block #260–#264 is used up);
   - the dashboard does not refresh by itself in PR 2 beyond a manual "refresh" (no polling of the API every few seconds).
 
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 0.2 | 2026-10-07 | Claude (task U01, PR 1) | After the code review: what `waiting_for` does not say (§2.4); Harry: a later task exposes the workflow's last waiting reason (§4) |
 | 0.1 | 2026-10-07 | Claude (task U01, PR 1) | First version: read only, served by the api under `/dashboard/`, 127.0.0.1 only, CSP, the token in memory, the four fields, one oversight resolution for the workflow and `waiting_for`; PR 2's app and tests |
