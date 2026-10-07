@@ -1,4 +1,4 @@
-// In-process stand-in for the LiteLLM admin API (v1.102.1 shapes, checked live in ADR-M24 §2.2).
+// In-process stand-in for the LiteLLM admin API (v1.104.0 shapes, checked live in ADR-M24 §2.2).
 // Records every request, so tests can check what the adapter sends. Every answer and error text
 // echoes a marker, so tests can check that nothing from LiteLLM leaks into errors.
 import http from 'node:http';

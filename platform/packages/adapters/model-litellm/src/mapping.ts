@@ -1,4 +1,4 @@
-// Pure mapping between the ModelGateway contract and the LiteLLM Proxy API (v1.102.1, checked live
+// Pure mapping between the ModelGateway contract and the LiteLLM Proxy API (v1.104.0, checked live
 // in design/ADR-M24 §2.2). Kept free of I/O so the unit tests can check caps, labels and parsing.
 import {
   COST_LABEL_NAMES,
