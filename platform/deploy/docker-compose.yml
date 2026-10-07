@@ -270,7 +270,7 @@ services:
   # OpenBao. Needs OpenBao unsealed and configured, and its AppRole credentials delivered
   # (`openbao/bootstrap.sh litellm-credentials`, runbook T11).
   litellm-agent:
-    image: openbao/openbao:2.6.3
+    image: openbao/openbao:2.7.1
     profiles: [models]
     restart: unless-stopped
     networks: [sdlc]
@@ -363,7 +363,7 @@ services:
     entrypoint: [/bin/sh, /scripts/create-buckets.sh]
 
   openbao:
-    image: openbao/openbao:2.6.3
+    image: openbao/openbao:2.7.1
     profiles: [core, observability]
     restart: unless-stopped
     networks: [sdlc]
@@ -392,7 +392,7 @@ services:
   # ------------------------------------------------------- observability ----
 
   clickhouse:
-    image: clickhouse/clickhouse-server:26.3.36.6
+    image: clickhouse/clickhouse-server:26.3.39.7
     profiles: [observability]
     restart: unless-stopped
     networks: [sdlc]
@@ -414,7 +414,7 @@ services:
       test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:8123/ping || exit 1']
 
   langfuse-worker:
-    image: langfuse/langfuse-worker:4.47.0
+    image: langfuse/langfuse-worker:4.50.0
     profiles: [observability]
     restart: unless-stopped
     networks: [sdlc]
@@ -466,7 +466,7 @@ services:
         ]
 
   langfuse-web:
-    image: langfuse/langfuse:4.47.0
+    image: langfuse/langfuse:4.50.0
     profiles: [observability]
     restart: unless-stopped
     networks: [sdlc]

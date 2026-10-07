@@ -1,5 +1,5 @@
 // The model-call trace store on Langfuse v4 (task E08, design/ADR-M53; D-02 FR-44). Checked live
-// on Langfuse 4.47.0 in `events_only` mode with ClickHouse 26.3 (spike, ADR-M53 §1):
+// on Langfuse 4.47.0 in `events_only` mode with ClickHouse 26.3 (spike, ADR-M53 §1; checked again on 4.50.0):
 //
 // - Selection: `GET /api/public/v2/observations` with `fields=core,metadata` (never `io`) and the
 //   filter `tags any of [...]`. Each observation returns its trace's tags in
@@ -38,7 +38,7 @@ export interface LangfuseTraceStoreOptions {
   readonly fetch?: typeof fetch;
 }
 
-/** The Langfuse tables that hold observations in `events_only` mode (4.47.0). */
+/** The Langfuse tables that hold observations in `events_only` mode (4.47.0, checked again on 4.50.0). */
 export const LANGFUSE_EVENT_TABLES = ['events_full', 'events_core'] as const;
 /** Observations per page (Langfuse's maximum). */
 export const OBSERVATION_PAGE = 1000;

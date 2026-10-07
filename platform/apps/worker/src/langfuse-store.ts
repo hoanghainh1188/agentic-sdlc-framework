@@ -25,7 +25,7 @@ export const LANGFUSE_SECRET_KEY_FIELD = 'langfuse_secret_key';
 export const CLICKHOUSE_PASSWORD_FIELD = 'clickhouse_password';
 /** The ClickHouse user `worker-langfuse-credentials` makes (ADR-M53 §2.3). */
 export const CLICKHOUSE_PURGE_USER = 'sdlc_purge';
-/** The prefix of Langfuse's raw OTLP files in its bucket (4.47.0, `LANGFUSE_S3_EVENT_UPLOAD_PREFIX`). */
+/** The prefix of Langfuse's raw OTLP files in its bucket (4.47.0, checked again on 4.50.0; `LANGFUSE_S3_EVENT_UPLOAD_PREFIX`). */
 export const LANGFUSE_RAW_PREFIX = 'events/otel/';
 
 export interface OpenedLangfusePurge {

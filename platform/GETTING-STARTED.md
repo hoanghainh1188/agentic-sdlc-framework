@@ -452,6 +452,14 @@ Start `core` alone first: `sdlc-api`, `sdlc-worker`, `sdlc-runner` and `litellm-
 | Once after the E02 update (Evidence Packs), or the API's evidence key may have leaked | `pnpm openbao:bootstrap api-evidence-credentials` → `sdlc-api` (runbook T11 §5h) |
 | A service log says it cannot log in to OpenBao (`invalid secret id`) | That service's credentials command |
 
+**After an image update on `main`** (for example issue #177: OpenBao 2.7.1, ClickHouse 26.3.39.7, Langfuse 4.50.0), on an existing dev stack:
+
+1. Pull the new images: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox --profile observability pull`.
+2. Follow the table above from item 1. The new OpenBao container starts sealed: unseal it as usual (items 2–3), then check `pnpm openbao:bootstrap status` says `unsealed`. OpenBao needs no data migration; ClickHouse and Langfuse migrate their own data at start-up.
+3. Your `sdlc_*` volumes keep their owner. OpenBao 2.7 no longer declares `VOLUME` in its image, which matters only for new volumes (covered by the live tests).
+4. Since OpenBao 2.7.1 an AppRole secret ID stops working exactly at its expiry (90 days, `APPROLE_SECRET_ID_TTL`); before, it could keep working until a tidy ran. A process that cannot log in to OpenBao after that time (`invalid secret id` in its log) needs its `pnpm openbao:bootstrap *-credentials` command again (table above, then restart that service).
+5. Never run `docker volume prune` or `docker system prune --volumes`.
+
 Restart one service: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox restart <service>`.
 
 To stop everything and keep the data: `pnpm compose:down`. If you do not need the platform for a while, stop it this way: a sealed OpenBao makes `sdlc-api` and `sdlc-worker` restart every minute.

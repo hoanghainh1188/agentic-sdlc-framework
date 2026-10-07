@@ -26,9 +26,9 @@ Versions were checked against Docker Hub, GHCR and GitHub releases on 2026-09-25
 | valkey | core | `valkey/valkey:8.1.10-alpine3.24` | BSD-3-Clause |
 | litellm | core | `ghcr.io/berriai/litellm:v1.104.0` (issue #177) | MIT (the `enterprise/` code is not activated) |
 | seaweedfs, seaweedfs-init (job) | core | `chrislusf/seaweedfs:4.48` | Apache-2.0 |
-| openbao | core | `openbao/openbao:2.6.3` | MPL-2.0 |
-| clickhouse | observability | `clickhouse/clickhouse-server:26.3.36.6` (LTS) | Apache-2.0 |
-| langfuse-web, langfuse-worker | observability | `langfuse/langfuse:4.47.0`, `langfuse/langfuse-worker:4.47.0` | MIT (the `ee/` code is not activated) |
+| openbao, litellm-agent | core, models | `openbao/openbao:2.7.1` (issue #177) | MPL-2.0 |
+| clickhouse | observability | `clickhouse/clickhouse-server:26.3.39.7` (LTS, issue #177) | Apache-2.0 |
+| langfuse-web, langfuse-worker | observability | `langfuse/langfuse:4.50.0`, `langfuse/langfuse-worker:4.50.0` (issue #177) | MIT (the `ee/` code is not activated) |
 
 All licences allow commercial use and redistribution (NFR-04). No MinIO, Redis or Elasticsearch (D-01 section 5.8e).
 
@@ -89,3 +89,4 @@ All licences allow commercial use and redistribution (NFR-04). No MinIO, Redis o
 | 0.1 | 2026-09-25 | Claude (task A02) | First version |
 | 0.2 | 2026-09-26 | Claude (task A11), approved by Harry | §2.3: "since A11" notes for OpenBao (no host port, gateway pinned and left out of the AppRole CIDRs; QUESTIONS #27, #37) |
 | 0.3 | 2026-09-26 | Claude (task C03), approved by Harry | §2.3: profile `models` with the LiteLLM sidecar; development-only LiteLLM keys in `.env` (ADR-M24) |
+| 0.4 | 2026-10-07 | Claude (issue #177, PR 2), approved by Harry | §2.1: OpenBao 2.7.1, ClickHouse 26.3.39.7, Langfuse 4.50.0; no configuration change (release notes read; live tests on throw-away stacks) |

@@ -72,7 +72,7 @@ It needs the retention loop (`worker-purge`) to run. Langfuse is behind an inter
 - After a pass that confirmed a purge of an intent with traces, at most once per UTC day, the worker runs `ALTER TABLE default.events_full APPLY DELETED MASK` and the same on `events_core` (`mutations_sync=1`), and logs `retention.langfuse_compacted` with its duration. The day and "owed" live in the process; after a restart an owed compaction waits for the next confirmed purge (runbook T11 §5j gives the manual command).
 - It runs as the ClickHouse user `sdlc_purge`, which has only `ALTER DELETE` on those two tables. Checked live: `ALTER UPDATE` is not enough for `APPLY DELETED MASK`; `sdlc_purge` cannot `SELECT` (code 497); a wrong key gets 403.
 - **Gap:** `ALTER DELETE` also allows `ALTER TABLE … DELETE WHERE …`, so this user could delete every row of the two tables (never read them). The credential lives only in `kv/worker/langfuse`.
-- The adapter knows the two table names of Langfuse 4.47.0. A Langfuse upgrade that renames them fails the live test (`pnpm test:observability`).
+- The adapter knows the two table names of Langfuse 4.47.0. A Langfuse upgrade that renames them fails the live test (`pnpm test:observability`). Checked again on Langfuse 4.50.0 with ClickHouse 26.3.39.7 (issue #177): the same tables, API and tag filter; the live test passes.
 - To create the user, ClickHouse's admin user `langfuse` (already the owner of every Langfuse table) gets access management: `CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1`. ClickHouse masks the password in its query log (checked live).
 
 ### 2.6. The key and the credentials (D3, QUESTIONS #252; AC2)
@@ -136,3 +136,4 @@ It needs the retention loop (`worker-purge`) to run. Langfuse is behind an inter
 |---|---|---|---|
 | 0.1 | 2026-10-05 | Claude (task E08) | First version: the spike (AC1), the step of the retention pass, selection by run IDs and the tag check, request then confirm, the raw file sweep, the ClickHouse compaction, the worker's key and credentials, `not_deployed` and `unavailable` |
 | 0.2 | 2026-10-05 | Claude (task E08) | After the code review: the key's project checked before any Langfuse step; the tenant guard; no starvation (order, set aside); the request recorded before the delete is sent; `up.sh` keeps the purge on when Langfuse's volume exists; the gaps |
+| 0.3 | 2026-10-07 | Claude (issue #177, PR 2), approved by Harry | §2.5: checked again on Langfuse 4.50.0 and ClickHouse 26.3.39.7 |
