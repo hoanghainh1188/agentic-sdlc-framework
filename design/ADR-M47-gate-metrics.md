@@ -50,7 +50,7 @@ What existed before E06:
 
 - Per (project, gate): the number of intents `in_gate` now and the oldest wait (now − the earliest `gate_entered_at`). Every gate: G4 at High risk and G6 in HITL mode also wait for a person.
 - Labelled "at the gate", not "waiting for a person": at G4 to G6 an intent may wait for a run or for CI. Never mixed into the statistics; the range and `--mode` do not apply (a mode belongs to a decision).
-- **Gap:** the step's wait reason (`decision`, `later_gate`, `frozen`…) is returned to the workflow and not stored, so the platform cannot tell "waiting for a person" cheaply. A later task can store it if the M-E data needs it.
+- **Gap:** the step's wait reason (`decision`, `later_gate`, `frozen`…) is returned to the workflow and not stored, so the platform cannot tell "waiting for a person" cheaply. A later task can store it if the M-E data needs it. Closed for the current wait by U02: the step records it on the intent (`intents.waiting_reason`, ADR-M54 §2.4b); its history is still not kept.
 
 ### 2.4. Range, filters and limits
 

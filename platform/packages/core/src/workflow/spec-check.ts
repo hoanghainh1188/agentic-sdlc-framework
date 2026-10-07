@@ -37,6 +37,7 @@ import { readSpec, type SpecRead } from '../specs/read.js';
 import { passedInput } from './g4.js';
 import { projectRepoRef } from './g4-proposal.js';
 import { closeGateOverdue } from './overdue.js';
+import { gateOversight } from './oversight.js';
 
 /** The gates at which the step re-checks the spec. */
 export const SPEC_CHECK_GATES = ['G2', 'G3', 'G4'] as const satisfies readonly GateCode[];
@@ -225,11 +226,7 @@ async function g2Actors(
   policy: PolicyEngine,
   intent: Intent,
 ): Promise<ProjectRole[]> {
-  const plan = await tx.plans.latest(intent.id);
-  const oversight = policy.oversightMode({
-    gate: 'G2',
-    riskTier: intent.risk_tier,
-    changeFlags: plan?.change_flags ?? [],
-  });
+  // U02 (QUESTIONS #264): the workflow's own resolution of G2.
+  const oversight = await gateOversight(tx, policy, intent, 'G2');
   return oversight.roles.filter((role) => role !== 'viewer');
 }

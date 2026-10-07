@@ -44,6 +44,7 @@ import {
   T0,
   type Harness,
   waitingFor,
+  waitingRow,
 } from '../g4-harness.js';
 import { createTestDatabase, describeDb, tamper, type TestDatabase } from './helpers.js';
 
@@ -200,7 +201,7 @@ describeDb('C08 PR 2: G6 reads CI, on PostgreSQL', () => {
     expect(await step(intent)).toEqual({ outcome: 'run_ended', runId });
     await finishRun(t.f.scope, t.runDeps, intent.id, runId);
     // G5 passes (HOTL); past its block window: the push and the pull request.
-    expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'later_gate' });
+    expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'hotl_block_window' });
     at(clock.getTime() - T0.getTime() + 3 * DAY);
     expect(await step(intent)).toEqual({ outcome: 'publish', runId, step: 'push' });
     await t.f.scope.transaction(async (tx) => {
@@ -245,6 +246,7 @@ describeDb('C08 PR 2: G6 reads CI, on PostgreSQL', () => {
     const runId = await runToCi(intent);
     const first = await step(intent);
     expect(first).toMatchObject({ outcome: 'waiting', reason: 'ci_pending' });
+    expect(await waitingRow(t.f.scope, intent)).toMatchObject({ reason: 'ci_pending' });
     // U01 (#261): waiting for CI, not for a person: nothing certain to show.
     expect(await waitingFor(t, intent)).toBeNull();
     expect((first as { wakeInMs?: number }).wakeInMs).toBeLessThanOrEqual(60 * MINUTE);

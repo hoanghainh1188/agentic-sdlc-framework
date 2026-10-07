@@ -32,6 +32,7 @@ import type { SpecGitHost } from '../specs/link.js';
 import { passedInput } from './g4.js';
 import { projectRepoRef } from './g4-proposal.js';
 import { closeGateOverdue } from './overdue.js';
+import { gateOversight } from './oversight.js';
 import type { SpecCheckOutcome, SpecHold } from './spec-check.js';
 
 /** The gates at which the step re-checks the plan. */
@@ -179,12 +180,9 @@ async function backToG3(
     at: registry.now(),
   });
   if (!updated) return;
-  const plan = await tx.plans.latest(intent.id);
-  const oversight = policy.policy.oversightMode({
-    gate: 'G3',
-    riskTier: intent.risk_tier,
-    changeFlags: plan?.change_flags ?? [],
-  });
+  // U02 (QUESTIONS #264): the workflow's own resolution, so after a return from G5, G6 or G7 the
+  // notice names G3's HITL approvers.
+  const oversight = await gateOversight(tx, policy.policy, intent, 'G3');
   await tx.intentNotices.record({
     intentId: intent.id,
     kind: 'plan_changed',

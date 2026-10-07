@@ -21,6 +21,15 @@ export interface IntentBody {
   readonly current_gate: string | null;
   /** U01 (QUESTIONS #260): when the intent last entered `current_gate` (FR-12). */
   readonly gate_entered_at: string | null;
+  /**
+   * U02 (ADR-M54 §2.4b): why the workflow holds the intent, as its step recorded it under the
+   * intent lock (`IntentWaitReason`), a cause code (the failed G4 check), since when, and until
+   * when for a HOTL block window. Null when nothing is recorded.
+   */
+  readonly waiting_reason: string | null;
+  readonly waiting_cause: string | null;
+  readonly waiting_since: string | null;
+  readonly waiting_until: string | null;
   readonly issue_number: number | null;
   readonly pr_number: number | null;
   readonly created_by: string;
@@ -45,6 +54,10 @@ export function presentIntent(
     status: intent.status,
     current_gate: intent.current_gate,
     gate_entered_at: intent.gate_entered_at?.toISOString() ?? null,
+    waiting_reason: intent.waiting_reason,
+    waiting_cause: intent.waiting_cause,
+    waiting_since: intent.waiting_since?.toISOString() ?? null,
+    waiting_until: intent.waiting_until?.toISOString() ?? null,
     issue_number: intent.issue_number,
     pr_number: intent.pr_number,
     created_by: intent.created_by,

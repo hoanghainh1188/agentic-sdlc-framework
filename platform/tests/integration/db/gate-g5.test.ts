@@ -185,7 +185,7 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
       await runToG5(intent, { status: 'succeeded' });
       expect(await t.settleRuns(intent)).toMatchObject({
         outcome: 'waiting',
-        reason: 'later_gate',
+        reason: 'hotl_block_window',
       });
       expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G6' });
       expect(await g5(intent)).toEqual([['pass', null, 'HOTL']]);

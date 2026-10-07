@@ -109,7 +109,7 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
     });
     expect(await step(intent)).toEqual({ outcome: 'run_ended', runId });
     await finishRun(w.t.f.scope, w.t.runDeps, intent.id, runId);
-    expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'later_gate' });
+    expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'hotl_block_window' });
     later(3 * DAY);
     expect(await step(intent)).toEqual({ outcome: 'publish', runId, step: 'push' });
     await w.t.f.scope.transaction(async (tx) => {

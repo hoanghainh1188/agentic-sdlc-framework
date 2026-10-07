@@ -5,7 +5,7 @@
 | Status | **Proposed** (task U01, for review) |
 | Date | 2026-10-07 |
 | Decided by | Harry (QUESTIONS #255; U01 plan approved 2026-10-07 with the answers to QUESTIONS #260–#263: the four read-only fields, #263 option B, the token in memory only) |
-| Related | D-08 task U01 (AC1–AC6); D-02 §4.2 (version 1.4); D-03 §5.1, §9, §11 (version 1.32); ADR-M03 (no web UI in the MVP), ADR-M26 (the API), ADR-M36 (the CLI's API client), ADR-M30 (intent workflow), ADR-M28 (escalations), ADR-M45 (cost report), ADR-M47 (gate metrics), ADR-M48 (Evidence Packs); handbook Ch.19 §19.8e; QUESTIONS #255, #260–#265 |
+| Related | D-08 task U01 (AC1–AC6); D-02 §4.2 (version 1.4); D-03 §5.1, §9, §11 (version 1.32); ADR-M03 (no web UI in the MVP), ADR-M26 (the API), ADR-M36 (the CLI's API client), ADR-M30 (intent workflow), ADR-M28 (escalations), ADR-M45 (cost report), ADR-M47 (gate metrics), ADR-M48 (Evidence Packs); handbook Ch.19 §19.8e; QUESTIONS #255, #260–#265; task U02 |
 
 ## 1. Context
 
@@ -57,11 +57,19 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
 - G8: the latest plan's change flags, production (QUESTIONS #220);
 - POLICY at G4 (Low, Medium) has no roles: the platform decides.
 
-**What `waiting_for` says, and what it does not.** It is the oversight of the current gate: who decides it (HITL: the approver roles and how many approvals; HOTL or AUDIT: the roles told, the platform passes it when its conditions hold; POLICY: the platform). It does **not** say whether a platform check holds the gate right now: a failed G4 check, a spec that cannot be read, a plan to submit again, a missing evidence credential at G8, a merge still to come at G7, or a freezing escalation. Those are the workflow's waiting reasons; copying them into the API would be a second resolution, which this ADR refuses. The dashboard therefore labels the field "decided by", shows `freezes_intent` from the escalations, and links to the issue, where the workflow's status comments explain a hold. Exposing the workflow's last waiting reason is task U02 (QUESTIONS #265; Harry, 2026-10-07; §4).
+**What `waiting_for` says, and what it does not.** It is the oversight of the current gate: who decides it (HITL: the approver roles and how many approvals; HOTL or AUDIT: the roles told, the platform passes it when its conditions hold; POLICY: the platform). It does **not** say whether a platform check holds the gate right now: a failed G4 check, a spec that cannot be read, a plan to submit again, a missing evidence credential at G8, a merge still to come at G7, or a freezing escalation. Those are the workflow's waiting reasons; copying them into the API would be a second resolution, which this ADR refuses. The dashboard therefore labels the field "decided by" and shows `freezes_intent` from the escalations. Since U02 the workflow's own record of what holds the intent is in the API too (§2.4b).
 
 `waiting_for` is null when the intent is not `in_gate`, when the stored configuration is refused (the workflow stops too), and **at G6 before CI passed**: the workflow resolves G6's oversight only after CI passed; before that it waits for CI, not for a person. Tests: a unit test of every special case, a static test that no step calls `oversightMode` itself, and database tests that compare `waiting_for` with what the workflow does in the G4 (POLICY, HITL), G5 → G3, G6 (CI pending, findings unknown) and G7 (dual approval) tests.
 
 `freezes_intent` (whether an escalation freezes its intent) was already in the escalation body (`isFreezing`, core): the dashboard shows it and never re-implements the freeze rule.
+
+### 2.4b. What holds an intent (task U02, QUESTIONS #264, #265)
+
+- **The record.** The intent workflow's step already returns why it waits (`IntentWaitReason`, about 30 codes), but only to Temporal. Since U02 the step writes it on the intent, in its own transaction, under the intent lock: `intents.waiting_reason`, `waiting_cause`, `waiting_since`, `waiting_until` (migration 0025, D-05 1.36). Written only when it changes, so `waiting_since` is when the hold began; never `updated_at`. Any other outcome writes null, and every move (`moveState`, `setState`) clears it, so another writer that moves the intent never leaves a stale reason. The one wait returned before the lock (the Git host down while G4's facts are read) is recorded under a short lock of its own, only while the intent still waits at G4. **The API reads these columns; it never evaluates a gate again** (#265).
+- **The cause.** A failed G4 check records its check code (the one in `gate.g4_check_failed`) as `waiting_cause`. The column and the labels are open to later gates: the database checks the code's format only, and a catalog test checks every known cause. The step's `waiting` result carries it as an optional `cause`; workflow code never reads it, so Temporal replay is unchanged.
+- **`hotl_block_window`** (Harry, U02 plan): the step returned `later_gate` both for an open HOTL block window and for a gate this worker does not handle. They are now two codes: wherever `hotlBlockWindowOpenUntil` gives a time (G4, G6, G7, G8 and the step's fallback), the step returns `hotl_block_window` and records the window's close in `waiting_until` (to the second); `later_gate` stays only for a dependency that is off.
+- **Shown:** the intent body (list and show) has the four fields; `sdlc intent show` prints "Held: …", the cause and the end; the dashboard shows a "held" line on the board's card and a "What holds it" panel under "Who decides this gate". `decision` (the normal wait for a person) is not shown as a hold. Labels: `intent.waiting.<reason>` and `intent.waiting_cause.<cause>` in the catalog, mapped in `@sdlc/api-schemas` (`WAITING_REASON_KEYS`, `WAITING_CAUSE_KEYS`); a code without a label is shown as its code.
+- **#264:** `plan-check.ts` (`plan_changed`) and `spec-check.ts` (G2's notice audience) resolve the gate's oversight with `gateOversight`, like the steps. With the simple policy engine a gate's HOTL and HITL roles come from the same matrix cell, so the audiences do not change today; the shared function keeps them right if a future engine or configuration separates them. Gate decisions do not change.
 
 ### 2.5. The dashboard app (PR 2)
 
@@ -109,14 +117,15 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
 - **Gaps:**
   - the token stays in the browser's memory while the tab is open; anyone at the unlocked screen can read the pages (sign out, lock the screen);
   - a role or a configuration changed after an escalation was raised: the roles shown are those of the configuration in force, as the clock uses them, not those at the raise;
-  - `plan-check.ts` and `spec-check.ts` still resolve the oversight of G3 and G2 for their notice audiences without the shared function; `waiting_for` does not depend on them. Harry (2026-10-07): they move to the shared function in task U02, not in U01 (QUESTIONS #264);
-  - `waiting_for` names who decides the current gate, not whether a platform check holds it (§2.4); the workflow's last waiting reason (for example `g4_refused`, `plan_resubmit_needed`, `evidence_unavailable`) is not in the API. task U02 exposes it, read from what the workflow recorded (QUESTIONS #265, D-08 1.23; Harry, 2026-10-07);
+  - closed by U02: `plan-check.ts` and `spec-check.ts` use the shared function (QUESTIONS #264, §2.4b);
+  - closed by U02: what holds the intent is `waiting_reason`, recorded by the workflow's step (§2.4b, QUESTIONS #265). An open intent gets it when the reconcile loop next wakes it (within 10 minutes of the upgrade);
   - the dashboard does not refresh by itself in PR 2 beyond a manual "refresh" (no polling of the API every few seconds).
 
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 0.4 | 2026-10-07 | Claude (task U02) | §2.4b what holds an intent (the step's record, the cause, `hotl_block_window`, the display), #264; §4 gaps closed |
 | 0.3 | 2026-10-07 | Claude (task U01, PR 2) | §2.5b as built (the shared schemas package, the build, the catalog plugin, the routes, the size), §2.6 the smoke test and the CI flag `run_dashboard` |
 | 0.2 | 2026-10-07 | Claude (task U01, PR 1) | After the code review: what `waiting_for` does not say (§2.4); Harry: task U02 exposes the workflow's last waiting reason and moves the notice audiences to the shared function (QUESTIONS #264, #265; §4) |
 | 0.1 | 2026-10-07 | Claude (task U01, PR 1) | First version: read only, served by the api under `/dashboard/`, 127.0.0.1 only, CSP, the token in memory, the four fields, one oversight resolution for the workflow and `waiting_for`; PR 2's app and tests |

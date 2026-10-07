@@ -30,7 +30,7 @@ C08 has two pull requests:
 
 When the intent waits `in_gate G6` after G5 passed its run, the G6 step (`stepG6`, core) does, in this order:
 
-1. Wait while the G5 HOTL block window is open (ADR-M34 §2.8): a person may still block G5, so nothing is pushed (`later_gate`, woken when the window closes).
+1. Wait while the G5 HOTL block window is open (ADR-M34 §2.8): a person may still block G5, so nothing is pushed (`later_gate`; since U02 `hotl_block_window`, ADR-M54 §2.4b; woken when the window closes).
 2. The freeze check (`push`, then `open_pr`; ADR-M28 §2.4).
 3. No push recorded for the run → the outcome `publish` / `push`. The workflow calls `preparePublish` (worker), then `publishRun` on the runner's task queue `sdlc-runner` (one attempt, heartbeats, 15 minutes), then `finishPublish` (worker).
 4. Pushed, no pull request linked → `publish` / `open_pr`: `finishPublish` only.

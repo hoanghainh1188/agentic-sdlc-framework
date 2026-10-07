@@ -61,8 +61,21 @@ test('every screen, read only, the token in memory only (AC1, AC2, AC3, AC4)', a
   await expect(page.getByText('frozen').first()).toBeVisible();
   // Finished intents stay off the open board.
   await expect(page.getByRole('link', { name: 'INT-2026-0011' })).toHaveCount(0);
+  // U02: a recorded hold shows on its card, with the failed check.
+  const held = page.locator('article', { has: page.getByRole('link', { name: 'INT-2026-0004' }) });
+  await expect(held).toContainText('A G4 check failed: the agent is not active');
+  // `decision` is the normal wait, not a hold.
+  const plain = page.locator('article', { has: page.getByRole('link', { name: 'INT-2026-0001' }) });
+  await expect(plain.locator('.card-hold')).toHaveCount(0);
 
   // An intent: who decides its gate, decisions, runs, packs.
+  // U02: an intent held by a failed G4 check: "What holds it" names the check.
+  await page.getByRole('link', { name: 'INT-2026-0004' }).click();
+  await expect(page.getByRole('heading', { name: 'What holds it' })).toBeVisible();
+  await expect(page.getByText('A G4 check failed: the agent is not active')).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Where every intent waits' })).toBeVisible();
+
   await page.getByRole('link', { name: 'INT-2026-0006' }).click();
   await expect(page.getByRole('heading', { name: 'Who decides this gate' })).toBeVisible();
   await expect(
@@ -155,6 +168,7 @@ test('keyboard: sign in, skip link, navigation (AC5)', async ({ page }) => {
 const SCREENS = [
   ['board', '#/intents', 'Where every intent waits'],
   ['intent', '#/intents/INT-2026-0006', 'Who decides this gate'],
+  ['intent-held', '#/intents/INT-2026-0004', 'What holds it'],
   ['escalations', '#/escalations', 'Open escalations, the nearest deadline first'],
   ['numbers', '#/numbers?project=pilot&by=intent', 'Gate waiting times (first round)'],
 ] as const;

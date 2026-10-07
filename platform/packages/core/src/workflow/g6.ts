@@ -3,7 +3,7 @@
 //
 // `stepG6` runs when the intent waits `in_gate G6` after G5 passed its run. In this order:
 //   1. the G5 block window: while a person may still block G5 (HOTL, ADR-M34 §2.8), nothing is
-//      pushed (`later_gate`, woken when the window closes);
+//      pushed (`hotl_block_window`, woken when the window closes);
 //   2. the freeze check (`push`, then `open_pr`; ADR-M28 §2.4);
 //   3. no push recorded for the run → `publish` / `push`: the workflow asks for a push token, the
 //      runner applies the run's stored diff (the diff G5 checked) to a clone of the run's base and
@@ -70,7 +70,8 @@ export async function stepG6(
 
   const now = registry.now();
   const until = await hotlBlockWindowOpenUntil(tx, registry, intent.id, now);
-  if (until !== null) return wait('later_gate', Math.max(0, until.getTime() - now.getTime()));
+  if (until !== null)
+    return wait('hotl_block_window', Math.max(0, until.getTime() - now.getTime()));
 
   const state = await publishState(tx, run.id);
   if (state.refused !== null) return stopPublish(tx, registry, policy, intent, run, state.refused);

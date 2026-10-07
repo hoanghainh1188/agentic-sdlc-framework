@@ -63,6 +63,12 @@ export type IntentStepResult =
       readonly outcome: 'waiting';
       readonly reason: IntentWaitReason;
       readonly wakeInMs?: number;
+      /**
+       * U02 (ADR-M54 §2.4b): a code that says more about the reason; the step records it with
+       * the reason. Today the failed G4 check (`gate.g4_check_failed`'s `check`); open to later
+       * gates. Never free text.
+       */
+      readonly cause?: string;
     }
   /** The intent is finished (`done`, `rejected`, `cancelled`, `blocked`); the workflow ends. */
   | { readonly outcome: 'finished'; readonly status: string }
@@ -100,10 +106,16 @@ export type IntentWaitReason =
   /** An escalation freezes the intent (ADR-M28 §2.4). */
   | 'frozen'
   /**
-   * The intent waits at a gate that later tasks handle, or for the end of the last HOTL block
-   * window before a run may start (G4, ADR-M30 §2.4b).
+   * The intent waits at a gate this worker does not handle (a dependency is off, for example the
+   * Cost Controller AppRole for G4 or the publish dependencies for G6).
    */
   | 'later_gate'
+  /**
+   * U02 (ADR-M54 §2.4b): a HOTL block window of a gate the platform passed is still open (ADR-M30
+   * §2.4b): a person with the gate's role may still send the passed gate back. The step wakes when
+   * the window closes (`wakeInMs`), and records that time.
+   */
+  | 'hotl_block_window'
   /**
    * A G4 check failed (task C06, ADR-M33): the agent, its instructions, the AI record, the
    * approved inputs or the budget. A system `fail` records the cause; the next wake checks again.
@@ -204,3 +216,43 @@ export type IntentWaitReason =
   | 'evidence_unavailable'
   /** A status that the workflow does not move (`paused`, `blocked`, `running`). */
   | 'not_in_gate';
+
+/**
+ * Every `IntentWaitReason`, at runtime (U02): the catalog test checks that each has a label, and
+ * the migration's CHECK accepts each.
+ */
+export const INTENT_WAIT_REASONS = [
+  'decision',
+  'input_missing',
+  'ai_record',
+  'frozen',
+  'later_gate',
+  'hotl_block_window',
+  'g4_check',
+  'run_pending',
+  'git_host_unavailable',
+  'spec_unavailable',
+  'plan_resubmit_needed',
+  'run_in_progress',
+  'run_review',
+  'proposal_review',
+  'g5_review',
+  'g5_decision',
+  'new_plan_needed',
+  'publish_review',
+  'publish_retry',
+  'ci_pending',
+  'g6_decision',
+  'g7_decision',
+  'g7_merge',
+  'g7_changes_requested',
+  'g7_review',
+  'g8_decision',
+  'g8_review',
+  'evidence_unavailable',
+  'not_in_gate',
+] as const satisfies readonly IntentWaitReason[];
+
+/** Compile-time check: the list holds every reason. */
+type MissingWaitReason = Exclude<IntentWaitReason, (typeof INTENT_WAIT_REASONS)[number]>;
+export const INTENT_WAIT_REASONS_COMPLETE: MissingWaitReason extends never ? true : never = true;

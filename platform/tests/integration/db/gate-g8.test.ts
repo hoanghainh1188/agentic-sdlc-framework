@@ -21,7 +21,7 @@ import { raiseEscalation } from '../../../packages/core/src/escalation/raise.js'
 import { currentPackHashes } from '../../../packages/core/src/evidence/build.js';
 import { buildReleasePack } from '../../../packages/core/src/workflow/g8.js';
 import { stepIntent } from '../../../packages/core/src/workflow/step.js';
-import { HOUR, notices } from '../g4-harness.js';
+import { HOUR, notices, waitingRow } from '../g4-harness.js';
 import { CAROL, DAY, g7World } from './g7-world.js';
 import { describeDb, tamper } from './helpers.js';
 import { MemoryEvidenceStore, sha256 } from './memory-evidence-store.js';
@@ -137,7 +137,9 @@ describeDb('E03: gate G8, release, on PostgreSQL', () => {
     it('builds the pack, waits for Person B, seals the version with the approval, closes', async () => {
       const intent = await toG8();
       expect(await settle(intent, false)).toMatchObject({ reason: 'evidence_unavailable' });
+      expect(await waitingRow(scope(), intent)).toMatchObject({ reason: 'evidence_unavailable' });
       expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'g8_decision' });
+      expect(await waitingRow(scope(), intent)).toMatchObject({ reason: 'g8_decision' });
       const [v1] = await packs(intent);
       expect(v1).toMatchObject({ version: 1, sealed_at: null, built_by: null });
       expect(v1!.release_sha256).toMatch(/^[0-9a-f]{64}$/);

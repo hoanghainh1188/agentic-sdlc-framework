@@ -17,6 +17,7 @@ import { useApi } from '../api/use-api.js';
 import {
   codeClass,
   Due,
+  Label,
   Duration,
   Empty,
   ErrorMessage,
@@ -28,6 +29,7 @@ import {
 import { t } from '../i18n.js';
 import { modeMeaning, roleName } from '../labels.js';
 import { escalationRows } from '../model/escalations.js';
+import { holdOf } from '../model/hold.js';
 import { intentLinks } from '../model/intents.js';
 import { roundUsd } from '../model/numbers.js';
 import { secondsSince } from '../model/time.js';
@@ -64,7 +66,10 @@ export function IntentDetail({ code }: { readonly code: string }) {
           <>
             <Head intent={intent} at={at} reload={reload} />
             <div class="detail-grid">
-              <DecidedBy intent={intent} at={at} />
+              <div class="detail-stack">
+                <DecidedBy intent={intent} at={at} />
+                <HeldBy intent={intent} at={at} />
+              </div>
               <Facts intent={intent} />
             </div>
             <section aria-labelledby="esc-title" class="panel">
@@ -227,6 +232,40 @@ function DecidedBy({ intent, at }: { intent: Detail; at: Date }) {
             <Duration seconds={secondsSince(intent.gate_entered_at, at)} />
           </p>
           <p class="hint">{t('dashboard.detail.decided_by_hint')}</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/** U02 (ADR-M54 §2.4b): what holds the intent, as the workflow's step recorded it. */
+function HeldBy({ intent, at }: { intent: Detail; at: Date }) {
+  const hold = holdOf(intent);
+  return (
+    <section class={`panel ${hold ? 'panel-hold' : 'panel-quiet'}`} aria-labelledby="held-title">
+      <h2 id="held-title">{t('dashboard.detail.held_by')}</h2>
+      {hold === null ? (
+        <p class="muted">{t('dashboard.detail.held_none')}</p>
+      ) : (
+        <>
+          <p class="hold-reason">
+            <Label value={hold.reason} />
+            {hold.cause && (
+              <>
+                {': '}
+                <Label value={hold.cause} />
+              </>
+            )}
+          </p>
+          <p>
+            {t('dashboard.detail.held_since')} <Duration seconds={secondsSince(hold.since, at)} />
+            {hold.until && Date.parse(hold.until) > at.getTime() && (
+              <>
+                {' · '}
+                {t('dashboard.detail.held_until')} <When iso={hold.until} />
+              </>
+            )}
+          </p>
         </>
       )}
     </section>

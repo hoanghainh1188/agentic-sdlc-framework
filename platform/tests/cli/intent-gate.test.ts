@@ -225,6 +225,32 @@ describe('sdlc intent list and show', () => {
     );
   });
 
+  it('U02: shows what holds the intent, with its cause and until when, from the catalog', async () => {
+    const h = await harness({
+      routes: {
+        'GET /v1/intents/INT-2026-0007': {
+          status: 200,
+          body: {
+            ...intentDetailBody(),
+            waiting_reason: 'g4_check',
+            waiting_cause: 'agent_not_active',
+            waiting_since: '2026-10-07T01:00:00.000Z',
+            waiting_until: '2026-10-07T02:00:00.000Z',
+          },
+        },
+      },
+    });
+    expect(await h.run(['intent', 'show', 'INT-2026-0007'])).toBe(EXIT.ok);
+    expect(h.out.slice(1, 4)).toEqual([
+      t('cli.intent.waiting', {
+        reason: t('intent.waiting.g4_check'),
+        since: '2026-10-07T01:00:00.000Z',
+      }),
+      t('cli.intent.waiting_cause', { cause: t('intent.waiting_cause.agent_not_active') }),
+      t('cli.intent.waiting_until', { until: '2026-10-07T02:00:00.000Z' }),
+    ]);
+  });
+
   it('refuses an answer that does not match the expected shape (exit 3)', async () => {
     const h = await harness({
       routes: { 'GET /v1/intents/INT-2026-0007': { status: 200, body: { code: 'x' } } },

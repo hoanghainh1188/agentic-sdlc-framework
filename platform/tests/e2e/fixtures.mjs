@@ -42,6 +42,11 @@ function intent(n, over) {
     created_by: uuid(2),
     created_at: at(-72 * HOUR),
     updated_at: at(-HOUR),
+    // U02: what the workflow's step recorded; `decision` is the normal wait for a person.
+    waiting_reason: 'decision',
+    waiting_cause: null,
+    waiting_since: at(-HOUR),
+    waiting_until: null,
     ...over,
   };
 }
@@ -67,11 +72,16 @@ const INTENTS = () => [
     gate_entered_at: at(-5 * HOUR),
   }),
   intent(4, {
+    waiting_reason: 'g4_check',
+    waiting_cause: 'agent_not_active',
+    waiting_since: at(-17 * MIN),
     title: 'Export the order list to CSV with a Shift_JIS option',
     current_gate: 'G4',
     gate_entered_at: at(-18 * MIN),
   }),
   intent(5, {
+    waiting_reason: 'ci_pending',
+    waiting_since: at(-50 * MIN),
     title: 'Low-stock warning based on a threshold',
     current_gate: 'G6',
     gate_entered_at: at(-52 * MIN),
@@ -91,12 +101,16 @@ const INTENTS = () => [
     pr_number: 35,
   }),
   intent(8, {
+    waiting_reason: 'g5_review',
+    waiting_since: at(-4 * HOUR),
     title: 'Cancel an order and return stock',
     status: 'paused',
     current_gate: 'G5',
     gate_entered_at: at(-4 * HOUR),
   }),
   intent(9, {
+    waiting_reason: 'input_missing',
+    waiting_since: at(-30 * MIN),
     title: 'Pagination for the order API and list screen',
     status: 'draft',
     current_gate: null,
@@ -105,6 +119,8 @@ const INTENTS = () => [
     project: PROJECTS.shop,
   }),
   intent(10, {
+    waiting_reason: null,
+    waiting_since: null,
     title: 'Delete orders older than 5 years',
     risk_tier: 'critical',
     max_autonomy: 'L0',
@@ -113,6 +129,8 @@ const INTENTS = () => [
     gate_entered_at: at(-50 * HOUR),
   }),
   intent(11, {
+    waiting_reason: null,
+    waiting_since: null,
     title: 'Show the order date in Japanese format',
     risk_tier: 'low',
     status: 'done',

@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { apiPath, segment } from '../../apps/dashboard/src/api/client.js';
 import { codeClass } from '../../apps/dashboard/src/components/class-name.js';
 import { escalationRows } from '../../apps/dashboard/src/model/escalations.js';
+import { holdOf } from '../../apps/dashboard/src/model/hold.js';
 import {
   buildBoard,
   gateTrack,
@@ -51,6 +52,10 @@ function intent(over: Partial<IntentView> = {}): IntentView {
     status: 'in_gate',
     current_gate: 'G2',
     gate_entered_at: ago(2 * HOUR),
+    waiting_reason: 'decision',
+    waiting_cause: null,
+    waiting_since: ago(2 * HOUR),
+    waiting_until: null,
     issue_number: 12,
     pr_number: null,
     created_by: 'u',
@@ -332,5 +337,29 @@ describe('server text and links', () => {
   it('CSS classes from codes hold no space or extra class', () => {
     expect(codeClass('decision', 'approve')).toBe('decision-approve');
     expect(codeClass('mode', 'HITL card-overdue')).toBe('mode-hitlcardoverdue');
+  });
+});
+
+describe('what holds an intent (U02)', () => {
+  it('shows a hold with its catalog labels; `decision` is not a hold', () => {
+    expect(holdOf(intent())).toBeNull();
+    expect(holdOf(intent({ waiting_reason: null, waiting_since: null }))).toBeNull();
+    expect(
+      holdOf(intent({ waiting_reason: 'g4_check', waiting_cause: 'agent_not_active' })),
+    ).toMatchObject({
+      reason: { key: 'intent.waiting.g4_check' },
+      cause: { key: 'intent.waiting_cause.agent_not_active' },
+    });
+    const window = holdOf(
+      intent({ waiting_reason: 'hotl_block_window', waiting_until: inMs(HOUR) }),
+    );
+    expect(window).toMatchObject({ reason: { key: 'intent.waiting.hotl_block_window' } });
+    expect(window?.until).toBe(inMs(HOUR));
+  });
+
+  it('a reason or cause the dashboard does not know yet is shown as its code', () => {
+    expect(
+      holdOf(intent({ waiting_reason: 'some_new_reason', waiting_cause: 'some_new_cause' })),
+    ).toMatchObject({ reason: { code: 'some_new_reason' }, cause: { code: 'some_new_cause' } });
   });
 });

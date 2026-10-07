@@ -3,7 +3,8 @@ import { readFile } from 'node:fs/promises';
 
 import { DATA_CLASSES, INTENT_STATUSES, RISK_TIERS } from '@sdlc/contracts';
 import { INTENT_CODE_PATTERN } from '@sdlc/core';
-import { t } from '@sdlc/messages';
+import { isHold, WAITING_CAUSE_KEYS, WAITING_REASON_KEYS } from '@sdlc/api-schemas';
+import { t, type MessageKey } from '@sdlc/messages';
 
 import {
   intentDetailSchema,
@@ -173,6 +174,7 @@ function printDetail(ctx: CliContext, intent: IntentDetail): void {
     pr: show(intent.pr_number),
     created_at: intent.created_at,
   });
+  printHold(ctx, intent);
   if (intent.spec) {
     say(ctx, 'cli.intent.spec', {
       version: intent.spec.version,
@@ -195,6 +197,27 @@ function printDetail(ctx: CliContext, intent: IntentDetail): void {
   if (intent.decisions.length === 0) say(ctx, 'cli.intent.decisions_none');
   for (const decision of intent.decisions)
     say(ctx, 'cli.intent.decision', decisionParams(decision));
+}
+
+/** U02 (ADR-M54 §2.4b): what holds the intent, as the workflow's step recorded it. */
+function printHold(ctx: CliContext, intent: IntentDetail): void {
+  if (!isHold(intent.waiting_reason)) return;
+  const label = (keys: Readonly<Record<string, string>>, code: string): string => {
+    const key = keys[code];
+    return key ? t(key as MessageKey) : code;
+  };
+  say(ctx, 'cli.intent.waiting', {
+    reason: label(WAITING_REASON_KEYS, intent.waiting_reason),
+    since: show(intent.waiting_since),
+  });
+  if (intent.waiting_cause) {
+    say(ctx, 'cli.intent.waiting_cause', {
+      cause: label(WAITING_CAUSE_KEYS, intent.waiting_cause),
+    });
+  }
+  if (intent.waiting_until) {
+    say(ctx, 'cli.intent.waiting_until', { until: intent.waiting_until });
+  }
 }
 
 export function decisionParams(decision: DecisionView): Record<string, string> {

@@ -67,6 +67,9 @@ export const MAX_INTENT_PAGE = 100;
 
 const MONEY = /^\d{1,12}(\.\d{1,6})?$/;
 
+/** The format of a waiting reason or cause (migration 0025's CHECK). */
+const WAITING_CODE = /^[a-z][a-z0-9_]{0,63}$/;
+
 export class IntentRepository extends TenantRepository {
   /**
    * Creates an intent in status `draft` with the next code of the tenant for the current UTC year.
@@ -284,6 +287,11 @@ export class IntentRepository extends TenantRepository {
           .set({
             status: change.status,
             current_gate: change.currentGate,
+            // U02 (ADR-M54 §2.4b): a move ends any wait; the next step records the new one.
+            waiting_reason: null,
+            waiting_cause: null,
+            waiting_since: null,
+            waiting_until: null,
             updated_at: sql<Date>`now()`,
           })
           .where('tenant_id', '=', this.tenantId)
@@ -317,6 +325,49 @@ export class IntentRepository extends TenantRepository {
   }
 
   /**
+   * U02 (ADR-M54 §2.4b): records why the intent waits, as the workflow's step decided it, in the
+   * step's transaction (the caller holds the intent lock). Writes only on a change, so
+   * `waiting_since` keeps the moment the hold began; `null` clears it. Never touches `updated_at`
+   * (retention reads it). Codes only: `reason` is an `IntentWaitReason`, `cause` a check code.
+   */
+  async recordWaiting(
+    id: string,
+    waiting: { reason: string; cause: string | null; until: Date | null } | null,
+    at: Date,
+  ): Promise<void> {
+    for (const code of [waiting?.reason, waiting?.cause]) {
+      if (code !== undefined && code !== null && !WAITING_CODE.test(code)) {
+        throw new DbError('invalid_value', 'waiting code');
+      }
+    }
+    const reason = waiting?.reason ?? null;
+    const cause = waiting?.cause ?? null;
+    const until = waiting?.until ?? null;
+    await this.run(
+      this.db
+        .updateTable('intents')
+        .set({
+          waiting_reason: reason,
+          waiting_cause: cause,
+          waiting_until: until,
+          waiting_since:
+            reason === null
+              ? null
+              : sql<Date>`CASE WHEN waiting_reason IS NOT DISTINCT FROM ${reason}
+                  AND waiting_cause IS NOT DISTINCT FROM ${cause}
+                  THEN waiting_since ELSE ${at} END`,
+        })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .where(
+          sql<boolean>`(waiting_reason, waiting_cause, waiting_until) IS DISTINCT FROM
+            (${reason}::text, ${cause}::text, ${until}::timestamptz)`,
+        )
+        .execute(),
+    );
+  }
+
+  /**
    * Moves the intent with compare-and-set (task B07, ADR-M30): only when its status and gate still
    * equal `move.from`. Returns the moved intent, or undefined when it is no longer in `from` (for
    * example an activity retried after the move was committed). A move to another gate sets
@@ -342,6 +393,11 @@ export class IntentRepository extends TenantRepository {
             ...(entersGate
               ? { gate_entered_at: move.to.currentGate === null ? null : move.at }
               : {}),
+            // U02 (ADR-M54 §2.4b): a move ends any wait; the next step records the new one.
+            waiting_reason: null,
+            waiting_cause: null,
+            waiting_since: null,
+            waiting_until: null,
             updated_at: sql<Date>`now()`,
           })
           .where('tenant_id', '=', this.tenantId)

@@ -83,7 +83,17 @@ describe('resolveGateOversight', () => {
 });
 
 describe('the workflow resolves oversight through the shared function', () => {
-  const steps = ['step.ts', 'g4.ts', 'g5.ts', 'g6-verify.ts', 'g7.ts', 'g8.ts'];
+  // U02 (QUESTIONS #264): the notice audiences of the plan and spec checks too.
+  const steps = [
+    'step.ts',
+    'g4.ts',
+    'g5.ts',
+    'g6-verify.ts',
+    'g7.ts',
+    'g8.ts',
+    'plan-check.ts',
+    'spec-check.ts',
+  ];
   for (const file of steps) {
     it(`${file} never calls oversightMode itself`, () => {
       const file_ = path.join(repoRoot(), 'platform/packages/core/src/workflow', file);

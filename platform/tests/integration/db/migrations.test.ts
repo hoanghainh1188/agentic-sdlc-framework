@@ -66,6 +66,11 @@ const UPDATABLE: Record<string, readonly string[]> = {
     'updated_at',
     'gate_entered_at',
     'run_budget_usd',
+    // U02 (migration 0025): why the intent waits, written by the workflow's step.
+    'waiting_reason',
+    'waiting_cause',
+    'waiting_since',
+    'waiting_until',
   ],
   spec_refs: [],
   plans: [],

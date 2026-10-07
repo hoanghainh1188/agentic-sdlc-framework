@@ -306,7 +306,8 @@ async function passMerged(
   const now = registry.now();
   // The G6 block window: a person may still block G6, which would send the intent back.
   const until = await hotlBlockWindowOpenUntil(tx, registry, intent.id, now);
-  if (until !== null) return wait('later_gate', Math.max(0, until.getTime() - now.getTime()));
+  if (until !== null)
+    return wait('hotl_block_window', Math.max(0, until.getTime() - now.getTime()));
   if (!(await allowed(tx, intent, registry))) return wait('frozen');
   await closeGateOverdue(tx, registry, intent.id, 'G7');
   const merge = reading.mergeCommitSha ? { merge_commit_sha: reading.mergeCommitSha } : {};

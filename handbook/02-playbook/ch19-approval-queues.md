@@ -212,7 +212,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 |---|---|
 | `sdlc intent create --project <slug> --title <text> --risk <tier> --data-class <class> [--description <text> \| --description-file <file>] [--budget <USD>] [--issue <number>]` | Creates an intent; you become its owner (Person A) |
 | `sdlc intent list [--project <slug>] [--status <status>] [--limit <n>] [--cursor <c>]` | Lists the intents you can read, newest first |
-| `sdlc intent show <INT-…>` | Shows an intent with its spec, plan and gate decisions |
+| `sdlc intent show <INT-…>` | Shows an intent with its spec, plan and gate decisions, and **what holds it** when the platform holds it ("Held: …", the cause, until when) |
 | `sdlc gate approve <gate> <INT-…>` | Approves the gate the intent waits at |
 | `sdlc gate reject <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Rejects the gate |
 | `sdlc gate request-changes <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Requests changes |
@@ -384,7 +384,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | **Cost and gate times** | Per project (or the whole tenant, for tenant admins): how long each gate waits for people (average, 90th percentile, longest, waiting now), and the model cost by intent, model or run status, with the wasted part | `sdlc metrics gates`, `sdlc cost report` |
 | **Audit check** | Tenant admins only: checks the tenant's audit chain, on request | `sdlc audit verify` |
 
-**"Who decides this gate" is not "what holds it".** It names the people (or the platform) that decide the gate. A platform check can still hold the gate: a failed G4 check, a plan to submit again, a frozen intent, a merge still to come. The status comments on the issue explain why. While the intent waits for CI at G6, the dashboard shows nothing there.
+**"Who decides this gate" and "what holds it".** "Who decides this gate" names the people (or the platform) that decide the gate. **What holds it** shows why the platform keeps the intent where it is, as the workflow recorded it the last time it looked: a failed G4 check and which one, a plan to submit again, a spec that cannot be read, a frozen intent, CI still running, a HOTL block window and when it closes. The board shows it on the card as **held**. A plain wait for a person's decision is not a hold. The same reason is printed by `sdlc intent show`.
 
 **Times.** Waiting times are wall-clock time, not working hours. A deadline in the next hour shows in amber, a missed one in red.
 
@@ -438,3 +438,4 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.16 | 2026-10-04 | Claude (task E05, PR 1) | §19.8d: archive refused with open intents and evidence deleted after a grace period, `sdlc admin evidence hold\|release\|show`, `sdlc ops retention report`, how long evidence is kept (ADR-M51) |
 | 0.17 | 2026-10-04 | Claude (task E05, PR 2) | §19.8d: the daily audit anchor and `audit.anchor_mismatch` (ADR-M51 §2.9) |
 | 0.18 | 2026-10-07 | Claude (task U01) | §19.8e: the read-only dashboard (ADR-M54) |
+| 0.19 | 2026-10-07 | Claude (task U02) | §19.8c, §19.8e: what holds an intent (`sdlc intent show`, the dashboard; ADR-M54 §2.4b) |

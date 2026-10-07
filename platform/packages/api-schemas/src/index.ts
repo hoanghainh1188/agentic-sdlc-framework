@@ -2,3 +2,4 @@
 // workspace dependency: the CLI and the dashboard import it, and an app never imports another app.
 export * from './schemas.js';
 export { cleanText } from './text.js';
+export { isHold, WAITING_CAUSE_KEYS, WAITING_REASON_KEYS } from './waiting.js';

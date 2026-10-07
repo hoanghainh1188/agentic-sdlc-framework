@@ -132,7 +132,8 @@ export async function stepG8(
     if ((await closeGateOverdue(tx, registry, intent.id, 'G8')) > 0) return moved;
     const now = registry.now();
     const until = await hotlBlockWindowOpenUntil(tx, registry, intent.id, now);
-    if (until !== null) return wait('later_gate', Math.max(0, until.getTime() - now.getTime()));
+    if (until !== null)
+      return wait('hotl_block_window', Math.max(0, until.getTime() - now.getTime()));
     if (!(await releaseAllowed(tx, intent, registry))) return wait('frozen');
     return release(tx, registry, intent, facts, approvals.at(-1)!.id);
   }
