@@ -23,7 +23,7 @@
 
 | Field | Meaning |
 |---|---|
-| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`) |
+| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early) |
 | Size | **S** ≈ 1 session · **M** ≈ 1–2 sessions · **L** ≈ split into 2–3 sessions. [Proposal] Relative estimate, not person-hours |
 | Depends on | Tasks that must be finished first |
 | Acceptance criteria | Conditions for the PR to be approved. Claude Code writes tests for them |
@@ -42,7 +42,8 @@
 | M-0 | Sample pilot repo (separate repo, right before M-C) | 4 | S×1 · M×2 · L×1 |
 | M-C | Run + G4–G6 | 12 | S×3 · M×8 · L×1 |
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
-| **Total** | | **49** | |
+| MVP+1 | Started early: read-only dashboard (QUESTIONS #255) | 1 | M×1 |
+| **Total** | | **50** | |
 
 ### Order and dependencies between milestones
 
@@ -54,6 +55,7 @@ flowchart LR
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> ME["M-E Trial"]
     ME --> MF["M-F Adjustment"]
+    MD --> MU["MVP+1 U01 read-only dashboard<br/>(in parallel with M-E)"]
 ```
 
 - M-0 lives in a **separate repo** (`pilot-order-inventory`). Done at the end of M-B, before C09.
@@ -763,6 +765,26 @@ flowchart LR
 
 > Note: After the trial M-E: write the MVP+1 user interface scope (web UI, dashboard; D-02 §4.2) from the trial data (who needs which screen, read-only or actions, sign-in), for Harry's approval, before any interface task is added (Harry, 2026-10-04)
 
+
+### MVP+1 — Started early: read-only dashboard (QUESTIONS #255)
+
+#### U01. Read-only web dashboard
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | B11, B13, E02, E04, E06 | D-02 §4.2, NFR-08 | platform/apps/dashboard (or inside platform/apps/api), platform/apps/api (static files only), platform/tests/*, design/ADR-M54 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Read-only: the dashboard uses only existing GET endpoints of the API; no new write path, no form that changes state; a static test fails if it calls anything but GET
+- [ ] AC2: Sign-in with an existing personal API token (`sdlc_pat_…`); the same access rules as the API (404 without a role, 403 with another role); the token is never put in a URL, a log or long-lived browser storage; sign-out forgets it
+- [ ] AC3: Served on the same origin as `sdlc-api` (127.0.0.1 in Compose); a strict Content-Security-Policy (no inline script, no third-party origin; every asset served by the platform); no new host port
+- [ ] AC4: Screens: intents and gates (current gate, who it waits for, waiting time, links to the issue and pull request); open escalations (severity, route, owner role, acknowledge and resolve due times); cost report and gate waiting times per project (E04, E06); an intent's evidence packs and, for tenant admins, the audit check (E02, A07)
+- [ ] AC5: Every label and message through the message catalog (NFR-08); server text shown as text, never as HTML; keyboard use and colour contrast checked
+- [ ] AC6: Tests: unit tests of the data mapping; API tests that the dashboard needs no new endpoint; an end-to-end smoke test (Playwright) against a test API; screenshots at 375, 768, 1440 px
+
+> Note: QUESTIONS #255 (Harry, 2026-10-07): in parallel with the trial M-E, which does not wait for it. ADR-M54 records the framework and the token handling (for example in memory only). Decisions stay in comments, reviews and the CLI; actions in a web UI and the full MVP+1 interface scope come from the trial data after M-E (E07 note)
+
 ---
 
 ## 5. Handing tasks to Claude Code
@@ -833,4 +855,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.19 | 2026-10-04 | Claude (task E05, PR 1), approved by Harry | E05 AC1: holds per intent (`evidence_holds`); E05 note: two PRs, the lock, the purge, holds, archive grace, what is not in E05 (ADR-M51, QUESTIONS #235–#239) |
 | 1.20 | 2026-10-06 | Claude, approved by Harry | A10 note: the runner VM or rootless Docker, ClickHouse access management (ADR-M25 §2.5, ADR-M53) |
 | 1.21 | 2026-10-06 | Claude, approved by Harry | E07 AC4: the API-model run is needed before M-F, not before M-E; the trial M-E runs with the local Ollama model (QUESTIONS #81) |
+| 1.22 | 2026-10-07 | Claude, approved by Harry | New milestone MVP+1 (started early) with task U01, a read-only web dashboard, in parallel with the trial M-E (QUESTIONS #255) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |

@@ -31,6 +31,7 @@ MILESTONES = {
     "M-0": "Sample pilot repo (separate repo)",
     "M-C": "Run + G4–G6",
     "M-D": "G7–G8 + evidence + cost",
+    "MVP+1": "Started early: read-only dashboard (QUESTIONS #255)",
 }
 LABELS = {
     "size:S": "c2e0c6",
