@@ -217,6 +217,7 @@ async function storePack(
   source: PackSource,
   content: Record<string, unknown>,
   hashes: PackHashes,
+  latest: EvidencePack | undefined,
   deps: EvidenceBuildDeps,
 ): Promise<EvidencePack> {
   const contentHash = hashes.contentSha256;
@@ -224,7 +225,9 @@ async function storePack(
   const locale = deps.locale ?? DEFAULT_LOCALE;
   const names = await approverNames(scope, source);
   const builtBy = actor.type === 'human' ? actor.userId : null;
-  const latest = await scope.evidencePacks.latest(intent.id);
+  // The version after the one the caller checked, never a fresh read: when another build stored
+  // a version since the check, the insert conflicts on (tenant, intent, version) and the caller
+  // checks again, so the same content never gets two versions.
   const build = {
     packId: (deps.newId ?? randomUUID)(),
     version: (latest?.version ?? 0) + 1,
@@ -299,7 +302,7 @@ export async function buildEvidencePack(
       return { intentCode: intent.code, pack: latest, created: false };
     }
     try {
-      const pack = await storePack(scope, actor, source, content, hashes, deps);
+      const pack = await storePack(scope, actor, source, content, hashes, latest, deps);
       return { intentCode: intent.code, pack, created: true };
     } catch (error) {
       // A concurrent build took the version: try the next one (its files stay unreferenced).

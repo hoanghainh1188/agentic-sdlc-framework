@@ -23,6 +23,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp, type ApiDeps } from '../../../apps/api/src/app.js';
 import { issueApiToken } from '../../../packages/core/src/admin/tokens.js';
+import { buildEvidencePack } from '../../../packages/core/src/evidence/build.js';
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
 import type { Intent } from '../../../packages/core/src/db/schema.js';
 import { CAROL, g7World } from './g7-world.js';
@@ -390,6 +391,64 @@ describeDb('E02: Evidence Packs on PostgreSQL', () => {
       expect(unavailable.body.error.code).toBe('evidence_unavailable');
       // Listing needs no store.
       expect((await call('GET', packs(), 'a', bare)).status).toBe(200);
+    });
+  });
+
+  describe('concurrent builds (CI run 37631770993)', () => {
+    it('a build that read the latest version before another build stored one makes no new version', async () => {
+      // Forces the interleaving: build B reads the latest version, then waits while build A
+      // stores the next one. B must return A's version, never store the same content again.
+      await tamper(w.db.name, `UPDATE intents SET pr_number = pr_number + 1 WHERE id = $1`, [
+        intent.id,
+      ]);
+      const before = await rowCount();
+      const scope = w.t.f.scope;
+      let release!: () => void;
+      const released = new Promise<void>((resolve) => (release = resolve));
+      let paused!: () => void;
+      const pausedB = new Promise<void>((resolve) => (paused = resolve));
+      let calls = 0;
+      const packsRepo = scope.evidencePacks;
+      const gatedPacks = new Proxy(packsRepo, {
+        get(target, prop) {
+          const value: unknown = Reflect.get(target, prop, target);
+          if (typeof value !== 'function') return value;
+          if (prop !== 'latest') return (value as (...a: unknown[]) => unknown).bind(target);
+          return async (...args: unknown[]) => {
+            const result: unknown = await (value as (...a: unknown[]) => unknown).apply(
+              target,
+              args,
+            );
+            calls += 1;
+            if (calls === 1) {
+              paused();
+              await released;
+            }
+            return result;
+          };
+        },
+      });
+      const gatedScope = new Proxy(scope, {
+        get(target, prop) {
+          if (prop === 'evidencePacks') return gatedPacks;
+          const value: unknown = Reflect.get(target, prop, target);
+          return typeof value === 'function'
+            ? (value as (...a: unknown[]) => unknown).bind(target)
+            : value;
+        },
+      });
+      const deps = { store, now: () => new Date(), maxItemBytes: 1024 * 1024 };
+      const actor = { type: 'human', userId: w.t.f.users.a } as const;
+
+      const b = buildEvidencePack(gatedScope, actor, intent.code, deps);
+      await pausedB;
+      const a = await buildEvidencePack(scope, actor, intent.code, deps);
+      expect(a).toMatchObject({ created: true, pack: { version: before + 1 } });
+      release();
+      const bResult = await b;
+      expect(bResult.created).toBe(false);
+      expect(bResult.pack.id).toBe(a.pack.id);
+      expect(await rowCount()).toBe(before + 1);
     });
   });
 
