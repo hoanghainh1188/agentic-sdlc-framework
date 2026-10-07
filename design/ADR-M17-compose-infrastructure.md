@@ -24,7 +24,7 @@ Versions were checked against Docker Hub, GHCR and GitHub releases on 2026-09-25
 | temporal-schema, temporal-namespace (jobs) | core | `temporalio/admin-tools:1.32.0` | MIT |
 | temporal-ui | core | `temporalio/ui:2.54.1` | MIT |
 | valkey | core | `valkey/valkey:8.1.10-alpine3.24` | BSD-3-Clause |
-| litellm | core | `ghcr.io/berriai/litellm:v1.102.1` | MIT (the `enterprise/` code is not activated) |
+| litellm | core | `ghcr.io/berriai/litellm:v1.104.0` (issue #177) | MIT (the `enterprise/` code is not activated) |
 | seaweedfs, seaweedfs-init (job) | core | `chrislusf/seaweedfs:4.48` | Apache-2.0 |
 | openbao | core | `openbao/openbao:2.6.3` | MPL-2.0 |
 | clickhouse | observability | `clickhouse/clickhouse-server:26.3.36.6` (LTS) | Apache-2.0 |

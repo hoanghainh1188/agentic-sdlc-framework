@@ -16,7 +16,7 @@ Task C03 connects the platform to LiteLLM, the model gateway (D-07 section 3):
 - A sync job copies spend from LiteLLM into `cost_records` (append-only, codes and numbers only).
 - Over budget, the request is blocked (FR-51: tenant/month, intent, run).
 
-All LiteLLM behaviour below was checked on the pinned image `ghcr.io/berriai/litellm:v1.102.1` (2026-09-26). The live test (`pnpm test:litellm`) checks it again on every change.
+All LiteLLM behaviour below was checked on the pinned image `ghcr.io/berriai/litellm:v1.102.1` (2026-09-26), and again on `v1.104.0` (2026-10-07, issue #177; the two changed facts are marked in §2.2). The live test (`pnpm test:litellm`) checks it again on every change.
 
 ## 2. Decision
 
@@ -39,7 +39,7 @@ All LiteLLM behaviour below was checked on the pinned image `ghcr.io/berriai/lit
 
 The secret ID file lives on a named Docker volume (on disk, readable by root only), not on tmpfs: the sidecar must log in again after a server restart without an operator. OpenBao itself needs two key holders after a restart anyway (D-03 §10.2).
 
-### 2.2. LiteLLM API facts (v1.102.1, checked live)
+### 2.2. LiteLLM API facts (v1.104.0, checked live)
 
 | Fact | Consequence |
 |---|---|
@@ -52,7 +52,8 @@ The secret ID file lives on a named Docker volume (on disk, readable by root onl
 | Team `budget_duration: 1mo` resets at 00:00 UTC on the first day of the next month | The tenant budget period is the UTC calendar month (D3) |
 | `/model/info`, `/v1/models`, `/model_group/info`, `/key/info`, `/team/info` and the other admin endpoints do not return provider keys, the master key or the salt key | Checked by the live test (addition 1) |
 | Spend is updated asynchronously; a key can go about one call over its budget (QUESTIONS #14) | The key and team budgets are a backstop. G5 (C07) reads `cost_records` |
-| Custom prices without cache prices: cached input tokens cost 0 | Noted for the price table of self-hosted models |
+| Custom prices without a cache price: cached input tokens cost the normal input price (v1.104.0, BerriAI/litellm#41832; on v1.102.1 they cost 0). An explicit `cache_read_input_token_cost: 0` still makes them free | Budgets and spend count every input token. Set a cache price in the price table of a self-hosted model only when its cache really is cheaper |
+| A call over a key, team or user budget is refused with HTTP **422** and `error.type` `budget_exceeded` (v1.104.0, BerriAI/litellm#42097; on v1.102.1 it was 429). Real rate limits (rpm, tpm) stay 429. `litellm_settings.budget_exceeded_status_code: 429` would restore the old code; the platform does not set it (issue #177) | A budget block is recognised by the status **and** the error type, never by 429 alone. Nothing in the platform reads the status: the runner's budget stop (C07, ADR-M34 §2.6) reads the key's spend, and an agent that fails on the refusal is re-checked against the spend and ends `stopped_budget` / `max_budget`. The agent no longer retries a refused call |
 
 ### 2.3. Budgets at three levels (FR-51, D3, addition 2)
 
@@ -142,3 +143,4 @@ Same responsibilities. Differences:
 |---|---|---|---|
 | 0.1 | 2026-09-26 | Claude (task C03) | First version |
 | 0.2 | 2026-10-04 | Claude (task C12), approved by Harry | §2.5: the scheduled sync as built: a worker loop instead of a Temporal schedule, look-back and catch-up windows, runs that just ended, slices, `truncated`, failures and the gap warning, the lock, G8; §3: open items (QUESTIONS #197, #225) |
+| 0.3 | 2026-10-07 | Claude (issue #177, PR 1), approved by Harry | §1, §2.2: checked again on LiteLLM v1.104.0: a budget block answers 422 with `budget_exceeded` (was 429), kept as the upstream default; cached input tokens without a cache price cost the input price (was 0) |

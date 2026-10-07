@@ -36,8 +36,14 @@ const TEST_TIMEOUT_MS = 3 * 60 * 1000;
 const NODE_IMAGE =
   'node:24.21.0-alpine3.23@sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2';
 const MODEL = 'stub-model';
-// stub-model.mjs: 1000 input tokens (200 cached, free) and 100 output tokens per call.
-const COST_PER_CALL = 0.001;
+// stub-model.mjs: 1000 input tokens (200 of them cached) and 100 output tokens per call, at the
+// stub's prices in config.test.ctmpl. The stub has no cache price, so since LiteLLM v1.104.0 the
+// cached tokens cost the normal input price (ADR-M24 §2.2): 1000 × 0.000001 + 100 × 0.000002.
+const COST_PER_CALL = 0.0012;
+// A budget block (FR-51): since LiteLLM v1.104.0, HTTP 422 with error type `budget_exceeded`
+// (was 429; ADR-M24 §2.2). `chat` returns this only for exactly that answer, never for a rate
+// limit (429) or another 422.
+const BUDGET_BLOCKED = 'budget_blocked';
 
 interface Result {
   status: number | null;
@@ -125,15 +131,25 @@ describe.skipIf(!enabled)(
     const containerOf = (service: string): string =>
       ok(compose('', 'ps', '-q', service), `ps ${service}`).stdout.trim();
 
-    /** One model call with a virtual key; returns the HTTP status. */
-    async function chat(key: string, model = MODEL): Promise<number> {
+    /**
+     * One model call with a virtual key; returns the HTTP status, or BUDGET_BLOCKED for a 422
+     * whose error type is `budget_exceeded`. The body is never printed (it can quote the key).
+     */
+    async function chat(key: string, model = MODEL): Promise<number | typeof BUDGET_BLOCKED> {
       const response = await fetch(`${litellmUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
         body: JSON.stringify({ model, messages: [{ role: 'user', content: 'hi' }] }),
       });
-      await response.text();
-      return response.status;
+      const text = await response.text();
+      if (response.status !== 422) return response.status;
+      let type: unknown;
+      try {
+        type = (JSON.parse(text) as { error?: { type?: unknown } }).error?.type;
+      } catch {
+        type = undefined;
+      }
+      return type === 'budget_exceeded' ? BUDGET_BLOCKED : response.status;
     }
 
     /** An admin call with the master key; returns the raw body text. */
@@ -146,13 +162,16 @@ describe.skipIf(!enabled)(
 
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    /** Calls until the gateway refuses (429) or `max` calls; returns the statuses. */
-    async function callUntilBlocked(key: string, max: number): Promise<number[]> {
-      const statuses: number[] = [];
+    /** Calls until the gateway blocks for the budget or `max` calls; returns the statuses. */
+    async function callUntilBlocked(
+      key: string,
+      max: number,
+    ): Promise<(number | typeof BUDGET_BLOCKED)[]> {
+      const statuses: (number | typeof BUDGET_BLOCKED)[] = [];
       for (let i = 0; i < max; i++) {
         const status = await chat(key);
         statuses.push(status);
-        if (status === 429) break;
+        if (status === BUDGET_BLOCKED) break;
         // LiteLLM updates spend asynchronously; give it a moment between calls (QUESTIONS #14).
         await sleep(700);
       }
@@ -576,7 +595,7 @@ describe.skipIf(!enabled)(
         const s = await seed({ runBudget: '0.002' });
         const issued = await issue(s);
         const statuses = await callUntilBlocked(issued.key.key.reveal(), 8);
-        expect(statuses.at(-1)).toBe(429);
+        expect(statuses.at(-1)).toBe(BUDGET_BLOCKED);
         const reader = new LiteLLMKeySpendReader({ baseUrl: litellmUrl });
         const blockedAt = Date.now();
         let info = await reader.readOwnSpend(issued.key.key);
@@ -609,7 +628,7 @@ describe.skipIf(!enabled)(
         });
         expect(again.inserted).toBe(0);
         expect(await s.scope.costRecords.listForRun(s.runId)).toHaveLength(2);
-        expect(await s.scope.costRecords.totalForIntent(s.intentId)).toBe('0.002000');
+        expect(await s.scope.costRecords.totalForIntent(s.intentId)).toBe('0.002400');
       });
     });
 
@@ -618,7 +637,7 @@ describe.skipIf(!enabled)(
         const s = await seed({ runBudget: '0.003' });
         const issued = await issue(s);
         const statuses = await callUntilBlocked(issued.key.key.reveal(), 8);
-        expect(statuses.at(-1)).toBe(429);
+        expect(statuses.at(-1)).toBe(BUDGET_BLOCKED);
         const allowed = statuses.filter((x) => x === 200).length;
         expect(allowed).toBeGreaterThanOrEqual(Math.floor(0.003 / COST_PER_CALL));
         expect(allowed).toBeLessThanOrEqual(Math.ceil(0.003 / COST_PER_CALL) + 1);
@@ -650,7 +669,7 @@ describe.skipIf(!enabled)(
           durationMinutes: 10,
           tenantGroupId: `sdlc-tenant-${s.slug}`,
         });
-        expect(await chat(second.key.reveal())).toBe(429);
+        expect(await chat(second.key.reveal())).toBe(BUDGET_BLOCKED);
       });
     });
   },
