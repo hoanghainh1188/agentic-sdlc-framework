@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
-# Image of the api process (task B03, design/ADR-M26 section 2.6). Build context: the repo root.
+# Image of the api process (task B03, design/ADR-M26 section 2.6), with the read-only dashboard's
+# static files (U01, ADR-M54). Build context: the repo root.
 #   docker compose -f platform/deploy/docker-compose.yml --profile platform build sdlc-api
 # Multi-stage: the build stage compiles the workspace; the runtime stage holds only the api and its
 # production dependencies, runs as the non-root user "node" and contains no secret.
@@ -12,12 +13,17 @@ COPY platform/apps platform/apps
 COPY platform/packages platform/packages
 RUN pnpm install --frozen-lockfile --ignore-scripts \
   && pnpm exec tsc -b platform/apps/api \
+  && pnpm --filter @sdlc/dashboard build \
   && pnpm --filter @sdlc/api deploy --legacy --prod /out
 
 FROM node:24.13.0-bookworm-slim
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=root:root /out /app
+# The read-only dashboard's built files (U01, design/ADR-M54): read once at start-up, served
+# under /dashboard/ with a strict CSP. Static files only: no dashboard code runs in Node.
+COPY --from=build --chown=root:root /repo/platform/apps/dashboard/dist/web /app/dashboard
+ENV SDLC_API_DASHBOARD_DIR=/app/dashboard
 USER node
 EXPOSE 8080
 CMD ["node", "/app/dist/main.js"]

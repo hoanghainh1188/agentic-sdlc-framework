@@ -207,7 +207,9 @@ describe('AC2: integration job runs the Compose core profile', () => {
     for (const heavy of ['compose', 'sandbox-image'])
       expect(job(heavy).needs).toEqual(['scan', 'checks']);
     expect(job('compose').if).toBe("needs.scan.outputs.run_compose == 'true'");
-    expect(job('sandbox-image').if).toBe("needs.scan.outputs.run_sandbox_image == 'true'");
+    expect(job('sandbox-image').if).toBe(
+      "needs.scan.outputs.run_sandbox_image == 'true' || needs.scan.outputs.run_dashboard == 'true'",
+    );
     expect(ciEnv.COMPOSE_FILE_PATH).toBe('platform/deploy/docker-compose.yml');
     const scan = runText('scan');
     expect(scan).toContain('[ ! -f "$COMPOSE_FILE_PATH" ]');
@@ -222,7 +224,9 @@ describe('AC2: integration job runs the Compose core profile', () => {
     const runs = steps.map((s) => s.run ?? '');
     const pilot = runs.indexOf('pnpm test:pilot');
     expect(pilot).toBeGreaterThan(runs.indexOf('pnpm test:agent'));
-    expect(steps[pilot]).toMatchObject({ if: "needs.scan.outputs.run_pilot == 'true'" });
+    expect(steps[pilot]).toMatchObject({
+      if: "needs.scan.outputs.run_pilot == 'true' && needs.scan.outputs.run_sandbox_image == 'true'",
+    });
     expect(job('scan').outputs?.run_pilot).toBeDefined();
     const scan = runText('scan');
     expect(scan).toContain('echo "run_pilot=$all" >> "$GITHUB_OUTPUT"');
@@ -231,6 +235,34 @@ describe('AC2: integration job runs the Compose core profile', () => {
     for (const p of ['platform/packages/core/src/workflow/', 'platform/apps/worker/'])
       expect(paths.split(/\s+/)).not.toContain(p);
     expect(paths.split(/\s+/)).toContain('platform/apps/runner/');
+  });
+
+  it('U01: the dashboard smoke test runs in the sandbox image job, alone when only it changed', () => {
+    const steps = job('sandbox-image').steps;
+    const dashboard = steps.findIndex((s) => s.run === 'pnpm test:dashboard');
+    expect(dashboard).toBeGreaterThan(0);
+    expect(steps[dashboard]).toMatchObject({ if: "needs.scan.outputs.run_dashboard == 'true'" });
+    expect(steps[dashboard - 1]).toMatchObject({
+      if: "needs.scan.outputs.run_dashboard == 'true'",
+      run: 'pnpm exec playwright install --with-deps chromium',
+    });
+    // Every sandbox step needs its own flag, so a dashboard-only pull request skips them.
+    for (const step of steps) {
+      if (/sandbox-image|test:agent|test:pilot|trivy|build\.sh/.test(step.run ?? '')) {
+        expect(step.if, step.run).toContain("needs.scan.outputs.run_sandbox_image == 'true'");
+      }
+    }
+    expect(job('scan').outputs?.run_dashboard).toBeDefined();
+    const scan = runText('scan');
+    const paths = scan.slice(scan.indexOf('decide_heavy run_dashboard')).split('\n\n')[0]!;
+    for (const p of [
+      'platform/apps/dashboard/',
+      'platform/packages/api-schemas/',
+      'platform/apps/api/src/dashboard/',
+      'platform/tests/e2e/',
+    ]) {
+      expect(paths.split(/\s+/)).toContain(p);
+    }
   });
 
   it('E07: the fresh deployment job runs on the weekly schedule and on demand only, and cleans up', () => {

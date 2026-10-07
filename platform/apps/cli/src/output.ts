@@ -2,17 +2,14 @@
 // message catalog only. Values that come from the server (titles, slugs, messages) are cleaned of
 // control and bidirectional-override characters first, so a crafted intent title cannot send
 // escape sequences to the terminal. `--json` prints the validated body.
+import { cleanText } from '@sdlc/api-schemas';
 import { t, type MessageKey, type MessageParams } from '@sdlc/messages';
 
 import type { CliContext } from './context.js';
 
-// C0 and C1 control characters, DEL, and Unicode bidirectional controls.
-// eslint-disable-next-line no-control-regex
-const UNSAFE = /[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
-
-/** One line of server text: unsafe characters become a space. */
+/** One line of server text: unsafe characters become a space (`@sdlc/api-schemas`). */
 export function clean(value: string): string {
-  return value.replace(UNSAFE, ' ');
+  return cleanText(value);
 }
 
 /** Prints a catalog message; every parameter is cleaned. */

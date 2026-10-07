@@ -16,7 +16,8 @@ function sourceFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) return sourceFiles(full);
-    return entry.name.endsWith('.ts') ? [full] : [];
+    // U01: the dashboard's screens are TSX.
+    return /\.tsx?$/.test(entry.name) ? [full] : [];
   });
 }
 
@@ -65,6 +66,9 @@ describe('message catalog', () => {
       )
       .map((file) => fs.readFileSync(file, 'utf8'))
       .join('\n');
-    expect(enKeys.filter((key) => !code.includes(`'${key}'`))).toEqual([]);
+    // JSX attributes quote keys with double quotes (`messageKey="…"`).
+    expect(
+      enKeys.filter((key) => !code.includes(`'${key}'`) && !code.includes(`"${key}"`)),
+    ).toEqual([]);
   });
 });

@@ -13,6 +13,7 @@
     "dist"
   ],
   "dependencies": {
+    "@sdlc/api-schemas": "workspace:*",
     "@sdlc/contracts": "workspace:*",
     "@sdlc/core": "workspace:*",
     "@sdlc/messages": "workspace:*",

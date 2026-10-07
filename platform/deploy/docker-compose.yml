@@ -552,6 +552,8 @@ services:
       # Wakes the intent workflow after a change (B07, ADR-M30). Plain gRPC on the Compose network.
       SDLC_API_TEMPORAL_ADDRESS: temporal:7233
       SDLC_API_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      # The read-only dashboard (U01, ADR-M54): built into the image; `off` turns it off.
+      SDLC_API_DASHBOARD_DIR: /app/dashboard
       # E02 (ADR-M48): Evidence Packs in SeaweedFS with the api's identity from OpenBao
       # (kv/api/evidence, `openbao:bootstrap api-evidence-credentials`): reads proposals and diffs
       # to re-check their hashes, reads and writes packs/ only.

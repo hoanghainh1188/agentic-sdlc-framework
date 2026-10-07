@@ -1,0 +1,68 @@
+/* Design tokens: an operations ledger. Warm paper and ink, hairline rules, colour only where it
+   means something (waiting, overdue, frozen, risk). Light and dark follow the system setting.
+   Text pairs are checked for WCAG AA contrast by platform/tests/dashboard/contrast.test.ts. */
+:root {
+  --paper: #f4efe6;
+  --paper-raised: #fffdf8;
+  --paper-sunk: #e9e1d2;
+  --ink: #1c2320;
+  --ink-muted: #4f5751;
+  --rule: #d3c8b4;
+  --rule-strong: #a99c84;
+  --masthead: #1c2320;
+  --masthead-ink: #f4efe6;
+  --accent: #8a5200;
+  --accent-fill: #b06d0a;
+  --alert: #a8261a;
+  --alert-fill: #d64533;
+  --warn: #7a5100;
+  --warn-fill: #e3b341;
+  --ok: #2c6a3d;
+  --hotl: #2b5788;
+  --focus: #b8730a;
+
+  --font-sans: 'Plex Sans', system-ui, sans-serif;
+  --font-mono: 'Plex Mono', ui-monospace, monospace;
+  --text-small: 0.8125rem;
+  --text-base: clamp(0.9375rem, 0.9rem + 0.15vw, 1rem);
+  --text-title: clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem);
+  --text-figure: clamp(2rem, 1.4rem + 2.4vw, 3.25rem);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-section: clamp(1.5rem, 1rem + 2vw, 3rem);
+
+  --radius-card: 6px;
+  --radius-chip: 3px;
+  --shadow-card: 0 1px 0 rgba(28, 35, 32, 0.06), 0 6px 18px -12px rgba(28, 35, 32, 0.35);
+  --duration-fast: 140ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #121614;
+    --paper-raised: #1a201d;
+    --paper-sunk: #0d100f;
+    --ink: #ece6da;
+    --ink-muted: #a9afa1;
+    --rule: #2e3632;
+    --rule-strong: #4b544f;
+    --masthead: #0a0c0b;
+    --masthead-ink: #ece6da;
+    --accent: #eab65a;
+    --accent-fill: #c98a22;
+    --alert: #ff8a7a;
+    --alert-fill: #e0523f;
+    --warn: #f2c35e;
+    --warn-fill: #b8862a;
+    --ok: #86c995;
+    --hotl: #8db8e8;
+    --focus: #eab65a;
+    --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.4), 0 8px 20px -14px rgba(0, 0, 0, 0.9);
+  }
+}

@@ -62,6 +62,7 @@ jobs:
       run_pilot: ${{ steps.decide.outputs.run_pilot }}
       run_compose: ${{ steps.decide.outputs.run_compose }}
       run_sandbox_image: ${{ steps.decide.outputs.run_sandbox_image }}
+      run_dashboard: ${{ steps.decide.outputs.run_dashboard }}
       run_fresh_deploy: ${{ steps.decide.outputs.run_fresh_deploy }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -143,6 +144,12 @@ jobs:
           decide_heavy run_sandbox_image "Sandbox image job" \
             "a sandbox image, the runner, the agent adapter, the package proxy or a live test" \
             platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/
+
+          # U01 (design/ADR-M54 §2.6): the dashboard's browser smoke test (Playwright, Chromium)
+          # runs in the sandbox image job, without the sandbox steps when only these paths changed.
+          decide_heavy run_dashboard "Dashboard smoke test (in the sandbox image job)" \
+            "the dashboard, its response schemas, the catalog, the api's static route or the smoke test" \
+            platform/apps/dashboard/ platform/packages/api-schemas/ platform/apps/api/src/dashboard/ platform/tests/e2e/ platform/packages/messages/src/locales/
 
           # C09: the pilot suite (G1–G8 with the real runner, about 7 minutes) runs on weekly and
           # manual runs only. After a pull request that changes the gate steps, the worker or the
@@ -334,10 +341,11 @@ jobs:
     # C04 (design/ADR-M25 §2.9, QUESTIONS #54): build the sandbox image node24, scan it with Trivy
     # (vulnerabilities and licences, ADR-M10 §2.1) and run it hardened with the real package
     # proxy. Nothing is pushed anywhere except a throw-away registry:2 on 127.0.0.1 inside the job:
-    # no GHCR, no GitHub secrets, no keys.
+    # no GHCR, no GitHub secrets, no keys. U01: also the dashboard's browser smoke test; a pull
+    # request that changes only the dashboard runs that step alone (Actions minutes).
     name: sandbox image (node24)
     needs: [scan, checks]
-    if: needs.scan.outputs.run_sandbox_image == 'true'
+    if: needs.scan.outputs.run_sandbox_image == 'true' || needs.scan.outputs.run_dashboard == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -351,11 +359,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build (no push)
+        if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
           ref="$(sh platform/sandbox-images/build.sh node24 --no-push)"
           docker save "$ref" -o "$RUNNER_TEMP/node24.tar"
           echo "Built $ref" >> "$GITHUB_STEP_SUMMARY"
       - name: Install trivy
+        if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
           archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
           curl -fsSLo "$RUNNER_TEMP/$archive" \
@@ -363,6 +373,7 @@ jobs:
           echo "$TRIVY_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" trivy
       - name: Report (does not block)
+        if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
           "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/node24.tar" --scanners vuln \
             --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" \
@@ -376,28 +387,48 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Scan vulnerabilities (severity CRITICAL blocks)
+        if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
           "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/node24.tar" --scanners vuln \
             --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile platform/sandbox-images/.trivyignore \
             --disable-telemetry --skip-version-check --exit-code 1
       # ADR-M10 §2.1: the CRITICAL licence category (AGPL, SSPL, commercial) blocks.
       - name: Scan licences (CRITICAL category blocks)
+        if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
           "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/node24.tar" --scanners license \
             --severity "$TRIVY_BLOCK_SEVERITY" \
             --disable-telemetry --skip-version-check --exit-code 1
       # Hardened sandbox from the image by digest (throw-away registry:2), with Verdaccio: Node 24,
       # pnpm through corepack and the proxy, no other way out.
-      - run: pnpm test:sandbox-image
+      - if: needs.scan.outputs.run_sandbox_image == 'true'
+        run: pnpm test:sandbox-image
       # C05 (design/ADR-M29): the runner drives the real OpenHands Agent Server in a node24 sandbox
       # with a scripted stub model (no provider, no key) and a throw-away PostgreSQL.
-      - run: pnpm test:agent
+      - if: needs.scan.outputs.run_sandbox_image == 'true'
+        run: pnpm test:agent
       # C09 (D-08 C09 AC1–AC5): G1–G6 on the sample repository's shape with the real runner, the
       # node24 sandbox and the Agent Server (stub model), the intent workflow on the Temporal test
       # server, a local Git host that protects main, and a throw-away PostgreSQL. One file at a time.
       # Weekly and manual runs only (Actions minutes).
-      - if: needs.scan.outputs.run_pilot == 'true'
+      - if: needs.scan.outputs.run_pilot == 'true' && needs.scan.outputs.run_sandbox_image == 'true'
         run: pnpm test:pilot
+      # U01 (design/ADR-M54 §2.6): the read-only dashboard in Chromium against a stub API that
+      # serves the build through the api's own static route; screenshots at 375, 768, 1440 px.
+      - name: Install Chromium for Playwright
+        if: needs.scan.outputs.run_dashboard == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: needs.scan.outputs.run_dashboard == 'true'
+        run: pnpm test:dashboard
+      # The screenshots (375, 768, 1440 px, light and dark) for the pull request's reviewer.
+      - name: Upload the dashboard screenshots
+        if: always() && needs.scan.outputs.run_dashboard == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dashboard-screenshots
+          path: platform/tests/e2e/screenshots/
+          retention-days: 14
+          if-no-files-found: ignore
       - name: Remove the image archive
         if: always()
         run: rm -f "$RUNNER_TEMP/node24.tar"
