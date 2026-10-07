@@ -53,6 +53,12 @@ export const intentSchema = z.object({
   status: code,
   current_gate: code.nullable(),
   gate_entered_at: time.nullable(),
+  /** U02 (ADR-M54 §2.4b): why the workflow holds the intent, as its step recorded it. */
+  // Optional: an older API (before U02) does not send them.
+  waiting_reason: code.nullable().optional(),
+  waiting_cause: code.nullable().optional(),
+  waiting_since: time.nullable().optional(),
+  waiting_until: time.nullable().optional(),
   issue_number: z.number().int().nullable(),
   pr_number: z.number().int().nullable(),
   created_by: id,

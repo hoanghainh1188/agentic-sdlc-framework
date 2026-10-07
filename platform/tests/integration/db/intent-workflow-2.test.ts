@@ -150,7 +150,7 @@ describeDb('B07 session 2: HOTL, binding and overdue gates on PostgreSQL', () =>
       // G4 belongs to C06; the workflow wakes when the last block window closes.
       expect(result).toEqual({
         outcome: 'waiting',
-        reason: 'later_gate',
+        reason: 'hotl_block_window',
         wakeInMs: WINDOW_END.getTime() - T0.getTime(),
       });
       expect(await t.reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G4' });
@@ -223,7 +223,7 @@ describeDb('B07 session 2: HOTL, binding and overdue gates on PostgreSQL', () =>
 
       // A new plan version passes again.
       await t.newPlan(intent, '7'.repeat(64));
-      expect(await t.settle(intent)).toMatchObject({ reason: 'later_gate' });
+      expect(await t.settle(intent)).toMatchObject({ reason: 'hotl_block_window' });
       expect(await t.reload(intent)).toMatchObject({ current_gate: 'G4' });
     });
 
@@ -293,7 +293,10 @@ describeDb('B07 session 2: HOTL, binding and overdue gates on PostgreSQL', () =>
       await t.newPlan(intent, '8'.repeat(64), ['migration']);
       await t.decide(intent, 'G3', 'approve', 'b');
       // At G4, woken when the second G2 pass's block window closes.
-      expect(await t.settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'later_gate' });
+      expect(await t.settle(intent)).toMatchObject({
+        outcome: 'waiting',
+        reason: 'hotl_block_window',
+      });
       expect(await t.reload(intent)).toMatchObject({ current_gate: 'G4' });
     });
 

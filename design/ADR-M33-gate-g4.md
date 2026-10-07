@@ -50,7 +50,7 @@ When the Git host cannot be read, the step waits (`git_host_unavailable`) and tr
 | # | Check | Result when it fails |
 |---|---|---|
 | 1 | Critical risk, or effective autonomy L0 (the stricter of the stored value and the current configuration's, QUESTIONS #22; never above L2) | `block`, reason `policy_denied`; intent `blocked` (final, the workflow ends); notice `blocked`. The agent never runs (FR-03, T10) |
-| 2 | The last HOTL block window is closed (ADR-M30 §2.4b) | Wait until it closes (`later_gate`, `wakeInMs`) |
+| 2 | The last HOTL block window is closed (ADR-M30 §2.4b) | Wait until it closes (`later_gate`, `wakeInMs`; since U02 `hotl_block_window`, ADR-M54 §2.4b) |
 | 3 | Not frozen for `run_start` (ADR-M28 §2.4) | Wait (`frozen`) |
 | 4 | The spec and plan are the versions G2 and G3 passed (Ch.13: approved "for these exact versions") | `fail`, `input_mismatch` (`spec_changed`, `plan_changed`). B08 and B09 add the send-back to G2 or G3 |
 | 5 | The project AI record allows the data class (FR-19 at G4, ADR-M32 §2.6) | `fail`, `ai_record_missing` / `data_class_not_allowed` |

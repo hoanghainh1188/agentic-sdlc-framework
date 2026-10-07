@@ -85,7 +85,11 @@ export type G4Evaluation =
   /** Critical risk or no autonomy (L0): the agent never runs (FR-03, T10). */
   | { readonly kind: 'block'; readonly autonomy: AutonomyLevel }
   /** Not yet: a block window is open (with the delay until it closes), or the intent is frozen. */
-  | { readonly kind: 'wait'; readonly reason: 'later_gate' | 'frozen'; readonly wakeInMs?: number }
+  | {
+      readonly kind: 'wait';
+      readonly reason: 'hotl_block_window' | 'frozen';
+      readonly wakeInMs?: number;
+    }
   /** A check failed: the gate decision's reason code and the exact cause for the audit log. */
   | {
       readonly kind: 'fail';
@@ -155,7 +159,7 @@ export async function evaluateG4(
   if (until !== null) {
     return {
       kind: 'wait',
-      reason: 'later_gate',
+      reason: 'hotl_block_window',
       wakeInMs: Math.max(0, until.getTime() - now.getTime()),
     };
   }
@@ -380,7 +384,11 @@ export async function stepG4(
       };
     case 'fail':
       await recordG4Failure(tx, registry, intent, evaluation);
-      return { kind: 'waiting', result: { outcome: 'waiting', reason: 'g4_check' } };
+      // U02: the exact check is recorded with the wait (ADR-M54 §2.4b), as in the audit event.
+      return {
+        kind: 'waiting',
+        result: { outcome: 'waiting', reason: 'g4_check', cause: evaluation.check },
+      };
     case 'ready': {
       const result = await decideReady(tx, registry, policy, intent, evaluation);
       return result === 'decided'

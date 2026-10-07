@@ -10,6 +10,8 @@
 //   at G4 takes the intent back to G3 with the approvals voided (FR-17).
 // The Git host is an in-memory fake; `platform/tests/plans/plan-rules.test.ts` covers the file
 // rules.
+import { randomUUID } from 'node:crypto';
+
 import { loadProjectConfig } from '@sdlc/config';
 import { t, type MessageKey } from '@sdlc/messages';
 import { sql } from 'kysely';
@@ -26,7 +28,9 @@ import { planFileSha256, planPath } from '../../../packages/core/src/plans/rules
 import { submitPlanFromGitHost } from '../../../packages/core/src/plans/submit.js';
 import { RegistryError } from '../../../packages/core/src/registry/errors.js';
 import { linkSpecFromGitHost } from '../../../packages/core/src/specs/link.js';
+import { gateOversight } from '../../../packages/core/src/workflow/oversight.js';
 import { stepIntent, type StepDeps } from '../../../packages/core/src/workflow/step.js';
+import { waitingRow } from '../g4-harness.js';
 import { FakeSpecGitHost as FakeGitHost, SPEC_PATH } from '../fake-spec-git-host.js';
 import { createWorkflowFixture, type Person, type WorkflowFixture } from '../workflow/fixture.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
@@ -448,6 +452,11 @@ describeDb('B09: plan submission and the plan re-check on PostgreSQL', () => {
       writePlan(intent, { paths: ['apps/api/src/**'] });
       expect(await settle(intent)).toEqual({ outcome: 'waiting', reason: 'plan_resubmit_needed' });
       expect(await reload(intent)).toMatchObject({ current_gate: 'G4' });
+      // U02: the step records the hold; a person sees why the run does not start.
+      expect(await waitingRow(f.scope, intent)).toMatchObject({
+        reason: 'plan_resubmit_needed',
+        cause: null,
+      });
 
       await submit(intent);
       expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
@@ -456,6 +465,46 @@ describeDb('B09: plan submission and the plan re-check on PostgreSQL', () => {
       const g3 = await f.scope.gateDecisions.listForIntent(intent.id, 'G3');
       expect(g3.map((d) => d.decision)).toEqual(['approve', 'void']);
       expect(g3[1]).toMatchObject({ reason_code: 'input_mismatch', voids_decision_id: g3[0]!.id });
+    });
+
+    it('U02 #264: after a return from G6, `plan_changed` names the HITL resolution of G3', async () => {
+      const intent = await atG2('low');
+      // G6 sent the intent back once (CI failed, no retry left): G3 is HITL from then on.
+      await f.scope.audit.append({
+        action: 'gate.g6_check_failed',
+        actorType: 'system',
+        actorId: null,
+        entityId: intent.id,
+        occurredAt: NOW,
+        payload: { check: 'ci_no_retries', run_id: randomUUID() },
+      });
+      writePlan(intent);
+      await submit(intent);
+      await settle(intent);
+      expect(await reload(intent)).toMatchObject({ current_gate: 'G3' });
+      expect(await waitingRow(f.scope, intent)).toMatchObject({ reason: 'decision' });
+      await decide(intent, 'G3', 'approve', 'b');
+      await settle(intent);
+      expect(await reload(intent)).toMatchObject({ current_gate: 'G4' });
+
+      // A new plan at G4: back to G3, and the notice names the workflow's own G3 approvers.
+      writePlan(intent, { paths: ['apps/web/src/**'] });
+      await submit(intent);
+      await settle(intent);
+      expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G3' });
+      const { policy } = await f.registry.policyFor(f.scope, intent.project_id);
+      const g3 = await gateOversight(f.scope, policy, await reload(intent), 'G3');
+      expect(g3.mode).toBe('HITL');
+      const notice = (await f.scope.intentNotices.listForIntent(intent.id)).find(
+        (n) => n.kind === 'plan_changed',
+      );
+      expect(notice?.audience_roles).toEqual(g3.roles.filter((role) => role !== 'viewer'));
+      // Gate decisions are unchanged: the G3 approval was recorded HITL, then voided.
+      const decisions = await f.scope.gateDecisions.listForIntent(intent.id, 'G3');
+      expect(decisions.map((d) => [d.decision, d.oversight_mode])).toEqual([
+        ['approve', 'HITL'],
+        ['void', 'HITL'],
+      ]);
     });
   });
 });

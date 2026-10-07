@@ -9,6 +9,7 @@
 // - `prepareRun`: contract, capped key, wrapped secrets; the recertification warning (FR-36).
 // - C07 (QUESTIONS #126): an unpinned agent instruction file at the base commit, or a commit the
 //   Git host lists only in part, fails G4 (`instructions_unpinned`); the run event `key_issued`.
+import { sql } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Intent } from '../../../packages/core/src/db/schema.js';
@@ -39,6 +40,7 @@ import {
   type Harness,
   type World,
   waitingFor,
+  waitingRow,
 } from '../g4-harness.js';
 import { FakeTransit } from '../../run-contract/helpers.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
@@ -113,8 +115,17 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
     it('no agent configured → agent_not_runnable, once; the next wake after the fix passes', async () => {
       await t.setConfig('run:\n  agent_key: null\n');
       const intent = await atG4(t, 'medium');
-      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'g4_check' });
+      expect(await t.settle(intent)).toEqual({
+        outcome: 'waiting',
+        reason: 'g4_check',
+        cause: 'agent_not_configured',
+      });
+      // U02: the step records the failed check as the hold's cause; another wake keeps `since`.
+      const first = await waitingRow(t.f.scope, intent);
+      expect(first).toMatchObject({ reason: 'g4_check', cause: 'agent_not_configured' });
+      expect(first.since).not.toBeNull();
       await t.settle(intent);
+      expect(await waitingRow(t.f.scope, intent)).toEqual(first);
       expect(await t.g4Decisions(intent)).toEqual([['fail', 'agent_not_runnable', 'POLICY']]);
       expect(await checksFailed(t, intent)).toEqual(['agent_not_configured']);
       // An unrelated commit on the default branch records nothing new (review of C06 session 1).
@@ -125,6 +136,11 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
 
       await t.setConfig(`run:\n  agent_key: ${t.agent.key}\n`);
       expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'run_pending' });
+      // U02: the cause goes with the reason it belonged to.
+      expect(await waitingRow(t.f.scope, intent)).toMatchObject({
+        reason: 'run_pending',
+        cause: null,
+      });
       expect((await t.g4Decisions(intent)).map(([d]) => d)).toEqual(['fail', 'pass']);
 
       // The status comment names the reason and mentions Person A.
@@ -153,7 +169,11 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
     ] as const)('instructions or model: %s → %s', async (change, reason, check) => {
       const intent = await atG4(t, 'medium');
       changes[change]!(t.world);
-      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'g4_check' });
+      expect(await t.settle(intent)).toEqual({
+        outcome: 'waiting',
+        reason: 'g4_check',
+        cause: check,
+      });
       expect(await t.g4Decisions(intent)).toEqual([['fail', reason, 'POLICY']]);
       expect(await checksFailed(t, intent)).toEqual([check]);
     });
@@ -161,7 +181,11 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
     it('C07 #126: another instruction file at the base commit → instructions_unpinned, once per set of files', async () => {
       const intent = await atG4(t, 'medium');
       t.world.paths = ['AGENTS.md', 'CLAUDE.md', 'src/main.ts'];
-      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'g4_check' });
+      expect(await t.settle(intent)).toEqual({
+        outcome: 'waiting',
+        reason: 'g4_check',
+        cause: 'instructions_unpinned',
+      });
       await t.settle(intent);
       expect(await t.g4Decisions(intent)).toEqual([['fail', 'instructions_unpinned', 'POLICY']]);
       expect(await checksFailed(t, intent)).toEqual(['instructions_unpinned']);
@@ -183,7 +207,11 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
     it('C07 #126: a commit the Git host lists only in part → instructions_unpinned (tree_truncated)', async () => {
       const intent = await atG4(t, 'medium');
       t.world.paths = 'truncated';
-      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'g4_check' });
+      expect(await t.settle(intent)).toEqual({
+        outcome: 'waiting',
+        reason: 'g4_check',
+        cause: 'tree_truncated',
+      });
       await t.settle(intent);
       expect(await t.g4Decisions(intent)).toEqual([['fail', 'instructions_unpinned', 'POLICY']]);
       expect(await checksFailed(t, intent)).toEqual(['tree_truncated']);
@@ -315,6 +343,7 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
         { now: () => T0 },
       );
       expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'frozen' });
+      expect(await waitingRow(t.f.scope, intent)).toMatchObject({ reason: 'frozen', cause: null });
       expect(await t.g4Decisions(intent)).toEqual([]);
     });
 
@@ -325,6 +354,12 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
         outcome: 'waiting',
         reason: 'git_host_unavailable',
         wakeInMs: 60_000,
+      });
+      // U02: returned before the step's lock, recorded under a short lock of its own.
+      expect(await waitingRow(t.f.scope, intent)).toMatchObject({
+        reason: 'git_host_unavailable',
+        cause: null,
+        until: null,
       });
       expect(await t.g4Decisions(intent)).toEqual([]);
     });
@@ -348,7 +383,12 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       await decideAt(t, intent, 'G1', 'a');
       await t.f.addInputs(intent);
       const waiting = await t.settle(intent);
-      expect(waiting).toMatchObject({ outcome: 'waiting', reason: 'later_gate' });
+      expect(waiting).toMatchObject({ outcome: 'waiting', reason: 'hotl_block_window' });
+      // U02: the window's close is recorded, to the second.
+      const held = await waitingRow(t.f.scope, intent);
+      expect(held.reason).toBe('hotl_block_window');
+      const closes = T0.getTime() + (waiting as { wakeInMs: number }).wakeInMs;
+      expect(Math.abs(held.until!.getTime() - closes)).toBeLessThan(1000);
       expect(await t.g4Decisions(intent)).toEqual([]);
 
       t.setClock(new Date(T0.getTime() + 6 * HOUR));
@@ -649,6 +689,48 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       expect(await t.reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G4' });
       expect(await checksFailed(t, intent)).toEqual(['plan_tools_not_registered']);
       expect(await t.g4Decisions(intent)).toEqual([['fail', 'agent_not_runnable', 'POLICY']]);
+    });
+  });
+  describe('U02: the recorded waiting reason (migration 0025)', () => {
+    it('a move clears it; the next step records the new one', async () => {
+      const intent = await t.f.newIntent({ riskTier: 'medium' });
+      await t.settle(intent);
+      expect(await waitingRow(t.f.scope, intent)).toMatchObject({ reason: 'decision' });
+      const current = await t.reload(intent);
+      await t.f.scope.intents.moveState(intent.id, {
+        from: { status: current.status, currentGate: current.current_gate },
+        to: { status: 'in_gate', currentGate: 'G2' },
+        at: T0,
+      });
+      expect(await waitingRow(t.f.scope, intent)).toEqual({
+        reason: null,
+        cause: null,
+        since: null,
+        until: null,
+      });
+      await t.settle(intent);
+      expect((await waitingRow(t.f.scope, intent)).reason).not.toBeNull();
+    });
+
+    it('the database refuses a free-text reason or a cause without a reason', async () => {
+      const intent = await t.f.newIntent({ riskTier: 'medium' });
+      await expect(
+        t.f.scope.intents.recordWaiting(
+          intent.id,
+          { reason: 'Not a code', cause: null, until: null },
+          T0,
+        ),
+      ).rejects.toMatchObject({ code: 'invalid_value' });
+      await expect(
+        sql`UPDATE intents SET waiting_cause = 'agent_not_active' WHERE id = ${intent.id}`.execute(
+          db.owner,
+        ),
+      ).rejects.toThrow(/intents_waiting_set/);
+      await expect(
+        sql`UPDATE intents SET waiting_reason = 'Free text', waiting_since = now() WHERE id = ${intent.id}`.execute(
+          db.owner,
+        ),
+      ).rejects.toThrow(/intents_waiting_reason_code/);
     });
   });
 });

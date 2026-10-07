@@ -10,7 +10,7 @@ const root = import.meta.dirname;
 const CATALOG_ID = 'virtual:dashboard-catalog';
 
 /**
- * The `dashboard.*` messages of the catalog (`@sdlc/messages`, NFR-08), bundled at build time. The
+ * The `dashboard.*` and `intent.waiting*` (U02) messages of the catalog (`@sdlc/messages`, NFR-08), bundled at build time. The
  * whole catalog is ~100 kB; the dashboard needs only its own keys.
  */
 export function dashboardCatalog(): Plugin {
@@ -23,7 +23,9 @@ export function dashboardCatalog(): Plugin {
       this.addWatchFile(file);
       const all = JSON.parse(readFileSync(file, 'utf8')) as Record<string, string>;
       const own = Object.fromEntries(
-        Object.entries(all).filter(([key]) => key.startsWith('dashboard.')),
+        Object.entries(all).filter(
+          ([key]) => key.startsWith('dashboard.') || key.startsWith('intent.waiting'),
+        ),
       );
       return `export default ${JSON.stringify(own)};`;
     },

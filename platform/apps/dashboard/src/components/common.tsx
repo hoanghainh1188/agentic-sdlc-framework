@@ -105,6 +105,15 @@ const TRACK_STATE_KEYS = {
   ahead: 'dashboard.track.ahead',
 } as const;
 
+/** A catalog label, or a server code shown as cleaned text when the dashboard has no label. */
+export function Label({
+  value,
+}: {
+  readonly value: { readonly key: string } | { readonly code: string };
+}) {
+  return 'key' in value ? <>{t(value.key)}</> : <Txt value={value.code} />;
+}
+
 /** G1–G8 as eight steps; the current gate is marked, the passed ones filled. */
 export function GateTrack({
   intent,

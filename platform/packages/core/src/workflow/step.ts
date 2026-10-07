@@ -205,11 +205,19 @@ export async function stepIntent(
         // G4 needs its facts. At G2 and G3 the gate is held, but people's rejections, requests
         // for changes and the overdue escalation are still handled (`SpecHold`).
         if (deps.g4 && peek.current_gate === 'G4') {
-          return {
+          const result: IntentStepResult = {
             outcome: 'waiting',
             reason: 'git_host_unavailable',
             wakeInMs: GIT_HOST_RETRY_MS,
           };
+          // U02: recorded under the intent lock, only while the intent still waits at G4.
+          await scope.transaction(async (tx) => {
+            const now = await tx.intents.lockAndGet(intentId);
+            if (now?.status === 'in_gate' && now.current_gate === 'G4') {
+              await recordWaiting(tx, deps, intentId, result);
+            }
+          });
+          return result;
         }
         specFacts = 'git_host_unavailable';
         planFacts = 'git_host_unavailable';
@@ -248,7 +256,7 @@ export async function stepIntent(
   // feedback was gone; `resume` goes back to G7 when the pull request still shows the pushed
   // commit. Read before the lock.
   const resumeHead = await readResumeHead(scope, deps, intentId);
-  return scope.transaction(async (tx) => {
+  const stepLocked = async (tx: TenantScope): Promise<IntentStepResult> => {
     const intent = await tx.intents.lockAndGet(intentId);
     if (!intent) throw new WorkflowError('intent_not_found', `intent ${intentId} not found`);
     if ((FINISHED_INTENT_STATUSES as readonly string[]).includes(intent.status)) {
@@ -334,10 +342,46 @@ export async function stepIntent(
       if (hold) return waiting(hold.reason, hold.wakeInMs);
       // G4 onwards: C06 continues. Wake when the last HOTL block window closes (C06 waits for it).
       const until = await hotlBlockWindowOpenUntil(tx, deps.registry, intent.id);
-      return waiting('later_gate', untilMs(deps, until));
+      // U02: a block window that is still open says so; otherwise this worker does not handle
+      // the gate (a dependency is off).
+      return waiting(until === null ? 'later_gate' : 'hotl_block_window', untilMs(deps, until));
     }
     return stepGate(tx, deps, policy, intent, gate, hold);
+  };
+  // U02 (ADR-M54 §2.4b): what the step decided is recorded in its own transaction, under the
+  // intent lock: the API reads it and never evaluates a gate again.
+  return scope.transaction(async (tx) => {
+    const result = await stepLocked(tx);
+    await recordWaiting(tx, deps, intentId, result);
+    return result;
   });
+}
+
+/**
+ * U02: records the step's waiting reason on the intent (`intents.waiting_*`, migration 0025), or
+ * clears it for any other outcome. A block window's close is read from the window itself (not
+ * from `now()` and the delay), so repeated wakes write nothing.
+ */
+async function recordWaiting(
+  tx: TenantScope,
+  deps: Pick<StepDeps, 'registry'>,
+  intentId: string,
+  result: IntentStepResult,
+): Promise<void> {
+  const at = deps.registry.now();
+  if (result.outcome !== 'waiting') {
+    await tx.intents.recordWaiting(intentId, null, at);
+    return;
+  }
+  const until =
+    result.reason === 'hotl_block_window'
+      ? await hotlBlockWindowOpenUntil(tx, deps.registry, intentId)
+      : null;
+  await tx.intents.recordWaiting(
+    intentId,
+    { reason: result.reason, cause: result.cause ?? null, until },
+    at,
+  );
 }
 
 /** G4 (C06): block, wait, or wait for the run (`run_pending`). */

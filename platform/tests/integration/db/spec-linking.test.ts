@@ -24,6 +24,7 @@ import type { Intent } from '../../../packages/core/src/db/schema.js';
 import { linkSpecFromGitHost } from '../../../packages/core/src/specs/link.js';
 import { stepIntent, type StepDeps } from '../../../packages/core/src/workflow/step.js';
 import { FakeSpecGitHost as FakeGitHost, SPEC_PATH, SPEC_TEXT } from '../fake-spec-git-host.js';
+import { waitingRow } from '../g4-harness.js';
 import { createWorkflowFixture, PLAN_HASH, type WorkflowFixture } from '../workflow/fixture.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
@@ -319,7 +320,7 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
       const intent = await atG2('low');
       await link(intent);
       await plan(intent);
-      expect(await settle(intent)).toMatchObject({ reason: 'later_gate' });
+      expect(await settle(intent)).toMatchObject({ reason: 'hotl_block_window' });
       expect(await reload(intent)).toMatchObject({ current_gate: 'G4' });
 
       const edited = '# T07 Cancel an order\nAC1: stock returns (low).\n';
@@ -412,6 +413,7 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
       await link(await reload(g2), 'docs/specs/T08.md');
       git.commit({ 'docs/specs/T08.md': null });
       expect(await settle(g2)).toMatchObject({ outcome: 'waiting', reason: 'spec_unavailable' });
+      expect(await waitingRow(f.scope, g2)).toMatchObject({ reason: 'spec_unavailable' });
       // An approval does not move the held gate; a rejection ends the intent.
       await decide(g2, 'G2', 'approve', 'a');
       expect(await settle(g2)).toMatchObject({ outcome: 'waiting', reason: 'spec_unavailable' });

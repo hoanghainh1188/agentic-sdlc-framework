@@ -264,6 +264,17 @@ export interface IntentsTable {
    * up and never back to null.
    */
   run_budget_usd: ColumnType<string | null, never, string | null>;
+  /**
+   * Why the open intent waits (migration 0025, U02, ADR-M54 §2.4b): the `IntentWaitReason` the
+   * step returned, written by the step under the intent lock; cleared by every move.
+   */
+  waiting_reason: ColumnType<string | null, never, string | null>;
+  /** A code that says more about the reason: the failed G4 check today. Open to later gates. */
+  waiting_cause: ColumnType<string | null, never, string | null>;
+  /** When the step first returned this reason (registry clock). */
+  waiting_since: ColumnType<Date | null, never, Date | null>;
+  /** When the wait ends by itself, if the step knows: the HOTL block window's close. */
+  waiting_until: ColumnType<Date | null, never, Date | null>;
 }
 
 /** A spec linked to an intent: path, commit and content hash, one row per version (FR-02). */
@@ -802,6 +813,10 @@ export const TABLE_COLUMNS = {
     'created_at',
     'gate_entered_at',
     'run_budget_usd',
+    'waiting_reason',
+    'waiting_cause',
+    'waiting_since',
+    'waiting_until',
   ]),
   spec_refs: columns<SpecRefsTable>()([
     'id',

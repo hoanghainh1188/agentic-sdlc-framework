@@ -456,6 +456,21 @@ describeDb('B03: API app on PostgreSQL', () => {
       const shown = (
         await inject('GET', `/v1/intents/${created.code}`, tenant.tokens.viewer)
       ).json();
+      // U02: what the workflow's step recorded is shown as it is (codes and times).
+      await tenant.scope.intents.recordWaiting(
+        created.id,
+        { reason: 'g4_check', cause: 'agent_not_active', until: null },
+        at,
+      );
+      const held = (
+        await inject('GET', `/v1/intents/${created.code}`, tenant.tokens.viewer)
+      ).json();
+      expect(held).toMatchObject({
+        waiting_reason: 'g4_check',
+        waiting_cause: 'agent_not_active',
+        waiting_since: at.toISOString(),
+        waiting_until: null,
+      });
       expect(shown.waiting_for).toEqual({
         gate: 'G1',
         mode: 'HITL',

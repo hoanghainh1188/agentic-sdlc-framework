@@ -179,6 +179,7 @@ Every command takes `--json`. Exit codes: 0 done, 1 refused, 2 wrong usage, 3 pl
 | **Cannot enter G1** (`ai_record_missing`, `data_class_not_allowed`) | The project's AI record is missing or does not allow the data class | Person A or PM / BrSE fixes the record; the intent enters G1 by itself |
 | Your command gets a **reply** instead of a status comment | It was refused (wrong gate, no role, you are a producer, bad syntax) | Read the reason, write a new comment |
 | **Plan resubmit needed** | The plan file on `main` is not the one you submitted | `sdlc plan submit <INT>` again (Person B approves G3 again if it was at G4) |
+| **Your intent does not move** | The platform holds it | `sdlc intent show <INT>` prints "Held: …" with the reason (and for a failed G4 check, which one); the dashboard shows the same under "What holds it" |
 | **Back at G2** (spec changed) | Someone edited the spec on `main` | Approve G2 again (passed by itself at Low risk) |
 | **Budget warning** | The run used 80 % of its budget | Nothing yet; at 100 % it stops and escalates |
 | **An escalation** (ESC-…) | A run or a gate needs a person: over budget, out of scope, overdue gate, CI timeout, early merge… | The owner named in the notice: `/ack ESC-…`, look at the cause, then `/decide ESC-… <decision>`. Details: handbook Ch.18 §18.8b |

@@ -239,6 +239,25 @@ export async function waitingFor(
   return currentGateWaitingFor(t.f.scope, policy, current);
 }
 
+/** U02 (ADR-M54 §2.4b): the waiting reason the workflow's step recorded on the intent. */
+export async function waitingRow(
+  scope: Pick<WorkflowFixture['scope'], 'intents'>,
+  intent: Pick<Intent, 'id'>,
+): Promise<{
+  reason: string | null;
+  cause: string | null;
+  since: Date | null;
+  until: Date | null;
+}> {
+  const row = (await scope.intents.getById(intent.id))!;
+  return {
+    reason: row.waiting_reason,
+    cause: row.waiting_cause,
+    since: row.waiting_since,
+    until: row.waiting_until,
+  };
+}
+
 export async function checksFailed(t: Harness, intent: Intent): Promise<string[]> {
   return (await t.f.scope.audit.listForEntity(intent.id, ['gate.g4_check_failed'])).map(
     (e) => (e.payload as { check: string }).check,

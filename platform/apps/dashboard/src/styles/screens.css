@@ -409,6 +409,54 @@ select {
   align-content: start;
 }
 
+.detail-stack {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+
+.detail-stack .panel {
+  margin-top: 0;
+}
+
+.panel-hold {
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--warn-fill);
+  border-radius: var(--radius-card);
+  background: var(--paper-raised);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.panel-hold > h2,
+.panel-quiet > h2 {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-muted);
+}
+
+.panel-quiet {
+  padding: 0 var(--space-4);
+}
+
+.hold-reason {
+  font-weight: 600;
+  font-size: 1.0625rem;
+}
+
+.card-hold {
+  font-size: var(--text-small);
+  color: var(--warn);
+  line-height: 1.35;
+}
+
 .panel-focus > h2 {
   border-bottom: 0;
   margin-bottom: 0;

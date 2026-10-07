@@ -172,7 +172,7 @@ describeDb('C08 PR 1: the push and the pull request at G6, on PostgreSQL', () =>
     });
     expect(await step(intent)).toEqual({ outcome: 'run_ended', runId });
     await finishRun(t.f.scope, t.runDeps, intent.id, runId);
-    expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'later_gate' });
+    expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'hotl_block_window' });
     expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G6' });
     return { intent, runId };
   }

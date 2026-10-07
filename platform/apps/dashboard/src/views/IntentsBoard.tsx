@@ -4,7 +4,8 @@ import type { IntentView, Me } from '@sdlc/api-schemas';
 
 import { readIntents, readOpenEscalations } from '../api/reads.js';
 import { useApi } from '../api/use-api.js';
-import { Bar, codeClass, Duration, Empty, Show, Txt } from '../components/common.js';
+import { Bar, codeClass, Duration, Empty, Label, Show, Txt } from '../components/common.js';
+import { holdOf } from '../model/hold.js';
 import { t } from '../i18n.js';
 import {
   buildBoard,
@@ -149,6 +150,7 @@ function Card({ card, scale }: { readonly card: BoardCard; readonly scale: numbe
   const { intent } = card;
   const links = intentLinks(intent);
   const flag = card.overdue ? 'card-overdue' : card.frozen ? 'card-frozen' : '';
+  const hold = holdOf(intent);
   return (
     <article class={`card ${flag}`} aria-labelledby={`card-${intent.id}`}>
       <header class="card-head">
@@ -162,6 +164,18 @@ function Card({ card, scale }: { readonly card: BoardCard; readonly scale: numbe
       <p class="card-title">
         <Txt value={intent.title} />
       </p>
+      {hold && (
+        <p class="card-hold">
+          <span class="chip chip-warn">{t('dashboard.board.held')}</span>{' '}
+          <Label value={hold.reason} />
+          {hold.cause && (
+            <>
+              {': '}
+              <Label value={hold.cause} />
+            </>
+          )}
+        </p>
+      )}
       <div class="card-wait">
         <Duration seconds={card.waitedSeconds} />
         <Bar
