@@ -13,6 +13,7 @@
 | D-09 | [Sample pilot repo: orders / inventory](D-09-sample-pilot-repo.md) | ✅ Approved | 2026-09-24 |
 | — | [Open questions raised while coding](QUESTIONS.md) | In use | |
 | — | [MVP done: the definition-of-done check](MVP-DONE.md) (task E07): each D-02 §10 criterion with the test that proves it, open items, numbers | Draft | |
+| — | [MVP+1 user interface scope](MVP1-UI-SCOPE.md): candidate functions by role, what never goes in the interface, conditions for actions, proposed order; checked against the M-E data | Draft | |
 | — | [M-E trial plan](M-E-TRIAL-PLAN.md): tasks T01–T10 on the sample repo, prerequisites, roles, order, what is measured, the data report, stop rules | Approved (Harry, 2026-10-06) | |
 | ADR-M09 | [Database access and migration tooling](ADR-M09-database-tooling.md) (task A06) | Proposed | |
 | ADR-M10 | [OpenHands Agent Server: result of the C01 PoC](ADR-M10-openhands-agent-server.md) (task C01) | Proposed | |
