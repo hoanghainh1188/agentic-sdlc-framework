@@ -32,6 +32,37 @@ These are enforced by the platform; plan the team around them.
 - **No client data before the client agrees in writing** (project AI record, handbook Ch.2). The first pilot uses no client data (handbook Ch.9 §9.7).
 - **Secrets never go through chat**: tokens, keys and OpenBao key shares stay in a password manager and a terminal.
 
+## 2b. Several people create intents, several people review
+
+Roles are given per project, and any number of people can hold each role.
+
+- **Creating work.** Everyone with `person_a` creates intents, links specs and submits plans (project configuration `access.intent_create_roles`, `spec_link_roles`, `plan_submit_roles`; by default `person_a`, and `pm_brse` may also link specs). To let the PM / BrSE create intents too, add `pm_brse` to `intent_create_roles`; `viewer` never can (rule M16).
+- **Reviewing.** Everyone with `person_b` can decide G3, G7 and G8. When a gate needs one approval, the first valid one counts: the notice on the issue names every holder of the role, so one reviewer's absence does not block the work. **Give `person_b` to at least two people** on each project.
+- **More than one approval.** G7 already needs Person B **and** the second approver for flagged changes (migration, payment, personal data, production infrastructure, breaking change, safety function) and at Critical risk; so does G8 at Critical risk. A project can ask for this at more gates or tiers: each cell of the gate × risk matrix has `approvals`, the approvals from different people. A cell never needs more approvals than the roles it lists (rule M12), and when it needs as many as it lists, each role approves once. So two approvals means two roles, for example Person B and the second approver on every High-risk pull request:
+
+  ```yaml
+  oversight:
+    matrix:
+      G7:
+        high: { mode: HITL, roles: [person_b, second_approver], approvals: 2 }
+  ```
+
+  Two approvals by two Person B holders, without a second role, are not possible. The same person never counts twice, and a producer never counts. Set GitHub's branch protection to the same number of approvals.
+- **On GitHub,** anyone with access may comment on and review a pull request. G7 counts only the reviews of people who are linked, hold the gate's role, are not producers of the intent, and reviewed the commit the platform pushed. One request for changes from such a person sends the intent back for a new run, even after other approvals.
+- **Who may not review what.** By default one person never holds both `person_a` and `person_b` on the same project (`access.conflicting_roles`, rule M21), so the people who create work and the people who review it are two groups. A person can be Person A on one project and Person B on another. Whatever the roles, the producers of an intent (its creator, the plan's submitter, whoever allowed its runs, the authors of its commits) never approve its G7 or G8.
+
+Example: a project team of six.
+
+| Person | Roles | Does |
+|---|---|---|
+| Tech lead | `person_a`, `admin` | Creates intents, writes plans, manages the project |
+| Two senior developers | `person_a` | Each creates intents for their own tasks |
+| A senior developer and the QA lead | `person_b` | Decide G3, review and merge (G7), approve releases (G8); one covers for the other |
+| BrSE | `pm_brse` | The project AI record, the client disclosure note; may link specs |
+| Director | `governance` | Escalations nobody answered |
+
+A team that wants developers to review each other's work on the same project (X creates, Y reviews, then the other way round) needs a change of rule M21: a policy decision, raised in `design/QUESTIONS.md`, not a configuration setting.
+
 ## 3. The rollout, phase by phase
 
 Each phase has an owner, a usual duration and a check. Do not start a phase before the check of the previous one passes.
