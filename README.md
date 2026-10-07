@@ -1,208 +1,120 @@
 # Agentic SDLC Framework
 
-**Agentic SDLC Framework = Handbook + Platform.** Both parts work together and live in one repo:
+**A way to let AI coding agents take part in software delivery without giving up control.** The framework has two parts that work together:
 
 | Part | What it is | For |
 |---|---|---|
-| **Handbook** (`handbook/`) | Policies, the 6-phase process, 8 gates, roles, responsibilities, templates, checklists, runbooks | People: leadership, PM/BrSE, developers, testers |
-| **Platform** (`platform/`) | Self-hosted software that **enforces** the handbook: runs AI agents through 8 gates, stores evidence and an audit log, measures tokens | The delivery team, every day |
+| **Handbook** (`handbook/`) | Policies, a 6-phase process, 8 gates, roles, templates, checklists and runbooks | People: leadership, PM / BrSE, developers, reviewers, testers |
+| **Platform** (`platform/`) | Self-hosted software that **enforces** the handbook: it runs AI agents through the 8 gates, keeps evidence and an audit log, and measures tokens and cost | The delivery team, every day |
 
 The handbook says **what must happen and why**. The platform **makes sure it happens**. The design documents (`design/`) connect the two.
 
-Direction of dependency: **project reference documents → handbook → platform**.
-
-Built for small and medium software companies working for Japanese clients. Internal use first, then offered to clients.
-
-| Item | Value |
-|---|---|
-| Language | English (see [writing style](handbook/00-introduction/06-writing-style.md)) |
-| Handbook status | Version 1.0, all parts written. **Not yet approved as a whole**; chapter approvals are interim (see handbook contents) |
-| Repository | `github.com/hoanghainh1188/agentic-sdlc-framework` (private), personal account `hoanghainh1188` on the **GitHub Free** plan (moved from the organization `harryforge` on 2026-10-06 for its own Actions minutes; the sample repo `pilot-order-inventory` and the test GitHub App stay in `harryforge`) — no server-side branch protection; compensating controls in place; upgrade to GitHub Team planned (Harry, 2026-09-24) |
-| Platform status | Design version 1.0 approved (2026-09-24, tag `design-v1.0`). **Coding the whole backlog now**, starting with A01; rework accepted after the handbook is approved |
-| Current work | Review of the handbook as a whole (Ch.13–20, Part 0 and templates still awaiting comments) |
-| Change log | [CHANGELOG.md](CHANGELOG.md) |
-| Instructions for Claude Code | [CLAUDE.md](CLAUDE.md) |
-
-An "AI agent" is an AI assistant that can carry out several steps in a row by itself (read code, change code, run tests…).
+Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
 ---
 
-## 1. What the framework does (one sentence)
+## 1. In one sentence
 
-> AI takes part in every stage of software development, but every task must pass **8 gates** (G1–G8), defined by the handbook and enforced by the platform, with **the right human approvers**, **evidence**, an **audit log that cannot be altered**, and **token / cost measured** per client, project and task.
+> AI takes part in every stage of software development, but every task passes **8 gates** (G1–G8) with **the right human approvers**, **evidence**, an **audit log that cannot be altered**, and **token and cost measured** per client, project and task.
 
 ![Overview: 6 phases and 8 gates](diagrams/svg/d1-overview-6-phases.svg)
 
-Red: always approved by a person (HITL). Orange: oversight depends on risk. Blue: automatic policy check. Details: [codes table §4](handbook/00-introduction/05-codes.md).
+Red: always approved by a person (HITL, human in the loop). Orange: oversight depends on risk. Blue: an automatic policy check. Details: [codes table §4](handbook/00-introduction/05-codes.md).
 
----
+## 2. Where to start
 
-## 2. Key decisions
+| You are | Read |
+|---|---|
+| **Leadership** deciding whether to adopt | This page, then handbook Part I: [Ch.1 summary](handbook/01-policy/ch01-executive-summary.md) and [Ch.9 adoption roadmap](handbook/01-policy/ch09-adoption-roadmap.md) |
+| **Bringing a project team onto the platform** (tech lead, leadership) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout phase by phase, the first week, common mistakes |
+| **A team member** (Person A, Person B, PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one task from G1 to G8, by role, with the commands and what to do when something goes wrong |
+| **Installing the platform** (operator) | [platform/deploy/README.md](platform/deploy/README.md), "Fresh deployment": from an empty checkout to the first task with Docker Compose; runbook [T11](handbook/03-templates/T11-openbao-runbook.md) |
+| **Working on the platform's code** | [CONTRIBUTING.md](CONTRIBUTING.md) and [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md) |
+| **Working on the handbook** | [CONTRIBUTING.md](CONTRIBUTING.md), the [contents](handbook/00-introduction/01-contents.md) and the [writing style](handbook/00-introduction/06-writing-style.md) |
 
-| Topic | Decision | Document |
-|---|---|---|
-| Approach | Build the platform ourselves (option C). Platform first, then trial, then adjust | D-01, D-02 |
-| Codes | 6 phases P1–P6 · autonomy L0–L4 + oversight HITL/HOTL/AUDIT · 8 gates G1–G8 with risk-based oversight · 2+N team | [Codes table](handbook/00-introduction/05-codes.md) (v1.3; handbook not yet approved as a whole) |
-| Architecture | Modular monolith in TypeScript: `api` (NestJS), `worker` (Temporal), `runner`, `cli` | D-03 |
-| First agent | OpenHands (Agent Server called over REST) | D-02, D-03 |
-| Git host | GitHub first (GitLab later). Events read by **polling** in the MVP | D-02, D-03 |
-| Models | Both API and self-hosted models, through **LiteLLM**. The MVP uses API models only | D-07 |
-| Hosting | Fully self-hosted with Docker Compose on **one internal server** | D-03 |
-| Reused components | PostgreSQL, Temporal, LiteLLM, Langfuse, **SeaweedFS**, **Valkey**, **OpenBao** | D-01 |
-| Secrets | OpenBao; unseal key split into 3 shares, any 2 open it | D-03 sections 8, 10.2 |
-| Approvals | Via the `sdlc` CLI and GitHub comments (`/approve G3`). No web UI in the MVP | D-02 |
-| Separation of duties | 2+N: Person A owns and executes, Person B approves G3/G7/G8; the producer never approves its own output | Codes table §5 (D-02 FR-11 to be revised) |
-| Data | Multi-tenant from day one. Per-tenant audit hash chain. Evidence Packs kept 6 months | D-05 |
-| Language | Everything in English. User-facing messages through a message catalog (Vietnamese / Japanese can be added) | D-02 NFR-08 |
-| Test repo | Sample repo `pilot-order-inventory` (Vue + NestJS + PostgreSQL), separate repo | D-09 |
+## 3. How it works
 
----
+**A task goes through eight gates.** A person describes the change (G1), links a specification (G2) and a plan that says which files may change (G3). The platform checks the agent, its permissions and the budget (G4), runs the agent in an isolated sandbox, checks that it stayed inside the plan and the budget (G5), pushes the change and waits for CI and security scans (G6). A reviewer reviews and merges the pull request (G7), then approves the release with its evidence (G8).
 
-## 3. Roadmap
+**The oversight of each gate depends on the risk.** Low-risk work passes some gates automatically when their conditions hold, and a person can still block it for a few hours. High-risk work lets the agent only write a proposal. Critical work never runs an agent.
 
-### Handbook
+**People, in a "2+N" team:**
 
-| Part | Content | Written where | Status |
-|---|---|---|---|
-| Part 0 | Contents, glossary, principles, codes, writing style | Outside Claude Code | 🟨 Codes v0.4, contents v0.2, style done |
-| Part I | Policy for leadership (Ch.1–9) | Outside Claude Code | 🟨 Ch.1 draft |
-| Part II | Playbook for the 6 phases (Ch.10–20) | General process: outside Claude Code. Platform usage: Claude Code, in the same PR as the code | ⬜ |
-| Part III | Templates, checklists, runbooks (T1–T18) | Drafted outside Claude Code; runbooks written by Claude Code | 🟨 T2 done |
+| Role | Does |
+|---|---|
+| **Person A**, the owner | Creates the work, writes specifications and plans, follows the agent |
+| **Person B**, the independent reviewer | Approves plans, reviews and merges pull requests, approves releases |
+| **Second approver** | A second approval for sensitive changes (migration, payment, personal data…) and Critical risk |
+| **PM / BrSE** | Records the client's consent to AI use and the disclosure note |
+| **Governance** (leadership) | Decides escalations nobody else answered |
+| **N agents** | Write code inside the limits they were given |
 
-### Platform
+**What the platform never does:**
 
-| Milestone | Content | Status |
-|---|---|---|
-| M-A | Foundation: monorepo, Docker Compose, OpenBao, database, audit, CI, backups | ✅ except A10 (TLS, backups, measurement: waits for the infrastructure operator) |
-| M-B | Intent + G1–G3 | ✅ |
-| M-0 | Sample repo (right before M-C) | ✅ |
-| M-C | Run + OpenHands + G4–G6 | ✅ |
-| M-D | G7–G8 + Evidence Pack + cost report | ✅ |
-| M-E | Trial of T01–T10 on the sample repo; collect data | ⬜ Ready to start with the local model `gpt-oss:20b`; waits for Person B (`design/M-E-TRIAL-PLAN.md`) |
-| M-F | Adjust, then trial on a real internal tool | ⬜ One real API-model run first (QUESTIONS #81) |
+- let the producer of a change approve it (the person who created the task, submitted the plan or allowed the run, and the agent itself);
+- merge a pull request or deploy to production: people do;
+- give an agent a real model key, access to secrets, or a way to push to the main branch;
+- change or delete an audit record.
 
-All 49 tasks: [design/D-08-mvp-backlog.md](design/D-08-mvp-backlog.md). The MVP definition-of-done check, criterion by criterion with the test that proves each one: [design/MVP-DONE.md](design/MVP-DONE.md).
+## 4. What the platform includes
 
----
+| Area | What it does |
+|---|---|
+| **Gates G1–G8** | A workflow per task; approvals through GitHub comments (`/approve G3`), GitHub reviews (G7) or the `sdlc` command; each approval bound to the exact version it approved, with an expiry |
+| **Agent runs** | OpenHands in a hardened sandbox per run, network limited to the model gateway and a package proxy; iteration, time and cost caps; loop detection; a kill switch that stops a run within minutes |
+| **Scope and budget** | Changed files compared with the approved plan; budgets per tenant, task and run, with a warning at 80 % and a stop at 100 % |
+| **Evidence** | An Evidence Pack per task (specification, plan, diff, CI, every gate decision, cost, the client AI disclosure note), exportable as Markdown, sealed at release |
+| **Audit** | An append-only, hash-chained audit log per tenant, checked by `sdlc audit verify`, with a daily anchor in locked storage |
+| **Escalations** | Time limits per severity, a backup owner, then governance; the work stays frozen while nobody answers |
+| **Cost** | Every model call through one gateway (LiteLLM) with labels for tenant, project, task and run; cost reports, including wasted cost |
+| **Retention** | Evidence kept 180 days by default, longer when configured; holds for disputes; the audit log kept at least two years |
+| **Dashboard** | A read-only web page: tasks by gate, who each waits for and why, escalations, cost, gate waiting times, evidence |
+| **Multi-tenant** | Every record belongs to a tenant; every query filters by it |
 
-## 4. Repo layout
+Interfaces keep the platform open to change: the Git host (GitHub today), the agent (OpenHands today), the policy engine and the model provider can each be replaced without changing the core.
+
+## 5. Technology
+
+| Layer | Choice |
+|---|---|
+| Platform | TypeScript: an API (NestJS), a workflow worker (Temporal), a sandbox runner, the `sdlc` command, the dashboard (Preact) |
+| Self-hosted services | PostgreSQL, Temporal, LiteLLM, Langfuse, SeaweedFS (object storage), Valkey, OpenBao (secrets, contract signing) |
+| Deployment | Docker Compose on one self-hosted server; no managed cloud service needed |
+| Models | API models and self-hosted models, all through the LiteLLM gateway |
+| Licences | Every reused component allows commercial use ([build vs buy](design/D-01-build-vs-buy.md)) |
+
+## 6. Repository layout
 
 ```text
 .
-├── README.md                     # This file
-├── CLAUDE.md                     # Instructions for Claude Code (rules, per-session workflow)
-├── CHANGELOG.md                  # Version history
-├── .github/
-│   ├── pull_request_template.md  # PR template with AI disclosure (T2)
-│   └── workflows/                # CI (ci.yml: checks, scans, integration jobs)
-├── handbook/                     # HANDBOOK: policies, process, templates (in progress)
-│   ├── 00-introduction/          # Contents, glossary, principles, codes, writing style
-│   ├── 01-policy/                # Part I: policy and governance (leadership)
-│   ├── 02-playbook/              # Part II: 6 phases, gates, review (delivery team)
-│   ├── 03-templates/             # Part III: templates, checklists, runbooks
-│   └── appendix/
-├── platform/                     # PLATFORM: code (none yet)
-│   ├── GETTING-STARTED.md        # Set up GitHub, create issues, first Claude Code task
-│   ├── apps/                     # api, worker, runner, cli
-│   ├── packages/                 # core, contracts, adapters/*, config
-│   ├── deploy/                   # docker-compose, OpenBao scripts, backups
-│   └── tests/integration/        # Scenarios N1–N6, tasks T01–T10
-├── design/                       # Platform design (D-xx), connecting handbook and platform — approved
-│   ├── README.md                 # Index + approval status
-│   └── QUESTIONS.md              # Questions raised while coding
-├── scripts/                      # create-issues.py, generate-backlog.py
-├── diagrams/                     # Mermaid sources (src/) and SVG (svg/)
-└── _review/                      # Review notes (historical, in Vietnamese); not a source of requirements
+├── handbook/        # The handbook: introduction, policy (Ch.1–9), playbook (Ch.10–20), templates (T1–T18)
+├── platform/
+│   ├── apps/        # api, worker, runner, cli, dashboard
+│   ├── packages/    # core, contracts, config, messages, secrets, telemetry, api-schemas, adapters/*
+│   ├── deploy/      # Docker Compose, OpenBao and SeaweedFS set-up
+│   ├── tests/       # unit, integration and end-to-end tests
+│   ├── USER-GUIDE.md, ROLLOUT-GUIDE.md, GETTING-STARTED.md
+├── design/          # Design documents (D-xx), decisions (ADR-Mxx), open questions
+├── diagrams/        # Mermaid sources and SVG
+└── scripts/         # Backlog and issue tools
 ```
 
----
+## 7. Documents
 
-## 5. Main documents
-
-**Handbook**: start from the [contents](handbook/00-introduction/01-contents.md) and the [codes table](handbook/00-introduction/05-codes.md).
-
-**Platform design**:
-
-| Code | Document |
+| Topic | Document |
 |---|---|
-| D-01 | [Build vs buy](design/D-01-build-vs-buy.md) |
-| D-02 | [MVP scope (FR/NFR, definition of done)](design/D-02-mvp-scope.md) |
-| D-03 | [MVP architecture (interfaces, Run Contract, security, deployment)](design/D-03-mvp-architecture.md) |
-| D-05 | [Data model](design/D-05-data-model.md) |
-| D-07 | [LLM model and token management](design/D-07-model-and-token-management.md) |
-| D-08 | [MVP backlog](design/D-08-mvp-backlog.md) · [CSV for issues](design/D-08-backlog.csv) |
-| D-09 | [Sample pilot repo](design/D-09-sample-pilot-repo.md) |
+| Codes: phases, gates, autonomy levels, oversight modes, risk tiers, roles | [Codes table](handbook/00-introduction/05-codes.md) |
+| Handbook contents | [Contents](handbook/00-introduction/01-contents.md) |
+| MVP scope and requirements | [D-02](design/D-02-mvp-scope.md) |
+| Architecture | [D-03](design/D-03-mvp-architecture.md) |
+| Data model | [D-05](design/D-05-data-model.md) |
+| Models, tokens and cost | [D-07](design/D-07-model-and-token-management.md) |
+| The sample repository used for tests | [D-09](design/D-09-sample-pilot-repo.md) |
+| What the web interface may offer next | [MVP+1 interface scope (draft)](design/MVP1-UI-SCOPE.md) |
+| Every design document and decision | [design/README.md](design/README.md) |
+| Diagrams | [diagrams/README.md](diagrams/README.md) |
+| Changes | [CHANGELOG.md](CHANGELOG.md) |
 
-Diagrams: [diagrams/README.md](diagrams/README.md).
+## 8. Licence
 
----
-
-## 6. Who reads what
-
-| Reader | Read |
-|---|---|
-| Developer / Claude Code (building the platform) | `CLAUDE.md` → D-08 (current task) → D-02, D-03, D-05 |
-| Tech lead / architect | All of `design/` |
-| Leadership | This README, handbook Part I (Ch.1–9) |
-| PM / BrSE, reviewers, testers | Handbook Part 0, Part II, templates |
-| Whoever brings a project team onto the platform (tech lead, leadership, operator) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout phase by phase, the first week, common mistakes |
-| Platform users (Person A, Person B, second approver, PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one task from G1 to G8, then handbook Ch.19 §19.8b–§19.8c |
-| Handbook authors | This README, the codes table, the writing style, D-02 (so the process matches the platform) |
-
----
-
-## 7. Getting started
-
-**Writing the handbook:** follow the 9-section structure, source tags, the codes table and the writing style (section 8). Handbook changes also go through pull requests.
-
-**Deploying the platform:** follow [platform/deploy/README.md, "Fresh deployment (operator)"](platform/deploy/README.md#fresh-deployment-operator): from an empty checkout to the first intent at G1 with Docker Compose. `pnpm test:fresh-deploy` runs the same steps with throw-away keys.
-
-**Bringing a team onto the platform:** follow [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, then the phases from deciding to widening, each with an owner and a check.
-
-**Using the platform:** start with [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one task from G1 to G8, by role, with the commands and what to do when something goes wrong.
-
-**Coding the platform:** follow **[platform/GETTING-STARTED.md](platform/GETTING-STARTED.md)**: push to GitHub, create issues, give each task to Claude Code. Then:
-
-1. Read `CLAUDE.md`.
-2. Take the next task in D-08 (starting with **A01**).
-3. Follow the per-session workflow in D-08 section 5.
-
----
-
-## 8. Conventions
-
-**Writing**
-- Plain English for non-native readers. See the [writing style](handbook/00-introduction/06-writing-style.md).
-- Short sentences, lists and tables. Explain technical terms on first use.
-- Source tags: **[Doc]** internal · **[External]** with a link · **[Proposal]** not yet backed by a source.
-- Process documents use the 9-section structure (see the [handbook contents](handbook/00-introduction/01-contents.md)).
-- Use only the codes in the [codes table](handbook/00-introduction/05-codes.md). Dates as `YYYY-MM-DD`.
-
-**Handbook ↔ platform consistency**
-- Handbook and platform use **the same codes** and **the same names** (gates, autonomy levels, roles).
-- A handbook process change that affects the platform → raise it in `design/QUESTIONS.md` or update the relevant D-xx.
-- A platform change visible to users → update the matching handbook chapter in the same PR.
-
-**Code**
-- Code, identifiers, commits and comments: English.
-- User-facing messages (CLI, PR comments): English by default, through a message catalog.
-
-**Diagrams**
-- Mermaid sources in `diagrams/src/`, SVG in `diagrams/svg/`. CI renders SVG whenever a `.mmd` changes.
-
----
-
-## 9. Contributing
-
-1. Branch from `main` (code: `task/<ID>-<short-name>`).
-2. Open a pull request using the template (AI disclosure).
-3. Handbook changes: separate PR, approved by the handbook owner. Changes to **approved** documents in `design/`: separate PR with the reason; new technical decisions → add an ADR.
-4. Record notable changes in `CHANGELOG.md`.
-
-| Role | Person |
-|---|---|
-| Repo owner / design approver | Harry |
-| Handbook owner | _(not decided)_ |
-| 3 OpenBao unseal key holders | _(not decided, see D-03 section 10.2)_ |
-
-Licence: internal company asset, not published.
+[MIT](LICENSE). The components the platform reuses keep their own licences; every one allows commercial use ([build vs buy](design/D-01-build-vs-buy.md)).

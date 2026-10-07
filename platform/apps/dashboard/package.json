@@ -2,7 +2,7 @@
   "name": "@sdlc/dashboard",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "Read-only web dashboard over the API, served by sdlc-api under /dashboard/ (task U01, design/ADR-M54).",
   "type": "module",
   "scripts": {

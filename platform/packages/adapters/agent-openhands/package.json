@@ -2,7 +2,7 @@
   "name": "@sdlc/adapter-agent-openhands",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "Agent adapter: OpenHands Agent Server. See design/D-03 section 7.2, D-08 C05, ADR-M10, ADR-M29.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

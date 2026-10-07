@@ -2,7 +2,7 @@
   "name": "@sdlc/contracts",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "Shared types, adapter interfaces and the Run Contract schema. See design/D-03 sections 7 and 8.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
