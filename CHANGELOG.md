@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Deploy images (issue #177, PR 2): OpenBao 2.6.3 → 2.7.1 (also the `litellm-agent` sidecar), ClickHouse 26.3.36.6 → 26.3.39.7, Langfuse 4.47.0 → 4.50.0. No configuration or code change; the release notes were read for breaking changes and the live tests pass on throw-away stacks. Since OpenBao 2.7.1 an AppRole secret ID stops working exactly at its expiry (90 days). Existing dev stack: GETTING-STARTED Step 13 (after an image update); a real server: runbook T11 §4b (a Raft snapshot first).
+
 ### Added
 - A lighter Low-risk task: `design/POSITIONING.md` 0.2 §6.1 counts what a Low-risk task costs today (six human steps; up to three HOTL block windows of 4 working hours, about 12 working hours of waiting) and the ways to make it lighter. The trial M-E uses a 1-working-hour block window and counts the blocks within a window (`design/M-E-TRIAL-PLAN.md` 1.4, decision D7). New backlog task U03: one CLI command creates an intent and links its spec (D-08 1.24).
 - `design/POSITIONING.md` 0.1 (draft): what the framework sells (control and evidence when AI writes code), compared with an AI assistant plus review, a Git host's own agent controls, cloud agent platforms and a written process; segments (offshore companies working for Japanese clients first); a positioning statement; risks; business models that fit the MIT licence; what to confirm in and after the trial M-E.

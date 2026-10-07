@@ -100,6 +100,17 @@ Settings (key shares, threshold, token and secret ID lifetimes) are in `platform
 
 A wrong share is refused and OpenBao stays sealed. To reset a half-finished unseal, restart the `openbao` container.
 
+## 4b. Upgrading the OpenBao image
+
+The image is pinned in `platform/deploy/docker-compose.yml` (services `openbao` and `litellm-agent`, design/ADR-M17 §2.1). An upgrade comes as a reviewed pull request.
+
+1. **On a real server, take a Raft snapshot first** (section 6) and copy it off the server. After a newer OpenBao has run on the Raft data, going back to the older image may not work: the newer version can write data the older one cannot read. The snapshot taken before the upgrade is the way back (section 7). On a development machine with throw-away keys this is optional.
+2. Pull the new image and recreate the container. It starts **sealed**: unseal it (section 4) and check `status`.
+3. Check that the platform processes log in again (their logs; `litellm-agent` renders its file).
+4. Record the upgrade (old and new version) in the operations log.
+
+Since 2.7.1, an AppRole secret ID stops working exactly at its expiry (`APPROLE_SECRET_ID_TTL`, 90 days), even before a tidy runs. A process that fails to log in after that time needs its credentials command again (sections 5d–5m, `pnpm openbao:bootstrap <process>-credentials`).
+
 ## 5. Root token: create only when needed, revoke immediately
 
 Daily work never uses a root token. A root token is needed only to:
@@ -816,3 +827,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.25 | 2026-10-05 | Claude Code (task E07) | Section 3.2 step 1: on the server, start only `openbao`, `postgres` and `seaweedfs` before the initialisation (`up.sh core` fails while `.env` holds no LiteLLM keys; found by `pnpm test:fresh-deploy`). Section 5d: the real API-model run (`pnpm test:agent-api`, QUESTIONS #81); the Anthropic gateway name is `claude-haiku-4-5-20251001` (QUESTIONS #93) |
 | 0.26 | 2026-10-06 | Claude Code (coordinator) | Section 5d: the API-model run is needed before M-F; the trial M-E runs with the local Ollama model (QUESTIONS #81) |
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
+| 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
