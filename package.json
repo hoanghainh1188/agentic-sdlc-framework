@@ -2,7 +2,7 @@
   "name": "agentic-sdlc-framework",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "Agentic SDLC Framework: handbook + platform monorepo",
   "engines": {
     "node": ">=24 <25",

@@ -2,7 +2,7 @@
   "name": "@sdlc/cli",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "The sdlc command-line tool. See design/D-03 section 5.1.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -2,7 +2,7 @@
   "name": "@sdlc/telemetry",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "OpenTelemetry tracing for the api, worker and runner processes: OTLP export, safe instrumentation, Temporal activity spans. See D-08 A08, design/ADR-M35.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

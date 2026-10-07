@@ -2,7 +2,7 @@
   "name": "@sdlc/adapter-model-litellm",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "Model gateway adapter: LiteLLM Proxy (virtual keys, tenant budgets, spend). See design/D-03 section 7.4, D-08 C03, ADR-M24.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

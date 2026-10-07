@@ -117,4 +117,4 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 
 ## 8. Licence
 
-Proprietary: a company asset, not open source and not published.
+[MIT](LICENSE). The components the platform reuses keep their own licences; every one allows commercial use ([build vs buy](design/D-01-build-vs-buy.md)).
