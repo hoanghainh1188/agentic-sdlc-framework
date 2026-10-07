@@ -2,8 +2,8 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.3 |
-| Date | 2026-10-06 |
+| Version | 1.4 |
+| Date | 2026-10-07 |
 | Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed; D6 (the local model, QUESTIONS #81) |
 | Readers | Harry, the trial team (Person A, Person B, second approver), Claude Code |
 | Related documents | D-02 §2, §10, §13.3 (milestones M-E, M-F); D-09 §7 (tasks T01–T10, scenarios N1–N10); `design/MVP-DONE.md`; `platform/GETTING-STARTED.md` Steps 11–14 |
@@ -82,7 +82,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 
 | Setting | Value | Note |
 |---|---|---|
-| `oversight.hotl_block_window` | 4 working hours (default) | Not the 1 minute of the test suites |
+| `oversight.hotl_block_window` | **1 working hour** (default 4) | Decision D7. Not the 1 minute of the test suites. With the default, a Low-risk task waits up to three block windows (after G2 and G3, after G5, after G6), about 12 working hours |
 | `oversight.hitl_gate_deadline` | 1 working day (default) | Overdue gates raise escalations: part of the data |
 | `oversight.approval_expiry` | 7 days (default) | |
 | `run.g6_ci_retries` | 2 (default) | |
@@ -104,6 +104,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | Share of PRs that needed changes | G7 `request_changes` per intent | From the evidence packs |
 | CI failures and retries | run event `ci_checked`, notices `ci_retry` | From the evidence packs |
 | Escalations by trigger and route | `escalations` | `sdlc escalation list --json` |
+| Blocks within a HOTL block window (D7) | `gate_decisions`: a `reject` or `request_changes` on a gate the platform passed | From the evidence packs; count per gate |
 | The audit chain intact | `audit_log` | `sdlc audit verify` at the end |
 
 ### 7.2. Manual log (one row per task)
@@ -138,7 +139,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | Anything that looks like real client data | Never: the pilot is fictional; stop and remove it |
 | The audit chain breaks (`sdlc audit verify`) | Stop the trial |
 
-## 10. Decisions (approved by Harry, 2026-10-06)
+## 10. Decisions (approved by Harry, 2026-10-06; D7 2026-10-07)
 
 | # | Question | Decision |
 |---|---|---|
@@ -148,6 +149,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | D4 | Unhappy scenarios | Record N1–N10 when they happen; do not force them (tests already prove them) |
 | D5 | Time frame | Harry decides; phases 1–2 first, a short review, then phases 3–5 |
 | D6 | Which model? (QUESTIONS #81, 2026-10-06) | The local Ollama model `gpt-oss:20b` on the owner's machine: there is no API key yet, and the pilot is fictional. The report marks quality and cost numbers as the local model's (internal cost per token, D-07 §3; not API prices). One run with an API model passes before M-F. On a 24 GB machine, run without the profile `observability` (the model needs about 14 GB) |
+| D7 | How long is the HOTL block window? (2026-10-07) | 1 working hour instead of the default 4, to measure the flow without most of its waiting. The report counts the blocks within a window per gate (§7.1): none at all supports a shorter or per-gate window after M-E (`design/POSITIONING.md` §6) |
 
 ## Version history
 
@@ -158,3 +160,4 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | 1.1 | 2026-10-06 | Claude (coordinator), approved by Harry | §3 item 11: the trial team reads `platform/USER-GUIDE.md` and logs in |
 | 1.2 | 2026-10-06 | Claude (coordinator), approved by Harry | D6: the trial runs with the local model `gpt-oss:20b`; §2 scope, §3 items 1 and 6, §8 (QUESTIONS #81) |
 | 1.3 | 2026-10-07 | Claude (coordinator), approved by Harry | §7.2 an interface column; §8 item 6 counts it against `design/MVP1-UI-SCOPE.md` |
+| 1.4 | 2026-10-07 | Claude (coordinator), approved by Harry | D7: the HOTL block window is 1 working hour for the trial; §6, §7.1 counts the blocks within a window |

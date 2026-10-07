@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.1 |
+| Version | 0.2 |
 | Date | 2026-10-07 |
 | Status | **Draft** (coordinator, from a discussion with Harry). Hypotheses to test with the trial M-E and with real clients; not approved |
 | Readers | Harry, leadership |
@@ -57,10 +57,27 @@ Not "AI writes code": other tools do that as well or better. The framework sells
 
 | Risk | Why it matters | How to watch it |
 |---|---|---|
-| The process is too heavy | People work around a process that slows them down; the value disappears | M-E: human minutes per task, waiting time per gate (`sdlc metrics gates`) |
+| The process is too heavy | People work around a process that slows them down; the value disappears | M-E: human minutes per task, waiting time per gate (`sdlc metrics gates`); see section 6.1 |
 | Agent quality | If the agent succeeds only on very small tasks, the value shrinks to "records for small tasks" | M-E: the share of tasks done right the first time, or after one request for changes |
 | Large vendors move fast | Git hosts and cloud providers add agent governance | Keep the lasting advantages: self-hosting, several Git hosts and models, a process for client delivery; review this document every three months |
 | The licence and the business model | Under MIT anyone may use and resell the code, so selling the software itself is not a model | Decide the business model (section 7) before the repository is made public |
+
+### 6.1. What a Low-risk task costs today
+
+Most of the weight of a Low-risk task is waiting, not approvals.
+
+- **Human steps (6):** the spec and plan files reach `main` through a reviewed pull request; Person A creates the intent, links the spec and submits the plan (three commands; the plan file is named after the intent code, so it can only be written after the intent exists); Person A approves G1; Person B reviews the agent's pull request (G7); a person who is not a producer merges it; Person B approves G8. G1, G7 and production G8 are mandatory rules M1–M3.
+- **Waiting:** every HOTL pass opens a block window (default 4 working hours), and the platform waits for it before the next step: after G2 and G3 (before the run), after G5 (before the push), after G6 (before G7). Up to about 12 working hours, before any person answers. The test suites use 1 minute, so they never showed it.
+
+| # | Lighter | Kind of change | Decision |
+|---|---|---|---|
+| A1 | A shorter block window (1 working hour) | Configuration only | For the trial M-E (`design/M-E-TRIAL-PLAN.md` D7) |
+| B1 | A block window per gate, for example none after a G6 AUDIT pass | Design (D-03 §6, ADR-M30), then a task | Only if M-E shows nobody blocks within a window |
+| B2 | One CLI command creates the intent and links its spec | A small task (D-08 U03) | Added to the backlog, after M-E |
+| B3 | A per-project `release.environment`: a non-production release at Low risk is HOTL at G8 | Design and a task; the codes table already allows it (QUESTIONS #220) | MVP+1 |
+| C1 | G1 passes on its own at Low risk | Handbook (rule M1) | Not proposed: G1 sets the risk tier every later gate depends on |
+
+G1, G7 and production G8 stay HITL: they are the record the framework sells (who asked, who approved, who released).
 
 ## 7. Business models to decide
 
@@ -89,3 +106,4 @@ This is Harry's decision, ideally before the repository is public.
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-07 | Claude (coordinator) | Draft from the discussion with Harry: what the framework sells, the alternatives, segments, a positioning statement, risks, business models, what to confirm |
+| 0.2 | 2026-10-07 | Claude (coordinator) | §6.1: what a Low-risk task costs (human steps, block-window waits) and the ways to make it lighter |
