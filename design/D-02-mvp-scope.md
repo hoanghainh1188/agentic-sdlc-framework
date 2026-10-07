@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.3 |
+| Version | 1.4 |
 | Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81); 1.4 approved by Harry on 2026-10-07 (§4.2: a read-only dashboard starts before MVP+1; QUESTIONS #255) |
 | Readers | Leadership (sections 1–4, 10–12), tech lead / developers (all), Claude Code (sections 5–9, 13) |
 | Related documents | D-01 (build vs buy), D-07 (models and tokens), handbook codes table and Chapters 2–6, 10–20 |
 
@@ -80,7 +80,7 @@ The **producer of a change never approves it**. One person may hold several role
 | Full OPA/Cedar policy engine (#8) | MVP+1. The MVP uses simple rules in code, behind an interface |
 | Backlog / Jira integration (#12) | MVP+1 |
 | Client reports (#13) | MVP+2 |
-| Web UI, dedicated dashboard | MVP+1. The MVP uses Langfuse + Temporal UI |
+| Web UI, dedicated dashboard | MVP+1. The MVP uses Langfuse + Temporal UI. Exception: a **read-only** dashboard (intents and gates, escalations, cost and gate waiting times, evidence and audit), signed in with the personal API tokens, starts in parallel with the trial M-E (task U01, QUESTIONS #255). Actions in a web UI stay MVP+1 |
 | SSO, Kubernetes, multiple installations | When selling to clients |
 | Autonomy level 3 (agent acting in production) | Not in the MVP |
 | Agent deploying to production | **Never automatic.** G8 production is always HITL |
@@ -400,5 +400,6 @@ The MVP is done when **all** of the following are true:
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Aligned with the handbook: 2+N roles, L0–L4, gate × risk oversight matrix, forced HITL (G3), dual approval (G7), approval binding, escalation with SLA, project AI record, agent register, kill switch, retention. New FR-14…19, FR-34…36, FR-43…44 |
 | 1.1 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §4.2 and §12: a local Ollama model on developer machines for the C05 proof only, not a deployment target; API-model run before M-E (QUESTIONS #78, #81) |
 | 1.2 | 2026-10-03 | Claude (task C08, PR 1), approved by Harry | §5 flow and diagram D10: the runner, not the agent in the sandbox, pushes the checked changes after G5; the platform opens the pull request (QUESTIONS #52, ADR-M38) |
+| 1.4 | 2026-10-07 | Claude (coordinator), approved by Harry | §4.2: a read-only dashboard (task U01) starts in parallel with the trial M-E; actions in a web UI stay MVP+1 (QUESTIONS #255) |
 | 1.3 | 2026-10-06 | Claude (coordinator), approved by Harry | §4.2 and §12: the trial M-E runs with the local Ollama model on the owner's development machine; the API-model run moves to before M-F (QUESTIONS #81) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. NFR-08 and Q5 updated for the English decision (message catalog). Section 11.1 fixed: step C belongs to M-F |
