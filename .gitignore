@@ -9,3 +9,7 @@ coverage/
 .env
 *.env
 !*.env.example
+
+# Dashboard smoke test output (U01): screenshots go to the PR, not the repository.
+platform/tests/e2e/screenshots/
+platform/tests/e2e/test-results/

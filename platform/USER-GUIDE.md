@@ -168,6 +168,10 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 
 Every command takes `--json`. Exit codes: 0 done, 1 refused, 2 wrong usage, 3 platform unreachable, 4 log in again. Full list: handbook Ch.19 §19.8c.
 
+### The dashboard (read only)
+
+`http://127.0.0.1:8090/dashboard/` on the platform machine shows the board of intents by gate, an intent's decisions and who decides its gate, the open escalations with their deadlines, cost and gate waiting times, and (tenant admins) the audit check. Sign in with your personal API token; it stays in the tab's memory only. The dashboard never decides anything: use comments, reviews and the CLI. Handbook Ch.19 §19.8e.
+
 ## 5. When something goes wrong
 
 | You see | What it means | What to do |

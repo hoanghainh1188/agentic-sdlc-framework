@@ -9,8 +9,8 @@
     "pnpm": ">=10 <11"
   },
   "scripts": {
-    "build": "tsc -b",
-    "typecheck": "tsc -b && tsc -p platform/tests/tsconfig.json && tsc -p platform/spikes/openhands/tsconfig.json",
+    "build": "tsc -b && pnpm --filter @sdlc/dashboard build",
+    "typecheck": "tsc -b && tsc -p platform/tests/tsconfig.json && tsc -p platform/tests/e2e/tsconfig.json && tsc -p platform/spikes/openhands/tsconfig.json",
     "lint": "eslint --max-warnings 0 .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -52,19 +52,22 @@
     "sandbox-image:build": "platform/sandbox-images/build.sh",
     "diagrams:render": "python3 scripts/diagrams.py render",
     "diagrams:check": "python3 scripts/diagrams.py check",
-    "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox down"
+    "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox down",
+    "test:dashboard": "pnpm build && playwright test --config platform/tests/e2e/playwright.config.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "3.1141.0",
     "@eslint/js": "10.0.1",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/sdk-trace-base": "2.11.0",
+    "@playwright/test": "1.63.0",
     "@sdlc/adapter-agent-openhands": "workspace:*",
     "@sdlc/adapter-evidence-s3": "workspace:*",
     "@sdlc/adapter-git-github": "workspace:*",
     "@sdlc/adapter-model-litellm": "workspace:*",
     "@sdlc/adapter-policy-simple": "workspace:*",
     "@sdlc/adapter-traces-langfuse": "workspace:*",
+    "@sdlc/api-schemas": "workspace:*",
     "@sdlc/config": "workspace:*",
     "@sdlc/contracts": "workspace:*",
     "@sdlc/messages": "workspace:*",

@@ -5,6 +5,7 @@
     { "path": "platform/packages/contracts" },
     { "path": "platform/packages/config" },
     { "path": "platform/packages/messages" },
+    { "path": "platform/packages/api-schemas" },
     { "path": "platform/packages/core" },
     { "path": "platform/packages/secrets" },
     { "path": "platform/packages/workflow-client" },
@@ -18,6 +19,7 @@
     { "path": "platform/apps/api" },
     { "path": "platform/apps/worker" },
     { "path": "platform/apps/runner" },
-    { "path": "platform/apps/cli" }
+    { "path": "platform/apps/cli" },
+    { "path": "platform/apps/dashboard" }
   ]
 }

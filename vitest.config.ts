@@ -7,6 +7,7 @@ const SOURCE_PACKAGES = [
   'contracts',
   'config',
   'messages',
+  'api-schemas',
   'core',
   'secrets',
   'workflow-client',

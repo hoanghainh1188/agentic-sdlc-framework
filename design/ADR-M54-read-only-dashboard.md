@@ -35,8 +35,10 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
 - **Content-Security-Policy** on every `/dashboard/` answer: `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`. No inline script or style, no third-party origin: every asset, the fonts included, is served by the platform. Also `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy: same-origin`, a `Permissions-Policy` that turns off camera, microphone and location.
 - **Caching:** `index.html` `no-store`; hashed files under `assets/` cached for a year (`immutable`), with an ETag.
 - **The token** (Harry, U01 plan): a person pastes their personal token (`sdlc_pat_…`) into a password field; the dashboard checks it with `GET /v1/me` and keeps it **in memory only**: never in a URL, `localStorage`, `sessionStorage`, a cookie or a log. A reload or "Sign out" forgets it; signing out does not revoke the token (the CLI's `sdlc logout` does).
+- **Password managers:** the token field is `type="password"` with `autocomplete="one-time-code"`, so browsers do not offer to save the token (they save passwords, never one-time codes). A person who saves it anyway stores it outside the platform's rules; the handbook says not to.
+- **zod under the CSP:** zod 4 probes `new Function` for its fast path; the CSP has no `'unsafe-eval'`, so the dashboard sets `config({ jitless: true })` before any schema runs.
 - **CSRF:** the token travels only in the `Authorization` header and every call is a `GET`, so another site cannot make the browser act. A static test refuses any other method and any `fetch` outside the one API client (PR 2).
-- **Server text** (titles, descriptions, names) is checked with the CLI's zod schemas, cleaned of control and bidirectional characters like the CLI's (ADR-M36), and always rendered as text, never as HTML.
+- **Server text** (titles, descriptions, names, and every code: status, severity, route, gate…) is checked with the CLI's zod schemas, cleaned of control, bidirectional and zero-width characters (`cleanText`, shared with the CLI, ADR-M36), and always rendered as text, never as HTML. A CSS class built from a code keeps letters, digits and `_` only; an intent link is built only from a real intent code.
 
 ### 2.4. The four fields (QUESTIONS #260–#263)
 
@@ -71,11 +73,23 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
 - **Response schemas:** the CLI's zod schemas move into a package both apps import (an app never imports another app).
 - **Labels and messages** through `@sdlc/messages` (`dashboard.*` keys), bundled at build time (NFR-08).
 
+### 2.5b. As built (PR 2)
+
+- `@sdlc/api-schemas` (`platform/packages/api-schemas`): the CLI's response schemas, moved, and `cleanText`. No workspace dependency; the CLI keeps importing them through `apps/cli/src/api/schemas.ts`. Lint: the dashboard imports only this package; the package imports nothing in the workspace.
+- The dashboard is part of `tsc -b` (type-checked, `emitDeclarationOnly`, types in `dist/types`); Vite builds `dist/web`. `pnpm build` runs both. The api image builds it and copies `dist/web` to `/app/dashboard` (`SDLC_API_DASHBOARD_DIR`, also set in Compose).
+- Labels: a Vite plugin bundles only the `dashboard.*` keys of `@sdlc/messages` (the whole catalog is ~100 kB). The catalog test now reads TSX and double-quoted keys.
+- Routes in the URL hash (`#/intents`, `#/intents/<INT>`, `#/escalations`, `#/numbers?project=…&by=…`, `#/audit`): filters can be shared; the token never is.
+- Built: 45 kB of JavaScript gzipped, 4 kB of CSS, four woff2 font files (Plex Sans 400, 600; Plex Mono 400, 500).
+- Colours: one token file, light and dark (`prefers-color-scheme`); colour means something only (waiting, past deadline, frozen, risk). Contrast checked by a test.
+- What the screens read: the board pages through `GET /v1/intents` (100 a page, up to 1,000) and reads open and acknowledged escalations (100 each); an intent reads its detail, runs, escalations and packs (a 403 or 404 on packs hides the section); the numbers read `GET /v1/metrics/gates` and `GET /v1/cost/report` with the API's default ranges.
+
 ### 2.6. Tests and CI
 
 - `pnpm test`: the static route (headers, list only, traversal, the guard), the new fields against the CLI schemas, the shared resolution; in PR 2 the data mapping, the "GET only, one client, no storage" static checks, the catalog keys and the colour contrast.
 - `pnpm test:db`: the new fields through the API; `waiting_for` against the workflow.
-- `pnpm test:dashboard` (PR 2): Playwright 1.63.0 (Apache-2.0) with Chromium against a stub API: sign-in, every screen, sign-out forgets the token, keyboard use; screenshots at 375, 768 and 1440 px in both themes. It runs in the existing `sandbox-image` job (weekly, manual, and when `platform/apps/dashboard/**` changes): no new job (Actions minutes).
+- `pnpm test:dashboard` (PR 2): Playwright 1.63.0 (Apache-2.0) with Chromium against a stub API (`platform/tests/e2e/stub-api.mjs`) that serves the build through the api's own `registerDashboard`, so the CSP under test is the real one. It checks sign-in (wrong format, unknown token), every screen, GET only, nothing loaded from another origin, no CSP or script error, an inline script blocked, the token never in the URL, storage or cookies, sign-out, keyboard use, no horizontal scroll; screenshots at 375, 768 and 1440 px in both themes.
+- CI: the existing `sandbox-image` job runs it (weekly, manual, and when the dashboard, `api-schemas`, the api's static route or the smoke test change: output `run_dashboard`). On a pull request that changes only those, the job's sandbox steps skip, so it costs the browser test only. No new job (Actions minutes).
+- `pnpm test` (`platform/tests/dashboard/`): the data mapping; static checks of the source (one `fetch`, GET only, no storage, no HTML injection, every `dashboard.*` key in the catalog, no English text outside it) and of the build (no inline script, only the api's file types, no `data:` URI, the 80 kB budget); every path the dashboard reads is a GET route of an API controller; colour contrast (WCAG AA) in both themes.
 
 ## 3. Alternatives considered
 
@@ -103,5 +117,6 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 0.3 | 2026-10-07 | Claude (task U01, PR 2) | §2.5b as built (the shared schemas package, the build, the catalog plugin, the routes, the size), §2.6 the smoke test and the CI flag `run_dashboard` |
 | 0.2 | 2026-10-07 | Claude (task U01, PR 1) | After the code review: what `waiting_for` does not say (§2.4); Harry: task U02 exposes the workflow's last waiting reason and moves the notice audiences to the shared function (QUESTIONS #264, #265; §4) |
 | 0.1 | 2026-10-07 | Claude (task U01, PR 1) | First version: read only, served by the api under `/dashboard/`, 127.0.0.1 only, CSP, the token in memory, the four fields, one oversight resolution for the workflow and `waiting_for`; PR 2's app and tests |

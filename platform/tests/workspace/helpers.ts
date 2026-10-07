@@ -18,16 +18,19 @@ export interface WorkspacePackage {
 }
 
 /** The packages required by design/D-03 section 11 (D-08 A01 AC2), plus `messages` (ADR-M18), `secrets` (A04,
- * ADR-M21), `workflow-client` (B07, ADR-M30) and `telemetry` (A08, ADR-M35). */
+ * ADR-M21), `workflow-client` (B07, ADR-M30), `telemetry` (A08, ADR-M35), and `api-schemas` and the
+ * `dashboard` app (U01, ADR-M54). */
 export const EXPECTED_PACKAGES: readonly WorkspacePackage[] = [
   { dir: 'platform/apps/api', name: '@sdlc/api' },
   { dir: 'platform/apps/worker', name: '@sdlc/worker' },
   { dir: 'platform/apps/runner', name: '@sdlc/runner' },
   { dir: 'platform/apps/cli', name: '@sdlc/cli' },
+  { dir: 'platform/apps/dashboard', name: '@sdlc/dashboard' },
   { dir: 'platform/packages/core', name: '@sdlc/core' },
   { dir: 'platform/packages/contracts', name: '@sdlc/contracts' },
   { dir: 'platform/packages/config', name: '@sdlc/config' },
   { dir: 'platform/packages/messages', name: '@sdlc/messages' },
+  { dir: 'platform/packages/api-schemas', name: '@sdlc/api-schemas' },
   { dir: 'platform/packages/secrets', name: '@sdlc/secrets' },
   { dir: 'platform/packages/workflow-client', name: '@sdlc/workflow-client' },
   { dir: 'platform/packages/telemetry', name: '@sdlc/telemetry' },

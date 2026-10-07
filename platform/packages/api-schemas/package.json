@@ -1,0 +1,15 @@
+{
+  "name": "@sdlc/api-schemas",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Response schemas of the API, shared by the CLI and the read-only dashboard (ADR-M36 §2.4, ADR-M54 §2.5).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "zod": "4.6.5"
+  }
+}

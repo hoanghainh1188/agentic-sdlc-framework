@@ -360,6 +360,34 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 
 - When the platform is upgraded and its default settings change, it checks every stored project configuration when it starts. A configuration nobody changed is saved again with the new defaults, and the audit log shows it as a change by the platform. A configuration that was changed outside the platform, or that the new defaults make invalid, is not used: the project stops until an admin saves a configuration again.
 
+## 19.8e. Using the platform: the dashboard (read only)
+
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task U01, 2026-10-07, and kept in line with the platform code (`design/ADR-M54-read-only-dashboard.md`).
+
+The dashboard shows in one page what the CLI shows one command at a time. **It only reads.** You still decide gates with comments, reviews and the CLI (§19.8b, §19.8c).
+
+**Open it.**
+
+1. Open `http://127.0.0.1:8090/dashboard/` on the machine that runs the platform (the API's own address; no other port).
+2. Paste your personal API token (`sdlc_pat_…`, the one you use for the CLI; create one with `sdlc token create`) and choose **Sign in**.
+3. The token stays in the memory of that browser tab only. A reload, closing the tab or **Sign out** forgets it. The dashboard never puts it in the address, in browser storage or in a cookie. **Sign out** does not revoke the token: `sdlc token revoke` does.
+
+The dashboard is for the platform machine itself. Do not open the API's port to other machines for it: that needs TLS and a review first.
+
+**What you see.** The same access rules as the CLI apply: you see the projects you have a role on, and a section your role cannot read says so.
+
+| Screen | What it shows | Same as |
+|---|---|---|
+| **Intents and gates** | The open intents, one row per gate, the longest wait first. Each card shows how long the intent has waited at its gate, the links to its issue and pull request, and two marks: **past deadline** (an overdue escalation) and **frozen** (an escalation freezes the intent). **Finished** lists the closed intents | `sdlc intent list` |
+| **An intent** | Where it stands on G1–G8; **who decides this gate** (the oversight mode, the approver roles and how many approvals, as the workflow resolves it); its decisions, runs, open escalations and Evidence Packs, with the pack files to download | `sdlc intent show`, `sdlc run list`, `sdlc evidence list\|export` |
+| **Escalations** | Open and acknowledged escalations, the nearest deadline first: severity, route, the role that holds the current step, the acknowledge or resolve clock | `sdlc escalation list` |
+| **Cost and gate times** | Per project (or the whole tenant, for tenant admins): how long each gate waits for people (average, 90th percentile, longest, waiting now), and the model cost by intent, model or run status, with the wasted part | `sdlc metrics gates`, `sdlc cost report` |
+| **Audit check** | Tenant admins only: checks the tenant's audit chain, on request | `sdlc audit verify` |
+
+**"Who decides this gate" is not "what holds it".** It names the people (or the platform) that decide the gate. A platform check can still hold the gate: a failed G4 check, a plan to submit again, a frozen intent, a merge still to come. The status comments on the issue explain why. While the intent waits for CI at G6, the dashboard shows nothing there.
+
+**Times.** Waiting times are wall-clock time, not working hours. A deadline in the next hour shows in amber, a missed one in red.
+
 ## 19.9. Roles and approval points
 
 | What | Who |
@@ -409,3 +437,4 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | 0.15 | 2026-10-04 | Claude (task C12) | §19.8c: freshness: spend is copied every few minutes and when a run ends (ADR-M24 §2.5) |
 | 0.16 | 2026-10-04 | Claude (task E05, PR 1) | §19.8d: archive refused with open intents and evidence deleted after a grace period, `sdlc admin evidence hold\|release\|show`, `sdlc ops retention report`, how long evidence is kept (ADR-M51) |
 | 0.17 | 2026-10-04 | Claude (task E05, PR 2) | §19.8d: the daily audit anchor and `audit.anchor_mismatch` (ADR-M51 §2.9) |
+| 0.18 | 2026-10-07 | Claude (task U01) | §19.8e: the read-only dashboard (ADR-M54) |

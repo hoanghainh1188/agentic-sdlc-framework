@@ -48,6 +48,16 @@ describe('sdlc-api service', () => {
     expect(api.volumes).toEqual(['api-approle:/run/sdlc/approle']);
   });
 
+  it('U01: serves the dashboard built into the image, on the same 127.0.0.1 port (ADR-M54)', () => {
+    expect(api.environment.SDLC_API_DASHBOARD_DIR).toBe('/app/dashboard');
+    const dockerfile = fs.readFileSync(path.join(root, 'platform/apps/api/Dockerfile'), 'utf8');
+    expect(dockerfile).toContain('pnpm --filter @sdlc/dashboard build');
+    expect(dockerfile).toContain(
+      'COPY --from=build --chown=root:root /repo/platform/apps/dashboard/dist/web /app/dashboard',
+    );
+    expect(dockerfile).toContain('ENV SDLC_API_DASHBOARD_DIR=/app/dashboard');
+  });
+
   it('publishes on 127.0.0.1 only, on its own host port', () => {
     expect(api.ports).toEqual(['${SDLC_BIND_ADDR:-127.0.0.1}:${SDLC_API_HOST_PORT:-8090}:8080']);
     expect(envExample.get('SDLC_API_HOST_PORT')).toBe('8090');

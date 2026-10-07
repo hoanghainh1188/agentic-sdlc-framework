@@ -8,5 +8,6 @@
     "experimentalDecorators": true,
     "rootDir": ".."
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts"],
+  "exclude": ["e2e/**"]
 }

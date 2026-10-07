@@ -31,7 +31,7 @@ export default tseslint.config(
       parserOptions: {
         projectService: {
           // Root config files are not part of any tsconfig project.
-          allowDefaultProject: ['*.ts'],
+          allowDefaultProject: ['*.ts', 'platform/apps/dashboard/*.ts'],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -44,7 +44,7 @@ export default tseslint.config(
 
   {
     // Module boundaries (D-03 AP4, D-08 A01 AC3, ADR-M16).
-    files: ['platform/**/*.ts', 'platform/**/*.mts', 'platform/**/*.cts'],
+    files: ['platform/**/*.ts', 'platform/**/*.tsx', 'platform/**/*.mts', 'platform/**/*.cts'],
     plugins: { 'sdlc-local': sdlcLocal },
     rules: {
       '@typescript-eslint/no-require-imports': 'error',
@@ -64,7 +64,42 @@ export default tseslint.config(
             // it (ADR-M35 §2.3). The type-only rule is checked by platform/tests/observability.
             { from: '@sdlc/telemetry', allowOnly: ['@sdlc/core'] },
             { from: '@sdlc/core', deny: ['@sdlc/telemetry'] },
+            // The read-only dashboard (U01, ADR-M54): the shared response schemas only; never
+            // another app. The schemas depend on nothing in the workspace.
+            { from: '@sdlc/dashboard', allowOnly: ['@sdlc/api-schemas'] },
+            { from: '@sdlc/api-schemas', allowOnly: [] },
           ],
+        },
+      ],
+    },
+  },
+
+  {
+    // The dashboard runs in the browser (U01, ADR-M54 §2.3): browser globals; no HTML injection,
+    // no browser storage, no network call outside its API client (also checked by
+    // platform/tests/dashboard/static.test.ts).
+    files: ['platform/apps/dashboard/src/**/*.{ts,tsx}'],
+    languageOptions: { globals: globals.browser },
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        { property: 'innerHTML', message: 'Render text with JSX; never inject HTML.' },
+        { property: 'outerHTML', message: 'Render text with JSX; never inject HTML.' },
+        { object: 'window', property: 'localStorage', message: 'The token stays in memory.' },
+        { object: 'window', property: 'sessionStorage', message: 'The token stays in memory.' },
+        { object: 'document', property: 'cookie', message: 'The token stays in memory.' },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'localStorage', message: 'The token stays in memory (ADR-M54 §2.3).' },
+        { name: 'sessionStorage', message: 'The token stays in memory (ADR-M54 §2.3).' },
+        { name: 'indexedDB', message: 'The token stays in memory (ADR-M54 §2.3).' },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message: 'Render text with JSX; never inject HTML.',
         },
       ],
     },
