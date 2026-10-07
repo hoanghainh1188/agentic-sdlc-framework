@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.5 |
+| Version | 0.6 |
 | Date | 2026-10-06 |
 | Status | **Draft** (task E07). AC4 prepared, waiting for the API-model run, now before M-F (QUESTIONS #81) |
 | Readers | Leadership, tech lead, Claude Code |
@@ -68,7 +68,7 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 | No manual spend-sync command; a gap longer than the catch-up window is only logged (`worker.cost_sync_gap`) | ADR-M24 §3 (C12) | M-F |
 | Upgrade the deploy images (LiteLLM, OpenBao, ClickHouse, Langfuse). With LiteLLM v1.104.0, 5 of 18 `pnpm test:litellm` tests fail: a budget block answers 422 instead of 429, and spend is computed differently. LiteLLM in its own PR with adapter and test changes; the others checked with `pnpm test:openbao`, `pnpm test:observability` and on the dev stack. The trial runs on the pinned versions | Dependabot PR #175 (closed), issue #177 | M-F |
 | A per-project `release.environment` and the non-production HOTL path at G8; an explicit PM/BrSE confirmation of the client's own disclosure note | QUESTIONS #220, #222 (E03) | MVP+1 |
-| The MVP+1 user interface scope (web UI with actions, other users), written from the trial data. A read-only dashboard starts earlier: task U01 (QUESTIONS #255) | D-02 §4.2, D-08 E07 note | After M-E (U01: in parallel with M-E) |
+| The MVP+1 user interface scope (web UI with actions, other users), written from the trial data; candidate list in `design/MVP1-UI-SCOPE.md` 0.1. The read-only dashboard is done: U01, U02 (QUESTIONS #255) | D-02 §4.2, D-08 E07 note | After M-E (U01: in parallel with M-E) |
 | Template T13 differs from the plan schema v1 (platform fields, `change_flags`, tool names) | B09 PR 2 (#150) | Handbook authors |
 | Who owns the project AI record: D-02 §3 and handbook Ch.2 §2.5 differ | QUESTIONS #103 | Docs follow-up |
 
@@ -81,3 +81,4 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 | 0.3 | 2026-10-06 | Claude (coordinator), approved by Harry | §5: upgrade of the deploy images (issue #177); header version and date fixed |
 | 0.4 | 2026-10-06 | Claude (coordinator), approved by Harry | §2, §4: the API-model run (QUESTIONS #81) is needed before M-F; the trial M-E runs with the local model |
 | 0.5 | 2026-10-07 | Claude (coordinator), approved by Harry | §5: the read-only dashboard U01 starts in parallel with M-E (QUESTIONS #255) |
+| 0.6 | 2026-10-07 | Claude (coordinator), approved by Harry | §5: the interface scope's candidate list (`design/MVP1-UI-SCOPE.md`); U01 and U02 done |

@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.2 |
+| Version | 1.3 |
 | Date | 2026-10-06 |
 | Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed; D6 (the local model, QUESTIONS #81) |
 | Readers | Harry, the trial team (Person A, Person B, second approver), Claude Code |
@@ -115,6 +115,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | Agent result quality | Did the merged change meet the spec's acceptance criteria? (Person B: yes / partly / no) |
 | Problems | Platform bugs, unclear messages, steps that felt too heavy, with the issue or PR link |
 | Notes for M-F | Gates, budgets or rules that should change, and why |
+| Interface | For each step done by comment or CLI: the function of `design/MVP1-UI-SCOPE.md` §3 you would have used (its code, for example B1), or one that is missing, and why (time lost, a mistake, information not found) |
 
 ## 8. The data report (the M-E deliverable)
 
@@ -125,7 +126,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 3. Per gate: waiting time (first round, after changes), auto-passed share, overdue escalations.
 4. Totals: tokens, cost, the share of PRs that needed changes.
 5. Problems found, with their fix status.
-6. Proposals for M-F (gates, budgets, rules, the plan-file step #230), and the input for the MVP+1 user interface scope.
+6. Proposals for M-F (gates, budgets, rules, the plan-file step #230), and the input for the MVP+1 user interface scope: the interface column counted per function of `design/MVP1-UI-SCOPE.md` §3, which then becomes version 1.0 for Harry's approval.
 
 ## 9. Stop rules
 
@@ -156,3 +157,4 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | 1.0 | 2026-10-06 | Claude (coordinator), approved by Harry | D1–D5 approved as proposed; the trial budget cap is USD 30 |
 | 1.1 | 2026-10-06 | Claude (coordinator), approved by Harry | §3 item 11: the trial team reads `platform/USER-GUIDE.md` and logs in |
 | 1.2 | 2026-10-06 | Claude (coordinator), approved by Harry | D6: the trial runs with the local model `gpt-oss:20b`; §2 scope, §3 items 1 and 6, §8 (QUESTIONS #81) |
+| 1.3 | 2026-10-07 | Claude (coordinator), approved by Harry | §7.2 an interface column; §8 item 6 counts it against `design/MVP1-UI-SCOPE.md` |

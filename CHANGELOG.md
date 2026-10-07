@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- `design/MVP1-UI-SCOPE.md` 0.1 (draft): candidate functions of the MVP+1 web interface by role (Person A, Person B, tenant admin, leadership), what never goes in the interface (merging, G7 approvals, changing append-only records, secrets, self-granted roles), the conditions before any action, a proposed order. The trial M-E records which functions the team missed (M-E plan 1.3, an interface column); version 1.0 comes after M-E for Harry's approval.
 - A01: TypeScript monorepo (pnpm 10 workspaces, TypeScript project references, ESLint, Prettier, Vitest). Packages `@sdlc/api`, `worker`, `runner`, `cli`, `core`, `contracts`, `config` and five `@sdlc/adapter-*` placeholders (D-03 section 11).
 - A01: module boundaries enforced by lint: `core` must not import adapters; adapters may import `@sdlc/contracts` only. Formatting and linting never touch the handbook, design docs or Markdown.
 - ADR-M16 (proposed): monorepo tooling, CommonJS output (open to change), pnpm build-script allow-list.
