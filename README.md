@@ -145,6 +145,7 @@ Diagrams: [diagrams/README.md](diagrams/README.md).
 | Tech lead / architect | All of `design/` |
 | Leadership | This README, handbook Part I (Ch.1–9) |
 | PM / BrSE, reviewers, testers | Handbook Part 0, Part II, templates |
+| Whoever brings a project team onto the platform (tech lead, leadership, operator) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout phase by phase, the first week, common mistakes |
 | Platform users (Person A, Person B, second approver, PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one task from G1 to G8, then handbook Ch.19 §19.8b–§19.8c |
 | Handbook authors | This README, the codes table, the writing style, D-02 (so the process matches the platform) |
 
@@ -155,6 +156,8 @@ Diagrams: [diagrams/README.md](diagrams/README.md).
 **Writing the handbook:** follow the 9-section structure, source tags, the codes table and the writing style (section 8). Handbook changes also go through pull requests.
 
 **Deploying the platform:** follow [platform/deploy/README.md, "Fresh deployment (operator)"](platform/deploy/README.md#fresh-deployment-operator): from an empty checkout to the first intent at G1 with Docker Compose. `pnpm test:fresh-deploy` runs the same steps with throw-away keys.
+
+**Bringing a team onto the platform:** follow [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, then the phases from deciding to widening, each with an owner and a check.
 
 **Using the platform:** start with [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one task from G1 to G8, by role, with the commands and what to do when something goes wrong.
 
