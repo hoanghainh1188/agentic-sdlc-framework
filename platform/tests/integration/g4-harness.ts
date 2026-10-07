@@ -16,6 +16,10 @@ import type { CostError } from '../../packages/core/src/cost/errors.js';
 import type { Intent } from '../../packages/core/src/db/schema.js';
 import type { G4Deps } from '../../packages/core/src/workflow/g4-proposal.js';
 import type { RunDeps } from '../../packages/core/src/workflow/run-lifecycle.js';
+import {
+  currentGateWaitingFor,
+  type WaitingFor,
+} from '../../packages/core/src/workflow/oversight.js';
 import { stepIntent } from '../../packages/core/src/workflow/step.js';
 import { FakeTransit } from '../run-contract/helpers.js';
 import { seedAgent, type SeededAgent } from './agent-seed.js';
@@ -220,6 +224,19 @@ export async function flush(t: Harness): Promise<void> {
 
 export async function notices(t: Harness, intent: Intent) {
   return (await t.f.scope.intentNotices.listForIntent(intent.id)).map((n) => n.kind);
+}
+
+/**
+ * U01 (QUESTIONS #261): the API's `waiting_for` of the intent as it is now, resolved like the
+ * workflow (`currentGateWaitingFor`).
+ */
+export async function waitingFor(
+  t: Pick<Harness, 'f'>,
+  intent: Intent,
+): Promise<WaitingFor | null> {
+  const current = (await t.f.scope.intents.getById(intent.id))!;
+  const { policy } = await t.f.registry.policyFor(t.f.scope, current.project_id);
+  return currentGateWaitingFor(t.f.scope, policy, current);
 }
 
 export async function checksFailed(t: Harness, intent: Intent): Promise<string[]> {

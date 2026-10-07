@@ -58,6 +58,7 @@ import {
 import { gateHistory, type GateHistory } from './gate-history.js';
 import { hotlBlockWindowOpenUntil } from './hotl.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
+import { resolveGateOversight } from './oversight.js';
 
 /** Why G8 stopped (audit `gate.g8_check_failed`): a stored evidence file failed its re-check. */
 export type G8Check = 'evidence_hash_mismatch' | 'evidence_missing';
@@ -149,12 +150,7 @@ function oversightAt(
   intent: Intent,
   changeFlags: Awaited<ReturnType<typeof flagsOf>>,
 ) {
-  return policy.policy.oversightMode({
-    gate: 'G8',
-    riskTier: intent.risk_tier,
-    changeFlags,
-    context: { environment: 'production' },
-  });
+  return resolveGateOversight(policy.policy, intent, 'G8', { changeFlags });
 }
 
 async function flagsOf(tx: TenantScope, intent: Intent) {

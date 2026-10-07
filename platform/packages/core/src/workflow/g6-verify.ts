@@ -46,6 +46,7 @@ import { gateHistory } from './gate-history.js';
 import { blockWindowEnd, sentBackForInput } from './hotl.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
 import { waitedSeconds } from './waited.js';
+import { g6Context, resolveGateOversight } from './oversight.js';
 
 /** Why G6 stopped at CI (audit `gate.g6_check_failed`, escalation packet). */
 export type G6Check =
@@ -206,20 +207,11 @@ function laterOf(a: Date, b: Date | null, now: Date): Date {
 
 /** The policy context of G6: the findings counts, and whether they are known (QUESTIONS #157). */
 export function contextOf(facts: G6Facts) {
-  const ci = facts.ci;
-  return {
-    securityFindings: ci?.counts ?? {},
-    securityFindingsUnknown: ci === null || ci.findings !== 'known',
-  };
+  return g6Context(facts);
 }
 
 function oversightAt(policy: G5Policy, intent: Intent, facts: G6Facts): OversightResolution {
-  return policy.policy.oversightMode({
-    gate: 'G6',
-    riskTier: intent.risk_tier,
-    changeFlags: [],
-    context: contextOf(facts),
-  });
+  return resolveGateOversight(policy.policy, intent, 'G6', { changeFlags: [], g6: facts });
 }
 
 /** CI failed: a retry from G4, or back to G3 when none is left (N2, FR-13). */

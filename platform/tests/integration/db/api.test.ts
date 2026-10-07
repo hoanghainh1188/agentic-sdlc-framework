@@ -433,6 +433,36 @@ describeDb('B03: API app on PostgreSQL', () => {
         'invalid_request',
       );
     });
+    it('U01 (#260–#262): the repository, the gate entry time and who the gate waits for', async () => {
+      const tenant = await seedTenant();
+      const created = await createIntent(tenant);
+      const draft = (
+        await inject('GET', `/v1/intents/${created.code}`, tenant.tokens.viewer)
+      ).json();
+      expect(draft).toMatchObject({
+        project: { slug: 'shop', repo_full_name: 'org/shop' },
+        gate_entered_at: null,
+        waiting_for: null,
+      });
+      const at = new Date('2026-10-07T01:00:00.000Z');
+      await tenant.scope.intents.moveState(created.id, {
+        from: { status: 'draft', currentGate: null },
+        to: { status: 'in_gate', currentGate: 'G1' },
+        at,
+      });
+      const listed = (await inject('GET', '/v1/intents', tenant.tokens.viewer)).json();
+      expect(listed.items[0]).toMatchObject({ gate_entered_at: at.toISOString() });
+      expect(listed.items[0]).not.toHaveProperty('waiting_for');
+      const shown = (
+        await inject('GET', `/v1/intents/${created.code}`, tenant.tokens.viewer)
+      ).json();
+      expect(shown.waiting_for).toEqual({
+        gate: 'G1',
+        mode: 'HITL',
+        roles: ['person_a'],
+        approvals_needed: 1,
+      });
+    });
   });
 
   describe('AC3: gate decisions (FR-11, FR-17, ADR-M20)', () => {

@@ -4,9 +4,11 @@
 // After a change, the intent's workflow is woken (B07, ADR-M30): creating an intent is its submit.
 import {
   CommandError,
+  currentGateWaitingFor,
   decideGate,
   INTENT_CODE_PATTERN,
   projectAccess,
+  RegistryError,
   type Intent,
   type Project,
   type Registry,
@@ -23,6 +25,7 @@ import {
   presentIntent,
   presentPlan,
   presentSpec,
+  presentWaitingFor,
   type IntentBody,
 } from './present.js';
 import type { createIntentSchema, decisionSchema, listIntentsSchema } from './schemas.js';
@@ -68,13 +71,15 @@ export class IntentsService {
 
   async show(p: Principal, ref: string): Promise<Record<string, unknown>> {
     const { intent, project } = await this.readable(p, ref);
-    const [decisions, spec, plan] = await Promise.all([
+    const [decisions, spec, plan, waitingFor] = await Promise.all([
       p.scope.gateDecisions.listForIntent(intent.id),
       p.scope.specRefs.latest(intent.id),
       p.scope.plans.latest(intent.id),
+      this.waitingFor(p, intent),
     ]);
     return {
       ...presentIntent(intent, project),
+      waiting_for: presentWaitingFor(waitingFor),
       spec: presentSpec(spec),
       plan: presentPlan(plan),
       decisions: decisions.map(presentDecision),
@@ -124,6 +129,20 @@ export class IntentsService {
       this.logger,
     );
     return presentDecision(row);
+  }
+
+  /** U01 (QUESTIONS #261): the workflow's resolution of the current gate, read only. */
+  private async waitingFor(p: Principal, intent: Intent) {
+    if (intent.status !== 'in_gate') return null;
+    let policy;
+    try {
+      ({ policy } = await this.registry.policyFor(p.scope, intent.project_id));
+    } catch (error) {
+      // A configuration the platform refuses stops the workflow too: nothing is certain.
+      if (error instanceof RegistryError) return null;
+      throw error;
+    }
+    return currentGateWaitingFor(p.scope, policy, intent);
   }
 
   /** The intent and its project, or `intent_not_found` when the caller cannot read the project. */

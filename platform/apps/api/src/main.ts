@@ -14,6 +14,7 @@ import { OTEL_ENDPOINT_ENV } from '@sdlc/telemetry';
 import { connectTemporal, TemporalIntentSignals } from '@sdlc/workflow-client';
 
 import { createApp } from './app.js';
+import { loadDashboardFiles } from './dashboard/static.js';
 import { connectDatabase } from './database.js';
 import { openEvidenceStore } from './evidence/store.js';
 import { createApiLogger, NestJsonLogger } from './observability/logging.js';
@@ -51,6 +52,11 @@ async function main(): Promise<void> {
   // Wakes the intent workflow after a change (B07, ADR-M30).
   const temporal = settings.temporal ? await connectTemporal(settings.temporal) : undefined;
   if (!temporal) log.log('warn', 'api.temporal_off', { message: t('api.start.temporal_off') });
+  // The read-only dashboard (U01, ADR-M54): fails the start when the folder is wrong.
+  const dashboard = settings.dashboardDir
+    ? await loadDashboardFiles(settings.dashboardDir)
+    : undefined;
+  if (!dashboard) log.log('info', 'api.dashboard_off', { message: t('api.start.dashboard_off') });
   const app = await createApp({
     db,
     settings,
@@ -58,6 +64,7 @@ async function main(): Promise<void> {
     nestLogger: new NestJsonLogger(log),
     ...(gitHost ? { gitHost } : {}),
     ...(evidence ? { evidence } : {}),
+    ...(dashboard ? { dashboard } : {}),
     ...(temporal ? { intentSignals: new TemporalIntentSignals(temporal.client) } : {}),
   });
   app

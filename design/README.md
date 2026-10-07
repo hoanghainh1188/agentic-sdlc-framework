@@ -49,6 +49,7 @@
 | ADR-M51 | [Evidence retention: object lock, the purge, holds, archived projects](ADR-M51-evidence-retention.md) (task E05) | Proposed | |
 | ADR-M52 | [SeaweedFS internal access: loopback binding and keys made at each start](ADR-M52-seaweedfs-internal-access.md) (task A12) | Proposed | |
 | ADR-M53 | [Purge a project's data from Langfuse](ADR-M53-langfuse-purge.md) (task E08) | Proposed | |
+| ADR-M54 | [A read-only web dashboard](ADR-M54-read-only-dashboard.md) (task U01) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

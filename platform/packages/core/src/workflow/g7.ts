@@ -58,6 +58,7 @@ import { isReviewReceipt, recordReviews, voidStaleReviewApprovals } from './g7-r
 import { gateHistory } from './gate-history.js';
 import { hotlBlockWindowOpenUntil } from './hotl.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
+import { resolveGateOversight } from './oversight.js';
 
 /** Why G7 stopped (audit `gate.g7_check_failed`). */
 export type G7Check =
@@ -286,7 +287,7 @@ function oversightAt(
   intent: Intent,
   changeFlags: Awaited<ReturnType<typeof flagsOf>>,
 ): OversightResolution {
-  return policy.policy.oversightMode({ gate: 'G7', riskTier: intent.risk_tier, changeFlags });
+  return resolveGateOversight(policy.policy, intent, 'G7', { changeFlags });
 }
 
 function reviewers(oversight: OversightResolution): ProjectRole[] {

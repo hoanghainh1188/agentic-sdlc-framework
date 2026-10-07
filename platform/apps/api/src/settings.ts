@@ -22,6 +22,7 @@ export const API_ENV = {
   evidenceBucket: 'SDLC_API_EVIDENCE_BUCKET',
   evidenceSecretPath: 'SDLC_API_EVIDENCE_SECRET_PATH',
   evidenceMaxItemMb: 'SDLC_API_EVIDENCE_MAX_ITEM_MB',
+  dashboardDir: 'SDLC_API_DASHBOARD_DIR',
 } as const;
 
 /** Fields of the KV entry written by `openbao:bootstrap api-evidence-credentials` (E02). */
@@ -81,6 +82,11 @@ const schema = z.object({
     .default('api/evidence'),
   // The largest evidence file the api reads back to check its hash, one file at a time.
   [API_ENV.evidenceMaxItemMb]: z.coerce.number().int().min(1).max(4096).default(256),
+  // The read-only dashboard's built files (U01, ADR-M54); `off`: no dashboard routes.
+  [API_ENV.dashboardDir]: z
+    .string()
+    .refine((v) => v === 'off' || v.startsWith('/'))
+    .default('off'),
   NODE_ENV: z.string().optional(),
 });
 
@@ -129,6 +135,8 @@ export interface ApiSettings {
     readonly secretPath: string;
     readonly maxItemBytes: number;
   } | null;
+  /** The dashboard's built files (U01, ADR-M54): an absolute folder; null: `off`. */
+  readonly dashboardDir: string | null;
 }
 
 /** A setting is missing or wrong. `key` is a message catalog key; `name` the variable. */
@@ -182,6 +190,7 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     rateLimitPerMinute: v[API_ENV.rateLimitPerMinute],
     authFailuresPerMinute: v[API_ENV.authFailuresPerMinute],
     githubApiUrl: v[API_ENV.githubApiUrl],
+    dashboardDir: v[API_ENV.dashboardDir] === 'off' ? null : v[API_ENV.dashboardDir],
     evidence:
       v[API_ENV.evidenceUrl] === 'off'
         ? null

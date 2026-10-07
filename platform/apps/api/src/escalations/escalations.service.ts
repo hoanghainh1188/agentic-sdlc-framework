@@ -6,12 +6,14 @@ import {
   decideEscalation,
   EscalationError,
   INTENT_CODE_PATTERN,
+  loadEffectiveConfig,
   projectAccess,
+  RegistryError,
   type Escalation,
   type Intent,
   type TenantScope,
 } from '@sdlc/core';
-import type { IntentWorkflowSignals } from '@sdlc/contracts';
+import type { EscalationRouting, IntentWorkflowSignals } from '@sdlc/contracts';
 import type { z } from 'zod';
 
 import type { Principal } from '../auth/principal.js';
@@ -35,7 +37,7 @@ export class EscalationsService {
       const intent = await this.readableIntent(p, query.intent);
       if (!intent) throw notFound(query.intent);
       const rows = (await p.scope.escalations.listForIntent(intent.id, statuses)).reverse();
-      return { items: rows.slice(0, query.limit).map((e) => presentEscalation(e, intent)) };
+      return { items: await this.present(p.scope, rows.slice(0, query.limit)) };
     }
     const projects = await p.scope.projects.list();
     const readable: string[] = [];
@@ -51,7 +53,7 @@ export class EscalationsService {
 
   async show(p: Principal, code: string): Promise<Record<string, unknown>> {
     const { escalation, intent } = await this.readable(p, code);
-    return presentEscalation(escalation, intent);
+    return presentEscalation(escalation, intent, await routingOf(p.scope, intent, escalation));
   }
 
   async acknowledge(p: Principal, code: string): Promise<Record<string, unknown>> {
@@ -62,7 +64,7 @@ export class EscalationsService {
       { now: this.now },
     );
     await this.wake(p, intent);
-    return presentEscalation(updated, intent);
+    return presentEscalation(updated, intent, await routingOf(p.scope, intent, updated));
   }
 
   async decide(
@@ -87,7 +89,7 @@ export class EscalationsService {
       { now: this.now },
     );
     await this.wake(p, intent);
-    return presentEscalation(updated, intent);
+    return presentEscalation(updated, intent, await routingOf(p.scope, intent, updated));
   }
 
   /** A decision may unfreeze the intent: its workflow looks again (B07, ADR-M30). */
@@ -135,13 +137,46 @@ export class EscalationsService {
         if (intent) intents.set(intent.id, intent);
       }
     }
+    const settings = new Map<string, EscalationSettings | null>();
+    for (const intent of intents.values()) {
+      if (!settings.has(intent.project_id)) {
+        settings.set(intent.project_id, await escalationSettings(scope, intent.project_id));
+      }
+    }
     return rows.flatMap((row) => {
       const intent = intents.get(row.intent_id);
-      return intent ? [presentEscalation(row, intent)] : [];
+      const routing = intent ? (settings.get(intent.project_id)?.routing[row.route] ?? null) : null;
+      return intent ? [presentEscalation(row, intent, routing)] : [];
     });
   }
 }
 
 function notFound(ref: string): EscalationError {
   return new EscalationError('not_found', `escalation ${ref} not found`);
+}
+
+type EscalationSettings = Awaited<ReturnType<typeof loadEffectiveConfig>>['config']['escalation'];
+
+/**
+ * The escalation settings of the project configuration in force (U01, QUESTIONS #263); null when
+ * the platform refuses the stored configuration (the clock then fails closed too).
+ */
+async function escalationSettings(
+  scope: TenantScope,
+  projectId: string,
+): Promise<EscalationSettings | null> {
+  try {
+    return (await loadEffectiveConfig(scope.projectConfigs, projectId)).config.escalation;
+  } catch (error) {
+    if (error instanceof RegistryError) return null;
+    throw error;
+  }
+}
+
+async function routingOf(
+  scope: TenantScope,
+  intent: Intent,
+  escalation: Escalation,
+): Promise<EscalationRouting | null> {
+  return (await escalationSettings(scope, intent.project_id))?.routing[escalation.route] ?? null;
 }

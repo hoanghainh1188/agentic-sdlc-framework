@@ -43,7 +43,7 @@ export type Me = z.infer<typeof meSchema>;
 export const intentSchema = z.object({
   id,
   code,
-  project: z.object({ id, slug: code }),
+  project: z.object({ id, slug: code, repo_full_name: z.string().max(200) }),
   title: z.string().max(1000),
   description: z.string().max(20_000),
   risk_tier: code,
@@ -52,6 +52,7 @@ export const intentSchema = z.object({
   budget_usd: code,
   status: code,
   current_gate: code.nullable(),
+  gate_entered_at: time.nullable(),
   issue_number: z.number().int().nullable(),
   pr_number: z.number().int().nullable(),
   created_by: id,
@@ -88,6 +89,15 @@ const specRefSchema = z.object({
 });
 
 export const intentDetailSchema = intentSchema.extend({
+  /** U01 (QUESTIONS #261): who the current gate waits for, as the workflow resolves it. */
+  waiting_for: z
+    .object({
+      gate: code,
+      mode: code,
+      roles: z.array(code).max(20),
+      approvals_needed: z.number().int(),
+    })
+    .nullable(),
   spec: specRefSchema.nullable(),
   plan: z
     .object({
@@ -259,6 +269,10 @@ export const escalationSchema = z.object({
   current_step: code,
   owner_id: id.nullable(),
   backup_owner_id: id.nullable(),
+  /** U01 (QUESTIONS #263): the route's roles in the configuration in force. */
+  owner_role: code.nullable(),
+  backup_role: code.nullable(),
+  step_role: code.nullable(),
   packet: codes,
   ack_due_at: time.nullable(),
   step_due_at: time.nullable(),

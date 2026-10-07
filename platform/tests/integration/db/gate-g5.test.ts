@@ -36,6 +36,7 @@ import {
   notices,
   T0,
   type Harness,
+  waitingFor,
 } from '../g4-harness.js';
 import { LATER_WALL_CLOCK, withWallClock } from '../wall-clock.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
@@ -284,6 +285,8 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
         reason: 'new_plan_needed',
       });
       expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G3' });
+      // U01 (#261): Low risk, but G3 is HITL after the return; the API shows it.
+      expect(await waitingFor(t, intent)).toMatchObject({ gate: 'G3', mode: 'HITL' });
       expect(await g5(intent)).toEqual([['fail', 'out_of_scope', 'HOTL']]);
       expect(await checks(intent)).toEqual(['out_of_scope']);
       expect(await t.f.scope.escalations.listForIntent(intent.id)).toEqual([]);

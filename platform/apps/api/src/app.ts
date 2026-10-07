@@ -38,6 +38,7 @@ import { RunsController } from './runs/runs.controller.js';
 import { RunsService } from './runs/runs.service.js';
 import { SpecsController } from './specs/specs.controller.js';
 import { SpecsService } from './specs/specs.service.js';
+import { registerDashboard, type DashboardFiles, type RouteHost } from './dashboard/static.js';
 import { LogContextInterceptor } from './observability/log-context.interceptor.js';
 import { createApiLogger } from './observability/logging.js';
 import type { ApiSettings } from './settings.js';
@@ -88,6 +89,11 @@ export interface ApiDeps {
    * pack file answers `evidence_unavailable`.
    */
   readonly evidence?: { readonly store: EvidenceStore; readonly maxItemBytes: number };
+  /**
+   * The read-only dashboard's built files (U01, ADR-M54), served under `/dashboard/`. Undefined
+   * (`SDLC_API_DASHBOARD_DIR=off`): no dashboard routes.
+   */
+  readonly dashboard?: DashboardFiles;
 }
 
 @Module({})
@@ -196,6 +202,9 @@ export async function createApp(deps: ApiDeps): Promise<NestFastifyApplication> 
     { logger: deps.nestLogger ?? ['error', 'warn'] },
   );
   app.enableShutdownHooks();
+  if (deps.dashboard) {
+    registerDashboard(app.getHttpAdapter().getInstance() as unknown as RouteHost, deps.dashboard);
+  }
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
   return app;

@@ -94,6 +94,14 @@ export {
 } from './g6-ci.js';
 export { contextOf, stepCi, type G6Check } from './g6-verify.js';
 export {
+  currentGateWaitingFor,
+  gateOversight,
+  gatherGateOversightFacts,
+  resolveGateOversight,
+  type GateOversightFacts,
+  type WaitingFor,
+} from './oversight.js';
+export {
   g7Producers,
   gatherG7Facts,
   readG7,

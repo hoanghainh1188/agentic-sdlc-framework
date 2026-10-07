@@ -3,6 +3,7 @@
 // endpoints, decisions bound to version, scope and expiry (FR-17, Ch.6 §6.6), and the notices
 // posted on the intent's issue (design/ADR-M28 §2.4, §2.5, §2.7). Uses the in-process GitHub stub.
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
+import { loadProjectConfig } from '@sdlc/config';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -513,6 +514,19 @@ describeDb('B11 PR 2: acknowledge, decide, comments, API and notices on PostgreS
       expect(listed.items.map((i) => i.code)).toEqual([e.code]);
       const show = await inject('GET', `/v1/escalations/${e.code}`, 'viewer');
       expect(show.json()).toMatchObject({ code: e.code, freezes_intent: true, status: 'open' });
+      // U01 (#263): the route's roles in the configuration in force.
+      const loaded = loadProjectConfig('');
+      if (!loaded.ok) throw new Error('default configuration must load');
+      const routing = loaded.config.escalation.routing.technical;
+      expect(show.json()).toMatchObject({
+        owner_role: routing.owner_role,
+        backup_role: routing.backup_role,
+        step_role: {
+          owner: routing.owner_role,
+          backup: routing.backup_role,
+          governance: 'governance',
+        }[e.current_step],
+      });
 
       const refused = await inject('POST', `/v1/escalations/${e.code}/ack`, 'viewer');
       expect(refused.statusCode).toBe(403);

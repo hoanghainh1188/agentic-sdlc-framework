@@ -71,6 +71,7 @@ import {
 import { hotlBlockWindowOpenUntil } from './hotl.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
 import { waitedSeconds } from './waited.js';
+import { gateOversight } from './oversight.js';
 
 /** Who hears about a failed G4 check: Person A operates the runs (handbook Ch.13 §13.3). */
 export const G4_OPERATOR_ROLES: readonly ProjectRole[] = ['person_a'];
@@ -468,11 +469,7 @@ export async function g4Decided(
   intent: Intent,
   inputSha256: string,
 ): Promise<G4Decided> {
-  const oversight = policy.policy.oversightMode({
-    gate: 'G4',
-    riskTier: intent.risk_tier,
-    changeFlags: (await tx.plans.latest(intent.id))?.change_flags ?? [],
-  });
+  const oversight = await gateOversight(tx, policy.policy, intent, 'G4');
   const history = await gateHistory(tx, intent.id, 'G4');
   if (oversight.mode !== 'HITL') {
     const decided = await passedSinceEntry(tx, intent.id, history.entrySeq, inputSha256);

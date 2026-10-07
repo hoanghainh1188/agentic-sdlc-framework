@@ -79,8 +79,9 @@ import { readCi, type CiReading, type G6Deps } from './g6-ci.js';
 import { stepG7, stepPausedG7 } from './g7.js';
 import { stepG8, stepPausedG8 } from './g8.js';
 import { readG7, type G7Deps, type G7Reading } from './g7-facts.js';
-import { refusedPlanHashes, returnedFromG5 } from './g5-scope.js';
+import { refusedPlanHashes } from './g5-scope.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
+import { gateOversight } from './oversight.js';
 import { FEEDBACK_UNAVAILABLE } from './prepare-run.js';
 import { lastPushedHead } from './publish-state.js';
 import { moveTo, moveToRunning, stepPaused, stepRunning } from './run-lifecycle.js';
@@ -570,15 +571,9 @@ async function resolveOversight(
   intent: Intent,
   gate: GateCode,
 ): Promise<OversightResolution> {
-  const plan = await tx.plans.latest(intent.id);
-  // C07 (QUESTIONS #131): G3 is HITL once G5 sent the intent back for scope.
-  const returned = gate === 'G3' && (await returnedFromG5(tx, intent.id));
-  return policy.policy.oversightMode({
-    gate,
-    riskTier: intent.risk_tier,
-    changeFlags: plan?.change_flags ?? [],
-    ...(returned ? { context: { returnedFromG5: true } } : {}),
-  });
+  // U01 (QUESTIONS #261): one resolution for the workflow and the API's `waiting_for`; G3 is
+  // HITL once G5 sent the intent back for scope (C07, QUESTIONS #131).
+  return gateOversight(tx, policy.policy, intent, gate);
 }
 
 /** The roles that act next at `gate`: the gate's approvers or the people it notifies. */
