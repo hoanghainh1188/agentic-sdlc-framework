@@ -21,16 +21,7 @@ Built for small and medium software companies, including those working for Japan
 
 Red: always approved by a person (HITL, human in the loop). Orange: oversight depends on risk. Blue: an automatic policy check. Details: [codes table §4](handbook/00-introduction/05-codes.md).
 
-## 2. Status
-
-| Part | State |
-|---|---|
-| Platform | **MVP built.** A task goes through every gate, G1 to G8, in automated end-to-end tests on the sample repository's shape, and every requirement has its tests ([MVP definition of done](design/MVP-DONE.md)). A read-only web dashboard is included |
-| Next step | **Trial M-E:** ten sample tasks on the sample repository with a real team, to measure gate waiting times, cost and rework ([trial plan](design/M-E-TRIAL-PLAN.md)) |
-| Before production use | TLS and backups on the target server, and one run with a commercial API model ([open items](design/MVP-DONE.md)) |
-| Handbook | Version 1.0, all parts written; approval of the whole handbook is in progress |
-
-## 3. Where to start
+## 2. Where to start
 
 | You are | Read |
 |---|---|
@@ -41,7 +32,7 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 | **Working on the platform's code** | [CONTRIBUTING.md](CONTRIBUTING.md) and [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md) |
 | **Working on the handbook** | [CONTRIBUTING.md](CONTRIBUTING.md), the [contents](handbook/00-introduction/01-contents.md) and the [writing style](handbook/00-introduction/06-writing-style.md) |
 
-## 4. How it works
+## 3. How it works
 
 **A task goes through eight gates.** A person describes the change (G1), links a specification (G2) and a plan that says which files may change (G3). The platform checks the agent, its permissions and the budget (G4), runs the agent in an isolated sandbox, checks that it stayed inside the plan and the budget (G5), pushes the change and waits for CI and security scans (G6). A reviewer reviews and merges the pull request (G7), then approves the release with its evidence (G8).
 
@@ -65,7 +56,7 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 - give an agent a real model key, access to secrets, or a way to push to the main branch;
 - change or delete an audit record.
 
-## 5. What the platform includes
+## 4. What the platform includes
 
 | Area | What it does |
 |---|---|
@@ -82,7 +73,7 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 
 Interfaces keep the platform open to change: the Git host (GitHub today), the agent (OpenHands today), the policy engine and the model provider can each be replaced without changing the core.
 
-## 6. Technology
+## 5. Technology
 
 | Layer | Choice |
 |---|---|
@@ -92,7 +83,7 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 | Models | API models and self-hosted models, all through the LiteLLM gateway |
 | Licences | Every reused component allows commercial use ([build vs buy](design/D-01-build-vs-buy.md)) |
 
-## 7. Repository layout
+## 6. Repository layout
 
 ```text
 .
@@ -108,7 +99,7 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 └── scripts/         # Backlog and issue tools
 ```
 
-## 8. Documents
+## 7. Documents
 
 | Topic | Document |
 |---|---|
@@ -118,12 +109,12 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 | Architecture | [D-03](design/D-03-mvp-architecture.md) |
 | Data model | [D-05](design/D-05-data-model.md) |
 | Models, tokens and cost | [D-07](design/D-07-model-and-token-management.md) |
-| The sample repository used for tests and the trial | [D-09](design/D-09-sample-pilot-repo.md) |
+| The sample repository used for tests | [D-09](design/D-09-sample-pilot-repo.md) |
 | What the web interface may offer next | [MVP+1 interface scope (draft)](design/MVP1-UI-SCOPE.md) |
 | Every design document and decision | [design/README.md](design/README.md) |
 | Diagrams | [diagrams/README.md](diagrams/README.md) |
 | Changes | [CHANGELOG.md](CHANGELOG.md) |
 
-## 9. Licence
+## 8. Licence
 
 Proprietary: a company asset, not open source and not published.
