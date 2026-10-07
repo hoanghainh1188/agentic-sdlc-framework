@@ -110,6 +110,7 @@
   "api.settings.temporal_off_in_production": "{name}=off (no intent workflow signals) is only allowed in development mode.",
   "api.start.dev_mode": "Development mode: the database URL comes from SDLC_API_DEV_DB_URL, not from OpenBao. Never use this on the server.",
   "api.start.temporal_off": "SDLC_API_TEMPORAL_ADDRESS=off: the api does not wake intent workflows; the worker catches up within its reconcile interval. Development mode only.",
+  "api.start.dashboard_off": "The read-only dashboard is off (SDLC_API_DASHBOARD_DIR=off).",
   "api.start.git_host_off": "Development mode without OpenBao: the API has no Git host, so linking a spec or submitting a plan answers git_host_unavailable.",
   "api.start.evidence_off": "SDLC_API_EVIDENCE_URL=off: the API builds and reads no Evidence Packs; those endpoints answer evidence_unavailable.",
   "api.start.evidence_missing": "The API's evidence credential is not in OpenBao (or development mode without OpenBao): building or reading an Evidence Pack answers evidence_unavailable. Run: pnpm openbao:bootstrap api-evidence-credentials.",

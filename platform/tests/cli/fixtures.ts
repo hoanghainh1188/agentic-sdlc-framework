@@ -46,11 +46,14 @@ import {
   presentIntent,
   presentPlan,
   presentSpec,
+  presentWaitingFor,
 } from '../../apps/api/src/intents/present.js';
 
 export const TENANT = '11111111-1111-4111-8111-111111111111';
 export const USER = '22222222-2222-4222-8222-222222222222';
 export const PROJECT = { id: '33333333-3333-4333-8333-333333333333', slug: 'pilot' };
+/** U01 (QUESTIONS #262): the intent body also names the repository. */
+const INTENT_PROJECT = { ...PROJECT, repo_full_name: 'harryforge/pilot-order-inventory' };
 const INTENT_ID = '44444444-4444-4444-8444-444444444444';
 const AT = new Date('2026-10-03T01:02:03.000Z');
 const HASH = 'a'.repeat(64);
@@ -81,7 +84,7 @@ export function intentRow(overrides: Partial<Intent> = {}): Intent {
 }
 
 export function intentBody(overrides: Partial<Intent> = {}): Record<string, unknown> {
-  return { ...presentIntent(intentRow(overrides), PROJECT) };
+  return { ...presentIntent(intentRow(overrides), INTENT_PROJECT) };
 }
 
 export function decisionRow(overrides: Partial<GateDecisionRow> = {}): GateDecisionRow {
@@ -123,7 +126,13 @@ export function intentDetailBody(): Record<string, unknown> {
   } as SpecRef;
   const plan = { version: 2, plan_sha256: HASH, change_flags: ['migration'] } as unknown as Plan;
   return {
-    ...presentIntent(intentRow(), PROJECT),
+    ...presentIntent(intentRow(), INTENT_PROJECT),
+    waiting_for: presentWaitingFor({
+      gate: 'G2',
+      mode: 'HITL',
+      roles: ['person_a'],
+      approvalsNeeded: 1,
+    }),
     spec: presentSpec(spec),
     plan: presentPlan(plan),
     decisions: [presentDecision(decisionRow())],
@@ -264,7 +273,11 @@ export function escalationBody(overrides: Partial<Escalation> = {}): Record<stri
     created_at: AT,
     ...overrides,
   };
-  return presentEscalation(row, { id: INTENT_ID, code: 'INT-2026-0007' });
+  return presentEscalation(
+    row,
+    { id: INTENT_ID, code: 'INT-2026-0007' },
+    { owner_role: 'person_b', backup_role: 'person_a' },
+  );
 }
 
 export function aiRecordBody(overrides: Partial<ProjectAiRecord> = {}): Record<string, unknown> {

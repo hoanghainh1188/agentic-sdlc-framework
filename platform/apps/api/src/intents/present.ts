@@ -1,11 +1,16 @@
 // Response bodies (snake_case, like the database and the codes table). Presenters pick fields
 // explicitly, so a new column never leaks into the API by accident.
-import type { GateDecisionRow, Intent, Plan, Project, SpecRef } from '@sdlc/core';
+import type { GateDecisionRow, Intent, Plan, Project, SpecRef, WaitingFor } from '@sdlc/core';
 
 export interface IntentBody {
   readonly id: string;
   readonly code: string;
-  readonly project: { readonly id: string; readonly slug: string };
+  /** U01 (QUESTIONS #262): `repo_full_name` for the issue and pull request links. */
+  readonly project: {
+    readonly id: string;
+    readonly slug: string;
+    readonly repo_full_name: string;
+  };
   readonly title: string;
   readonly description: string;
   readonly risk_tier: string;
@@ -14,6 +19,8 @@ export interface IntentBody {
   readonly budget_usd: string;
   readonly status: string;
   readonly current_gate: string | null;
+  /** U01 (QUESTIONS #260): when the intent last entered `current_gate` (FR-12). */
+  readonly gate_entered_at: string | null;
   readonly issue_number: number | null;
   readonly pr_number: number | null;
   readonly created_by: string;
@@ -21,11 +28,14 @@ export interface IntentBody {
   readonly updated_at: string;
 }
 
-export function presentIntent(intent: Intent, project: Pick<Project, 'id' | 'slug'>): IntentBody {
+export function presentIntent(
+  intent: Intent,
+  project: Pick<Project, 'id' | 'slug' | 'repo_full_name'>,
+): IntentBody {
   return {
     id: intent.id,
     code: intent.code,
-    project: { id: project.id, slug: project.slug },
+    project: { id: project.id, slug: project.slug, repo_full_name: project.repo_full_name },
     title: intent.title,
     description: intent.description,
     risk_tier: intent.risk_tier,
@@ -34,6 +44,7 @@ export function presentIntent(intent: Intent, project: Pick<Project, 'id' | 'slu
     budget_usd: intent.budget_usd,
     status: intent.status,
     current_gate: intent.current_gate,
+    gate_entered_at: intent.gate_entered_at?.toISOString() ?? null,
     issue_number: intent.issue_number,
     pr_number: intent.pr_number,
     created_by: intent.created_by,
@@ -77,5 +88,21 @@ export function presentSpec(spec: SpecRef | undefined): Record<string, unknown> 
 export function presentPlan(plan: Plan | undefined): Record<string, unknown> | null {
   return plan
     ? { version: plan.version, plan_sha256: plan.plan_sha256, change_flags: plan.change_flags }
+    : null;
+}
+
+/**
+ * U01 (QUESTIONS #261): who the intent waits for at its current gate, as the workflow resolves it
+ * (`currentGateWaitingFor`, core). Null when nothing is certain (not at a gate, or G6 waiting for
+ * CI).
+ */
+export function presentWaitingFor(waiting: WaitingFor | null): Record<string, unknown> | null {
+  return waiting
+    ? {
+        gate: waiting.gate,
+        mode: waiting.mode,
+        roles: [...waiting.roles],
+        approvals_needed: waiting.approvalsNeeded,
+      }
     : null;
 }

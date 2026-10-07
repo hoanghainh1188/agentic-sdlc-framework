@@ -19,6 +19,7 @@ describe('api settings', () => {
       authFailuresPerMinute: 10,
       temporal: { address: 'temporal:7233', namespace: 'default' },
       githubApiUrl: 'https://api.github.com',
+      dashboardDir: null,
       evidence: {
         url: 'http://seaweedfs:8333',
         bucket: 'evidence',
@@ -106,5 +107,12 @@ describe('api settings', () => {
     expect(() => loadSettings({ [name]: value })).toThrowError(
       expect.objectContaining({ key: 'api.settings.invalid', setting: name }),
     );
+  });
+
+  it('U01: the dashboard folder is off by default, else an absolute path', () => {
+    expect(loadSettings({ SDLC_API_DASHBOARD_DIR: '/app/dashboard' }).dashboardDir).toBe(
+      '/app/dashboard',
+    );
+    expect(() => loadSettings({ SDLC_API_DASHBOARD_DIR: 'dist' })).toThrow(SettingsError);
   });
 });

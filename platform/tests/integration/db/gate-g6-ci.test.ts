@@ -43,6 +43,7 @@ import {
   Secret,
   T0,
   type Harness,
+  waitingFor,
 } from '../g4-harness.js';
 import { createTestDatabase, describeDb, tamper, type TestDatabase } from './helpers.js';
 
@@ -244,6 +245,8 @@ describeDb('C08 PR 2: G6 reads CI, on PostgreSQL', () => {
     const runId = await runToCi(intent);
     const first = await step(intent);
     expect(first).toMatchObject({ outcome: 'waiting', reason: 'ci_pending' });
+    // U01 (#261): waiting for CI, not for a person: nothing certain to show.
+    expect(await waitingFor(t, intent)).toBeNull();
     expect((first as { wakeInMs?: number }).wakeInMs).toBeLessThanOrEqual(60 * MINUTE);
     await step(intent); // the same reading: not recorded twice
     const events = (await t.f.scope.runEvents.list(runId)).filter(
@@ -358,6 +361,12 @@ describeDb('C08 PR 2: G6 reads CI, on PostgreSQL', () => {
     ci.checks = [ok()];
     ci.findings = { known: false, reason: 'not_enabled' };
     expect(await step(intent)).toMatchObject({ outcome: 'waiting', reason: 'g6_decision' });
+    // U01 (#261): the API shows the HITL the workflow waits with.
+    expect(await waitingFor(t, intent)).toMatchObject({
+      gate: 'G6',
+      mode: 'HITL',
+      roles: ['person_b'],
+    });
   });
 
   it('a critical finding → paused, a security escalation; resume → Person B approves', async () => {

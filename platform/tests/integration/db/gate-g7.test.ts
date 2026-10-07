@@ -19,7 +19,7 @@ import { CommandError } from '../../../packages/core/src/commands/errors.js';
 import { decideGate } from '../../../packages/core/src/commands/gate-command.js';
 import { handleGitEvent } from '../../../packages/core/src/commands/git-event-handler.js';
 import { RegistryError } from '../../../packages/core/src/registry/errors.js';
-import { HOUR, notices } from '../g4-harness.js';
+import { HOUR, notices, waitingFor } from '../g4-harness.js';
 import { PEOPLE } from '../workflow/fixture.js';
 import {
   actor,
@@ -179,6 +179,12 @@ describeDb('E01: gate G7, review and merge, on PostgreSQL', () => {
   describe('AC3: dual approval for a flagged plan (N9)', () => {
     it('migration: Person B alone is not enough; the second approver completes it', async () => {
       const intent = await toG7(['migration']);
+      // U01 (#261): the API shows the dual approval the workflow waits for.
+      expect(await waitingFor(w.t, intent)).toMatchObject({
+        gate: 'G7',
+        mode: 'HITL',
+        approvalsNeeded: 2,
+      });
       review(PEOPLE.b, 'approved');
       expect(await step(intent)).toMatchObject({ reason: 'g7_decision' });
       review(SECOND, 'approved');

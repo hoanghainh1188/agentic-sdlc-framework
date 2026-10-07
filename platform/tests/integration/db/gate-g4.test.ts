@@ -38,6 +38,7 @@ import {
   T0,
   type Harness,
   type World,
+  waitingFor,
 } from '../g4-harness.js';
 import { FakeTransit } from '../../run-contract/helpers.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
@@ -75,6 +76,8 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'run_pending' });
       expect(await t.reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G4' });
       expect(await t.g4Decisions(intent)).toEqual([['pass', null, 'POLICY']]);
+      // U01 (#261): the API shows the mode the workflow decided with.
+      expect(await waitingFor(t, intent)).toMatchObject({ gate: 'G4', mode: 'POLICY', roles: [] });
 
       const [proposed] = await t.f.scope.audit.listForEntity(intent.id, ['run.proposed']);
       const [pass] = await t.f.scope.gateDecisions.listForIntent(intent.id, 'G4');
@@ -389,6 +392,12 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       const [proposed] = await t.f.scope.audit.listForEntity(intent.id, ['run.proposed']);
       expect(proposed?.payload).toMatchObject({ autonomy_level: 'L1' });
       expect(await notices(t, intent)).toContain('run_proposed');
+      expect(await waitingFor(t, intent)).toMatchObject({
+        gate: 'G4',
+        mode: 'HITL',
+        roles: ['person_a'],
+        approvalsNeeded: 1,
+      });
 
       // Person B holds no G4 role; Person A approves.
       await expect(t.decide(await t.reload(intent), 'approve', 'b')).rejects.toMatchObject({

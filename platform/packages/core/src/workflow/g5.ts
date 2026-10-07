@@ -39,7 +39,6 @@ import {
   type GateReasonCode,
   type IntentStepResult,
   type IntentStatus,
-  type OversightResolution,
   type PolicyEngine,
   type ProjectRole,
   type ValidatedProjectConfig,
@@ -63,6 +62,7 @@ import { gatherG5Facts, spentPercent, type G5Facts } from './g5-facts.js';
 import { gateHistory } from './gate-history.js';
 import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js';
 import { sentBackForInput } from './hotl.js';
+import { resolveGateOversight } from './oversight.js';
 import { waitedSeconds } from './waited.js';
 
 export interface G5Policy {
@@ -163,7 +163,7 @@ export async function stepG5(
   const breach = g5Breach(facts, policy.config);
   if (breach) return failG5(tx, registry, policy, intent, facts, breach);
 
-  const oversight = oversightAt(policy, intent, false);
+  const oversight = resolveGateOversight(policy.policy, intent, 'G5', { changeFlags: [] });
   if (oversight.mode === 'HITL') {
     const { valid } = await registry.revalidateApprovals(tx, {
       intentId: intent.id,
@@ -209,15 +209,6 @@ export async function stepG5(
   return move(tx, registry, intent, { status: 'in_gate', gate: 'G6' }, 'hotl_passed', {
     decisionId: pass.id,
     audience: oversight.roles.filter((role) => role !== 'viewer'),
-  });
-}
-
-function oversightAt(policy: G5Policy, intent: Intent, breached: boolean): OversightResolution {
-  return policy.policy.oversightMode({
-    gate: 'G5',
-    riskTier: intent.risk_tier,
-    changeFlags: [],
-    context: { breached },
   });
 }
 
@@ -444,11 +435,9 @@ export async function g3Approvers(
   policy: G5Policy,
   intent: Intent,
 ): Promise<ProjectRole[]> {
-  const g3 = policy.policy.oversightMode({
-    gate: 'G3',
-    riskTier: intent.risk_tier,
+  const g3 = resolveGateOversight(policy.policy, intent, 'G3', {
     changeFlags: (await tx.plans.latest(intent.id))?.change_flags ?? [],
-    context: { returnedFromG5: true },
+    returnedFromG5: true,
   });
   return g3.roles.filter((role) => role !== 'viewer');
 }
