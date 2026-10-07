@@ -27,6 +27,7 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 |---|---|
 | **Leadership** deciding whether to adopt | This page, then handbook Part I: [Ch.1 summary](handbook/01-policy/ch01-executive-summary.md) and [Ch.9 adoption roadmap](handbook/01-policy/ch09-adoption-roadmap.md) |
 | **Bringing a project team onto the platform** (tech lead, leadership) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout phase by phase, the first week, common mistakes |
+| **New to the platform** | [The platform in five minutes](platform/PLATFORM-IN-5-MINUTES.md), then the [tutorial: your first feature](platform/TUTORIAL-FIRST-FEATURE.md), one real feature from idea to release |
 | **A team member** (Person A, Person B, PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one task from G1 to G8, by role, with the commands and what to do when something goes wrong |
 | **Installing the platform** (operator) | [platform/deploy/README.md](platform/deploy/README.md), "Fresh deployment": from an empty checkout to the first task with Docker Compose; runbook [T11](handbook/03-templates/T11-openbao-runbook.md) |
 | **Working on the platform's code** | [CONTRIBUTING.md](CONTRIBUTING.md) and [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md) |

@@ -1,6 +1,6 @@
 # User guide: taking one task through the platform
 
-For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one task from G1 to G8 and points to the handbook for details. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md).
+For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one task from G1 to G8 and points to the handbook for details. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
 Version 0.1, 2026-10-06. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
 

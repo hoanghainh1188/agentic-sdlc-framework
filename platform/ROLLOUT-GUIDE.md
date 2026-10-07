@@ -107,7 +107,7 @@ The platform works on a GitHub repository. The sample repository `pilot-order-in
 
 | # | Do | Check |
 |---|---|---|
-| 3.1 | Read `platform/USER-GUIDE.md` (about 20 minutes) and the handbook chapters of your role (section 1) | — |
+| 3.1 | Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and the [tutorial](TUTORIAL-FIRST-FEATURE.md) (about 20 minutes), then `platform/USER-GUIDE.md` and the handbook chapters of your role (section 1) | — |
 | 3.2 | Get a first token from the tenant admin, log in, create your own token and revoke the first one (USER-GUIDE §2) | `sdlc whoami` shows your roles |
 | 3.3 | Open the dashboard and sign in with your token | You see the project's (empty) board |
 | 3.4 | A 30-minute walk-through together: the eight gates, who decides each, how comment commands work (first line of a new comment), what an escalation is | Everyone can say who approves G3 and G7 on this project |
