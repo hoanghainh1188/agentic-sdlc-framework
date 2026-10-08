@@ -15,6 +15,8 @@
 | D11 | MVP architecture | design/D-03 | [src](src/d11-mvp-architecture.mmd) | [svg](svg/d11-mvp-architecture.svg) | ✅ Approved |
 | D12 | Gate state machine G1–G8 | design/D-03 | [src](src/d12-gate-state-machine.mmd) | [svg](svg/d12-gate-state-machine.svg) | ✅ Approved |
 | D13 | MVP entity-relationship diagram | design/D-05 | [src](src/d13-mvp-erd.mmd) | [svg](svg/d13-mvp-erd.svg) | ✅ Approved |
+| D14 | Two repositories: the platform and your project | README, platform/ROLLOUT-GUIDE phase 1 | [src](src/d14-two-repositories.mmd) | [svg](svg/d14-two-repositories.svg) | ✅ Approved |
+| D15 | From a spec to a submitted plan (Spec Kit, BMAD, `sdlc plan draft`) | platform/ROLLOUT-GUIDE phase 1 | [src](src/d15-spec-to-plan.mmd) | [svg](svg/d15-spec-to-plan.svg) | ✅ Approved |
 
 Colour conventions:
 - Light red: gate always approved by a person (HITL).

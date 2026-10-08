@@ -1,0 +1,16 @@
+%%{init: {"flowchart": {"wrappingWidth": 360}}}%%
+flowchart TB
+    S1["1. Write the spec<br/>Spec Kit, BMAD or by hand<br/>(with acceptance criteria)"]
+    S2["2. Pull request with the spec<br/>reviewed, merged on main"]
+    S3["3. sdlc intent create …<br/>→ INT-2026-0007"]
+    S4["4. sdlc spec link INT-… --path … --tool spec-kit | bmad | manual<br/>the platform counts the acceptance criteria"]
+    G2{{"G2 passes only with at least<br/>one acceptance criterion"}}
+    S5["5. sdlc plan draft INT-… --from tasks.md --tool spec-kit<br/>a draft on your machine; nothing is sent"]
+    S6["6. A person fills allowed_paths, tools, change_flags<br/>pull request with .sdlc/plans/INT-….yaml, merged"]
+    S7["7. sdlc plan submit INT-…"]
+    G3{{"G3 Plan / Architecture<br/>Person B"}}
+    S1 --> S2 --> S3 --> S4 --> G2 --> S5 --> S6 --> S7 --> G3
+    classDef gate fill:#ffd6d6,stroke:#c0392b;
+    classDef auto fill:#d6e9ff,stroke:#2e6da4;
+    class G3 gate;
+    class G2 auto;

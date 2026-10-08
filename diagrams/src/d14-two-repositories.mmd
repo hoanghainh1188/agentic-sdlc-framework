@@ -1,0 +1,26 @@
+%%{init: {"flowchart": {"wrappingWidth": 320}}}%%
+flowchart LR
+    T["Team<br/>sdlc CLI · /approve comments · dashboard"]
+    subgraph R1["Repo 1: agentic-sdlc-framework (the platform: a tool)"]
+        direction TB
+        P1["platform/ · handbook/ · design/"]
+        P2["Installed once on a server with Docker Compose<br/>api · worker · runner · dashboard<br/>PostgreSQL · OpenBao · LiteLLM · SeaweedFS"]
+        P3["Serves many projects and tenants<br/>keeps no working copy of your code<br/>keeps: run diffs as evidence (≥ 180 days),<br/>hashes, logs; model traces with observability"]
+        P1 --> P2 --> P3
+    end
+    subgraph R2["Repo 2: your project's repository (your code: the product)"]
+        direction TB
+        A1["On GitHub, as today<br/>one per project"]
+        A2["apps/ · AGENTS.md · docs/specs/<br/>.sdlc/plans/ · .github/ (CI, ci-ok)"]
+        A3["Branches agent/INT-… and pull requests<br/>reviewed and merged by people"]
+        A1 --> A2 --> A3
+    end
+    SB["Temporary sandbox per run<br/>clone → agent writes code → removed"]
+    T --> R1
+    T -- "review and merge" --> R2
+    R1 -- "GitHub App: reads specs and plans,<br/>pushes agent/INT-…, opens pull requests,<br/>reads CI and reviews" --> R2
+    R1 -. "runner" .-> SB
+    SB -. "clone" .-> R2
+    classDef note fill:#fff8d6,stroke:#c9a400,stroke-dasharray: 4 3;
+    classDef ai fill:#eeeeee,stroke:#888888;
+    class SB ai;
