@@ -2,7 +2,7 @@
 
 For **whoever leads the rollout** (usually the tech lead, with leadership and the platform operator), and for **everyone on the team** who wants to know where to start. It puts the existing guides in order: what to read, who does what, in which order, and how to check each step. It does not replace them.
 
-Version 0.1, 2026-10-07. Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
+Version 0.2, 2026-10-08 (phase 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
 
 ---
 
@@ -79,16 +79,108 @@ Each phase has an owner, a usual duration and a check. Do not start a phase befo
 
 ### Phase 1. Prepare the repository (Person A, the repository owner; 1–2 days)
 
-The platform works on a GitHub repository. The sample repository `pilot-order-inventory` is the reference: copy what it does.
+#### Two repositories, never one
 
-| # | Do | Check |
-|---|---|---|
-| 1.1 | Branch protection on the default branch: no direct push, a pull request, required checks, at least one approval | `main` refuses a direct push |
-| 1.2 | CI with **one aggregate required check** that passes only when everything passed (the pilot's `ci-ok`), and security scans (secrets, code, dependencies) | The check appears on every pull request |
-| 1.3 | `AGENTS.md` at the repository root: build and test commands, conventions. The agent reads it; the platform pins its hash | The file exists on `main` |
-| 1.4 | A folder for specs (for example `docs/specs/`), one Markdown file per change, with acceptance criteria | One example spec merged |
-| 1.5 | The pull request template with the AI disclosure (template T2) and `CODEOWNERS` | A test pull request shows the template |
-| 1.6 | Install the platform's GitHub App on this repository only (Contents and Pull requests read and write; Issues read and write; Checks, Commit statuses, Code scanning alerts and Metadata read) | The operator sees the installation |
+The platform and your application live in **two separate repositories**:
+
+```mermaid
+flowchart LR
+    subgraph P["Repository 1: the platform (this repository)"]
+        direction TB
+        P1["Installed once on a server<br/>with Docker Compose"]
+        P2["api · worker · runner · dashboard<br/>PostgreSQL · OpenBao · LiteLLM · SeaweedFS"]
+    end
+    subgraph A["Repository 2: your application (one per project)"]
+        direction TB
+        A1["Your code, on GitHub as today"]
+        A2["AGENTS.md · docs/specs/ · .sdlc/plans/<br/>CI with one aggregate check"]
+    end
+    T["Team<br/>sdlc CLI · /approve comments · dashboard"] --> P
+    T -- "reviews and merges pull requests" --> A
+    P -- "GitHub App: reads specs and plans,<br/>pushes agent/INT-… branches,<br/>opens pull requests, reads CI and reviews" --> A
+```
+
+- **The platform is a tool**, like a CI server: installed once by the operator, used by many projects. Team members use it through the `sdlc` command, GitHub comments and the dashboard; they never change its repository.
+- **Your application keeps its own repository on GitHub.** The tenant admin registers it as a project (`sdlc admin project create … --repo <org>/<name>`), and the operator installs the platform's GitHub App on it.
+- **The platform keeps no copy of your code.** For each run, the runner clones your repository into a temporary sandbox, the agent works there, the runner pushes the branch `agent/INT-…` and removes the sandbox. The platform keeps the diff as evidence (with a retention period), hashes and logs.
+- People review and merge the pull request **in your repository, on GitHub**.
+
+#### What your repository needs
+
+The sample repository [`harryforge/pilot-order-inventory`](https://github.com/harryforge/pilot-order-inventory) has all of it. A typical layout:
+
+```text
+my-app/
+├── AGENTS.md              ← the agent's instructions (exactly one; see below)
+├── docs/specs/            ← one Markdown spec per change, with acceptance criteria
+├── .sdlc/plans/           ← INT-…yaml, one plan per intent
+├── .github/
+│   ├── workflows/ci.yml   ← one aggregate check (for example ci-ok) and security scans
+│   ├── pull_request_template.md
+│   └── CODEOWNERS
+├── apps/ …                ← your code (Node.js / TypeScript today)
+└── package.json, pnpm-lock.yaml
+```
+
+| # | Do | Why | Check |
+|---|---|---|---|
+| 1.1 | Branch protection on the default branch: no direct push, a pull request, required checks, at least one approval | Nobody, agents included, pushes to `main`; people merge (G7) | `main` refuses a direct push |
+| 1.2 | CI with **one aggregate required check** that passes only when everything passed (the pilot's `ci-ok`), and security scans (secrets, code, dependencies) | G6 waits for the check named in `verification.required_checks` | The check appears on every pull request |
+| 1.3 | GitHub **code scanning** turned on (for example CodeQL, or Semgrep uploading SARIF) | G6 reads the open security findings; when it cannot, G6 needs a person (HITL) | The repository's Security tab shows code scanning |
+| 1.4 | `AGENTS.md` at the repository root: build and test commands, conventions | The agent reads it; the platform pins its hash in the agent register | The file exists on `main` |
+| 1.5 | A folder for specs (for example `docs/specs/`), one Markdown file per change (at most 256 KiB) with **acceptance criteria** | G2 passes only when the linked spec has at least one criterion | One example spec merged |
+| 1.6 | The pull request template with the AI disclosure (template T2) and `CODEOWNERS` | Reviewers see who and what wrote the change | A test pull request shows the template |
+| 1.7 | Install the platform's GitHub App on this repository only (Contents and Pull requests read and write; Issues read and write; Checks, Commit statuses, Code scanning alerts and Metadata read) | Every platform action on GitHub goes through it | The operator sees the installation |
+| 1.8 | Check that the project builds and tests in the sandbox image (`node24` today) | The agent runs `AGENTS.md`'s commands in it | Phase 2.6 |
+
+**Limits today:**
+
+- **GitHub only.** GitLab comes later through the same interface.
+- **Node.js / TypeScript only.** The sandbox image is `node24` and the package proxy serves npm. Another toolchain needs a sandbox image and a package proxy first.
+- **Very large repositories are refused.** When GitHub lists the base commit's tree only in part, G4 refuses the run (`instructions_unpinned`, cause `tree_truncated`).
+
+#### Exactly one file of agent instructions
+
+The agent (OpenHands) also reads instructions from other files. Any of them would change what the agent does without a new, approved agent version. So **G4 refuses to run** (`instructions_unpinned`) when the repository holds one of these besides the pinned `AGENTS.md`:
+
+- at the root: `CLAUDE.md`, `agent.md`, `GEMINI.md`, `.cursorrules` (any case);
+- an `AGENTS.md` in a sub-folder;
+- any file under `.agents/skills/`, `.openhands/skills/` or `.openhands/microagents/`.
+
+G5 also stops a run that added, changed or removed one of them. **Changing `AGENTS.md` itself** needs a new agent version, approved again (handbook Ch.20).
+
+If your team uses Claude Code, Cursor or another assistant: put shared instructions in `AGENTS.md`, keep personal ones on your machine (not committed), or register the other file as the pinned one instead (one per agent). Folders such as `.claude/` and `_bmad/` are not read by the agent and are allowed.
+
+#### Writing specs with Spec Kit or BMAD (optional)
+
+The platform does not run these tools: Person A or the PM / BrSE runs them in their own AI assistant, and the platform reads the files they produce. Use the **pinned versions**: the platform counts acceptance criteria by their templates (`design/ADR-M61-spec-structure.md`); another version may count 0 and hold the intent at G2.
+
+| Tool | Install (pinned) | With Claude Code it writes | Never use |
+|---|---|---|---|
+| Spec Kit **v1.1.2** (needs Python 3.11+, `uv`) | `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@v1.1.2`, then `specify init <name> --integration claude` | `.specify/`, `.claude/skills/`; each feature in `specs/<NNN-name>/` (`spec.md`, `tasks.md`) | The `agent-context` extension (it writes `CLAUDE.md`); integrations that install into `.agents/skills/` (for example `codex`) |
+| BMAD **v6.12.1** (needs Node.js 20.12+, Python 3.10+, `uv`) | `npx bmad-method@6.12.1 install`, choose **Claude Code** | `_bmad/`, `.claude/skills/`; documents in `_bmad-output/` | Tools it installs into `.agents/skills/` (Codex, Amp, Auggie…); the unpinned `npx skills add` |
+
+Where the platform finds the acceptance criteria (G2 needs at least one):
+
+- **Spec Kit:** each `**Acceptance Scenarios**:` block; every `Given / When / Then` item counts. `FR-xxx` and `SC-xxx` items do not.
+- **BMAD:** a story file's `## Acceptance Criteria` section, or an epics file's `**Acceptance Criteria:**` blocks.
+- **By hand:** a heading that contains `Acceptance criteria` or `受入基準`; each top-level list item counts.
+
+From a spec to a submitted plan:
+
+```mermaid
+flowchart TB
+    S1["1. Write the spec<br/>(Spec Kit, BMAD or by hand)"] --> S2["2. Pull request with the spec → merged on main"]
+    S2 --> S3["3. sdlc intent create … → INT-2026-0007"]
+    S3 --> S4["4. sdlc spec link INT-… --path … --tool spec-kit|bmad|manual<br/>(the platform counts the acceptance criteria)"]
+    S4 --> S5["5. sdlc plan draft INT-… --from tasks.md --tool spec-kit<br/>(a draft on your machine; nothing is sent)"]
+    S5 --> S6["6. A person fills allowed_paths, tools, change_flags<br/>pull request with .sdlc/plans/INT-….yaml → merged"]
+    S6 --> S7["7. sdlc plan submit INT-…"]
+```
+
+- `sdlc plan draft` reads a Spec Kit `tasks.md` or **one** BMAD story file (an epics file is refused). It leaves `allowed_paths`, `tools` and `change_flags` for a person: submission refuses the draft until they are filled. It never submits, commits or pushes.
+- The plan file is named after the intent code, so create the intent first.
+- Details: USER-GUIDE and handbook Ch.19 §19.8c.
 
 ### Phase 2. Set up the platform for the project (operator, tenant admin, PM / BrSE; about 1 day)
 
@@ -146,6 +238,8 @@ Run real tasks, one at a time at first. The trial plan of the sample repository 
 | Mistake | What happens | Avoid it |
 |---|---|---|
 | One person is both Person A and Person B | The platform refuses the second role | Name two people in phase 0 |
+| A `CLAUDE.md`, `.cursorrules` or `.agents/skills/` committed next to `AGENTS.md` | G4 refuses every run (`instructions_unpinned`) | One file of agent instructions (phase 1); keep personal ones uncommitted |
+| Spec Kit or BMAD in another version than the pinned one | The spec may count 0 acceptance criteria; the intent waits at G2 | Install the pinned versions (phase 1) |
 | A GitHub account linked by login, or not at all | That person's `/approve` comments are refused | Link by numeric ID (`gh api users/<login> --jq .id`) |
 | No project AI record | Intents wait before G1 (`ai_record_missing`) | Phase 2.5 before the first intent |
 | The spec or the plan is not on the default branch | The spec cannot be linked; the plan cannot be submitted | Merge them first: the platform reads `main` |
