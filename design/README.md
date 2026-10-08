@@ -3,7 +3,7 @@
 | Code | Document | Status | Approved on |
 |---|---|---|---|
 | D-01 | [Build vs buy](D-01-build-vs-buy.md) | ✅ Approved | 2026-10-08 (0.7) |
-| D-02 | [MVP scope](D-02-mvp-scope.md) | ✅ Approved | 2026-09-24 |
+| D-02 | [MVP scope](D-02-mvp-scope.md) | ✅ Approved | 2026-10-08 (1.6) |
 | D-03 | [MVP architecture](D-03-mvp-architecture.md) | ✅ Approved | 2026-09-24 |
 | D-04 | Physical design and stack | ➖ Merged into D-03 (sections 8–11) and D-07 for the MVP | |
 | D-05 | [MVP data model](D-05-data-model.md) | ✅ Approved | 2026-09-24 |
