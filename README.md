@@ -27,13 +27,23 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 |---|---|
 | **Leadership** deciding whether to adopt | This page, then handbook Part I: [Ch.1 summary](handbook/01-policy/ch01-executive-summary.md) and [Ch.9 adoption roadmap](handbook/01-policy/ch09-adoption-roadmap.md) |
 | **Bringing a project team onto the platform** (tech lead, leadership) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout phase by phase, the first week, common mistakes |
+| **Preparing your application's repository** (Person A, repository owner) | [ROLLOUT-GUIDE phase 1](platform/ROLLOUT-GUIDE.md#phase-1-prepare-the-repository-person-a-the-repository-owner-12-days): the two repositories, what yours needs, the one file of agent instructions, Spec Kit and BMAD |
 | **New to the platform** | [The platform in five minutes](platform/PLATFORM-IN-5-MINUTES.md), then the [tutorial: your first feature](platform/TUTORIAL-FIRST-FEATURE.md), one real feature from idea to release |
 | **A team member** (Person A, Person B, PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one task from G1 to G8, by role, with the commands and what to do when something goes wrong |
 | **Installing the platform** (operator) | [platform/deploy/README.md](platform/deploy/README.md), "Fresh deployment": from an empty checkout to the first task with Docker Compose; runbook [T11](handbook/03-templates/T11-openbao-runbook.md) |
-| **Working on the platform's code** | [CONTRIBUTING.md](CONTRIBUTING.md) and [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md) |
+| **Working on the platform's code** (not needed to use it) | [CONTRIBUTING.md](CONTRIBUTING.md) and [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md) (the developers' set-up: dev stack, test GitHub App) |
 | **Working on the handbook** | [CONTRIBUTING.md](CONTRIBUTING.md), the [contents](handbook/00-introduction/01-contents.md) and the [writing style](handbook/00-introduction/06-writing-style.md) |
 
 ## 3. How it works
+
+**Two repositories.** The platform (this repository) is installed once on a server and serves many projects. Each project keeps its application in its own GitHub repository; the platform reaches it through a GitHub App, runs agents on a temporary clone, and opens pull requests there. It keeps no copy of the code.
+
+```mermaid
+flowchart LR
+    T["Team: sdlc CLI, /approve comments, dashboard"] --> P["Platform<br/>(this repository, on a server)"]
+    P -- "GitHub App: specs, plans, agent branches,<br/>pull requests, CI, reviews" --> A["Your application's repository<br/>(GitHub, one per project)"]
+    T -- "review and merge" --> A
+```
 
 **A task goes through eight gates.** A person describes the change (G1), links a specification (G2) and a plan that says which files may change (G3). The platform checks the agent, its permissions and the budget (G4), runs the agent in an isolated sandbox, checks that it stayed inside the plan and the budget (G5), pushes the change and waits for CI and security scans (G6). A reviewer reviews and merges the pull request (G7), then approves the release with its evidence (G8).
 
