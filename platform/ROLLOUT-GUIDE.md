@@ -81,29 +81,30 @@ Each phase has an owner, a usual duration and a check. Do not start a phase befo
 
 #### Two repositories, never one
 
-The platform and your application live in **two separate repositories**:
+The platform and your application live in **two separate repositories**. The platform holds none of your code.
 
-```mermaid
-flowchart LR
-    subgraph P["Repository 1: the platform (this repository)"]
-        direction TB
-        P1["Installed once on a server<br/>with Docker Compose"]
-        P2["api · worker · runner · dashboard<br/>PostgreSQL · OpenBao · LiteLLM · SeaweedFS"]
-    end
-    subgraph A["Repository 2: your application (one per project)"]
-        direction TB
-        A1["Your code, on GitHub as today"]
-        A2["AGENTS.md · docs/specs/ · .sdlc/plans/<br/>CI with one aggregate check"]
-    end
-    T["Team<br/>sdlc CLI · /approve comments · dashboard"] --> P
-    T -- "reviews and merges pull requests" --> A
-    P -- "GitHub App: reads specs and plans,<br/>pushes agent/INT-… branches,<br/>opens pull requests, reads CI and reviews" --> A
-```
+![Two repositories: the platform and your project](../diagrams/svg/d14-two-repositories.svg)
 
-- **The platform is a tool**, like a CI server: installed once by the operator, used by many projects. Team members use it through the `sdlc` command, GitHub comments and the dashboard; they never change its repository.
-- **Your application keeps its own repository on GitHub.** The tenant admin registers it as a project (`sdlc admin project create … --repo <org>/<name>`), and the operator installs the platform's GitHub App on it.
-- **The platform keeps no copy of your code.** For each run, the runner clones your repository into a temporary sandbox, the agent works there, the runner pushes the branch `agent/INT-…` and removes the sandbox. The platform keeps the diff as evidence (with a retention period), hashes and logs.
-- People review and merge the pull request **in your repository, on GitHub**.
+**Repo 1, the platform (this repository):**
+
+- A tool, like a CI server: installed once on a server, it serves many projects and many tenants.
+- Team members never change it. They use it through the `sdlc` command, `/approve` comments on GitHub and the dashboard.
+
+**Repo 2, your project's repository (one per team or project):**
+
+- The normal application repository your team already works in, on GitHub.
+- It only needs a few additions: `AGENTS.md`, `docs/specs/`, `.sdlc/plans/`, CI with one aggregate check, a protected `main` (the table below).
+
+**How the two connect:**
+
+1. The tenant admin registers the project and names its repository: `sdlc admin project create … --repo <org>/<name>`.
+2. The operator installs the platform's GitHub App on that repository.
+3. When a task runs, the runner **clones the repository into a temporary sandbox**. The agent writes code there; the runner pushes the branch `agent/INT-…` and opens the pull request, then **removes the sandbox**. The platform keeps no working copy of the code. It keeps each run's diff as evidence (in SeaweedFS, at least 180 days, then purged unless held), hashes and logs; with the optional `observability` profile, Langfuse also keeps the model prompts and answers, which contain code, until the retention purge (ADR-M53).
+4. People review and merge the pull request **on GitHub, in the project's repository**.
+
+**Today:** Repo 1 is `hoanghainh1188/agentic-sdlc-framework` (public). Repo 2 for the trial is `harryforge/pilot-order-inventory`, a fictional order and inventory application (Vue, NestJS, PostgreSQL). Each real project later uses its own repository with the same platform.
+
+So "what your repository needs" below is about **Repo 2**. Repo 1 is installed by the operator; team members do not touch it.
 
 #### What your repository needs
 
@@ -168,15 +169,7 @@ Where the platform finds the acceptance criteria (G2 needs at least one):
 
 From a spec to a submitted plan:
 
-```mermaid
-flowchart TB
-    S1["1. Write the spec<br/>(Spec Kit, BMAD or by hand)"] --> S2["2. Pull request with the spec → merged on main"]
-    S2 --> S3["3. sdlc intent create … → INT-2026-0007"]
-    S3 --> S4["4. sdlc spec link INT-… --path … --tool spec-kit|bmad|manual<br/>(the platform counts the acceptance criteria)"]
-    S4 --> S5["5. sdlc plan draft INT-… --from tasks.md --tool spec-kit<br/>(a draft on your machine; nothing is sent)"]
-    S5 --> S6["6. A person fills allowed_paths, tools, change_flags<br/>pull request with .sdlc/plans/INT-….yaml → merged"]
-    S6 --> S7["7. sdlc plan submit INT-…"]
-```
+![From a spec to a submitted plan](../diagrams/svg/d15-spec-to-plan.svg)
 
 - `sdlc plan draft` reads a Spec Kit `tasks.md` or **one** BMAD story file (an epics file is refused). It leaves `allowed_paths`, `tools` and `change_flags` for a person: submission refuses the draft until they are filled. It never submits, commits or pushes.
 - The plan file is named after the intent code, so create the intent first.
