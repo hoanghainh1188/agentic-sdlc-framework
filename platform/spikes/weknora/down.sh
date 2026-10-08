@@ -6,5 +6,5 @@ cd "$(dirname "$0")"
 docker compose -p k01-weknora -f compose.spike.yaml down -v --remove-orphans 2>/dev/null \
   || docker compose -p k01-weknora down -v --remove-orphans
 : "${K01_STATE_DIR:=${TMPDIR:-/tmp}/k01-weknora}"
-docker volume rm k01-weknora-trivy-cache trivy-k01-cache 2>/dev/null || true
+for v in k01-weknora-trivy-cache trivy-k01-cache; do docker volume rm "$v" >/dev/null 2>&1 || true; done
 rm -rf "$K01_STATE_DIR"
