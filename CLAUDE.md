@@ -15,7 +15,7 @@ The **Agentic SDLC Framework = Handbook + Platform**, in one repo:
 - `platform/` — a self-hosted system that *enforces* the handbook: runs AI coding agents through 8 human/automatic gates (G1–G8),
   records evidence and an append-only audit log, and tracks token cost per tenant/project/intent/run.
 - `design/` — approved design docs that connect the two.
-Internal use first; will be sold to customers later → multi-tenant from day one.
+Open for everyone (Harry, 2026-10-08): the code is MIT and the documentation CC BY 4.0, and they stay open; any income later comes from services (deployment, training, support), never from closing the code or a paid edition (`design/POSITIONING.md` §7). Multi-tenant from day one.
 Handbook and platform must stay consistent: same codes, same names for gates, autonomy levels and roles.
 
 ## Read these first

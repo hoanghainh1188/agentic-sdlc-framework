@@ -2,8 +2,8 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.6 |
-| Date | 2026-10-06 |
+| Version | 0.7 |
+| Date | 2026-10-08 |
 | Status | **Draft** (task E07). AC4 prepared, waiting for the API-model run, now before M-F (QUESTIONS #81) |
 | Readers | Leadership, tech lead, Claude Code |
 | Related documents | D-02 §10 (the criteria), D-08 task E07, D-09 §7 and §10, QUESTIONS #81 |
@@ -66,7 +66,7 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 | Every intent needs a merged pull request with its plan file before G3 (the plan is a file on the protected default branch) | QUESTIONS #230 (C09) | M-F, from the trial's waiting times |
 | Redone runs (sent back by G6 or G7) do not count as wasted tokens in the cost report | ADR-M45 §2.3 (E04) | M-F |
 | No manual spend-sync command; a gap longer than the catch-up window is only logged (`worker.cost_sync_gap`) | ADR-M24 §3 (C12) | M-F |
-| Upgrade the deploy images (LiteLLM, OpenBao, ClickHouse, Langfuse). With LiteLLM v1.104.0, 5 of 18 `pnpm test:litellm` tests fail: a budget block answers 422 instead of 429, and spend is computed differently. LiteLLM in its own PR with adapter and test changes; the others checked with `pnpm test:openbao`, `pnpm test:observability` and on the dev stack. The trial runs on the pinned versions | Dependabot PR #175 (closed), issue #177 | M-F |
+| ~~Upgrade the deploy images (LiteLLM, OpenBao, ClickHouse, Langfuse)~~ **Done before M-E:** LiteLLM v1.104.0 (#195: a budget block answers 422 `budget_exceeded`; cached tokens are billed at the input price when a model has no cache price), OpenBao 2.7.1, ClickHouse 26.3.39.7, Langfuse 4.50.0 (#197) | Issue #177 (closed) | Done |
 | A per-project `release.environment` and the non-production HOTL path at G8; an explicit PM/BrSE confirmation of the client's own disclosure note | QUESTIONS #220, #222 (E03) | MVP+1 |
 | The MVP+1 user interface scope (web UI with actions, other users), written from the trial data; candidate list in `design/MVP1-UI-SCOPE.md` 0.1. The read-only dashboard is done: U01, U02 (QUESTIONS #255) | D-02 §4.2, D-08 E07 note | After M-E (U01: in parallel with M-E) |
 | Template T13 differs from the plan schema v1 (platform fields, `change_flags`, tool names) | B09 PR 2 (#150) | Handbook authors |
@@ -82,3 +82,4 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 | 0.4 | 2026-10-06 | Claude (coordinator), approved by Harry | §2, §4: the API-model run (QUESTIONS #81) is needed before M-F; the trial M-E runs with the local model |
 | 0.5 | 2026-10-07 | Claude (coordinator), approved by Harry | §5: the read-only dashboard U01 starts in parallel with M-E (QUESTIONS #255) |
 | 0.6 | 2026-10-07 | Claude (coordinator), approved by Harry | §5: the interface scope's candidate list (`design/MVP1-UI-SCOPE.md`); U01 and U02 done |
+| 0.7 | 2026-10-08 | Claude (coordinator), approved by Harry | §5: the deploy image upgrade (#177) is done before M-E (#195, #197) |

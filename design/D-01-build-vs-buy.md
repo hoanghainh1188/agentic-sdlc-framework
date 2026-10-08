@@ -2,11 +2,11 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.5 |
-| Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) |
+| Version | 0.6 |
+| Date | 2026-10-08 |
+| Status | **Approved** (Harry, 2026-09-24); 0.6 approved by Harry on 2026-10-08 (open for everyone instead of "sell later"; `design/POSITIONING.md` §7) |
 | Readers | Leadership, tech lead / architect |
-| Related decisions | Option C (build the full platform ourselves). Monorepo. Internal first, sell to clients later. GitHub + GitLab. Fully self-hosted. Models: both API and self-hosted |
+| Related decisions | Option C (build the full platform ourselves). Monorepo. Internal first, then open for everyone (MIT code, CC BY 4.0 documentation; 2026-10-08). GitHub + GitLab. Fully self-hosted. Models: both API and self-hosted |
 
 ---
 
@@ -300,7 +300,7 @@ Details: D-03 section 8.1.
 
 ## 8. Open questions for leadership
 
-- ~~Internal or for sale?~~ → Decided: internal first, sell later.
+- ~~Internal or for sale?~~ → Decided: internal first, sell later. **Changed 2026-10-08:** open for everyone; the code (MIT) and the documentation (CC BY 4.0) stay open, and any income comes from services only (`design/POSITIONING.md` §7). The licence criterion still holds: every reused component must allow commercial use and redistribution, because anyone may now run or resell the platform.
 - ~~Where is the code?~~ → Decided: GitHub + GitLab.
 - ~~Self-hosted or managed?~~ → Decided: fully self-hosted.
 - ~~Which models?~~ → Decided: both API and self-hosted (see D-07).
@@ -352,3 +352,4 @@ Reliability notes:
 | 0.3 | 2026-09-24 | Claude (draft) | Added LLM gateway, self-hosted models, Cost Controller (details in D-07) |
 | 0.4 | 2026-09-24 | Claude (draft) | After review: SeaweedFS replaces MinIO, Valkey replaces Redis; 13 build components renumbered |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Content unchanged (risk rows renumbered 1–10) |
+| 0.6 | 2026-10-08 | Claude (coordinator), approved by Harry | Header and §8: open for everyone instead of "sell later" (`design/POSITIONING.md` §7) |

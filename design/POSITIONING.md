@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.2 |
+| Version | 0.3 |
 | Date | 2026-10-07 |
-| Status | **Draft** (coordinator, from a discussion with Harry). Hypotheses to test with the trial M-E and with real clients; not approved |
+| Status | **Draft** (coordinator, from a discussion with Harry). Hypotheses to test with the trial M-E and with real clients; not approved, except §7 (decided by Harry, 2026-10-08) |
 | Readers | Harry, leadership |
 | Related documents | D-01 (build vs buy, the alternatives), D-02 §2 (MVP goal), `design/M-E-TRIAL-PLAN.md`, `design/MVP1-UI-SCOPE.md`, handbook Ch.1, Ch.9 |
 
@@ -60,7 +60,7 @@ Not "AI writes code": other tools do that as well or better. The framework sells
 | The process is too heavy | People work around a process that slows them down; the value disappears | M-E: human minutes per task, waiting time per gate (`sdlc metrics gates`); see section 6.1 |
 | Agent quality | If the agent succeeds only on very small tasks, the value shrinks to "records for small tasks" | M-E: the share of tasks done right the first time, or after one request for changes |
 | Large vendors move fast | Git hosts and cloud providers add agent governance | Keep the lasting advantages: self-hosting, several Git hosts and models, a process for client delivery; review this document every three months |
-| The licence and the business model | Under MIT anyone may use and resell the code, so selling the software itself is not a model | Decide the business model (section 7) before the repository is made public |
+| The licence and the business model | Under MIT anyone may use and resell the code, so selling the software itself is not a model | Decided: open for everyone, services only (section 7) |
 
 ### 6.1. What a Low-risk task costs today
 
@@ -79,18 +79,19 @@ Most of the weight of a Low-risk task is waiting, not approvals.
 
 G1, G7 and production G8 stay HITL: they are the record the framework sells (who asked, who approved, who released).
 
-## 7. Business models to decide
+## 7. Business model (decided by Harry, 2026-10-08)
 
-The code is MIT (2026-10-07). Models that fit an open licence:
+**Open for everyone.** The code (MIT, [LICENSE](../LICENSE)) and the documentation (CC BY 4.0, [LICENSE-docs.md](../LICENSE-docs.md)) are open and stay open: never a closed or paid edition of the software or the handbook. If the project earns money later, it comes from services only:
 
-| Model | Offer | Notes |
+| Service | Offer | Notes |
 |---|---|---|
-| Services | Setting up and running the platform for a company (managed hosting), migration of its process | Revenue from operations, not licences |
-| Consulting and training | The handbook as a method: readiness assessment (T17), rollout (ROLLOUT-GUIDE), training of Person A and Person B roles | The handbook is the main asset |
-| Certification | An "AI-governed delivery" assessment that a client can ask its suppliers for | Needs a recognised standard and independent assessors |
-| Open core | MIT core; commercial enterprise parts (single sign-on, a web interface with actions, several servers, support) | Requires a clear line between the core and the commercial parts |
+| Deployment and operation | Setting up and running the platform for a company (managed hosting), moving its process onto it | Revenue from operations, not licences |
+| Consulting and training | The handbook as a method: readiness assessment (T17), rollout (ROLLOUT-GUIDE), training of the Person A and Person B roles | The handbook is the main asset, and it stays free to read and reuse |
+| Support | Help with upgrades, incidents, configuration | |
 
-This is Harry's decision, ideally before the repository is public.
+Not chosen: open core (a commercial enterprise edition), and selling the software. A certification of "AI-governed delivery" is possible later, but needs a recognised standard and independent assessors.
+
+Before the repository is made public, one session does the content review: `_review/`, `CLAUDE.md`, names of people and clients, a Gitleaks scan of the whole history, `SECURITY.md`, `CODE_OF_CONDUCT.md`, issue templates.
 
 ## 8. What to confirm, and when
 
@@ -107,3 +108,4 @@ This is Harry's decision, ideally before the repository is public.
 |---|---|---|---|
 | 0.1 | 2026-10-07 | Claude (coordinator) | Draft from the discussion with Harry: what the framework sells, the alternatives, segments, a positioning statement, risks, business models, what to confirm |
 | 0.2 | 2026-10-07 | Claude (coordinator) | §6.1: what a Low-risk task costs (human steps, block-window waits) and the ways to make it lighter |
+| 0.3 | 2026-10-08 | Claude (coordinator), approved by Harry | §7 decided: open for everyone (MIT code, CC BY 4.0 documentation), services only; the content review before going public |
