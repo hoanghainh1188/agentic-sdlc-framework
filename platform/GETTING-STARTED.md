@@ -29,8 +29,8 @@ Building the platform is **internal work** with no client data, so Claude Code m
 
 ## Step 1. Create the repo on GitHub and push
 
-1. Create a **private** repository `agentic-sdlc-framework`. Do not add a README, licence or `.gitignore` (the repo already has them).
-   - Current repository: `github.com/hoanghainh1188/agentic-sdlc-framework`, personal account on the **GitHub Free** plan (moved from the organization `harryforge` on 2026-10-06; Harry). The sample repo and the test GitHub App stay in `harryforge`. Suggested mitigations: two-factor authentication for all members; a second trusted owner; an offline mirror (`git clone --mirror`); move to a company-controlled organization before any client or sales use.
+1. Create a repository `agentic-sdlc-framework` (it was private until 2026-10-08, public since). Do not add a README, licence or `.gitignore` (the repo already has them).
+   - Current repository: `github.com/hoanghainh1188/agentic-sdlc-framework`, **public** since 2026-10-08, personal account on the **GitHub Free** plan (moved from the organization `harryforge` on 2026-10-06; Harry). The sample repo and the test GitHub App stay in `harryforge`. Suggested mitigations: two-factor authentication for all members; a second trusted owner; an offline mirror (`git clone --mirror`); move to a company-controlled organization before any client or sales use.
 2. Unzip, copy the folder where you want it, and push **one initial commit** (the repository history starts here):
 
 ```bash
@@ -58,23 +58,23 @@ Check on GitHub:
 
 Do this **after** the first push, so protection does not block it.
 
-> **GitHub Free plan:** branch protection and rulesets are **not available** for private repositories. Until the organization moves to **GitHub Team** (planned), use these compensating controls (in place since 2026-09-24):
+> **Since 2026-10-08 the repository is public:** branch protection and rulesets are available on GitHub Free (see the table below). The compensating controls that were used while it was private (2026-09-24 to 2026-10-08) stay good practice:
 > - Merge settings: squash merge only; delete branch after merge (available on Free).
 > - Local `pre-push` hook that blocks direct pushes to `main` (`.git/hooks/pre-push`; install it on every machine that pushes). Bypass with `--no-verify` only in an emergency, with Harry's approval.
 > - Process: every change through a pull request, reviewed by someone other than its producer (handbook Ch.5).
 > - CI (`.github/workflows/ci.yml`, task A09) runs on every pull request, daily on `main` (Tuesday to Sunday, 03:00 JST: security scans; build, tests and database tests when `main` changed) and weekly with every job (Monday 03:00 JST). A push to `main` runs nothing: the pull request already ran every check. To save Actions minutes, open a pull request as a **draft** while you iterate: the heavy jobs (Compose, sandbox image) wait until you mark it ready for review. A red check cannot block the merge on GitHub Free: **never merge a pull request whose `ci-ok` check is red or still running**. A red scheduled run on `main` means something was merged anyway: fix it first.
 > - Security scan exceptions (`.gitleaks.toml`, `.trivyignore`, `.semgrepignore`) change only with a reason, a date and Person B's approval in the pull request.
-> After the upgrade: turn on the branch protection below and add Person B to the repository (GitHub does not let authors approve their own pull requests).
+> Turn on the branch protection below. Require at least one approval only once a second person (Person B) has write access: GitHub never lets authors approve their own pull requests, so with one maintainer a required approval blocks every merge.
 
 | Setting | Value | Why |
 |---|---|---|
 | Branch protection on `main` | PR required; at least 1 approval; required status check `ci-ok` (the one summary job of `ci.yml`); no force push; dismiss stale approvals when new commits are pushed | Nobody, including AI, pushes straight to `main`; approval stays bound to what was reviewed |
 | Merge method | Squash merge only | 1 PR = 1 commit |
 | Delete branch after merge | On | Tidy repo |
-| Access | Project members only | Internal asset |
+| Access | Public read; write access for the maintainers only | Open for everyone (MIT code, CC BY 4.0 documentation) |
 | Secret scanning / push protection (if your plan has it) | On | Blocks leaked secrets |
 
-`.github/CODEOWNERS` (task A09) names Harry as the only owner today. GitHub ignores CODEOWNERS for private repositories on the Free plan; it takes effect after the upgrade. Add Person B then.
+`.github/CODEOWNERS` (task A09) names Harry as the only owner today; GitHub uses it since the repository is public. Add Person B when they join.
 
 ## Step 3. Create milestones, labels and the 49 issues
 
