@@ -1,0 +1,44 @@
+name: Bug report
+description: Something in the platform or the handbook does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Never paste secrets, tokens, real client data or personal data here.
+        Security problems go through SECURITY.md, not a public issue.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Platform (API, worker, runner, CLI, dashboard)
+        - Deployment (Docker Compose, OpenBao, LiteLLM, SeaweedFS)
+        - Handbook or design documents
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Commands, gate and risk tier, the configuration you changed (without secrets).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The commit or tag you run.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error codes
+      description: The platform logs codes and IDs only; paste the relevant lines.
+      render: text
