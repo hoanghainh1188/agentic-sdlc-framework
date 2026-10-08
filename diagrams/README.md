@@ -3,7 +3,7 @@
 | Code | Name | Used in | Source | SVG | Status |
 |---|---|---|---|---|---|
 | D1 | Overview: 6 phases + 8 gates, oversight by risk | README, Ch.1, Ch.10 | [src](src/d1-overview-6-phases.mmd) | [svg](svg/d1-overview-6-phases.svg) | ✅ Approved |
-| D2 | Four agent autonomy levels | Ch.4 | — | — | ⬜ |
+| D2 | Five agent autonomy levels (L0–L4) | Ch.4 | — | — | ⬜ |
 | D3 | AI code review flow | Ch.11, Ch.15 | — | — | ⬜ |
 | D4 | Pilot roadmap | Ch.1, Ch.7 | — | — | ⬜ |
 | D5 | Data flow and security boundaries | Ch.3 | — | — | ⬜ |
@@ -37,4 +37,4 @@ Diagrams D9–D13 are copies of the Mermaid blocks in the design docs: when a de
 
 ## Progress snapshot
 
-[status/platform-status.svg](status/platform-status.svg): the MVP architecture (design/D-03 §4) coloured by build progress, with progress per milestone. It is drawn by hand, not generated from Mermaid, and shows one date (in its subtitle). Update it after a milestone or when asked; the source of truth for progress is the GitHub issues of the D-08 tasks.
+[status/platform-status.svg](status/platform-status.svg): the MVP architecture (design/D-03 §4) coloured by build progress, with progress per milestone. It is drawn by hand, not generated from Mermaid, and shows one date (in its subtitle): the current drawing is of **2026-10-06** and does not show the work merged after that date. Update it after a milestone or when asked; the source of truth for progress is the GitHub issues of the D-08 tasks.

@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.7 |
+| Version | 0.8 |
 | Date | 2026-10-08 |
-| Status | **Approved** (Harry, 2026-09-24); 0.6 approved by Harry on 2026-10-08 (open for everyone instead of "sell later"; `design/POSITIONING.md` §7); 0.7 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged) |
+| Status | **Approved** (Harry, 2026-09-24); 0.6 approved by Harry on 2026-10-08 (open for everyone instead of "sell later"; `design/POSITIONING.md` §7); 0.7 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 0.8 approved by Harry on 2026-10-08 (docs fix PR A: §3 and §4b worded like 0.6; meaning unchanged) |
 | Readers | Leadership, tech lead / architect |
 | Related decisions | Option C (build the full platform ourselves). Monorepo. Internal first, then open for everyone (MIT code, CC BY 4.0 documentation; 2026-10-08). GitHub + GitLab. Fully self-hosted. Models: both API and self-hosted |
 
@@ -26,7 +26,7 @@
 
 | # | Criterion | Why it matters to us |
 |---|---|---|
-| 1 | Licence | Can we use it commercially? Can we sell the framework to clients? |
+| 1 | Licence | Can we use it commercially? Can anyone run, redistribute or resell the open framework (MIT code, CC BY 4.0 documentation)? |
 | 2 | Self-hostable | Code and data of Japanese clients must stay on infrastructure we control |
 | 3 | Cost | Limited budget |
 | 4 | Vendor lock-in | How easy is it to switch later? |
@@ -50,7 +50,7 @@
 
 | Decision | Impact on the design |
 |---|---|
-| **Internal use first, then sell to clients** | Design for **multi-tenancy** from day one (data separated per client/project). Only choose components whose licence allows commercial use and redistribution. Do not use third-party trademarks in the product name |
+| **Internal use first, then open for everyone** (changed 2026-10-08 from "sell to clients"; `design/POSITIONING.md` §7) | Design for **multi-tenancy** from day one (data separated per client/project). Only choose components whose licence allows commercial use and redistribution. Do not use third-party trademarks in the product name |
 | **Code on both GitHub and GitLab** | The platform must be **independent of the code host**, with adapters for both. GitHub AI Controls only covers GitHub, so it cannot be the main governance layer |
 | **Prefer fully self-hosted** | Managed services (AgentCore, Temporal Cloud, Langfuse Cloud) are removed from the main option. Every component must run with Docker/Kubernetes on our own infrastructure |
 
@@ -354,3 +354,4 @@ Reliability notes:
 | 0.5 | 2026-09-24 | Claude | Translated into English. Content unchanged (risk rows renumbered 1–10) |
 | 0.6 | 2026-10-08 | Claude (coordinator), approved by Harry | Header and §8: open for everyone instead of "sell later" (`design/POSITIONING.md` §7) |
 | 0.7 | 2026-10-08 | Claude (coordinator), approved by Harry | Sources: citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged |
+| 0.8 | 2026-10-08 | Claude (docs fix PR A), approved by Harry | §3 criterion 1 and §4b: the remaining "sell to clients" wording follows 0.6 (open for everyone); meaning unchanged |

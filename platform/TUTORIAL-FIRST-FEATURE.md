@@ -71,10 +71,10 @@ sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.
 ```
 
 ```text
-INT-2026-0007: spec version 1 linked: docs/specs/T01-product-list-japanese-labels.md at 4c1e… (SHA-256 9b7f…).
+INT-2026-0007: spec version 1 linked: docs/specs/T01-product-list-japanese-labels.md at 4c1e… (SHA-256 9b7f…). Tool -, structure manual_heading, 5 acceptance criteria.
 ```
 
-The risk is Low, so G2 is **HOTL**: the platform passes it, because a spec is linked, and tells the team how long they can still stop it:
+The risk is Low, so G2 is **HOTL**: the platform passes it, because a spec is linked and it has acceptance criteria (five, under its `受入基準 / Acceptance criteria` heading), and tells the team how long they can still stop it:
 
 > **INT-2026-0007**: the platform passed **G2** (HOTL): its conditions hold. The intent now waits at **G3** (Plan). @an: until **2026-10-08 15:00** you can still block G2 with `/reject G2 <reason>` or `/request-changes G2 <reason>`.
 

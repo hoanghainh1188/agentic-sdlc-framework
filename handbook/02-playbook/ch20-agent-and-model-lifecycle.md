@@ -81,7 +81,7 @@ The platform keeps the register in its database. Only an agent that is registere
 
 | Step (stage) | Command | Who |
 |---|---|---|
-| Register (stage 2) | `sdlc admin agent register --key coder-openhands --version 1.0.0 --owner <email> --model claude-haiku-4-5-20251001 --instructions AGENTS.md@v5 --instructions-file AGENTS.md --tools file_editor,terminal --max-autonomy L2` | A tenant admin, who names the technical owner |
+| Register (stage 2) | `sdlc admin agent register --key coder-openhands --version 1.0.0 --owner <email> --model claude-haiku-4-5-20251001 --instructions AGENTS.md@v5 --instructions-file AGENTS.md --tools file_editor,terminal --max-autonomy L2 --environments sandbox` (without `sandbox` the agent can never run) | A tenant admin, who names the technical owner |
 | Approve for use (stage 4) | `sdlc admin agent approve --key coder-openhands --purpose activate --as <owner\|person_a\|person_b>` | By agent type (§20.7): L0 Person A + technical owner; L1–L2 technical owner + Person B |
 | Recertify (stage 5) | `sdlc admin agent recertify --key coder-openhands [--date YYYY-MM-DD]` | The technical owner |
 | Change (stage 6) | Suspend (below), then `sdlc admin agent update --key … --version 1.1.0 [--model …] [--instructions … --instructions-file …]`, then approve again with `--purpose activate` | The owner or a tenant admin changes; technical owner + Person B approve (§20.11) |
@@ -273,3 +273,4 @@ Old context must not quietly come back through caches, indexes or copied instruc
 | 0.2 | 2026-09-24 | Claude (draft) | Recertification every 3 months; agent register in the repository (Harry) |
 | 0.3 | 2026-09-27 | Claude (task C10) | §20.5b: the agent register on the platform (commands, enforced rules, gaps) |
 | 0.4 | 2026-10-03 | Claude (task B13, PR 2) | §20.5b: the register through the API; approvals by agent type, change and retirement approvals, suspension by Person B or leadership (ADR-M37 §2.8) |
+| 0.5 | 2026-10-08 | Claude (docs fix PR A) | §20.5b: `register` needs `--environments sandbox`, or the agent can never run |

@@ -46,6 +46,9 @@ const USER_COMMANDS: Readonly<
   admin: runAdminApi,
 };
 
+/** The command groups that go through the API; `cli.usage` lists them (test `cli/usage-texts.test.ts`). */
+export const USER_COMMAND_GROUPS: readonly string[] = Object.keys(USER_COMMANDS);
+
 /** Runs one `sdlc` command and returns its exit code. */
 export async function runCli(argv: readonly string[], ctx: CliContext): Promise<number> {
   const [group, command, ...rest] = argv;

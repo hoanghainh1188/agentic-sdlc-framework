@@ -3,14 +3,14 @@ flowchart TB
     subgraph P1["P1 Requirements"]
         direction LR
         A1["Agents: summarise, translate JP-EN,<br/>draft Intent Record and spec, flag gaps"]
-        G1{{"G1 Intent / Scope / Risk<br/>Human A · always HITL"}}
-        G2{{"G2 Specification<br/>Human A (B for High+) · by risk"}}
+        G1{{"G1 Intent / Scope / Risk<br/>Person A · always HITL"}}
+        G2{{"G2 Specification<br/>Person A (Person B for High+) · by risk"}}
         A1 --> G1 --> G2
     end
     subgraph P2["P2 Analysis and design"]
         direction LR
         A2["Agents: design options, draft ADR,<br/>task plan"]
-        G3{{"G3 Plan / Architecture<br/>Human B · by risk"}}
+        G3{{"G3 Plan / Architecture<br/>Person B · by risk"}}
         A2 --> G3
     end
     subgraph P3["P3 Coding"]
@@ -28,9 +28,9 @@ flowchart TB
     end
     subgraph P5["P5 Release"]
         direction LR
-        G7{{"G7 Review / Merge<br/>Human B · always HITL"}}
+        G7{{"G7 Review / Merge<br/>Person B · always HITL"}}
         A5["Agents: release record,<br/>checklist, rollback plan"]
-        G8{{"G8 Release / Learning<br/>Human B · HITL for production"}}
+        G8{{"G8 Release / Learning<br/>Person B · HITL for production"}}
         G7 --> A5 --> G8
     end
     subgraph P6["P6 Operations and maintenance"]

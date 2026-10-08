@@ -40,6 +40,9 @@ const SPECS = {
   },
 } as const;
 type Command = keyof typeof SPECS;
+
+/** The `sdlc ops agent` commands; `cli.ops.usage` lists them (test `cli/usage-texts.test.ts`). */
+export const OPS_AGENT_COMMANDS: readonly string[] = Object.keys(SPECS);
 type AgentStatus = Agent['status'];
 
 const REQUIRED: Readonly<Record<Command, readonly string[]>> = {

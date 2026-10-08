@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, backup, restore)
 
-> Status: **v0.6: tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.2 (rekey) give the commands; the recovery drill in task A10 tests them.
+> Status: **v0.29. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.2 (rekey) give the commands; the recovery drill in task A10 tests them.
 > Readers: key holders, infrastructure operator, platform admin.
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -178,13 +178,13 @@ The salt key the same way at `litellm/salt-key`, without the `sk-` prefix (GETTI
 | `platform_app` database password of the worker (field `password`) | `kv/worker/database` | `worker` (section 5f) |
 | Database and SeaweedFS passwords of a process | `kv/<process>/…` | That process |
 
-The GitHub App key is read by `api`, by the `worker` (it polls GitHub, posts gate comments and reads spec files; `design/QUESTIONS.md` #42) and by the runner to create short-lived tokens. It must **never** enter an agent sandbox (task C04; `design/QUESTIONS.md` #44 may remove the runner's access).
+The GitHub App key is read by `api` and by the `worker` (it polls GitHub, posts gate comments, reads spec and plan files, issues the short-lived tokens of each run and opens pull requests; `design/QUESTIONS.md` #42). The runner never reads it: it receives each run's short-lived token from the worker as a single-use wrapping token (`design/QUESTIONS.md` #44). The key must **never** enter an agent sandbox.
 
 ### The GitHub App (task B05)
 
 Create one GitHub App per installation of the platform (`design/ADR-M23-github-adapter.md` section 2.2):
 
-- Repository permissions: Metadata read, Issues read and write, Pull requests read, Checks read, Commit statuses read, Contents read. Later tasks add Contents write (C04) and Pull requests write (C08).
+- Repository permissions: Contents read and write (the runner pushes `agent/INT-…` branches, C08), Pull requests read and write (the platform opens pull requests, C08), Issues read and write, Code scanning alerts read (security findings at G6, C08 PR 2), Checks read, Commit statuses read, Metadata read. Same list as `platform/GETTING-STARTED.md` Step 11. After a change, accept the new permissions on each installation.
 - No organisation or account permissions. Webhook: off (the platform polls). Install it on **selected** repositories only.
 - Generate a private key. Store it with the App's client ID in `kv/shared/github-app` (fields `client_id` and `private_key`), then delete the downloaded `.pem` file. The admin token is typed at the hidden prompt; the key goes through stdin, never through a command-line argument:
 
@@ -517,7 +517,7 @@ The loop starts in `report` mode: it counts what it would purge and deletes noth
   - `retention.langfuse_purge_pending`: Langfuse still shows traces after a request. Check that `langfuse-worker` runs.
   - `retention.langfuse_failed`, `retention.project_purge_waits_langfuse`: Langfuse cannot be reached, or the worker has no Langfuse credential (section 5m).
   - `retention.langfuse_project_mismatch`: the worker's Langfuse key belongs to another Langfuse project. Nothing is purged in Langfuse until it is fixed (section 5m step 1).
-  - `retention.langfuse_tenant_guard_tripped`: too many intents of a tenant are due at once (the evidence guard settings). Check `pnpm sdlc ops retention report`; raise `SDLC_WORKER_RETENTION_GUARD_PERCENT` for one pass if right.
+  - `retention.langfuse_tenant_guard_tripped`: too many intents of a tenant are due at once (the evidence guard settings). Check `pnpm sdlc ops retention report --tenant <slug>`; raise `SDLC_WORKER_RETENTION_GUARD_PERCENT` for one pass if right.
 - **Deleting traces by hand** (the cases above, or `project.purged` events from before E08 with `langfuse: manual`): on the server, never from a chat tool.
   1. In the Langfuse UI, filter the traces by the tag `run_id:<run ID>` of each run of the intent (or `tenant:<tenant slug>` and `project:<project slug>`), and check them.
   2. Delete them in the UI, or with `DELETE /api/public/traces` and the worker's Langfuse key.
@@ -828,3 +828,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.26 | 2026-10-06 | Claude Code (coordinator) | Section 5d: the API-model run is needed before M-F; the trial M-E runs with the local Ollama model (QUESTIONS #81) |
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
+| 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |

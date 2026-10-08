@@ -19,7 +19,7 @@ Version 0.2, 2026-10-08 (phase 1: the two repositories, what the project reposit
 | **Second approver** | `platform/USER-GUIDE.md` steps 7–8 | Log in; you are asked only for flagged changes and Critical risk | Most of the rest |
 | **Developer of the platform** | `platform/GETTING-STARTED.md`, `CLAUDE.md` | — | This guide |
 
-The dashboard (`http://<platform>/dashboard/`, read only) shows everyone what waits for whom; decisions are made in GitHub comments, GitHub reviews and the `sdlc` command (USER-GUIDE).
+The dashboard (read only; `http://127.0.0.1:8090/dashboard/` on the platform machine, handbook Ch.19 §19.8e; other machines cannot reach it yet) shows everyone what waits for whom; decisions are made in GitHub comments, GitHub reviews and the `sdlc` command (USER-GUIDE).
 
 ## 2. The rules to know before you start
 
@@ -97,7 +97,7 @@ The platform and your application live in **two separate repositories**. The pla
 
 **How the two connect:**
 
-1. The tenant admin registers the project and names its repository: `sdlc admin project create … --repo <org>/<name>`.
+1. The tenant admin registers the project and names its repository: `sdlc admin project create --slug <slug> --name <name> --repo <org>/<name>`.
 2. The operator installs the platform's GitHub App on that repository.
 3. When a task runs, the runner **clones the repository into a temporary sandbox**. The agent writes code there; the runner pushes the branch `agent/INT-…` and opens the pull request, then **removes the sandbox**. The platform keeps no working copy of the code. It keeps each run's diff as evidence (in SeaweedFS, at least 180 days, then purged unless held), hashes and logs; with the optional `observability` profile, Langfuse also keeps the model prompts and answers, which contain code, until the retention purge (ADR-M53).
 4. People review and merge the pull request **on GitHub, in the project's repository**.
@@ -171,7 +171,7 @@ From a spec to a submitted plan:
 
 ![From a spec to a submitted plan](../diagrams/svg/d15-spec-to-plan.svg)
 
-- `sdlc plan draft` reads a Spec Kit `tasks.md` or **one** BMAD story file (an epics file is refused). It leaves `allowed_paths`, `tools` and `change_flags` for a person: submission refuses the draft until they are filled. It never submits, commits or pushes.
+- `sdlc plan draft <INT-…> --from <file> --tool spec-kit|bmad` reads a Spec Kit `tasks.md` or **one** BMAD story file (an epics file is refused). It leaves `allowed_paths`, `tools` and `change_flags` for a person: submission refuses the draft until they are filled. It never submits, commits or pushes.
 - The plan file is named after the intent code, so create the intent first.
 - Details: USER-GUIDE and handbook Ch.19 §19.8c.
 
@@ -181,11 +181,11 @@ From a spec to a submitted plan:
 |---|---|---|---|
 | 2.1 | Operator | Install the platform, or use the existing one (`platform/deploy/README.md` "Fresh deployment"; on a developer machine `platform/GETTING-STARTED.md` Step 11b) | `curl http://<platform>/health/ready` answers ok |
 | 2.2 | Operator | Create the tenant and its first tenant admin (`sdlc ops bootstrap`, run in a terminal; the token is printed once) | The tenant admin logs in: `sdlc whoami` |
-| 2.3 | Tenant admin | Create the project (`sdlc admin project create --repo <owner/name>`) | `sdlc admin project show --project <slug>` |
+| 2.3 | Tenant admin | Create the project (`sdlc admin project create --slug <slug> --name <name> --repo <owner/name>`) | `sdlc admin project show --project <slug>` |
 | 2.4 | Tenant admin | Add each person, link their GitHub account by its numeric ID, give the roles of T5 (handbook Ch.19 §19.8d). The admin's own role comes from a second admin or from the operator | `sdlc admin role list --project <slug>`: Person A and Person B are different people |
 | 2.5 | PM / BrSE or Person A | Save the project AI record: AI allowed, data classes, production logs, disclosure format, the link to the client's written consent (`sdlc ai-record set`) | `sdlc ai-record show --project <slug>` |
 | 2.6 | Operator, tenant admin | Build the sandbox image for the project's toolchain and pin it by digest (`pnpm sandbox-image:build node24`; other toolchains need a new image) | The reference ends in `@sha256:…` |
-| 2.7 | Tenant admin, owner, Person B | Register the agent (model, `AGENTS.md`, tools, autonomy at most L2), then the owner and Person B approve it (handbook Ch.20 §20.5b) | `sdlc admin agent show <key>` says `active` |
+| 2.7 | Tenant admin, owner, Person B | Register the agent (model, `AGENTS.md`, tools, autonomy at most L2), then the owner and Person B approve it (handbook Ch.20 §20.5b) | `sdlc admin agent show --key <key>` says `active` |
 | 2.8 | Tenant admin | Upload the project configuration: at least `run.agent_key`, `sandbox.image`, `verification.required_checks` (the aggregate check of 1.2); the budgets of 0.4 | `sdlc admin config show --project <slug>` shows the new version |
 
 ### Phase 3. Prepare the people (each team member; half a day)
@@ -193,7 +193,7 @@ From a spec to a submitted plan:
 | # | Do | Check |
 |---|---|---|
 | 3.1 | Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and the [tutorial](TUTORIAL-FIRST-FEATURE.md) (about 20 minutes), then `platform/USER-GUIDE.md` and the handbook chapters of your role (section 1) | — |
-| 3.2 | Get a first token from the tenant admin, log in, create your own token and revoke the first one (USER-GUIDE §2) | `sdlc whoami` shows your roles |
+| 3.2 | Install the `sdlc` command ([USER-GUIDE §2, "Install the sdlc command"](USER-GUIDE.md#install-the-sdlc-command)). Get a first token from the tenant admin, log in, create your own token and revoke the first one (USER-GUIDE §2) | `sdlc whoami` shows your roles |
 | 3.3 | Open the dashboard and sign in with your token | You see the project's (empty) board |
 | 3.4 | A 30-minute walk-through together: the eight gates, who decides each, how comment commands work (first line of a new comment), what an escalation is | Everyone can say who approves G3 and G7 on this project |
 
@@ -239,7 +239,7 @@ Run real tasks, one at a time at first. The trial plan of the sample repository 
 | The plan file changed after it was submitted | G3 or G4 waits for "plan resubmit needed" | Submit it again with `sdlc plan submit` |
 | `verification.required_checks` does not match the repository's CI | G6 waits for a check that never comes, then escalates | Use the aggregate check of phase 1.2 |
 | Merging before "ready to merge", or by the producer | A `security` escalation; the intent pauses | Person B merges, after the platform's notice |
-| A token pasted into chat or a ticket | Anyone who reads it acts as you | Revoke it (`sdlc token revoke`) and create a new one |
+| A token pasted into chat or a ticket | Anyone who reads it acts as you | Revoke it (`sdlc token revoke --id <ID>`, the ID from `sdlc token list`) and create a new one |
 | Nobody answers an escalation | It moves to the backup owner, then to governance; the work stays frozen | Name a backup for each role in T5 |
 
 ## 6. Where to read more

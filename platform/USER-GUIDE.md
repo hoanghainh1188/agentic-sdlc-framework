@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one task from G1 to G8 and points to the handbook for details. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.1, 2026-10-06. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
+Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
 
 ---
 
@@ -30,6 +30,33 @@ Three rules that never change:
 Risk tiers decide how far the agent may go: Low and Medium → it changes code (L2); High → it only writes a proposal (L1); Critical → it never runs (L0). Details: handbook codes table (`handbook/00-introduction/05-codes.md`).
 
 ## 2. Before your first task
+
+### Install the sdlc command
+
+The `sdlc` command is not published as a package yet. You run it from a checkout of this repository (Node.js 24, pnpm 10; `corepack enable` once):
+
+```bash
+git clone https://github.com/hoanghainh1188/agentic-sdlc-framework.git
+cd agentic-sdlc-framework
+pnpm install && pnpm build
+```
+
+Then choose one way to call it:
+
+- **From the repository root, without installing:** `pnpm sdlc <command>`, for example `pnpm sdlc whoami`. It compiles the CLI first when needed.
+- **As `sdlc` everywhere, with pnpm:** run `pnpm setup` once (it creates pnpm's global folder and adds it to your shell profile; open a new terminal after it), then link the CLI:
+
+  ```bash
+  cd platform/apps/cli
+  pnpm link --global
+  ```
+
+  `pnpm --filter @sdlc/cli link --global` does not work (pnpm refuses `--filter` here). To remove the link: `pnpm uninstall --global @sdlc/cli`.
+- **As `sdlc` everywhere, with an alias:** add `alias sdlc='node <checkout>/platform/apps/cli/dist/main.js'` to your shell profile.
+
+After a `git pull`, run `pnpm install && pnpm build` again. The examples in this guide write `sdlc …`; with the first way, write `pnpm sdlc …`.
+
+### Account and login
 
 1. **Account.** A tenant admin creates your platform user, links your GitHub account (by its numeric ID) and gives you your roles on the project. Ask them; you cannot give roles to yourself.
 2. **Token and login.** You get a first personal token (`sdlc_pat_…`) from the admin. Keep it in your password manager, never in chat or a ticket.
@@ -166,7 +193,7 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 | `sdlc metrics gates --project <slug>` | How long gates wait for people |
 | `sdlc evidence build\|list\|show\|export <INT>` | The Evidence Pack |
 
-Every command takes `--json`. Exit codes: 0 done, 1 refused, 2 wrong usage, 3 platform unreachable, 4 log in again. Full list: handbook Ch.19 §19.8c.
+Every command takes `--json`. Exit codes: 0 done; 1 refused by the platform (no role, not found, conflict, rule broken); 2 wrong command or options, not logged in, or an unsafe saved login; 3 platform unreachable or an unexpected answer; 4 token missing, expired or revoked (log in again). Same list: handbook Ch.19 §19.8c.
 
 ### The dashboard (read only)
 

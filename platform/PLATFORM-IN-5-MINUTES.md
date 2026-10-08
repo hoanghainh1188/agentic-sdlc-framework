@@ -49,7 +49,7 @@ The risk tier changes how far the agent may go: **Low and Medium** risk, the age
 
 ## 5. Three rules that never change
 
-1. **Whoever produces a change never approves it.** That includes the person who created the intent and the agent.
+1. **Whoever produces a change never approves it** at review and release (G7, G8): the person who created the intent, submitted the plan, allowed a run or authored a commit, and the agent. The creator still approves G1, their own request.
 2. **No gate passes by silence.** If nobody decides, the task waits, and an escalation goes up the chain.
 3. **The platform never merges and never deploys.** People do.
 
