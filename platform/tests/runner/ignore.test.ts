@@ -2,6 +2,7 @@
 // the ignore rules of `base_sha` ignore (read from the runner's own clone) are read past, never
 // kept; a `.gitignore` or `.gitattributes` the agent adds hides nothing from the proposal.
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,6 +17,7 @@ import {
   packTar,
   untarWorkspace,
   type TarEntry,
+  type WorkspaceEntry,
 } from '../../apps/runner/src/index.js';
 
 const LIMITS = { maxBytes: 1024 * 1024, maxEntries: 1000 };
@@ -45,6 +47,29 @@ function* chunks(buffer: Buffer): Generator<Buffer> {
   }
 }
 
+/** Fixed-size chunks: every header and file is split at the same offset. */
+function* fixedChunks(buffer: Buffer, size: number): Generator<Buffer> {
+  for (let at = 0; at < buffer.length; at += size) yield buffer.subarray(at, at + size);
+}
+
+/**
+ * The entries with each file's content as its size and SHA-256. Vitest's deep `toEqual` walks a
+ * Buffer one element at a time: about 1.3 s for the two 900 KB files below on a laptop, more than
+ * the default 5 s on GitHub's runners. The hash still catches any byte that differs.
+ */
+const summary = (entries: readonly WorkspaceEntry[]) =>
+  entries.map((e) =>
+    e.type === 'file'
+      ? {
+          type: e.type,
+          path: e.path,
+          executable: e.executable,
+          size: e.content.length,
+          sha256: createHash('sha256').update(e.content).digest('hex'),
+        }
+      : e,
+  );
+
 const workspace = (entries: TarEntry[]) =>
   packTar([
     { type: 'dir', path: 'workspace' },
@@ -61,17 +86,29 @@ describe('untarWorkspace streams the archive', () => {
     { type: 'file', path: 'debug.log', content: Buffer.alloc(900_000, 0x63) },
   ]);
 
-  // Streams a 4 MB archive twice, once in small chunks: about 1.3 s on a laptop, more than the
-  // default 5 s on GitHub's runners since 2026-10-08. A longer limit until the root cause is
-  // known (a follow-up session checks whether untarWorkspace is slow with many small chunks).
-  it('reads the same entries from any chunking', { timeout: 30_000 }, async () => {
-    const whole = await untarWorkspace(archive, 'workspace', { ...LIMITS, maxBytes: 4_000_000 });
-    const streamed = await untarWorkspace(chunks(archive), 'workspace', {
-      ...LIMITS,
-      maxBytes: 4_000_000,
-    });
-    expect(streamed).toEqual(whole);
-    expect(streamed.map((e) => e.path)).toContain('node_modules/big/index.js');
+  it('reads the same entries from any chunking', async () => {
+    const limits = { ...LIMITS, maxBytes: 4_000_000 };
+    const whole = await untarWorkspace(archive, 'workspace', limits);
+    expect(whole.map((e) => e.path)).toContain('node_modules/big/index.js');
+    for (const source of [chunks(archive), fixedChunks(archive, 511), fixedChunks(archive, 513)]) {
+      const streamed = await untarWorkspace(source, 'workspace', limits);
+      expect(summary(streamed)).toEqual(summary(whole));
+      expect(streamed.map((e) => e.path)).toContain('node_modules/big/index.js');
+      const big = (list: WorkspaceEntry[]) =>
+        list.find((e) => e.path === 'node_modules/big/index.js') as { content: Buffer };
+      expect(big(streamed).content.equals(big(whole).content)).toBe(true);
+    }
+  });
+
+  it('reads hundreds of thousands of tiny chunks', async () => {
+    // Guards against a per-chunk copy or concat in ByteReader (quadratic): it would hit the default timeout.
+    const big = workspace([
+      { type: 'file', path: 'big.bin', content: Buffer.alloc(4_000_000, 0x64) },
+    ]);
+    const limits = { ...LIMITS, maxBytes: 4_000_000 };
+    const whole = await untarWorkspace(big, 'workspace', limits);
+    const streamed = await untarWorkspace(fixedChunks(big, 16), 'workspace', limits);
+    expect(summary(streamed)).toEqual(summary(whole));
   });
 
   it('reads past skipped entries: they never count against the kept size', async () => {
