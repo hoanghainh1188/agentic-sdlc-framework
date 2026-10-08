@@ -40,6 +40,7 @@
 | ADR-M35 | [Observability: structured logs, OpenTelemetry traces, one OTLP pipeline to Langfuse](ADR-M35-observability.md) (task A08) | Proposed | |
 | ADR-M36 | [CLI: API client and credentials](ADR-M36-cli-api-client.md) (task B04) | Proposed | |
 | ADR-M37 | [Admin onboarding: tenant admins, projects, users, identities, roles, configuration](ADR-M37-admin-onboarding.md) (task B13) | Proposed | |
+| ADR-M38 | [Gate G6: the push, the pull request and CI](ADR-M38-gate-g6.md) (task C08) | Proposed | |
 | ADR-M39 | [Spec linking and the spec hash check](ADR-M39-spec-linking.md) (task B08) | Proposed | |
 | ADR-M40 | [Plan submission and the G3 approval](ADR-M40-plan-submission.md) (task B09) | Proposed | |
 | ADR-M41 | [Gate G7: review and merge](ADR-M41-gate-g7.md) (task E01) | Proposed | |
@@ -52,7 +53,7 @@
 | ADR-M52 | [SeaweedFS internal access: loopback binding and keys made at each start](ADR-M52-seaweedfs-internal-access.md) (task A12) | Proposed | |
 | ADR-M53 | [Purge a project's data from Langfuse](ADR-M53-langfuse-purge.md) (task E08) | Proposed | |
 | ADR-M54 | [A read-only web dashboard](ADR-M54-read-only-dashboard.md) (task U01) | Proposed | |
-| ADR-M59 | [WeKnora for document knowledge: result of the K01 spike](ADR-M59-weknora-spike.md) (task K01) | Proposed | |
+| ADR-M59 | [WeKnora for document knowledge: result of the K01 spike](ADR-M59-weknora-spike.md) (task K01) | Proposed; decision taken: option A, K02 deferred (QUESTIONS #300) | 2026-10-08 (the decision) |
 | ADR-M61 | [The structure of a spec, and G2 needs acceptance criteria](ADR-M61-spec-structure.md) (task S01) | Proposed | |
 | ADR-M62 | [`sdlc plan draft`: a plan file draft from Spec Kit tasks or a BMAD story](ADR-M62-plan-draft.md) (task S02) | Proposed | |
 

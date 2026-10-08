@@ -1,5 +1,7 @@
 # Getting started: from the zip file to the first task
 
+> **For the developers of the platform** (the repository owner and Claude Code sessions): their machine, the dev stack, the test GitHub App. To use the platform, read [USER-GUIDE.md](USER-GUIDE.md); to install it on a server, read [deploy/README.md](deploy/README.md) "Fresh deployment".
+
 This guide covers: pushing the repo to GitHub, creating the 44 backlog issues, running tasks with Claude Code, and sending handbook comments.
 Done by: the repo owner / tech lead (Harry). Time: about half a day for steps 1–6.
 
@@ -223,7 +225,7 @@ The GitHub adapter (B05, ADR-M23) talks to GitHub through a **GitHub App**. Use 
 
 Done once by the repo owner in the browser. Claude must never read or handle the private key.
 
-1. **Test repository.** Private repository `harryforge/pilot-order-inventory` with a README, and one open issue for the live test (issue #1, "Live test issue (GitHub adapter)").
+1. **Test repository.** Public repository `harryforge/pilot-order-inventory` (fictional data only) with a README, and one open issue for the live test (issue #1, "Live test issue (GitHub adapter)").
 2. **Create the App:** organization settings → Developer settings → GitHub Apps → **New GitHub App** (`https://github.com/organizations/harryforge/settings/apps/new`).
 
 | Field | Value |
@@ -474,7 +476,7 @@ Live tests run the platform against the real `harryforge/pilot-order-inventory` 
 | 2 | The pilot project, its team and AI record | Step 12 item 5; `pnpm sdlc ai-record set …` (handbook Ch.19 §19.8b). Person A and Person B are two different people with two GitHub accounts | `pnpm sdlc admin config show --project pilot`, `pnpm sdlc ai-record show --project pilot` |
 | 3 | The project configuration | `pnpm sdlc admin config show --project pilot` gives the version; write the settings that differ from the defaults into a YAML file outside the repo, then `pnpm sdlc admin config set --project pilot --file <file> --expected-version <version>` (handbook Ch.19 §19.8d). For the pilot: `verification.required_checks: [ci-ok]` (G6 waits only for the pilot's `ci-ok`, handbook Ch.14), `sandbox.image` (Step 14 item 4) and `run.agent_key` (item 5) | `config show` prints the new version and values |
 | 4 | The sandbox image | `pnpm sandbox-image:build node24` prints the reference by digest; on Docker Desktop use `platform/sandbox-images/build.sh node24 --no-push` (runbook T11 §5g). Put it in `sandbox.image` | The reference ends in `@sha256:…` |
-| 5 | A registered, active agent | `pnpm sdlc admin agent register …`, then the approvals (handbook Ch.20 §20.5b). Its `instructions_ref` points at the pilot's `AGENTS.md` | `pnpm sdlc admin agent show <key>` says `active` |
+| 5 | A registered, active agent | `pnpm sdlc admin agent register …`, then the approvals (handbook Ch.20 §20.5b). Its `instructions_ref` points at the pilot's `AGENTS.md` | `pnpm sdlc admin agent show --key <key>` says `active` |
 | 6 | A model | A provider key in OpenBao (runbook T11 §5d), or on a dev machine the local Ollama model `gpt-oss:20b` (QUESTIONS #78). One real run with an API model is needed before M-F (QUESTIONS #81; the trial M-E runs with the local model) (QUESTIONS #81): `pnpm test:agent-api` (runbook T11 §5d, "The real API-model run") | `curl -s -H "Authorization: Bearer <master key>" http://127.0.0.1:4000/v1/models` lists it (run in the terminal; never paste the key) |
 | 7 | The plan file of the C09 / E07 live test (QUESTIONS #230) | Once a year: open a pull request on the pilot that adds `.sdlc/plans/INT-<UTC year>-0001.yaml` with the content of `platform/tests/integration/pilot/fixtures/live-plan.yaml` (change the year in `intent_id` too), let `ci-ok` pass and merge it yourself. The App and the platform never merge. The plan allows `docs/live-test/**` only: a live run never changes the application code. A file merged before E07 (`allowed_paths: [apps/web/src/features/products/**]`, `[stub:append]`) must be replaced by the new content | `gh api repos/harryforge/pilot-order-inventory/contents/.sdlc/plans/INT-2026-0001.yaml --jq .path` |
 | 8 | Person B's GitHub account (E07 live G8 only) | A second person with their own GitHub account and write access to the pilot (they review and merge). Add to the settings file of the test App (Step 11 item 7): `"person_b_github_id": <numeric ID>` (`gh api users/<login> --jq .id`) and `"person_b_login": "<login>"` | `gh api repos/harryforge/pilot-order-inventory/collaborators/<login>/permission --jq .permission` says `write` or more |

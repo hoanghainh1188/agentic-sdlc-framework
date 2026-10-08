@@ -153,7 +153,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 **HOTL gates (Low risk: G2 and G3 by default).** The project setting `oversight.matrix` says which gates are HOTL at which risk tier.
 
 - The platform **passes** the gate by itself when its conditions hold:
-  - G2: a spec is linked to the intent;
+  - G2: a spec is linked to the intent and has at least one acceptance criterion (without one, G2 waits at every risk tier and a person's `/approve G2` is refused);
   - G3: a plan with at least one planned file is submitted, and no change flag forces HITL (for example `migration`; Chapter 12).
 - It posts a status comment that mentions the people of the gate (G2: Person A; G3: Person B) and says **until when you can block it**. This is the **block window**: 4 working hours by default (project setting `oversight.hotl_block_window`, counted on the project's working calendar).
 - **To block a passed gate**, write within the window `/request-changes G2 <reason>` or `/reject G2 <reason>`, even though the intent already waits at a later gate. You need the gate's role.
@@ -368,7 +368,7 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | `sdlc admin project list`, `show`, `update`, `archive` | An archived project takes no new roles or configuration. An archive is refused while the project has open intents (`project_has_open_intents`): finish or cancel them first. About 7 days after the archive the platform deletes the project's evidence files, except held ones (below). There is no un-archive command |
 | `sdlc admin evidence hold <INT-…> [--ref <https link>]`, `release <INT-…>`, `show <INT-…>` | Puts an intent's evidence on hold: the platform keeps its evidence files until the hold is released, also past the retention and after an archive. For a dispute, an incident or a client request. Tenant admins, or the roles in `access.evidence_hold_roles` (by default governance and admin; never viewer). Write the reason where it can be edited and give its link with `--ref`: the platform keeps no text |
 | `sdlc admin user list`, `show`, `update`, `disable`, `enable --user <id or email>` | A disabled person's tokens stop working at once |
-| `sdlc admin identity list [--all]`, `unlink --user <id or email> --id <identity ID>` | `--all` also shows unlinked accounts |
+| `sdlc admin identity list --user <id or email> [--all]`, `unlink --user <id or email> --id <identity ID>` | `--all` also shows unlinked accounts |
 | `sdlc admin role list --project <slug> [--all]`, `revoke --project <slug> --id <role ID>` | `--all` also shows revoked roles |
 | `sdlc admin tenant-admin grant --user <id or email>`, `list [--all]`, `revoke --id <ID>` | Tenant admins only |
 | `sdlc admin token issue --user <id or email> --name <name> [--days <1-7>]` | A first token for a new person, shown once. It lasts at most 7 days: the person creates their own token and revokes this one |
@@ -465,3 +465,4 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.19 | 2026-10-07 | Claude (task U02) | §19.8c, §19.8e: what holds an intent (`sdlc intent show`, the dashboard; ADR-M54 §2.4b) |
 | 0.20 | 2026-10-08 | Claude (task S01) | §19.8c: G2 needs acceptance criteria; the spec structures by tool (ADR-M61) |
 | 0.21 | 2026-10-08 | Claude (task S02) | §19.8c: `sdlc plan draft` from a Spec Kit `tasks.md` or a BMAD story file (ADR-M62) |
+| 0.22 | 2026-10-08 | Claude (docs fix PR A) | §19.8b: a HOTL G2 also needs an acceptance criterion; §19.8d: `sdlc admin identity list --user <id or email>` |

@@ -18,7 +18,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 
 - Docker Engine with Docker Compose v2.24 or later.
 - OpenSSL 3.x as `openssl` on the `PATH` (for `init-env.sh` and the TLS tests of `@sdlc/secrets`). On macOS, `/usr/bin/openssl` is LibreSSL, and the TLS tests stop with a message when they find it: install OpenSSL 3 (`brew install openssl@3`) and put it first (`export PATH="$(brew --prefix openssl@3)/bin:$PATH"`).
-- Node.js 24 + pnpm 10 only for the `pnpm` shortcuts and tests. The shell scripts work without them.
+- Node.js 24 + pnpm 10 (`corepack enable` once). The fresh deployment below needs them (`pnpm install`, `pnpm openbao:bootstrap`, `pnpm db:migrate`, `pnpm sdlc ops …`), and so do the `pnpm` shortcuts and the tests. Only starting and stopping the containers works without them (`init-env.sh`, `up.sh`).
 
 ## Fresh deployment (operator)
 
@@ -206,7 +206,7 @@ Without pnpm:
 platform/deploy/scripts/init-env.sh
 platform/deploy/scripts/up.sh core
 platform/deploy/scripts/up.sh core observability
-docker compose -f platform/deploy/docker-compose.yml --profile core --profile observability down
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability down
 ```
 
 - `up.sh` fails if a service is not healthy within `SDLC_WAIT_TIMEOUT` seconds (default 300), or if a job does not exit 0.

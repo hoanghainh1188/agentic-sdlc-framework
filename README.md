@@ -62,7 +62,7 @@ flowchart LR
 
 **What the platform never does:**
 
-- let the producer of a change approve it (the person who created the task, submitted the plan or allowed the run, and the agent itself);
+- let the producer of a change approve it at G7 or G8 (the person who created the task, submitted the plan, allowed a run or authored a commit, and the agent itself); the creator still approves G1;
 - merge a pull request or deploy to production: people do;
 - give an agent a real model key, access to secrets, or a way to push to the main branch;
 - change or delete an audit record.
