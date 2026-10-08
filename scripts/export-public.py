@@ -144,9 +144,10 @@ def scan_text(out: Path) -> list[str]:
 def gitleaks(out: Path) -> None:
     if shutil.which("docker") is None:
         raise ExportError("Docker is needed for the Gitleaks scan of the snapshot")
+    # Scan "." from inside the folder: the repository's approved allowlists match relative paths.
     cfg = ["--config", ".gitleaks.toml"] if (out / ".gitleaks.toml").exists() else []
     res = subprocess.run(
-        ["docker", "run", "--rm", "-v", f"{out}:/scan", "-w", "/scan", GITLEAKS_IMAGE, "dir", *cfg, "--redact", "/scan"],
+        ["docker", "run", "--rm", "-v", f"{out}:/scan", "-w", "/scan", GITLEAKS_IMAGE, "dir", *cfg, "--redact", "."],
         capture_output=True,
         text=True,
     )
