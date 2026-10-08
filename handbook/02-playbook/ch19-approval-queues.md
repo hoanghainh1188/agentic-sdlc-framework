@@ -243,6 +243,17 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **If someone edits the spec on the default branch after G2**, the platform notices it at the next step: it links the new version, takes the intent back to G2 and posts a comment (`spec_changed`). Approvals of the old spec no longer count. At Low risk G2 is HOTL, so the platform may pass the new spec again, with its block window; at other tiers a person approves it again.
 - If the file is removed, renamed or cannot be read, the intent goes back to G2 and waits (`spec_unavailable`) until you restore it or link another spec.
 - If GitHub cannot be reached, the intent waits; it never passes a gate without the check.
+- **G2 needs acceptance criteria** (task S01, `design/ADR-M61-spec-structure.md`). When the platform reads the spec, it counts its acceptance criteria and shows the count (`sdlc spec link`, `sdlc spec list`). It keeps the count, never the text. G2 passes only with at least one criterion, at every risk tier. Otherwise the platform records `fail spec_unclear`, posts a comment, and the intent waits at G2 (`spec_unclear`); nobody can approve G2 until the spec has criteria. Person A may still reject G2 or request changes.
+- Name the tool with `--tool` so the platform reads the right structure:
+
+  | `--tool` | Where the platform finds the criteria | One criterion |
+  |---|---|---|
+  | `spec-kit` (Spec Kit 1.1.2) | each `**Acceptance Scenarios**:` block | each numbered item (`1. **Given** … **When** … **Then** …`). Requirements `FR-xxx` and success criteria `SC-xxx` do not count |
+  | `bmad` (BMAD Method 6.12.1) | a story file's `## Acceptance Criteria`, or an epics file's `**Acceptance Criteria:**` blocks | each list item; in an epics file, each `**Given**` group |
+  | `manual`, or no `--tool` | a heading with "Acceptance criteria" or 受入基準, for example `## 受入基準 / Acceptance criteria` | each top-level list item under it |
+
+  If the tool's structure is not found, the platform tries the other structures. Template text that was never filled in (`[initial state]`, `{{precondition}}`) and text that is not a list item do not count.
+- A spec linked before this rule existed has no count: link it again (`sdlc spec link` with the same path) and the platform counts it.
 
 **Submitting a plan (G3 input).** G3 checks the intent's task plan (template T13). Submit it with `sdlc plan submit` (task B09, `design/ADR-M40-plan-submission.md`):
 
@@ -439,3 +450,4 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.17 | 2026-10-04 | Claude (task E05, PR 2) | §19.8d: the daily audit anchor and `audit.anchor_mismatch` (ADR-M51 §2.9) |
 | 0.18 | 2026-10-07 | Claude (task U01) | §19.8e: the read-only dashboard (ADR-M54) |
 | 0.19 | 2026-10-07 | Claude (task U02) | §19.8c, §19.8e: what holds an intent (`sdlc intent show`, the dashboard; ADR-M54 §2.4b) |
+| 0.20 | 2026-10-08 | Claude (task S01) | §19.8c: G2 needs acceptance criteria; the spec structures by tool (ADR-M61) |

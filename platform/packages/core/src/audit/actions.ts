@@ -169,7 +169,8 @@ export const AUDIT_ACTIONS = {
   /**
    * A spec was linked to an intent (FR-02). Never the path or the content. B08 (ADR-M39): the
    * linked commit and the `cause`: `linked` (a person) or `head_changed` (the platform linked the
-   * spec at the head of the default branch because its content changed there).
+   * spec at the head of the default branch because its content changed there). S01 (ADR-M61):
+   * the structure rule that matched and the number of acceptance criteria found; never their text.
    */
   'spec.linked': {
     entityType: 'intent',
@@ -179,6 +180,8 @@ export const AUDIT_ACTIONS = {
       content_sha256: 'sha256',
       commit_sha: 'code?',
       cause: 'code?',
+      structure: 'code',
+      acceptance_criteria: 'count',
     },
   },
   /**

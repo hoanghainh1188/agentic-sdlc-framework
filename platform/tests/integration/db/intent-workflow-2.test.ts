@@ -107,6 +107,8 @@ async function harness(db: TestDatabase): Promise<Harness> {
         path: 'docs/specs/t07.md',
         commitSha: 'e'.repeat(40),
         contentSha256: sha,
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
         actorType: 'human',
         actorId: f.users.a,
       });

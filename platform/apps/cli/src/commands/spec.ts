@@ -58,10 +58,27 @@ async function link(args: readonly string[], ctx: CliContext): Promise<number> {
         path: spec.path,
         commit: spec.commit_sha,
         sha256: spec.content_sha256,
+        ...structureParams(spec),
       });
+      if (!((spec.acceptance_criteria ?? 0) > 0)) {
+        say(ctx, 'cli.spec.no_criteria', { intent: spec.intent });
+      }
     }
     return EXIT.ok;
   });
+}
+
+/** S01 (ADR-M61): the tool, the structure rule and the count; `-` when not known. */
+function structureParams(spec: {
+  readonly source_tool: string | null;
+  readonly structure: string | null;
+  readonly acceptance_criteria: number | null;
+}): { tool: string; structure: string; criteria: string } {
+  return {
+    tool: spec.source_tool ?? '-',
+    structure: spec.structure ?? '-',
+    criteria: spec.acceptance_criteria === null ? '-' : String(spec.acceptance_criteria),
+  };
 }
 
 async function list(args: readonly string[], ctx: CliContext): Promise<number> {
@@ -82,6 +99,7 @@ async function list(args: readonly string[], ctx: CliContext): Promise<number> {
         path: spec.path,
         commit: spec.commit_sha,
         sha256: spec.content_sha256,
+        ...structureParams(spec),
       });
     }
     return EXIT.ok;

@@ -94,6 +94,10 @@ export function presentSpec(spec: SpecRef | undefined): Record<string, unknown> 
         path: spec.path,
         commit_sha: spec.commit_sha,
         content_sha256: spec.content_sha256,
+        // S01 (ADR-M61): codes and a count; null for a spec linked before S01.
+        source_tool: spec.source_tool,
+        structure: spec.structure,
+        acceptance_criteria: spec.acceptance_criteria,
       }
     : null;
 }

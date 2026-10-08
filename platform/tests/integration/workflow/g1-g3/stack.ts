@@ -54,7 +54,8 @@ export const REPO = 'pilot-order-inventory';
 export const REPO_PATH = `/repos/${OWNER}/${REPO}`;
 export const PROJECT = 'pilot';
 export const SPEC_PATH = 'docs/specs/T07.md';
-export const SPEC_TEXT = '# T07 Cancel an order\nAC1: the stock returns.\n';
+export const SPEC_TEXT =
+  '# T07 Cancel an order\n## Acceptance criteria\n- AC1: the stock returns.\n';
 
 /** Monday 2026-09-28 10:00 in Asia/Ho_Chi_Minh (the default working calendar). */
 export const T0 = new Date('2026-09-28T03:00:00.000Z');

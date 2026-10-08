@@ -102,6 +102,8 @@ export function intentNoticeKey(notice: Pick<IntentNotice, 'kind' | 'gate'>): Me
       return 'intent.status.spec_changed';
     case 'spec_unavailable':
       return 'intent.status.spec_unavailable';
+    case 'spec_unclear':
+      return 'intent.status.spec_unclear';
     case 'plan_changed':
       return 'intent.status.plan_changed';
     case 'plan_resubmit_needed':

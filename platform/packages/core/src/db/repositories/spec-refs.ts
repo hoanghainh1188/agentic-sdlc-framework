@@ -5,7 +5,13 @@ import { sql } from 'kysely';
 import { RegistryError } from '../../registry/errors.js';
 import { DbError } from '../errors.js';
 import type { SpecRef } from '../schema.js';
-import { SPEC_SOURCE_TOOLS, type SpecSourceTool } from '../vocabulary.js';
+import {
+  ACCEPTANCE_CRITERIA_MAX,
+  SPEC_SOURCE_TOOLS,
+  SPEC_STRUCTURES,
+  type SpecSourceTool,
+  type SpecStructureCode,
+} from '../vocabulary.js';
 import { AuditLogRepository } from './audit-log.js';
 import { TenantRepository } from './base.js';
 import { lockIntent } from './locks.js';
@@ -22,6 +28,12 @@ export interface LinkSpec extends RegistryActor {
    * (the workflow follows a change of the file at the head of the default branch).
    */
   readonly cause?: 'linked' | 'head_changed';
+  /**
+   * S01 (ADR-M61): the structure rule that matched and the acceptance criteria it found
+   * (`readSpecStructure`, read with the content hash). Required: every new version has a count.
+   */
+  readonly structure: SpecStructureCode;
+  readonly acceptanceCriteria: number;
 }
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/;
@@ -50,6 +62,12 @@ export class SpecRefRepository extends TenantRepository {
     if (!SHA256.test(input.contentSha256)) throw invalid('contentSha256 must be a SHA-256 digest');
     const tool = input.sourceTool ?? null;
     if (tool !== null && !SPEC_SOURCE_TOOLS.includes(tool)) throw invalid('unknown source tool');
+    if (!SPEC_STRUCTURES.includes(input.structure)) throw invalid('unknown spec structure');
+    const count = input.acceptanceCriteria;
+    if (!Number.isInteger(count) || count < 0 || count > ACCEPTANCE_CRITERIA_MAX) {
+      throw invalid('acceptanceCriteria must be a count');
+    }
+    if (input.structure === 'none' && count !== 0) throw invalid('no structure, no criteria');
     return this.run(
       this.transactional(async (db) => {
         await lockIntent(db, intentId);
@@ -76,6 +94,8 @@ export class SpecRefRepository extends TenantRepository {
             commit_sha: input.commitSha,
             content_sha256: input.contentSha256,
             source_tool: tool,
+            structure: input.structure,
+            acceptance_criteria: count,
           })
           .returningAll()
           .executeTakeFirstOrThrow();
@@ -90,6 +110,8 @@ export class SpecRefRepository extends TenantRepository {
             content_sha256: spec.content_sha256,
             commit_sha: spec.commit_sha,
             cause: input.cause ?? 'linked',
+            structure: input.structure,
+            acceptance_criteria: count,
           },
         });
         return spec;

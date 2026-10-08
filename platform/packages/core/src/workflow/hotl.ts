@@ -37,6 +37,7 @@ export function isPassableGate(gate: string): gate is PassableGate {
 import type { Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import type { Registry } from '../registry/registry.js';
+import { specHasCriteria } from './g2-criteria.js';
 import { gateHistory } from './gate-history.js';
 
 /** True when `earlier` comes before `later` in the gate order. */
@@ -61,8 +62,11 @@ export async function hotlConditionsHold(
   switch (gate) {
     case 'G1':
       return false; // G1 is HITL at every tier (mandatory rule); never passed by the platform.
-    case 'G2':
-      return (await scope.specRefs.latest(intent.id)) !== undefined;
+    case 'G2': {
+      // S01 (D-02 §6.2): a spec with at least one acceptance criterion.
+      const spec = await scope.specRefs.latest(intent.id);
+      return spec !== undefined && specHasCriteria(spec);
+    }
     case 'G3': {
       const plan = await scope.plans.latest(intent.id);
       return plan !== undefined && plan.planned_files.length > 0;

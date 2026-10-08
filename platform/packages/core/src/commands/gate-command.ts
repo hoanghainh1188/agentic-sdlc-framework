@@ -9,6 +9,7 @@ import type { TenantScope } from '../db/tenant-scope.js';
 import { normalizeScope, type ApprovalScope } from '../registry/approval-binding.js';
 import type { HumanDecision } from '../registry/decision-rules.js';
 import type { Registry } from '../registry/registry.js';
+import { specWithoutCriteria } from '../workflow/g2-criteria.js';
 import { refusedPlanHashes, returnedFromG5 } from '../workflow/g5-scope.js';
 import { RegistryError } from '../registry/errors.js';
 import { gatherG6Facts } from '../workflow/g6-ci.js';
@@ -107,6 +108,17 @@ export async function decideGate(
         'decision_not_allowed',
         `${gate} ${command.decision}: producer`,
         'producer',
+      );
+    }
+    // S01 (D-02 §6.2, QUESTIONS #292): G2 never passes without acceptance criteria.
+    if (
+      gate === 'G2' &&
+      command.decision === 'approve' &&
+      (await specWithoutCriteria(tx, current.id))
+    ) {
+      throw new CommandError(
+        'spec_unclear',
+        `${current.code}: the spec has no acceptance criteria`,
       );
     }
     // C07 (QUESTIONS #131): after a run went outside its plan, G3 is HITL and needs a new plan.

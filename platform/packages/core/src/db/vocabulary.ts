@@ -86,6 +86,19 @@ export {
 export const SPEC_SOURCE_TOOLS = ['spec-kit', 'bmad', 'manual'] as const;
 export type SpecSourceTool = (typeof SPEC_SOURCE_TOOLS)[number];
 
+/** Which rule found a spec's acceptance criteria (S01, ADR-M61; `spec_refs.structure`). */
+export const SPEC_STRUCTURES = [
+  'spec_kit',
+  'bmad_story',
+  'bmad_epics',
+  'manual_heading',
+  'none',
+] as const;
+export type SpecStructureCode = (typeof SPEC_STRUCTURES)[number];
+
+/** The largest acceptance criteria count stored (the database CHECK; a spec is ≤ 256 KiB). */
+export const ACCEPTANCE_CRITERIA_MAX = 10_000;
+
 /** Where a gate decision came from (D-05 `gate_decisions.source`). */
 export const GATE_DECISION_SOURCES = [
   'cli',

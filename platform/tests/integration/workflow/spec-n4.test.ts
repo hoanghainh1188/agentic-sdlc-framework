@@ -125,7 +125,8 @@ describeWorkflow(
       await at(intent, 'G3');
 
       // N4: someone edits the spec on the default branch after G2.
-      const edited = '# T07 Cancel an order\nAC1: stock returns.\nAC2: refund within 3 days.\n';
+      const edited =
+        '# T07 Cancel an order\n## Acceptance criteria\n- AC1: stock returns.\n- AC2: refund within 3 days.\n';
       git.commit({ [SPEC_PATH]: edited });
       await signals.wake(ref);
       await at(intent, 'G2');

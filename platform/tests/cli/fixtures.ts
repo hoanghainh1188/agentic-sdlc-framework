@@ -127,6 +127,9 @@ export function intentDetailBody(): Record<string, unknown> {
     path: 'docs/specs/T01.md',
     commit_sha: 'b'.repeat(40),
     content_sha256: HASH,
+    source_tool: 'manual',
+    structure: 'manual_heading',
+    acceptance_criteria: 3,
   } as SpecRef;
   const plan = { version: 2, plan_sha256: HASH, change_flags: ['migration'] } as unknown as Plan;
   return {
@@ -148,6 +151,9 @@ const SPEC_ROW = {
   path: 'docs/specs/T07 cancel.md',
   commit_sha: 'd'.repeat(40),
   content_sha256: HASH,
+  source_tool: 'spec-kit',
+  structure: 'spec_kit',
+  acceptance_criteria: 4,
 } as SpecRef;
 
 /** B08: `POST /v1/intents/:intent/specs`. */

@@ -120,6 +120,8 @@ describeDb('B09 PR 2: the runner reads the plan file for the prompt, on PostgreS
       path: 'docs/specs/T01-japanese-labels.md',
       commitSha: BASE,
       contentSha256: 'd'.repeat(64),
+      structure: 'manual_heading',
+      acceptanceCriteria: 1,
       actorType: 'human',
       actorId: personA,
     });

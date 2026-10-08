@@ -1,11 +1,20 @@
 // Reading a spec file from the Git host (task B08, design/ADR-M39 §2.3). The content is hashed and
-// dropped at once: it is client data and never leaves this function (QUESTIONS #163).
+// dropped at once: it is client data and never leaves this function (QUESTIONS #163). S01
+// (ADR-M61): in the same call its acceptance criteria are counted (`readSpecStructure`); only the
+// count and the structure code leave it.
 import { GitHostError, type GitHostAdapter, type RepoRef } from '@sdlc/contracts';
 
+import type { SpecSourceTool } from '../db/vocabulary.js';
 import { SPEC_MAX_BYTES, specContentSha256, type SpecUnreadableCause } from './rules.js';
+import { readSpecStructure, type SpecStructureCode } from './structure.js';
 
 export type SpecRead =
-  | { readonly kind: 'ok'; readonly sha256: string }
+  | {
+      readonly kind: 'ok';
+      readonly sha256: string;
+      readonly structure: SpecStructureCode;
+      readonly acceptanceCriteria: number;
+    }
   | { readonly kind: 'unreadable'; readonly cause: SpecUnreadableCause };
 
 const UNREADABLE: Readonly<Partial<Record<GitHostError['code'], SpecUnreadableCause>>> = {
@@ -25,6 +34,8 @@ export async function readSpec(
   ref: RepoRef,
   path: string,
   commitSha: string,
+  /** The spec's `source_tool`: which structure rule applies first (S01). */
+  tool: SpecSourceTool | null = null,
 ): Promise<SpecRead> {
   let text: string;
   try {
@@ -37,5 +48,5 @@ export async function readSpec(
   if (Buffer.byteLength(text, 'utf8') > SPEC_MAX_BYTES) {
     return { kind: 'unreadable', cause: 'too_large' };
   }
-  return { kind: 'ok', sha256: specContentSha256(text) };
+  return { kind: 'ok', sha256: specContentSha256(text), ...readSpecStructure(text, tool) };
 }

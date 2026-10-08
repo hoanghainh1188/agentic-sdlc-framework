@@ -134,6 +134,8 @@ export async function createWorkflowFixture(
         path: 'docs/specs/t07.md',
         commitSha: COMMIT,
         contentSha256: SPEC_HASH,
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
         actorType: 'human',
         actorId: users.a,
       });

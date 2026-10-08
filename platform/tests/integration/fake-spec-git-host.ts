@@ -3,7 +3,7 @@
 import { GitHostError, type GitHostAdapter } from '../../packages/contracts/src/index.js';
 
 export const SPEC_PATH = 'docs/specs/T07.md';
-export const SPEC_TEXT = '# T07 Cancel an order\nAC1: stock returns.\n';
+export const SPEC_TEXT = '# T07 Cancel an order\n## Acceptance criteria\n- AC1: stock returns.\n';
 
 /** A repository on the default branch: each change is a new head commit. */
 export class FakeSpecGitHost implements Pick<GitHostAdapter, 'getBranchHead' | 'getFileAtCommit'> {
