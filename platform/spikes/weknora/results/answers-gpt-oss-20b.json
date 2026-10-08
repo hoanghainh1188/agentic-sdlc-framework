@@ -1,0 +1,81 @@
+{
+  "model": "gpt-oss-20b",
+  "n": 8,
+  "total_s_p50": 69.8,
+  "total_s_max": 168.4,
+  "gold_in_references": 8,
+  "rows": [
+    {
+      "id": "Q01",
+      "lang": "en",
+      "status": 200,
+      "first_token_s": 22.4,
+      "total_s": 24.9,
+      "answer_chars": 478,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q06",
+      "lang": "en",
+      "status": 200,
+      "first_token_s": 22.1,
+      "total_s": 24.8,
+      "answer_chars": 548,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q09",
+      "lang": "en",
+      "status": 200,
+      "first_token_s": 35.2,
+      "total_s": 40.3,
+      "answer_chars": 740,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q11",
+      "lang": "en",
+      "status": 200,
+      "first_token_s": 20.1,
+      "total_s": 21.6,
+      "answer_chars": 219,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q14",
+      "lang": "ja",
+      "status": 200,
+      "first_token_s": 147.5,
+      "total_s": 168.4,
+      "answer_chars": 235,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q16",
+      "lang": "ja",
+      "status": 200,
+      "first_token_s": 150.2,
+      "total_s": 155,
+      "answer_chars": 314,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q20",
+      "lang": "ja",
+      "status": 200,
+      "first_token_s": 39.3,
+      "total_s": 69.8,
+      "answer_chars": 354,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q22",
+      "lang": "ja",
+      "status": 200,
+      "first_token_s": 135.1,
+      "total_s": 139.9,
+      "answer_chars": 340,
+      "gold_in_references": true
+    }
+  ]
+}

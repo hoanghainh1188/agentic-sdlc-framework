@@ -1,0 +1,7 @@
+wechatopenai/weknora-app@sha256:bc8a534799fcb54045100daf4bc5db86270b38ae45c5f761c410c50b4dcd6cdc wechatopenai/weknora-app:v0.8.2
+wechatopenai/weknora-docreader@sha256:3c36e7e738ba515315523876d8041f9bb02809145a4e3b331e2550e4bff98b7a wechatopenai/weknora-docreader:v0.8.2
+pgvector/pgvector@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21 pgvector/pgvector:0.8.1-pg17
+qdrant/qdrant@sha256:dab6de32f7b2cc599985a7c764db3e8b062f70508fb85ca074aa856f829bf335 qdrant/qdrant:v1.16.2
+valkey/valkey@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507 valkey/valkey:8.1.10-alpine3.24
+ghcr.io/berriai/litellm@sha256:625981c83410a3ea68eb0697590a57ec1d764d634514d54fa5db0591077ee839 ghcr.io/berriai/litellm:v1.104.0
+nicolaka/netshoot@sha256:7f08c4aff13ff61a35d30e30c5c1ea8396eac6ab4ce19fd02d5a4b3b5d0d09a2 nicolaka/netshoot:v0.14

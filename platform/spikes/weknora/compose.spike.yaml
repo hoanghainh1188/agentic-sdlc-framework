@@ -1,0 +1,182 @@
+# K01 spike only (design/ADR-M59). Thrown away after the ADR. Never part of the platform stack.
+# Project name k01-weknora: own networks and volumes, no `sdlc_*` name. Images pinned by digest in up.sh
+# (K01_*_IMAGE variables). Only `gateway` publishes a port, on 127.0.0.1.
+#
+# Licence-clean variant (NFR-04): plain PostgreSQL + pgvector (no ParadeDB pg_search, AGPL-3.0),
+# Qdrant for vectors and keyword search, Valkey instead of Redis, local file storage (no MinIO).
+# WeKnora's agent sandbox, web search, graph RAG, Langfuse tracing and sign-up are off.
+
+name: k01-weknora
+
+x-weknora-env: &weknora-env
+  GIN_MODE: release
+  LOG_LEVEL: info
+  TZ: UTC
+  AUTO_MIGRATE: 'true'
+  DB_DRIVER: postgres
+  DB_HOST: postgres
+  DB_PORT: '5432'
+  DB_USER: weknora
+  DB_NAME: weknora
+  DB_PASSWORD: ${K01_DB_PASSWORD:?}
+  RETRIEVE_DRIVER: qdrant
+  QDRANT_HOST: qdrant
+  QDRANT_PORT: '6334'
+  STORAGE_TYPE: local
+  LOCAL_STORAGE_BASE_DIR: /data/files
+  REDIS_ADDR: valkey:6379
+  REDIS_PASSWORD: ${K01_VALKEY_PASSWORD:?}
+  DOCREADER_ADDR: docreader:50051
+  DOCREADER_TRANSPORT: grpc
+  OLLAMA_BASE_URL: http://ollama-disabled.invalid:11434
+  OLLAMA_OPTIONAL: 'true'
+  LANGFUSE_ENABLED: 'false'
+  NEO4J_ENABLE: 'false'
+  WEKNORA_SANDBOX_DOCKER_ENABLED: 'false'
+  DISABLE_REGISTRATION: 'false'
+  WEKNORA_TENANT_ENABLE_CROSS_TENANT_ACCESS: 'false'
+  SYSTEM_AES_KEY: ${K01_AES_KEY:?}
+  SYSTEM_SIGNING_KEY: ${K01_SIGNING_KEY:?}
+  JWT_SECRET: ${K01_JWT_SECRET:?}
+  SSRF_WHITELIST_EXTRA: litellm,qdrant
+  BUILTIN_MODELS_CONFIG: /app/config/builtin_models.yaml
+  K01_LITELLM_KEY: ${K01_LITELLM_KEY:?}
+  K01_CHAT_MODEL: ${K01_CHAT_MODEL:-gpt-oss-20b}
+
+services:
+  app:
+    image: ${K01_APP_IMAGE:?}
+    environment: *weknora-env
+    volumes:
+      - data-files:/data/files
+      - docreader-tmp:/tmp/docreader:ro
+      - ${K01_WEKNORA_SRC:?}/config/config.yaml:/app/config/config.yaml:ro
+      - ./builtin_models.yaml:/app/config/builtin_models.yaml:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+      qdrant: { condition: service_started }
+      docreader: { condition: service_healthy }
+      litellm: { condition: service_healthy }
+    networks: [kint]
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8080/health]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  docreader:
+    image: ${K01_DOCREADER_IMAGE:?}
+    environment:
+      TZ: UTC
+      DOCREADER_IMAGE_OUTPUT_DIR: /tmp/docreader
+      DOCREADER_GRPC_MAX_WORKERS: '2'
+    volumes:
+      - docreader-tmp:/tmp/docreader
+    networks: [kint]
+    healthcheck:
+      test: [CMD, grpc_health_probe, -addr=:50051]
+      interval: 5s
+      retries: 60
+      start_period: 20s
+
+  postgres:
+    image: ${K01_POSTGRES_IMAGE:?}
+    environment:
+      POSTGRES_USER: weknora
+      POSTGRES_PASSWORD: ${K01_DB_PASSWORD:?}
+      POSTGRES_DB: weknora
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [kint]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U weknora -d weknora]
+      interval: 5s
+      retries: 30
+
+  qdrant:
+    image: ${K01_QDRANT_IMAGE:?}
+    environment:
+      QDRANT__TELEMETRY_DISABLED: 'true'
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks: [kint]
+
+  valkey:
+    image: ${K01_VALKEY_IMAGE:?}
+    command: [valkey-server, --appendonly, 'yes', --requirepass, '${K01_VALKEY_PASSWORD:?}']
+    volumes:
+      - valkey-data:/data
+    networks: [kint]
+    healthcheck:
+      test:
+        [CMD-SHELL, 'valkey-cli -a "$$K01_VALKEY_PASSWORD" --no-auth-warning ping | grep -q PONG']
+      interval: 5s
+      retries: 30
+    environment:
+      K01_VALKEY_PASSWORD: ${K01_VALKEY_PASSWORD:?}
+
+  # The only service with a route out: it reaches the host's Ollama (local tags only, never `:cloud`).
+  litellm:
+    image: ${K01_LITELLM_IMAGE:?}
+    command: [--config, /app/config.yaml, --port, '4000', --telemetry, 'False']
+    environment:
+      LITELLM_MASTER_KEY: ${K01_LITELLM_KEY:?}
+      OLLAMA_API_BASE: http://host.docker.internal:11434
+    volumes:
+      - ./litellm.spike.yaml:/app/config.yaml:ro
+    extra_hosts: ['host.docker.internal:host-gateway']
+    networks: [kint, kext]
+    healthcheck:
+      test:
+        [
+          CMD,
+          python3,
+          -c,
+          "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness', timeout=4)",
+        ]
+      interval: 5s
+      retries: 30
+      start_period: 30s
+
+  # Inbound only: forwards 127.0.0.1:32080 → app:8080 and 127.0.0.1:32040 → litellm:4000 for the
+  # evaluation scripts. kint is internal, so no other container of WeKnora can reach the internet.
+  gateway:
+    image: ${K01_NETSHOOT_IMAGE:?}
+    command:
+      [
+        sh,
+        -c,
+        'socat TCP-LISTEN:8080,fork,reuseaddr TCP:app:8080 & socat TCP-LISTEN:4000,fork,reuseaddr TCP:litellm:4000 & wait',
+      ]
+    ports: ['127.0.0.1:32080:8080', '127.0.0.1:32040:4000']
+    networks: [kint, kext]
+
+  # Packet capture in the network namespaces of app and docreader (detection; kint is the enforcement).
+  # Recreate them after app or docreader restarts: they follow the namespace of the container they started with.
+  capture-app:
+    image: ${K01_NETSHOOT_IMAGE:?}
+    network_mode: service:app
+    command: [sh, -c, 'exec tcpdump -i any -nn -U -w /cap/app-$$(date +%s).pcap']
+    volumes: [capture:/cap]
+    depends_on: [app]
+  capture-docreader:
+    image: ${K01_NETSHOOT_IMAGE:?}
+    network_mode: service:docreader
+    command: [sh, -c, 'exec tcpdump -i any -nn -U -w /cap/docreader-$$(date +%s).pcap']
+    volumes: [capture:/cap]
+    depends_on: [docreader]
+
+networks:
+  kint:
+    internal: true
+  kext: {}
+
+volumes:
+  data-files:
+  docreader-tmp:
+  postgres-data:
+  qdrant-data:
+  valkey-data:
+  capture:

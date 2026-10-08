@@ -1,0 +1,46 @@
+{
+  "_note": "K01 spike, measured 2026-10-08 on a developer Mac (24 GB RAM, Docker Desktop VM 8 GB / 12 CPUs, Ollama on the host). docker stats every 5 s; stack = app, docreader, postgres, qdrant, valkey, litellm (capture and gateway left out). CPU in % of one core.",
+  "stack_ram_mb_peak": { "idle": 1121, "ingest": 1317, "query": 1338, "answer": 1354 },
+  "per_container_ram_mb_peak": {
+    "app": 268,
+    "docreader": 190,
+    "litellm": 578,
+    "postgres": 81,
+    "qdrant": 330,
+    "valkey": 12
+  },
+  "cpu_percent_peak_ingest": {
+    "app": 44,
+    "docreader": 0,
+    "litellm": 72,
+    "postgres": 15,
+    "qdrant": 12,
+    "valkey": 3
+  },
+  "cpu_percent_peak_query": { "app": 12, "litellm": 16, "postgres": 10, "qdrant": 9 },
+  "cpu_answer_phase": "not reliable: the host was swapping (free memory 1 %), docker stats reported values above 500 %",
+  "models_on_host_gb": { "gpt-oss:20b": 12, "bge-m3": 1.2 },
+  "host_memory_free_percent_min": { "answer_with_gpt_oss": 1, "ingest_with_summaries": 13 },
+  "image_disk_gb": {
+    "weknora-docreader": 5.52,
+    "weknora-app": 2.31,
+    "litellm": 1.72,
+    "pgvector": 0.65,
+    "qdrant": 0.29,
+    "valkey": 0.06
+  },
+  "volume_disk_mb": { "qdrant": 905, "postgres": 74, "valkey": 7, "files": 0.1 },
+  "ingest_seconds": {
+    "with_llm_summaries_bilingual": 1264,
+    "with_llm_summaries_split": "not finished after 30 min (Ollama stalled)",
+    "without_summaries_bilingual": [6.4, 76.0],
+    "without_summaries_split": [3.5, 13.3]
+  },
+  "ingest_note": "Corpus: 12 Markdown files, 55 KB. Without summaries the time is embedding only (bge-m3); the 76 s run started with gpt-oss loaded and Ollama swapping models.",
+  "chunks": {
+    "weknora_bilingual": 115,
+    "weknora_split": 70,
+    "baseline_own_bilingual": 124,
+    "baseline_own_split": 82
+  }
+}

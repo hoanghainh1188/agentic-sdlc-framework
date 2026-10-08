@@ -1,0 +1,29 @@
+{
+  "decoy_visible_to_owner": true,
+  "rest_list_other_tenant_hidden": true,
+  "rest_get_other_tenant_kb_status": 403,
+  "rest_search_other_tenant_status": 403,
+  "rest_search_other_tenant_leaks": false,
+  "mcp_endpoint_created": 201,
+  "mcp_token_shown_once_prefix_ok": true,
+  "mcp_token_not_stored_plain": true,
+  "mcp_initialize_status": 200,
+  "mcp_tools_listed": [
+    "grep_chunks",
+    "list_documents",
+    "list_knowledge_bases",
+    "read_document",
+    "search_knowledge"
+  ],
+  "mcp_only_allowlisted_tools": true,
+  "mcp_search_own_kb_ok": true,
+  "mcp_search_kb_outside_scope_refused": true,
+  "mcp_search_other_tenant_leaks": false,
+  "mcp_write_tool_refused": true,
+  "mcp_chat_tool_refused": true,
+  "mcp_no_token_status": 401,
+  "mcp_wrong_token_status": 401,
+  "mcp_other_tenant_delete_status": 404,
+  "mcp_delete_status": 200,
+  "mcp_deleted_token_status": 401
+}

@@ -1,0 +1,25 @@
+# K01 spike only. Local Ollama tags only (never `:cloud`, D-07 §3). No provider key.
+model_list:
+  - model_name: gpt-oss-20b
+    litellm_params:
+      model: ollama_chat/gpt-oss:20b
+      api_base: os.environ/OLLAMA_API_BASE
+      num_ctx: 32768
+      reasoning_effort: low
+      # WeKnora sends reasoning_effort "none", which Ollama's gpt-oss refuses; keep ours (low).
+      additional_drop_params: [reasoning_effort]
+  - model_name: qwen2.5-7b
+    litellm_params:
+      model: ollama_chat/qwen2.5:7b
+      api_base: os.environ/OLLAMA_API_BASE
+  - model_name: bge-m3
+    litellm_params:
+      model: ollama/bge-m3
+      api_base: os.environ/OLLAMA_API_BASE
+    model_info:
+      mode: embedding
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+litellm_settings:
+  telemetry: false
+  drop_params: true
