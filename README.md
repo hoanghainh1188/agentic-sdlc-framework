@@ -38,12 +38,7 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 
 **Two repositories.** The platform (this repository) is installed once on a server and serves many projects. Each project keeps its application in its own GitHub repository; the platform reaches it through a GitHub App, runs agents on a temporary clone, and opens pull requests there. It keeps no copy of the code.
 
-```mermaid
-flowchart LR
-    T["Team: sdlc CLI, /approve comments, dashboard"] --> P["Platform<br/>(this repository, on a server)"]
-    P -- "GitHub App: specs, plans, agent branches,<br/>pull requests, CI, reviews" --> A["Your application's repository<br/>(GitHub, one per project)"]
-    T -- "review and merge" --> A
-```
+![Two repositories: the platform and your project](diagrams/svg/d14-two-repositories.svg)
 
 **A task goes through eight gates.** A person describes the change (G1), links a specification (G2) and a plan that says which files may change (G3). The platform checks the agent, its permissions and the budget (G4), runs the agent in an isolated sandbox, checks that it stayed inside the plan and the budget (G5), pushes the change and waits for CI and security scans (G6). A reviewer reviews and merges the pull request (G7), then approves the release with its evidence (G8).
 

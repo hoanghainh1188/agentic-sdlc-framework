@@ -83,19 +83,7 @@ Each phase has an owner, a usual duration and a check. Do not start a phase befo
 
 The platform and your application live in **two separate repositories**. The platform holds none of your code.
 
-```text
-┌─────────────────────────────────────┐        ┌──────────────────────────────────┐
-│ Repo 1: agentic-sdlc-framework      │        │ Repo 2: your project's repo      │
-│ (the platform: a tool)              │        │ (your code: the product)         │
-│                                     │        │                                  │
-│ platform/  handbook/  design/       │        │ for example harryforge/          │
-│                                     │        │         pilot-order-inventory    │
-│ → installed once on a server        │ GitHub │ apps/  docs/specs/  AGENTS.md    │
-│   with Docker Compose               │ ◀────▶ │ .sdlc/plans/  .github/           │
-│   (api, worker, runner, PostgreSQL, │  App   │                                  │
-│    OpenBao, LiteLLM, SeaweedFS…)    │        │ → on GitHub, as today            │
-└─────────────────────────────────────┘        └──────────────────────────────────┘
-```
+![Two repositories: the platform and your project](../diagrams/svg/d14-two-repositories.svg)
 
 **Repo 1, the platform (this repository):**
 
@@ -181,15 +169,7 @@ Where the platform finds the acceptance criteria (G2 needs at least one):
 
 From a spec to a submitted plan:
 
-```mermaid
-flowchart TB
-    S1["1. Write the spec<br/>(Spec Kit, BMAD or by hand)"] --> S2["2. Pull request with the spec → merged on main"]
-    S2 --> S3["3. sdlc intent create … → INT-2026-0007"]
-    S3 --> S4["4. sdlc spec link INT-… --path … --tool spec-kit|bmad|manual<br/>(the platform counts the acceptance criteria)"]
-    S4 --> S5["5. sdlc plan draft INT-… --from tasks.md --tool spec-kit<br/>(a draft on your machine; nothing is sent)"]
-    S5 --> S6["6. A person fills allowed_paths, tools, change_flags<br/>pull request with .sdlc/plans/INT-….yaml → merged"]
-    S6 --> S7["7. sdlc plan submit INT-…"]
-```
+![From a spec to a submitted plan](../diagrams/svg/d15-spec-to-plan.svg)
 
 - `sdlc plan draft` reads a Spec Kit `tasks.md` or **one** BMAD story file (an epics file is refused). It leaves `allowed_paths`, `tools` and `change_flags` for a person: submission refuses the draft until they are filled. It never submits, commits or pushes.
 - The plan file is named after the intent code, so create the intent first.
