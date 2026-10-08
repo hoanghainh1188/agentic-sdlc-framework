@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.4 |
+| Version | 1.5 |
 | Date | 2026-10-07 |
 | Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed; D6 (the local model, QUESTIONS #81) |
 | Readers | Harry, the trial team (Person A, Person B, second approver), Claude Code |
@@ -42,6 +42,7 @@
 | 9 | The trial budget set: USD 30 in total (decision D3) | Owner | `budget.*` in the configuration; the tenant's monthly budget |
 | 10 | The manual log ready (section 7.2) | Person A | A shared sheet with the columns of section 7.2 |
 | 11 | Every member of the trial team has read `platform/USER-GUIDE.md` and logged in (`sdlc whoami`) | Each member | `sdlc whoami` shows the roles |
+| 12 | The spec and knowledge tasks are merged (QUESTIONS #285): S01, S02, K01, and K02 unless the K01 ADR deferred it | Coordinator | D-08 milestone Pre-M-E; the trial uses `sdlc plan draft` and, after K02, the agent's document search |
 
 ## 4. People and roles
 
@@ -161,3 +162,4 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | 1.2 | 2026-10-06 | Claude (coordinator), approved by Harry | D6: the trial runs with the local model `gpt-oss:20b`; §2 scope, §3 items 1 and 6, §8 (QUESTIONS #81) |
 | 1.3 | 2026-10-07 | Claude (coordinator), approved by Harry | §7.2 an interface column; §8 item 6 counts it against `design/MVP1-UI-SCOPE.md` |
 | 1.4 | 2026-10-07 | Claude (coordinator), approved by Harry | D7: the HOTL block window is 1 working hour for the trial; §6, §7.1 counts the blocks within a window |
+| 1.5 | 2026-10-08 | Claude (coordinator), approved by Harry | §3 item 12: the trial waits for S01, S02, K01 and K02 (or its deferral) (QUESTIONS #285) |

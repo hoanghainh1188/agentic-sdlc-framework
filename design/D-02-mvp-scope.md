@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.5 |
+| Version | 1.6 |
 | Date | 2026-10-08 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81); 1.4 approved by Harry on 2026-10-07 (§4.2: a read-only dashboard starts before MVP+1; QUESTIONS #255); 1.5 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81); 1.4 approved by Harry on 2026-10-07 (§4.2: a read-only dashboard starts before MVP+1; QUESTIONS #255); 1.5 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 1.6 approved by Harry on 2026-10-08 (§4.2: the BMAD / Spec Kit spec tasks and WeKnora come before the trial M-E; QUESTIONS #285) |
 | Readers | Leadership (sections 1–4, 10–12), tech lead / developers (all), Claude Code (sections 5–9, 13) |
 | Related documents | D-01 (build vs buy), D-07 (models and tokens), handbook codes table and Chapters 2–6, 10–20 |
 
@@ -55,7 +55,7 @@ The **producer of a change never approves it**. One person may hold several role
 | 5 | Audit Log | Append-only table with a hash chain. Has an integrity check command |
 | 9 | Agent adapter | **OpenHands** |
 | 6 | Git adapter | **GitHub**, with the interface ready for GitLab |
-| 10 | Spec adapter | Reads Markdown spec files produced by Spec Kit/BMAD. **Read only, no conversion yet** |
+| 10 | Spec adapter | Reads Markdown spec files produced by Spec Kit/BMAD. **Read only, no conversion yet**. Before the trial M-E (QUESTIONS #285): reads their structure, G2 needs acceptance criteria (S01), and drafts a plan file from their tasks (S02) |
 | 7 | Cost Controller | Issues a LiteLLM virtual key per run, with a cost cap. Warns at 80%, stops at 100% |
 | — | Multi-tenancy | Every table has `tenant_id` from day one. One installation |
 | — | Oversight | Oversight mode (HITL / HOTL / AUDIT) per gate from the **gate × risk matrix** in project config; forced HITL at G3 for listed change types; dual approval at G7 for sensitive change types |
@@ -74,9 +74,10 @@ The **producer of a change never approves it**. One person may hold several role
 |---|---|
 | Second Git host | MVP+1 |
 | Second agent, multi-agent | MVP+1 |
-| WeKnora (document knowledge), code index, full context snapshots (#11) | MVP+1 |
+| WeKnora (document knowledge) | **Before the trial M-E** (QUESTIONS #285): a spike first (K01), the agent's access over MCP only if the spike says go (K02) |
+| Code index, full context snapshots (#11) | MVP+1 |
 | Self-hosted models (vLLM) | When the GPU decision is made. The MVP gateway only needs to be able to add models. Exception: a local Ollama model on a **developer machine** proves the agent path in C05 (QUESTIONS #78) and runs the trial M-E on the fictional sample repo (QUESTIONS #81); it is not a deployment target |
-| Converting BMAD/Spec Kit specs into our own format | MVP+1 |
+| Converting BMAD/Spec Kit specs into our own format | **Before the trial M-E** (QUESTIONS #285): their structure and acceptance criteria (S01), a plan draft from their tasks (S02). A full conversion into our own format stays MVP+1 |
 | Full OPA/Cedar policy engine (#8) | MVP+1. The MVP uses simple rules in code, behind an interface |
 | Backlog / Jira integration (#12) | MVP+1 |
 | Client reports (#13) | MVP+2 |
@@ -403,3 +404,4 @@ The MVP is done when **all** of the following are true:
 | 1.3 | 2026-10-06 | Claude (coordinator), approved by Harry | §4.2 and §12: the trial M-E runs with the local Ollama model on the owner's development machine; the API-model run moves to before M-F (QUESTIONS #81) |
 | 0.5 | 2026-09-24 | Claude | Translated into English. NFR-08 and Q5 updated for the English decision (message catalog). Section 11.1 fixed: step C belongs to M-F |
 | 1.5 | 2026-10-08 | Claude (coordinator), approved by Harry | Sources: citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged |
+| 1.6 | 2026-10-08 | Claude (coordinator), approved by Harry | §4.1 item 10, §4.2: BMAD / Spec Kit structure and plan drafts, and WeKnora, come before the trial M-E (QUESTIONS #285) |

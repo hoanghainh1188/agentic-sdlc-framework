@@ -23,7 +23,7 @@
 
 | Field | Meaning |
 |---|---|
-| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early) |
+| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early), `S` = spec tools and `K` = document knowledge (before the trial M-E) |
 | Size | **S** ≈ 1 session · **M** ≈ 1–2 sessions · **L** ≈ split into 2–3 sessions. [Proposal] Relative estimate, not person-hours |
 | Depends on | Tasks that must be finished first |
 | Acceptance criteria | Conditions for the PR to be approved. Claude Code writes tests for them |
@@ -42,8 +42,9 @@
 | M-0 | Sample pilot repo (separate repo, right before M-C) | 4 | S×1 · M×2 · L×1 |
 | M-C | Run + G4–G6 | 12 | S×3 · M×8 · L×1 |
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
+| Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×1 · M×2 · L×1 |
 | MVP+1 | Started early: read-only dashboard (QUESTIONS #255); lighter steps | 3 | S×2 · M×1 |
-| **Total** | | **52** | |
+| **Total** | | **56** | |
 
 ### Order and dependencies between milestones
 
@@ -53,7 +54,8 @@ flowchart LR
     MB --> MC["M-C Run + G4–G6"]
     M0["M-0 Sample repo"] --> MC
     MC --> MD["M-D G7–G8 + evidence"]
-    MD --> ME["M-E Trial"]
+    MD --> MP["Pre-M-E S01, S02, K01, K02<br/>spec tools, document knowledge"]
+    MP --> ME["M-E Trial"]
     ME --> MF["M-F Adjustment"]
     MD --> MU["MVP+1 U01 read-only dashboard<br/>(in parallel with M-E)"]
 ```
@@ -766,6 +768,71 @@ flowchart LR
 > Note: After the trial M-E: write the MVP+1 user interface scope (web UI, dashboard; D-02 §4.2) from the trial data (who needs which screen, read-only or actions, sign-in), for Harry's approval, before any interface task is added (Harry, 2026-10-04)
 
 
+### Pre-M-E — Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)
+
+#### S01. Read the structure of BMAD / Spec Kit specs; G2 needs acceptance criteria
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | B08 | FR-02, D-02 §6.2 G2, NFR-08 | platform/packages/core (specs, workflow G2), migrations (if needed), platform/apps/cli (spec), platform/tests/*, handbook Ch.19 §19.8c, design/ADR-M61 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Recognise the structure of a spec by its `source_tool`: `spec-kit` and `bmad` (the formats of pinned versions, named in ADR-M61) and `manual` (a heading for acceptance criteria, also the bilingual `受入基準 / Acceptance criteria` of D-09 §8); an unknown structure falls back to the `manual` rule
+- [ ] AC2: When a spec is linked and when the step re-reads it at the head (B08), count its acceptance criteria; store counts and codes only, never the text (a new column of `spec_refs` is a migration with a D-05 update)
+- [ ] AC3: G2 passes, HOTL or HITL, only when the linked spec has at least one acceptance criterion; otherwise a system `fail spec_unclear` once per spec version and a notice, and the intent waits at G2 (D-02 §6.2: "Acceptance criteria present")
+- [ ] AC4: `sdlc spec link` and `sdlc spec list` show the tool and the count; labels from the message catalog
+- [ ] AC5: Tests: fixtures of each pinned tool's output, the pilot's specs T01–T10 (all pass), a spec without criteria (G2 waits), a spec whose criteria were removed at the head (back to G2)
+
+> Note: QUESTIONS #285 (Harry, 2026-10-08): before the trial M-E. QUESTIONS #290–#294, ADR-M61. A full conversion into the platform's own spec format stays MVP+1
+
+#### S02. `sdlc plan draft`: a plan file draft from Spec Kit tasks or BMAD stories
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | S01, B09 | FR-20, NFR-08 | platform/apps/cli (plan draft), platform/packages/core (plan schema reuse), platform/tests/cli/*, handbook Ch.19 §19.8c |
+
+**Acceptance criteria**
+
+- [ ] AC1: `sdlc plan draft <INT> --from <path> --tool spec-kit|bmad [--output <file>]` reads the tool's task list (Spec Kit `tasks.md`, BMAD story files) from the local working tree and writes `.sdlc/plans/<INT>.yaml` in schema version 1 (template T13): one task per item, with its summary and dependencies
+- [ ] AC2: The draft never guesses what a person must decide: `allowed_paths`, `tools` and `change_flags` stay marked for the person to fill, so the draft fails submission until they are filled; it never submits, commits or pushes (QUESTIONS #167)
+- [ ] AC3: The draft passes `parsePlanFile` once the marked fields are filled; refused input (platform fields, `**`, `.github/`, `.sdlc/`, agent instruction files) is reported with the same codes as submission
+- [ ] AC4: Tests with fixtures of the pinned tools' output (S01's versions); handbook Ch.19 usage
+
+> Note: QUESTIONS #285 (Harry, 2026-10-08): before the trial M-E, lighter plan writing (`design/POSITIONING.md` §6.1). QUESTIONS #295–#299; ADR-M62 only if a new decision is needed
+
+#### K01. Spike: WeKnora on the pilot's documents (go / no-go)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | A02 | D-01 §5.8b, NFR-01, NFR-04 | platform/spikes/weknora/* (thrown away), design/ADR-M59 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Run a pinned WeKnora version self-hosted in a throw-away Compose project (never the dev stack), with its own agent, sandbox and memory features off; it calls models only through LiteLLM
+- [ ] AC2: Load the pilot's fictional Japanese–English documents (D-09 specs T01–T10, README, AGENTS.md); ask at least 20 questions in Japanese and English and measure retrieval quality (the right passage in the top 5) and answer time
+- [ ] AC3: Record resource use (RAM, CPU, disk), the licence and supply chain (images, dependencies, NFR-04), workspace isolation per tenant, and the MCP tools it offers with the ones an agent may use
+- [ ] AC4: ADR-M59: the numbers, a go / no-go for K02 and, for go, the integration constraints (egress, tokens, data classes, what is recorded)
+
+> Note: QUESTIONS #285 (Harry, 2026-10-08): before the trial M-E. No client data. QUESTIONS #300–#304, ADR-M59
+
+#### K02. Agents search the project's documents through WeKnora (MCP)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| L | K01, C04, C05 | D-01 §5.8b, FR-31, FR-33 | platform/deploy (profile `knowledge`), platform/apps/runner (egress, MCP config), platform/packages/adapters/agent-openhands, platform/packages/core (run events), platform/tests/*, design/D-03 §9, design/ADR-M60 |
+
+**Acceptance criteria**
+
+- [ ] AC1: WeKnora runs in a Compose profile `knowledge`, pinned; one workspace per project; its own model calls go through LiteLLM with the seven labels
+- [ ] AC2: A run reaches WeKnora only as a new sandbox egress service in `docker/guard.ts` (like LiteLLM and the package proxy), with a per-run read-only credential handed over as a single-use wrapping token; no long-lived key in the sandbox; only the project's workspace
+- [ ] AC3: The agent gets only search and read tools over MCP; the data class rules apply (`client_restricted`: only when WeKnora and its model are self-hosted; `prohibited`: never)
+- [ ] AC4: A run event records which documents the agent read: IDs and hashes, never text (context snapshot)
+- [ ] AC5: D-03 §9 and §10 updated (sandbox egress); tests: the egress probe from a sandbox, a stub-model run that searches, another project's workspace refused
+
+> Note: QUESTIONS #285 (Harry, 2026-10-08): only if ADR-M59 (K01) says go. QUESTIONS #305–#309, ADR-M60. Code index and full context snapshots stay MVP+1
+
+
 ### MVP+1 — Started early: read-only dashboard (QUESTIONS #255); lighter steps
 
 #### U01. Read-only web dashboard
@@ -890,4 +957,5 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.22 | 2026-10-07 | Claude, approved by Harry | New milestone MVP+1 (started early) with task U01, a read-only web dashboard, in parallel with the trial M-E (QUESTIONS #255) |
 | 1.23 | 2026-10-07 | Claude, approved by Harry | New task U02: the workflow's waiting reason in the API and one oversight resolution for the plan and spec notices (QUESTIONS #264, #265) |
 | 1.24 | 2026-10-07 | Claude, approved by Harry | New task U03: one CLI command creates an intent and links its spec (`design/POSITIONING.md` §6.1, option B2) |
+| 1.25 | 2026-10-08 | Claude, approved by Harry | New milestone Pre-M-E with tasks S01, S02 (BMAD / Spec Kit structure, plan drafts) and K01, K02 (WeKnora), before the trial M-E (QUESTIONS #285) |
 | 0.3 | 2026-09-24 | Claude | Translated into English. User-facing messages via a message catalog (NFR-08). E02 adapter name fixed to `evidence-s3` (matches D-03). A06 includes `git_event_cursors` |
