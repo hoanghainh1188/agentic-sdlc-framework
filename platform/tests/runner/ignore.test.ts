@@ -61,7 +61,10 @@ describe('untarWorkspace streams the archive', () => {
     { type: 'file', path: 'debug.log', content: Buffer.alloc(900_000, 0x63) },
   ]);
 
-  it('reads the same entries from any chunking', async () => {
+  // Streams a 4 MB archive twice, once in small chunks: about 1.3 s on a laptop, more than the
+  // default 5 s on GitHub's runners since 2026-10-08. A longer limit until the root cause is
+  // known (a follow-up session checks whether untarWorkspace is slow with many small chunks).
+  it('reads the same entries from any chunking', { timeout: 30_000 }, async () => {
     const whole = await untarWorkspace(archive, 'workspace', { ...LIMITS, maxBytes: 4_000_000 });
     const streamed = await untarWorkspace(chunks(archive), 'workspace', {
       ...LIMITS,
