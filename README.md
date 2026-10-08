@@ -36,7 +36,7 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 
 ## 3. How it works
 
-**Two repositories.** The platform (this repository) is installed once on a server and serves many projects. Each project keeps its application in its own GitHub repository; the platform reaches it through a GitHub App, runs agents on a temporary clone, and opens pull requests there. It keeps no copy of the code.
+**Two repositories.** The platform (this repository) is installed once on a server and serves many projects. Each project keeps its application in its own GitHub repository; the platform reaches it through a GitHub App, runs agents on a temporary clone, and opens pull requests there. It keeps no working copy of the code; it keeps each run's diff as evidence (at least 180 days) and, with the optional `observability` profile, the model prompts and answers in Langfuse until they are purged.
 
 ![Two repositories: the platform and your project](diagrams/svg/d14-two-repositories.svg)
 
