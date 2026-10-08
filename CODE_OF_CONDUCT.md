@@ -8,8 +8,9 @@ Harassment, insults and personal attacks are not accepted, in issues, pull reque
 
 ## Reporting
 
-Report unacceptable behaviour privately to the maintainer: **CONTACT: TO BE ADDED BEFORE THE PUBLIC RELEASE**.
-Reports are handled confidentially. The maintainer decides on the response, following the
+Report unacceptable behaviour privately, through GitHub: the repository's **Security** tab → **Report a vulnerability**,
+with a title that starts with `Conduct:`. Only the maintainers see these reports. You may also use GitHub's
+**Report content** on the comment or issue (that report goes to GitHub). Reports are handled confidentially. The maintainer decides on the response, following the
 enforcement guidelines of the Contributor Covenant (correction, warning, temporary ban, permanent ban).
 
 Security problems go through [SECURITY.md](SECURITY.md), not through this channel.

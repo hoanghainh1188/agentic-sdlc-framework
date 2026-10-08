@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.6 |
+| Version | 0.7 |
 | Date | 2026-10-08 |
-| Status | **Approved** (Harry, 2026-09-24); 0.6 approved by Harry on 2026-10-08 (open for everyone instead of "sell later"; `design/POSITIONING.md` §7) |
+| Status | **Approved** (Harry, 2026-09-24); 0.6 approved by Harry on 2026-10-08 (open for everyone instead of "sell later"; `design/POSITIONING.md` §7); 0.7 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged) |
 | Readers | Leadership, tech lead / architect |
 | Related decisions | Option C (build the full platform ourselves). Monorepo. Internal first, then open for everyone (MIT code, CC BY 4.0 documentation; 2026-10-08). GitHub + GitLab. Fully self-hosted. Models: both API and self-hosted |
 
@@ -37,7 +37,7 @@
 
 ## 4. General principle
 
-[Doc] Draft v1.0 (section 5.1.2) states:
+[Doc] An earlier internal draft states:
 - **Do not rebuild 7 systems**: Git, CI runner, container registry, secret manager, monitoring, identity provider, deployment controller.
 - **Only build what is specific to agents**: intent/spec registry, agent registry, run management, policy/gate orchestration, context snapshots, tool control, evidence/provenance, agent-aware audit.
 - The platform is a **policy + orchestration + evidence layer** wrapped around existing tools.
@@ -70,7 +70,7 @@ Conclusion labels:
 | OpenHands | Open source | MIT | Yes | Runs the agent in a Docker sandbox. Works with many models. Has an SDK for integration |
 | Aider | Open source | Apache 2.0 | Yes | Each AI change is a separate git commit; easy to review or revert |
 | OpenCode | Open source | MIT | Yes | Written in TypeScript; works with many model providers |
-| Claude Agent SDK | Commercial SDK | Pay per token | Model via API/Bedrock | Draft v1.0 proposed it as the agent runtime |
+| Claude Agent SDK | Commercial SDK | Pay per token | Model via API/Bedrock | An earlier internal draft proposed it as the agent runtime |
 | GitHub Copilot cloud agent | SaaS | Copilot plan | No | Built into GitHub |
 
 **Conclusion: REUSE.** [Proposal]
@@ -135,7 +135,7 @@ Conclusion labels:
 
 | Option | Type | Price | Notes |
 |---|---|---|---|
-| Docker + git worktree | Open source | Infrastructure only | Proposed for the MVP in draft v1.0 |
+| Docker + git worktree | Open source | Infrastructure only | Proposed for the MVP in an earlier internal draft |
 | OpenHands sandbox | Open source | Infrastructure only | Included when using OpenHands |
 | AgentCore Runtime | AWS, pay per use | About USD 0.0895 per vCPU-hour + USD 0.00945 per GB-hour (mid-2026) | Serverless; nothing to operate |
 
@@ -167,7 +167,7 @@ Conclusion labels:
 
 ### 5.8. Automated verification (CI, security scans)
 
-[Doc] Draft v1.0 proposes: GitHub/GitLab CI, Semgrep/CodeQL, Trivy, Gitleaks, Syft, Cosign.
+[Doc] An earlier internal draft proposes: GitHub/GitLab CI, Semgrep/CodeQL, Trivy, Gitleaks, Syft, Cosign.
 
 **Conclusion: REUSE.** Only build the part that **collects results into an Evidence Pack**.
 
@@ -175,7 +175,7 @@ Conclusion labels:
 
 The context layer is where the agent finds documents, specs, meeting notes and relevant code before it works.
 
-[Doc] Draft v1.0 proposes: PostgreSQL + pgvector, Tree-sitter, SCIP; move to Qdrant/OpenSearch when it grows.
+[Doc] An earlier internal draft proposes: PostgreSQL + pgvector, Tree-sitter, SCIP; move to Qdrant/OpenSearch when it grows.
 
 #### Further evaluation: WeKnora (Tencent)
 
@@ -274,7 +274,7 @@ Details: D-03 section 8.1.
 | 12 | **Project management integration**: Backlog / Jira / GitHub Issues | Existing APIs | Medium |
 | 13 | **Client reports**: export evidence per task | Evidence Pack | Low (after the pilot) |
 
-[Doc] Items 1–5, 8, 9, 11 match "what the platform builds" in draft v1.0 (section 5.1.2).
+[Doc] Items 1–5, 8, 9, 11 match "what the platform builds" in an earlier internal draft.
 [Proposal] Items 6, 7, 10, 12, 13 were added for our context (GitHub + GitLab, tokens, Japanese projects).
 
 **In short:** option C = **build 13 core components**, reuse about 10 existing ones.
@@ -311,7 +311,7 @@ Details: D-03 section 8.1.
 ## 9. References
 
 **Internal**
-- Draft v1.0 "AI-Agentic-SDLC-Handbook", sections 0.6, 5.1.2, 5.8, 5.10.5.
+- design/D-02, design/D-03, design/D-07.
 
 **External** (accessed 2026-09-24)
 - GitHub Changelog, Enterprise AI Controls & agent control plane GA (2026-02-26): https://github.blog/changelog/2026-02-26-enterprise-ai-controls-agent-control-plane-now-generally-available/
@@ -353,3 +353,4 @@ Reliability notes:
 | 0.4 | 2026-09-24 | Claude (draft) | After review: SeaweedFS replaces MinIO, Valkey replaces Redis; 13 build components renumbered |
 | 0.5 | 2026-09-24 | Claude | Translated into English. Content unchanged (risk rows renumbered 1–10) |
 | 0.6 | 2026-10-08 | Claude (coordinator), approved by Harry | Header and §8: open for everyone instead of "sell later" (`design/POSITIONING.md` §7) |
+| 0.7 | 2026-10-08 | Claude (coordinator), approved by Harry | Sources: citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged |

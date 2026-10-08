@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.5 |
-| Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24); 0.4 approved by Harry on 2026-09-27 in the C05 session 2 plan (Ollama on developer machines; QUESTIONS #78); 0.5 approved by Harry on 2026-10-06 (the trial M-E on the local model; QUESTIONS #81) |
+| Version | 0.6 |
+| Date | 2026-10-08 |
+| Status | **Approved** (Harry, 2026-09-24); 0.4 approved by Harry on 2026-09-27 in the C05 session 2 plan (Ollama on developer machines; QUESTIONS #78); 0.5 approved by Harry on 2026-10-06 (the trial M-E on the local model; QUESTIONS #81); 0.6 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged) |
 | Readers | Leadership (sections 1, 2, 7, 9), tech lead / architect (all) |
 | Related decisions | Fully self-hosted. Models: **both API and self-hosted** |
 
@@ -132,7 +132,7 @@ Every model call must carry these labels (metadata):
 | Cost per gate / phase | Which stage costs most |
 | Self-hosted vs API share | Whether routing policy is followed |
 
-[Doc] Draft v1.0 already mentioned "cost, retries, failures" on the dashboard (section 5.8.4). This document adds detail.
+[Doc] An earlier internal draft already mentioned "cost, retries, failures" on the dashboard (section 5.8.4). This document adds detail.
 
 ---
 
@@ -148,7 +148,7 @@ Three budget levels, from largest to smallest:
 
 ### Link to the gates
 
-- [Doc] Draft v1.0 had a separate "Resource & Budget" gate. In the canonical codes it is **merged into G5 Scope drift** (see the codes table).
+- [Doc] An earlier internal draft had a separate "Resource & Budget" gate. In the canonical codes it is **merged into G5 Scope drift** (see the codes table).
 - [Proposal] **G1**: when approving an intent, record its **expected token budget**.
 - [Proposal] **G4**: when granting the agent permission to run, also grant a **token cap** and a **maximum number of iterations**.
 - [Proposal] **G5**: above 80% of budget → warning. At 100% → stop; the owner must approve before it continues.
@@ -219,7 +219,7 @@ Ordered by expected impact (to be measured in the pilot):
 ## 10. References
 
 **Internal**
-- Draft v1.0 "AI-Agentic-SDLC-Handbook", sections 5.8.4, 5.10.5; gate G8 Resource & Budget (old codes).
+- design/D-01, design/D-02, design/D-03, design/D-05.
 
 **External** (accessed 2026-09-24)
 - LiteLLM docs, Budgets & Rate Limits: https://docs.litellm.ai/docs/proxy/users
@@ -244,3 +244,4 @@ Note: prices and features change often. Check again before budgeting.
 | 0.3 | 2026-09-24 | Claude | Translated into English. Content unchanged |
 | 0.4 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §3: Ollama on developer machines only, local tags, same gateway, routing and internal-cost rules; §4: never for client data (QUESTIONS #78) |
 | 0.5 | 2026-10-06 | Claude (coordinator), approved by Harry | §3, §4: the trial M-E runs with the local Ollama model on the fictional sample repo; the API-model run moves to before M-F (QUESTIONS #81) |
+| 0.6 | 2026-10-08 | Claude (coordinator), approved by Harry | Sources: citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged |
