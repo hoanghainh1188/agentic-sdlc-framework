@@ -20,6 +20,8 @@ export interface CliContext {
   readonly connect: (config: DatabaseConfig) => PlatformDatabase;
   /** Network and terminal access of the user commands. Missing: the real process (`processApiIo`). */
   readonly api?: ApiIo;
+  /** The folder relative paths start from (`sdlc plan draft`). Missing: `process.cwd()`. */
+  readonly cwd?: string;
 }
 
 /**

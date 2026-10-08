@@ -233,3 +233,7 @@ const bmadStory: Rule = (lines) => {
   });
   return found ? { structure: 'bmad_story', acceptanceCriteria: count } : null;
 };
+
+// Shared with `sdlc plan draft` (task S02, ADR-M62), which reads Spec Kit task lists and BMAD
+// story files with the same Markdown rules (fences and HTML comments skipped, template text).
+export { toLines as markdownLines, filled as isFilledItem, type Line as MarkdownLine };
