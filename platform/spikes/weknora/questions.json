@@ -1,0 +1,173 @@
+{
+  "_note": "K01 spike (design/ADR-M59). Written by AI (Claude) from the public fictional pilot repo harryforge/pilot-order-inventory: the numbers may be biased. Questions paraphrase; no heading is copied. A retrieved chunk is a hit when it comes from one of `docs` and contains one of `evidence` (whitespace ignored). `lang` is the question's language; the target passage language depends on the corpus (README.md and AGENTS.md are English only; specs are bilingual in corpus `bilingual`, Japanese only in corpus `split`).",
+  "questions": [
+    {
+      "id": "Q01",
+      "lang": "en",
+      "docs": ["T04"],
+      "evidence": ["CSV_UNSUPPORTED_CHARACTER"],
+      "q": "If a customer name holds a character that the legacy Japanese encoding cannot represent, what must the export endpoint do?"
+    },
+    {
+      "id": "Q02",
+      "lang": "en",
+      "docs": ["T07"],
+      "evidence": ["order_cancel"],
+      "q": "What is written to the stock history when staff withdraw an order that has not left the warehouse?"
+    },
+    {
+      "id": "Q03",
+      "lang": "en",
+      "docs": ["T02"],
+      "evidence": ["^[A-Z]{3}-[0-9]{3}$", "tea-001"],
+      "q": "Which pattern must product codes follow, and are lowercase codes corrected automatically?"
+    },
+    {
+      "id": "Q04",
+      "lang": "en",
+      "docs": ["T08"],
+      "evidence": ["pageSize"],
+      "q": "How many orders may one page of the order listing hold, and what is the default?"
+    },
+    {
+      "id": "Q05",
+      "lang": "en",
+      "docs": ["T06"],
+      "evidence": ["切り捨て"],
+      "q": "When the tax comes to a fraction of a yen, is it rounded up, down or to the nearest yen?"
+    },
+    {
+      "id": "Q06",
+      "lang": "en",
+      "docs": ["T05"],
+      "evidence": ["lowStock"],
+      "q": "Under what condition is a product flagged as running short in the stock overview?"
+    },
+    {
+      "id": "Q07",
+      "lang": "en",
+      "docs": ["T09"],
+      "evidence": ["MAIN"],
+      "q": "Under which site code is the current stock moved when the system starts to track several storage sites?"
+    },
+    {
+      "id": "Q08",
+      "lang": "en",
+      "docs": ["T10"],
+      "evidence": ["--execute"],
+      "q": "Does the clean-up command for very old sales records remove anything when run without extra flags?"
+    },
+    {
+      "id": "Q09",
+      "lang": "en",
+      "docs": ["README"],
+      "evidence": ["engine binaries"],
+      "q": "Why was the other popular ORM rejected for this repository?"
+    },
+    {
+      "id": "Q10",
+      "lang": "en",
+      "docs": ["AGENTS"],
+      "evidence": ["Do not try to install or start PostgreSQL"],
+      "q": "May a coding agent set up its own database server in the sandbox so that the database tests can run?"
+    },
+    {
+      "id": "Q11",
+      "lang": "en",
+      "docs": ["T01"],
+      "evidence": ["商品はまだ登録されていません"],
+      "q": "What text should the catalogue page show when it has no items yet?"
+    },
+    {
+      "id": "Q12",
+      "lang": "en",
+      "docs": ["T03"],
+      "evidence": ["`shipped`"],
+      "q": "Which values does the new order state parameter accept, and what does an English value get back?"
+    },
+    {
+      "id": "Q13",
+      "lang": "ja",
+      "docs": ["T02"],
+      "evidence": ["^[A-Z]{3}-[0-9]{3}$", "tea-001"],
+      "q": "品番は英字と数字をどう並べればよいですか。小文字で入力した場合は自動で直りますか。"
+    },
+    {
+      "id": "Q14",
+      "lang": "ja",
+      "docs": ["T07"],
+      "evidence": ["受付 → キャンセル"],
+      "q": "注文を取り消せるのはどの状態の注文だけですか。"
+    },
+    {
+      "id": "Q15",
+      "lang": "ja",
+      "docs": ["T08"],
+      "evidence": ["互換性のない"],
+      "q": "一覧の応答の形が変わると、既存の呼び出し側には影響がありますか。"
+    },
+    {
+      "id": "Q16",
+      "lang": "ja",
+      "docs": ["T06"],
+      "evidence": ["税率ごとに合計"],
+      "q": "税金は明細一行ずつ計算するのですか、それともまとめてから計算するのですか。"
+    },
+    {
+      "id": "Q17",
+      "lang": "ja",
+      "docs": ["T05"],
+      "evidence": ["既定値は 10"],
+      "q": "在庫が少ないと判断する基準は、最初はいくつに設定されますか。"
+    },
+    {
+      "id": "Q18",
+      "lang": "ja",
+      "docs": ["T10"],
+      "evidence": ["元に戻せない"],
+      "q": "古い注文を消す作業をエージェントに任せないのはなぜですか。"
+    },
+    {
+      "id": "Q19",
+      "lang": "ja",
+      "docs": ["T09"],
+      "evidence": ["プッシュしない"],
+      "q": "保管場所を複数にする作業で、エージェントの変更がそのまま反映されないのはなぜですか。"
+    },
+    {
+      "id": "Q20",
+      "lang": "ja",
+      "docs": ["README"],
+      "evidence": ["whole order is refused"],
+      "q": "注文の中に在庫が足りない商品が一つでもあったら、注文全体はどう扱われますか。"
+    },
+    {
+      "id": "Q21",
+      "lang": "ja",
+      "docs": ["AGENTS", "README"],
+      "evidence": ["Test.createTestingModule"],
+      "q": "APIのテストで依存先を差し替えたいとき、どの方法を使うべきですか。"
+    },
+    {
+      "id": "Q22",
+      "lang": "ja",
+      "docs": ["README"],
+      "evidence": ["numbers can have gaps"],
+      "q": "注文番号が連番にならず、飛ぶことがあるのはなぜですか。"
+    },
+    {
+      "id": "Q23",
+      "lang": "ja",
+      "docs": ["AGENTS"],
+      "evidence": ["Never change the registry"],
+      "q": "エージェントはパッケージの取得先を自分で変更してもよいですか。"
+    },
+    {
+      "id": "Q24",
+      "lang": "ja",
+      "docs": ["README"],
+      "evidence": ["single check that branch protection requires"],
+      "q": "メインブランチの保護で必須になっているCIの確認はどれですか。"
+    }
+  ]
+}

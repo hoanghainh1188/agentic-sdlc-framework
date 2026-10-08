@@ -1,0 +1,118 @@
+{
+  "_note": "K01 spike: Trivy 0.74.0 (aquasec/trivy@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969), scanners vuln and license, 2026-10-08. Counts per severity; vuln_fixable = a fixed version exists. Licence severities are Trivy categories (CRITICAL = forbidden, HIGH = restricted, for example GPL in OS packages). Image keys are \"<repository> <tag>\".",
+  "images": {
+    "pgvector/pgvector 0.8.1-pg17": {
+      "vulnerabilities": {
+        "LOW": 205,
+        "HIGH": 126,
+        "MEDIUM": 253,
+        "CRITICAL": 20,
+        "UNKNOWN": 10
+      },
+      "vulnerabilities_fixable": {
+        "MEDIUM": 91,
+        "LOW": 41,
+        "HIGH": 63,
+        "CRITICAL": 17,
+        "UNKNOWN": 6
+      },
+      "licence_findings": {
+        "HIGH": 477,
+        "LOW": 213,
+        "UNKNOWN": 328,
+        "MEDIUM": 1
+      },
+      "licence_critical": []
+    },
+    "qdrant/qdrant v1.16.2": {
+      "vulnerabilities": {
+        "LOW": 169,
+        "HIGH": 179,
+        "MEDIUM": 243,
+        "UNKNOWN": 2,
+        "CRITICAL": 10
+      },
+      "vulnerabilities_fixable": {
+        "HIGH": 135,
+        "MEDIUM": 185,
+        "LOW": 109,
+        "CRITICAL": 10
+      },
+      "licence_findings": {
+        "HIGH": 301,
+        "UNKNOWN": 188,
+        "LOW": 1561,
+        "MEDIUM": 4
+      },
+      "licence_critical": []
+    },
+    "valkey/valkey 8.1.10-alpine3.24": {
+      "vulnerabilities": {
+        "MEDIUM": 1
+      },
+      "vulnerabilities_fixable": {
+        "MEDIUM": 1
+      },
+      "licence_findings": {
+        "HIGH": 14,
+        "LOW": 12,
+        "MEDIUM": 1,
+        "UNKNOWN": 1
+      },
+      "licence_critical": []
+    },
+    "wechatopenai/weknora-app v0.8.2": {
+      "vulnerabilities": {
+        "LOW": 1298,
+        "HIGH": 684,
+        "MEDIUM": 2628,
+        "UNKNOWN": 184,
+        "CRITICAL": 34
+      },
+      "vulnerabilities_fixable": {
+        "HIGH": 61,
+        "MEDIUM": 87,
+        "LOW": 25,
+        "CRITICAL": 19
+      },
+      "licence_findings": {
+        "HIGH": 952,
+        "LOW": 1021,
+        "UNKNOWN": 683,
+        "MEDIUM": 10,
+        "CRITICAL": 1
+      },
+      "licence_critical": ["WTFPL"]
+    },
+    "wechatopenai/weknora-docreader v0.8.2": {
+      "vulnerabilities": {
+        "MEDIUM": 6659,
+        "LOW": 2332,
+        "UNKNOWN": 351,
+        "HIGH": 2136,
+        "CRITICAL": 202
+      },
+      "vulnerabilities_fixable": {
+        "UNKNOWN": 26,
+        "HIGH": 1263,
+        "MEDIUM": 3299,
+        "LOW": 532,
+        "CRITICAL": 162
+      },
+      "licence_findings": {
+        "HIGH": 2332,
+        "UNKNOWN": 1383,
+        "LOW": 1373,
+        "MEDIUM": 121,
+        "CRITICAL": 1
+      },
+      "licence_critical": ["AGPL-3.0-or-later"]
+    }
+  },
+  "details": {
+    "docreader_critical_os": "199 in Debian 12.12 packages (159 fixable), mostly ImageMagick 6; 3 in grpc_health_probe (Go stdlib, grpc)",
+    "docreader_licence_critical": "EbookLib 0.20 (AGPL-3.0-or-later), a Python library in the docreader process (EPUB parsing)",
+    "app_critical_os": "34 in Debian 12.12 packages (19 fixable), for example mbedtls, perl",
+    "app_licence_critical": "node-path-is-inside (WTFPL, permissive; Trivy lists WTFPL as forbidden by default)"
+  }
+}

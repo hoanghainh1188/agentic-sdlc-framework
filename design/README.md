@@ -52,6 +52,7 @@
 | ADR-M52 | [SeaweedFS internal access: loopback binding and keys made at each start](ADR-M52-seaweedfs-internal-access.md) (task A12) | Proposed | |
 | ADR-M53 | [Purge a project's data from Langfuse](ADR-M53-langfuse-purge.md) (task E08) | Proposed | |
 | ADR-M54 | [A read-only web dashboard](ADR-M54-read-only-dashboard.md) (task U01) | Proposed | |
+| ADR-M59 | [WeKnora for document knowledge: result of the K01 spike](ADR-M59-weknora-spike.md) (task K01) | Proposed | |
 | ADR-M61 | [The structure of a spec, and G2 needs acceptance criteria](ADR-M61-spec-structure.md) (task S01) | Proposed | |
 | ADR-M62 | [`sdlc plan draft`: a plan file draft from Spec Kit tasks or a BMAD story](ADR-M62-plan-draft.md) (task S02) | Proposed | |
 

@@ -1,0 +1,19 @@
+# K01 spike only: WeKnora's models all point at the spike's LiteLLM (OpenAI-compatible).
+builtin_models:
+  - id: k01-chat
+    type: KnowledgeQA
+    source: remote
+    is_default: true
+    name: ${K01_CHAT_MODEL}
+    parameters:
+      base_url: http://litellm:4000/v1
+      api_key: ${K01_LITELLM_KEY}
+  - id: k01-embed
+    type: Embedding
+    source: remote
+    is_default: true
+    name: bge-m3
+    dimension: 1024
+    parameters:
+      base_url: http://litellm:4000/v1
+      api_key: ${K01_LITELLM_KEY}

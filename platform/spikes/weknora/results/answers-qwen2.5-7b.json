@@ -1,0 +1,81 @@
+{
+  "model": "qwen2.5-7b",
+  "n": 8,
+  "total_s_p50": 27.4,
+  "total_s_max": 45.1,
+  "gold_in_references": 8,
+  "rows": [
+    {
+      "id": "Q01",
+      "lang": "en",
+      "status": 200,
+      "first_token_s": 24.6,
+      "total_s": 39.4,
+      "answer_chars": 3112,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q06",
+      "lang": "en",
+      "status": 200,
+      "first_token_s": 12.7,
+      "total_s": 21.8,
+      "answer_chars": 1837,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q09",
+      "lang": "en",
+      "status": 200,
+      "first_token_s": 9.9,
+      "total_s": 17.9,
+      "answer_chars": 1580,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q11",
+      "lang": "en",
+      "status": 200,
+      "first_token_s": 10.6,
+      "total_s": 14.9,
+      "answer_chars": 733,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q14",
+      "lang": "ja",
+      "status": 200,
+      "first_token_s": 10.9,
+      "total_s": 15.1,
+      "answer_chars": 304,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q16",
+      "lang": "ja",
+      "status": 200,
+      "first_token_s": 13.2,
+      "total_s": 27.4,
+      "answer_chars": 889,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q20",
+      "lang": "ja",
+      "status": 200,
+      "first_token_s": 19.9,
+      "total_s": 32,
+      "answer_chars": 586,
+      "gold_in_references": true
+    },
+    {
+      "id": "Q22",
+      "lang": "ja",
+      "status": 200,
+      "first_token_s": 23.1,
+      "total_s": 45.1,
+      "answer_chars": 1044,
+      "gold_in_references": true
+    }
+  ]
+}
