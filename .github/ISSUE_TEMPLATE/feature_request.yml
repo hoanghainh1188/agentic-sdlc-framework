@@ -1,0 +1,24 @@
+name: Idea or change request
+description: A change to the platform or the process.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What is hard or missing today, and for which role (Person A, Person B, tenant admin, operator, leadership)?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Your proposal
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: The rules this change must keep
+      options:
+        - label: The producer of a change never approves it, and G1, G7 and production G8 stay human decisions
+        - label: No secrets, client data or free text in the append-only tables
