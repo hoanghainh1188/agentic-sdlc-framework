@@ -222,6 +222,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc spec list <INT-…>` | Lists the linked spec versions: path, commit and SHA-256 |
 | `sdlc plan submit <INT-…> [--commit <SHA>]` | Submits the intent's plan file (below) |
 | `sdlc plan list <INT-…>` / `sdlc plan show <INT-…>` | Lists the submitted plan versions / shows the latest one with its path patterns, tools and change flags |
+| `sdlc plan draft <INT-…> --from <file> --tool spec-kit\|bmad [--output <file>] [--force]` | Writes a plan file draft on your machine from a Spec Kit `tasks.md` or a BMAD story file (below). Sends nothing |
 | `sdlc ai-record show --project <slug>` | Shows the project AI record |
 | `sdlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
 | `sdlc cost report [--project <slug> \| --intent <INT-…>] [--from <time>] [--to <time>] [--by project\|intent\|model\|status]` | Shows tokens and cost (below) |
@@ -243,6 +244,17 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **If someone edits the spec on the default branch after G2**, the platform notices it at the next step: it links the new version, takes the intent back to G2 and posts a comment (`spec_changed`). Approvals of the old spec no longer count. At Low risk G2 is HOTL, so the platform may pass the new spec again, with its block window; at other tiers a person approves it again.
 - If the file is removed, renamed or cannot be read, the intent goes back to G2 and waits (`spec_unavailable`) until you restore it or link another spec.
 - If GitHub cannot be reached, the intent waits; it never passes a gate without the check.
+- **G2 needs acceptance criteria** (task S01, `design/ADR-M61-spec-structure.md`). When the platform reads the spec, it counts its acceptance criteria and shows the count (`sdlc spec link`, `sdlc spec list`). It keeps the count, never the text. G2 passes only with at least one criterion, at every risk tier. Otherwise the platform records `fail spec_unclear`, posts a comment, and the intent waits at G2 (`spec_unclear`); nobody can approve G2 until the spec has criteria. Person A may still reject G2 or request changes.
+- Name the tool with `--tool` so the platform reads the right structure:
+
+  | `--tool` | Where the platform finds the criteria | One criterion |
+  |---|---|---|
+  | `spec-kit` (Spec Kit 1.1.2) | each `**Acceptance Scenarios**:` block | each numbered item (`1. **Given** … **When** … **Then** …`). Requirements `FR-xxx` and success criteria `SC-xxx` do not count |
+  | `bmad` (BMAD Method 6.12.1) | a story file's `## Acceptance Criteria`, or an epics file's `**Acceptance Criteria:**` blocks | each list item; in an epics file, each `**Given**` group |
+  | `manual`, or no `--tool` | a heading with "Acceptance criteria" or 受入基準, for example `## 受入基準 / Acceptance criteria` | each top-level list item under it |
+
+  If the tool's structure is not found, the platform tries the other structures. Template text that was never filled in (`[initial state]`, `{{precondition}}`) and text that is not a list item do not count.
+- A spec linked before this rule existed has no count: link it again (`sdlc spec link` with the same path) and the platform counts it.
 
 **Submitting a plan (G3 input).** G3 checks the intent's task plan (template T13). Submit it with `sdlc plan submit` (task B09, `design/ADR-M40-plan-submission.md`):
 
@@ -271,6 +283,18 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - Leave out `--commit`, or give a commit that holds the same file as the default branch; otherwise the platform refuses (`plan_not_on_default_branch`). The platform always records the head of the default branch it read as the plan's commit, also when you name an older commit (QUESTIONS #212). A refused file answers `plan_invalid` with the reason, for example `pattern_too_broad` or `platform_field`.
 - **If someone edits the plan file on the default branch after you submitted it**, G3 or G4 waits (`plan_resubmit_needed`) and the platform posts a comment. It never takes the new file by itself: submit it again with `sdlc plan submit`. At G4 a new plan takes the intent back to G3, where Person B approves it again; earlier approvals no longer count.
 - If GitHub cannot be reached, the intent waits; it never passes G3 or starts a run without the check.
+
+**Drafting a plan from Spec Kit or BMAD.** If the team already has a task list, `sdlc plan draft` writes the plan file for you to complete (task S02, `design/ADR-M62-plan-draft.md`). It runs on your machine only: it calls no API, runs no Git command and never submits, commits or pushes.
+
+- Sources (the pinned versions): a Spec Kit `tasks.md` (`--tool spec-kit`) or a BMAD **story** file (`--tool bmad`). A BMAD epics file is refused: one intent is one story, so draft from the story file. The file must be UTF-8 text of at most 256 KiB.
+- What it writes:
+  - Spec Kit: one task per line such as `- [ ] T012 [P] [US1] Create the model in src/models/order.ts`, with the description as `summary`, `depends_on` only from an explicit "(depends on T010, T011)", and the phase's `**Checkpoint**:` on its last task. With more than 20 lines it writes one task per phase instead (a plan holds at most 20 tasks) and says so; split it again if you want.
+  - BMAD: one task per top-level item of `## Tasks / Subtasks`, with its subtasks as `definition_of_done`.
+- **What you decide.** Each task's `allowed_paths` and `tools`, and the plan's `change_flags`, are written as `null` under a comment `PERSON MUST FILL` or `PERSON MUST DECIDE`. The platform refuses the file (`schema_invalid`) until you fill them. Write `change_flags: []` when no flag applies. Paths that a Spec Kit task names are listed in comments as suggestions only: check them before you copy them.
+- A task list that still holds template text (`[Entity1]`, `Task 1 (AC: #)`) is refused: fill it first.
+- Where: `.sdlc/plans/<INT-…>.yaml` at the root of your repository (the nearest folder with `.git`, also when you run the command in a sub-folder), or the file you name with `--output`. An existing file is replaced only with `--force`.
+- Then: check every task, fill the marked fields, commit the file to the default branch and run `sdlc plan submit <INT-…>`. You are the producer of the plan, as if you had written it by hand.
+
 
 **Reading the cost report.** `sdlc cost report` shows what the model calls cost (task E04, `design/ADR-M45-cost-report.md`, D-02 FR-53):
 
@@ -439,3 +463,5 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.17 | 2026-10-04 | Claude (task E05, PR 2) | §19.8d: the daily audit anchor and `audit.anchor_mismatch` (ADR-M51 §2.9) |
 | 0.18 | 2026-10-07 | Claude (task U01) | §19.8e: the read-only dashboard (ADR-M54) |
 | 0.19 | 2026-10-07 | Claude (task U02) | §19.8c, §19.8e: what holds an intent (`sdlc intent show`, the dashboard; ADR-M54 §2.4b) |
+| 0.20 | 2026-10-08 | Claude (task S01) | §19.8c: G2 needs acceptance criteria; the spec structures by tool (ADR-M61) |
+| 0.21 | 2026-10-08 | Claude (task S02) | §19.8c: `sdlc plan draft` from a Spec Kit `tasks.md` or a BMAD story file (ADR-M62) |

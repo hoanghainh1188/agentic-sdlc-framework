@@ -1,4 +1,5 @@
-// `sdlc plan submit|list|show` over the API (D-08 B09 AC2, ADR-M40 §2.3, handbook Ch.19 §19.8c).
+// `sdlc plan submit|list|show` over the API (D-08 B09 AC2, ADR-M40 §2.3, handbook Ch.19 §19.8c);
+// `sdlc plan draft` works on local files only (task S02, ADR-M62, `plan-draft.ts`).
 // The plan is the file `.sdlc/plans/<INT-…>.yaml` on the default branch (template T13). The
 // platform reads it from the Git host and keeps its SHA-256, path patterns, tools and change flags
 // only; the text stays in the repository. `--commit` is optional and must hold the same file as
@@ -11,6 +12,7 @@ import { parseCommand, segment, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
 import { say, toJson } from '../output.js';
 import { intentRef } from './intent.js';
+import { draft } from './plan-draft.js';
 
 const COMMIT = /^[0-9a-f]{40}$/;
 
@@ -19,6 +21,7 @@ export async function runPlan(args: readonly string[], ctx: CliContext): Promise
   if (command === 'submit') return submit(rest, ctx);
   if (command === 'list') return list(rest, ctx, false);
   if (command === 'show') return list(rest, ctx, true);
+  if (command === 'draft') return draft(rest, ctx, usage);
   return usage(ctx);
 }
 

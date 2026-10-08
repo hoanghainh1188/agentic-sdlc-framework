@@ -42,8 +42,30 @@ describe('sdlc spec', () => {
         path: 'docs/specs/T07 cancel.md',
         commit: COMMIT,
         sha256: 'a'.repeat(64),
+        tool: 'spec-kit',
+        structure: 'spec_kit',
+        criteria: '4',
       }),
     ]);
+  });
+
+  it('S01: says when the linked spec has no acceptance criteria, and shows the count', async () => {
+    const body = { ...linkedSpecBody(), structure: 'none', acceptance_criteria: 0 };
+    const h = await harness({ routes: { [`POST ${PATH}`]: { status: 201, body } } });
+    expect(await h.run(['spec', 'link', 'INT-2026-0007', '--path', 'a.md'])).toBe(EXIT.ok);
+    expect(h.out[0]).toContain('structure none, 0 acceptance criteria');
+    expect(h.out[1]).toBe(t('cli.spec.no_criteria', { intent: 'INT-2026-0007' }));
+    // A spec linked before S01 shows `-`.
+    const old = {
+      ...linkedSpecBody(),
+      source_tool: null,
+      structure: null,
+      acceptance_criteria: null,
+    };
+    const h2 = await harness({ routes: { [`POST ${PATH}`]: { status: 201, body: old } } });
+    expect(await h2.run(['spec', 'link', 'INT-2026-0007', '--path', 'a.md'])).toBe(EXIT.ok);
+    expect(h2.out[0]).toContain('Tool -, structure -, - acceptance criteria');
+    expect(h2.out[1]).toBe(t('cli.spec.no_criteria', { intent: 'INT-2026-0007' }));
   });
 
   it('links without a commit (the head of the default branch), with --json', async () => {
@@ -62,6 +84,7 @@ describe('sdlc spec', () => {
     expect(await h.run(['spec', 'list', 'INT-2026-0007'])).toBe(EXIT.ok);
     expect(h.out).toHaveLength(2);
     expect(h.out[0]).toContain('v1');
+    expect(h.out[0]).toContain('criteria 4');
     const empty = await harness({
       routes: { [`GET ${PATH}`]: { status: 200, body: specListBody(true) } },
     });

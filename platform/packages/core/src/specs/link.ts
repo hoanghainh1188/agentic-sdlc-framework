@@ -9,7 +9,11 @@
 // - What: the spec is the file at the head of the project's default branch (QUESTIONS #160). The
 //   commit is optional; a given commit must hold the same content as the head
 //   (`not_on_default_branch` otherwise), so the approved spec is the one the agent will read.
-// - Linking the same path and content again changes nothing (the latest version is returned).
+// - Linking the same path and content again changes nothing (the latest version is returned),
+//   unless that version was linked before S01 and has no acceptance criteria count: then a new
+//   version with a count is linked (QUESTIONS #290).
+// - S01 (ADR-M61): the file's structure and acceptance criteria are counted with its hash
+//   (`readSpec`); a spec without criteria is linked, and G2 waits on it (`spec_unclear`).
 import { GitHostError, type GitHostAdapter, type ProjectRole } from '@sdlc/contracts';
 
 import { CommandError } from '../commands/errors.js';
@@ -20,6 +24,7 @@ import { loadEffectiveConfig } from '../registry/effective-config.js';
 import { projectRepoRef } from '../workflow/g4-proposal.js';
 import { SpecError } from './errors.js';
 import { readSpec } from './read.js';
+import type { SpecStructure } from './structure.js';
 import { isSpecPath } from './rules.js';
 
 /** What spec linking reads from the Git host (the API wires the GitHub adapter). */
@@ -102,10 +107,14 @@ export async function linkSpecFromGitHost(
   const ref = project ? projectRepoRef(project) : undefined;
   if (!project || !ref) throw new SpecError('repository_invalid', 'repository name invalid');
 
-  const { head, sha256 } = await readOnDefaultBranch(deps, ref, project.default_branch, {
-    path,
-    commit,
-  });
+  const tool = request.sourceTool ?? null;
+  const { head, sha256, structure } = await readOnDefaultBranch(
+    deps,
+    ref,
+    project.default_branch,
+    { path, commit },
+    tool,
+  );
   return scope.transaction(async (tx) => {
     const locked = await tx.intents.lockAndGet(intent.id);
     if (!locked || !specLinkable(locked)) {
@@ -116,15 +125,23 @@ export async function linkSpecFromGitHost(
       throw new CommandError('forbidden', 'the caller may not link a spec');
     }
     const latest = await tx.specRefs.latest(intent.id);
-    if (latest?.path === path && latest.content_sha256 === sha256) return latest;
+    if (
+      latest?.path === path &&
+      latest.content_sha256 === sha256 &&
+      latest.acceptance_criteria !== null
+    ) {
+      return latest;
+    }
     return tx.specRefs.link(intent.id, {
       actorType: 'human',
       actorId: request.actorId,
       path,
       commitSha: commit ?? head,
       contentSha256: sha256,
-      sourceTool: request.sourceTool ?? null,
+      sourceTool: tool,
       cause: 'linked',
+      structure: structure.structure,
+      acceptanceCriteria: structure.acceptanceCriteria,
     });
   });
 }
@@ -134,10 +151,11 @@ async function readOnDefaultBranch(
   ref: Parameters<typeof readSpec>[1],
   branch: string,
   at: { readonly path: string; readonly commit: string | null },
-): Promise<{ head: string; sha256: string }> {
+  tool: SpecSourceTool | null,
+): Promise<{ head: string; sha256: string; structure: SpecStructure }> {
   try {
     const head = await deps.gitHost.getBranchHead(ref, branch);
-    const atHead = await readSpec(deps.gitHost, ref, at.path, head);
+    const atHead = await readSpec(deps.gitHost, ref, at.path, head, tool);
     if (atHead.kind === 'unreadable') {
       throw new SpecError('spec_unreadable', 'spec cannot be read at head', atHead.cause);
     }
@@ -150,7 +168,14 @@ async function readOnDefaultBranch(
         throw new SpecError('not_on_default_branch', 'the commit holds another version');
       }
     }
-    return { head, sha256: atHead.sha256 };
+    return {
+      head,
+      sha256: atHead.sha256,
+      structure: {
+        structure: atHead.structure,
+        acceptanceCriteria: atHead.acceptanceCriteria,
+      },
+    };
   } catch (error) {
     if (error instanceof GitHostError) {
       throw new SpecError('git_host_unavailable', 'git host unavailable', undefined, error.code);

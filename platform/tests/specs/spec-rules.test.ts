@@ -54,7 +54,13 @@ describe('readSpec through the GitHub adapter', () => {
     h.stub.on('GET', PATH, raw(bytes));
     const read = await readSpec(h.adapter(), REPO, 'docs/specs/T06 tax.md', SHA_A);
     const expected = createHash('sha256').update(bytes).digest('hex');
-    expect(read).toEqual({ kind: 'ok', sha256: expected });
+    // S01: the structure is counted in the same read; the text never leaves `readSpec`.
+    expect(read).toEqual({
+      kind: 'ok',
+      sha256: expected,
+      structure: 'none',
+      acceptanceCriteria: 0,
+    });
     expect(specContentSha256(bytes.toString('utf8'))).toBe(expected);
   });
 

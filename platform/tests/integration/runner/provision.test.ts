@@ -186,6 +186,8 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
         path: 'docs/specs/t01.md',
         commitSha: baseSha,
         contentSha256: 'd'.repeat(64),
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
         actorType: 'human',
         actorId: personA,
       });

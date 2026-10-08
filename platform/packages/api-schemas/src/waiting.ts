@@ -14,6 +14,7 @@ export const WAITING_REASON_KEYS: Readonly<Record<string, string>> = {
   run_pending: 'intent.waiting.run_pending',
   git_host_unavailable: 'intent.waiting.git_host_unavailable',
   spec_unavailable: 'intent.waiting.spec_unavailable',
+  spec_unclear: 'intent.waiting.spec_unclear',
   plan_resubmit_needed: 'intent.waiting.plan_resubmit_needed',
   run_in_progress: 'intent.waiting.run_in_progress',
   run_review: 'intent.waiting.run_review',

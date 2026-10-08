@@ -236,6 +236,8 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
         path: 'docs/specs/t07.md',
         commitSha: 'e'.repeat(40),
         contentSha256: '9'.repeat(64),
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
         actorType: 'human',
         actorId: t.f.users.a,
       });

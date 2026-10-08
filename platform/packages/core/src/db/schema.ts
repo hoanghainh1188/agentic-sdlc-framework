@@ -37,6 +37,7 @@ import type {
   ProdLogsAllowed,
   ProjectStatus,
   SpecSourceTool,
+  SpecStructureCode,
   TenantRole,
   TenantStatus,
   UserStatus,
@@ -287,6 +288,10 @@ export interface SpecRefsTable {
   commit_sha: Immutable<string>;
   content_sha256: Immutable<string>;
   source_tool: Immutable<SpecSourceTool | null>;
+  /** S01 (ADR-M61): the rule that found the acceptance criteria; null before S01. */
+  structure: Immutable<SpecStructureCode | null>;
+  /** S01: acceptance criteria found; null before S01 (G2 counts it as none, QUESTIONS #290). */
+  acceptance_criteria: Immutable<number | null>;
   created_at: CreatedAt;
 }
 
@@ -828,6 +833,9 @@ export const TABLE_COLUMNS = {
     'content_sha256',
     'source_tool',
     'created_at',
+    // Migration 0026 (S01).
+    'structure',
+    'acceptance_criteria',
   ]),
   plans: columns<PlansTable>()([
     'id',

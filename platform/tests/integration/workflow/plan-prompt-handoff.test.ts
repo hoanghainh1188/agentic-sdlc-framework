@@ -191,6 +191,8 @@ describeWorkflow(
         path: 'docs/specs/t07.md',
         commitSha: clone.commit,
         contentSha256: '5'.repeat(64),
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
         actorType: 'human',
         actorId: t.f.users.a,
       });

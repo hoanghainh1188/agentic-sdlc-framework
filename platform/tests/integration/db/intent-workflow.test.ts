@@ -188,6 +188,8 @@ describeDb('B07: the intent workflow step on PostgreSQL', () => {
         path: 'docs/specs/t07.md',
         commitSha: 'd'.repeat(40),
         contentSha256: '7'.repeat(64),
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
         actorType: 'human',
         actorId: f.users.a,
       });
@@ -218,6 +220,8 @@ describeDb('B07: the intent workflow step on PostgreSQL', () => {
         path: 'docs/specs/t07.md',
         commitSha: 'e'.repeat(40),
         contentSha256: '8'.repeat(64),
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
         actorType: 'human',
         actorId: f.users.a,
       });

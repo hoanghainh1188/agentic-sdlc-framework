@@ -200,6 +200,8 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
         path: 'docs/specs/T01-japanese-labels.md',
         commitSha: BASE,
         contentSha256: SHA('d'),
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
         actorType: 'human',
         actorId: personA,
       });

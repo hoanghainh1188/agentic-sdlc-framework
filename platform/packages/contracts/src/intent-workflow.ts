@@ -134,6 +134,11 @@ export type IntentWaitReason =
    */
   | 'spec_unavailable'
   /**
+   * S01 (ADR-M61, D-02 §6.2): the linked spec has no acceptance criteria (or was linked before
+   * S01, QUESTIONS #290); G2 waits until a person links a spec with at least one.
+   */
+  | 'spec_unclear'
+  /**
    * B09 (ADR-M40 §2.4, QUESTIONS #167): the plan file at the head of the default branch is not
    * the submitted plan (changed, removed or not readable); G3 or G4 waits until a person with a
    * submit role submits the plan again.
@@ -232,6 +237,7 @@ export const INTENT_WAIT_REASONS = [
   'run_pending',
   'git_host_unavailable',
   'spec_unavailable',
+  'spec_unclear',
   'plan_resubmit_needed',
   'run_in_progress',
   'run_review',

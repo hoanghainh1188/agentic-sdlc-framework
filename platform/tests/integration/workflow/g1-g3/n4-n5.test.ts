@@ -37,7 +37,7 @@ describeStack(
 
       // Someone edits the spec on the default branch; the next wake (here the worker's reconcile
       // loop) reads the head again.
-      const edited = `${SPEC_TEXT}AC2: the refund is made within 3 days.\n`;
+      const edited = `${SPEC_TEXT}- AC2: the refund is made within 3 days.\n`;
       s.commit({ [SPEC_PATH]: edited });
       await s.reconcileLoop.pass();
       await s.atGate(intent, 'G2');

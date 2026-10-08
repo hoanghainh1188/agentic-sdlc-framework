@@ -17,3 +17,10 @@ export {
   specContentSha256,
   type SpecUnreadableCause,
 } from './rules.js';
+export {
+  ACCEPTANCE_CRITERIA_MAX,
+  readSpecStructure,
+  SPEC_STRUCTURES,
+  type SpecStructure,
+  type SpecStructureCode,
+} from './structure.js';

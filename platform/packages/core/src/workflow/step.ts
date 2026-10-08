@@ -64,6 +64,7 @@ import {
   type EarlierBlock,
 } from './hotl.js';
 import { gatherG4Facts, projectRepoRef, type G4Deps, type G4Facts } from './g4-proposal.js';
+import { specUnclearRecorded, specWithoutCriteria } from './g2-criteria.js';
 import {
   checkSpec,
   gatherSpecFacts,
@@ -539,6 +540,31 @@ async function stepGate(
     const subject = gate === 'G1' ? 'intent' : gate === 'G2' ? 'spec' : 'plan';
     const wake = await overdue({ kind: subject, sha256: inputSha256 });
     return waiting(hold.reason, earliest(wake, hold.wakeInMs));
+  }
+  // S01 (D-02 §6.2, QUESTIONS #290–#292): G2 never passes without acceptance criteria, at any
+  // tier: a system `fail spec_unclear` once per spec content, a notice, and the gate waits.
+  if (gate === 'G2' && (await specWithoutCriteria(tx, intent.id))) {
+    if (!(await specUnclearRecorded(tx, intent.id, inputSha256))) {
+      const fail = await registry.decide(tx, {
+        intentId: intent.id,
+        gate,
+        decision: 'fail',
+        actor: { type: 'system' },
+        reasonCode: 'spec_unclear',
+        inputSha256,
+        source: 'workflow',
+      });
+      await tx.intentNotices.record({
+        intentId: intent.id,
+        kind: 'spec_unclear',
+        status: intent.status,
+        gate,
+        previousGate: null,
+        decisionId: fail.id,
+        audienceRoles: await nextActors(tx, policy, intent, gate),
+      });
+    }
+    return waiting('spec_unclear', await overdue({ kind: 'spec', sha256: inputSha256 }));
   }
   // C07 (QUESTIONS #131): a plan that a run went outside of is never approved again.
   if (gate === 'G3' && (await refusedPlanHashes(tx, intent.id)).has(inputSha256)) {

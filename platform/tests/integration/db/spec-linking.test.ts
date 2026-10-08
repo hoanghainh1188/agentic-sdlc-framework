@@ -169,19 +169,24 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
         source_tool: 'manual',
       });
       expect(reply.statusCode, JSON.stringify(reply.json())).toBe(201);
-      const text = '# T07 Cancel an order\nAC1: stock returns.\n';
+      const text = '# T07 Cancel an order\n## Acceptance criteria\n- AC1: stock returns.\n';
       expect(reply.json()).toEqual({
         intent: intent.code,
         version: 1,
         path: SPEC_PATH,
         commit_sha: git.head,
         content_sha256: sha256(text),
+        // S01: the tool, the structure rule and the count; never the criteria's text.
+        source_tool: 'manual',
+        structure: 'manual_heading',
+        acceptance_criteria: 1,
       });
       // Only the path, the commit and the hash: the content never reaches the database.
       const dump = JSON.stringify(
         (await sql`SELECT * FROM spec_refs WHERE intent_id = ${intent.id}`.execute(db.owner)).rows,
       );
       expect(dump).not.toContain('Cancel an order');
+      expect(dump).not.toContain('stock returns');
       const audit = await f.scope.audit.listForEntity(intent.id, ['spec.linked']);
       const linked = (await f.scope.specRefs.latest(intent.id))!;
       expect(audit.at(-1)?.payload).toEqual({
@@ -190,6 +195,8 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
         content_sha256: sha256(text),
         commit_sha: git.head,
         cause: 'linked',
+        structure: 'manual_heading',
+        acceptance_criteria: 1,
       });
       expect(JSON.stringify(audit)).not.toContain(SPEC_PATH);
 
@@ -226,13 +233,18 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
       expect(ok.statusCode, JSON.stringify(ok.json())).toBe(201);
       expect(ok.json()).toMatchObject({ commit_sha: same });
 
-      git.commit({ [SPEC_PATH]: '# T07 Cancel an order\nAC1: stock returns at once.\n' });
+      git.commit({
+        [SPEC_PATH]:
+          '# T07 Cancel an order\n## Acceptance criteria\n- AC1: stock returns at once.\n',
+      });
       expectError(
         await inject('POST', url, tokens.a, { path: SPEC_PATH, commit_sha: same }),
         409,
         'spec_not_on_default_branch',
       );
-      git.commit({ [SPEC_PATH]: '# T07 Cancel an order\nAC1: stock returns.\n' });
+      git.commit({
+        [SPEC_PATH]: '# T07 Cancel an order\n## Acceptance criteria\n- AC1: stock returns.\n',
+      });
     });
 
     it('refuses a path that is not Markdown, a file that cannot be read, and answers 503 when GitHub is down', async () => {
@@ -281,7 +293,8 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
   describe('AC2: the spec is checked again before G3 and before the run (N4)', () => {
     it('the spec changed on the default branch while at G3: back to G2, new version, old approvals void', async () => {
       const intent = await atG3();
-      const edited = '# T07 Cancel an order\nAC1: stock returns.\nAC2: refund.\n';
+      const edited =
+        '# T07 Cancel an order\n## Acceptance criteria\n- AC1: stock returns.\n- AC2: refund.\n';
       const head = git.commit({ [SPEC_PATH]: edited });
 
       expect(await step(intent)).toEqual({ outcome: 'moved' });
@@ -323,7 +336,7 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
       expect(await settle(intent)).toMatchObject({ reason: 'hotl_block_window' });
       expect(await reload(intent)).toMatchObject({ current_gate: 'G4' });
 
-      const edited = '# T07 Cancel an order\nAC1: stock returns (low).\n';
+      const edited = '# T07 Cancel an order\n## Acceptance criteria\n- AC1: stock returns (low).\n';
       git.commit({ [SPEC_PATH]: edited });
       await settle(intent);
       expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G4' });
@@ -340,7 +353,9 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
 
     it('a spec a person links while the intent waits at G3 takes it back to G2', async () => {
       const intent = await atG3();
-      git.commit({ 'docs/specs/T07-v2.md': '# T07 v2\n' });
+      git.commit({
+        'docs/specs/T07-v2.md': '# T07 v2\n## Acceptance criteria\n- AC1: stock returns.\n',
+      });
       await link(await reload(intent), 'docs/specs/T07-v2.md');
       expect(await step(intent)).toEqual({ outcome: 'moved' });
       expect(await reload(intent)).toMatchObject({ current_gate: 'G2' });
@@ -372,7 +387,9 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
       ]);
 
       // The file is back: G2 decides again (an approval from before the return no longer counts).
-      git.commit({ [SPEC_PATH]: '# T07 Cancel an order\nAC1: stock returns.\n' });
+      git.commit({
+        [SPEC_PATH]: '# T07 Cancel an order\n## Acceptance criteria\n- AC1: stock returns.\n',
+      });
       expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
       await decide(intent, 'G2', 'approve', 'a');
       await settle(intent);
@@ -409,7 +426,7 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
       }
 
       const g2 = await atG2();
-      git.commit({ 'docs/specs/T08.md': '# T08\n' });
+      git.commit({ 'docs/specs/T08.md': '# T08\n## Acceptance criteria\n- AC1: pages.\n' });
       await link(await reload(g2), 'docs/specs/T08.md');
       git.commit({ 'docs/specs/T08.md': null });
       expect(await settle(g2)).toMatchObject({ outcome: 'waiting', reason: 'spec_unavailable' });
@@ -421,7 +438,7 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
       await decide(g2, 'G2', 'reject', 'a');
       await settle(g2);
       expect(await reload(g2)).toMatchObject({ status: 'rejected' });
-      git.commit({ 'docs/specs/T08.md': '# T08\n' });
+      git.commit({ 'docs/specs/T08.md': '# T08\n## Acceptance criteria\n- AC1: pages.\n' });
     });
 
     it('a spec file that comes and goes is announced once per spec version and cause', async () => {
@@ -461,6 +478,141 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
       const before = git.headReads;
       await stepIntent(f.scope, g4Deps, intent.id);
       expect(git.headReads - before).toBe(1);
+    });
+  });
+
+  // S01 (D-08 S01 AC2, AC3, AC5, D-02 §6.2, ADR-M61, QUESTIONS #290–#292): G2 passes only with
+  // at least one acceptance criterion, at every tier; the count and the structure are stored,
+  // never the text.
+  describe('S01: G2 needs acceptance criteria', () => {
+    const NO_CRITERIA = '# T11 Faster screen\n\n## Purpose\n\nMake the screen faster.\n';
+    const WITH_CRITERIA = `${NO_CRITERIA}\n## Acceptance criteria\n\n- AC1: the screen opens in 1 s.\n`;
+    const T11 = 'docs/specs/T11.md';
+    const g2Decisions = async (intent: Intent) =>
+      (await f.scope.gateDecisions.listForIntent(intent.id, 'G2')).map((d) => [
+        d.decision,
+        d.reason_code,
+        d.actor_type,
+      ]);
+
+    it('HITL (Medium): a spec without criteria → one system fail spec_unclear, one notice, G2 waits; approve refused', async () => {
+      const intent = await atG2();
+      git.commit({ [T11]: NO_CRITERIA });
+      const linked = await link(await reload(intent), T11);
+      expect(linked).toMatchObject({ structure: 'none', acceptance_criteria: 0 });
+
+      for (let i = 0; i < 3; i += 1) {
+        expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'spec_unclear' });
+      }
+      expect(await waitingRow(f.scope, intent)).toMatchObject({ reason: 'spec_unclear' });
+      expect(await g2Decisions(intent)).toEqual([['fail', 'spec_unclear', 'system']]);
+      const fail = (await f.scope.gateDecisions.listForIntent(intent.id, 'G2'))[0]!;
+      expect(fail.input_sha256).toBe(sha256(NO_CRITERIA));
+      expect((await notices(intent)).filter(([kind]) => kind === 'spec_unclear')).toEqual([
+        ['spec_unclear', 'G2', null],
+      ]);
+
+      // A person's approval is refused (CLI, API); the gate stays open for a request for changes.
+      await expect(decide(intent, 'G2', 'approve', 'a')).rejects.toMatchObject({
+        code: 'spec_unclear',
+      });
+      expectError(
+        await inject('POST', `/v1/intents/${intent.code}/gates/G2/decisions`, tokens.a, {
+          decision: 'approve',
+        }),
+        422,
+        'spec_unclear',
+      );
+      await decide(intent, 'G2', 'request_changes', 'a');
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'spec_unclear' });
+
+      // Criteria added on the default branch: the step links the new version with its count.
+      git.commit({ [T11]: WITH_CRITERIA });
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
+      expect(await f.scope.specRefs.latest(intent.id)).toMatchObject({
+        structure: 'manual_heading',
+        acceptance_criteria: 1,
+      });
+      await decide(intent, 'G2', 'approve', 'a');
+      await settle(intent);
+      expect(await reload(intent)).toMatchObject({ current_gate: 'G3' });
+      // The fail is never a rejection, and was written once.
+      expect((await g2Decisions(intent)).filter(([d]) => d === 'fail')).toHaveLength(1);
+    });
+
+    it('HOTL (Low): never passes a spec without criteria; passes once they are there', async () => {
+      const intent = await atG2('low');
+      git.commit({ [T11]: NO_CRITERIA });
+      await link(await reload(intent), T11);
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'spec_unclear' });
+      expect((await g2Decisions(intent)).map(([d]) => d)).toEqual(['fail']);
+
+      git.commit({ [T11]: WITH_CRITERIA });
+      await settle(intent);
+      expect(await reload(intent)).toMatchObject({ current_gate: 'G3' });
+      expect((await g2Decisions(intent)).map(([d]) => d)).toEqual(['fail', 'pass']);
+    });
+
+    it('criteria removed at the head while at G3: back to G2, where it waits (spec_unclear)', async () => {
+      const intent = await atG3();
+      git.commit({ [SPEC_PATH]: '# T07 Cancel an order\n\nNo criteria any more.\n' });
+      await settle(intent);
+      expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G2' });
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'spec_unclear' });
+      expect(await f.scope.specRefs.latest(intent.id)).toMatchObject({
+        version: 2,
+        structure: 'none',
+        acceptance_criteria: 0,
+      });
+      const linked = await f.scope.audit.listForEntity(intent.id, ['spec.linked']);
+      expect(linked.at(-1)?.payload).toMatchObject({
+        cause: 'head_changed',
+        structure: 'none',
+        acceptance_criteria: 0,
+      });
+      git.commit({ [SPEC_PATH]: SPEC_TEXT });
+    });
+
+    it('a spec linked before S01 (no count) waits at G2 until linked again (QUESTIONS #290)', async () => {
+      const intent = await atG2();
+      const commit = git.head;
+      // A row as migration 0026 leaves it: no structure, no count.
+      await sql`INSERT INTO spec_refs (tenant_id, intent_id, version, path, commit_sha, content_sha256)
+        VALUES (${f.target.tenantId}, ${intent.id}, 1, ${SPEC_PATH}, ${commit}, ${sha256(SPEC_TEXT)})`.execute(
+        db.owner,
+      );
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'spec_unclear' });
+      await expect(decide(intent, 'G2', 'approve', 'a')).rejects.toMatchObject({
+        code: 'spec_unclear',
+      });
+      // Linking the same file again makes a new version with a count.
+      const again = await link(await reload(intent));
+      expect(again).toMatchObject({ version: 2, acceptance_criteria: 1 });
+      expect(await settle(intent)).toMatchObject({ outcome: 'waiting', reason: 'decision' });
+      await decide(intent, 'G2', 'approve', 'a');
+      await settle(intent);
+      expect(await reload(intent)).toMatchObject({ current_gate: 'G3' });
+    });
+
+    it('migration 0026: the count and the structure come together, in range, with known codes', async () => {
+      const intent = await atG2();
+      const insert = (version: number, structure: string | null, count: number | null) =>
+        sql`INSERT INTO spec_refs (tenant_id, intent_id, version, path, commit_sha, content_sha256,
+              structure, acceptance_criteria)
+            VALUES (${f.target.tenantId}, ${intent.id}, ${version}, ${SPEC_PATH}, ${git.head},
+              ${sha256(SPEC_TEXT)}, ${structure}, ${count})`.execute(db.owner);
+      await expect(insert(1, 'manual_heading', null)).rejects.toThrow(/spec_refs_structure_set/);
+      await expect(insert(1, null, 2)).rejects.toThrow(/spec_refs_structure_set/);
+      await expect(insert(1, 'free_text', 2)).rejects.toThrow(/spec_refs_structure_code/);
+      await expect(insert(1, 'manual_heading', -1)).rejects.toThrow(/acceptance_criteria_range/);
+      await expect(insert(1, 'none', 3)).rejects.toThrow(/spec_refs_structure_none/);
+      await insert(1, 'spec_kit', 4);
+      // Rows never change: the application role has no UPDATE.
+      await expect(
+        sql`UPDATE spec_refs SET acceptance_criteria = 9 WHERE intent_id = ${intent.id}`.execute(
+          db.appRaw,
+        ),
+      ).rejects.toThrow(/permission denied/);
     });
   });
 });

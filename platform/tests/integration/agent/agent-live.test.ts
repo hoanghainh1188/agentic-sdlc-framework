@@ -109,7 +109,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
       litellmContainer: names.stub,
       model: 'stub-model',
       planSummary: `Create hello.txt. ${script}`,
-      specText: '# T01\n\nCreate hello.txt.\n',
+      specText: '# T01\n\n## Acceptance criteria\n\n- Create hello.txt.\n',
       agentsMd: `# Agent instructions\n\nMarker: ${CANARY}\n`,
       caps,
     });
