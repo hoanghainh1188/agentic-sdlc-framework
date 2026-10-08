@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task K01, PR for review) |
+| Status | **Proposed** (task K01, PR for review); decision of §2 taken by Harry on 2026-10-08: option A, K02 deferred (QUESTIONS #300) |
 | Date | 2026-10-08 |
 | Decided by | Harry (plan approved 2026-10-08, with six additions) |
 | Related | D-08 tasks K01, K02; D-01 §5.8b; D-02 §4.2; D-07 §3–§4; D-09 §7–§8; ADR-M25 §2.2; design/QUESTIONS.md #285, #300 |
@@ -24,7 +24,7 @@ All sources were accessed on 2026-10-08.
 
 ## 2. Decision
 
-**NO-GO for K02 now** (proposed). Defer K02; the trial M-E does not wait for it (QUESTIONS #285: M-E waits for K02 *or its deferral by this ADR*). Revisit when a project has documents that are not in its repository, mainly Office and PDF files (§5).
+**NO-GO for K02 now** (Harry, 2026-10-08, QUESTIONS #300 option A). Defer K02; the trial M-E does not wait for it (QUESTIONS #285: M-E waits for K02 *or its deferral by this ADR*). Revisit when a project has documents that are not in its repository, mainly Office and PDF files (§5).
 
 Reasons, in order:
 
@@ -171,7 +171,7 @@ Revisit when a real project (M-F) has requirement documents outside the reposito
 
 ## 6. Consequences
 
-- K02 is deferred (D-08: a backlog change, by Harry). The trial M-E runs without document search.
+- K02 is deferred (Harry, 2026-10-08). The trial M-E runs without document search. D-08 still lists K02; a backlog note follows in a separate change (`scripts/generate-backlog.py`).
 - D-01 §5.8b stays as an evaluation; this ADR adds the measured result and the limits for a later attempt.
 - The spike stack is removed with `platform/spikes/weknora/down.sh` (project `k01-weknora` only).
 
@@ -180,3 +180,4 @@ Revisit when a real project (M-F) has requirement documents outside the reposito
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-08 | Claude (task K01) | First version: no-go for K02 now; numbers, licences, Trivy, isolation, network checks; limits for a later attempt |
+| 0.2 | 2026-10-08 | Claude (task K01), decided by Harry | §2, §6: Harry chose option A, K02 deferred (QUESTIONS #300) |
