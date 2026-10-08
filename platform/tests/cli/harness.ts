@@ -35,6 +35,8 @@ export interface HarnessOptions {
   readonly stdin?: string;
   readonly tty?: boolean;
   readonly hidden?: string;
+  /** The folder relative paths start from (`sdlc plan draft`). */
+  readonly cwd?: string;
 }
 
 export interface Harness {
@@ -108,6 +110,7 @@ async function makeHarness(options: HarnessOptions = {}): Promise<Harness> {
       throw new Error('no database in CLI user-command tests');
     },
     api,
+    ...(options.cwd ? { cwd: options.cwd } : {}),
   };
   return { ctx, out, err, requests, home, run: (argv) => runCli(argv, ctx) };
 }
