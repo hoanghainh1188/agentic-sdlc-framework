@@ -81,29 +81,42 @@ Each phase has an owner, a usual duration and a check. Do not start a phase befo
 
 #### Two repositories, never one
 
-The platform and your application live in **two separate repositories**:
+The platform and your application live in **two separate repositories**. The platform holds none of your code.
 
-```mermaid
-flowchart LR
-    subgraph P["Repository 1: the platform (this repository)"]
-        direction TB
-        P1["Installed once on a server<br/>with Docker Compose"]
-        P2["api · worker · runner · dashboard<br/>PostgreSQL · OpenBao · LiteLLM · SeaweedFS"]
-    end
-    subgraph A["Repository 2: your application (one per project)"]
-        direction TB
-        A1["Your code, on GitHub as today"]
-        A2["AGENTS.md · docs/specs/ · .sdlc/plans/<br/>CI with one aggregate check"]
-    end
-    T["Team<br/>sdlc CLI · /approve comments · dashboard"] --> P
-    T -- "reviews and merges pull requests" --> A
-    P -- "GitHub App: reads specs and plans,<br/>pushes agent/INT-… branches,<br/>opens pull requests, reads CI and reviews" --> A
+```text
+┌─────────────────────────────────────┐        ┌──────────────────────────────────┐
+│ Repo 1: agentic-sdlc-framework      │        │ Repo 2: your project's repo      │
+│ (the platform: a tool)              │        │ (your code: the product)         │
+│                                     │        │                                  │
+│ platform/  handbook/  design/       │        │ for example harryforge/          │
+│                                     │        │         pilot-order-inventory    │
+│ → installed once on a server        │ GitHub │ apps/  docs/specs/  AGENTS.md    │
+│   with Docker Compose               │ ◀────▶ │ .sdlc/plans/  .github/           │
+│   (api, worker, runner, PostgreSQL, │  App   │                                  │
+│    OpenBao, LiteLLM, SeaweedFS…)    │        │ → on GitHub, as today            │
+└─────────────────────────────────────┘        └──────────────────────────────────┘
 ```
 
-- **The platform is a tool**, like a CI server: installed once by the operator, used by many projects. Team members use it through the `sdlc` command, GitHub comments and the dashboard; they never change its repository.
-- **Your application keeps its own repository on GitHub.** The tenant admin registers it as a project (`sdlc admin project create … --repo <org>/<name>`), and the operator installs the platform's GitHub App on it.
-- **The platform keeps no copy of your code.** For each run, the runner clones your repository into a temporary sandbox, the agent works there, the runner pushes the branch `agent/INT-…` and removes the sandbox. The platform keeps the diff as evidence (with a retention period), hashes and logs.
-- People review and merge the pull request **in your repository, on GitHub**.
+**Repo 1, the platform (this repository):**
+
+- A tool, like a CI server: installed once on a server, it serves many projects and many tenants.
+- Team members never change it. They use it through the `sdlc` command, `/approve` comments on GitHub and the dashboard.
+
+**Repo 2, your project's repository (one per team or project):**
+
+- The normal application repository your team already works in, on GitHub.
+- It only needs a few additions: `AGENTS.md`, `docs/specs/`, `.sdlc/plans/`, CI with one aggregate check, a protected `main` (the table below).
+
+**How the two connect:**
+
+1. The tenant admin registers the project and names its repository: `sdlc admin project create … --repo <org>/<name>`.
+2. The operator installs the platform's GitHub App on that repository.
+3. When a task runs, the runner **clones the repository into a temporary sandbox**. The agent writes code there; the runner pushes the branch `agent/INT-…` and opens the pull request, then **removes the sandbox**. The platform keeps no copy of the code: only the diff as evidence (in SeaweedFS, with a retention period), hashes and logs.
+4. People review and merge the pull request **on GitHub, in the project's repository**.
+
+**Today:** Repo 1 is `hoanghainh1188/agentic-sdlc-framework` (public). Repo 2 for the trial is `harryforge/pilot-order-inventory`, a fictional order and inventory application (Vue, NestJS, PostgreSQL). Each real project later uses its own repository with the same platform.
+
+So "what your repository needs" below is about **Repo 2**. Repo 1 is installed by the operator; team members do not touch it.
 
 #### What your repository needs
 
