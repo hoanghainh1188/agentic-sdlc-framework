@@ -2,8 +2,8 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.5 |
-| Date | 2026-10-07 |
+| Version | 1.6 |
+| Date | 2026-10-08 |
 | Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed; D6 (the local model, QUESTIONS #81) |
 | Readers | Harry, the trial team (Person A, Person B, second approver), Claude Code |
 | Related documents | D-02 §2, §10, §13.3 (milestones M-E, M-F); D-09 §7 (tasks T01–T10, scenarios N1–N10); `design/MVP-DONE.md`; `platform/GETTING-STARTED.md` Steps 11–14 |
@@ -42,7 +42,7 @@
 | 9 | The trial budget set: USD 30 in total (decision D3) | Owner | `budget.*` in the configuration; the tenant's monthly budget |
 | 10 | The manual log ready (section 7.2) | Person A | A shared sheet with the columns of section 7.2 |
 | 11 | Every member of the trial team has read `platform/USER-GUIDE.md` and logged in (`sdlc whoami`) | Each member | `sdlc whoami` shows the roles |
-| 12 | The spec and knowledge tasks are merged (QUESTIONS #285): S01, S02, K01, and K02 unless the K01 ADR deferred it | Coordinator | D-08 milestone Pre-M-E; the trial uses `sdlc plan draft` and, after K02, the agent's document search |
+| 12 | ~~The spec and knowledge tasks are merged (QUESTIONS #285): S01, S02, K01, and K02 unless the K01 ADR deferred it~~ **Done 2026-10-08:** S01 (#209), S02 (#210), K01 (#211); K02 deferred (QUESTIONS #300) | Coordinator | D-08 milestone Pre-M-E; the trial uses `sdlc plan draft` and, after K02, the agent's document search |
 
 ## 4. People and roles
 
@@ -149,7 +149,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | D3 | The trial budget | A total cap of USD 30 for T01–T10, plus the defaults per intent (10) and per run (2) |
 | D4 | Unhappy scenarios | Record N1–N10 when they happen; do not force them (tests already prove them) |
 | D5 | Time frame | Harry decides; phases 1–2 first, a short review, then phases 3–5 |
-| D6 | Which model? (QUESTIONS #81, 2026-10-06) | The local Ollama model `gpt-oss:20b` on the owner's machine: there is no API key yet, and the pilot is fictional. The report marks quality and cost numbers as the local model's (internal cost per token, D-07 §3; not API prices). One run with an API model passes before M-F. On a 24 GB machine, run without the profile `observability` (the model needs about 14 GB) |
+| D6 | Which model? (QUESTIONS #81, 2026-10-06) | The local Ollama model `gpt-oss:20b` on the owner's machine: there is no API key yet, and the pilot is fictional. The report marks quality and cost numbers as the local model's (internal cost per token, D-07 §3; not API prices). One run with an API model passes before M-F. On a 24 GB machine, run without the profile `observability` (the model needs about 14 GB). **Memory (K01, ADR-M59 §3.5, 2026-10-08):** with `gpt-oss:20b` (12 GB), `bge-m3` and an 8 GB Docker VM the host swapped (1 % free; Japanese answers 70–168 s). Before phase 1, run one task with the dev stack up and record the time; if it swaps, give Docker less memory, leave `observability` off, or decide again |
 | D7 | How long is the HOTL block window? (2026-10-07) | 1 working hour instead of the default 4, to measure the flow without most of its waiting. The report counts the blocks within a window per gate (§7.1): none at all supports a shorter or per-gate window after M-E (`design/POSITIONING.md` §6) |
 
 ## Version history
@@ -163,3 +163,4 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | 1.3 | 2026-10-07 | Claude (coordinator), approved by Harry | §7.2 an interface column; §8 item 6 counts it against `design/MVP1-UI-SCOPE.md` |
 | 1.4 | 2026-10-07 | Claude (coordinator), approved by Harry | D7: the HOTL block window is 1 working hour for the trial; §6, §7.1 counts the blocks within a window |
 | 1.5 | 2026-10-08 | Claude (coordinator), approved by Harry | §3 item 12: the trial waits for S01, S02, K01 and K02 (or its deferral) (QUESTIONS #285) |
+| 1.6 | 2026-10-08 | Claude (coordinator), approved by Harry | §3 item 12 done (K02 deferred, QUESTIONS #300); D6: the memory finding of K01 and a timed task before phase 1 |
