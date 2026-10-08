@@ -284,6 +284,8 @@ describeDb('B02: registry on PostgreSQL', () => {
         path: 'docs/specs/T01.md',
         commitSha: COMMIT,
         contentSha256: HASH('d'),
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
         sourceTool: 'manual',
       });
       expect(spec).toMatchObject({ version: 1, content_sha256: HASH('d') });
@@ -295,6 +297,8 @@ describeDb('B02: registry on PostgreSQL', () => {
             path: '../secrets.md',
             commitSha: COMMIT,
             contentSha256: HASH('d'),
+            structure: 'manual_heading',
+            acceptanceCriteria: 1,
           }),
         ),
       ).toBe('db:invalid_value');
@@ -606,6 +610,8 @@ describeDb('B02: registry on PostgreSQL', () => {
         path: 'docs/specs/T01.md',
         commitSha: COMMIT,
         contentSha256: HASH('d'),
+        structure: 'manual_heading',
+        acceptanceCriteria: 1,
       });
       await registry.submitPlan(s.scope, intent.id, {
         actorType: 'human',

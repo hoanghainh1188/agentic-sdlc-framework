@@ -9,7 +9,9 @@
 // - the content changed at head → the platform links it as a new spec version (`head_changed`);
 //   at G3 or G4 the intent goes back to G2 (notice `spec_changed`). The approvals of G2 up to the
 //   gate it left are voided (FR-17); the matrix decides whether G2 passes again
-//   (HOTL at Low risk, with its block window) or waits for a person (QUESTIONS #161).
+//   (HOTL at Low risk, with its block window) or waits for a person (QUESTIONS #161). S01: the
+//   new version carries the count read at head; at G2 a version without acceptance criteria
+//   waits (`spec_unclear`, `specCriteriaMissing`).
 // - a person linked a new spec after G2 passed (the latest spec is not the one G2 passed) → back
 //   to G2, the same way.
 // - the file cannot be read at head (removed, renamed, not a file, too large, not UTF-8) → back to
@@ -72,7 +74,10 @@ export async function gatherSpecFacts(
   if (!latest) return { headSha, spec: null };
   return {
     headSha,
-    spec: { specRefId: latest.id, read: await readSpec(deps.gitHost, ref, latest.path, headSha) },
+    spec: {
+      specRefId: latest.id,
+      read: await readSpec(deps.gitHost, ref, latest.path, headSha, latest.source_tool),
+    },
   };
 }
 
@@ -137,6 +142,8 @@ export async function checkSpec(
       contentSha256: read.sha256,
       sourceTool: latest.source_tool,
       cause: 'head_changed',
+      structure: read.structure,
+      acceptanceCriteria: read.acceptanceCriteria,
     });
     if (gate === 'G2') await notice(tx, policy, intent, 'spec_changed');
     else await backToG2(tx, registry, policy, intent, gate, 'spec_changed');

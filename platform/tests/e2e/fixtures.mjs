@@ -188,6 +188,9 @@ function detail(base) {
       path: 'docs/specs/T06.md',
       commit_sha: 'b'.repeat(40),
       content_sha256: hash('d'),
+      source_tool: 'manual',
+      structure: 'manual_heading',
+      acceptance_criteria: 3,
     },
     plan: { version: 2, plan_sha256: hash('e'), change_flags: six ? ['core_business_rule'] : [] },
     decisions: six

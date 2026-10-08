@@ -32,6 +32,11 @@ export type CommandErrorCode =
    * is sent as a GitHub review (**Request changes**) or a `/request-changes G7` comment.
    */
   | 'g7_feedback_on_git_host'
+  /**
+   * An approval of G2 for a spec without acceptance criteria (task S01, D-02 §6.2, QUESTIONS
+   * #292): the spec must hold at least one; reject or request changes instead.
+   */
+  | 'spec_unclear'
   /** Unknown intent, or an intent of a project the actor cannot read. */
   | 'intent_not_found'
   /** Unknown project, or a project the actor has no role on. */

@@ -632,6 +632,8 @@ describeDb('B03: API app on PostgreSQL', () => {
           path: 'docs/specs/T01.md',
           commitSha: COMMIT,
           contentSha256: HASH('d'),
+          structure: 'manual_heading',
+          acceptanceCriteria: 1,
           sourceTool: 'manual',
         });
         const reply = await decide(tenantA, 'a', created.code, 'G2', { decision: 'approve' });

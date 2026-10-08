@@ -15,6 +15,7 @@ export {
   type EarlierBlock,
   type PassedGate,
 } from './hotl.js';
+export { specHasCriteria, specUnclearRecorded, specWithoutCriteria } from './g2-criteria.js';
 export { closeGateOverdue, gateDeadline, overdueRoute, type HumanGate } from './overdue.js';
 export {
   gatherG4Facts,

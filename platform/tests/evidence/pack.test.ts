@@ -322,6 +322,31 @@ describe('E02 manifest (AC1, AC3)', () => {
     expect(content.cost).toMatchObject({ cost_usd: '0.012000', calls: 3 });
   });
 
+  it('S01: lists the system G2 fail spec_unclear like any decision (codes only)', () => {
+    const unclear = decision(0, 'G2', 'fail', {
+      oversight_mode: 'HITL',
+      approver_role: null,
+      actor_type: 'system',
+      decided_by: null,
+      reason_code: 'spec_unclear',
+      waited_seconds: null,
+      source: 'workflow',
+      event_source: null,
+    });
+    const withFail = { ...source(), decisions: [unclear, ...source().decisions] };
+    const decisions = buildManifestContent(withFail).gate_decisions as Record<string, unknown>[];
+    expect(decisions[0]).toMatchObject({
+      gate: 'G2',
+      decision: 'fail',
+      actor_type: 'system',
+      reason_code: 'spec_unclear',
+    });
+    const md = renderPackMarkdown({ source: withFail, build, names: new Map(), locale: 'en' });
+    const row = md.split('\n').find((line) => line.includes('`spec_unclear`'));
+    expect(row).toBeDefined();
+    expect(row).toContain('the platform');
+  });
+
   it('never holds free text: no title, description or name', () => {
     const json = canonicalJson(buildManifestContent(source()));
     expect(json).not.toContain('Secret client title');

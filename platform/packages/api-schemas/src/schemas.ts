@@ -92,6 +92,10 @@ const specRefSchema = z.object({
   path: z.string().max(1024),
   commit_sha: code,
   content_sha256: code,
+  /** S01 (ADR-M61): the tool, the structure rule and the acceptance criteria count. */
+  source_tool: code.nullable(),
+  structure: code.nullable(),
+  acceptance_criteria: z.number().int().min(0).nullable(),
 });
 
 export const intentDetailSchema = intentSchema.extend({

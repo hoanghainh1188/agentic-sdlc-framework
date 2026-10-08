@@ -140,6 +140,8 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
     path: SPEC_PATH,
     commitSha: baseSha,
     contentSha256: crypto.createHash('sha256').update(blob).digest('hex'),
+    structure: 'manual_heading',
+    acceptanceCriteria: 1,
     actorType: 'human',
     actorId: person,
   });

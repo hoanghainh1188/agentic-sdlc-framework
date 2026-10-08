@@ -56,6 +56,8 @@ export const INTENT_NOTICE_KINDS = [
   // B08 (ADR-M39 §2.4): the spec changed at the head of the default branch, or cannot be read.
   'spec_changed',
   'spec_unavailable',
+  // S01 (ADR-M61): the spec at G2 has no acceptance criteria; the intent waits at G2.
+  'spec_unclear',
   // B09 (ADR-M40 §2.4): a new plan was submitted after G3 (back to G3), or the plan file at the
   // head of the default branch is not the submitted plan (G3 or G4 held until it is submitted).
   'plan_changed',

@@ -476,4 +476,42 @@ describeDb('E06: gate waiting-time metrics on PostgreSQL', () => {
       await refused('/v1/metrics/gates?project=ops', otherAdmin, 404, 'project_not_found');
     });
   });
+
+  // S01 (ADR-M61): the system `fail spec_unclear` at G2 is a check of the input, never a person's
+  // wait nor a platform pass: it changes no statistic; the intent counts as open at G2.
+  describe('S01: a G2 fail spec_unclear is never counted', () => {
+    it('leaves the first round, the after-changes round and auto_passed unchanged', async () => {
+      const url = '/v1/metrics/gates?project=shop&gate=G2';
+      const before = row(await metrics(url, tokens.a), 'shop', 'G2');
+      setClock(at(8 * HOUR));
+      const x5 = await f.newIntent({ riskTier: 'low' });
+      await settle(f.scope, x5);
+      await decide(f.scope, await reload(f.scope, x5), 'G1', 'approve', f.users.a);
+      await settle(f.scope, x5);
+      await f.registry.linkSpec(f.scope, x5.id, {
+        path: 'docs/specs/t11.md',
+        commitSha: 'c'.repeat(40),
+        contentSha256: 'd'.repeat(64),
+        structure: 'none',
+        acceptanceCriteria: 0,
+        actorType: 'human',
+        actorId: f.users.a,
+      });
+      await settle(f.scope, x5);
+      expect(
+        (await f.scope.gateDecisions.listForIntent(x5.id, 'G2')).map((d) => [
+          d.decision,
+          d.reason_code,
+          d.actor_type,
+        ]),
+      ).toEqual([['fail', 'spec_unclear', 'system']]);
+      const after = row(await metrics(url, tokens.a), 'shop', 'G2');
+      expect(after).toMatchObject({
+        first_round: before?.first_round,
+        after_changes: before?.after_changes,
+        auto_passed: before?.auto_passed,
+      });
+      expect(after?.open.count).toBe((before?.open.count ?? 0) + 1);
+    });
+  });
 });
