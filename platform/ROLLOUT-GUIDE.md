@@ -2,7 +2,7 @@
 
 For **whoever leads the rollout** (usually the tech lead, with leadership and the platform operator), and for **everyone on the team** who wants to know where to start. It puts the existing guides in order: what to read, who does what, in which order, and how to check each step. It does not replace them.
 
-Version 0.4, 2026-10-09 (docs review PR C: the producers, the conflicting roles, who decides and the GitHub App permissions link to their sources; the conflicting roles include Person B and the second approver). Version 0.3, 2026-10-09 (the rollout "phases" are now "steps", because the codes table keeps "phase" for P1–P6; words as in the glossary). Version 0.2, 2026-10-08 (step 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
+Version 0.5, 2026-10-09 (docs review PR C2: step 1 links to the handbook for counting acceptance criteria and for the list of agent instruction files; step 2 for each set-up task; 0.4 for the budgets). Version 0.4, 2026-10-09 (docs review PR C: the producers, the conflicting roles, who decides and the GitHub App permissions link to their sources; the conflicting roles include Person B and the second approver). Version 0.3, 2026-10-09 (the rollout "phases" are now "steps", because the codes table keeps "phase" for P1–P6; words as in the glossary). Version 0.2, 2026-10-08 (step 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
 
 ---
 
@@ -18,6 +18,8 @@ Version 0.4, 2026-10-09 (docs review PR C: the producers, the conflicting roles,
 | **PM / BrSE** | Handbook Ch.2 §2.5 (project AI record), template T7 | Record the client's consent and the allowed data classes (step 2) | Operator sections |
 | **Second approver** | `platform/USER-GUIDE.md` §3, steps 7–8 | Log in; you are asked only for flagged changes and Critical risk | Most of the rest |
 | **Developer of the platform** | `platform/GETTING-STARTED.md`, `CLAUDE.md` | — | This guide |
+
+Every document by reader, outside the rollout too: [README §2](../README.md#2-where-to-start).
 
 The dashboard (read only, on the platform machine only for now: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) shows everyone what waits for whom; decisions are made in GitHub comments, GitHub reviews and the `sdlc` command (USER-GUIDE).
 
@@ -74,7 +76,7 @@ Each step names who does it, a usual duration and a check. Do not start a step b
 | 0.1 | Choose the project: clear scope, Low or Medium risk work, no client data at first (handbook Ch.9 §9.7) | The project is named in the rollout notes |
 | 0.2 | Name the people: Person A, Person B, PM / BrSE, a second approver if flagged changes are likely, governance (leadership) | Template T5 (RACI) filled in |
 | 0.3 | Run the readiness assessment with the team (half a day) | Template T17: **Go** or **Conditional Go** (handbook Ch.9 §9.6) |
-| 0.4 | Set the budget: per month for the tenant, per intent and per run (defaults: USD 10 per intent, USD 2 per run) | The amounts written down; leadership agrees |
+| 0.4 | Set the budget: per month for the tenant, per intent and per run (the defaults and how they apply: [handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#budgets)) | The amounts written down; leadership agrees |
 | 0.5 | Choose the model: an API model, or a self-hosted one for `client_restricted` data (D-07) | The model is in the platform's gateway list |
 
 ### Step 1. Prepare the repository (Person A, the repository owner; 1–2 days)
@@ -142,11 +144,7 @@ my-app/
 
 #### Exactly one file of agent instructions
 
-The agent (OpenHands) also reads instructions from other files. Any of them would change what the agent does without a new, approved agent version. So **G4 refuses to run** (`instructions_unpinned`) when the repository holds one of these besides the pinned `AGENTS.md`:
-
-- at the root: `CLAUDE.md`, `agent.md`, `GEMINI.md`, `.cursorrules` (any case);
-- an `AGENTS.md` in a sub-folder;
-- any file under `.agents/skills/`, `.openhands/skills/` or `.openhands/microagents/`.
+The agent (OpenHands) also reads instructions from other files, such as `CLAUDE.md`, `.cursorrules` or an `AGENTS.md` in a sub-folder. Any of them would change what the agent does without a new, approved agent version. So **G4 refuses to run** (`instructions_unpinned`) when the repository holds one besides the pinned `AGENTS.md`. The full list: [handbook Ch.13 §13.10.2, check 6b](../handbook/02-playbook/ch13-p3-coding.md#instruction-files).
 
 G5 also stops a run that added, changed or removed one of them. **Changing `AGENTS.md` itself** needs a new agent version, approved again (handbook Ch.20).
 
@@ -161,11 +159,7 @@ The platform does not run these tools: Person A or the PM / BrSE runs them in th
 | Spec Kit **v1.1.2** (needs Python 3.11+, `uv`) | `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git@v1.1.2`, then `specify init <name> --integration claude` | `.specify/`, `.claude/skills/`; each feature in `specs/<NNN-name>/` (`spec.md`, `tasks.md`) | The `agent-context` extension (it writes `CLAUDE.md`); integrations that install into `.agents/skills/` (for example `codex`) |
 | BMAD **v6.12.1** (needs Node.js 20.12+, Python 3.10+, `uv`) | `npx bmad-method@6.12.1 install`, choose **Claude Code** | `_bmad/`, `.claude/skills/`; documents in `_bmad-output/` | Tools it installs into `.agents/skills/` (Codex, Amp, Auggie…); the unpinned `npx skills add` |
 
-Where the platform finds the acceptance criteria (G2 needs at least one):
-
-- **Spec Kit:** each `**Acceptance Scenarios**:` block; every `Given / When / Then` item counts. `FR-xxx` and `SC-xxx` items do not.
-- **BMAD:** a story file's `## Acceptance Criteria` section, or an epics file's `**Acceptance Criteria:**` blocks.
-- **By hand:** a heading that contains `Acceptance criteria` or `受入基準`; each top-level list item counts.
+G2 needs at least one acceptance criterion. Where the platform finds them in each tool's files, and what counts as one: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria).
 
 From a spec to a submitted plan:
 
@@ -173,20 +167,20 @@ From a spec to a submitted plan:
 
 - `sdlc plan draft <INT-…> --from <file> --tool spec-kit|bmad` reads a Spec Kit `tasks.md` or **one** BMAD story file (an epics file is refused). It leaves `allowed_paths`, `tools` and `change_flags` for a person: submission refuses the draft until they are filled. It never submits, commits or pushes.
 - The plan file is named after the intent code, so create the intent first.
-- Details: USER-GUIDE and handbook Ch.19 §19.8c.
+- Details: handbook Ch.19 §19.8c, [drafting a plan](../handbook/02-playbook/ch19-approval-queues.md#plan-draft) and [submitting it](../handbook/02-playbook/ch19-approval-queues.md#plan-file).
 
 ### Step 2. Set up the platform for the project (operator, tenant admin, PM / BrSE; about 1 day)
 
 | # | Who | Do | Check |
 |---|---|---|---|
-| 2.1 | Operator | Install the platform, or use the existing one (`platform/deploy/README.md` "Fresh deployment"; on a developer machine `platform/GETTING-STARTED.md` Step 11b) | `curl http://<platform>/health/ready` answers ok |
-| 2.2 | Operator | Create the tenant and its first tenant admin (`sdlc ops bootstrap`, run in a terminal; the API token is printed once) | The tenant admin logs in: `sdlc whoami` |
-| 2.3 | Tenant admin | Create the project (`sdlc admin project create --slug <slug> --name <name> --repo <owner/name>`) | `sdlc admin project show --project <slug>` |
-| 2.4 | Tenant admin | Add each person, link their GitHub account by its numeric ID, give the roles of T5 (handbook Ch.19 §19.8d). The admin's own role comes from a second admin or from the operator | `sdlc admin role list --project <slug>`: Person A and Person B are different people |
-| 2.5 | PM / BrSE or Person A | Save the project AI record: AI allowed, data classes, production logs, disclosure format, the link to the client's written consent (`sdlc ai-record set`) | `sdlc ai-record show --project <slug>` |
-| 2.6 | Operator, tenant admin | Build the sandbox image for the project's toolchain and pin it by digest (`pnpm sandbox-image:build node24`; other toolchains need a new image) | The reference ends in `@sha256:…` |
-| 2.7 | Tenant admin, agent owner, Person B | Register the agent (model, `AGENTS.md`, tools, autonomy at most L2), then the agent owner and Person B approve it (handbook Ch.20 §20.5b) | `sdlc admin agent show --key <key>` says `active` |
-| 2.8 | Tenant admin | Upload the project configuration: at least `run.agent_key`, `sandbox.image`, `verification.required_checks` (the aggregate check of 1.2); the budgets of 0.4 | `sdlc admin config show --project <slug>` shows the new version |
+| 2.1 | Operator | Install the platform, or use the existing one ([deploy/README, Fresh deployment](deploy/README.md#fresh-deployment-operator); on a developer machine [GETTING-STARTED Step 11b](GETTING-STARTED.md#step-11b-set-up-the-dev-stack-from-scratch-dev)) | `curl http://<platform>/health/ready` answers ok |
+| 2.2 | Operator | Create the tenant and its first tenant admin, in a terminal: the API token is printed once ([deploy/README step 8](deploy/README.md#8-the-tenant-and-its-first-admin)) | The tenant admin logs in: `sdlc whoami` |
+| 2.3 | Tenant admin | Create the project ([handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins); the commands in order: [deploy/README step 9](deploy/README.md#9-the-project-and-its-team)) | `sdlc admin project show --project <slug>` |
+| 2.4 | Tenant admin | Add each person, link their GitHub account by its numeric ID, give the roles of T5 ([handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)). The admin's own role comes from a second admin or from the operator | `sdlc admin role list --project <slug>`: Person A and Person B are different people |
+| 2.5 | PM / BrSE or Person A | Save the project AI record: the client's written consent as codes, and the link to the human record ([handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#ai-record), template T7) | `sdlc ai-record show --project <slug>` |
+| 2.6 | Operator, tenant admin | Build the sandbox image for the project's toolchain and pin it by digest ([deploy/README step 10](deploy/README.md#10-the-sandbox-image); other toolchains need a new image) | The reference ends in `@sha256:…` |
+| 2.7 | Tenant admin, agent owner, Person B | Register the agent, then the agent owner and Person B approve it ([handbook Ch.20 §20.5b](../handbook/02-playbook/ch20-agent-and-model-lifecycle.md#205b-the-agent-register-on-the-platform)) | `sdlc admin agent show --key <key>` says `active` |
+| 2.8 | Tenant admin | Upload the project configuration: at least `run.agent_key`, `sandbox.image`, `verification.required_checks` (the aggregate check of 1.2); the budgets of 0.4 ([deploy/README step 12](deploy/README.md#12-the-project-configuration)) | `sdlc admin config show --project <slug>` shows the new version |
 
 ### Step 3. Prepare the people (each team member; half a day)
 

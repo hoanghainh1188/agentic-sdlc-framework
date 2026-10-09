@@ -150,7 +150,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - A command that the platform cannot read or refuses gets a reply that says why and shows the syntax. Nothing is recorded in that case: fix the command and write a new comment.
 - If the platform itself fails while handling your command, it tries again on the next polls. After a few failed attempts it gives up and replies that it could not record the command. Nothing is recorded; write the command again later, and tell the platform operator.
 
-**HOTL gates (Low risk: G2 and G3 by default).** The project setting `oversight.matrix` says which gates are HOTL at which risk tier.
+<a id="block-window"></a>**HOTL gates (Low risk: G2 and G3 by default).** The project setting `oversight.matrix` says which gates are HOTL at which risk tier.
 
 - The platform **passes** the gate by itself when its conditions hold:
   - G2: a spec with at least one acceptance criterion is linked ([§19.8c](#g2-acceptance-criteria));
@@ -169,11 +169,11 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - Every gate that waits for a person's decision has a deadline, at any of G1–G8: 1 working day by default (project setting `oversight.hitl_gate_deadline`). The clock starts when the intent enters the gate, and starts again at each request for changes. It also runs while the gate waits for its spec or plan.
 - When the deadline passes, the platform raises **one escalation** (Chapter 18 §18.8b): Medium, level Notify by default (project setting `oversight.gate_overdue`). It goes to Person A when Person A holds the gate's role (route `intent`, for example G1, G2 below High risk, G4 at High risk), otherwise to Person B (route `technical`, for example G3, G6, G7, G8).
 - When the gate is decided (approved, rejected, changes requested, passed), the platform closes that escalation itself. You do not need to `/ack` or `/decide` it.
-- The platform records how long each gate waited for the person who decided (`waited_seconds`). The report: `sdlc metrics gates` (§19.8c, "Reading the gate waiting times").
+- The platform records how long each gate waited for the person who decided (`waited_seconds`). The report: `sdlc metrics gates` ([§19.8c](#gate-metrics)).
 
 **Scopes.** An approval of G1, G2 or G3 has no scope. The API refuses an approval that sends one (`scope_not_allowed`).
 
-**The project AI record (before G1).** An intent enters G1 only when the project's AI record allows the intent's data class (Chapter 2 §2.5, D-02 FR-19).
+<a id="ai-record"></a>**The project AI record (before G1).** An intent enters G1 only when the project's AI record allows the intent's data class (Chapter 2 §2.5, D-02 FR-19).
 
 - The platform keeps the record as codes: AI use allowed (`no`, `yes`, `yes_with_conditions`), the allowed data classes, AI on production logs and data (`no`, `yes_masked`), the disclosure format (`client_format`, `standard_note`), the date the client confirmed in writing, and a link (`https://`) to the human record of template T7 (for example `docs/project/ai-record.md`). The client contact, the allowed tools and locations and any special conditions stay in that human record, never in the platform.
 - Until the client has answered in writing (no confirmation date), client data is handled only as `client_restricted`: the record cannot allow `client_confidential`, and an intent with that data class waits. `prohibited` is never allowed. When AI use is `no`, no client data class is allowed. The platform never changes an intent's data class: get the written answer, or create the intent again with the right class.
@@ -235,7 +235,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - Gate decisions take **codes only**: a reason code (§19.8b) and, if you want, `--reason-ref` with an `https://` link to a comment that explains it. The platform never stores your words, because its records are kept for years.
 - The rules are the same as for comments (§19.8b): you need the gate's role, you can decide only the gate the intent waits at, and a producer never approves.
 
-**Linking a spec (G2 input).** G2 checks the intent's spec. Link it with `sdlc spec link` (task B08, `design/ADR-M39-spec-linking.md`):
+<a id="spec-link"></a>**Linking a spec (G2 input).** G2 checks the intent's spec. Link it with `sdlc spec link` (task B08, `design/ADR-M39-spec-linking.md`):
 
 - Who: Person A and PM / BrSE by default (project setting `access.spec_link_roles`; the viewer role never may).
 - When: while the intent is a draft or waits at G1, G2, G3 or G4.
@@ -249,14 +249,14 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 
   | `--tool` | Where the platform finds the criteria | One criterion |
   |---|---|---|
-  | `spec-kit` (Spec Kit 1.1.2) | each `**Acceptance Scenarios**:` block | each numbered item (`1. **Given** … **When** … **Then** …`). Requirements `FR-xxx` and success criteria `SC-xxx` do not count |
-  | `bmad` (BMAD Method 6.12.1) | a story file's `## Acceptance Criteria`, or an epics file's `**Acceptance Criteria:**` blocks | each list item; in an epics file, each `**Given**` group |
+  | `spec-kit` (Spec Kit 1.1.2) | each `**Acceptance Scenarios**:` block | each top-level list item of the block; in the template, a numbered item `1. **Given** … **When** … **Then** …` (one item, however many lines). Requirements `FR-xxx` and success criteria `SC-xxx` do not count |
+  | `bmad` (BMAD Method 6.12.1) | a story file's `## Acceptance Criteria`, or an epics file's `**Acceptance Criteria:**` blocks | each top-level list item; in an epics file, each `**Given**` group (a block without one: each list item) |
   | `manual`, or no `--tool` | a heading with "Acceptance criteria" or 受入基準, for example `## 受入基準 / Acceptance criteria` | each top-level list item under it |
 
   If the tool's structure is not found, the platform tries the other structures. Template text that was never filled in (`[initial state]`, `{{precondition}}`) and text that is not a list item do not count.
 - A spec linked before this rule existed has no count: link it again (`sdlc spec link` with the same path) and the platform counts it.
 
-**Submitting a plan (G3 input).** G3 checks the intent's task plan (template T13). Submit it with `sdlc plan submit` (task B09, `design/ADR-M40-plan-submission.md`):
+<a id="plan-file"></a>**Submitting a plan (G3 input).** G3 checks the intent's task plan (template T13). Submit it with `sdlc plan submit` (task B09, `design/ADR-M40-plan-submission.md`):
 
 - Where: the file `.sdlc/plans/<intent code>.yaml`, for example `.sdlc/plans/INT-2026-0007.yaml`, **merged into the default branch** first. The platform reads it from GitHub and keeps its SHA-256, path patterns, tools and change flags; summaries and other text stay in the repository.
 - Who: Person A by default (project setting `access.plan_submit_roles`; the viewer role never may). **Whoever submits a plan never approves it at G3**: Person B does.
@@ -284,7 +284,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **If someone edits the plan file on the default branch after you submitted it**, G3 or G4 waits (`plan_resubmit_needed`) and the platform posts a comment. It never takes the new file by itself: submit it again with `sdlc plan submit`. At G4 a new plan takes the intent back to G3, where Person B approves it again; earlier approvals no longer count.
 - If GitHub cannot be reached, the intent waits; it never passes G3 or starts a run without the check.
 
-**Drafting a plan from Spec Kit or BMAD.** If the team already has a task list, `sdlc plan draft` writes the plan file for you to complete (task S02, `design/ADR-M62-plan-draft.md`). It runs on your machine only: it calls no API, runs no Git command and never submits, commits or pushes.
+<a id="plan-draft"></a>**Drafting a plan from Spec Kit or BMAD.** If the team already has a task list, `sdlc plan draft` writes the plan file for you to complete (task S02, `design/ADR-M62-plan-draft.md`). It runs on your machine only: it calls no API, runs no Git command and never submits, commits or pushes.
 
 - Sources (the pinned versions): a Spec Kit `tasks.md` (`--tool spec-kit`) or a BMAD **story** file (`--tool bmad`). A BMAD epics file is refused: one intent is one story, so draft from the story file. The file must be UTF-8 text of at most 256 KiB.
 - What it writes:
@@ -296,7 +296,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - Then: check every task, fill the marked fields, commit the file to the default branch and run `sdlc plan submit <INT-…>`. You are the producer of the plan, as if you had written it by hand.
 
 
-**Reading the cost report.** `sdlc cost report` shows what the model calls cost (task E04, `design/ADR-M45-cost-report.md`, D-02 FR-53):
+<a id="cost-report"></a>**Reading the cost report.** `sdlc cost report` shows what the model calls cost (task E04, `design/ADR-M45-cost-report.md`, D-02 FR-53):
 
 - Who: the whole tenant (no `--project`, no `--intent`): tenant admins only. One project or one intent: a tenant admin, or a role in the project setting `access.cost_read_roles` (by default Person A, Person B, PM / BrSE, governance and admin). The viewer role never may.
 - When: times are UTC, written `YYYY-MM-DD` (00:00 that day) or `YYYY-MM-DDThh:mm:ssZ`. `--from` is included and `--to` is excluded: `--from 2026-10-01 --to 2026-11-01` is all of October. Without them, the report covers the current month until now. At most 366 days. A range that is empty (`--to` not after `--from`) or longer than 366 days is refused: the API answers 400 `invalid_request` with the reason `range_empty` or `range_too_long`, and the command exits with code 2. So does a time in another format, or `--project` together with `--intent`.
@@ -304,7 +304,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **Wasted** = tokens and cost of runs that ended failed, cancelled or stopped (budget, scope, time, stalled, killed). Runs that succeeded, and L1 runs that produced a proposal, are not wasted. Runs sent back later by G6 or G7 are not counted as wasted yet.
 - **The numbers are as fresh as the last copy from the model gateway.** The platform copies spend every few minutes (5 by default) and again when a run ends, so a run still in progress shows its cost so far. Calls of the last few minutes may not be shown yet. Every report ends with the time of the latest recorded call, the time of the last copy, and the number of runs still in progress.
 
-**Reading the gate waiting times.** `sdlc metrics gates` shows how long the gates waited for a person's decision (task E06, `design/ADR-M47-gate-metrics.md`, D-02 FR-12). Use it to see whether the gates slow the team down.
+<a id="gate-metrics"></a>**Reading the gate waiting times.** `sdlc metrics gates` shows how long the gates waited for a person's decision (task E06, `design/ADR-M47-gate-metrics.md`, D-02 FR-12). Use it to see whether the gates slow the team down.
 
 - Who: the whole tenant (no `--project`): tenant admins only. One project: a tenant admin, or a role in the project setting `access.metrics_read_roles` (by default Person A, Person B, the second approver, PM / BrSE, governance and admin). The viewer role never may.
 - When: the same time formats as the cost report. `--from` is included, `--to` is excluded. Without them, the last 30 days until now. At most 366 days; a bad range is refused with 400 and exit code 2. The range selects the decisions by the time they were recorded.
@@ -467,3 +467,4 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.21 | 2026-10-08 | Claude (task S02) | §19.8c: `sdlc plan draft` from a Spec Kit `tasks.md` or a BMAD story file (ADR-M62) |
 | 0.22 | 2026-10-08 | Claude (docs fix PR A) | §19.8b: a HOTL G2 also needs an acceptance criterion; §19.8d: `sdlc admin identity list --user <id or email>` |
 | 0.23 | 2026-10-09 | Claude (docs review PR C) | One source per topic: §19.8c holds the G2 condition (acceptance criteria) and the CLI exit codes (exit code 2 also for an HTTP 400); §19.8d the conflicting roles and their defaults; §19.8b links to them and to Ch.15 for producers; the overdue escalation at every gate that waits for a person (route `intent` or `technical`); the gate times report is `sdlc metrics gates` |
+| 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

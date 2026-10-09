@@ -71,7 +71,7 @@ A word you do not know? The [glossary](handbook/00-introduction/02-glossary.md) 
 | **Gates G1–G8** | A workflow per intent; approvals through GitHub comments (`/approve G3`), GitHub reviews (G7) or the `sdlc` command; each approval bound to the exact version it approved, with an expiry |
 | **Agent runs** | OpenHands (an open-source coding agent) in a hardened sandbox per run, network limited to the model gateway and a package proxy; iteration, time and cost caps; loop detection; a kill switch that stops a run within minutes |
 | **Scope and budget** | Changed files compared with the approved plan; budgets per tenant (a client or unit, with its own data), intent and run, with a warning at 80 % and a stop at 100 % |
-| **Evidence** | An Evidence Pack per intent (specification, plan, diff, CI, every gate decision, cost, the client AI disclosure note), exportable as Markdown, sealed at release |
+| **Evidence** | An Evidence Pack per intent: the hashes and references of the specification, plan and diff, CI, every gate decision, cost, the client AI disclosure note; never the code or the texts. Exportable as Markdown, sealed at release ([what it holds](handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)) |
 | **Audit** | An append-only, hash-chained audit log per tenant, checked by `sdlc audit verify`, with a daily anchor in locked storage |
 | **Escalations** | Time limits per severity, a backup owner for each escalation, then governance; the work stays frozen while nobody answers |
 | **Cost** | Every model call through one gateway (LiteLLM) with labels for tenant, project, intent and run; cost reports, including wasted cost |
