@@ -17,7 +17,14 @@ import path from 'node:path';
 
 import type { MessageKey, MessageParams } from '@sdlc/messages';
 
-import { envValue, hostPort, trialEnv, type ProjectOverride } from './env-file.js';
+import {
+  envSecrets,
+  envValue,
+  hostPort,
+  trialApiUrl,
+  trialEnv,
+  type ProjectOverride,
+} from './env-file.js';
 import { parseInitOutput, SecretBag } from './secrets.js';
 import { MODEL_NAMES, type TrialPerson, type TrialSettings } from './settings.js';
 import { TRIAL_AGENT_KEY, TRIAL_AGENT_VERSION, trialProjectConfig } from './trial-config.js';
@@ -153,7 +160,8 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
   const appDbPassword = bag.keep(envValue(envText, 'PLATFORM_APP_DB_PASSWORD') ?? '');
   const ownerDbPassword = bag.keep(envValue(envText, 'PLATFORM_DB_PASSWORD') ?? '');
   const pgPort = hostPort(envText, 'POSTGRES_HOST_PORT', 5432);
-  const apiUrl = `http://127.0.0.1:${hostPort(envText, 'SDLC_API_HOST_PORT', 8090)}`;
+  const apiUrl = trialApiUrl(envText);
+  for (const value of envSecrets(envText)) bag.keep(value);
   composeProject = envValue(envText, 'COMPOSE_PROJECT_NAME') ?? '';
 
   // Step 3: OpenBao with throw-away keys, in memory only.

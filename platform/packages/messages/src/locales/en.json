@@ -1058,6 +1058,7 @@
   "trial.refused.production": "Refused: NODE_ENV is production. pnpm trial:up is for a developer machine only; on a server follow platform/deploy/README.md, Fresh deployment.",
   "trial.refused.env_exists": "Refused: {path} exists. trial:up never overwrites a settings file of another stack. If it is an earlier trial stack, remove it with pnpm trial:down --wipe.",
   "trial.refused.volumes_exist": "Refused: {count} Docker volume(s) of a platform stack exist, for example {first}. trial:up never removes them. An earlier trial stack: pnpm trial:down --wipe. A development stack (sdlc_*): use another machine, or stop here.",
+  "trial.refused.volumes_unknown": "Docker could not list its volumes, so trial:up cannot check that no other stack would be touched. Check `docker volume ls`, then try again.",
   "trial.refused.no_docker": "Refused: Docker does not answer. Start Docker Desktop or the Docker Engine, then run trial:up again.",
   "trial.refused.compose_old": "Refused: Docker Compose {version} is too old; version 2.24 or later is needed.",
   "trial.refused.docker_memory": "Refused: Docker has {have} GiB of memory; the trial stack needs at least {need} GiB. On Docker Desktop: Settings, Resources, Memory.",
@@ -1091,5 +1092,6 @@
   "trial.down.not_confirmed": "Not confirmed: nothing was removed.",
   "trial.down.failed": "docker compose down failed. Its last lines follow.",
   "trial.down.stopped": "The trial stack {project} is stopped. OpenBao is sealed now and its throw-away keys are gone: to try again, pnpm trial:down --wipe, then pnpm trial:up.",
-  "trial.down.wiped": "The trial stack {project} is removed: its volumes, env file, TLS folder and (with --settings) the trial logins."
+  "trial.down.wiped": "The trial stack {project} is removed: its volumes, env file, TLS folder and (with --settings) the trial logins.",
+  "trial.down.kept_login": "Kept {path}: it holds a login to another platform, not to this trial stack."
 }

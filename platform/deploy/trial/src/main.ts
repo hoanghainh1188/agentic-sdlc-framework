@@ -15,8 +15,9 @@ import { parseArgs } from 'node:util';
 import { t, type MessageKey, type MessageParams } from '@sdlc/messages';
 
 import { downRefusal, trialDown } from './down.js';
-import { TRIAL_PROJECT, type ProjectOverride } from './env-file.js';
+import { TRIAL_PROJECT, trialApiUrl } from './env-file.js';
 import { exec, gatherFacts, isDockerDesktop, sdlc } from './host.js';
+import { projectOverride, trialEnvFile } from './override.js';
 import { preflight } from './preflight.js';
 import { SecretBag } from './secrets.js';
 import { credentialsFile, parseSettings, SettingsError, type TrialSettings } from './settings.js';
@@ -32,26 +33,8 @@ const sayError = (key: MessageKey, params?: MessageParams) =>
 
 const DEFAULT_ENV_FILE = path.join(repoRoot, 'platform/deploy/.env');
 
-/**
- * The live test's throw-away project. Honoured only with its own env file (never the default one)
- * and a trial-like project name, so no variable can point trial:up or trial:down --wipe at the
- * dev stack (review V02).
- */
-function override(): ProjectOverride | undefined {
-  const project = process.env.SDLC_TRIAL_PROJECT;
-  const file = process.env.SDLC_TRIAL_ENV_FILE;
-  if (!project || !file || path.resolve(file) === DEFAULT_ENV_FILE) return undefined;
-  if (!/^(sdlc-trial|sdlctrialit)[a-z0-9-]*$/.test(project)) return undefined;
-  return {
-    project,
-    subnet: process.env.SDLC_TRIAL_SUBNET ?? '',
-    gateway: process.env.SDLC_TRIAL_GATEWAY ?? '',
-    portOffset: Number(process.env.SDLC_TRIAL_PORT_OFFSET ?? '0'),
-  };
-}
-
-const envFile = () =>
-  override() ? path.resolve(process.env.SDLC_TRIAL_ENV_FILE!) : DEFAULT_ENV_FILE;
+const override = () => projectOverride(process.env, DEFAULT_ENV_FILE);
+const envFile = () => trialEnvFile(process.env, DEFAULT_ENV_FILE);
 
 function readSettings(file: string): TrialSettings | undefined {
   let text: string;
@@ -164,8 +147,10 @@ async function down(args: string[]): Promise<number> {
     project,
     wipe: values.wipe === true,
     credentialsFiles: settings ? [settings.personA, settings.personB].map(credentialsFile) : [],
+    apiUrl: trialApiUrl(text ?? ''),
     exec,
   });
+  for (const kept of r.keptLogins) sayError('trial.down.kept_login', { path: kept });
   if (r.status !== 0) {
     sayError('trial.down.failed');
     const tail = r.stderr.trim().split('\n').slice(-20).join('\n');
