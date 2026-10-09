@@ -18,6 +18,7 @@ import { downRefusal, trialDown } from './down.js';
 import { TRIAL_PROJECT, type ProjectOverride } from './env-file.js';
 import { exec, gatherFacts, isDockerDesktop, sdlc } from './host.js';
 import { preflight } from './preflight.js';
+import { SecretBag } from './secrets.js';
 import { credentialsFile, parseSettings, SettingsError, type TrialSettings } from './settings.js';
 import { TrialStepError, trialUp } from './up.js';
 
@@ -29,9 +30,18 @@ const say = (key: MessageKey, params?: MessageParams) =>
 const sayError = (key: MessageKey, params?: MessageParams) =>
   process.stderr.write(`${t(key, params)}\n`);
 
+const DEFAULT_ENV_FILE = path.join(repoRoot, 'platform/deploy/.env');
+
+/**
+ * The live test's throw-away project. Honoured only with its own env file (never the default one)
+ * and a trial-like project name, so no variable can point trial:up or trial:down --wipe at the
+ * dev stack (review V02).
+ */
 function override(): ProjectOverride | undefined {
   const project = process.env.SDLC_TRIAL_PROJECT;
-  if (!project) return undefined;
+  const file = process.env.SDLC_TRIAL_ENV_FILE;
+  if (!project || !file || path.resolve(file) === DEFAULT_ENV_FILE) return undefined;
+  if (!/^(sdlc-trial|sdlctrialit)[a-z0-9-]*$/.test(project)) return undefined;
   return {
     project,
     subnet: process.env.SDLC_TRIAL_SUBNET ?? '',
@@ -41,7 +51,7 @@ function override(): ProjectOverride | undefined {
 }
 
 const envFile = () =>
-  process.env.SDLC_TRIAL_ENV_FILE ?? path.join(repoRoot, 'platform/deploy/.env');
+  override() ? path.resolve(process.env.SDLC_TRIAL_ENV_FILE!) : DEFAULT_ENV_FILE;
 
 function readSettings(file: string): TrialSettings | undefined {
   let text: string;
@@ -151,13 +161,15 @@ async function down(args: string[]): Promise<number> {
   const r = await trialDown({
     repoRoot,
     envFile: file,
+    project,
     wipe: values.wipe === true,
     credentialsFiles: settings ? [settings.personA, settings.personB].map(credentialsFile) : [],
     exec,
   });
   if (r.status !== 0) {
     sayError('trial.down.failed');
-    process.stderr.write(`${r.stderr.trim().split('\n').slice(-20).join('\n')}\n`);
+    const tail = r.stderr.trim().split('\n').slice(-20).join('\n');
+    process.stderr.write(`${new SecretBag().redact(tail)}\n`);
     return EXIT.failed;
   }
   say(values.wipe ? 'trial.down.wiped' : 'trial.down.stopped', { project });

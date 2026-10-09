@@ -13,8 +13,11 @@ import type { Exec, ExecResult, Sdlc } from './up.js';
 /** Runs a command with stdin from `input`; stdout and stderr are captured, never shown. */
 export const exec: Exec = (cmd, args, opts = {}) =>
   new Promise<ExecResult>((resolve) => {
+    // Without COMPOSE_PROJECT_NAME of the shell: Compose would prefer it to the env file's.
+    const inherited = { ...process.env };
+    delete inherited.COMPOSE_PROJECT_NAME;
     const child = spawn(cmd, args, {
-      env: { ...process.env, ...opts.env },
+      env: { ...inherited, ...opts.env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const out: Buffer[] = [];

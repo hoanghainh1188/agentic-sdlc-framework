@@ -6,7 +6,7 @@ export const TRIAL_AGENT_KEY = 'trial-coder';
 export const TRIAL_AGENT_VERSION = '1.0.0';
 
 export function trialProjectConfig(sandboxImage: string): string {
-  if (!/@sha256:[0-9a-f]{64}$/.test(sandboxImage)) {
+  if (!/^[\w./:-]+@sha256:[0-9a-f]{64}$/.test(sandboxImage)) {
     throw new Error('the sandbox image must be pinned by digest');
   }
   return [

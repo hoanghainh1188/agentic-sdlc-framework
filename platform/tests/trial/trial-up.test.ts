@@ -103,6 +103,18 @@ describe('V02 AC1: the settings file', () => {
     );
   });
 
+  it('refuses option-like values and control characters', () => {
+    expect(fieldOf(SETTINGS_YAML.replace('name: Person A', 'name: --help'))).toBe(
+      'people.person_a.name',
+    );
+    expect(fieldOf(SETTINGS_YAML.replace('a@example.test', '-x@example.test'))).toBe(
+      'people.person_a.email',
+    );
+    expect(fieldOf(SETTINGS_YAML.replace('name: Person A', 'name: "A\\u0007"'))).toBe(
+      'people.person_a.name',
+    );
+  });
+
   it('refuses one person in both roles (QUESTIONS #341)', () => {
     expect(fieldOf(SETTINGS_YAML.replace('github_id: "1002"', 'github_id: "1001"'))).toBe(
       'people.person_b.github_id',
@@ -227,6 +239,14 @@ describe('V02 AC3: secrets never reach the terminal', () => {
     expect(out).toContain('Unseal Key 1: <redacted>');
   });
 
+  it('hides one line of a multi-line secret, and the URL-encoded form', () => {
+    const bag = new SecretBag();
+    bag.keep('-----BEGIN KEY-----\nMIIEpAIBAAKCAQEAsecretline0123\n-----END KEY-----');
+    bag.keep('p@ss/word+with=chars');
+    expect(bag.redact('error near MIIEpAIBAAKCAQEAsecretline0123')).not.toContain('secretline');
+    expect(bag.redact('postgres://u:p%40ss%2Fword%2Bwith%3Dchars@h')).not.toContain('p%40ss');
+  });
+
   it('a dropped value is no longer needed, the patterns still apply', () => {
     const bag = new SecretBag();
     bag.keep('some-throwaway-share');
@@ -279,6 +299,7 @@ describe('V02: the env file and the configuration of the trial stack', () => {
       sandbox: { image },
     });
     expect(() => trialProjectConfig('node24:latest')).toThrow();
+    expect(() => trialProjectConfig(`x\nrun: {}\n@sha256:${'a'.repeat(64)}`)).toThrow();
   });
 });
 

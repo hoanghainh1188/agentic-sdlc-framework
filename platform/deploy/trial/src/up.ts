@@ -125,11 +125,15 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
     input = '',
     env: Record<string, string> = {},
   ) => deps.exec(cmd, args, { input, env: { SDLC_ENV_FILE: deps.envFile, ...env } });
+  // Always with `-p`: the project of the trial's env file, never one of the shell (review V02).
+  let composeProject = '';
   const compose = (input: string, ...args: string[]) =>
     run(
       'docker',
       [
         'compose',
+        '-p',
+        composeProject,
         '-f',
         path.join(deployDir, 'docker-compose.yml'),
         '--env-file',
@@ -150,7 +154,7 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
   const ownerDbPassword = bag.keep(envValue(envText, 'PLATFORM_DB_PASSWORD') ?? '');
   const pgPort = hostPort(envText, 'POSTGRES_HOST_PORT', 5432);
   const apiUrl = `http://127.0.0.1:${hostPort(envText, 'SDLC_API_HOST_PORT', 8090)}`;
-  const composeProject = envValue(envText, 'COMPOSE_PROJECT_NAME') ?? '';
+  composeProject = envValue(envText, 'COMPOSE_PROJECT_NAME') ?? '';
 
   // Step 3: OpenBao with throw-away keys, in memory only.
   step('3');
@@ -173,10 +177,13 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
   for (const m of init.stdout.matchAll(/^(?:Unseal Key \d+|Initial Root Token): (\S+)$/gm))
     bag.keep(m[1]!);
   const { shares, rootToken } = parseInitOutput(init.stdout);
-  ok(await bootstrap(['unseal'], `${shares[0]}\n${shares[1]}\n`), 'openbao:unseal');
-  for (const share of shares) bag.drop(share);
-  shares.length = 0;
-  ok(await bootstrap(['configure', '--keep-token'], `${rootToken}\n`), 'openbao:configure');
+  try {
+    ok(await bootstrap(['unseal'], `${shares[0]}\n${shares[1]}\n`), 'openbao:unseal');
+  } finally {
+    // Never needed again: the trial stack is never unsealed a second time (QUESTIONS #345).
+    for (const share of shares) bag.drop(share);
+    shares.length = 0;
+  }
   /** An admin command in the OpenBao container: the root token and the values come on stdin. */
   const admin = async (script: string, input: string, what: string) =>
     ok(
@@ -192,44 +199,63 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
       what,
     );
 
-  // Step 4: the shared secrets, on stdin (never on a command line).
-  step('4');
-  const appKey = bag.keep(fs.readFileSync(settings.appKeyFile, 'utf8').trim());
-  await admin(
-    'IFS= read -r CLIENT_ID; bao kv put -mount=kv shared/github-app client_id="$CLIENT_ID" private_key=- >/dev/null',
-    `${settings.appClientId}\n${appKey}\n`,
-    'secrets:github-app',
-  );
-  const random = () => bag.keep(`sk-${randomBytes(24).toString('hex')}`);
-  await admin(
-    'IFS= read -r m; IFS= read -r s; ' +
-      'printf %s "$m" | bao kv put -mount=kv cost-controller/litellm-master-key value=- >/dev/null && ' +
-      'printf %s "$s" | bao kv put -mount=kv litellm/salt-key value=- >/dev/null',
-    `${random()}\n${random()}\n`,
-    'secrets:litellm',
-  );
-  if (settings.model.provider === 'anthropic') {
-    const key = bag.keep(fs.readFileSync(settings.model.apiKeyFile, 'utf8').trim());
-    await admin(
-      'IFS= read -r p; printf %s "$p" | bao kv put -mount=kv litellm/providers/anthropic api_key=- >/dev/null',
-      `${key}\n`,
-      'secrets:anthropic',
-    );
-  } else {
-    await admin(
-      'IFS= read -r u; bao kv put -mount=kv litellm/providers/ollama api_base="$u" >/dev/null',
-      `${settings.model.ollamaUrl}\n`,
-      'secrets:ollama',
-    );
-  }
+  let rootRevoked = false;
+  try {
+    ok(await bootstrap(['configure', '--keep-token'], `${rootToken}\n`), 'openbao:configure');
 
-  // Step 5: the credentials of every process; then the root token is revoked and forgotten.
-  step('5');
-  for (const command of CREDENTIALS_COMMANDS) {
-    ok(await bootstrap([command], `${rootToken}\n`), command);
+    // Step 4: the shared secrets, on stdin (never on a command line).
+    step('4');
+    const appKey = bag.keep(fs.readFileSync(settings.appKeyFile, 'utf8').trim());
+    await admin(
+      'IFS= read -r CLIENT_ID; bao kv put -mount=kv shared/github-app client_id="$CLIENT_ID" private_key=- >/dev/null',
+      `${settings.appClientId}\n${appKey}\n`,
+      'secrets:github-app',
+    );
+    const random = () => bag.keep(`sk-${randomBytes(24).toString('hex')}`);
+    await admin(
+      'IFS= read -r m; IFS= read -r s; ' +
+        'printf %s "$m" | bao kv put -mount=kv cost-controller/litellm-master-key value=- >/dev/null && ' +
+        'printf %s "$s" | bao kv put -mount=kv litellm/salt-key value=- >/dev/null',
+      `${random()}\n${random()}\n`,
+      'secrets:litellm',
+    );
+    if (settings.model.provider === 'anthropic') {
+      const key = bag.keep(fs.readFileSync(settings.model.apiKeyFile, 'utf8').trim());
+      await admin(
+        'IFS= read -r p; printf %s "$p" | bao kv put -mount=kv litellm/providers/anthropic api_key=- >/dev/null',
+        `${key}\n`,
+        'secrets:anthropic',
+      );
+    } else {
+      await admin(
+        'IFS= read -r u; bao kv put -mount=kv litellm/providers/ollama api_base="$u" >/dev/null',
+        `${settings.model.ollamaUrl}\n`,
+        'secrets:ollama',
+      );
+    }
+
+    // Step 5: the credentials of every process; then the root token is revoked and forgotten.
+    step('5');
+    for (const command of CREDENTIALS_COMMANDS) {
+      ok(await bootstrap([command], `${rootToken}\n`), command);
+    }
+    await admin('bao token revoke -self >/dev/null', '', 'openbao:revoke-root');
+    rootRevoked = true;
+  } finally {
+    // Also when a step failed: no root token stays valid once trial:up has stopped.
+    if (!rootRevoked) {
+      await compose(
+        `${rootToken}\n`,
+        'exec',
+        '-T',
+        'openbao',
+        'sh',
+        '-c',
+        'IFS= read -r t; BAO_TOKEN="$t" bao token revoke -self >/dev/null 2>&1',
+      ).catch(() => undefined);
+    }
+    bag.drop(rootToken);
   }
-  await admin('bao token revoke -self >/dev/null', '', 'openbao:revoke-root');
-  bag.drop(rootToken);
 
   // Step 6: the database.
   step('6');
@@ -364,8 +390,6 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
     '90',
   ]);
   tokens.b = bag.keep(String(issued.token));
-  await login(a, tokens.a);
-  await login(b, tokens.b);
 
   // Step 10: the sandbox image, by digest.
   step('10');
@@ -484,6 +508,9 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
     '--disclosure',
     'standard_note',
   ]);
+  // Last: the logins, so a failure above never leaves a credentials file behind (review V02).
+  await login(a, tokens.a);
+  await login(b, tokens.b);
   return { apiUrl, project, composeProject, model, sandboxImage: image };
 
   /** `sdlc login --token-stdin` into the person's own config folder (mode 600, by the CLI). */

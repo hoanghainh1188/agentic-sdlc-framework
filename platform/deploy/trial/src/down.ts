@@ -24,6 +24,8 @@ export function downRefusal(
 export interface DownOptions {
   readonly repoRoot: string;
   readonly envFile: string;
+  /** The trial's Compose project: passed with `-p`, so no shell variable can choose another. */
+  readonly project: string;
   readonly wipe: boolean;
   /** Credentials files of the trial's people, removed with `--wipe` (their tokens are dead). */
   readonly credentialsFiles: readonly string[];
@@ -35,6 +37,8 @@ export async function trialDown(
 ): Promise<{ status: number | null; stderr: string }> {
   const args = [
     'compose',
+    '-p',
+    o.project,
     '-f',
     path.join(o.repoRoot, 'platform/deploy/docker-compose.yml'),
     '--env-file',

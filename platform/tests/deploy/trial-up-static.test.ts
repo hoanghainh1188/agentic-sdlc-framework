@@ -103,6 +103,26 @@ describe('V02: the bootstrap switch for throw-away keys', () => {
     );
   });
 
+  it('is refused on an env file that is not a trial stack, and for other commands', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-bootstrap-'));
+    try {
+      const dev = path.join(dir, 'dev.env');
+      fs.writeFileSync(dev, 'COMPOSE_PROJECT_NAME=sdlc\n');
+      expect(run({ SDLC_OPENBAO_THROWAWAY: '1', SDLC_ENV_FILE: dev }).stderr).toContain(
+        'trial stack only',
+      );
+      const trial = path.join(dir, 'trial.env');
+      fs.writeFileSync(trial, 'COMPOSE_PROJECT_NAME=sdlc-trial\n');
+      const other = spawnSync(bootstrap, ['root-token', '--stdout-not-tty'], {
+        encoding: 'utf8',
+        env: { PATH: process.env.PATH ?? '', SDLC_ENV_FILE: trial, SDLC_OPENBAO_THROWAWAY: '1' },
+      });
+      expect(other.stderr).toContain('unknown option');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('is accepted for the trial (the run then stops at the missing env file)', () => {
     const r = run({ SDLC_OPENBAO_THROWAWAY: '1' });
     expect(r.stderr).not.toContain('unknown option');

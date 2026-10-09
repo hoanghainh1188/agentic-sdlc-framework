@@ -17,12 +17,19 @@ export class SecretBag {
   /** Remembers a secret so `redact` hides it; returns it unchanged. */
   keep(value: string): string {
     if (value.length >= 6) this.#values.add(value);
+    // A tool may print one line of a multi-line secret (a PEM key), or its URL-encoded form.
+    for (const line of value.split('\n'))
+      if (line.trim().length >= 16) this.#values.add(line.trim());
+    const encoded = encodeURIComponent(value);
+    if (encoded !== value && value.length >= 6) this.#values.add(encoded);
     return value;
   }
 
   /** Forgets a secret that is no longer needed (the key shares and the root token after use). */
   drop(value: string): void {
     this.#values.delete(value);
+    for (const line of value.split('\n')) this.#values.delete(line.trim());
+    this.#values.delete(encodeURIComponent(value));
   }
 
   get size(): number {

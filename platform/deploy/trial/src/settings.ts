@@ -51,7 +51,7 @@ export class SettingsError extends Error {
 
 const SLUG = /^[a-z][a-z0-9-]{1,38}$/;
 const REPO = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL = /^[^\s@-][^\s@]*@[^\s@]+\.[^\s@]+$/;
 const GITHUB_ID = /^[1-9][0-9]{0,19}$/;
 const GITHUB_LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const CLIENT_ID = /^[A-Za-z0-9._-]{4,64}$/;
@@ -71,6 +71,9 @@ function text(map: Mapping, key: string, field: string, pattern?: RegExp): strin
   // YAML reads an unquoted numeric ID as a number: accept it as its digits.
   const s = typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : value;
   if (typeof s !== 'string' || s.trim() === '' || s.length > 500) throw new SettingsError(field);
+  // Never read as a command-line option, never a control character (review V02).
+  // eslint-disable-next-line no-control-regex
+  if (s.startsWith('-') || /[\u0000-\u001f\u007f]/.test(s)) throw new SettingsError(field);
   if (pattern && !pattern.test(s)) throw new SettingsError(field);
   return s;
 }
