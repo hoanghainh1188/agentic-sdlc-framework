@@ -1,5 +1,6 @@
 // The CLI's response schemas against the API's own presenters (B04 AC3, design/ADR-M36 §2.4):
 // when a presenter changes in a way the CLI cannot read, this test fails.
+import { PROPOSAL_MAX_BYTES } from '@sdlc/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -28,6 +29,8 @@ import {
   evidenceListSchema,
   evidenceShowSchema,
   evidenceFileSchema,
+  proposalSchema,
+  PROPOSAL_BASE64_MAX,
   submittedPlanSchema,
   specListSchema,
   intentSchema,
@@ -40,6 +43,7 @@ import {
   linkedSpecBody,
   planListBody,
   runListBody,
+  proposalBody,
   killBody,
   costReportBody,
   gateMetricsBody,
@@ -99,6 +103,7 @@ describe('CLI response schemas match the API presenters', () => {
       { intent: 'INT-2026-0007', packs: [evidencePackBody(1), evidencePackBody(2)] },
     ],
     ['evidence pack file', evidenceFileSchema, evidenceFileBody('# Evidence Pack\n')],
+    ['L1 proposal', proposalSchema, proposalBody(Buffer.from([0x2b, 0x93, 0xfa, 0x0a]))],
     ['me', meSchema, meBody()],
     ['admin project', adminProjectSchema, projectBody()],
     ['admin user', adminUserSchema, userBody({}, true)],
@@ -119,5 +124,11 @@ describe('CLI response schemas match the API presenters', () => {
     expect(parsed.error?.issues).toBeUndefined();
     // Nothing the presenter sends is dropped: the CLI shows the whole body with --json.
     expect(parsed.data).toEqual(body);
+  });
+});
+
+describe('C13: the proposal cap', () => {
+  it('the schema allows exactly PROPOSAL_MAX_BYTES of @sdlc/contracts in base64', () => {
+    expect(PROPOSAL_BASE64_MAX).toBe(Math.ceil(PROPOSAL_MAX_BYTES / 3) * 4);
   });
 });

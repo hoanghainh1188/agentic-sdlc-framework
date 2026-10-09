@@ -20,6 +20,7 @@ import { RateLimiter } from './auth/rate-limiter.js';
 import { ErrorFilter } from './errors/error.filter.js';
 import { EscalationsController } from './escalations/escalations.controller.js';
 import { EvidenceController } from './evidence/evidence.controller.js';
+import { ProposalController } from './evidence/proposal.controller.js';
 import { EvidenceHoldsController } from './evidence/holds.controller.js';
 import { EvidenceService } from './evidence/evidence.service.js';
 import { EscalationsService } from './escalations/escalations.service.js';
@@ -114,6 +115,7 @@ class ApiModule {
         CostController,
         MetricsController,
         EvidenceController,
+        ProposalController,
         EvidenceHoldsController,
         EscalationsController,
         AiRecordsController,

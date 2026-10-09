@@ -517,6 +517,28 @@ export const evidenceFileSchema = z.object({
   }),
 });
 
+/** C13: PROPOSAL_MAX_BYTES of `@sdlc/contracts` (32 MiB) in base64; a test keeps them equal. */
+export const PROPOSAL_BASE64_MAX = Math.ceil((32 * 1024 * 1024) / 3) * 4;
+
+/**
+ * `GET /v1/intents/:intent/runs/:run/proposal` (C13, ADR-M64 §2.1): an L1 run's patch, in base64
+ * (a patch is bytes), with the SHA-256 the platform checked; the CLI checks it again.
+ */
+export const proposalSchema = z.object({
+  proposal: z.object({
+    intent: code,
+    run_id: id,
+    media_type: z.literal('text/x-diff'),
+    sha256,
+    size_bytes: z.number().int().min(0),
+    // At most PROPOSAL_MAX_BYTES (`@sdlc/contracts`, 32 MiB) in base64.
+    content_base64: z
+      .string()
+      .max(PROPOSAL_BASE64_MAX)
+      .regex(/^[A-Za-z0-9+/]*={0,2}$/),
+  }),
+});
+
 /** An evidence hold (E05, ADR-M51, QUESTIONS #235): IDs, times and the optional link. */
 export const evidenceHoldSchema = z.object({
   id,

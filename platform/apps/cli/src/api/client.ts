@@ -36,8 +36,14 @@ type Query = Readonly<Record<string, string | number | undefined>>;
 export class ApiClient {
   constructor(private readonly options: ApiClientOptions) {}
 
-  get<T>(path: string, schema: z.ZodType<T>, query: Query = {}): Promise<T> {
-    return this.request('GET', path, schema, undefined, query);
+  /** `maxBytes`: a larger cap for one answer (C13: a proposal); default `MAX_RESPONSE_BYTES`. */
+  get<T>(
+    path: string,
+    schema: z.ZodType<T>,
+    query: Query = {},
+    maxBytes: number = MAX_RESPONSE_BYTES,
+  ): Promise<T> {
+    return this.request('GET', path, schema, undefined, query, maxBytes);
   }
 
   post<T>(path: string, schema: z.ZodType<T>, body: unknown = {}): Promise<T> {
@@ -62,6 +68,7 @@ export class ApiClient {
     schema: z.ZodType<T>,
     body: unknown,
     query: Query = {},
+    maxBytes: number = MAX_RESPONSE_BYTES,
   ): Promise<T> {
     const url = new URL(`${this.options.apiUrl}${path}`);
     for (const [key, value] of Object.entries(query)) {
@@ -90,7 +97,7 @@ export class ApiClient {
       await response.body?.cancel().catch(() => undefined);
       throw new ApiCallError('redirect', response.status);
     }
-    const json = await readJson(response);
+    const json = await readJson(response, maxBytes);
     if (!response.ok) {
       const envelope = errorEnvelopeSchema.safeParse(json);
       throw new ApiCallError('http', response.status, envelope.success ? envelope.data : undefined);
@@ -101,8 +108,8 @@ export class ApiClient {
   }
 }
 
-/** Reads at most `MAX_RESPONSE_BYTES` and parses JSON. Undefined for an empty body. */
-async function readJson(response: Response): Promise<unknown> {
+/** Reads at most `maxBytes` and parses JSON. Undefined for an empty body. */
+async function readJson(response: Response, maxBytes: number): Promise<unknown> {
   if (response.body === null) return undefined;
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -110,7 +117,7 @@ async function readJson(response: Response): Promise<unknown> {
     // Leaving the loop early cancels the stream.
     for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
       size += chunk.byteLength;
-      if (size > MAX_RESPONSE_BYTES) throw new ApiCallError('too_large', response.status);
+      if (size > maxBytes) throw new ApiCallError('too_large', response.status);
       chunks.push(chunk);
     }
   } catch (error) {

@@ -36,7 +36,7 @@ import {
 import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
 import { presentPlanList, presentSubmittedPlan } from '../../apps/api/src/plans/present.js';
 import { presentCostReport } from '../../apps/api/src/cost/present.js';
-import { presentPack } from '../../apps/api/src/evidence/present.js';
+import { presentPack, presentProposal } from '../../apps/api/src/evidence/present.js';
 import { presentGateMetrics } from '../../apps/api/src/metrics/present.js';
 import { presentKill, presentRunList } from '../../apps/api/src/runs/present.js';
 import { presentLinkedSpec, presentSpecList } from '../../apps/api/src/specs/present.js';
@@ -643,6 +643,16 @@ export function evidencePackBody(version = 1, sealed = false): Record<string, un
 }
 
 /** E02: a pack file as `GET …/evidence-packs/:version/:file` returns it. */
+/** C13: `GET /v1/intents/:intent/runs/:run/proposal`; bytes that are not UTF-8 included. */
+export function proposalBody(content: Buffer, sha256?: string): Record<string, unknown> {
+  return presentProposal(
+    'INT-2026-0007',
+    RUN_ID,
+    sha256 ?? createHash('sha256').update(content).digest('hex'),
+    content,
+  );
+}
+
 export function evidenceFileBody(content: string, sha256?: string): Record<string, unknown> {
   return {
     file: {

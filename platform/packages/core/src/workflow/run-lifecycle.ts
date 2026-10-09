@@ -64,6 +64,8 @@ import {
   type PrepareRunResult,
 } from './prepare-run.js';
 import { isFinalRun, roundRuns } from './run-round.js';
+import { gateHistory } from './gate-history.js';
+import { closeGateOverdue } from './overdue.js';
 
 /** Run statuses that go to G5 (C07 decides what happens next). */
 const TO_G5: readonly RunStatus[] = [
@@ -126,6 +128,24 @@ export async function stepRunning(
     return { outcome: 'run_prepare' };
   }
   return { outcome: 'run_ended', runId: latest.id };
+}
+
+/**
+ * C13 (ADR-M64 §2.2): the G4 rejection that ends an intent paused after an L1 proposal (the
+ * latest run ended `succeeded_proposal_only`), or null. `decideGate` accepts no other decision
+ * there. Closes the G4 overdue escalation like a G4 rejection at the gate. Under the intent lock.
+ */
+export async function proposalRejection(
+  tx: TenantScope,
+  registry: Registry,
+  intent: Intent,
+): Promise<string | null> {
+  const latest = (await tx.runs.listForIntent(intent.id)).at(-1);
+  if (latest?.status !== 'succeeded_proposal_only') return null;
+  const { rejection } = await gateHistory(tx, intent.id, 'G4');
+  if (rejection === null) return null;
+  await closeGateOverdue(tx, registry, intent.id, 'G4');
+  return rejection;
 }
 
 /**

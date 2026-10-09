@@ -231,6 +231,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc evidence list <INT-…>` / `sdlc evidence show <INT-…> [--version <n>]` | Lists the pack's versions / shows one (default: the latest), with its release SHA-256 (what a G8 approval is bound to) |
 | `sdlc gate approve G8 <INT-…>` / `sdlc gate reject G8 <INT-…> --reason-code <code>` | Approves or rejects the release at G8 (Person B; at Critical risk also the second approver). The platform seals the pack and closes the intent: Chapter 15 §15.10.3 |
 | `sdlc evidence export <INT-…> [--version <n>] [--manifest] [--output <file>]` | Prints or saves the readable pack (`pack.md`), or the manifest with `--manifest`, after checking its SHA-256; `--output` never overwrites a file |
+| `sdlc evidence proposal <INT-…> [--run <run ID>] --output <file> [--force]` | Saves the patch of a High-risk (L1) run after checking its SHA-256 (client code: mode 600, never printed; every download audited). Then end the intent with `sdlc gate reject G4`: Chapter 13 §13.10.4 |
 
 - Gate decisions take **codes only**: a reason code (§19.8b) and, if you want, `--reason-ref` with an `https://` link to a comment that explains it. The platform never stores your words, because its records are kept for years.
 - The rules are the same as for comments (§19.8b): you need the gate's role, you can decide only the gate the intent waits at, and a producer never approves.
@@ -467,6 +468,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.21 | 2026-10-08 | Claude (task S02) | §19.8c: `sdlc plan draft` from a Spec Kit `tasks.md` or a BMAD story file (ADR-M62) |
 | 0.22 | 2026-10-08 | Claude (docs fix PR A) | §19.8b: a HOTL G2 also needs an acceptance criterion; §19.8d: `sdlc admin identity list --user <id or email>` |
 | 0.23 | 2026-10-09 | Claude (docs review PR C) | One source per topic: §19.8c holds the G2 condition (acceptance criteria) and the CLI exit codes (exit code 2 also for an HTTP 400); §19.8d the conflicting roles and their defaults; §19.8b links to them and to Ch.15 for producers; the overdue escalation at every gate that waits for a person (route `intent` or `technical`); the gate times report is `sdlc metrics gates` |
+| 0.28 | 2026-10-09 | Claude (task C13) | §19.8c: `sdlc evidence proposal` |
 | 0.27 | 2026-10-09 | Claude (task U03) | §19.8c: `sdlc intent create --spec` creates the intent and links its spec in one command |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |

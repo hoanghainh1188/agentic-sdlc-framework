@@ -22,9 +22,9 @@ Two things were missing (found in the review of the user commands, 2026-10-09):
 
 - `GET /v1/intents/:intent/runs/:run/proposal` returns the stored patch of one run; `sdlc evidence proposal <INT-…> [--run <run ID>] --output <file> [--force]`. Without `--run`, the latest run of the intent with a proposal.
 - **Who:** the roles in config `access.evidence_read_roles` (rule M30: never `viewer`), tenant admins always; the same answers as the other evidence reads (no role → 404, another role → 403).
-- **The api reads it** with its existing identity `api-evidence` (`Read:evidence/proposals/*`, ADR-M48 §2.2), at most `SDLC_API_EVIDENCE_MAX_ITEM_MB`, and checks its SHA-256 and size against `evidence_items` **before** it answers: a mismatch is refused (fail closed) and audited `evidence.check_failed`, as when a pack is built. Without the credential: 503 `evidence_unavailable` after the access check.
+- **The api reads it** with its existing identity `api-evidence` (`Read:evidence/proposals/*`, ADR-M48 §2.2), at most `SDLC_API_EVIDENCE_MAX_ITEM_MB` and at most **32 MiB** (`PROPOSAL_MAX_BYTES` in `@sdlc/contracts`: the whole patch travels in one JSON answer, so the api's and the CLI's memory stay bounded; a larger proposal answers `evidence_too_large`), and checks its SHA-256 and size against `evidence_items` **before** it answers: a mismatch is refused (fail closed) and audited `evidence.check_failed`, as when a pack is built. Without the credential: 503 `evidence_unavailable` after the access check.
 - **Every download is audited:** a new action `evidence.proposal_read` (the run ID, the SHA-256, the size; never a path or the content).
-- **The patch is client code.** The answer is `text/x-diff`, an attachment, with the SHA-256 in a header; the CLI checks the hash again and writes the file with mode 600, never to standard output, never over an existing file without `--force`. The api never logs or keeps the bytes. The read-only dashboard never shows a proposal.
+- **The patch is client code.** The answer is JSON like the pack file endpoint: `media_type` `text/x-diff`, the SHA-256, the size and the bytes in **base64** (a patch is bytes: a file in Shift_JIS must reach the person unchanged; as built in PR 2). The answer has `Cache-Control: no-store`. The CLI raises its answer cap for this one call (32 MiB in base64), checks the size and the hash again and writes the file with mode 600, never to standard output, never over an existing file without `--force` (then through a temporary file and one rename: a failed write keeps the old file, a link is replaced, never followed). Without `--run` the CLI takes the latest run that ended `succeeded_proposal_only` from `GET /v1/intents/:intent/runs`. The api never logs or keeps the bytes. The read-only dashboard never shows a proposal.
 
 ### 2.2 The end of the intent (QUESTIONS #335)
 
@@ -42,7 +42,7 @@ Only the L1 proposal case. Withdrawing an intent at any gate (a running run, a p
 
 - T09 can finish in the trial M-E: the proposal is read by a person, then the intent ends `rejected` with a link to where the work went.
 - A fourth process path reads client code (the api, on a person's request); each read is audited, checked and capped.
-- The gate waiting-time metrics (E06) count this rejection as a person's decision at G4.
+- The rejection has no `waited_seconds` (the intent did not wait at the gate for it; as for a block of a passed gate), so the gate waiting-time metrics (E06) leave it out.
 - The state machine (D-03 §6, diagram D12) gains `G4 → Rejected` after a proposal.
 
 ## 4. Rejected
@@ -56,3 +56,4 @@ Only the L1 proposal case. Withdrawing an intent at any gate (a running run, a p
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-09 | Claude Code (task C13, PR 1) | The download, the end of the intent by a G4 rejection, the scope |
+| 0.2 | 2026-10-09 | Claude Code (task C13, PR 2) | As built: the answer is JSON with the bytes in base64; the CLI finds the latest run with a proposal; the rejection has no `waited_seconds`; after the code review: the 32 MiB cap, `no-store`, `--force` through a rename |

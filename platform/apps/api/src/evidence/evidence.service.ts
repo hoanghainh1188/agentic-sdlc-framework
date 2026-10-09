@@ -10,13 +10,14 @@ import {
   getEvidencePack,
   listEvidencePacks,
   readEvidencePackFile,
+  readProposal,
   resolveEvidenceSubject,
   type EvidenceAccess,
 } from '@sdlc/core';
 import type { EvidenceStore } from '@sdlc/contracts';
 
 import type { Principal } from '../auth/principal.js';
-import { presentPack } from './present.js';
+import { presentPack, presentProposal } from './present.js';
 import type { PackFile } from './schemas.js';
 
 export interface EvidenceServiceDeps {
@@ -95,5 +96,18 @@ export class EvidenceService {
         content: content.toString('utf8'),
       },
     };
+  }
+
+  /** C13 (ADR-M64 §2.1): one run's L1 proposal, checked and audited by core. */
+  async proposal(p: Principal, ref: string, runId: string): Promise<Record<string, unknown>> {
+    const store = await this.store(p, ref, 'read');
+    const { intentCode, item, content } = await readProposal(
+      p.scope,
+      { type: 'human', userId: p.userId },
+      ref,
+      runId,
+      { store, now: this.deps.now, maxItemBytes: this.deps.maxItemBytes },
+    );
+    return presentProposal(intentCode, item.run_id, item.sha256, content);
   }
 }

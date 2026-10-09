@@ -85,7 +85,13 @@ import { checkGateOverdue, closeGateOverdue, gateClockStart } from './overdue.js
 import { gateOversight } from './oversight.js';
 import { FEEDBACK_UNAVAILABLE } from './prepare-run.js';
 import { lastPushedHead } from './publish-state.js';
-import { moveTo, moveToRunning, stepPaused, stepRunning } from './run-lifecycle.js';
+import {
+  moveTo,
+  moveToRunning,
+  proposalRejection,
+  stepPaused,
+  stepRunning,
+} from './run-lifecycle.js';
 import { waitedSeconds } from './waited.js';
 
 export { waitedSeconds };
@@ -264,6 +270,21 @@ export async function stepIntent(
       return { outcome: 'finished', status: intent.status };
     }
     if (intent.status === 'draft') return submit(tx, deps, intent);
+    // C13 (ADR-M64 §2.2): Person A took an L1 proposal forward and rejected G4: the intent ends.
+    if (intent.status === 'paused' && intent.current_gate === 'G4') {
+      const rejection = await proposalRejection(tx, deps.registry, intent);
+      if (rejection !== null) {
+        return move(
+          tx,
+          deps,
+          await deps.registry.policyFor(tx, intent.project_id),
+          intent,
+          { status: 'rejected', gate: 'G4' },
+          'rejected',
+          rejection,
+        );
+      }
+    }
     if (deps.startRuns && intent.current_gate === 'G4') {
       if (intent.status === 'running') {
         return stepRunning(

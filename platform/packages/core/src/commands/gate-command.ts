@@ -93,7 +93,14 @@ export async function decideGate(
     if (!current) throw new CommandError('intent_not_found', `intent ${intent.code} not found`);
     const now = registry.now();
     const atGate = current.status === 'in_gate' && current.current_gate === gate;
-    if (!atGate && !(await mayBlockPassedGate(registry, tx, current, gate, command, now))) {
+    // C13 (ADR-M64 §2.2): after an L1 proposal the intent is paused at G4; Person A ends it with a
+    // G4 rejection once the proposal is taken forward. No other decision, no other paused case.
+    const endsProposal = await rejectsProposal(tx, current, gate, command);
+    if (
+      !atGate &&
+      !endsProposal &&
+      !(await mayBlockPassedGate(registry, tx, current, gate, command, now))
+    ) {
       throw new CommandError(
         'gate_not_current',
         `${current.code} is not waiting at ${gate} (${current.status}, ${String(current.current_gate)})`,
@@ -183,6 +190,22 @@ async function g6Context(tx: TenantScope, intentId: string) {
 async function runProducers(tx: TenantScope, intentId: string): Promise<string[]> {
   const run = (await tx.runs.listForIntent(intentId)).at(-1);
   return run?.triggered_by ? [run.triggered_by] : [];
+}
+
+/**
+ * C13 (ADR-M64 §2.2): a rejection at G4 while the intent is paused there after an L1 run stored
+ * its proposal (the latest run ended `succeeded_proposal_only`). Under the intent lock.
+ */
+async function rejectsProposal(
+  tx: TenantScope,
+  intent: Intent,
+  gate: string,
+  command: GateCommand,
+): Promise<boolean> {
+  if (gate !== 'G4' || command.decision !== 'reject') return false;
+  if (intent.status !== 'paused' || intent.current_gate !== 'G4') return false;
+  const latest = (await tx.runs.listForIntent(intent.id)).at(-1);
+  return latest?.status === 'succeeded_proposal_only';
 }
 
 /** A rejection or request for changes of a gate the platform passed, within its block window. */

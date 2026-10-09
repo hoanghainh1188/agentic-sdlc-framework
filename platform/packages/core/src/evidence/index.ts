@@ -5,3 +5,4 @@ export * from './disclosure.js';
 export * from './errors.js';
 export * from './manifest.js';
 export * from './markdown.js';
+export * from './proposal.js';

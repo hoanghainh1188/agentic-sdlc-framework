@@ -204,6 +204,8 @@ export class PilotStack extends Stack {
           releases: { store: this.bucket.store('packs/'), maxItemBytes: RELEASE_MAX_ITEM_BYTES },
         } as unknown as Partial<IntentActivityDeps>;
       },
+      // C13: the api reads L1 proposals back (the same in-memory bucket as the runner's).
+      apiEvidence: { store: this.bucket.store('packs/'), maxItemBytes: RELEASE_MAX_ITEM_BYTES },
     });
     if (!live) {
       this.#routePilot();
