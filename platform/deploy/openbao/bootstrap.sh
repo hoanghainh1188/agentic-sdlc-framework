@@ -123,10 +123,13 @@ for arg in "$@"; do
       [ "$command" = configure ] || fail "unknown option: $arg"
       keep_token=yes
       ;;
-    # Test hook only: lets the live test keep the printed secrets in memory. Accepted only when
-    # SDLC_OPENBAO_TEST=1; never documented in --help.
+    # Lets a caller keep the printed secrets in memory: the live tests (SDLC_OPENBAO_TEST=1) and
+    # `pnpm trial:up` (SDLC_OPENBAO_THROWAWAY=1, throw-away keys of a trial stack on a developer
+    # machine, D-08 V02). Never with NODE_ENV=production; never documented in --help.
     --stdout-not-tty)
-      [ "${SDLC_OPENBAO_TEST:-}" = 1 ] || fail "unknown option: $arg"
+      [ "${NODE_ENV:-}" != production ] || fail "unknown option: $arg"
+      [ "${SDLC_OPENBAO_TEST:-}" = 1 ] || [ "${SDLC_OPENBAO_THROWAWAY:-}" = 1 ] ||
+        fail "unknown option: $arg"
       allow_non_tty=yes
       ;;
     *) fail "unknown option: $arg" ;;
@@ -146,6 +149,15 @@ esac
 
 env_file="${SDLC_ENV_FILE:-$deploy_dir/.env}"
 [ -f "$env_file" ] || fail "$env_file not found; run scripts/init-env.sh first"
+# The trial's switch (D-08 V02): `init` only, and only on a trial stack's own env file, so it can
+# never send a real deployment's key shares to a pipe or a log.
+if [ "$allow_non_tty" = yes ] && [ "${SDLC_OPENBAO_TEST:-}" != 1 ]; then
+  [ "$command" = init ] || fail "unknown option: --stdout-not-tty"
+  case "$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' "$env_file" | tail -n 1)" in
+    sdlc-trial* | sdlctrialit*) ;;
+    *) fail "--stdout-not-tty is for the throw-away keys of a trial stack only (pnpm trial:up)" ;;
+  esac
+fi
 command -v docker >/dev/null 2>&1 || fail "docker is required"
 
 compose() { docker compose -f "$deploy_dir/docker-compose.yml" --env-file "$env_file" "$@"; }

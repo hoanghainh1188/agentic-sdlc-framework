@@ -44,6 +44,9 @@ importers:
       '@sdlc/api-schemas':
         specifier: workspace:*
         version: link:platform/packages/api-schemas
+      '@sdlc/cli':
+        specifier: workspace:*
+        version: link:platform/apps/cli
       '@sdlc/config':
         specifier: workspace:*
         version: link:platform/packages/config

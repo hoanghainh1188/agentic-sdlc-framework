@@ -59,7 +59,7 @@ describe('message catalog', () => {
   );
 
   it('has no unused keys: every key appears in platform code', () => {
-    const code = ['platform/packages', 'platform/apps']
+    const code = ['platform/packages', 'platform/apps', 'platform/deploy/trial/src']
       .flatMap((dir) => sourceFiles(path.join(root, dir)))
       .filter(
         (file) => !file.includes(`${path.sep}dist${path.sep}`) && !file.includes('node_modules'),

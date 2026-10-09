@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "pnpm trial:up and trial:down (D-08 V02). Not a workspace package: built by tsc -b from the root tsconfig."
+}

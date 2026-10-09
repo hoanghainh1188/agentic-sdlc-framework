@@ -276,6 +276,15 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(job('ci-ok').needs).toContain('fresh-deploy');
   });
 
+  it('V02: the trial set-up job has the same trigger as the fresh deployment, and cleans up', () => {
+    expect(job('trial-up').needs).toEqual(['scan', 'checks']);
+    expect(job('trial-up').if).toBe("needs.scan.outputs.run_fresh_deploy == 'true'");
+    const steps = job('trial-up').steps;
+    expect(steps.map((s) => s.run ?? '')).toContain('pnpm test:trial-up');
+    expect(steps.at(-1)).toMatchObject({ if: 'always()' });
+    expect(job('ci-ok').needs).toContain('trial-up');
+  });
+
   it('heavy jobs run on the weekly schedule and on demand, never on the daily run or a draft (ADR-M25 §2.9)', () => {
     const scan = runText('scan');
     expect(scan).toMatch(/workflow_dispatch \]; then\s*all=true/);

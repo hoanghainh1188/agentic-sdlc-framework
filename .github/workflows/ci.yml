@@ -464,6 +464,33 @@ jobs:
             docker compose -p "$p" down --volumes --remove-orphans || true
           done
 
+  trial-up:
+    # V02 (D-08 V02 AC5): `pnpm trial:up`, the same README steps for the community trial, on a
+    # throw-away Compose project to the first intent at G1, then `pnpm trial:down --wipe`. Same
+    # trigger as fresh-deploy (weekly and on demand). Throw-away keys only, never printed.
+    name: trial set-up (pnpm trial:up)
+    needs: [scan, checks]
+    if: needs.scan.outputs.run_fresh_deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (reads packageManager)
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:trial-up
+      - name: Stop and remove every throw-away Compose project
+        if: always()
+        run: |
+          for p in $(docker compose ls -a -q | grep '^sdlctrialit' || true); do
+            docker compose -p "$p" down --volumes --remove-orphans || true
+          done
+
   db:
     # Task A06: migrations and tenant isolation on a throw-away PostgreSQL (same image and init
     # script as Compose). Runs on every PR: DB code changes outside platform/deploy/ too.
@@ -498,7 +525,7 @@ jobs:
 
   ci-ok:
     name: ci-ok
-    needs: [scan, checks, compose, sandbox-image, fresh-deploy, db]
+    needs: [scan, checks, compose, sandbox-image, fresh-deploy, trial-up, db]
     # The summary for pull requests (the future required check). Scheduled runs need no summary:
     # a failed job there already marks the run red.
     if: ${{ always() && github.event_name != 'schedule' }}
