@@ -1,0 +1,21 @@
+{
+  "url": "https://github.com/hoanghainh1188/agentic-sdlc-framework",
+  "description": "Agentic SDLC Framework platform (D-08 V03). Polls GitHub; no webhook.",
+  "public": false,
+  "hook_attributes": {
+    "url": "https://example.invalid/sdlc-webhook-off",
+    "active": false
+  },
+  "default_events": [],
+  "default_permissions": {
+    "contents": "write",
+    "issues": "write",
+    "pull_requests": "write",
+    "security_events": "read",
+    "checks": "read",
+    "statuses": "read",
+    "metadata": "read"
+  },
+  "request_oauth_on_install": false,
+  "setup_on_update": false
+}

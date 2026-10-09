@@ -21,6 +21,7 @@
     { "path": "platform/apps/runner" },
     { "path": "platform/apps/cli" },
     { "path": "platform/apps/dashboard" },
-    { "path": "platform/deploy/trial" }
+    { "path": "platform/deploy/trial" },
+    { "path": "platform/deploy/github-app" }
   ]
 }

@@ -25,6 +25,7 @@ import { EXIT, type CliContext } from './context.js';
 import { clean } from './output.js';
 
 export { EXIT, processApiIo, processContext, type ApiIo, type CliContext } from './context.js';
+export { InputAbortedError, readHiddenLine } from './credentials/prompt.js';
 
 /** User commands: through the API, with the login of `sdlc login` (task B04, ADR-M36). */
 const USER_COMMANDS: Readonly<

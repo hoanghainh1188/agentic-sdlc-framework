@@ -46,7 +46,7 @@ Best: two people. If you are alone, you may use a second GitHub account for Pers
 ### 3.2. The platform
 
 1. Clone this repository and check out the release: `git checkout v0.1.0` (or later). Then `corepack enable` and `pnpm install`.
-2. Create **your own GitHub App** and install it on your fork only: [Create the GitHub App](platform/deploy/README.md#create-the-github-app-operator). Keep its private key in a file outside every repository, readable only by you (`chmod 600 <file>`).
+2. Create **your own GitHub App** and install it on your fork only. In a terminal, run `pnpm github-app:create --out ~/secrets/sdlc-trial-app.private-key.pem`, open the local page it prints, press the button and confirm on GitHub; it saves the private key (mode 600) and prints the client ID and the install link ([Create the GitHub App](platform/deploy/README.md#create-the-github-app-operator), option A). By hand instead: option B there. Keep the private key in a file outside every repository, readable only by you (`chmod 600 <file>`).
 3. Clone **your fork** somewhere on the machine (the agent's instructions are read from `AGENTS.md` on its `main` branch).
 4. Choose a model (section 4). For the local model: `ollama pull gpt-oss:20b` first. For an API model: put the key alone in a file, `chmod 600`.
 5. Copy [`platform/deploy/trial/trial-settings.example.yaml`](platform/deploy/trial/trial-settings.example.yaml) to a place **outside the repository**, and fill it in: your fork and its clone, the App's client ID and key file, the model, and Person A and Person B (e-mail, GitHub login and numeric ID, and a config folder each).

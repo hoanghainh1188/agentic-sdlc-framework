@@ -10,8 +10,11 @@ export class InputAbortedError extends Error {
   }
 }
 
-/** Reads one line from the terminal in raw mode, without echo. Ctrl-C or Ctrl-D aborts. */
-export function readHiddenLine(prompt: string): Promise<string> {
+/**
+ * Reads one line from the terminal in raw mode, without echo. Ctrl-C or Ctrl-D aborts. A `signal`
+ * ends the prompt early (it rejects with `InputAbortedError`) and gives the terminal its echo back.
+ */
+export function readHiddenLine(prompt: string, signal?: AbortSignal): Promise<string> {
   const stdin = process.stdin;
   return new Promise((resolve, reject) => {
     let value = '';
@@ -26,6 +29,7 @@ export function readHiddenLine(prompt: string): Promise<string> {
       stdin.removeListener('error', abort);
       process.removeListener('SIGTERM', abort);
       process.removeListener('SIGHUP', abort);
+      signal?.removeEventListener('abort', abort);
       // Always give the terminal back its echo, whatever ended the prompt.
       if (stdin.isTTY) stdin.setRawMode(false);
       stdin.pause();
@@ -48,6 +52,8 @@ export function readHiddenLine(prompt: string): Promise<string> {
         if (value.length > MAX_SECRET_INPUT) return abort();
       }
     };
+    if (signal?.aborted) return reject(new InputAbortedError());
+    signal?.addEventListener('abort', abort, { once: true });
     process.stderr.write(prompt);
     stdin.on('end', abort);
     stdin.on('error', abort);
