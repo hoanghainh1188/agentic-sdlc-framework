@@ -78,7 +78,7 @@
 | **Plan file** ◆ | The plan of one intent as a YAML file, `.sdlc/plans/<intent code>.yaml` (template T13), on the default branch. It lists the tasks, the files each may change (`allowed_paths`), the tools and the change flags | 計画ファイル |
 | **Platform** | Our self-hosted software that enforces the handbook's gates, budgets and records | プラットフォーム |
 | **PQC (production-qualified change)** | A change that passed all gates, needed no major rework, and caused no problem during the observation window (Chapter 8) | 本番適格変更 |
-| **Producer** ◆ | Anyone who produced a change: the intent's creator, the plan's submitter, the person who allowed a run, the authors of its commits, and the agent. A producer never approves that change at G7 or G8 | 作成者 |
+| **Producer** ◆ | Anyone who produced a change: the intent's creator, the plan's submitter, the person who allowed a run, the authors of its commits, and the agent. A producer never approves that change at G7 or G8 (the commit authors count at G7 only; the platform's list: [Chapter 15 §15.10.1](../02-playbook/ch15-p5-release.md#producers)) | 作成者 |
 | **Project admin** ◆ | A person with the project role `admin`: manages that project's roles and configuration (Chapter 19 §19.8d). Design document D-02 §3 calls this role "platform admin" | プロジェクト管理者 |
 | **Project AI record** ◆ | The project's record of the client's consent to AI use: whether AI is allowed, which data classes, the production-logs flag, the disclosure format (template T7). Checked at G1 and G4 | プロジェクトAI利用記録 |
 | **Prompt** | An instruction given to an AI model for one task or turn. Different from intent | プロンプト |
@@ -121,4 +121,4 @@
 |---|---|---|---|
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content: about 60 terms with Japanese reference terms |
-| 0.2 | 2026-10-09 | Claude (draft), awaiting approval | Docs review PR B: 30 new entries for the platform's words (◆); Evidence Pack and Run Contract capitalised; intent is the unit of one change; gate short names; model token vs API token |
+| 0.2 | 2026-10-09 | Claude (draft), awaiting approval | Docs review PR B: 30 new entries for the platform's words (◆); Evidence Pack and Run Contract capitalised; intent is the unit of one change; gate short names; model token vs API token; docs review PR C: **Producer** links to the platform's list (commit authors at G7 only) |

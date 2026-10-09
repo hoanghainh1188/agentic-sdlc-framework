@@ -78,7 +78,7 @@ INT-2026-0007: spec version 1 linked: docs/specs/T01-product-list-japanese-label
 
 The SHA-256 is a fingerprint of the file's content: any change to the file changes it.
 
-The risk is Low, so G2 is **HOTL**: the platform passes it, because a spec is linked and it has acceptance criteria (five, under its `受入基準 / Acceptance criteria` heading), and tells the team how long they can still stop it, the **block window** (4 working hours by default):
+The risk is Low, so G2 is **HOTL**: the platform passes it, because a spec is linked and it has acceptance criteria (five, under its `受入基準 / Acceptance criteria` heading; the rule: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria)), and tells the team how long they can still stop it, the **block window** (4 working hours by default):
 
 > **INT-2026-0007**: the platform passed **G2** (HOTL): its conditions hold. The intent now waits at **G3** (Plan). @an: until **2026-10-08 15:00** you can still block G2 with `/reject G2 <reason>` or `/request-changes G2 <reason>`.
 
@@ -187,7 +187,7 @@ The feature is merged, and the record of how it was made is sealed. `sdlc eviden
 
 ## What the dashboard shows along the way
 
-At any moment, anyone on the team opens the dashboard (`/dashboard/`, read only) and sees where each intent waits, for how long, and who must act:
+At any moment, anyone on the team opens the dashboard (read only, [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) and sees where each intent waits, for how long, and who must act:
 
 ![The dashboard: intents by gate](docs-images/dashboard-board.png)
 
@@ -202,7 +202,7 @@ Opening an intent shows who decides its current gate, what holds it, every decis
 | | An (Person A) | Binh (Person B) | The platform | The agent |
 |---|---|---|---|---|
 | G1 | Created the intent, `/approve G1` | | Checked the AI record | |
-| G2 | Wrote and linked the spec | Could block it | Passed it (HOTL) | |
+| G2 | Wrote and linked the spec; could block it | | Passed it (HOTL) | |
 | G3 | Wrote and submitted the plan | Could block it | Passed it (HOTL) | |
 | G4 | | | Checked the agent, budget, data; started the run | |
 | Run | | | Sandbox, caps, stop on a loop | Wrote the code and the test |
@@ -211,7 +211,7 @@ Opening an intent shows who decides its current gate, what holds it, every decis
 | G7 | | **Reviewed and merged** | Counted only valid reviews | Answered a request for changes, if any |
 | G8 | | **Approved the release** | Built and sealed the Evidence Pack | |
 
-An spent the time on **what** to build (the spec and the plan); Binh on **checking** it. Nobody wrote the code by hand, and nobody approved their own work.
+An spent the time on **what** to build (the spec and the plan); Binh on **checking** it. Nobody wrote the code by hand, and nobody approved their own work. Who decides each gate by default: [user guide §1](USER-GUIDE.md#who-decides).
 
 ## Try it yourself
 

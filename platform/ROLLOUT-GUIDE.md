@@ -2,7 +2,7 @@
 
 For **whoever leads the rollout** (usually the tech lead, with leadership and the platform operator), and for **everyone on the team** who wants to know where to start. It puts the existing guides in order: what to read, who does what, in which order, and how to check each step. It does not replace them.
 
-Version 0.3, 2026-10-09 (the rollout "phases" are now "steps", because the codes table keeps "phase" for P1–P6; words as in the glossary). Version 0.2, 2026-10-08 (step 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
+Version 0.4, 2026-10-09 (docs review PR C: the producers, the conflicting roles, who decides and the GitHub App permissions link to their sources; the conflicting roles include Person B and the second approver). Version 0.3, 2026-10-09 (the rollout "phases" are now "steps", because the codes table keeps "phase" for P1–P6; words as in the glossary). Version 0.2, 2026-10-08 (step 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
 
 ---
 
@@ -19,14 +19,14 @@ Version 0.3, 2026-10-09 (the rollout "phases" are now "steps", because the codes
 | **Second approver** | `platform/USER-GUIDE.md` §3, steps 7–8 | Log in; you are asked only for flagged changes and Critical risk | Most of the rest |
 | **Developer of the platform** | `platform/GETTING-STARTED.md`, `CLAUDE.md` | — | This guide |
 
-The dashboard (read only; `http://127.0.0.1:8090/dashboard/` on the platform machine, handbook Ch.19 §19.8e; other machines cannot reach it yet) shows everyone what waits for whom; decisions are made in GitHub comments, GitHub reviews and the `sdlc` command (USER-GUIDE).
+The dashboard (read only, on the platform machine only for now: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) shows everyone what waits for whom; decisions are made in GitHub comments, GitHub reviews and the `sdlc` command (USER-GUIDE).
 
 ## 2. The rules to know before you start
 
 These are enforced by the platform; plan the team around them.
 
 - **Person A and Person B are two different people**, each with their own GitHub account. One person cannot hold both roles on a project (rule M21). A team of one cannot use the platform.
-- **The producer of a change never approves it**: whoever created the intent, submitted the plan, allowed the run or authored a commit cannot approve G7 or G8 for it.
+- **The producer of a change never approves it** at G7 or G8; the creator still approves G1. Who the producers are: [handbook Ch.15 §15.10.1](../handbook/02-playbook/ch15-p5-release.md#producers).
 - **Nobody gives a role to themselves.** The first tenant admin comes from the operator; after that, admins set up the others.
 - **The platform never merges and never deploys.** A person merges the pull request on GitHub, after the platform says "ready to merge".
 - **No client data before the client agrees in writing** (project AI record, handbook Ch.2). The first pilot uses no client data (handbook Ch.9 §9.7).
@@ -37,8 +37,8 @@ These are enforced by the platform; plan the team around them.
 Roles are given per project, and any number of people can hold each role.
 
 - **Creating work.** Everyone with `person_a` creates intents, links specs and submits plans (project configuration `access.intent_create_roles`, `spec_link_roles`, `plan_submit_roles`; by default `person_a`, and `pm_brse` may also link specs). To let the PM / BrSE create intents too, add `pm_brse` to `intent_create_roles`; `viewer` never can (rule M16).
-- **Reviewing.** Everyone with `person_b` can decide G3, G7 and G8. When a gate needs one approval, the first valid one counts: the notice on the issue names every holder of the role, so one reviewer's absence does not block the work. **Give `person_b` to at least two people** on each project.
-- **More than one approval.** G7 already needs Person B **and** the second approver for flagged changes (migration, payment, personal data, production infrastructure, breaking change, safety function) and at Critical risk; so does G8 at Critical risk. A project can ask for this at more gates or tiers: each cell of the gate × risk matrix has `approvals`, the approvals from different people. A cell never needs more approvals than the roles it lists (rule M12), and when it needs as many as it lists, each role approves once. So two approvals means two roles, for example Person B and the second approver on every High-risk pull request:
+- **Reviewing.** Everyone with `person_b` can decide Person B's gates: G3, G7, G8, and G2 and G6 at High risk and above ([user guide §1](USER-GUIDE.md#who-decides)). When a gate needs one approval, the first valid one counts: the notice on the issue names every holder of the role, so one reviewer's absence does not block the work. **Give `person_b` to at least two people** on each project.
+- **More than one approval.** By default G7 needs Person B **and** the second approver for flagged changes and at Critical risk, and G8 at Critical risk ([user guide §1](USER-GUIDE.md#who-decides)). A project can ask for this at more gates or tiers: each cell of the gate × risk matrix has `approvals`, the approvals from different people. A cell never needs more approvals than the roles it lists (rule M12), and when it needs as many as it lists, each role approves once. So two approvals means two roles, for example Person B and the second approver on every High-risk pull request:
 
   ```yaml
   oversight:
@@ -49,7 +49,7 @@ Roles are given per project, and any number of people can hold each role.
 
   Two approvals by two Person B holders, without a second role, are not possible. The same person never counts twice, and a producer never counts. Set GitHub's branch protection to the same number of approvals.
 - **On GitHub,** anyone with access may comment on and review a pull request. G7 counts only the reviews of people who are linked, hold the gate's role, are not producers of the intent, and reviewed the commit the platform pushed. One request for changes from such a person sends the intent back for a new run, even after other approvals.
-- **Who may not review what.** By default one person never holds both `person_a` and `person_b` on the same project (`access.conflicting_roles`, rule M21), so the people who create work and the people who review it are two groups. A person can be Person A on one project and Person B on another. Whatever the roles, the producers of an intent (its creator, the plan's submitter, whoever allowed its runs, the authors of its commits) never approve its G7 or G8.
+- **Who may not review what.** Some pairs of roles are never held by one person on the same project, Person A and Person B always (rule M21); the list and its defaults: [handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#conflicting-roles). So the people who create work and the people who review it are two groups. A person can be Person A on one project and Person B on another. Whatever the roles, the [producers](../handbook/02-playbook/ch15-p5-release.md#producers) of an intent never approve its G7 or G8.
 
 Example: a project team of six.
 
@@ -131,7 +131,7 @@ my-app/
 | 1.4 | `AGENTS.md` at the repository root: build and test commands, conventions | The agent reads it; the platform pins its hash in the agent register | The file exists on `main` |
 | 1.5 | A folder for specs (for example `docs/specs/`), one Markdown file per change (at most 256 KiB) with **acceptance criteria** | G2 passes only when the linked spec has at least one criterion | One example spec merged |
 | 1.6 | The pull request template with the AI disclosure (template T2) and `CODEOWNERS` | Reviewers see who and what wrote the change | A test pull request shows the template |
-| 1.7 | Install the platform's GitHub App on this repository only (Contents and Pull requests read and write; Issues read and write; Checks, Commit statuses, Code scanning alerts and Metadata read) | Every platform action on GitHub goes through it | The operator sees the installation |
+| 1.7 | Install the platform's GitHub App on this repository only (its permissions: [deploy/README](deploy/README.md#github-app-permissions)) | Every platform action on GitHub goes through it | The operator sees the installation |
 | 1.8 | Check that the project builds and tests in the sandbox image (`node24` today) | The agent runs `AGENTS.md`'s commands in it | Step 2.6 |
 
 **Limits today:**

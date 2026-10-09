@@ -125,7 +125,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 **Who may decide.**
 
 - Your GitHub account must be linked to your platform user. The link uses the numeric account ID, so renaming your GitHub login does not break it. Ask a tenant admin to link it.
-- You need the gate's role on the project, for example Person A for G1 and Person B for G3 (codes table §4). The producer of a change never approves it.
+- You need the gate's role on the project, for example Person A for G1 and Person B for G3 (codes table §4). The producer of a change never approves it at G7 or G8 ([Chapter 15 §15.10.1](ch15-p5-release.md#producers)).
 - Bots and automation accounts never decide.
 - The intent must be linked to the issue or pull request. One issue (or pull request) has at most one open intent; the platform refuses a second one until the first is closed.
 - **You can decide only the gate the intent is waiting at.** The last status comment shows it. A command for another gate gets a reply, and nothing is recorded. One exception: a gate the platform passed on HOTL can still be rejected or sent back during its block window (below).
@@ -153,7 +153,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 **HOTL gates (Low risk: G2 and G3 by default).** The project setting `oversight.matrix` says which gates are HOTL at which risk tier.
 
 - The platform **passes** the gate by itself when its conditions hold:
-  - G2: a spec is linked to the intent and has at least one acceptance criterion (without one, G2 waits at every risk tier and a person's `/approve G2` is refused);
+  - G2: a spec with at least one acceptance criterion is linked ([§19.8c](#g2-acceptance-criteria));
   - G3: a plan with at least one planned file is submitted, and no change flag forces HITL (for example `migration`; Chapter 12).
 - It posts a status comment that mentions the people of the gate (G2: Person A; G3: Person B) and says **until when you can block it**. This is the **block window**: 4 working hours by default (project setting `oversight.hotl_block_window`, counted on the project's working calendar).
 - **To block a passed gate**, write within the window `/request-changes G2 <reason>` or `/reject G2 <reason>`, even though the intent already waits at a later gate. You need the gate's role.
@@ -166,10 +166,10 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 
 **Deadlines of the gates (FR-12).**
 
-- A gate that waits for a person has a deadline: 1 working day by default (project setting `oversight.hitl_gate_deadline`). The clock starts when the intent enters the gate, and starts again at each request for changes. It also runs while the gate waits for its spec or plan.
-- When the deadline passes, the platform raises **one escalation** (Chapter 18 §18.8b): Medium, level Notify by default (project setting `oversight.gate_overdue`). It goes to Person A when Person A holds the gate's role (G1, G2), otherwise to Person B (G3).
+- Every gate that waits for a person's decision has a deadline, at any of G1–G8: 1 working day by default (project setting `oversight.hitl_gate_deadline`). The clock starts when the intent enters the gate, and starts again at each request for changes. It also runs while the gate waits for its spec or plan.
+- When the deadline passes, the platform raises **one escalation** (Chapter 18 §18.8b): Medium, level Notify by default (project setting `oversight.gate_overdue`). It goes to Person A when Person A holds the gate's role (route `intent`, for example G1, G2 below High risk, G4 at High risk), otherwise to Person B (route `technical`, for example G3, G6, G7, G8).
 - When the gate is decided (approved, rejected, changes requested, passed), the platform closes that escalation itself. You do not need to `/ack` or `/decide` it.
-- The platform records how long each gate waited for the person who decided (`waited_seconds`). The report comes with task E06.
+- The platform records how long each gate waited for the person who decided (`waited_seconds`). The report: `sdlc metrics gates` (§19.8c, "Reading the gate waiting times").
 
 **Scopes.** An approval of G1, G2 or G3 has no scope. The API refuses an approval that sends one (`scope_not_allowed`).
 
@@ -244,7 +244,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **If someone edits the spec on the default branch after G2**, the platform notices it at the next step: it links the new version, takes the intent back to G2 and posts a comment (`spec_changed`). Approvals of the old spec no longer count. At Low risk G2 is HOTL, so the platform may pass the new spec again, with its block window; at other tiers a person approves it again.
 - If the file is removed, renamed or cannot be read, the intent goes back to G2 and waits (`spec_unavailable`) until you restore it or link another spec.
 - If GitHub cannot be reached, the intent waits; it never passes a gate without the check.
-- **G2 needs acceptance criteria** (task S01, `design/ADR-M61-spec-structure.md`). When the platform reads the spec, it counts its acceptance criteria and shows the count (`sdlc spec link`, `sdlc spec list`). It keeps the count, never the text. G2 passes only with at least one criterion, at every risk tier. Otherwise the platform records `fail spec_unclear`, posts a comment, and the intent waits at G2 (`spec_unclear`); nobody can approve G2 until the spec has criteria. Person A may still reject G2 or request changes.
+- <a id="g2-acceptance-criteria"></a>**G2 needs acceptance criteria** (task S01, `design/ADR-M61-spec-structure.md`). This is the one description of the G2 condition; other documents link here. When the platform reads the spec, it counts its acceptance criteria and shows the count (`sdlc spec link`, `sdlc spec list`). It keeps the count, never the text. G2 passes only when a spec is linked and has at least one criterion, at every risk tier and in every oversight mode: the platform's HOTL pass at Low risk needs it too. Otherwise the platform records `fail spec_unclear`, posts a comment, and the intent waits at G2 (`spec_unclear`); nobody can approve G2 until the spec has criteria. Person A may still reject G2 or request changes.
 - Name the tool with `--tool` so the platform reads the right structure:
 
   | `--tool` | Where the platform finds the criteria | One criterion |
@@ -319,14 +319,14 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - The report never shows who decided: it is about the gates, not about people.
 - `--gate`, `--mode` (the oversight mode of the decision) and `--risk` (the intent's risk tier) narrow the rows. At most 500 rows are shown.
 
-**When a command fails.** The message says why. The exit code tells scripts what happened:
+<a id="exit-codes"></a>**When a command fails.** The message says why. The exit code tells scripts what happened (this is the one list; other documents link here):
 
 | Exit code | Meaning |
 |---|---|
 | 0 | Done |
 | 1 | The platform refused (no role, not found, conflict, rule broken, too many requests) |
-| 2 | Wrong command or options, not logged in, unsafe saved login |
-| 3 | The platform could not be reached or answered something unexpected |
+| 2 | Wrong command or options, not logged in, unsafe saved login, or a request the API refuses as malformed (HTTP 400, for example a bad time range) |
+| 3 | The platform could not be reached, failed (HTTP 5xx) or answered something unexpected |
 | 4 | Your API token is missing, expired or revoked: get a new one and run `sdlc login` |
 
 ## 19.8d. Using the platform: setting up a team (admins)
@@ -344,7 +344,7 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 **The rules the platform enforces.**
 
 - **Nobody gives a role to themselves**, and nobody disables themselves. Ask another admin. A team with only one admin asks the platform operator, who does it on the server (`sdlc ops role grant`).
-- **Person A and Person B are never the same person on a project.** Some other pairs of roles are kept apart too; the project configuration lists them (`access.conflicting_roles`, by default also Person B and the second approver). A role that would break a pair is refused.
+- <a id="conflicting-roles"></a>**Person A and Person B are never the same person on a project.** Some other pairs of roles are kept apart too; the project configuration lists them (`access.conflicting_roles`). The defaults are two pairs: Person A and Person B (rule M21: a project can never remove it), and Person B and the second approver. A project may add or remove the other pairs. A role that would break a pair is refused.
 - **The tenant always keeps one tenant admin.** The last one cannot be removed or disabled: make someone else a tenant admin first.
 - A role is never deleted: it is revoked, and the history stays. A GitHub account is unlinked, not deleted.
 - A GitHub account is linked by its **numeric account ID**, never by its login, because a login can change. Find the ID with `gh api users/<login> --jq .id`.
@@ -466,3 +466,4 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.20 | 2026-10-08 | Claude (task S01) | §19.8c: G2 needs acceptance criteria; the spec structures by tool (ADR-M61) |
 | 0.21 | 2026-10-08 | Claude (task S02) | §19.8c: `sdlc plan draft` from a Spec Kit `tasks.md` or a BMAD story file (ADR-M62) |
 | 0.22 | 2026-10-08 | Claude (docs fix PR A) | §19.8b: a HOTL G2 also needs an acceptance criterion; §19.8d: `sdlc admin identity list --user <id or email>` |
+| 0.23 | 2026-10-09 | Claude (docs review PR C) | One source per topic: §19.8c holds the G2 condition (acceptance criteria) and the CLI exit codes (exit code 2 also for an HTTP 400); §19.8d the conflicting roles and their defaults; §19.8b links to them and to Ch.15 for producers; the overdue escalation at every gate that waits for a person (route `intent` or `technical`); the gate times report is `sdlc metrics gates` |

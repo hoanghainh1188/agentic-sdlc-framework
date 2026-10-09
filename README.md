@@ -59,7 +59,7 @@ A word you do not know? The [glossary](handbook/00-introduction/02-glossary.md) 
 
 **What the platform never does:**
 
-- let the producer of a change approve it at G7 or G8 (the person who created the intent, submitted the plan, allowed a run or authored a commit, and the agent itself); the creator still approves G1;
+- let the producer of a change approve it at review (G7) or release (G8); the creator still approves G1, their own request ([who the producers are](handbook/02-playbook/ch15-p5-release.md#producers));
 - merge a pull request or deploy to production: people do;
 - give an agent a real model key, access to secrets, or a way to push to the main branch;
 - change or delete an audit record.

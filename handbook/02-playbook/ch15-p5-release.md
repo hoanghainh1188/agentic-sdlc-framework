@@ -167,9 +167,19 @@ When CI passed at G6 (Chapter 14 §14.10.2), the intent waits at **G7**. The pla
 
 - Only a review of the **latest commit the platform pushed** counts. A review of an older commit never counts. A new run (after a request for changes) pushes a new commit, and earlier approvals no longer count (Principle 3).
 - The reviewer must be linked to a platform user by their GitHub account (Chapter 19) and hold the gate's role: Person B; for dual approval also the second approver (two different people).
-- **Never counted:** the author of the intent, the person who allowed a run (G4 at High risk), the people who submitted the plan, anyone who authored a commit of the pull request, and bots.
+- **Never counted:** the producers of the change (below) and bots.
 - A dismissed review, or a later review of the same person, replaces the earlier decision.
 - A review by a linked user that cannot count (no role, a producer) gets one reply on the pull request with the reason. Bots and accounts not linked to a platform user get no reply.
+
+<a id="producers"></a>**Producers.** The producer of a change never approves it (FR-11). This is the one list of producers for the platform; other documents link here.
+
+| Gate | Producers: they never approve or merge, and never request changes |
+|---|---|
+| G7 | The person who created the intent; the person who allowed each of its runs (`triggered_by`: the person who approved G4, which is HITL at High risk; at Low and Medium risk G4 is a policy check and no person allowed the run); the people who submitted its plan files; every platform user who authored a commit of the pull request (mapped by numeric GitHub account ID). The agent and bots never approve anything |
+| G8 | The same people **without** the commit authors: the creator, the people who allowed its runs and the plan submitters (D-03 §6, G8 "Who") |
+
+- The creator is a producer only at G7 and G8: they still approve G1, their own request (Person A).
+- At G1–G6 the gate's role decides who may approve; Chapter 19 §19.8b.
 
 **Two approvals** (dual approval, §15.5 Step 2) are needed when the plan G3 approved is flagged `migration`, `payment`, `personal_data`, `prod_infrastructure`, `breaking_contract` or `safety_function`, and at Critical risk.
 
@@ -288,7 +298,7 @@ After a person merged the approved pull request (§15.10.1), the intent waits at
 | Reject | `/reject G8 <reason>`, or `sdlc gate reject G8 INT-… --reason-code …` | The intent is closed as `rejected`; the pack is not sealed |
 | Request changes | `/request-changes G8 <reason>` | The intent stays at G8. The change is already merged: **a fix needs a new intent**. Approvals given before the request no longer count |
 
-- **Who:** Person B; at **Critical** risk Person B **and** the second approver (two different people). The author of the intent, the people who allowed its runs and the plan submitters never decide G8 (the producer never approves).
+- **Who:** Person B; at **Critical** risk Person B **and** the second approver (two different people). The producers of the change never decide G8 ([§15.10.1, Producers](#producers): the commit authors are not G8 producers).
 - **Approvals are bound to the evidence.** If anything recorded before G8 changes (a new evidence file, an escalation, a CI result, the cost, the project AI record's disclosure format or link), the pack gets a new release SHA-256 and earlier G8 approvals no longer count: approve again. Another person's G8 approval does not cancel yours.
 - **The client's own disclosure format:** the G8 comment says so and links the project AI record. **Approving G8 confirms that the client's note is ready**: the PM / BrSE writes it from the AI record before Person B approves.
 - **No project AI record:** the pack has no disclosure note and G8 cannot pass. The platform posts **G8 cannot pass**; save the record (`sdlc ai-record set`, Chapter 2), and G8 checks again.
@@ -341,3 +351,4 @@ After a person merged the approved pull request (§15.10.1), the intent waits at
 | 0.5 | 2026-10-04 | Claude (task E02) | §15.10.2: the Evidence Pack (contents, versions, who, the disclosure note, failed hash checks, export); ADR-M48 |
 | 0.6 | 2026-10-04 | Claude (task E03) | §15.10.3: gate G8 (the release pack, who decides, approvals bound to the release SHA-256, the client's own disclosure format, no AI record, a failed evidence check, what is recorded); ADR-M49 |
 | 0.7 | 2026-10-04 | Claude (task E05, PR 1) | §15.10.2: retention of the pack files and evidence holds (ADR-M51) |
+| 0.8 | 2026-10-09 | Claude (docs review PR C) | §15.10.1: "Producers", the one list of producers at G7 and G8 (commit authors at G7 only, as D-03 §6 and the code); other documents link here |

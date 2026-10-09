@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, backup, restore)
 
-> Status: **v0.29. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.2 (rekey) give the commands; the recovery drill in task A10 tests them.
+> Status: **v0.30. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.2 (rekey) give the commands; the recovery drill in task A10 tests them.
 > Readers: key holders, infrastructure operator, platform admin.
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -53,11 +53,22 @@ Use this to learn the procedure and to test changes. The keys are worthless: del
 
 ```bash
 pnpm compose:env               # once
-pnpm compose:core
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs
 pnpm openbao:bootstrap init    # prints 3 shares and a root token ONCE
 pnpm openbao:bootstrap unseal  # enter 2 of the shares (hidden input)
 pnpm openbao:bootstrap configure   # enter the root token; it is revoked at the end
+pnpm openbao:bootstrap status  # says unsealed
 ```
+
+These are the first commands of the whole set-up, in the same order as on the server (`platform/deploy/README.md` "Fresh deployment" step 3; on a development machine `platform/GETTING-STARTED.md` Step 11b). On a development machine `pnpm compose:core` also works instead of the `docker compose … up` line, because LiteLLM uses the key from `.env` there.
+
+Notes for a development machine:
+
+- `init` and `root-token` print key shares and tokens to the terminal only: they refuse to run when their output is redirected or piped, and never write them to a file.
+- `configure` is safe to run again. It needs a root token: `pnpm openbao:bootstrap root-token` makes one from two shares (section 5).
+- The OpenBao audit log is `/openbao/logs/audit.log` on the volume `openbao-audit`.
+- A stack started before task A03 has no fixed Compose subnet, and one started before task A11 has no fixed gateway (`SDLC_NETWORK_SUBNET`, default `172.30.0.0/24`, and `SDLC_NETWORK_GATEWAY`, default `172.30.0.1`; why: section 5b "Issuing a secret ID"): run `pnpm compose:down`, then `pnpm compose:core` once, then `configure` again.
+- A `.env` created before task A11 still has `OPENBAO_HOST_PORT`: delete that line (it is not used), and add `SDLC_NETWORK_GATEWAY=172.30.0.1` (or the `.1` address of your own subnet).
 
 To start again from zero: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core down -v` (this deletes **all** data of the stack).
 
@@ -184,8 +195,7 @@ The GitHub App key is read by `api` and by the `worker` (it polls GitHub, posts 
 
 Create one GitHub App per installation of the platform (`design/ADR-M23-github-adapter.md` section 2.2):
 
-- Repository permissions: Contents read and write (the runner pushes `agent/INT-…` branches, C08), Pull requests read and write (the platform opens pull requests, C08), Issues read and write, Code scanning alerts read (security findings at G6, C08 PR 2), Checks read, Commit statuses read, Metadata read. Same list as `platform/GETTING-STARTED.md` Step 11. After a change, accept the new permissions on each installation.
-- No organisation or account permissions. Webhook: off (the platform polls). Install it on **selected** repositories only.
+- Permissions, webhook and installation: [platform/deploy/README.md, "The GitHub App's settings"](../../platform/deploy/README.md#github-app-permissions), the one list.
 - Generate a private key. Store it with the App's client ID in `kv/shared/github-app` (fields `client_id` and `private_key`), then delete the downloaded `.pem` file. The admin token is typed at the hidden prompt; the key goes through stdin, never through a command-line argument:
 
 ```bash
@@ -829,3 +839,4 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.30 | 2026-10-09 | Claude Code (docs review PR C) | Section 3.1: the same first commands as the fresh deployment, and the development notes moved from `platform/deploy/README.md` (configure again, audit log path, subnet and gateway of old stacks, `OPENBAO_HOST_PORT`); section 5b: the GitHub App permissions link to `platform/deploy/README.md` |
