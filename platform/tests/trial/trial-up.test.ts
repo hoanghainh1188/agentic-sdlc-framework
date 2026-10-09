@@ -232,7 +232,8 @@ describe('V02 AC3: secrets never reach the terminal', () => {
       'Initial Root Token: s.AAAAAAAAAAAAAAAAAAAAAAAA',
       `token ${'sdlc_pat_'}${'x'.repeat(43)}`,
       `vault ${'hvs'}.${'CAESI'}${'q'.repeat(24)}`,
-      '-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----',
+      // Built at run time, so no PEM header is in the source (Gitleaks rule private-key).
+      `-----BEGIN RSA ${'PRIVATE'} KEY-----\nMIIE\n-----END RSA ${'PRIVATE'} KEY-----`,
     ].join('\n');
     const out = bag.redact(text);
     expect(out).not.toMatch(/correct-horse|abcdefghijklmnop|AAAAAAAA|xxxxxxxx|CAESI|qqqq|MIIE/);

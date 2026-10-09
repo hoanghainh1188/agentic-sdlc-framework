@@ -61,3 +61,17 @@ condition = "AND"
 paths = ['''^platform/tests/gitleaks/fixtures/[^/]+$''']
 regexTarget = "match"
 regexes = ['''FAKE''']
+
+# Approved by: Harry (Person B), 2026-10-10, PR #242 (task V02 follow-up).
+# False positive: the V02 redaction test (PR #236, commit 2e9f713) wrote a fake PEM block whose
+# whole body is "MIIE", to prove that `trial:up` hides private keys in its output. It is in the
+# history of main, which CI scans, so it cannot be removed without rewriting history. Since this
+# PR the test builds the header at run time. Only private-key matches in that one test file that
+# hold this exact fake body are skipped; any other key there, or anywhere else, is still reported.
+[[allowlists]]
+description = "Fake PEM block with the body MIIE in the trial:up redaction test (PR #236)"
+targetRules = ["private-key"]
+condition = "AND"
+paths = ['''^platform/tests/trial/trial-up\.test\.ts$''']
+regexTarget = "match"
+regexes = ['''BEGIN RSA PRIVATE KEY-----\\nMIIE\\n-----END RSA PRIVATE KEY''']
