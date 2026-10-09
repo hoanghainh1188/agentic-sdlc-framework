@@ -32,6 +32,7 @@ MILESTONES = {
     "M-C": "Run + G4–G6",
     "M-D": "G7–G8 + evidence + cost",
     "Pre-M-E": "Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)",
+    "M-E": "The trial, run by the community (QUESTIONS #340)",
     "MVP+1": "Started early: read-only dashboard (QUESTIONS #255)",
 }
 LABELS = {
