@@ -62,7 +62,7 @@ paths = ['''^platform/tests/gitleaks/fixtures/[^/]+$''']
 regexTarget = "match"
 regexes = ['''FAKE''']
 
-# Approved by: Harry (Person B), 2026-10-10, PR (this PR, task V02 follow-up).
+# Approved by: Harry (Person B), 2026-10-10, PR #242 (task V02 follow-up).
 # False positive: the V02 redaction test (PR #236, commit 2e9f713) wrote a fake PEM block whose
 # whole body is "MIIE", to prove that `trial:up` hides private keys in its output. It is in the
 # history of main, which CI scans, so it cannot be removed without rewriting history. Since this
