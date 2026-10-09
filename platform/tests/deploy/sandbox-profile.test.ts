@@ -193,6 +193,8 @@ describe('sdlc-runner service', () => {
       'docker-proxy:/run/docker-proxy',
       'runner-approle:/run/sdlc/approle',
       'runner-work:/var/lib/sdlc-runner/work',
+      // A10 (ADR-M63): the CA that verifies OpenBao's certificate, read-only.
+      'openbao-ca:/run/sdlc/openbao-ca:ro',
     ]);
     expect(runner.depends_on?.['docker-socket-proxy']).toEqual({ condition: 'service_healthy' });
   });

@@ -152,7 +152,8 @@ bao_exec_no_input() { compose exec -T openbao "$@" </dev/null; }
 
 # Prints uninitialised, sealed or unsealed. Fails when the container or API is not reachable.
 state() {
-  out="$(bao_exec_no_input wget -q -O - http://127.0.0.1:8200/v1/sys/seal-status 2>/dev/null)" ||
+  # The key-holder listener 8210: plain, reachable only inside the container (openbao.hcl).
+  out="$(bao_exec_no_input wget -q -O - http://127.0.0.1:8210/v1/sys/seal-status 2>/dev/null)" ||
     fail "OpenBao is not reachable; start it with: pnpm compose:core"
   case "$out" in
     *'"initialized":false'*) echo uninitialised ;;

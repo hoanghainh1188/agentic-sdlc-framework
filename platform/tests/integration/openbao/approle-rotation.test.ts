@@ -16,7 +16,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { deployDir } from '../../deploy/compose';
-import { isolateEnv, openbaoImage } from '../throwaway-compose';
+import { baoClientArgs, isolateEnv, openbaoImage } from '../throwaway-compose';
 
 const enabled = process.env.SDLC_OPENBAO_TEST === '1';
 const PORT_OFFSET = 26000;
@@ -129,8 +129,7 @@ describe.skipIf(!enabled)(
           '-i',
           '--network',
           network,
-          '-e',
-          'BAO_ADDR=http://openbao:8200',
+          ...baoClientArgs(network),
           '--entrypoint',
           'sh',
           image,
@@ -274,8 +273,7 @@ describe.skipIf(!enabled)(
             '-i',
             '--network',
             network,
-            '-e',
-            'BAO_ADDR=http://openbao:8200',
+            ...baoClientArgs(network),
             '--entrypoint',
             'sh',
             image,

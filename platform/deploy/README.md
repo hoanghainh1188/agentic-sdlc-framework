@@ -17,7 +17,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 ## Requirements
 
 - Docker Engine with Docker Compose v2.24 or later.
-- OpenSSL 3.x as `openssl` on the `PATH` (for `init-env.sh` and the TLS tests of `@sdlc/secrets`). On macOS, `/usr/bin/openssl` is LibreSSL, and the TLS tests stop with a message when they find it: install OpenSSL 3 (`brew install openssl@3`) and put it first (`export PATH="$(brew --prefix openssl@3)/bin:$PATH"`).
+- OpenSSL 3 or later as `openssl` on the `PATH` (for `init-env.sh`, OpenBao's TLS certificates and the TLS tests of `@sdlc/secrets`). On macOS, `/usr/bin/openssl` is LibreSSL, and the TLS tests stop with a message when they find it: install OpenSSL 3 (`brew install openssl@3`) and put it first (`export PATH="$(brew --prefix openssl@3)/bin:$PATH"`).
 - Node.js 24 + pnpm 10 (`corepack enable` once). The fresh deployment below needs them (`pnpm install`, `pnpm openbao:bootstrap`, `pnpm db:migrate`, `pnpm sdlc ops …`), and so do the `pnpm` shortcuts and the tests. Only starting and stopping the containers works without them (`init-env.sh`, `up.sh`).
 
 ## Where to run it
@@ -32,7 +32,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 | GPU | Not needed with API models. Only for a self-hosted model on the same machine (D-07 §3) |
 | Sandboxes | 1 by default (`SDLC_RUNNER_MAX_SANDBOXES`); 2 on a larger server |
 | The runner | In its own VM or with rootless Docker, because it controls Docker (ADR-M25 §2.5). Not yet done (A10) |
-| OpenBao | TLS on port 8200 and three named key holders before any real secret or client data (runbook T11 §3.2). Not yet done (A10) |
+| OpenBao | TLS on port 8200 runs everywhere (A10); on the server the certificate comes from the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Three named key holders before any real secret or client data (runbook T11 §3.2): not yet done (A10) |
 | Backups | Off the server, encrypted ([Backup and restore](#backup-and-restore)) |
 
 **Access from other machines: not supported yet.** The API and the dashboard listen on `127.0.0.1:8090` of the server only. TLS and a reverse proxy for team access come later (A10, M-F). Until then, people use the CLI and the dashboard on the server itself; an SSH tunnel to `127.0.0.1:8090` works for one person, but it is not a supported set-up. Comment commands and reviews on GitHub work from anywhere.
@@ -70,7 +70,7 @@ After the first deployment: [Restart after a reboot](#restart-after-a-reboot), [
 
 - The [Requirements](#requirements) above (Docker Compose v2.24+, Node.js 24, pnpm 10 with `corepack enable`, OpenSSL 3).
 - A GitHub App installed on the project's repository only, and its private key in a file outside the repo. The App's settings are below; how to create one, step by step: [Create the GitHub App](#create-the-github-app-operator).
-- On the internal server: the three OpenBao key holders are named and TLS is in place (runbook T11 §3.2, task A10). Until then, use this procedure on a development machine with throw-away keys only.
+- On the internal server: the three OpenBao key holders are named (runbook T11 §3.2, task A10), and OpenBao's certificate is issued with the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Until then, use this procedure on a development machine with throw-away keys only.
 - `pnpm install` and `pnpm build`.
 
 <a id="github-app-permissions"></a>**The GitHub App's settings.** This is the one list of the App's permissions; other documents link here. One App per installation of the platform (`design/ADR-M23-github-adapter.md` §2.2).
@@ -96,7 +96,7 @@ After the first deployment: [Restart after a reboot](#restart-after-a-reboot), [
 pnpm compose:env
 ```
 
-It creates `platform/deploy/.env` with random passwords (mode 600, never overwritten). It also fills `SDLC_DOCKER_GID`, the group ID of the Docker socket: check it on the server (runbook T11 §5g). On the server, leave `LITELLM_MASTER_KEY` and `LITELLM_SALT_KEY` empty (runbook T11 §5d).
+It creates `platform/deploy/.env` with random passwords (mode 600, never overwritten). It also makes a throw-away CA and OpenBao's TLS certificate in `platform/deploy/openbao-tls/` (Git-ignored; the CA key is deleted at once) and sets `SDLC_OPENBAO_TLS_DIR`. On the server, replace them with the company CA's certificate before step 3: `pnpm openbao:tls ca <offline folder>`, then `pnpm openbao:tls server <offline folder>` ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). It also fills `SDLC_DOCKER_GID`, the group ID of the Docker socket: check it on the server (runbook T11 §5g). On the server, leave `LITELLM_MASTER_KEY` and `LITELLM_SALT_KEY` empty (runbook T11 §5d).
 
 ### 3. OpenBao
 
@@ -337,7 +337,7 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 
 Valkey, ClickHouse, the Langfuse worker, the OpenTelemetry Collector, **OpenBao**, the runner, the socket proxy and the npm proxy publish no port.
 
-OpenBao is reachable only on the Compose network (`design/QUESTIONS.md` #27, task A11). The platform processes run in Compose and use `http://openbao:8200`. Key holders and admins work inside the container with `pnpm openbao:bootstrap …` or `docker compose … exec openbao …` (runbook T11). There is no host port for `curl`.
+OpenBao is reachable only on the Compose network (`design/QUESTIONS.md` #27, task A11). The platform processes run in Compose and use `https://openbao:8200`, verified with the CA of the volume `openbao-ca` (TLS since A10, [T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Key holders and admins work inside the container with `pnpm openbao:bootstrap …` or `docker compose … exec openbao …` (runbook T11). There is no host port for `curl`.
 
 SeaweedFS (task A12, `design/ADR-M52-seaweedfs-internal-access.md`): only the S3 API (8333) listens on the Compose network; every platform process uses it with its own identity. The master, volume server and filer listen on `127.0.0.1` inside the container and need JWT keys that `seaweedfs/start.sh` makes at every start (kept nowhere else; no keys, no start). Admin work: `docker compose … exec seaweedfs weed shell -master=127.0.0.1:9333` (runbook T11 §5l). `seaweedfs-init` runs in the container's network namespace.
 
@@ -412,7 +412,7 @@ OpenBao starts **uninitialised and sealed**. `openbao/bootstrap.sh` initialises 
 
 - The order of the commands on a new machine: [Fresh deployment, step 3](#3-openbao).
 - The procedure, the key custody, unsealing after a restart, the settings files and troubleshooting: [runbook T11](../../handbook/03-templates/T11-openbao-runbook.md) §3 and §4 (on a development machine with throw-away keys: §3.1).
-- The real initialisation on the internal server waits until the three key holders are named and TLS is in place (T11 §3.2, `design/QUESTIONS.md` #20).
+- The real initialisation on the internal server waits until the three key holders are named and the company CA's certificate is issued (T11 §3.2, §3c, `design/QUESTIONS.md` #20).
 
 ## Health: what "healthy" means
 
@@ -424,7 +424,7 @@ OpenBao starts **uninitialised and sealed**. `openbao/bootstrap.sh` initialises 
 | OpenTelemetry Collector | Its `health_check` extension answers (inside the container) |
 | Valkey | `PING` with the password returns `PONG` |
 | LiteLLM | `/health/liveliness` answers |
-| **OpenBao** | **The API is reachable. It does NOT mean initialised or unsealed.** A new volume is uninitialised and sealed; initialise it with `openbao/bootstrap.sh` (see above). After every restart, OpenBao is sealed again until two key holders unseal it (D-03 section 10.2). Check with `pnpm openbao:bootstrap status` (OpenBao publishes no host port) |
+| **OpenBao** | **The API answers over TLS with a certificate the CA accepts (`bao status`). It does NOT mean initialised or unsealed.** A new volume is uninitialised and sealed; initialise it with `openbao/bootstrap.sh` (see above). After every restart, OpenBao is sealed again until two key holders unseal it (D-03 section 10.2). Check with `pnpm openbao:bootstrap status` (OpenBao publishes no host port) |
 
 ## Logs and traces (A08)
 
@@ -498,7 +498,7 @@ Upgrades come from `main` as reviewed changes; read the [CHANGELOG](../../CHANGE
 
 1. Take a backup ([above](#backup-and-restore)); before an OpenBao image change, a Raft snapshot ([T11 §4b](../../handbook/03-templates/T11-openbao-runbook.md#4b-upgrading-the-openbao-image)).
 2. `git pull`, then `pnpm install && pnpm build`.
-3. Add any new `.env` variables (`.env.example` lists them; `init-env.sh` never overwrites `.env`).
+3. Add any new `.env` variables (`.env.example` lists them; `init-env.sh` never overwrites `.env`). After the A10 update (TLS on OpenBao): `pnpm openbao:tls dev` on a development machine; on the server, the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)).
 4. Pull the pinned images and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`): `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull`, then the same with `build` (add `--profile observability` when you use it).
 5. Start only OpenBao, PostgreSQL and SeaweedFS, unseal OpenBao ([Restart after a reboot](#restart-after-a-reboot), first three commands), apply new migrations ([step 6](#6-database)), then start everything ([step 7](#7-start-the-platform)).
 6. Run a credentials command only when the CHANGELOG says an update added one or gave one new rights ([Fresh deployment, step 5](#5-credentials-of-every-process)).
@@ -513,6 +513,8 @@ Never run `docker volume prune` or `docker system prune --volumes`: they delete 
 | `sdlc-api`, `sdlc-worker` or `sdlc-runner` restart every minute; the log says "OpenBao at … is sealed" | OpenBao is sealed after a restart | `pnpm openbao:bootstrap status`, then two key holders unseal it (runbook T11 §4) |
 | `up.sh` times out with the `core`, `platform`, `models` or `sandbox` profile | OpenBao is sealed, or `up.sh core` was run alone on the server (LiteLLM has no keys without `models`) | Follow [Restart after a reboot](#restart-after-a-reboot) |
 | A log line ending in `_missing` (for example `worker.evidence_missing`) | A process has no credential for that feature | Run the credentials command the message names ([step 5](#5-credentials-of-every-process); `worker-langfuse-credentials`: [step 7](#7-start-the-platform)), then restart the service |
+| `openbao` does not start; `openbao-tls-init` says a file is missing in `SDLC_OPENBAO_TLS_DIR` | No TLS certificate for OpenBao (an `.env` from before A10, or a missing file) | Development: `pnpm openbao:tls dev`. Server: [T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal) |
+| `up.sh` warns that OpenBao's TLS certificate ends soon | Less than 30 days left | Renew: [T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal); OpenBao stays unsealed |
 | "AppRole login failed (HTTP status 400)" in a log | The AppRole secret ID expired (90 days) or was destroyed | That process's credentials command again, then restart it |
 | `worker.runs_off`; every intent waits at G4 | The worker has no `cost-controller` AppRole | `pnpm openbao:bootstrap worker-credentials`, restart `sdlc-worker` |
 | Intents wait at G8; packs answer `evidence_unavailable` | No evidence credential for the worker or the API | `api-evidence-credentials` (runbook T11 §5h) or `worker-evidence-credentials` (§5i) |
@@ -540,7 +542,7 @@ This deletes every intent, the evidence, the audit log and the secrets. Keep a b
 |---|---|---|
 | `pnpm test` | Static checks of the compose file, `.env.example`, `init-env.sh` and `.gitignore` (`platform/tests/deploy/`) | No |
 | `pnpm test:db` | Migrations and tenant isolation on a throw-away PostgreSQL container (same image and init script). Takes about 10 seconds ([ADR-M09](../../design/ADR-M09-database-tooling.md) section 2.6) | Yes |
-| `pnpm test:openbao` | OpenBao bootstrap (A03): starts only `openbao` in a throw-away Compose project, runs `init`, `unseal`, `configure`, `root-token`, checks every AppRole's access, re-runs `configure`, then removes everything. Throw-away keys, kept in memory only. About 1 minute | Yes |
+| `pnpm test:openbao` | OpenBao bootstrap (A03): starts only `openbao` in a throw-away Compose project, runs `init`, `unseal`, `configure`, `root-token`, checks every AppRole's access, re-runs `configure`, then removes everything. Throw-away keys, kept in memory only. Also TLS (A10, `tls.test.ts`): a wrong CA, an address other than `openbao` and plain HTTP are refused, a renewal is read without a restart, a missing file stops OpenBao. A few minutes | Yes |
 | `pnpm test:runner` | The runner on the local Docker Engine: sandbox egress and hardening, the provisioning flow, the clean-up after a restart (throw-away PostgreSQL, fixture image) | Yes |
 | `pnpm test:runner-compose` | The `sdlc-runner` container in the profile `sandbox` on a throw-away Compose project: `runner-credentials`, socket proxy, clean-up at start, health check, no secret in the container. About 1 minute | Yes |
 | `pnpm test:sandbox-image` | Builds the sandbox image `node24` and runs it hardened with the real Verdaccio: Node 24, pnpm through corepack and the proxy, no other way out. Needs internet | Yes |

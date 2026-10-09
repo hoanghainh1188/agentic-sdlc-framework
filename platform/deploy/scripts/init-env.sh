@@ -9,6 +9,9 @@
 # - An existing output file is never overwritten.
 # - Secrets are never printed. Read them from the file when you need them
 #   (for example the Langfuse admin password).
+# - OpenBao's TLS (A10, design/ADR-M63): a throw-away CA and server certificate in openbao-tls/
+#   next to the output file, made by openbao/tls.sh dev (the CA key is deleted at once). The
+#   server replaces them with the company CA's certificate (runbook T11 section 3c).
 set -eu
 
 deploy_dir="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,6 +23,10 @@ if [ -e "$output" ]; then
   exit 1
 fi
 command -v openssl >/dev/null 2>&1 || { echo "init-env: openssl is required" >&2; exit 1; }
+case "$(openssl version 2>/dev/null)" in
+  'OpenSSL '[3-9]*) ;;
+  *) echo "init-env: OpenSSL 3 or later is required, not LibreSSL (platform/deploy/README.md, Requirements)" >&2; exit 1 ;;
+esac
 
 hex() { openssl rand -hex "$1"; }
 
@@ -63,3 +70,4 @@ chmod 600 "$tmp"
 mv "$tmp" "$output"
 trap - EXIT
 echo "init-env: wrote $output (mode 600). Secrets are not printed."
+"$deploy_dir/openbao/tls.sh" dev "$output"

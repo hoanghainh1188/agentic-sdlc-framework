@@ -99,7 +99,7 @@ A04 is not affected. The sidecar is OpenBao's own Agent, not this client. The `l
 |---|---|
 | Response-wrapped secret IDs (a wrapping token that the client unwraps once), to limit exposure during delivery (decision D3: deferred) | Deployment of the platform processes |
 | Mounting the role ID and secret ID files (tmpfs, mode 600) into the process containers | Deployment of the platform processes |
-| TLS on 8200 with the internal CA; check that no production file sets `SDLC_OPENBAO_ALLOW_PLAINTEXT` | A10 |
+| TLS on 8200 with the internal CA; check that no production file sets `SDLC_OPENBAO_ALLOW_PLAINTEXT` | A10. **Done in A10 PR 1** (ADR-M63): TLS everywhere, the compose file sets the flag nowhere (static test `deploy/openbao-tls-static.test.ts`) |
 | Host logins through the published port pass the CIDR check | QUESTIONS #27 |
 | Connecting the logger hook to the platform logger | A08 |
 

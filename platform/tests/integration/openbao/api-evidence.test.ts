@@ -116,7 +116,7 @@ describe.skipIf(!enabled)(
           'openbao',
           'sh',
           '-c',
-          'IFS= read -r BAO_TOKEN && export BAO_TOKEN BAO_ADDR=http://127.0.0.1:8200 && ' +
+          'IFS= read -r BAO_TOKEN && export BAO_TOKEN && ' +
             `bao kv get -mount=kv -format=json -field=data ${kvPath}`,
         ),
         `kv get ${kvPath}`,

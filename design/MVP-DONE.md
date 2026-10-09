@@ -51,7 +51,7 @@ D-08 E07 AC4 (QUESTIONS #81): **prepared, waiting for the run, now before M-F.**
 |---|---|---|
 | QUESTIONS #81: one real run with an API model (`pnpm test:agent-api`) | Owner (an API key in OpenBao, T11 §5d) | M-F (the trial on a real internal tool); issue #45. Not the trial M-E, which runs with the local model |
 | The live G1 → G8 run on the real pilot (`SDLC_PILOT_LIVE_G8=1 pnpm test:pilot-live`): the plan file merged on the pilot, a second GitHub account for Person B, the dev stack running (GETTING-STARTED Steps 13–14) | Owner | Nothing in the MVP; it is the first real G1 → G8 on GitHub |
-| A10: internal CA and TLS on OpenBao, backup and restore drill, resource measurement | Infrastructure operator | The real deployment on the internal server |
+| A10: TLS on OpenBao is built (PR 1, everywhere, ADR-M63); the company CA, the backup and restore drill (PR 2) and the resource measurement on the server | Infrastructure operator | The real deployment on the internal server |
 | MVP+1 user interface scope (web UI, dashboard; D-02 §4.2), written from the trial data after M-E | Claude, for the owner's approval | Nothing in the MVP (D-08 E07 note) |
 
 ## 5. Kept for later

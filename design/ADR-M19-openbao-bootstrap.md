@@ -98,7 +98,7 @@ Since C04 (QUESTIONS #44, ADR-M25 §2.11) the `runner` policy can **not** read t
 
 | Item | Where |
 |---|---|
-| TLS on the OpenBao listeners (carried over from A02) | QUESTIONS #20 |
+| TLS on the OpenBao listeners (carried over from A02) | QUESTIONS #20. **Done in A10 PR 1** (ADR-M63): TLS on 8200 everywhere; 8210 stays plain |
 | How LiteLLM reads model provider keys | Done in C03: OpenBao Agent sidecar, AppRole `litellm` (QUESTIONS #1, ADR-M24) |
 | Delivering secret IDs to processes (response wrapping, file mounts) | A04 defined the client side: role ID and secret ID files (ADR-M21 §2.2). File mounts and response wrapping: deployment of the platform processes (ADR-M21 §3) |
 | Audit log rotation, off-server copy, 2-year retention | A10, E05 |

@@ -1,6 +1,8 @@
 // Helpers for the live tests that start a throw-away Compose project (tasks A02, A03, A04, A11).
 // Since A11, OpenBao publishes no port on the host (design/QUESTIONS.md #27): the tests reach it
 // through a one-shot container on the throw-away Compose network, like a platform process.
+// Since A10 (design/ADR-M63), OpenBao speaks TLS on 8200: a one-shot container mounts the CA of
+// the project's volume openbao-ca and verifies the certificate, like the platform processes.
 import { spawnSync } from 'node:child_process';
 
 import { loadCompose } from '../deploy/compose';
@@ -39,6 +41,32 @@ export function openbaoImage(): string {
   return image;
 }
 
+/** Where a one-shot container mounts OpenBao's CA certificate (as the platform processes do). */
+export const OPENBAO_CA_FILE = '/run/sdlc/openbao-ca/ca.pem';
+export const OPENBAO_URL = 'https://openbao:8200';
+
+/** The Compose project of a throw-away network `<project>-net`. */
+function projectOf(network: string): string {
+  if (!network.endsWith('-net')) throw new Error(`not a Compose network: ${network}`);
+  return network.slice(0, -'-net'.length);
+}
+
+/** `docker run` options that mount the project's CA read-only (volume `<project>_openbao-ca`). */
+export function openbaoCaMount(network: string): string[] {
+  return ['-v', `${projectOf(network)}_openbao-ca:/run/sdlc/openbao-ca:ro`];
+}
+
+/** `docker run` options for a `bao` command against OpenBao over TLS, CA verified. */
+export function baoClientArgs(network: string): string[] {
+  return [
+    ...openbaoCaMount(network),
+    '-e',
+    `BAO_ADDR=${OPENBAO_URL}`,
+    '-e',
+    `BAO_CACERT=${OPENBAO_CA_FILE}`,
+  ];
+}
+
 export interface SealStatus {
   initialized: boolean;
   sealed: boolean;
@@ -48,7 +76,7 @@ export interface SealStatus {
 }
 
 /**
- * Reads /v1/sys/seal-status from a one-shot container on `network` (no host port since A11).
+ * Reads the seal status from a one-shot container on `network` (no host port since A11), over TLS.
  * Retries briefly: right after a restart OpenBao can refuse connections.
  */
 export async function sealStatusOnNetwork(network: string): Promise<SealStatus> {
@@ -60,17 +88,18 @@ export async function sealStatusOnNetwork(network: string): Promise<SealStatus> 
         '--rm',
         '--network',
         network,
+        ...baoClientArgs(network),
         '--entrypoint',
-        'wget',
+        'bao',
         openbaoImage(),
-        '-q',
-        '-O',
-        '-',
-        'http://openbao:8200/v1/sys/seal-status',
+        'status',
+        '-format=json',
       ],
       { encoding: 'utf8' },
     );
-    if (r.status === 0) return JSON.parse(r.stdout) as SealStatus;
+    // `bao status`: 0 unsealed, 2 sealed or uninitialised (both print the status), 1 an error.
+    if ((r.status === 0 || r.status === 2) && r.stdout.trim().startsWith('{'))
+      return JSON.parse(r.stdout) as SealStatus;
     if (attempt >= 20) throw new Error(`seal-status failed: ${r.stderr}`);
     await new Promise((resolve) => setTimeout(resolve, 500));
   }

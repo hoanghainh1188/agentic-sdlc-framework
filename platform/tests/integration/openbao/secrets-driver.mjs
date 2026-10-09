@@ -7,6 +7,7 @@
 // would, and never printed. stdout: one JSON object with results that hold no secret: error keys,
 // booleans, versions, signatures (not secret) and logger events.
 import fs from 'node:fs';
+import https from 'node:https';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -21,7 +22,8 @@ const events = [];
 const logger = { log: (level, event, fields) => events.push({ level, event, fields }) };
 const client = new OpenBaoClient({
   address: process.env.SDLC_OPENBAO_ADDR,
-  allowPlaintext: true, // A10 adds TLS on 8200 (QUESTIONS #20)
+  // TLS since A10 (ADR-M63): the CA of the project's volume openbao-ca.
+  caCertFile: process.env.SDLC_OPENBAO_CA_CERT_FILE,
   roleIdFile: `${dir}/role-id`,
   secretIdFile: `${dir}/secret-id`,
   logger,
@@ -64,14 +66,21 @@ const steps = {
   },
   // Revokes every AppRole token with the throw-away admin token, as an operator could.
   revokeAllTokens: async () => {
-    const res = await fetch(
-      `${process.env.SDLC_OPENBAO_ADDR}/v1/sys/leases/revoke-prefix/auth/approle/login`,
-      {
-        method: 'POST',
-        headers: { 'X-Vault-Token': input.adminToken },
-      },
-    );
-    return res.status;
+    // node:https with the CA: the global fetch would not use the client's CA (A10).
+    const url = `${process.env.SDLC_OPENBAO_ADDR}/v1/sys/leases/revoke-prefix/auth/approle/login`;
+    const ca = fs.readFileSync(process.env.SDLC_OPENBAO_CA_CERT_FILE);
+    return new Promise((resolve, reject) => {
+      const req = https.request(
+        url,
+        { method: 'POST', headers: { 'X-Vault-Token': input.adminToken }, ca },
+        (res) => {
+          res.resume();
+          res.on('end', () => resolve(res.statusCode));
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
   },
   loginCount: () => events.filter((e) => e.event === 'openbao.login').length,
   wrap: ({ value, ttlSeconds }) =>

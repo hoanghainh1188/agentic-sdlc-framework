@@ -38,6 +38,7 @@
     "test:agent-real": "SDLC_AGENT_REAL_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/agent/agent-real.test.ts platform/deploy/scripts/test-db.sh",
     "test:agent-api": "SDLC_AGENT_API_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/agent/agent-api.test.ts platform/deploy/scripts/test-db.sh",
     "openbao:bootstrap": "platform/deploy/openbao/bootstrap.sh",
+    "openbao:tls": "platform/deploy/openbao/tls.sh",
     "db:migrate": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js latest",
     "db:status": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js status",
     "sdlc": "tsc -b platform/apps/cli && node platform/apps/cli/dist/main.js",

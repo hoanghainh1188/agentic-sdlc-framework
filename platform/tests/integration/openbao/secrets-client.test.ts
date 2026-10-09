@@ -14,7 +14,15 @@ import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { deployDir, root } from '../../deploy/compose';
-import { containerIp, hostPortBindings, isolateEnv, networkGateways } from '../throwaway-compose';
+import {
+  containerIp,
+  hostPortBindings,
+  isolateEnv,
+  networkGateways,
+  OPENBAO_CA_FILE,
+  OPENBAO_URL,
+  openbaoCaMount,
+} from '../throwaway-compose';
 
 const enabled = process.env.SDLC_OPENBAO_TEST === '1';
 const PORT_OFFSET = 22000;
@@ -147,8 +155,13 @@ describe.skipIf(!enabled)('OpenBao client (live)', { timeout: TEST_TIMEOUT_MS },
         '/run/sdlc:uid=1000,gid=1000,mode=0700',
         '-v',
         `${root}:/repo:ro`,
+        // The certificate names openbao, not the IP: from the host, map the name to the IP (A10).
+        ...(fromHost ? ['--add-host', `openbao:${containerIp(openbaoContainer(), network)}`] : []),
+        ...openbaoCaMount(network),
         '-e',
-        `SDLC_OPENBAO_ADDR=http://${fromHost ? containerIp(openbaoContainer(), network) : 'openbao'}:8200`,
+        `SDLC_OPENBAO_ADDR=${OPENBAO_URL}`,
+        '-e',
+        `SDLC_OPENBAO_CA_CERT_FILE=${OPENBAO_CA_FILE}`,
         '-e',
         'SECRETS_DIST=/repo/platform/packages/secrets/dist/index.js',
         NODE_IMAGE,
