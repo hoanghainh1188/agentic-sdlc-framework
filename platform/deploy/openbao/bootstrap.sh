@@ -331,6 +331,7 @@ cmd_litellm_credentials() {
   require_unsealed
   token="$(read_secret 'Admin or root token (hidden)')"
   [ -n "$token" ] || fail "no token given"
+  ensure_service_image litellm-agent models
   accessor="$(issue_secret_id litellm |
     compose --profile core --profile models run --rm -T --no-deps --user root --entrypoint sh \
       litellm-agent -c '
@@ -347,6 +348,7 @@ cmd_litellm_credentials() {
       chmod 700 /openbao/approle
       printf "%s\n" "$accessor"')" ||
     fail "could not deliver the litellm credentials (token valid? OpenBao configured with the litellm AppRole?)"
+  accessor="$(printf '%s\n' "$accessor" | tail -n 1)"
   revoke_other_secret_ids litellm "$accessor"
   say "litellm AppRole credentials written to the litellm-approle volume, old secret IDs revoked; restart litellm-agent to use them"
 }
@@ -356,9 +358,22 @@ cmd_litellm_credentials() {
 # environment variable. The platform services drop every capability; this one-shot root container
 # gets back only what it needs to write the files and give them to the user node. It prints the
 # new accessor only after the files are written; then the old secret IDs are revoked. Needs $token.
+# On a fresh machine the service's image does not exist yet; `compose run` would then build it
+# and print the build log on stdout, before the accessor (seen in CI on a fresh deployment). So
+# the image is built first, its log on stderr. An existing image is used as it is.
+# ensure_service_image <Compose service> <profile>
+ensure_service_image() {
+  image="$(compose --profile core --profile "$2" config --images "$1" 2>/dev/null | head -n 1)"
+  [ -n "$image" ] || fail "no image for the Compose service $1"
+  docker image inspect "$image" >/dev/null 2>&1 && return 0
+  say "building the image of $1 (first run on this machine; a few minutes)"
+  compose --profile core --profile "$2" build "$1" >&2 ||
+    fail "could not build the image of $1; run: docker compose … build $1"
+}
 # deliver_approle <AppRole> <Compose service> <directory in the service> <profile> [owner]
 # The owner is node:node (the platform services) unless given (backup-agent: openbao:openbao).
 deliver_approle() {
+  ensure_service_image "$2" "$4"
   accessor="$(issue_secret_id "$1" |
     compose --profile core --profile "$4" run --rm -T --no-deps --user root \
       --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "$2" -c '
@@ -375,6 +390,8 @@ deliver_approle() {
       chmod 700 "$0"
       printf "%s\n" "$accessor"' "$3" "${5:-node:node}")" ||
     fail "could not deliver the $1 credentials (token valid? OpenBao configured with the $1 AppRole?)"
+  # The accessor is the container's last line: anything Compose printed before it is not.
+  accessor="$(printf '%s\n' "$accessor" | tail -n 1)"
   revoke_other_secret_ids "$1" "$accessor"
 }
 
