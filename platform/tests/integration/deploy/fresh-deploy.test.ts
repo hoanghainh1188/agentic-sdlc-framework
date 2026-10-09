@@ -268,6 +268,9 @@ describe.skipIf(!enabled)(
         ...composeArgs,
         '--profile',
         'observability',
+        // A10: the backup job's AppRole volume belongs to the profile `backup` only.
+        '--profile',
+        'backup',
         'down',
         '--volumes',
         '--remove-orphans',
