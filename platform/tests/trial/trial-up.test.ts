@@ -231,11 +231,11 @@ describe('V02 AC3: secrets never reach the terminal', () => {
       'Unseal Key 1: abcdefghijklmnopqrstuvwxyz0123456789',
       'Initial Root Token: s.AAAAAAAAAAAAAAAAAAAAAAAA',
       `token ${'sdlc_pat_'}${'x'.repeat(43)}`,
-      'vault hvs.CAESIabcdefghijklmnopqrstuvwxyz',
+      `vault ${'hvs'}.${'CAESI'}${'q'.repeat(24)}`,
       '-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----',
     ].join('\n');
     const out = bag.redact(text);
-    expect(out).not.toMatch(/correct-horse|abcdefghijklmnop|AAAAAAAA|xxxxxxxx|CAESI|MIIE/);
+    expect(out).not.toMatch(/correct-horse|abcdefghijklmnop|AAAAAAAA|xxxxxxxx|CAESI|qqqq|MIIE/);
     expect(out).toContain('Unseal Key 1: <redacted>');
   });
 
