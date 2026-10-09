@@ -13,6 +13,7 @@ const SCRIPTS = [
   'openbao/cidr-exclude.sh',
   'openbao/bootstrap/configure.sh',
   'openbao/bootstrap/root-token.sh',
+  'openbao/tls.sh',
 ];
 const settings = parseEnvFile(readDeployFile('openbao/bootstrap/bootstrap.conf'));
 const roles = (settings.get('APPROLE_ROLES') ?? '').split(' ').filter(Boolean);
@@ -245,6 +246,12 @@ describe('OpenBao in Compose', () => {
     const [main, keyHolder] = listeners;
     expect(main).toMatch(/address\s*=\s*"0\.0\.0\.0:8200"/);
     expect(main).not.toMatch(/disable_unauthed/);
+    // A10 (ADR-M63): TLS on the Compose network; the in-container listener stays plain.
+    expect(main).not.toMatch(/tls_disable/);
+    expect(main).toMatch(/tls_cert_file\s*=\s*"\/openbao\/tls\/server\.pem"/);
+    expect(main).toMatch(/tls_key_file\s*=\s*"\/openbao\/tls\/server-key\.pem"/);
+    expect(keyHolder).toMatch(/tls_disable\s*=\s*true/);
+    expect(hcl).toMatch(/api_addr\s*=\s*"https:\/\/openbao:8200"/);
     expect(keyHolder).toMatch(/address\s*=\s*"127\.0\.0\.1:8210"/);
     expect(keyHolder).toMatch(/disable_unauthed_generate_root_endpoints\s*=\s*false/);
     expect(openbao.ports).toBeUndefined();

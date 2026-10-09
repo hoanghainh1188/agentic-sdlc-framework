@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.33. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.3 (rekey) give the commands; the recovery drill in task A10 tests them.
+> Status: **v0.34. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.3 (rekey) give the commands; the recovery drill in task A10 tests them.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -13,7 +13,7 @@ OpenBao is the platform's secret manager. It stores the platform secrets (GitHub
 All OpenBao data is encrypted. After every restart OpenBao is **sealed**: it cannot answer any request until key holders **unseal** it with their key shares. If the key shares are lost, every secret is lost.
 
 This runbook covers:
-- the first initialisation;
+- the first initialisation and TLS (section 3c);
 - unsealing after a restart;
 - root tokens;
 - daily admin work and AppRole secret IDs (an AppRole is OpenBao's login for a machine process: a fixed role ID plus a secret ID that expires);
@@ -24,7 +24,7 @@ This runbook covers:
 - troubleshooting;
 - the operations log.
 
-It does **not** cover TLS (open item, `design/QUESTIONS.md` #20, task A10).
+TLS on port 8200 is section 3c.
 
 All commands run from the repo root on the server. They need Docker only. `pnpm openbao:bootstrap <command>` is the same as `platform/deploy/openbao/bootstrap.sh <command>`.
 
@@ -77,6 +77,7 @@ To start again from zero: `docker compose -f platform/deploy/docker-compose.yml 
 
 Preconditions:
 - leadership has named the three key holders (section 2);
+- OpenBao's certificate is issued with the company CA (section 3c);
 - three envelopes, a pen, and access to the safe are ready;
 - a room with no cameras, and screens that nobody else can see;
 - the operations log (section 10) is open.
@@ -103,6 +104,28 @@ What `configure` sets up (details: `design/ADR-M19-openbao-bootstrap.md`):
 - a check that the file audit device is on.
 
 Settings (key shares, threshold, token and secret ID lifetimes) are in `platform/deploy/openbao/bootstrap/bootstrap.conf`. Access rules are in `platform/deploy/openbao/bootstrap/policies/*.hcl`. Changes to either go through a reviewed pull request, then `configure` again.
+
+## 3c. TLS on port 8200: the CA, the certificate, renewal
+
+OpenBao's listener 8200 speaks TLS on every machine (task A10, `design/ADR-M63-openbao-tls-and-backups.md`, QUESTIONS #20, #325). Every platform process verifies the certificate with the CA; there is no plain listener on the Compose network. The listener 8210 inside the container stays plain.
+
+**Where the files are.** The env file names the folder: `SDLC_OPENBAO_TLS_DIR` (an absolute path) with `ca.pem`, `server.pem` and `server-key.pem` (mode 600). The job `openbao-tls-init` copies them into the volumes `openbao-tls` and `openbao-ca` at every start. **The CA's private key is never in this folder.**
+
+**On a development machine (throw-away CA).** `pnpm compose:env` makes a throw-away CA and a certificate in `platform/deploy/openbao-tls/` (Git-ignored) and deletes the CA key at once. An `.env` made before A10: run `pnpm openbao:tls dev` once (it adds the folder and the variable), then `pnpm compose:core`. OpenBao's data stays; no unseal procedure changes.
+
+**On the internal server (the company CA).** Done by the infrastructure operator, before the initialisation of section 3.2:
+
+1. Make the CA in a folder **outside the repository**, for example on an encrypted USB drive: `pnpm openbao:tls ca /media/ca-usb/openbao-ca`. It writes `ca.pem` and `ca-key.pem` (5 years). It refuses a folder inside the repository and never overwrites a CA.
+2. Set `SDLC_OPENBAO_TLS_DIR` in `platform/deploy/.env` to a folder outside the repository on the server, for example `/etc/sdlc/openbao-tls`.
+3. Issue the server certificate: `pnpm openbao:tls server /media/ca-usb/openbao-ca` (1 year, names `openbao` and `127.0.0.1`).
+4. Check: `pnpm openbao:tls check` shows both end dates.
+5. Take the CA folder offline: the USB drive goes into the safe with the key shares' envelopes. Record it in the operations log (section 10).
+
+**Renewal (every year; the reminder 30 days before the end).**
+
+- `pnpm openbao:tls check` fails within 30 days of the end; `up.sh` prints a warning at every start. Put the end date in the team calendar with a reminder 30 days before.
+- To renew: take the CA folder out of the safe, run `pnpm openbao:tls server <ca-folder>`, then `pnpm openbao:tls reload`. OpenBao reads the new certificate and **stays unsealed**; the clients keep working (same CA). Put the CA folder back; record it in the operations log.
+- A new CA (every 5 years, or after a leak): `pnpm openbao:tls ca` in a new folder, `server`, `reload`, then restart every client (`sdlc-api`, `sdlc-worker`, `sdlc-runner`, `litellm-agent`): they read `ca.pem` when they start.
 
 ## 4. Unseal after a server restart
 
@@ -264,8 +287,8 @@ Each platform process (api, worker, runner, cost-controller) uses the OpenBao cl
 
 | Setting | Value |
 |---|---|
-| `SDLC_OPENBAO_ADDR` | `https://openbao:8200` after A10 (the process runs in Compose; OpenBao publishes no host port). Before A10, only on development machines and in CI: `http://openbao:8200` together with `SDLC_OPENBAO_ALLOW_PLAINTEXT=1` |
-| `SDLC_OPENBAO_CA_CERT_FILE` | The company internal CA certificate (after A10). The client always checks the server certificate; there is no way to skip the check |
+| `SDLC_OPENBAO_ADDR` | `https://openbao:8200` (the process runs in Compose; OpenBao publishes no host port). Plain HTTP is not used anywhere since A10 |
+| `SDLC_OPENBAO_CA_CERT_FILE` | `/run/sdlc/openbao-ca/ca.pem`, from the volume `openbao-ca` (section 3c). The client always checks the server certificate; there is no way to skip the check |
 | `SDLC_OPENBAO_ROLE_ID_FILE` | File with the role ID |
 | `SDLC_OPENBAO_SECRET_ID_FILE` | File with the secret ID: mode 600, on a tmpfs mount, readable only by the process |
 
@@ -782,8 +805,10 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | A process says `OpenBao at … is sealed` | Restart. Compose still shows OpenBao as healthy: healthy only means the API answers | Section 4 |
 | A process says `OpenBao at … is not initialised` | New, empty volume, or the wrong Compose project | Section 3. If you expected data, **stop** and check the volume |
 | A process says `The OpenBao policy of this process does not allow …` | The process asked for a path outside its policy | Correct the path in the process. Change a policy only through `bootstrap/policies/` and `configure` |
-| A process says `The certificate of OpenBao at … could not be verified` | Wrong or missing CA file, expired server certificate, or the address does not match the certificate | Check `SDLC_OPENBAO_CA_CERT_FILE` and the certificate dates (A10). Never turn the check off |
-| A process says `… does not use TLS` | `http://` address without `SDLC_OPENBAO_ALLOW_PLAINTEXT=1` | On the server: use `https://`. The flag is for development machines and CI only |
+| A process says `The certificate of OpenBao at … could not be verified` | A new CA the process has not read yet, an expired server certificate, or an address other than `openbao` | `pnpm openbao:tls check`; after a new CA restart the clients (section 3c). Never turn the check off |
+| A process says `… does not use TLS` | An `http://` address | Use `https://openbao:8200` |
+| `openbao` does not start; `openbao-tls-init` exited with `… missing in SDLC_OPENBAO_TLS_DIR` | The certificate folder is not set, or a file is missing | Development: `pnpm openbao:tls dev`. Server: section 3c |
+| `openbao` stays unhealthy after a renewal | The new certificate is not signed by the CA in `openbao-ca` | `pnpm openbao:tls check`, then `pnpm openbao:tls reload` |
 | `no file audit device` | `openbao.hcl` changed | Restore the `audit "file"` block. OpenBao also refuses requests when it cannot write the audit log: check the `openbao-audit` volume (disk full, permissions) |
 | `litellm-agent` stays unhealthy; LiteLLM does not start | OpenBao is sealed, the sidecar's secret ID is missing or expired, or the master key or salt key is not stored | Section 4; `pnpm openbao:bootstrap litellm-credentials`; section 5d step 2. `docker compose … logs litellm-agent` shows the reason (never a key) |
 | LiteLLM exits with `no rendered configuration (Compose profile models) and no LITELLM_MASTER_KEY` | Started without the profile `models` and without a development master key | On the server: `pnpm compose:models`. On a development machine: set `LITELLM_MASTER_KEY` in `.env` |
@@ -844,6 +869,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.34 | 2026-10-09 | Claude Code (task A10, PR 1) | New section 3c: TLS on 8200 everywhere (QUESTIONS #20, #325), the throw-away CA on development machines, the company CA on the server (`pnpm openbao:tls ca`, `server`), renewal without unsealing (`reload`), the 30-day reminder; section 5c and the troubleshooting rows. Tested with throw-away certificates (`pnpm test:openbao`, `tls.test.ts`) |
 | 0.33 | 2026-10-09 | Claude Code (docs review E3) | Readability: AppRole, tidy, TTL and the wrapping token explained at first use; one name for the wrapping token; section 3.2 step 1 and section 5g step 3b split into short items |
 | 0.32 | 2026-10-09 | Claude Code (docs review E2) | Sections 5d, 5e, 5f, 5g: on the server every profile starts at once after the migrations (Fresh deployment step 7); the tenant bootstrap is Fresh deployment step 8, not a step of 5e |
 | 0.31 | 2026-10-09 | Claude Code (docs review fixes) | Title and scope: the processes' credentials are in this runbook; the filer gap note removed (closed by A12, section 5l); sections 8.2 and 8.3 in order; rotation covers sections 5d–5m; "OpenBao admin" for the operator with the admin token |

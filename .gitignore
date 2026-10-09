@@ -9,6 +9,8 @@ coverage/
 .env
 *.env
 !*.env.example
+# OpenBao TLS certificates made by platform/deploy/openbao/tls.sh dev (A10): never committed.
+openbao-tls/
 
 # Dashboard smoke test output (U01): screenshots go to the PR, not the repository.
 platform/tests/e2e/screenshots/

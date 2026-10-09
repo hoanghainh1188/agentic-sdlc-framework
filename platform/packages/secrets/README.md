@@ -7,7 +7,7 @@ OpenBao client for the platform processes (task A04, design/ADR-M21).
 - KV v2 read (`client.kv().read('worker/db')`): values are `Redacted`; call `reveal()` only where the value is used.
 - Transit Ed25519 sign and verify for Run Contracts (`client.transit()`), through OpenBao or locally with the public key.
 - Clear errors (message catalog) when OpenBao is sealed or not initialised, unreachable, or refuses a request.
-- TLS: the server certificate is always verified; `SDLC_OPENBAO_CA_CERT_FILE` names the company internal CA. Plain `http://` only with `SDLC_OPENBAO_ALLOW_PLAINTEXT=1` (development machines and CI).
+- TLS: the server certificate is always verified; `SDLC_OPENBAO_CA_CERT_FILE` names the CA (in Compose `/run/sdlc/openbao-ca/ca.pem`, A10, `design/ADR-M63-openbao-tls-and-backups.md`). Plain `http://` only with `SDLC_OPENBAO_ALLOW_PLAINTEXT=1`, which no compose service sets since A10 (unit tests against a stub may).
 
 ```ts
 const client = OpenBaoClient.fromEnv();

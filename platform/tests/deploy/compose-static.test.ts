@@ -36,6 +36,7 @@ const env = (name: string) => service(name).environment ?? {};
 const CORE = [
   'litellm',
   'openbao',
+  'openbao-tls-init',
   'postgres',
   'seaweedfs',
   'seaweedfs-init',
@@ -46,7 +47,7 @@ const CORE = [
   'valkey',
 ];
 const OBSERVABILITY_ONLY = ['clickhouse', 'langfuse-web', 'langfuse-worker', 'otel-collector'];
-const JOBS = ['seaweedfs-init', 'temporal-namespace', 'temporal-schema'];
+const JOBS = ['openbao-tls-init', 'seaweedfs-init', 'temporal-namespace', 'temporal-schema'];
 
 function createdDatabases(): string[] {
   const script = readDeployFile('postgres/init/01-create-databases.sh');
@@ -307,6 +308,13 @@ describe('init-env.sh', () => {
         expect(stdout).not.toContain(value);
       } else if (key === 'SDLC_DOCKER_GID') {
         expect(value, key).toMatch(/^[0-9]+$/); // detected (C04, ADR-M25 §2.5)
+      } else if (key === 'SDLC_OPENBAO_TLS_DIR') {
+        // A10 (ADR-M63): a throw-away CA next to the env file; the CA key is deleted at once.
+        const dir = path.join(tmp, 'openbao-tls');
+        expect(value, key).toBe(dir);
+        expect(fs.readdirSync(dir).sort()).toEqual(['ca.pem', 'server-key.pem', 'server.pem']);
+        expect(fs.statSync(path.join(dir, 'server-key.pem')).mode & 0o777).toBe(0o600);
+        expect(fs.statSync(path.join(dir, 'ca.pem')).mode & 0o777).toBe(0o644);
       } else {
         expect(value, key).toBe(envExample.get(key));
       }

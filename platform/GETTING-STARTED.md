@@ -215,6 +215,8 @@ Use this after a reboot, after Docker Desktop restarted, or when `sdlc-api` and 
 
 Start `core` alone first: `sdlc-api`, `sdlc-worker`, `sdlc-runner` and `litellm-agent` cannot become healthy while OpenBao is sealed, so `up.sh` with those profiles would wait until it times out.
 
+**After the A10 update (TLS on OpenBao, 2026-10):** an `.env` made before it has no `SDLC_OPENBAO_TLS_DIR`, and `up.sh` stops with `set SDLC_OPENBAO_TLS_DIR in .env`. Run once, in a terminal: `pnpm openbao:tls dev` (a throw-away CA and certificate in `platform/deploy/openbao-tls/`, the variable added to `.env`), then rebuild the platform images and follow the table from item 1. OpenBao's data and its key shares stay the same; no credentials command is needed (runbook T11 §3c).
+
 **The credentials commands are NOT needed after a plain restart.** The AppRole secret IDs stay in the services' volumes and live 90 days (`APPROLE_SECRET_ID_TTL`); the processes log in again by themselves. Run a credentials command only in these cases (each one asks for an admin token, runbook T11 §5.1, and prints no secret):
 
 | When | Do (then restart that service) |

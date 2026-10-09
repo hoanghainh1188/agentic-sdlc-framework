@@ -63,9 +63,12 @@ describe('AC1: the sidecar (Compose profile "models")', () => {
     expect(agent.ports).toBeUndefined();
     // The OTLP endpoint is not a secret; it only turns on LiteLLM's tracing (A08, ADR-M35).
     expect(agent.environment).toEqual({
-      BAO_ADDR: 'http://openbao:8200',
+      // A10 (ADR-M63): TLS, verified with the CA of the volume openbao-ca.
+      BAO_ADDR: 'https://openbao:8200',
+      BAO_CACERT: '/openbao/ca/ca.pem',
       SDLC_OTEL_ENDPOINT: '${SDLC_OTEL_ENDPOINT:-}',
     });
+    expect(agent.volumes).toContain('openbao-ca:/openbao/ca:ro');
   });
 
   it('renders into a tmpfs volume, mode 0600, and fails closed', () => {

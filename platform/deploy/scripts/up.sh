@@ -15,7 +15,7 @@
 set -eu
 
 # One-shot jobs (restart: "no"). A static test keeps this list in sync with docker-compose.yml.
-JOBS="temporal-schema temporal-namespace seaweedfs-init"
+JOBS="openbao-tls-init temporal-schema temporal-namespace seaweedfs-init"
 
 [ "$#" -gt 0 ] || { echo "usage: $0 <profile>..." >&2; exit 2; }
 
@@ -53,6 +53,12 @@ if [ "${langfuse_on:-no}" = yes ] && [ -z "${SDLC_WORKER_LANGFUSE_URL:-}" ] &&
   ! grep -Eq '^SDLC_WORKER_LANGFUSE_URL=.+' "$env_file"; then
   SDLC_WORKER_LANGFUSE_URL=http://langfuse-web:3000
   export SDLC_WORKER_LANGFUSE_URL
+fi
+
+# OpenBao's TLS certificates (A10, design/ADR-M63): warn 30 days before they end; never block.
+if ! SDLC_ENV_FILE="$env_file" "$deploy_dir/openbao/tls.sh" check >/dev/null 2>&1; then
+  SDLC_ENV_FILE="$env_file" "$deploy_dir/openbao/tls.sh" check >&2 || true
+  echo "up: warning: OpenBao's TLS certificate is missing or ends soon (runbook T11 section 3c)" >&2
 fi
 
 set -- $(for p in "$@"; do printf -- '--profile %s ' "$p"; done)

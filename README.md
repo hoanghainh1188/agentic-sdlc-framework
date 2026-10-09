@@ -11,7 +11,7 @@ The handbook says **what must happen and why**. The platform **makes sure it hap
 
 Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
-**Status (2026-10-09): built and tested, not yet used on a real project.** The platform is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on a fictional sample project has not started; the first real internal project comes after it. Before real client data, the server still needs encrypted connections (TLS) and named key holders for the secret manager, a tested backup and restore, and measured resources (the open task A10).
+**Status (2026-10-09): built and tested, not yet used on a real project.** The platform is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on a fictional sample project has not started; the first real internal project comes after it. Before real client data, the server still needs the company's own certificate and named key holders for the secret manager (encrypted connections to it are built), a tested backup and restore, and measured resources (the open task A10).
 
 **Supported today:** GitHub, projects built with Node.js and TypeScript (one sandbox image, `node24`), the OpenHands agent, and one server with Docker Compose. People reach the API and the dashboard on the server itself; access from other machines comes later ([where to run it](platform/deploy/README.md#where-to-run-it)).
 

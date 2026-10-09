@@ -53,6 +53,11 @@ volumes:
   seaweedfs-data:
   openbao-data:
   openbao-audit:
+  # OpenBao's TLS key and certificate (owner openbao, key mode 600) and the CA certificate every
+  # client mounts read-only (mode 644). Written by the job openbao-tls-init from the folder
+  # SDLC_OPENBAO_TLS_DIR (A10, design/ADR-M63).
+  openbao-tls:
+  openbao-ca:
   # AppRole role ID and secret ID of the LiteLLM sidecar (mode 600). Written by
   # `openbao/bootstrap.sh litellm-credentials` (runbook T11).
   litellm-approle:
@@ -279,7 +284,9 @@ services:
         condition: service_healthy
     command: [agent, -config=/openbao/agent/agent.hcl]
     environment:
-      BAO_ADDR: http://openbao:8200
+      # TLS (A10, ADR-M63): the agent verifies OpenBao's certificate with this CA.
+      BAO_ADDR: https://openbao:8200
+      BAO_CACERT: /openbao/ca/ca.pem
       # Tracing (A08, ADR-M35 §2.4): when set, config.ctmpl turns on LiteLLM's langfuse_otel and
       # points it at the collector. Empty: no tracing. Set by up.sh with the profile observability.
       SDLC_OTEL_ENDPOINT: ${SDLC_OTEL_ENDPOINT:-}
@@ -289,6 +296,7 @@ services:
       - ${SDLC_LITELLM_TEMPLATE:-./litellm/config.ctmpl}:/openbao/litellm-template/config.ctmpl:ro
       - litellm-approle:/openbao/approle
       - litellm-config:/run/litellm
+      - openbao-ca:/openbao/ca:ro
     healthcheck:
       <<: *healthcheck-defaults
       test: [CMD-SHELL, 'test -s /run/litellm/config.yaml']
@@ -362,16 +370,53 @@ services:
       - ./seaweedfs/create-buckets.sh:/scripts/create-buckets.sh:ro
     entrypoint: [/bin/sh, /scripts/create-buckets.sh]
 
+  # Copies OpenBao's TLS files from the host folder SDLC_OPENBAO_TLS_DIR into the volumes
+  # openbao-tls (key and certificate, owner openbao) and openbao-ca (the CA certificate, readable
+  # by every client), so no host file needs the container's user (A10, design/ADR-M63). Runs at
+  # every start; `openbao/tls.sh reload` runs it again after a renewal. No network.
+  openbao-tls-init:
+    image: openbao/openbao:2.7.1
+    profiles: [core, observability]
+    restart: 'no'
+    network_mode: none
+    user: root
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        for f in ca.pem server.pem server-key.pem; do
+          test -s "/src/$$f" || { echo "openbao-tls-init: $$f missing in SDLC_OPENBAO_TLS_DIR (openbao/tls.sh dev, or runbook T11 section 3c)" >&2; exit 1; }
+        done
+        cp /src/server.pem /tls/server.pem.new
+        cp /src/server-key.pem /tls/server-key.pem.new
+        cp /src/ca.pem /ca/ca.pem.new
+        chown 100:1000 /tls/server.pem.new /tls/server-key.pem.new
+        chmod 0644 /tls/server.pem.new /ca/ca.pem.new
+        chmod 0600 /tls/server-key.pem.new
+        chmod 0755 /tls /ca
+        mv /tls/server.pem.new /tls/server.pem
+        mv /tls/server-key.pem.new /tls/server-key.pem
+        mv /ca/ca.pem.new /ca/ca.pem
+        echo 'openbao-tls-init: certificates in place'
+    volumes:
+      - ${SDLC_OPENBAO_TLS_DIR:?set SDLC_OPENBAO_TLS_DIR in .env (openbao/tls.sh dev)}:/src:ro
+      - openbao-tls:/tls
+      - openbao-ca:/ca
+
   openbao:
     image: openbao/openbao:2.7.1
     profiles: [core, observability]
     restart: unless-stopped
     networks: [sdlc]
+    depends_on:
+      openbao-tls-init:
+        condition: service_completed_successfully
     # Starts uninitialised and sealed. Never dev mode. Initialise, unseal and configure it with
     # openbao/bootstrap.sh (task A03, runbook handbook/03-templates/T11-openbao-runbook.md).
     command: [server]
     environment:
-      BAO_ADDR: http://127.0.0.1:8200
+      # Admin commands inside the container go through TLS too (the certificate names 127.0.0.1).
+      BAO_ADDR: https://127.0.0.1:8200
+      BAO_CACERT: /openbao/ca/ca.pem
     volumes:
       - ./openbao/openbao.hcl:/openbao/config/openbao.hcl:ro
       # Bootstrap scripts, settings and policies; outside /openbao/config (every .hcl file
@@ -380,14 +425,18 @@ services:
       - openbao-data:/openbao/file
       # File audit device (openbao.hcl). Its own volume, kept when the container is removed.
       - openbao-audit:/openbao/logs
+      - openbao-tls:/openbao/tls:ro
+      - openbao-ca:/openbao/ca:ro
     # No published port (A11, design/QUESTIONS.md #27): OpenBao is reachable only on the Compose
     # network. Key holders and admins use `docker compose exec openbao` (runbook T11).
     healthcheck:
       <<: *healthcheck-defaults
-      # Healthy = the API is reachable. It does NOT mean initialised or unsealed (see README).
+      # Healthy = the API answers over TLS with a certificate the CA accepts. It does NOT mean
+      # initialised or unsealed (see README): `bao status` exits 0 (unsealed) or 2 (sealed or
+      # uninitialised); 1 is an error, for example a bad certificate.
       test:
         - CMD-SHELL
-        - wget -q -O /dev/null 'http://127.0.0.1:8200/v1/sys/health?uninitcode=200&sealedcode=200&standbyok=true'
+        - bao status >/dev/null 2>&1; s=$$?; [ "$$s" -eq 0 ] || [ "$$s" -eq 2 ]
 
   # ------------------------------------------------------- observability ----
 
@@ -561,13 +610,14 @@ services:
       SDLC_API_EVIDENCE_BUCKET: evidence
       # Traces over OTLP to the collector (A08, ADR-M35). Empty: off. Set by up.sh (observability).
       SDLC_OTEL_ENDPOINT: ${SDLC_OTEL_ENDPOINT:-}
-      SDLC_OPENBAO_ADDR: http://openbao:8200
-      # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
-      SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'
+      # TLS (A10, ADR-M63): the client always verifies OpenBao's certificate with this CA.
+      SDLC_OPENBAO_ADDR: https://openbao:8200
+      SDLC_OPENBAO_CA_CERT_FILE: /run/sdlc/openbao-ca/ca.pem
       SDLC_OPENBAO_ROLE_ID_FILE: /run/sdlc/approle/role_id
       SDLC_OPENBAO_SECRET_ID_FILE: /run/sdlc/approle/secret_id
     volumes:
       - api-approle:/run/sdlc/approle
+      - openbao-ca:/run/sdlc/openbao-ca:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -606,9 +656,9 @@ services:
       SDLC_WORKER_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       # Traces over OTLP to the collector (A08, ADR-M35). Empty: off. Set by up.sh (observability).
       SDLC_OTEL_ENDPOINT: ${SDLC_OTEL_ENDPOINT:-}
-      SDLC_OPENBAO_ADDR: http://openbao:8200
-      # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
-      SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'
+      # TLS (A10, ADR-M63): the client always verifies OpenBao's certificate with this CA.
+      SDLC_OPENBAO_ADDR: https://openbao:8200
+      SDLC_OPENBAO_CA_CERT_FILE: /run/sdlc/openbao-ca/ca.pem
       SDLC_OPENBAO_ROLE_ID_FILE: /run/sdlc/approle/role_id
       SDLC_OPENBAO_SECRET_ID_FILE: /run/sdlc/approle/secret_id
       # C06 session 2 (ADR-M33 §2.5): the second AppRole "cost-controller" (the LiteLLM master key)
@@ -649,6 +699,7 @@ services:
     volumes:
       - worker-approle:/run/sdlc/approle
       - worker-cost-approle:/run/sdlc/cost-approle
+      - openbao-ca:/run/sdlc/openbao-ca:ro
     read_only: true
     tmpfs: [/tmp]
     cap_drop: [ALL]
@@ -783,15 +834,16 @@ services:
       # identity from OpenBao (kv/runner/evidence, `openbao:bootstrap runner-evidence-credentials`).
       SDLC_RUNNER_EVIDENCE_URL: http://seaweedfs:8333
       SDLC_RUNNER_EVIDENCE_BUCKET: evidence
-      SDLC_OPENBAO_ADDR: http://openbao:8200
-      # Plain HTTP on the Compose network until TLS on OpenBao 8200 (task A10, QUESTIONS #20).
-      SDLC_OPENBAO_ALLOW_PLAINTEXT: '1'
+      # TLS (A10, ADR-M63): the client always verifies OpenBao's certificate with this CA.
+      SDLC_OPENBAO_ADDR: https://openbao:8200
+      SDLC_OPENBAO_CA_CERT_FILE: /run/sdlc/openbao-ca/ca.pem
       SDLC_OPENBAO_ROLE_ID_FILE: /run/sdlc/approle/role_id
       SDLC_OPENBAO_SECRET_ID_FILE: /run/sdlc/approle/secret_id
     volumes:
       - docker-proxy:/run/docker-proxy
       - runner-approle:/run/sdlc/approle
       - runner-work:/var/lib/sdlc-runner/work
+      - openbao-ca:/run/sdlc/openbao-ca:ro
     read_only: true
     # /tmp holds the heartbeat file the health check reads.
     tmpfs: [/tmp]

@@ -18,7 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runContractBytes } from '../../../packages/core/src/run-contract/canonical.js';
 import { deployDir, root } from '../../deploy/compose';
 import { SAMPLE_CONTRACT } from '../../run-contract/helpers';
-import { isolateEnv } from '../throwaway-compose';
+import { isolateEnv, OPENBAO_CA_FILE, OPENBAO_URL, openbaoCaMount } from '../throwaway-compose';
 
 const enabled = process.env.SDLC_OPENBAO_TEST === '1';
 const PORT_OFFSET = 23000;
@@ -123,8 +123,11 @@ describe.skipIf(!enabled)(
             '/run/sdlc:uid=1000,gid=1000,mode=0700',
             '-v',
             `${root}:/repo:ro`,
+            ...openbaoCaMount(network),
             '-e',
-            'SDLC_OPENBAO_ADDR=http://openbao:8200',
+            `SDLC_OPENBAO_ADDR=${OPENBAO_URL}`,
+            '-e',
+            `SDLC_OPENBAO_CA_CERT_FILE=${OPENBAO_CA_FILE}`,
             '-e',
             'SECRETS_DIST=/repo/platform/packages/secrets/dist/index.js',
             NODE_IMAGE,

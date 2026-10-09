@@ -53,6 +53,8 @@ describe('sdlc-worker service', () => {
       'worker-approle:/run/sdlc/approle',
       // C06 session 2a (ADR-M33 §2.5): the second AppRole, cost-controller; files, not values.
       'worker-cost-approle:/run/sdlc/cost-approle',
+      // A10 (ADR-M63): the CA that verifies OpenBao's certificate, read-only.
+      'openbao-ca:/run/sdlc/openbao-ca:ro',
     ]);
     expect(worker.environment).toMatchObject({
       SDLC_WORKER_COST_ROLE_ID_FILE: '/run/sdlc/cost-approle/role_id',

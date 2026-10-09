@@ -45,7 +45,11 @@ describe('sdlc-api service', () => {
       SDLC_OPENBAO_ROLE_ID_FILE: '/run/sdlc/approle/role_id',
       SDLC_OPENBAO_SECRET_ID_FILE: '/run/sdlc/approle/secret_id',
     });
-    expect(api.volumes).toEqual(['api-approle:/run/sdlc/approle']);
+    expect(api.volumes).toEqual([
+      'api-approle:/run/sdlc/approle',
+      // A10 (ADR-M63): the CA that verifies OpenBao's certificate, read-only.
+      'openbao-ca:/run/sdlc/openbao-ca:ro',
+    ]);
   });
 
   it('U01: serves the dashboard built into the image, on the same 127.0.0.1 port (ADR-M54)', () => {

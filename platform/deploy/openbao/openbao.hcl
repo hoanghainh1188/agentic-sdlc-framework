@@ -10,11 +10,15 @@ storage "raft" {
   node_id = "openbao-1"
 }
 
-# TLS is off on the internal Docker network; the host port is bound to 127.0.0.1 by
-# default. Accepted for development only: TLS is open item design/QUESTIONS.md #20.
+# TLS on the Compose network (task A10, design/ADR-M63, QUESTIONS #20). The certificate (names
+# openbao and 127.0.0.1) comes from the job openbao-tls-init: a throw-away CA on development
+# machines and in CI, the company CA on the server. Renewal without a restart: tls.sh reload
+# (SIGHUP). Every client verifies the CA; there is no plain listener on the network.
 listener "tcp" {
-  address     = "0.0.0.0:8200"
-  tls_disable = true
+  address         = "0.0.0.0:8200"
+  tls_cert_file   = "/openbao/tls/server.pem"
+  tls_key_file    = "/openbao/tls/server-key.pem"
+  tls_min_version = "tls12"
 }
 
 # Key-holder listener: reachable only inside the container (docker compose exec), never from
@@ -39,8 +43,8 @@ audit "file" "file" {
   }
 }
 
-api_addr     = "http://openbao:8200"
-cluster_addr = "http://openbao:8201"
+api_addr     = "https://openbao:8200"
+cluster_addr = "https://openbao:8201"
 
 # Recommended with integrated storage (memory-mapped files).
 disable_mlock = true
