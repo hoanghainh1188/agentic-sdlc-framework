@@ -687,7 +687,7 @@ Needs the profiles `core` and `observability` running, and OpenBao unsealed. Run
    pnpm openbao:bootstrap worker-langfuse-credentials
    ```
    It asks for an admin token, the public key (`pk-lf-…`) and the secret key (`sk-lf-…`), all hidden. It stores `kv/worker/langfuse`, applies the SeaweedFS identity and the ClickHouse user, checks both, and prints no secret. Then close the Langfuse window.
-   - On a server updated from before E08, restart ClickHouse once first (`pnpm compose:obs`): the setting `CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT` lets the command make the user.
+   - The command makes the user as `sdlc_admin`, a ClickHouse user that answers only inside the container (`platform/deploy/clickhouse/sdlc-admin.xml`; it may manage users and grant `ALTER DELETE` on the two event tables, nothing else). Langfuse's own user `langfuse` cannot create users (ADR-M63 §6). On a server updated from before A10, restart ClickHouse once first (`pnpm compose:obs`); an existing `sdlc_purge` keeps working.
 3. **Turn it on.** Set `SDLC_WORKER_LANGFUSE_URL=http://langfuse-web:3000` in `platform/deploy/.env`. (`up.sh` also sets it when `observability` is in the same call or Langfuse's ClickHouse volume exists: Langfuse's data stays in its volumes when the profile is off.) Restart `sdlc-worker`. The start log has no `worker.langfuse_missing`; the first pass logs no `retention.langfuse_project_mismatch` (the key must belong to the project "Agentic SDLC platform", `LANGFUSE_INIT_PROJECT_ID`).
 4. Record the date in the operations log.
 

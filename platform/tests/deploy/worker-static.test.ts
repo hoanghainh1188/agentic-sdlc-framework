@@ -215,11 +215,34 @@ describe('sdlc-worker service', () => {
     );
   });
 
-  it('E08: ClickHouse lets its admin user create sdlc_purge (access management)', () => {
+  it('A10: no ClickHouse user manages users over the network; sdlc_admin is loopback only', () => {
     const clickhouse = compose.services.clickhouse as unknown as {
       environment: Record<string, string>;
+      volumes: string[];
     };
-    expect(clickhouse.environment.CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT).toBe('1');
+    // `langfuse` (the network user) has no access management (ADR-M63 §6).
+    expect(clickhouse.environment).not.toHaveProperty('CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT');
+    expect(JSON.stringify(compose)).not.toMatch(/ACCESS_MANAGEMENT/);
+    expect(clickhouse.volumes).toContain(
+      './clickhouse/sdlc-admin.xml:/etc/clickhouse-server/users.d/sdlc-admin.xml:ro',
+    );
+    const xml = fs.readFileSync(path.join(deployDir, 'clickhouse/sdlc-admin.xml'), 'utf8');
+    // Well-formed: a double hyphen inside a comment stops ClickHouse at start.
+    for (const comment of xml.match(/<!--[\s\S]*?-->/g) ?? []) {
+      expect(comment.slice(4, -3)).not.toContain('--');
+    }
+    const body = xml.replace(/<!--[\s\S]*?-->/g, '');
+    // Loopback only, and no access_management switch (the grants below are the whole right).
+    expect([...body.matchAll(/<ip>([^<]*)<\/ip>/g)].map((m) => m[1])).toEqual(['::1', '127.0.0.1']);
+    expect(body).not.toMatch(/<host|<host_regexp|access_management/);
+    expect([...body.matchAll(/<query>([^<]*)<\/query>/g)].map((m) => m[1])).toEqual([
+      'GRANT CREATE USER, ALTER USER, DROP USER ON *.*',
+      'GRANT SHOW USERS ON *.*',
+      'GRANT ALTER DELETE ON default.events_full WITH GRANT OPTION',
+      'GRANT ALTER DELETE ON default.events_core WITH GRANT OPTION',
+    ]);
+    // The only user it declares.
+    expect([...body.matchAll(/<users>\s*<([a-z_]+)>/g)].map((m) => m[1])).toEqual(['sdlc_admin']);
   });
 
   it('E08: worker-langfuse-credentials: List and delete under events/otel only, ALTER DELETE only', () => {
@@ -244,6 +267,8 @@ describe('sdlc-worker service', () => {
       new Set(['ALTER DELETE default.events_full', 'ALTER DELETE default.events_core']),
     );
     expect(command).toContain('REVOKE ALL ON *.* FROM sdlc_purge');
+    // As the loopback-only admin, never as `langfuse`.
+    expect(command).toContain("ch_admin='clickhouse-client --user sdlc_admin --multiquery'");
     // Secrets go through pipes: never a clickhouse-client password argument or a host file.
     expect(command).not.toMatch(/--password/);
     expect(command).toContain('bao kv put -mount=kv worker/langfuse -');

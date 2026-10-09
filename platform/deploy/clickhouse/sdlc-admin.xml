@@ -1,0 +1,27 @@
+<!-- The ClickHouse user that manages sdlc_purge (task A10, design/ADR-M63 §6, QUESTIONS #330).
+     Only from inside the container (clickhouse-client in `docker compose exec clickhouse`, as
+     the user sdlc_admin), never over the Compose network: no password, loopback only.
+     No double hyphen in this comment: XML refuses it and ClickHouse would not start.
+     It may create and change users and grant exactly what sdlc_purge needs (ALTER DELETE on the
+     two Langfuse event tables, for APPLY DELETED MASK). It reads no data, cannot widen its own
+     rights and cannot make another user that manages users. The Langfuse user `langfuse` has no
+     access management. -->
+<clickhouse>
+    <users>
+        <sdlc_admin>
+            <no_password/>
+            <networks>
+                <ip>::1</ip>
+                <ip>127.0.0.1</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <grants>
+                <query>GRANT CREATE USER, ALTER USER, DROP USER ON *.*</query>
+                <query>GRANT SHOW USERS ON *.*</query>
+                <query>GRANT ALTER DELETE ON default.events_full WITH GRANT OPTION</query>
+                <query>GRANT ALTER DELETE ON default.events_core WITH GRANT OPTION</query>
+            </grants>
+        </sdlc_admin>
+    </users>
+</clickhouse>
