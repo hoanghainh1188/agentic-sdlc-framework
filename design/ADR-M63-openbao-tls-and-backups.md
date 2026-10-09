@@ -49,8 +49,19 @@
 - **Bind-mounting the host files**: needs host modes the container users can read (a key readable by others, or a group change on the host).
 - **The health check on the plain listener 8210**: it could not see a bad certificate on 8200.
 
+## 6. ClickHouse: no user manages users over the network
+
+- **Context.** E08 gave ClickHouse's user `langfuse` access management (`CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1`, ADR-M53 §2.3) so the bootstrap could make `sdlc_purge`. `langfuse` is the user Langfuse connects with over the Compose network, so Langfuse, or anyone with its password, could create ClickHouse users and grants (MVP-DONE §5, before the real server).
+- **Decision** (Harry, 2026-10-09, QUESTIONS #330):
+  - `langfuse` has no access management: the setting is gone from the compose file.
+  - A second user, **`sdlc_admin`**, is declared in `platform/deploy/clickhouse/sdlc-admin.xml` (mounted read-only into `users.d/`): no password, **loopback only** (`::1`, `127.0.0.1`), so only `clickhouse-client` inside the container reaches it (`docker compose exec clickhouse`).
+  - Its grants are exactly: create, change and drop users; show users; `ALTER DELETE` on `default.events_full` and `default.events_core` with grant option. It reads no data, cannot grant anything else, and cannot make another user that manages users (checked live on ClickHouse 26.3.39.7).
+  - `openbao:bootstrap worker-langfuse-credentials` makes and checks `sdlc_purge` as `sdlc_admin`; the SQL still goes on stdin.
+- **Consequences.** An `sdlc_purge` made before stays (ClickHouse keeps it in its volume); a restart of ClickHouse applies the change. Whoever can run `docker compose exec` on the server can still manage these users, as before. `pnpm test:observability` checks over the network that `langfuse` cannot create a user and `sdlc_admin` cannot sign in; a static test checks the file (loopback only, the exact grants, no double hyphen in a comment: ClickHouse refuses to start on it).
+
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-09 | Claude Code (task A10, PR 1) | TLS everywhere, the throw-away CA on development machines and in CI, `openbao-tls-init`, renewal by SIGHUP, `tls.sh` |
+| 0.3 | 2026-10-09 | Claude Code (task A10) | §6: ClickHouse access management moves from `langfuse` to the loopback-only `sdlc_admin` (QUESTIONS #330; supersedes part of ADR-M53 §2.3) |
