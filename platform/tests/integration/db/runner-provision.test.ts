@@ -428,8 +428,11 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
     // Another runner deployment on the same Docker host.
     const foreign = '77777777-7777-4777-8777-777777777777';
     docker.volumes.set(`sdlc-ws-${foreign}`, labelsOf(s, foreign, 'staging'));
-    // A clone the old process left on disk.
+    // A clone and an unfinished push folder the old process left on disk, and an unrelated folder.
     fs.mkdirSync(path.join(workDir, 'run-old'));
+    fs.mkdirSync(path.join(workDir, 'publish-old'));
+    fs.writeFileSync(path.join(workDir, 'publish-old', 'client-file.ts'), 'export {};\n');
+    fs.mkdirSync(path.join(workDir, 'keep-me'));
 
     // New process: fresh held set, nothing in memory.
     const fresh = { ...deps, held: new HeldRuns() };
@@ -456,6 +459,8 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
     expect(docker.networks.size).toBe(0);
     expect([...docker.volumes.keys()]).toEqual([`sdlc-ws-${foreign}`]); // never touched
     expect(fs.existsSync(path.join(workDir, 'run-old'))).toBe(false);
+    expect(fs.existsSync(path.join(workDir, 'publish-old'))).toBe(false);
+    expect(fs.existsSync(path.join(workDir, 'keep-me'))).toBe(true);
     docker.volumes.clear();
   });
 

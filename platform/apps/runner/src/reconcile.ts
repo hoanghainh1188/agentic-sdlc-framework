@@ -137,7 +137,13 @@ async function cleanUpRun(
   return failed;
 }
 
-/** Clones of the old process (`run-*` in the work folder, also the kept clones of L1 runs): remove them. */
+/**
+ * Folders the old process left in the work folder: the run clones (`run-*`, also the kept clones of
+ * L1 runs) and the push folders of a publish it did not finish (`publish-*`). Both hold client code.
+ */
+const OLD_CLONE_PREFIXES = ['run-', 'publish-'] as const;
+
+/** Remove the old process's clones; other entries of the work folder stay. */
 function removeOldClones(workDir: string): void {
   let entries: string[];
   try {
@@ -146,7 +152,7 @@ function removeOldClones(workDir: string): void {
     return; // no work folder yet
   }
   for (const entry of entries) {
-    if (entry.startsWith('run-')) {
+    if (OLD_CLONE_PREFIXES.some((prefix) => entry.startsWith(prefix))) {
       fs.rmSync(path.join(workDir, entry), { recursive: true, force: true });
     }
   }
