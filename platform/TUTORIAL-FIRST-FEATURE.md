@@ -106,6 +106,7 @@ tasks:
 - `allowed_paths` is the most important line: the agent may change **only** these files. Here, the product screens of the web application; not the API.
 - `tools` are what the agent may use: edit files, run commands in its sandbox.
 - If the change were a database migration, a payment or personal data, the plan would say so in `change_flags`, and the platform would ask for more approvals.
+- Every field and rule of the plan file: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#plan-file).
 
 An submits it:
 
@@ -168,7 +169,7 @@ Binh clicks **Merge** on GitHub.
 
 ## Step 7. Release (Binh, gate G8)
 
-The platform builds the **Evidence Pack**: the spec and plan hashes, the diff, CI, every gate decision with who made it, the runs, the cost, and the client AI disclosure note.
+The platform builds the **Evidence Pack**: the hashes of the spec, the plan and the diff (never the code or the texts), CI, every gate decision with who made it, the runs, the cost, and the client AI disclosure note ([what it holds](../handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)).
 
 > **INT-2026-0007** waits for the release approval at **G8** (Release). The platform built the Evidence Pack (`sdlc evidence show INT-2026-0007`); the approval is bound to its release hash. @binh: check the pack …, then approve with `/approve G8` …
 

@@ -19,7 +19,7 @@ Two people stay in control of every project: **Person A**, the intent owner, who
 | Pushing a branch and opening a pull request | Done by the platform, after it checked the agent's changes | The platform |
 | CI on the pull request | The same CI, read by the platform | The platform |
 | Code review and merge | The **same GitHub review**, by someone who did not produce the change; then a person merges | Person B |
-| Release approval | Person B approves the release with an **Evidence Pack**: spec, plan, diff, CI, every decision, cost | Person B |
+| Release approval | Person B approves the release with an **Evidence Pack**: the fingerprints (hashes) of the spec, plan and diff, CI, every decision, cost ([what it holds](../handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)) | Person B |
 
 Your day-to-day tools stay the same: **GitHub issues, comments and reviews**. Two small additions: the `sdlc` command (to create intents, link specs, submit plans) and a read-only **dashboard** that shows what waits for whom.
 

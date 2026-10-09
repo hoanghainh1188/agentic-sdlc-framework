@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.4, 2026-10-09 (docs review PR C: §1 "Who decides each gate" is the one table of the defaults; the second approver at Critical risk at G7; the exit codes, the dashboard and the producers link to their sources). Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block window, the gate short names). Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
+Version 0.5, 2026-10-09 (docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists). Version 0.4, 2026-10-09 (docs review PR C: §1 "Who decides each gate" is the one table of the defaults; the second approver at Critical risk at G7; the exit codes, the dashboard and the producers link to their sources). Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block window, the gate short names). Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
 
 ---
 
@@ -26,7 +26,7 @@ You describe a change; an AI agent writes the code in an isolated sandbox; peopl
 Three rules that never change:
 
 - **The producer of a change never approves it** at G7 or G8; the creator still approves G1. Who the producers are: [handbook Ch.15 §15.10.1](../handbook/02-playbook/ch15-p5-release.md#producers).
-- **No gate passes by silence.** A gate that waits for you waits until a person with the role decides. HOTL gates pass only when their conditions hold, and you can still block them within the **block window** (4 working hours by default, configurable).
+- **No gate passes by silence.** A gate that waits for you waits until a person with the role decides. HOTL gates pass only when their conditions hold, and you can still block them within the **block window** (4 working hours by default; how it works: [handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#block-window)).
 - **The platform never merges and never deploys.** People do.
 
 Risk tiers decide how far the agent may go: Low and Medium → it changes code (L2, controlled change); High → it only writes a proposal (L1, execute in sandbox); Critical → it never runs (L0, assist). Details: handbook codes table (`handbook/00-introduction/05-codes.md`).
@@ -99,7 +99,7 @@ Check the goal, scope and risk, then approve on the issue:
 
 ### Step 3. Link the spec → G2 (Person A, or PM / BrSE)
 
-The spec is a Markdown file **on the default branch** (`main`):
+The spec is a Markdown file **on the default branch** (`main`); the rules: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#spec-link):
 
 ```bash
 sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.md
@@ -124,7 +124,7 @@ sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.
        tools: [file_editor, terminal]
    ```
 
-   `allowed_paths` are the only files the agent may change. Add `change_flags` (for example `migration`, `personal_data`) when the change is of that kind: they make G3 a human decision and G7 need two approvals.
+   `allowed_paths` are the only files the agent may change. Add `change_flags` when the change is of that kind: some make G3 a human decision (for example `migration`, `new_service_boundary`), some make G7 need two approvals (for example `migration`, `payment`, `personal_data`); the two lists are in the [codes table §4](../handbook/00-introduction/05-codes.md#4-eight-gates-g1g8-with-risk-based-oversight). Every field, what the platform refuses, and how the agent reads the task text: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#plan-file). From a Spec Kit or BMAD task list, `sdlc plan draft` writes the file for you to complete ([§19.8c](../handbook/02-playbook/ch19-approval-queues.md#plan-draft)).
 2. Open a pull request with the file, let Person B review it, and merge it into `main`.
 3. Submit it: `sdlc plan submit INT-2026-0007`.
 
@@ -137,14 +137,14 @@ When G3 is passed and every block window is closed (section 1), the platform che
 
 - **High risk:** Person A approves the run first: `/approve G4`. The agent then writes only a **proposal** (no push); the intent pauses for Person A to decide what to do with it.
 - **Critical risk:** the platform **blocks** the intent; the agent never runs.
-- At 80 % of the run's budget a warning comment appears; at 100 % the run stops.
-- To stop a run at any time: `/kill` on the issue, or `sdlc run kill INT-2026-0007` (handbook Ch.18 §18.8d).
+- At 80 % of the run's budget a warning comment appears; at 100 % the run stops ([budgets: handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#budgets)).
+- To stop a run at any time: `/kill` on the issue, or `sdlc run kill INT-2026-0007` (who may, and what happens: [handbook Ch.18 §18.8d](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188d-using-the-platform-the-kill-switch)).
 
 ### Step 6. G5 and G6 (the platform)
 
-- **G5** compares the changed files with the plan and the cost with the budget. Outside the plan → back to G3. Over the budget or a stalled agent → paused with an escalation (section 5).
+- **G5** compares the changed files with the plan and the cost with the budget. Outside the plan → back to G3. Over the budget or a stalled agent → paused with an escalation (section 5). Every check: [handbook Ch.13 §13.10.5](../handbook/02-playbook/ch13-p3-coding.md#13105-gate-g5-scope-and-budget).
 - The platform then pushes the change to the branch `agent/INT-2026-0007` and **opens the pull request**.
-- **G6** waits for CI (`ci-ok` on the sample repo). CI fails → a new run fixes it, up to 2 times; then back to G3. Security findings, or High risk → Person B approves G6.
+- **G6** waits for CI (`ci-ok` on the sample repo). CI fails → a new run fixes it, up to 2 times by default; then back to G3. Security findings, or High risk → Person B approves G6. Every outcome, the retries and the timeout: [handbook Ch.14 §14.10.2](../handbook/02-playbook/ch14-p4-testing.md#14102-how-g6-reads-ci).
 
 ### Step 7. G7: review and merge (Person B; the second approver when flagged)
 
@@ -155,11 +155,11 @@ The issue shows **the pull request waits for review**.
 2. When the platform posts **ready to merge**, a person who is not a producer **merges** the pull request on GitHub. Merge only then, and only the commit that was approved.
 3. The platform posts **merged**; the intent waits at G8.
 
-Merging too early, or by a producer or a bot, stops the intent with a security escalation.
+Merging too early, or by a producer or a bot, stops the intent with a security escalation. Which reviews count, the second approver, and when G7 stops: [handbook Ch.15 §15.10.1](../handbook/02-playbook/ch15-p5-release.md#15101-gate-g7-review-and-merge).
 
 ### Step 8. G8: the release (Person B; + second approver at Critical)
 
-The platform builds the **Evidence Pack** (spec, plan, diff, CI, every gate decision, cost, the client AI disclosure note) and asks for the release approval.
+The platform builds the **Evidence Pack** (what it holds: [handbook Ch.15 §15.10.2](../handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)) and asks for the release approval (how G8 decides: [§15.10.3](../handbook/02-playbook/ch15-p5-release.md#15103-gate-g8-release)).
 
 ```bash
 sdlc evidence show INT-2026-0007     # what your approval is bound to
@@ -178,7 +178,7 @@ The platform seals the pack, records the metrics and closes the intent: **releas
 | `/approve G<n>` | Approve the gate the intent waits at (not G7) |
 | `/reject G<n> [reason_code] <reason>` | Reject. Ends the intent at G1–G3 and G8; back to G3 at G7 |
 | `/request-changes G<n> [reason_code] <reason>` | Ask for changes; the intent stays at the gate (at G7: a new run) |
-| `/ack ESC-…` / `/decide ESC-… <resume\|modify\|roll-back\|terminate\|escalate>` | Escalations (section 5) |
+| `/ack ESC-…` / `/decide ESC-… <resume\|modify\|roll-back\|terminate\|escalate>` | Escalations (section 5; [handbook Ch.18 §18.8b](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188b-using-the-platform-escalations-ack-and-decide)) |
 | `/kill` | Stop the intent's agent run |
 
 Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `other`… The platform keeps the code and a link to your comment, never your words: write reasons that can stay on GitHub, with no personal or client data.
@@ -212,7 +212,7 @@ The dashboard shows intents by gate, escalations, cost and gate waiting times; i
 | **Your intent does not move** | The platform holds it | `sdlc intent show <INT>` prints "Held: …" with the reason (and for a failed G4 check, which one); the dashboard shows the same under "What holds it" |
 | **Back at G2** (spec changed) | Someone edited the spec on `main` | Approve G2 again (passed by itself at Low risk) |
 | **Budget warning** | The run used 80 % of its budget | Nothing yet; at 100 % it stops and escalates |
-| **An escalation** (ESC-…) | A run or a gate needs a person: over budget, out of scope, overdue gate, CI timeout, early merge… | The escalation owner named in the notice: `/ack ESC-…`, look at the cause, then `/decide ESC-… <decision>`. Details: handbook Ch.18 §18.8b |
+| **An escalation** (ESC-…) | A run or a gate needs a person: over budget, out of scope, overdue gate, CI timeout, early merge… | The escalation owner named in the notice: `/ack ESC-…`, look at the cause, then `/decide ESC-… <decision>`. Who may, and what each decision does: [handbook Ch.18 §18.8b](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188b-using-the-platform-escalations-ack-and-decide) |
 | **The gate is overdue** | Nobody decided within 1 working day | Decide the gate; the escalation closes by itself |
 | **CI failed** | The agent's change does not pass `ci-ok` | Nothing: a new run tries again (2 times), then the intent goes back to G3 |
 | The intent is **paused** | An escalation is open | Decide the escalation |
@@ -220,6 +220,8 @@ The dashboard shows intents by gate, escalations, cost and gate waiting times; i
 The work stays frozen while an escalation waits (except safe actions such as stopping a run). Nobody answering never means "go ahead": the escalation moves to the backup owner, then to governance.
 
 ## 6. Never
+
+Your habits; what the platform itself never does (merge, deploy, give an agent a real key…) is in [README §3](../README.md#3-how-it-works).
 
 - Approve your own work, or merge a pull request whose change you produced.
 - Merge before the platform says **ready to merge**, or push to an `agent/INT-…` branch yourself.
