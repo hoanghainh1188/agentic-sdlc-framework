@@ -98,6 +98,25 @@ describe('OpenBao bootstrap scripts', () => {
     expect(r.stderr).toMatch(/not found; run scripts\/init-env\.sh first/);
   });
 
+  it('builds a missing service image before compose run, and reads the accessor from the last line', () => {
+    // On a fresh machine `compose run` builds a missing image and prints the build log on stdout,
+    // before the accessor (fresh deployment in CI, 2026-10-09).
+    const text = fs.readFileSync(BOOTSTRAP, 'utf8');
+    const ensure = /^ensure_service_image\(\) \{[\s\S]*?^\}$/m.exec(text)?.[0] ?? '';
+    expect(ensure).toContain('config --images "$1"');
+    expect(ensure).toMatch(/build "\$1" >&2/);
+    for (const fn of ['deliver_approle', 'cmd_litellm_credentials']) {
+      const body = new RegExp(`^${fn}\\(\\) \\{[\\s\\S]*?^\\}$`, 'm').exec(text)?.[0] ?? '';
+      expect(body, fn).not.toBe('');
+      const ensureAt = body.indexOf('ensure_service_image');
+      expect(ensureAt, fn).toBeGreaterThan(-1);
+      expect(ensureAt, fn).toBeLessThan(body.indexOf(' run --rm -T'));
+      const lastLine = body.indexOf(`accessor="$(printf '%s\\n' "$accessor" | tail -n 1)"`);
+      expect(lastLine, fn).toBeGreaterThan(-1);
+      expect(lastLine, fn).toBeLessThan(body.indexOf('revoke_other_secret_ids'));
+    }
+  });
+
   it('refuses unknown commands and options', () => {
     expect(runBootstrap(['destroy']).status).toBe(2);
     expect(runBootstrap(['init', '--keep-token']).stderr).toMatch(/unknown option/);
