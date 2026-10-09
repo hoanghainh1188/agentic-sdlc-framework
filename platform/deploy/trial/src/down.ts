@@ -27,14 +27,36 @@ export interface DownOptions {
   /** The trial's Compose project: passed with `-p`, so no shell variable can choose another. */
   readonly project: string;
   readonly wipe: boolean;
-  /** Credentials files of the trial's people, removed with `--wipe` (their tokens are dead). */
+  /**
+   * Credentials files of the trial's people, removed with `--wipe` (their tokens are dead), but
+   * only when they still hold a login to the trial's API (review V02 #1): a login to another
+   * platform saved there later is kept.
+   */
   readonly credentialsFiles: readonly string[];
+  /** The trial stack's API address (`trialApiUrl`). */
+  readonly apiUrl: string;
   readonly exec: Exec;
 }
 
-export async function trialDown(
-  o: DownOptions,
-): Promise<{ status: number | null; stderr: string }> {
+/** Whether a credentials file holds a login to `apiUrl`. Pure; unreadable or other → false. */
+export function isTrialLogin(text: string, apiUrl: string): boolean {
+  try {
+    const body = JSON.parse(text) as { api_url?: unknown };
+    const strip = (url: string) => url.replace(/\/+$/, '');
+    return typeof body.api_url === 'string' && strip(body.api_url) === strip(apiUrl);
+  } catch {
+    return false;
+  }
+}
+
+export interface DownResult {
+  readonly status: number | null;
+  readonly stderr: string;
+  /** Credentials files kept because they hold a login to another platform. */
+  readonly keptLogins: readonly string[];
+}
+
+export async function trialDown(o: DownOptions): Promise<DownResult> {
   const args = [
     'compose',
     '-p',
@@ -49,10 +71,20 @@ export async function trialDown(
     ...(o.wipe ? ['--volumes'] : []),
   ];
   const r = await o.exec('docker', args);
-  if (r.status !== 0 || !o.wipe) return { status: r.status, stderr: r.stderr };
+  if (r.status !== 0 || !o.wipe) return { status: r.status, stderr: r.stderr, keptLogins: [] };
   // The TLS folder next to the env file (`openbao/tls.sh dev`), the env file, the credentials.
   fs.rmSync(path.join(path.dirname(o.envFile), 'openbao-tls'), { recursive: true, force: true });
   fs.rmSync(o.envFile, { force: true });
-  for (const file of o.credentialsFiles) fs.rmSync(file, { force: true });
-  return { status: 0, stderr: '' };
+  const keptLogins: string[] = [];
+  for (const file of o.credentialsFiles) {
+    let text: string;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch {
+      continue; // already gone
+    }
+    if (isTrialLogin(text, o.apiUrl)) fs.rmSync(file, { force: true });
+    else keptLogins.push(file);
+  }
+  return { status: 0, stderr: '', keptLogins };
 }

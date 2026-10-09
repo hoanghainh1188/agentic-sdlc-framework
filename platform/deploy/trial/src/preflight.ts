@@ -27,8 +27,8 @@ export interface HostFacts {
   readonly nodeEnv: string | undefined;
   readonly envFile: string;
   readonly envFileExists: boolean;
-  /** Volumes of the dev stack (`sdlc_*`) or of an earlier trial stack. */
-  readonly existingVolumes: readonly string[];
+  /** Volumes of the dev stack (`sdlc_*`) or of an earlier trial stack; `null`: Docker could not list them. */
+  readonly existingVolumes: readonly string[] | null;
   /** `null`: no Docker, or the daemon does not answer. */
   readonly docker: { readonly composeVersion: string | null; readonly memoryBytes: number } | null;
   readonly hostMemoryBytes: number;
@@ -59,7 +59,9 @@ export function preflight(settings: TrialSettings, facts: HostFacts): Refusal[] 
 
   if (facts.nodeEnv === 'production') no('trial.refused.production');
   if (facts.envFileExists) no('trial.refused.env_exists', { path: facts.envFile });
-  if (facts.existingVolumes.length > 0) {
+  if (facts.existingVolumes === null) {
+    if (facts.docker !== null) no('trial.refused.volumes_unknown');
+  } else if (facts.existingVolumes.length > 0) {
     no('trial.refused.volumes_exist', {
       count: facts.existingVolumes.length,
       first: facts.existingVolumes[0]!,

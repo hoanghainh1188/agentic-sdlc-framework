@@ -83,9 +83,10 @@ async function dockerFacts(): Promise<HostFacts['docker']> {
  * Volumes of the dev stack (`sdlc_…`) or of a trial stack (`<project>_…`). The live test's
  * throw-away project (other name, network and ports) checks only its own.
  */
-async function volumes(project: string, devStack: boolean): Promise<string[]> {
+async function volumes(project: string, devStack: boolean): Promise<string[] | null> {
   const r = await exec('docker', ['volume', 'ls', '-q']);
-  if (r.status !== 0) return [];
+  // Unknown is never "none": preflight refuses (review V02 #2).
+  if (r.status !== 0) return null;
   return r.stdout
     .split('\n')
     .map((v) => v.trim())
