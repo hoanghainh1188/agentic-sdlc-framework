@@ -1,6 +1,6 @@
 # Chapter 15. P5 — Release (G7, G8)
 
-> Readers: **Person B, Person A, PM/BrSE, developers** · Reading time: about 15 minutes
+> Readers: **Person B, Person A, PM / BrSE, developers** · Reading time: about 15 minutes
 > Status: **Draft 0.2**, awaiting Harry's comments.
 > Section 15.10 (platform usage) is written by Claude Code together with the platform code.
 

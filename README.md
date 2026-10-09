@@ -4,7 +4,7 @@
 
 | Part | What it is | For |
 |---|---|---|
-| **Handbook** (`handbook/`) | Policies, a 6-phase process, 8 gates, roles, templates, checklists and runbooks | People: leadership, PM / BrSE, developers, reviewers, testers |
+| **Handbook** (`handbook/`) | Policies, a 6-phase process, 8 gates, roles, templates, checklists and runbooks | People: leadership, PM / BrSE (project manager, bridge system engineer), developers, reviewers, testers |
 | **Platform** (`platform/`) | Self-hosted software that **enforces** the handbook: it runs AI agents through the 8 gates, keeps evidence and an audit log, and measures tokens and cost | The delivery team, every day |
 
 The handbook says **what must happen and why**. The platform **makes sure it happens**. The design documents (`design/`) connect the two.
@@ -15,7 +15,7 @@ Built for small and medium software companies, including those working for Japan
 
 ## 1. In one sentence
 
-> AI takes part in every stage of software development, but every task passes **8 gates** (G1–G8) with **the right human approvers**, **evidence**, an **audit log that cannot be altered**, and **token and cost measured** per client, project and task.
+> AI takes part in every stage of software development, but every **intent** (one change to make) passes **8 gates** (G1–G8) with **the right human approvers**, **evidence**, an **audit log that cannot be altered**, and **token and cost measured** per client, project and intent.
 
 ![Overview: 6 phases and 8 gates](diagrams/svg/d1-overview-6-phases.svg)
 
@@ -26,13 +26,15 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 | You are | Read |
 |---|---|
 | **Leadership** deciding whether to adopt | This page, then handbook Part I: [Ch.1 summary](handbook/01-policy/ch01-executive-summary.md) and [Ch.9 adoption roadmap](handbook/01-policy/ch09-adoption-roadmap.md) |
-| **Bringing a project team onto the platform** (tech lead, leadership) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout phase by phase, the first week, common mistakes |
-| **Preparing your application's repository** (Person A, repository owner) | [ROLLOUT-GUIDE phase 1](platform/ROLLOUT-GUIDE.md#phase-1-prepare-the-repository-person-a-the-repository-owner-12-days): the two repositories, what yours needs, the one file of agent instructions, Spec Kit and BMAD |
+| **Bringing a project team onto the platform** (tech lead, leadership) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout step by step, the first week, common mistakes |
+| **Preparing your application's repository** (Person A, repository owner) | [ROLLOUT-GUIDE step 1](platform/ROLLOUT-GUIDE.md#step-1-prepare-the-repository-person-a-the-repository-owner-12-days): the two repositories, what yours needs, the one file of agent instructions, Spec Kit and BMAD |
 | **New to the platform** | [The platform in five minutes](platform/PLATFORM-IN-5-MINUTES.md), then the [tutorial: your first feature](platform/TUTORIAL-FIRST-FEATURE.md), one real feature from idea to release |
-| **A team member** (Person A, Person B, PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one task from G1 to G8, by role, with the commands and what to do when something goes wrong |
-| **Installing the platform** (operator) | [platform/deploy/README.md](platform/deploy/README.md), "Fresh deployment": from an empty checkout to the first task with Docker Compose; runbook [T11](handbook/03-templates/T11-openbao-runbook.md) |
+| **A team member** (Person A, Person B, PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one intent from G1 to G8, by role, with the commands and what to do when something goes wrong |
+| **Installing the platform** (operator) | [platform/deploy/README.md](platform/deploy/README.md), "Fresh deployment": from an empty checkout to the first intent with Docker Compose; runbook [T11](handbook/03-templates/T11-openbao-runbook.md) |
 | **Working on the platform's code** (not needed to use it) | [CONTRIBUTING.md](CONTRIBUTING.md) and [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md) (the developers' set-up: dev stack, test GitHub App) |
 | **Working on the handbook** | [CONTRIBUTING.md](CONTRIBUTING.md), the [contents](handbook/00-introduction/01-contents.md) and the [writing style](handbook/00-introduction/06-writing-style.md) |
+
+A word you do not know? The [glossary](handbook/00-introduction/02-glossary.md) explains the words, and the [codes table](handbook/00-introduction/05-codes.md) the codes (G1–G8, L0–L4, HITL, HOTL, AUDIT).
 
 ## 3. How it works
 
@@ -40,16 +42,16 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 
 ![Two repositories: the platform and your project](diagrams/svg/d14-two-repositories.svg)
 
-**A task goes through eight gates.** A person describes the change (G1), links a specification (G2) and a plan that says which files may change (G3). The platform checks the agent, its permissions and the budget (G4), runs the agent in an isolated sandbox, checks that it stayed inside the plan and the budget (G5), pushes the change and waits for CI and security scans (G6). A reviewer reviews and merges the pull request (G7), then approves the release with its evidence (G8).
+**An intent goes through eight gates.** An intent is one change to make, with a code such as `INT-2026-0007` ([glossary](handbook/00-introduction/02-glossary.md)). A person describes the change and its risk (G1), links a specification (G2) and a plan that says which files may change (G3). The platform checks the agent, its permissions and the budget (G4), runs the agent in an isolated sandbox, checks that it stayed inside the plan and the budget (G5), pushes the change and waits for CI (continuous integration: the build and the tests) and security scans (G6). Person B, the independent reviewer and approver, reviews and merges the pull request (G7), then approves the release with its evidence (G8).
 
-**The oversight of each gate depends on the risk.** Low-risk work passes some gates automatically when their conditions hold, and a person can still block it for a few hours. High-risk work lets the agent only write a proposal. Critical work never runs an agent.
+**The oversight of each gate depends on the risk.** Low-risk work passes some gates automatically when their conditions hold (HOTL, human on the loop), and a person can still block it within the **block window** (4 working hours by default, configurable). High-risk work lets the agent only write a proposal: a patch kept as evidence, never pushed. Critical work never runs an agent.
 
 **People, in a "2+N" team:**
 
 | Role | Does |
 |---|---|
-| **Person A**, the owner | Creates the work, writes specifications and plans, follows the agent |
-| **Person B**, the independent reviewer | Approves plans, reviews and merges pull requests, approves releases |
+| **Person A**, the intent owner (owner and executor) | Creates the work, writes specifications and plans, follows the agent |
+| **Person B**, the independent reviewer and approver | Approves plans, reviews and merges pull requests, approves releases |
 | **Second approver** | A second approval for sensitive changes (migration, payment, personal data…) and Critical risk |
 | **PM / BrSE** | Records the client's consent to AI use and the disclosure note |
 | **Governance** (leadership) | Decides escalations nobody else answered |
@@ -57,7 +59,7 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 
 **What the platform never does:**
 
-- let the producer of a change approve it at G7 or G8 (the person who created the task, submitted the plan, allowed a run or authored a commit, and the agent itself); the creator still approves G1;
+- let the producer of a change approve it at G7 or G8 (the person who created the intent, submitted the plan, allowed a run or authored a commit, and the agent itself); the creator still approves G1;
 - merge a pull request or deploy to production: people do;
 - give an agent a real model key, access to secrets, or a way to push to the main branch;
 - change or delete an audit record.
@@ -66,15 +68,15 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 
 | Area | What it does |
 |---|---|
-| **Gates G1–G8** | A workflow per task; approvals through GitHub comments (`/approve G3`), GitHub reviews (G7) or the `sdlc` command; each approval bound to the exact version it approved, with an expiry |
-| **Agent runs** | OpenHands in a hardened sandbox per run, network limited to the model gateway and a package proxy; iteration, time and cost caps; loop detection; a kill switch that stops a run within minutes |
-| **Scope and budget** | Changed files compared with the approved plan; budgets per tenant, task and run, with a warning at 80 % and a stop at 100 % |
-| **Evidence** | An Evidence Pack per task (specification, plan, diff, CI, every gate decision, cost, the client AI disclosure note), exportable as Markdown, sealed at release |
+| **Gates G1–G8** | A workflow per intent; approvals through GitHub comments (`/approve G3`), GitHub reviews (G7) or the `sdlc` command; each approval bound to the exact version it approved, with an expiry |
+| **Agent runs** | OpenHands (an open-source coding agent) in a hardened sandbox per run, network limited to the model gateway and a package proxy; iteration, time and cost caps; loop detection; a kill switch that stops a run within minutes |
+| **Scope and budget** | Changed files compared with the approved plan; budgets per tenant (a client or unit, with its own data), intent and run, with a warning at 80 % and a stop at 100 % |
+| **Evidence** | An Evidence Pack per intent (specification, plan, diff, CI, every gate decision, cost, the client AI disclosure note), exportable as Markdown, sealed at release |
 | **Audit** | An append-only, hash-chained audit log per tenant, checked by `sdlc audit verify`, with a daily anchor in locked storage |
-| **Escalations** | Time limits per severity, a backup owner, then governance; the work stays frozen while nobody answers |
-| **Cost** | Every model call through one gateway (LiteLLM) with labels for tenant, project, task and run; cost reports, including wasted cost |
+| **Escalations** | Time limits per severity, a backup owner for each escalation, then governance; the work stays frozen while nobody answers |
+| **Cost** | Every model call through one gateway (LiteLLM) with labels for tenant, project, intent and run; cost reports, including wasted cost |
 | **Retention** | Evidence kept 180 days by default, longer when configured; holds for disputes; the audit log kept at least two years |
-| **Dashboard** | A read-only web page: tasks by gate, who each waits for and why, escalations, cost, gate waiting times, evidence |
+| **Dashboard** | A read-only web page: intents by gate, who each waits for and why, escalations, cost, gate waiting times, evidence |
 | **Multi-tenant** | Every record belongs to a tenant; every query filters by it |
 
 Interfaces keep the platform open to change: the Git host (GitHub today), the agent (OpenHands today), the policy engine and the model provider can each be replaced without changing the core.
@@ -110,6 +112,7 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 | Topic | Document |
 |---|---|
 | Codes: phases, gates, autonomy levels, oversight modes, risk tiers, roles | [Codes table](handbook/00-introduction/05-codes.md) |
+| Words: intent, block window, producer, tenant admin… | [Glossary](handbook/00-introduction/02-glossary.md) |
 | Handbook contents | [Contents](handbook/00-introduction/01-contents.md) |
 | MVP scope and requirements | [D-02](design/D-02-mvp-scope.md) |
 | Architecture | [D-03](design/D-03-mvp-architecture.md) |

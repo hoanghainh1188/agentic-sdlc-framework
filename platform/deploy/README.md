@@ -170,7 +170,7 @@ Then `pnpm sdlc admin config set --project <project> --file <file> --expected-ve
 
 ### 13. The project AI record
 
-Person A (or the PM/BrSE) records the client's consent (handbook Ch.2 §2.5, template T7):
+Person A (or the PM / BrSE) records the client's consent (handbook Ch.2 §2.5, template T7):
 
 ```bash
 pnpm sdlc ai-record set --project <project> --expected-version 0 --ai-allowed yes \

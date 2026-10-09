@@ -1,8 +1,8 @@
-# User guide: taking one task through the platform
+# User guide: taking one intent through the platform
 
-For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one task from G1 to G8 and points to the handbook for details. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
+For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
+Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block window, the gate short names). Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
 
 ---
 
@@ -12,7 +12,7 @@ You describe a change; an AI agent writes the code in an isolated sandbox; peopl
 
 | Gate | Question | Who decides (default) |
 |---|---|---|
-| G1 Intent | What problem, what scope, what risk? | Person A |
+| G1 Intent, scope, risk | What problem, what scope, what risk? | Person A |
 | G2 Specification | Is the spec complete and clear? | Person A (Person B at High+); at Low risk the platform passes it (HOTL) |
 | G3 Plan | Is the plan right? Which files may change? | Person B; at Low risk the platform passes it (HOTL) |
 | G4 Execution boundary | May the agent run, with which limits? | The platform (policy); Person A at High risk |
@@ -24,12 +24,12 @@ You describe a change; an AI agent writes the code in an isolated sandbox; peopl
 Three rules that never change:
 
 - **The producer of a change never approves it.** Whoever creates the intent, submits the plan, allows the run or authored a commit cannot approve G7 or G8 for it.
-- **No gate passes by silence.** A gate that waits for you waits until a person with the role decides. HOTL gates pass only when their conditions hold, and you can still block them for a few hours.
+- **No gate passes by silence.** A gate that waits for you waits until a person with the role decides. HOTL gates pass only when their conditions hold, and you can still block them within the **block window** (4 working hours by default, configurable).
 - **The platform never merges and never deploys.** People do.
 
-Risk tiers decide how far the agent may go: Low and Medium → it changes code (L2); High → it only writes a proposal (L1); Critical → it never runs (L0). Details: handbook codes table (`handbook/00-introduction/05-codes.md`).
+Risk tiers decide how far the agent may go: Low and Medium → it changes code (L2, controlled change); High → it only writes a proposal (L1, execute in sandbox); Critical → it never runs (L0, assist). Details: handbook codes table (`handbook/00-introduction/05-codes.md`).
 
-## 2. Before your first task
+## 2. Before your first intent
 
 ### Install the sdlc command
 
@@ -58,8 +58,8 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
 
 ### Account and login
 
-1. **Account.** A tenant admin creates your platform user, links your GitHub account (by its numeric ID) and gives you your roles on the project. Ask them; you cannot give roles to yourself.
-2. **Token and login.** You get a first personal token (`sdlc_pat_…`) from the admin. Keep it in your password manager, never in chat or a ticket.
+1. **Account.** A tenant admin (who manages users, projects and roles for your company on the platform) creates your platform user, links your GitHub account (by its numeric ID) and gives you your roles on the project. Ask them; you cannot give roles to yourself.
+2. **API token and login.** You get a first API token (`sdlc_pat_…`) from the tenant admin. Keep it in your password manager, never in chat or a ticket.
 
    ```bash
    sdlc login --api-url https://<platform address>
@@ -67,16 +67,16 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
    sdlc token create --name laptop
    ```
 
-   `sdlc login` asks for the token at a hidden prompt. After `token create`, log in again with your own token and revoke the first one (`sdlc token list`, `sdlc token revoke --id <ID>`). Details: handbook Ch.19 §19.8c.
-3. **The project's AI record** must allow the data class of your work (Person A or PM / BrSE writes it once per project: `sdlc ai-record show --project <slug>`). Without it, intents cannot enter G1.
+   `sdlc login` asks for the API token at a hidden prompt. After `token create`, log in again with your own API token and revoke the first one (`sdlc token list`, `sdlc token revoke --id <ID>`). Details: handbook Ch.19 §19.8c.
+3. **The project AI record** (the client's recorded consent to AI use) must allow the data class of your work (how sensitive its information is) (Person A or PM / BrSE writes it once per project: `sdlc ai-record show --project <slug>`). Without it, intents cannot enter G1.
 
-## 3. One task, step by step
+## 3. One intent, step by step
 
 The example is task T01 of the sample repo, Low risk. Where Medium or High risk differs, it says so.
 
 ### Step 1. Create the intent (Person A)
 
-Open a GitHub issue for the task, then:
+Open a GitHub issue for the change, then:
 
 ```bash
 sdlc intent create --project pilot --title "Japanese labels on the product list" \
@@ -130,7 +130,7 @@ sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.
 
 ### Step 5. G4 and the run (the platform; Person A at High risk)
 
-When G3 is passed and every block window is closed, the platform checks the agent, the limits and the budget, and starts the run. You see **run started** on the issue.
+When G3 is passed and every block window is closed (section 1), the platform checks the agent, the limits and the budget, and starts the run. You see **run started** on the issue.
 
 - **High risk:** Person A approves the run first: `/approve G4`. The agent then writes only a **proposal** (no push); the intent pauses for Person A to decide what to do with it.
 - **Critical risk:** the platform **blocks** the intent; the agent never runs.
@@ -193,11 +193,11 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 | `sdlc metrics gates --project <slug>` | How long gates wait for people |
 | `sdlc evidence build\|list\|show\|export <INT>` | The Evidence Pack |
 
-Every command takes `--json`. Exit codes: 0 done; 1 refused by the platform (no role, not found, conflict, rule broken); 2 wrong command or options, not logged in, or an unsafe saved login; 3 platform unreachable or an unexpected answer; 4 token missing, expired or revoked (log in again). Same list: handbook Ch.19 §19.8c.
+Every command takes `--json`. Exit codes: 0 done; 1 refused by the platform (no role, not found, conflict, rule broken); 2 wrong command or options, not logged in, or an unsafe saved login; 3 platform unreachable or an unexpected answer; 4 API token missing, expired or revoked (log in again). Same list: handbook Ch.19 §19.8c.
 
 ### The dashboard (read only)
 
-`http://127.0.0.1:8090/dashboard/` on the platform machine shows the board of intents by gate, an intent's decisions and who decides its gate, the open escalations with their deadlines, cost and gate waiting times, and (tenant admins) the audit check. Sign in with your personal API token; it stays in the tab's memory only. The dashboard never decides anything: use comments, reviews and the CLI. Handbook Ch.19 §19.8e.
+`http://127.0.0.1:8090/dashboard/` on the platform machine shows the board of intents by gate, an intent's decisions and who decides its gate, the open escalations with their deadlines, cost and gate waiting times, and (tenant admins) the audit check. Sign in with your API token; it stays in the tab's memory only. The dashboard never decides anything: use comments, reviews and the CLI. Handbook Ch.19 §19.8e.
 
 ## 5. When something goes wrong
 
@@ -209,18 +209,18 @@ Every command takes `--json`. Exit codes: 0 done; 1 refused by the platform (no 
 | **Your intent does not move** | The platform holds it | `sdlc intent show <INT>` prints "Held: …" with the reason (and for a failed G4 check, which one); the dashboard shows the same under "What holds it" |
 | **Back at G2** (spec changed) | Someone edited the spec on `main` | Approve G2 again (passed by itself at Low risk) |
 | **Budget warning** | The run used 80 % of its budget | Nothing yet; at 100 % it stops and escalates |
-| **An escalation** (ESC-…) | A run or a gate needs a person: over budget, out of scope, overdue gate, CI timeout, early merge… | The owner named in the notice: `/ack ESC-…`, look at the cause, then `/decide ESC-… <decision>`. Details: handbook Ch.18 §18.8b |
+| **An escalation** (ESC-…) | A run or a gate needs a person: over budget, out of scope, overdue gate, CI timeout, early merge… | The escalation owner named in the notice: `/ack ESC-…`, look at the cause, then `/decide ESC-… <decision>`. Details: handbook Ch.18 §18.8b |
 | **The gate is overdue** | Nobody decided within 1 working day | Decide the gate; the escalation closes by itself |
 | **CI failed** | The agent's change does not pass `ci-ok` | Nothing: a new run tries again (2 times), then the intent goes back to G3 |
 | The intent is **paused** | An escalation is open | Decide the escalation |
 
-The work stays frozen while an escalation waits (except safe actions such as stopping a run). Nobody answering never means "go ahead": the escalation moves to the backup, then to governance.
+The work stays frozen while an escalation waits (except safe actions such as stopping a run). Nobody answering never means "go ahead": the escalation moves to the backup owner, then to governance.
 
 ## 6. Never
 
 - Approve your own work, or merge a pull request whose change you produced.
 - Merge before the platform says **ready to merge**, or push to an `agent/INT-…` branch yourself.
-- Put a token in a command line, chat, ticket or comment.
+- Put an API token in a command line, chat, ticket or comment.
 - Put personal or client data in comments or reasons: the sample repo is public, and the platform's records are kept for years.
 - Edit a comment to change a decision: write a new comment.
 

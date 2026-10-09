@@ -1,9 +1,9 @@
 sequenceDiagram
     autonumber
-    actor A as Person A (owner)
-    actor B as Person B (approver)
+    actor A as Person A (intent owner)
+    actor B as Person B (independent reviewer and approver)
     participant P as Platform<br/>(Orchestrator + Registry)
-    participant R as Run Manager
+    participant R as Runner
     participant AG as Agent (sandbox)
     participant GW as LLM Gateway
     participant G as Git host + CI
@@ -22,9 +22,10 @@ sequenceDiagram
     R->>G: Push the checked changes to agent/INT-… (after G5)
     P->>G: Open the PR (template T2, codes only)
     G-->>P: G6: CI, test, scan results
-    P-->>B: Request review (G7) + evidence pack
+    P-->>B: Request review (G7) + Evidence Pack
     B->>G: Approve PR (+ second approver for sensitive changes)
-    G-->>P: G7 passed (producer never counts) → merge
+    B->>G: Merge the approved PR (a person, never the platform)
+    G-->>P: Merge read → G7 passed (producer never counts)
     P-->>B: Request release approval (G8) + client AI disclosure
     B->>P: /approve G8
     P->>P: Write audit, close intent, record metrics

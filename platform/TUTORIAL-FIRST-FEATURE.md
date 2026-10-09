@@ -8,11 +8,11 @@ Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) first. The command
 
 | Person | Role on the project | In this story |
 |---|---|---|
-| **An** | Person A, the owner | Asks for the change, writes the spec and the plan |
-| **Binh** | Person B, the independent reviewer | Approves the plan, reviews and merges the pull request, approves the release |
+| **An** | Person A, the intent owner | Asks for the change, writes the spec and the plan |
+| **Binh** | Person B, the independent reviewer and approver | Approves the plan, reviews and merges the pull request, approves the release |
 | The agent | `coder-openhands` | Writes the code |
 
-The change is **Low risk** and uses **internal** data only (the application is fictional), so the platform passes some gates by itself.
+The change is **Low risk** and uses **internal** data only (the application is fictional), so the platform passes some gates by itself. A word you do not know: see the [glossary](../handbook/00-introduction/02-glossary.md).
 
 ---
 
@@ -29,6 +29,8 @@ sdlc intent create --project pilot --title "Japanese labels on the product list 
 Intent INT-2026-0007 is created in project pilot (status draft, risk low, data class internal,
 maximum autonomy L2, budget 10 USD). The platform checks the project AI record and moves it to G1.
 ```
+
+**L2** (controlled change) is the highest autonomy level a Low-risk intent can get: the agent may change code, but only through the gates. The **project AI record** is the client's recorded consent to AI use, with the data classes it allows; the PM / BrSE keeps it.
 
 A few seconds later the platform posts on issue #107:
 
@@ -74,7 +76,9 @@ sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.
 INT-2026-0007: spec version 1 linked: docs/specs/T01-product-list-japanese-labels.md at 4c1e… (SHA-256 9b7f…). Tool -, structure manual_heading, 5 acceptance criteria.
 ```
 
-The risk is Low, so G2 is **HOTL**: the platform passes it, because a spec is linked and it has acceptance criteria (five, under its `受入基準 / Acceptance criteria` heading), and tells the team how long they can still stop it:
+The SHA-256 is a fingerprint of the file's content: any change to the file changes it.
+
+The risk is Low, so G2 is **HOTL**: the platform passes it, because a spec is linked and it has acceptance criteria (five, under its `受入基準 / Acceptance criteria` heading), and tells the team how long they can still stop it, the **block window** (4 working hours by default):
 
 > **INT-2026-0007**: the platform passed **G2** (HOTL): its conditions hold. The intent now waits at **G3** (Plan). @an: until **2026-10-08 15:00** you can still block G2 with `/reject G2 <reason>` or `/request-changes G2 <reason>`.
 
@@ -117,7 +121,7 @@ At Low risk without change flags, G3 is HOTL too, so the platform passes it and 
 
 ## Step 4. The agent works (the platform, gates G4 and G5)
 
-When every block window has closed, the platform checks, at **G4**, that the agent is registered and active, that the budget is enough and that the client's AI record allows internal data. Then it starts the run:
+When every block window has closed, the platform checks, at **G4**, that the agent is registered and active, that the budget is enough and that the project AI record allows internal data. Then it starts the run:
 
 > **INT-2026-0007**: G4 is passed. The platform starts the agent run.
 
@@ -211,6 +215,6 @@ An spent the time on **what** to build (the spec and the plan); Binh on **checki
 
 ## Try it yourself
 
-1. Ask your tenant admin for an account, a role and a first token ([user guide §2](USER-GUIDE.md#2-before-your-first-task)).
+1. Ask your tenant admin (the person who manages users and projects on the platform) for an account, a role and a first API token ([user guide §2](USER-GUIDE.md#2-before-your-first-intent)).
 2. Pick a small, Low-risk change with clear acceptance criteria.
 3. Follow the steps above. When something does not go as shown, see [user guide §5, "When something goes wrong"](USER-GUIDE.md#5-when-something-goes-wrong).

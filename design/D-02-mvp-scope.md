@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.6 |
-| Date | 2026-10-08 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81); 1.4 approved by Harry on 2026-10-07 (§4.2: a read-only dashboard starts before MVP+1; QUESTIONS #255); 1.5 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 1.6 approved by Harry on 2026-10-08 (§4.2: the BMAD / Spec Kit spec tasks and WeKnora come before the trial M-E; QUESTIONS #285) |
+| Version | 1.7 |
+| Date | 2026-10-09 |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81); 1.4 approved by Harry on 2026-10-07 (§4.2: a read-only dashboard starts before MVP+1; QUESTIONS #255); 1.5 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 1.6 approved by Harry on 2026-10-08 (§4.2: the BMAD / Spec Kit spec tasks and WeKnora come before the trial M-E; QUESTIONS #285); 1.7 approved by Harry on 2026-10-09 (§5 flow: the order of the merge and G7 corrected; the rest is wording) |
 | Readers | Leadership (sections 1–4, 10–12), tech lead / developers (all), Claude Code (sections 5–9, 13) |
 | Related documents | D-01 (build vs buy), D-07 (models and tokens), handbook codes table and Chapters 2–6, 10–20 |
 
@@ -99,10 +99,10 @@ The **producer of a change never approves it**. One person may hold several role
 ```mermaid
 sequenceDiagram
     autonumber
-    actor A as Person A (owner)
-    actor B as Person B (approver)
+    actor A as Person A (intent owner)
+    actor B as Person B (independent reviewer and approver)
     participant P as Platform<br/>(Orchestrator + Registry)
-    participant R as Run Manager
+    participant R as Runner
     participant AG as Agent (sandbox)
     participant GW as LLM Gateway
     participant G as Git host + CI
@@ -121,9 +121,10 @@ sequenceDiagram
     R->>G: Push the checked changes to agent/INT-… (after G5)
     P->>G: Open the PR (template T2, codes only)
     G-->>P: G6: CI, test, scan results
-    P-->>B: Request review (G7) + evidence pack
+    P-->>B: Request review (G7) + Evidence Pack
     B->>G: Approve PR (+ second approver for sensitive changes)
-    G-->>P: G7 passed (producer never counts) → merge
+    B->>G: Merge the approved PR (a person, never the platform)
+    G-->>P: Merge read → G7 passed (producer never counts)
     P-->>B: Request release approval (G8) + client AI disclosure
     B->>P: /approve G8
     P->>P: Write audit, close intent, record metrics
@@ -405,3 +406,4 @@ The MVP is done when **all** of the following are true:
 | 0.5 | 2026-09-24 | Claude | Translated into English. NFR-08 and Q5 updated for the English decision (message catalog). Section 11.1 fixed: step C belongs to M-F |
 | 1.5 | 2026-10-08 | Claude (coordinator), approved by Harry | Sources: citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged |
 | 1.6 | 2026-10-08 | Claude (coordinator), approved by Harry | §4.1 item 10, §4.2: BMAD / Spec Kit structure and plan drafts, and WeKnora, come before the trial M-E (QUESTIONS #285) |
+| 1.7 | 2026-10-09 | Claude (docs review PR B), approved by Harry | §5 flow and diagram D10: "G7 passed → merge" was a wrong order, corrected to "Person B merges, then G7 passes" (ADR-M41: the platform never merges). The rest is wording: "Run Manager" → "Runner", Person A "intent owner", Person B "independent reviewer and approver", "Evidence Pack" |
