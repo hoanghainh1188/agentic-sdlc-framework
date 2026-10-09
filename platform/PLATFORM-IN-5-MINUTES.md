@@ -8,12 +8,12 @@ You already deliver software in steps: someone asks for a change, someone design
 
 ## 2. What changes for you
 
-Two people stay in control of every project: **Person A**, the intent owner, who asks for the change and follows it, and **Person B**, the independent reviewer and approver, who checks and approves what others produced.
+Two people stay in control of every project. **Person A**, the intent owner, asks for the change and follows it. **Person B**, the independent reviewer and approver, checks and approves what others produced.
 
 | What you do today | With the platform | Who |
 |---|---|---|
 | A ticket or a request from the client | An **intent**: the change, its risk and its data class (how sensitive its information is), linked to a GitHub issue | You (Person A) |
-| A specification or a ticket description | A **spec**: a Markdown file in the repository, with acceptance criteria | You (Person A, or the BrSE) |
+| A specification or a ticket description | A **spec**: a Markdown file in the repository, with acceptance criteria | You (Person A, or the BrSE: the bridge engineer between the client and the team) |
 | Deciding which files and modules to touch | A **plan**: a small YAML file that lists the files the agent may change | You write it; Person B approves it |
 | Writing the code and the tests | An **agent run**: the agent codes in an isolated sandbox, inside the plan and the budget | The agent; you can stop it |
 | Pushing a branch and opening a pull request | Done by the platform, after it checked the agent's changes | The platform |
@@ -29,7 +29,7 @@ Your day-to-day tools stay the same: **GitHub issues, comments and reviews**. Tw
 |---|---|
 | **Intent** | One change you want, from request to release. It has a code such as `INT-2026-0007` |
 | **Gate** | A checkpoint, G1 to G8. The intent cannot move on until the gate passes |
-| **HITL / HOTL / AUDIT** | At a HITL gate a person must decide. At a HOTL gate the platform passes it when its conditions hold, and a person can still block it within the **block window** (4 working hours by default, configurable). At an AUDIT gate the platform passes it and people check samples afterwards |
+| **HITL / HOTL / AUDIT** | HITL (human in the loop), HOTL (human on the loop), AUDIT (checked afterwards). At a HITL gate a person must decide. At a HOTL gate the platform passes it when its conditions hold, and a person can still block it within the **block window** (4 working hours by default, configurable). At an AUDIT gate the platform passes it and people check samples afterwards |
 | **Run** | One session of the agent working on the intent, in a sandbox, with a cap on iterations, time and cost |
 | **Escalation** | The platform asking a named person to decide something unexpected (over budget, files outside the plan, a gate waiting too long). The work waits until someone answers |
 | **Evidence Pack** | The record of the intent, built and sealed at release, that you can show a client |

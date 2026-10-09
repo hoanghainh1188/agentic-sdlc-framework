@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.31. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.3 (rekey) give the commands; the recovery drill in task A10 tests them.
+> Status: **v0.33. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.3 (rekey) give the commands; the recovery drill in task A10 tests them.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -16,7 +16,7 @@ This runbook covers:
 - the first initialisation;
 - unsealing after a restart;
 - root tokens;
-- daily admin work and AppRole secret IDs;
+- daily admin work and AppRole secret IDs (an AppRole is OpenBao's login for a machine process: a fixed role ID plus a secret ID that expires);
 - the keys of LiteLLM (model provider keys, master key, salt key);
 - the credentials of every platform process (sections 5c–5m) and the image upgrade (4b);
 - snapshot backup and restore;
@@ -82,7 +82,9 @@ Preconditions:
 - the operations log (section 10) is open.
 
 Steps:
-1. The operator starts OpenBao, PostgreSQL and SeaweedFS only: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs` (the evidence credentials commands of sections 5g–5k create SeaweedFS identities). Not `pnpm compose:core`: on the server `.env` holds no LiteLLM keys (section 5d), so LiteLLM stays unhealthy until the profile `models` runs, and `up.sh core` stops with an error (found by `pnpm test:fresh-deploy`, task E07). The whole stack starts later, after section 5d (`platform/deploy/README.md`, "Fresh deployment", step 7). `pnpm openbao:bootstrap status` must say `uninitialised`.
+1. The operator starts OpenBao, PostgreSQL and SeaweedFS only: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs`. Check: `pnpm openbao:bootstrap status` says `uninitialised`.
+   - Not `pnpm compose:core`: on the server `.env` holds no LiteLLM keys (section 5d), so LiteLLM cannot become healthy before the profile `models` runs. The whole stack starts later (`platform/deploy/README.md`, "Fresh deployment", step 7).
+   - SeaweedFS must run because the credentials commands of sections 5g–5k create SeaweedFS identities.
 2. All three key holders are present. The operator runs `pnpm openbao:bootstrap init` in a terminal on the server. The script refuses to run if its output is redirected or piped.
 3. Each key holder copies **only their own share** into their password manager, and writes it on paper for their envelope. The operator does not copy any share.
 4. The operator notes the **initial root token** only long enough for step 6. It is not stored anywhere.
@@ -95,7 +97,7 @@ Steps:
 What `configure` sets up (details: `design/ADR-M19-openbao-bootstrap.md`):
 - KV version 2 at `kv/`;
 - Transit at `transit/`, with the Ed25519 key `run-contract` (not exportable, not deletable);
-- AppRoles `api`, `worker`, `runner`, `cost-controller`, each reading only `kv/<its name>/…` (plus `kv/shared/github-app` for `api` and `worker`; the `runner` receives each run's GitHub token from the worker as a single-use wrapped token, `design/ADR-M25-runner-sandbox.md` §2.11);
+- AppRoles `api`, `worker`, `runner`, `cost-controller`, each reading only `kv/<its name>/…` (plus `kv/shared/github-app` for `api` and `worker`; the `runner` receives each run's GitHub token from the worker as a single-use wrapping token (a token that gives one process one secret, once), `design/ADR-M25-runner-sandbox.md` §2.11);
 - the AppRole `litellm` for the LiteLLM sidecar: it reads the model provider keys, the LiteLLM salt key and the LiteLLM master key, nothing else (section 5d);
 - the token role `platform-admin` (tokens of at most 1 hour);
 - a check that the file audit device is on.
@@ -121,7 +123,7 @@ The image is pinned in `platform/deploy/docker-compose.yml` (services `openbao` 
 3. Check that the platform processes log in again (their logs; `litellm-agent` renders its file).
 4. Record the upgrade (old and new version) in the operations log.
 
-Since 2.7.1, an AppRole secret ID stops working exactly at its expiry (`APPROLE_SECRET_ID_TTL`, 90 days), even before a tidy runs. A process that fails to log in after that time needs its credentials command again (sections 5d–5m, `pnpm openbao:bootstrap <process>-credentials`).
+Since 2.7.1, an AppRole secret ID stops working exactly at its expiry (`APPROLE_SECRET_ID_TTL`, 90 days), even before OpenBao's clean-up job (tidy) runs. A process that fails to log in after that time needs its credentials command again (sections 5d–5m, `pnpm openbao:bootstrap <process>-credentials`).
 
 ## 5. Root token: create only when needed, revoke immediately
 
@@ -385,11 +387,14 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
    pnpm openbao:bootstrap runner-credentials
    ```
    Record it in the operations log (role `runner`, date, reason; not the secret ID).
-3b. Give the runner its SeaweedFS identity for the proposals of High-risk (L1) runs (task C06, `design/ADR-M33-gate-g4.md` §2.9) and the diffs of every run (task C07, `design/ADR-M34-gate-g5.md` §2.2). SeaweedFS must run (`pnpm compose:core`). The command asks for an admin token (hidden). It makes a new key pair inside the openbao container, stores it at `kv/runner/evidence` and gives it to SeaweedFS as the identity `runner-evidence`, which may **write** under `evidence/proposals/` and `evidence/diffs/`, and **read** under `evidence/diffs/` only (task C08, `design/ADR-M38-gate-g6.md` §2.2: the push applies the checked diff; no list, no read of proposals). It prints no secret. An identity made before C08 cannot read diffs, so pushes fail (`evidence_unavailable`): run the command again once after the C08 update, then restart `sdlc-runner`:
+3b. Give the runner its SeaweedFS identity `runner-evidence`. SeaweedFS must run. The command asks for an admin token (hidden) and prints no secret:
    ```bash
    pnpm openbao:bootstrap runner-evidence-credentials
    ```
-   Without it the runner still starts (log line `runner.evidence_missing`), but every High-risk run fails when it tries to store its proposal, and every other run fails at its end (`agent_changes_unavailable`): no run reaches G5 without its stored diff. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys. Admin work in SeaweedFS: section 5l.
+   - What it does: makes a new key pair inside the openbao container, stores it at `kv/runner/evidence` and registers it in SeaweedFS as `runner-evidence`.
+   - What the identity may do: **write** under `evidence/proposals/` (the proposals of High-risk runs, `design/ADR-M33-gate-g4.md` §2.9) and `evidence/diffs/` (the diff of every run, `design/ADR-M34-gate-g5.md` §2.2); **read** under `evidence/diffs/` only (the push applies the checked diff, `design/ADR-M38-gate-g6.md` §2.2). No list, no read of proposals.
+   - Upgrade note: an identity made before task C08 cannot read diffs, so pushes fail (`evidence_unavailable`). Run the command again once, then restart `sdlc-runner`.
+   - Without it the runner still starts (log line `runner.evidence_missing`), but every High-risk run fails when it tries to store its proposal, and every other run fails at its end (`agent_changes_unavailable`): no run reaches G5 without its stored diff. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys. Admin work in SeaweedFS: section 5l.
 4. Start: on the server every profile at once (Fresh deployment step 7); on a development machine `pnpm compose:sandbox` (profiles `core` and `sandbox`). It also starts the npm package proxy (`npm-proxy`, Verdaccio) and the local image registry (`registry`).
 5. Check: `docker compose … ps sdlc-runner` shows `healthy`. The runner's log has one line with `"event":"runner.started"`.
 
@@ -726,7 +731,7 @@ Secret IDs expire after 90 days in any case, so a missed rotation shows up as a 
 
 ### 8.2. After a leaked secret ID or token
 
-Destroying a secret ID does **not** end the tokens already issued from it. They stay valid until their TTL (1 hour, at most 4 hours), and they work only from the Compose network.
+Destroying a secret ID does **not** end the tokens already issued from it. They stay valid until they expire (TTL, time to live: 1 hour, at most 4 hours), and they work only from the Compose network.
 
 1. Rotate at once: run the service's credentials command (section 8.1) and restart the service.
 2. If a token of the role may have leaked too, revoke all tokens of that AppRole. This needs a root token (section 5), because it lists every token accessor. Replace `api` with the role. The command prints only a count:
@@ -839,6 +844,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.33 | 2026-10-09 | Claude Code (docs review E3) | Readability: AppRole, tidy, TTL and the wrapping token explained at first use; one name for the wrapping token; section 3.2 step 1 and section 5g step 3b split into short items |
 | 0.32 | 2026-10-09 | Claude Code (docs review E2) | Sections 5d, 5e, 5f, 5g: on the server every profile starts at once after the migrations (Fresh deployment step 7); the tenant bootstrap is Fresh deployment step 8, not a step of 5e |
 | 0.31 | 2026-10-09 | Claude Code (docs review fixes) | Title and scope: the processes' credentials are in this runbook; the filer gap note removed (closed by A12, section 5l); sections 8.2 and 8.3 in order; rotation covers sections 5d–5m; "OpenBao admin" for the operator with the admin token |
 | 0.30 | 2026-10-09 | Claude Code (docs review PR C) | Section 3.1: the same first commands as the fresh deployment, and the development notes moved from `platform/deploy/README.md` (configure again, audit log path, subnet and gateway of old stacks, `OPENBAO_HOST_PORT`); section 5b: the GitHub App permissions link to `platform/deploy/README.md` |

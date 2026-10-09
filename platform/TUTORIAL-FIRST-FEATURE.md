@@ -76,9 +76,9 @@ sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.
 INT-2026-0007: spec version 1 linked: docs/specs/T01-product-list-japanese-labels.md at 4c1e… (SHA-256 9b7f…). Tool -, structure manual_heading, 5 acceptance criteria.
 ```
 
-The SHA-256 is a fingerprint of the file's content: any change to the file changes it.
+The SHA-256 is a fingerprint of the file's content: any change to the file changes it. `Tool -` means the spec was written without a spec tool (Spec Kit or BMAD); `structure manual_heading` means the platform found the acceptance criteria under a heading.
 
-The risk is Low, so G2 is **HOTL**: the platform passes it, because a spec is linked and it has acceptance criteria (five, under its `受入基準 / Acceptance criteria` heading; the rule: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria)), and tells the team how long they can still stop it, the **block window** (4 working hours by default):
+The risk is Low, so G2 is **HOTL**: the platform passes it by itself. It checks that a spec is linked and has acceptance criteria (here five, under the `受入基準 / Acceptance criteria` heading; the rule: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria)). The team can still stop it during the **block window**, 4 working hours by default:
 
 > **INT-2026-0007**: the platform passed **G2** (HOTL): its conditions hold. The intent now waits at **G3** (Plan). @an: until **2026-10-08 15:00** you can still block G2 with `/reject G2 <reason>` or `/request-changes G2 <reason>`.
 
@@ -128,7 +128,7 @@ When every block window has closed, the platform checks, at **G4**, that the age
 
 What happens now, without anyone doing anything:
 
-1. The platform makes a fresh copy of the repository in an **isolated sandbox**. The sandbox can reach the model gateway and a package mirror, nothing else: no GitHub, no secrets.
+1. The platform makes a fresh copy of the repository in an **isolated sandbox**. The sandbox can reach the model gateway and a package proxy, nothing else: no GitHub, no secrets.
 2. The agent reads `AGENTS.md` (the repository's build and test commands), the spec and the plan, edits `ProductListView.vue`, adds a component test, and runs the tests.
 3. The run is capped: 30 iterations, 60 minutes and its budget by default. At 80 % of the budget a warning appears on the issue. If the agent repeats itself or stops making progress, the platform stops it.
 
@@ -172,6 +172,8 @@ Binh clicks **Merge** on GitHub.
 The platform builds the **Evidence Pack**: the hashes of the spec, the plan and the diff (never the code or the texts), CI, every gate decision with who made it, the runs, the cost, and the client AI disclosure note ([what it holds](../handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)).
 
 > **INT-2026-0007** waits for the release approval at **G8** (Release). The platform built the Evidence Pack (`sdlc evidence show INT-2026-0007`); the approval is bound to its release hash. @binh: check the pack …, then approve with `/approve G8` …
+
+The release hash is the fingerprint of the Evidence Pack Binh approves. If the pack changes after the approval, the approval no longer counts.
 
 Binh reads it, then approves:
 
