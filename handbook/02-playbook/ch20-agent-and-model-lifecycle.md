@@ -84,10 +84,10 @@ The platform keeps the register in its database. Only an agent that is registere
 | Register (stage 2) | `sdlc admin agent register --key coder-openhands --version 1.0.0 --owner <email> --model claude-haiku-4-5-20251001 --instructions AGENTS.md@v5 --instructions-file AGENTS.md --tools file_editor,terminal --max-autonomy L2 --environments sandbox` (without `sandbox` the agent can never run) | A tenant admin, who names the technical owner |
 | Approve for use (stage 4) | `sdlc admin agent approve --key coder-openhands --purpose activate --as <owner\|person_a\|person_b>` | By agent type (§20.7): L0 Person A + technical owner; L1–L2 technical owner + Person B |
 | Recertify (stage 5) | `sdlc admin agent recertify --key coder-openhands [--date YYYY-MM-DD]` | The technical owner |
-| Change (stage 6) | Suspend (below), then `sdlc admin agent update --key … --version 1.1.0 [--model …] [--instructions … --instructions-file …]`, then approve again with `--purpose activate` | The owner or a tenant admin changes; technical owner + Person B approve (§20.11) |
+| Change (stage 6) | Suspend (below), then `sdlc admin agent update --key … --version 1.1.0 [--model …] [--instructions … --instructions-file …]`, then approve again with `--purpose activate` | The agent owner or a tenant admin changes; technical owner + Person B approve (§20.11) |
 | Suspend or quarantine (stage 6) | `sdlc admin agent suspend\|quarantine --key <key> --reason <code>` | Person B or leadership, at any time |
-| Retire (stage 7) | `sdlc admin agent approve --key <key> --purpose retire --as <owner\|governance> --reason <code>` | Owner + leadership |
-| New owner | `sdlc admin agent owner --key <key> --owner <email>` | A tenant admin |
+| Retire (stage 7) | `sdlc admin agent approve --key <key> --purpose retire --as <owner\|governance> --reason <code>` | Agent owner + leadership |
+| New agent owner | `sdlc admin agent owner --key <key> --owner <email>` | A tenant admin |
 | Look | `sdlc admin agent show --key <key>` (with the approvals still missing); `sdlc admin agent list [--overdue] [--json]` | Anyone in the tenant |
 
 **How approvals work.**
@@ -95,7 +95,7 @@ The platform keeps the register in its database. Only an agent that is registere
 - Each approver approves in one capacity with `--as`: `owner` (the agent's technical owner) or a role: `person_a`, `person_b`, `governance` (leadership). You fill a role when you hold it on an active project of the tenant.
 - The approvers of one step are always **different people**: one person never counts twice, even when they hold two capacities.
 - When the last needed approval arrives, the agent becomes active (or retired) at once. `show` lists what is still missing.
-- An approval counts only for the agent **as it is now**. Any change of the agent (a new version, a status change, a new owner) starts again from zero.
+- An approval counts only for the agent **as it is now**. Any change of the agent (a new version, a status change, a new agent owner) starts again from zero.
 - If the platform is down, the server operator can still suspend or quarantine an agent (`sdlc ops agent suspend|quarantine --tenant <slug> --key <key> --reason <code>`). Nobody activates an agent outside the approvals.
 
 Reason codes: `incident`, `quality`, `security`, `no_owner`, `replaced`, `unused`, `provider_end_of_support`, `other`.
@@ -107,7 +107,7 @@ Rules the platform enforces:
 - **Model**: the model is the name of a model in the platform's model gateway, and the name includes the model version (for example `claude-haiku-4-5-20251001`). If the model behind a name changes, register a new agent version.
 - **Instructions**: the platform stores the SHA-256 of the instructions file (for example `AGENTS.md`) and compares it with the file in the repository before each run. **Every edit of `AGENTS.md` stops the agent's runs** (error "instructions differ") until you register a new agent version with the new file. Review the edit, then `suspend`, `update --version … --instructions-file AGENTS.md`, and approve the change.
 - **Autonomy**: at most L2 in the MVP.
-- **Recertification**: every 3 months (the project configuration may choose a shorter time). The first activation counts as the first certification. When the time has passed, the run still starts, and the owner gets a warning. `list --overdue` shows the agents to recertify.
+- **Recertification**: every 3 months (the project configuration may choose a shorter time). The first activation counts as the first certification. When the time has passed, the run still starts, and the agent owner gets a warning. `list --overdue` shows the agents to recertify.
 
 Not yet on the platform (MVP): agents with L3 or more (leadership and the security owner approve, §20.7), and suspension from a GitHub comment. In the MVP the table of who approves what is fixed in the platform, not in a setting (`design/ADR-M37-admin-onboarding.md` §2.8); it moves into a tenant setting later.
 

@@ -2,7 +2,7 @@
 
 For **whoever leads the rollout** (usually the tech lead, with leadership and the platform operator), and for **everyone on the team** who wants to know where to start. It puts the existing guides in order: what to read, who does what, in which order, and how to check each step. It does not replace them.
 
-Version 0.2, 2026-10-08 (phase 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
+Version 0.3, 2026-10-09 (the rollout "phases" are now "steps", because the codes table keeps "phase" for P1–P6; words as in the glossary). Version 0.2, 2026-10-08 (step 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
 
 ---
 
@@ -10,13 +10,13 @@ Version 0.2, 2026-10-08 (phase 1: the two repositories, what the project reposit
 
 | You are | Read first | Your first action | You can skip |
 |---|---|---|---|
-| **Leadership** | Handbook Ch.1 (summary), Ch.9 (adoption roadmap) | Choose the pilot project and approve the readiness result (section 3, phase 0) | Everything under `platform/` |
-| **Platform operator** | `platform/deploy/README.md` "Fresh deployment"; runbook T11 | Install the platform and create the tenant (phase 2) | The handbook's process chapters |
-| **Tenant admin** (often the tech lead) | This guide; handbook Ch.19 §19.8d | Create the project, the people and their roles (phase 2) | — |
-| **Person A** (owner of the work) | `platform/USER-GUIDE.md`; handbook Ch.5 (roles) | Write specs with acceptance criteria; run the first Low-risk task (phase 4) | Admin and operator sections |
-| **Person B** (independent reviewer) | `platform/USER-GUIDE.md` steps 4, 7, 8; handbook Ch.17 (reviewing AI output) | Link your GitHub account and log in (phase 3) | Admin and operator sections |
-| **PM / BrSE** | Handbook Ch.2 §2.5 (project AI record), template T7 | Record the client's consent and the allowed data classes (phase 2) | Operator sections |
-| **Second approver** | `platform/USER-GUIDE.md` steps 7–8 | Log in; you are asked only for flagged changes and Critical risk | Most of the rest |
+| **Leadership** | Handbook Ch.1 (summary), Ch.9 (adoption roadmap) | Choose the pilot project and approve the readiness result (section 3, step 0) | Everything under `platform/` |
+| **Platform operator** | `platform/deploy/README.md` "Fresh deployment"; runbook T11 | Install the platform and create the tenant (step 2) | The handbook's process chapters |
+| **Tenant admin** (often the tech lead) | This guide; handbook Ch.19 §19.8d | Create the project, the people and their roles (step 2) | — |
+| **Person A** (intent owner) | `platform/USER-GUIDE.md`; handbook Ch.5 (roles) | Write specs with acceptance criteria; take the first Low-risk intent through the gates (step 4) | Admin and operator sections |
+| **Person B** (independent reviewer and approver) | `platform/USER-GUIDE.md` §3, steps 4, 7, 8; handbook Ch.17 (reviewing AI output) | Link your GitHub account and log in (step 3) | Admin and operator sections |
+| **PM / BrSE** | Handbook Ch.2 §2.5 (project AI record), template T7 | Record the client's consent and the allowed data classes (step 2) | Operator sections |
+| **Second approver** | `platform/USER-GUIDE.md` §3, steps 7–8 | Log in; you are asked only for flagged changes and Critical risk | Most of the rest |
 | **Developer of the platform** | `platform/GETTING-STARTED.md`, `CLAUDE.md` | — | This guide |
 
 The dashboard (read only; `http://127.0.0.1:8090/dashboard/` on the platform machine, handbook Ch.19 §19.8e; other machines cannot reach it yet) shows everyone what waits for whom; decisions are made in GitHub comments, GitHub reviews and the `sdlc` command (USER-GUIDE).
@@ -56,18 +56,18 @@ Example: a project team of six.
 | Person | Roles | Does |
 |---|---|---|
 | Tech lead | `person_a`, `admin` | Creates intents, writes plans, manages the project |
-| Two senior developers | `person_a` | Each creates intents for their own tasks |
+| Two senior developers | `person_a` | Each creates intents for their own changes |
 | A senior developer and the QA lead | `person_b` | Decide G3, review and merge (G7), approve releases (G8); one covers for the other |
 | BrSE | `pm_brse` | The project AI record, the client disclosure note; may link specs |
 | Director | `governance` | Escalations nobody answered |
 
 A team that wants developers to review each other's work on the same project (X creates, Y reviews, then the other way round) needs a change of rule M21: a policy decision, raised in `design/QUESTIONS.md`, not a configuration setting.
 
-## 3. The rollout, phase by phase
+## 3. The rollout, step by step
 
-Each phase has an owner, a usual duration and a check. Do not start a phase before the check of the previous one passes.
+Each step names who does it, a usual duration and a check. Do not start a step before the check of the previous one passes.
 
-### Phase 0. Decide (leadership, tech lead; about 1 week)
+### Step 0. Decide (leadership, tech lead; about 1 week)
 
 | # | Do | Check |
 |---|---|---|
@@ -77,7 +77,7 @@ Each phase has an owner, a usual duration and a check. Do not start a phase befo
 | 0.4 | Set the budget: per month for the tenant, per intent and per run (defaults: USD 10 per intent, USD 2 per run) | The amounts written down; leadership agrees |
 | 0.5 | Choose the model: an API model, or a self-hosted one for `client_restricted` data (D-07) | The model is in the platform's gateway list |
 
-### Phase 1. Prepare the repository (Person A, the repository owner; 1–2 days)
+### Step 1. Prepare the repository (Person A, the repository owner; 1–2 days)
 
 #### Two repositories, never one
 
@@ -99,7 +99,7 @@ The platform and your application live in **two separate repositories**. The pla
 
 1. The tenant admin registers the project and names its repository: `sdlc admin project create --slug <slug> --name <name> --repo <org>/<name>`.
 2. The operator installs the platform's GitHub App on that repository.
-3. When a task runs, the runner **clones the repository into a temporary sandbox**. The agent writes code there; the runner pushes the branch `agent/INT-…` and opens the pull request, then **removes the sandbox**. The platform keeps no working copy of the code. It keeps each run's diff as evidence (in SeaweedFS, at least 180 days, then purged unless held), hashes and logs; with the optional `observability` profile, Langfuse also keeps the model prompts and answers, which contain code, until the retention purge (ADR-M53).
+3. When an intent's agent runs, the runner **clones the repository into a temporary sandbox**. The agent writes code there; the runner pushes the branch `agent/INT-…` and opens the pull request, then **removes the sandbox**. The platform keeps no working copy of the code. It keeps each run's diff as evidence (in SeaweedFS, at least 180 days, then purged unless held), hashes and logs; with the optional `observability` profile, Langfuse also keeps the model prompts and answers, which contain code, until the retention purge (ADR-M53).
 4. People review and merge the pull request **on GitHub, in the project's repository**.
 
 **Today:** Repo 1 is `hoanghainh1188/agentic-sdlc-framework` (public). Repo 2 for the trial is `harryforge/pilot-order-inventory`, a fictional order and inventory application (Vue, NestJS, PostgreSQL). Each real project later uses its own repository with the same platform.
@@ -132,7 +132,7 @@ my-app/
 | 1.5 | A folder for specs (for example `docs/specs/`), one Markdown file per change (at most 256 KiB) with **acceptance criteria** | G2 passes only when the linked spec has at least one criterion | One example spec merged |
 | 1.6 | The pull request template with the AI disclosure (template T2) and `CODEOWNERS` | Reviewers see who and what wrote the change | A test pull request shows the template |
 | 1.7 | Install the platform's GitHub App on this repository only (Contents and Pull requests read and write; Issues read and write; Checks, Commit statuses, Code scanning alerts and Metadata read) | Every platform action on GitHub goes through it | The operator sees the installation |
-| 1.8 | Check that the project builds and tests in the sandbox image (`node24` today) | The agent runs `AGENTS.md`'s commands in it | Phase 2.6 |
+| 1.8 | Check that the project builds and tests in the sandbox image (`node24` today) | The agent runs `AGENTS.md`'s commands in it | Step 2.6 |
 
 **Limits today:**
 
@@ -175,78 +175,78 @@ From a spec to a submitted plan:
 - The plan file is named after the intent code, so create the intent first.
 - Details: USER-GUIDE and handbook Ch.19 §19.8c.
 
-### Phase 2. Set up the platform for the project (operator, tenant admin, PM / BrSE; about 1 day)
+### Step 2. Set up the platform for the project (operator, tenant admin, PM / BrSE; about 1 day)
 
 | # | Who | Do | Check |
 |---|---|---|---|
 | 2.1 | Operator | Install the platform, or use the existing one (`platform/deploy/README.md` "Fresh deployment"; on a developer machine `platform/GETTING-STARTED.md` Step 11b) | `curl http://<platform>/health/ready` answers ok |
-| 2.2 | Operator | Create the tenant and its first tenant admin (`sdlc ops bootstrap`, run in a terminal; the token is printed once) | The tenant admin logs in: `sdlc whoami` |
+| 2.2 | Operator | Create the tenant and its first tenant admin (`sdlc ops bootstrap`, run in a terminal; the API token is printed once) | The tenant admin logs in: `sdlc whoami` |
 | 2.3 | Tenant admin | Create the project (`sdlc admin project create --slug <slug> --name <name> --repo <owner/name>`) | `sdlc admin project show --project <slug>` |
 | 2.4 | Tenant admin | Add each person, link their GitHub account by its numeric ID, give the roles of T5 (handbook Ch.19 §19.8d). The admin's own role comes from a second admin or from the operator | `sdlc admin role list --project <slug>`: Person A and Person B are different people |
 | 2.5 | PM / BrSE or Person A | Save the project AI record: AI allowed, data classes, production logs, disclosure format, the link to the client's written consent (`sdlc ai-record set`) | `sdlc ai-record show --project <slug>` |
 | 2.6 | Operator, tenant admin | Build the sandbox image for the project's toolchain and pin it by digest (`pnpm sandbox-image:build node24`; other toolchains need a new image) | The reference ends in `@sha256:…` |
-| 2.7 | Tenant admin, owner, Person B | Register the agent (model, `AGENTS.md`, tools, autonomy at most L2), then the owner and Person B approve it (handbook Ch.20 §20.5b) | `sdlc admin agent show --key <key>` says `active` |
+| 2.7 | Tenant admin, agent owner, Person B | Register the agent (model, `AGENTS.md`, tools, autonomy at most L2), then the agent owner and Person B approve it (handbook Ch.20 §20.5b) | `sdlc admin agent show --key <key>` says `active` |
 | 2.8 | Tenant admin | Upload the project configuration: at least `run.agent_key`, `sandbox.image`, `verification.required_checks` (the aggregate check of 1.2); the budgets of 0.4 | `sdlc admin config show --project <slug>` shows the new version |
 
-### Phase 3. Prepare the people (each team member; half a day)
+### Step 3. Prepare the people (each team member; half a day)
 
 | # | Do | Check |
 |---|---|---|
 | 3.1 | Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and the [tutorial](TUTORIAL-FIRST-FEATURE.md) (about 20 minutes), then `platform/USER-GUIDE.md` and the handbook chapters of your role (section 1) | — |
-| 3.2 | Install the `sdlc` command ([USER-GUIDE §2, "Install the sdlc command"](USER-GUIDE.md#install-the-sdlc-command)). Get a first token from the tenant admin, log in, create your own token and revoke the first one (USER-GUIDE §2) | `sdlc whoami` shows your roles |
-| 3.3 | Open the dashboard and sign in with your token | You see the project's (empty) board |
+| 3.2 | Install the `sdlc` command ([USER-GUIDE §2, "Install the sdlc command"](USER-GUIDE.md#install-the-sdlc-command)). Get a first API token from the tenant admin, log in, create your own API token and revoke the first one (USER-GUIDE §2) | `sdlc whoami` shows your roles |
+| 3.3 | Open the dashboard and sign in with your API token | You see the project's (empty) board |
 | 3.4 | A 30-minute walk-through together: the eight gates, who decides each, how comment commands work (first line of a new comment), what an escalation is | Everyone can say who approves G3 and G7 on this project |
 
-### Phase 4. Pilot (the whole team; 2–4 weeks)
+### Step 4. Pilot (the whole team; 2–4 weeks)
 
-Run real tasks, one at a time at first. The trial plan of the sample repository (`design/M-E-TRIAL-PLAN.md`) is a worked example.
+Run real intents, one at a time at first. The trial plan of the sample repository (`design/M-E-TRIAL-PLAN.md`) is a worked example.
 
 | # | Do | Check |
 |---|---|---|
-| 4.1 | First task: **Low risk**, small, clear acceptance criteria. Follow USER-GUIDE §3 from G1 to G8 | The intent ends `done`; its evidence pack is sealed |
-| 4.2 | Then Low and Medium tasks one after another; then two at the same time | No platform problem left open between tasks |
-| 4.3 | Keep a short manual log per task: minutes of human work per step, whether the result met the spec, problems, notes (M-E plan §7.2) | One row per task |
+| 4.1 | First intent: **Low risk**, small, clear acceptance criteria. Follow USER-GUIDE §3 from G1 to G8 | The intent ends `done`; its Evidence Pack is sealed |
+| 4.2 | Then Low and Medium intents one after another; then two at the same time | No platform problem left open between intents |
+| 4.3 | Keep a short manual log per intent: minutes of human work per gate, whether the result met the spec, problems, notes (M-E plan §7.2) | One row per intent |
 | 4.4 | Use the stop rules: a `security` escalation, a broken audit chain (`sdlc audit verify`), the budget reached, anything that looks like real client data → stop and tell governance (M-E plan §9) | — |
 
-### Phase 5. Review, then widen (tech lead, leadership; at the end of the pilot)
+### Step 5. Review, then widen (tech lead, leadership; at the end of the pilot)
 
 | # | Do | Check |
 |---|---|---|
-| 5.1 | Collect the numbers: `sdlc metrics gates --project <slug>` (waiting time per gate), `sdlc cost report --project <slug>` (tokens, cost, wasted cost), the share of pull requests that needed changes (evidence packs) | A short report, like the M-E report (M-E plan §8) |
+| 5.1 | Collect the numbers: `sdlc metrics gates --project <slug>` (waiting time per gate), `sdlc cost report --project <slug>` (tokens, cost, wasted cost), the share of pull requests that needed changes (Evidence Packs) | A short report, like the M-E report (M-E plan §8) |
 | 5.2 | Decide what to change: gate deadlines, oversight at a gate, budgets, retries (a configuration change, audited); never the mandatory rules | The new configuration uploaded, or "no change" recorded |
-| 5.3 | Decide the next step with leadership: more task types, Medium-risk work, a second project, or client work with written consent (handbook Ch.9 §9.5, gate between steps) | Leadership's decision recorded |
+| 5.3 | Decide the next step with leadership: more kinds of change, Medium-risk work, a second project, or client work with written consent (handbook Ch.9 §9.5, gate between steps) | Leadership's decision recorded |
 
 ## 4. The first week of a new team (example)
 
 | Day | Morning | Afternoon |
 |---|---|---|
-| 1 | Phase 0: readiness assessment (T17), roles (T5) | Phase 1: branch protection, the aggregate CI check, `AGENTS.md` |
-| 2 | Phase 1: the spec folder, the PR template, the GitHub App | Phase 2: project, people, roles, AI record |
-| 3 | Phase 2: sandbox image, agent register and approvals, configuration | Phase 3: everyone logs in; the walk-through |
-| 4 | Phase 4: the first Low-risk task, G1 → G4 | The run, G5 → G7 (review and merge) |
-| 5 | G8 and the evidence pack; the first manual-log rows | A short retrospective: what was slow, what was unclear |
+| 1 | Step 0: readiness assessment (T17), roles (T5) | Step 1: branch protection, the aggregate CI check, `AGENTS.md` |
+| 2 | Step 1: the spec folder, the PR template, the GitHub App | Step 2: project, people, roles, AI record |
+| 3 | Step 2: sandbox image, agent register and approvals, configuration | Step 3: everyone logs in; the walk-through |
+| 4 | Step 4: the first Low-risk intent, G1 → G4 | The run, G5 → G7 (review and merge) |
+| 5 | G8 and the Evidence Pack; the first manual-log rows | A short retrospective: what was slow, what was unclear |
 
 ## 5. Common mistakes when starting
 
 | Mistake | What happens | Avoid it |
 |---|---|---|
-| One person is both Person A and Person B | The platform refuses the second role | Name two people in phase 0 |
-| A `CLAUDE.md`, `.cursorrules` or `.agents/skills/` committed next to `AGENTS.md` | G4 refuses every run (`instructions_unpinned`) | One file of agent instructions (phase 1); keep personal ones uncommitted |
-| Spec Kit or BMAD in another version than the pinned one | The spec may count 0 acceptance criteria; the intent waits at G2 | Install the pinned versions (phase 1) |
+| One person is both Person A and Person B | The platform refuses the second role | Name two people in step 0 |
+| A `CLAUDE.md`, `.cursorrules` or `.agents/skills/` committed next to `AGENTS.md` | G4 refuses every run (`instructions_unpinned`) | One file of agent instructions (step 1); keep personal ones uncommitted |
+| Spec Kit or BMAD in another version than the pinned one | The spec may count 0 acceptance criteria; the intent waits at G2 | Install the pinned versions (step 1) |
 | A GitHub account linked by login, or not at all | That person's `/approve` comments are refused | Link by numeric ID (`gh api users/<login> --jq .id`) |
-| No project AI record | Intents wait before G1 (`ai_record_missing`) | Phase 2.5 before the first intent |
+| No project AI record | Intents wait before G1 (`ai_record_missing`) | Step 2.5 before the first intent |
 | The spec or the plan is not on the default branch | The spec cannot be linked; the plan cannot be submitted | Merge them first: the platform reads `main` |
 | The plan file changed after it was submitted | G3 or G4 waits for "plan resubmit needed" | Submit it again with `sdlc plan submit` |
-| `verification.required_checks` does not match the repository's CI | G6 waits for a check that never comes, then escalates | Use the aggregate check of phase 1.2 |
+| `verification.required_checks` does not match the repository's CI | G6 waits for a check that never comes, then escalates | Use the aggregate check of step 1.2 |
 | Merging before "ready to merge", or by the producer | A `security` escalation; the intent pauses | Person B merges, after the platform's notice |
-| A token pasted into chat or a ticket | Anyone who reads it acts as you | Revoke it (`sdlc token revoke --id <ID>`, the ID from `sdlc token list`) and create a new one |
+| An API token pasted into chat or a ticket | Anyone who reads it acts as you | Revoke it (`sdlc token revoke --id <ID>`, the ID from `sdlc token list`) and create a new one |
 | Nobody answers an escalation | It moves to the backup owner, then to governance; the work stays frozen | Name a backup for each role in T5 |
 
 ## 6. Where to read more
 
 | Topic | Where |
 |---|---|
-| One task from G1 to G8, commands, troubleshooting | `platform/USER-GUIDE.md` |
+| One intent from G1 to G8, commands, troubleshooting | `platform/USER-GUIDE.md` |
 | Installing the platform | `platform/deploy/README.md` "Fresh deployment"; runbook T11 |
 | Setting up a team (admin commands) | Handbook Ch.19 §19.8d |
 | When a team may start, readiness, choosing pilots | Handbook Ch.9; templates T17, T5 |

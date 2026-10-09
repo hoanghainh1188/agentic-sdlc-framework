@@ -85,7 +85,7 @@ test('every screen, read only, the token in memory only (AC1, AC2, AC3, AC4)', a
     'href',
     'https://github.com/harryforge/pilot-order-inventory/pull/38',
   );
-  await expect(page.getByRole('heading', { name: 'Evidence packs' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Evidence Packs' })).toBeVisible();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Markdown' }).click();
   expect((await download).suggestedFilename()).toBe('INT-2026-0006-v1-pack.md');

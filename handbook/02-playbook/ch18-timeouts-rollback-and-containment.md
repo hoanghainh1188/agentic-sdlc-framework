@@ -156,7 +156,7 @@ The platform raises an escalation when a run or a gate needs a decision from a p
   - Stopping a run and revoking its credentials are always possible.
 - **An overdue gate** (Chapter 19 §19.8b) raises a Medium escalation at level Notify by default (project setting `oversight.gate_overdue`). The platform closes it itself when the gate is decided.
 - **Two clocks run** (Chapter 6 §6.4 SLA): acknowledge, and resolve.
-  - If nobody acknowledges, the platform reminds the owner at 75 % of the acknowledge time.
+  - If nobody acknowledges, the platform reminds the escalation owner at 75 % of the acknowledge time.
   - Then it moves the escalation to the backup owner, then to governance, with a new acknowledge time at each step.
   - If nobody decides by the resolve deadline, governance takes over. For Critical, the incident process is due (Chapter 6 §6.7).
   - No answer never means "go ahead".
@@ -188,7 +188,7 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 
 **Who may act.**
 
-- The owner may act at any time.
+- The escalation owner may act at any time.
 - The backup owner may act once the escalation has reached the backup step.
 - Governance may act at any time.
 - A producer of the change never acts, and neither do bots.

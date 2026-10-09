@@ -1,6 +1,6 @@
 # Chapter 16. P6 — Operations and maintenance
 
-> Readers: **developers, Person A, Person B, PM/BrSE** (maintenance contracts) · Reading time: about 15 minutes
+> Readers: **developers, Person A, Person B, PM / BrSE** (maintenance contracts) · Reading time: about 15 minutes
 > Status: **Draft 0.2**, awaiting Harry's comments.
 > Section 16.9 (platform usage) is written by Claude Code together with the platform code.
 

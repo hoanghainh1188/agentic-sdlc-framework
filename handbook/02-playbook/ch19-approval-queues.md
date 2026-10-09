@@ -1,6 +1,6 @@
 # Chapter 19. Approval queues and avoiding review bottlenecks
 
-> Readers: **Person A, Person B, PM/BrSE** · Reading time: about 10 minutes
+> Readers: **Person A, Person B, PM / BrSE** · Reading time: about 10 minutes
 > Status: **Draft 0.1**, awaiting Harry's comments.
 
 ---
@@ -124,7 +124,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 
 **Who may decide.**
 
-- Your GitHub account must be linked to your platform user. The link uses the numeric account ID, so renaming your GitHub login does not break it. Ask the platform admin to link it.
+- Your GitHub account must be linked to your platform user. The link uses the numeric account ID, so renaming your GitHub login does not break it. Ask a tenant admin to link it.
 - You need the gate's role on the project, for example Person A for G1 and Person B for G3 (codes table §4). The producer of a change never approves it.
 - Bots and automation accounts never decide.
 - The intent must be linked to the issue or pull request. One issue (or pull request) has at most one open intent; the platform refuses a second one until the first is closed.
@@ -180,7 +180,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - When the check fails, the intent stays a draft and the platform posts one status comment with the reason code, mentioning the people who may write the record. When the record is fixed, the intent enters G1 by itself within a few minutes.
 - Who may write the record: Person A and PM / BrSE by default (project setting `access.ai_record_write_roles`; the viewer role never may). Every change is a new version; the platform keeps every version and records who made it.
 - How to write it:
-  - through the API: `GET` and `PUT /v1/projects/<project>/ai-record` with your personal token. `PUT` needs `expected_version` (the version you read; `0` for the first version). The CLI does the same: `sdlc ai-record show|set` (§19.8c).
+  - through the API: `GET` and `PUT /v1/projects/<project>/ai-record` with your API token. `PUT` needs `expected_version` (the version you read; `0` for the first version). The CLI does the same: `sdlc ai-record show|set` (§19.8c).
   - the platform operator, on the server, for a new project: `sdlc ops ai-record set --tenant <slug> --project <slug> --on-behalf-of <email> --expected-version <n> --ai-allowed <…> --classes <a,b | none> --prod-logs <…> --disclosure <…> [--confirmed-at YYYY-MM-DD] [--record-ref https://…]` and `sdlc ops ai-record show --tenant <slug> --project <slug>`. The person named with `--on-behalf-of` must hold a write role on the project: they are accountable for the content.
 
 ---
@@ -193,24 +193,24 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 
 **Log in once.**
 
-1. Get your first personal API token (`sdlc_pat_…`) from a tenant admin (it lasts at most 7 days) or, for the first person of a tenant, from the platform operator. Keep it in your password manager. After you log in, create your own token (`sdlc token create`), log in again with it, and revoke the first one.
-2. Run `sdlc login --api-url https://<platform address>` and paste the token at the prompt. The prompt does not show what you type.
-   - The platform checks the token first. Only a valid token is saved.
+1. Get your first API token (`sdlc_pat_…`) from a tenant admin (it lasts at most 7 days) or, for the first person of a tenant, from the platform operator. Keep it in your password manager. After you log in, create your own API token (`sdlc token create`), log in again with it, and revoke the first one.
+2. Run `sdlc login --api-url https://<platform address>` and paste the API token at the prompt. The prompt does not show what you type.
+   - The platform checks the API token first. Only a valid API token is saved.
    - The address must use `https://`. `http://` works only for a platform on your own machine (`http://127.0.0.1:8090`).
    - If your company uses its own certificate authority, add it with the standard Node setting `NODE_EXTRA_CA_CERTS=<file>`. The command never runs with certificate checks turned off.
 3. `sdlc whoami` shows who you are and your roles per project.
 
-- The token is saved in `~/.config/sdlc/credentials.json` (or under `$XDG_CONFIG_HOME`), readable only by you. It is stored as plain text, so protect your account and your disk. If the file can be read by others, the command stops until you fix it (`chmod 600`) and log in again.
-- **Never put the token on the command line**, in a script, in a chat or in a ticket. There is no `--token` option. To pipe a token in (for example from a password manager), use `--token-stdin`.
-- `sdlc logout` revokes the token on the server, then deletes the saved login on your machine. If the server cannot be reached, it still deletes the login and says the token is still valid: revoke it later with `sdlc token revoke` from another login.
-- Your own tokens: `sdlc token create --name <name> [--days <n>]` (the new token is shown once), `sdlc token list`, `sdlc token revoke --id <ID>`. Use one token per machine.
+- The API token is saved in `~/.config/sdlc/credentials.json` (or under `$XDG_CONFIG_HOME`), readable only by you. It is stored as plain text, so protect your account and your disk. If the file can be read by others, the command stops until you fix it (`chmod 600`) and log in again.
+- **Never put the API token on the command line**, in a script, in a chat or in a ticket. There is no `--token` option. To pipe an API token in (for example from a password manager), use `--token-stdin`.
+- `sdlc logout` revokes the API token on the server, then deletes the saved login on your machine. If the server cannot be reached, it still deletes the login and says the API token is still valid: revoke it later with `sdlc token revoke` from another login.
+- Your own API tokens: `sdlc token create --name <name> [--days <n>]` (the new API token is shown once), `sdlc token list`, `sdlc token revoke --id <ID>`. Use one API token per machine.
 - In CI only, set `SDLC_API_URL` and `SDLC_API_TOKEN` (as CI secrets) instead of logging in. Do not use them on your own machine: environment variables can leak into process lists and logs.
 
 **Commands.** Add `--json` to any command for machine-readable output.
 
 | Command | Does |
 |---|---|
-| `sdlc intent create --project <slug> --title <text> --risk <tier> --data-class <class> [--description <text> \| --description-file <file>] [--budget <USD>] [--issue <number>]` | Creates an intent; you become its owner (Person A) |
+| `sdlc intent create --project <slug> --title <text> --risk <tier> --data-class <class> [--description <text> \| --description-file <file>] [--budget <USD>] [--issue <number>]` | Creates an intent; you become its intent owner (Person A) |
 | `sdlc intent list [--project <slug>] [--status <status>] [--limit <n>] [--cursor <c>]` | Lists the intents you can read, newest first |
 | `sdlc intent show <INT-…>` | Shows an intent with its spec, plan and gate decisions, and **what holds it** when the platform holds it ("Held: …", the cause, until when) |
 | `sdlc gate approve <gate> <INT-…>` | Approves the gate the intent waits at |
@@ -327,7 +327,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | 1 | The platform refused (no role, not found, conflict, rule broken, too many requests) |
 | 2 | Wrong command or options, not logged in, unsafe saved login |
 | 3 | The platform could not be reached or answered something unexpected |
-| 4 | Your token is missing, expired or revoked: get a new one and run `sdlc login` |
+| 4 | Your API token is missing, expired or revoked: get a new one and run `sdlc login` |
 
 ## 19.8d. Using the platform: setting up a team (admins)
 
@@ -371,8 +371,8 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | `sdlc admin identity list --user <id or email> [--all]`, `unlink --user <id or email> --id <identity ID>` | `--all` also shows unlinked accounts |
 | `sdlc admin role list --project <slug> [--all]`, `revoke --project <slug> --id <role ID>` | `--all` also shows revoked roles |
 | `sdlc admin tenant-admin grant --user <id or email>`, `list [--all]`, `revoke --id <ID>` | Tenant admins only |
-| `sdlc admin token issue --user <id or email> --name <name> [--days <1-7>]` | A first token for a new person, shown once. It lasts at most 7 days: the person creates their own token and revokes this one |
-| `sdlc admin token list\|revoke --user <id or email> …` | Anyone's tokens, for example after a laptop was lost |
+| `sdlc admin token issue --user <id or email> --name <name> [--days <1-7>]` | A first API token for a new person, shown once. It lasts at most 7 days: the person creates their own API token and revokes this one |
+| `sdlc admin token list\|revoke --user <id or email> …` | Anyone's API tokens, for example after a laptop was lost |
 | `sdlc admin agent …` | The agent register, Chapter 20 §20.5b |
 | `sdlc audit verify` | Checks your tenant's audit log (exit code 1 when a record was changed) |
 
@@ -393,8 +393,8 @@ The dashboard shows in one page what the CLI shows one command at a time. **It o
 **Open it.**
 
 1. Open `http://127.0.0.1:8090/dashboard/` on the machine that runs the platform (the API's own address; no other port).
-2. Paste your personal API token (`sdlc_pat_…`, the one you use for the CLI; create one with `sdlc token create`) and choose **Sign in**.
-3. The token stays in the memory of that browser tab only. A reload, closing the tab or **Sign out** forgets it. The dashboard never puts it in the address, in browser storage or in a cookie. **Sign out** does not revoke the token: `sdlc token revoke` does.
+2. Paste your API token (`sdlc_pat_…`, the one you use for the CLI; create one with `sdlc token create`) and choose **Sign in**.
+3. The API token stays in the memory of that browser tab only. A reload, closing the tab or **Sign out** forgets it. The dashboard never puts it in the address, in browser storage or in a cookie. **Sign out** does not revoke the API token: `sdlc token revoke` does.
 
 The dashboard is for the platform machine itself. Do not open the API's port to other machines for it: that needs TLS and a review first.
 
