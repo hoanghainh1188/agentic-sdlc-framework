@@ -186,7 +186,7 @@ export function planListBody(empty = false): Record<string, unknown> {
 
 export const RUN_ID = '77777777-7777-4777-8777-777777777777';
 
-function runRow(overrides: Partial<Run> = {}): Run {
+export function runRow(overrides: Partial<Run> = {}): Run {
   return {
     id: RUN_ID,
     tenant_id: TENANT,
