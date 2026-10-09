@@ -2,10 +2,10 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A10, PR 1: TLS; PR 2 adds the backups section) |
+| Status | **Proposed** (task A10: PR 1 TLS, PR 2 backups) |
 | Date | 2026-10-09 |
-| Decided by | Harry (A10 plan approved 2026-10-09, with answers to QUESTIONS #325–#327) |
-| Related | D-08 task A10 (AC1); D-03 §8.2, §9 (TLS for internal services); QUESTIONS #20 (the internal CA), #27 (no host port), #67 (plain HTTP until A10), #325–#327; ADR-M19 §2.5, §3; ADR-M21 §2.4 (the client always verifies); runbook T11 section 3c |
+| Decided by | Harry (A10 plans approved 2026-10-09, with answers to QUESTIONS #325–#329) |
+| Related | D-08 task A10 (AC1–AC3); D-03 §10.2 (backups, drills); D-03 §8.2, §9 (TLS for internal services); QUESTIONS #20 (the internal CA), #27 (no host port), #67 (plain HTTP until A10), #325–#327; ADR-M19 §2.5, §3; ADR-M21 §2.4 (the client always verifies); runbook T11 section 3c |
 
 ## 1. Context
 
@@ -36,12 +36,26 @@
 - `pnpm openbao:tls check` shows when the CA and the certificate end and fails within 30 days of the end; `up.sh` runs it and prints a warning, never blocks.
 - Existing development stacks: `pnpm openbao:tls dev` adds a throw-away CA and the variable to an existing `.env`; OpenBao's data stays.
 
+## 5. Backups and the restore drill (PR 2)
+
+- **One command, `pnpm backup`** (`platform/deploy/backup/backup.sh`), one folder per run in `SDLC_BACKUP_DIR` (QUESTIONS #327: a target folder the operator chooses, outside the repository; copying it further away is the infrastructure's job):
+  - every database (`pg_dumpall --clean --if-exists`, online);
+  - OpenBao's Raft snapshot, taken by the one-shot service **`backup-agent`** (profile `backup`, never started by `up.sh`, hardened, user openbao) with the **AppRole `backup`**, whose policy reads only `sys/storage/raft/snapshot` (QUESTIONS #328): unattended, and the snapshot is useless without two key shares;
+  - the volumes `seaweedfs-data`, `openbao-audit` and `clickhouse-data` (when it exists), copied with SeaweedFS and ClickHouse **stopped for about a minute**, then started again and waited for (QUESTIONS #329: a consistent copy at night);
+  - the env file (the passwords a restore needs) and OpenBao's TLS folder;
+  - `MANIFEST`: SHA-256 and size of every file, the commit, the images; no secret.
+- **Encryption with age** (QUESTIONS #326), public key only: every part is encrypted as it streams, so no unencrypted copy touches a disk, and the server cannot read its own backups. The private key stays offline with the key shares. A folder appears only when every part is done; `SDLC_BACKUP_KEEP` (14) folders are kept.
+- **The schedule is the server's**: a systemd timer example (`sdlc-backup.service`, `.timer`, 02:30) or cron (QUESTIONS #329). The platform never schedules or deletes its own backups, and backups run when the platform is down.
+- **`pnpm restore <folder> <age key>`** (`restore.sh`) restores into an **empty** stack only: it checks `MANIFEST` first, writes the env file and TLS folder, fills the volumes, loads the databases (the superuser's own role lines left out), initialises OpenBao with a throw-away key kept in the process, restores the snapshot over it, and leaves OpenBao **sealed with the original keys** for two key holders. The AppRole volumes are not backed up: the credentials commands run again.
+- `pnpm test:backup` (CI `compose` job) runs the whole drill on throw-away keys: data in every store, the backup, the loss, a tampered copy refused, the restore, the original shares, every piece of data back.
+
 ## 3. Consequences
 
 - One more one-shot job (`openbao-tls-init`) in `up.sh` and two small volumes.
 - Every OpenBao live test reaches OpenBao over TLS with the project's CA (`throwaway-compose.ts`); tests that reach it by IP from the host map the name `openbao` to the IP (`--add-host`).
 - OpenSSL 3 or later is needed on the host (already a requirement; LibreSSL is refused).
-- Open (A10, with the operator): the real CA and key holders on the server, the backups (PR 2), the resource measurement and the runner's VM (PR 3).
+- Open (A10 PR 3, with the operator): the real CA and key holders on the server, the first drill there, the resource measurement and the runner's VM.
+- A backup stops SeaweedFS and ClickHouse for about a minute: an evidence write or a trace in that minute fails and is retried by its caller.
 
 ## 4. Rejected
 
@@ -54,3 +68,4 @@
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-09 | Claude Code (task A10, PR 1) | TLS everywhere, the throw-away CA on development machines and in CI, `openbao-tls-init`, renewal by SIGHUP, `tls.sh` |
+| 0.2 | 2026-10-09 | Claude Code (task A10, PR 2) | §5: backups and the restore drill (QUESTIONS #326–#329) |

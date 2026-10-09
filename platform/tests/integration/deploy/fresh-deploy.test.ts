@@ -43,6 +43,7 @@ const CREDENTIALS_COMMANDS = [
   'worker-evidence-credentials',
   'worker-purge-credentials',
   'worker-anchor-credentials',
+  'backup-credentials',
 ] as const;
 const MODEL = 'claude-haiku-4-5-20251001';
 

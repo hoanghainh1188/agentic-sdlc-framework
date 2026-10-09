@@ -123,8 +123,8 @@ describe('OpenBao bootstrap settings (bootstrap.conf)', () => {
     expect(settings.get('SECRET_ID_BOUND_CIDRS')).toBe('compose-network');
   });
 
-  it('has one AppRole per platform process (AC2), the LiteLLM sidecar (C03), one policy each', () => {
-    expect(roles).toEqual(['api', 'worker', 'runner', 'cost-controller', 'litellm']);
+  it('has one AppRole per platform process (AC2), the LiteLLM sidecar (C03), the backup job (A10), one policy each', () => {
+    expect(roles).toEqual(['api', 'worker', 'runner', 'cost-controller', 'litellm', 'backup']);
     expect(policyNames).toEqual([...roles, 'platform-admin'].sort());
   });
 });
@@ -151,6 +151,11 @@ describe('OpenBao policies', () => {
         // One exception (QUESTIONS #44): the worker wraps the run token for the runner.
         if (name === 'worker' && rule.path === 'sys/wrapping/wrap') {
           expect(rule.capabilities).toEqual(['update']);
+          continue;
+        }
+        // The other (A10, ADR-M63 §5, QUESTIONS #328): the backup job reads the Raft snapshot only.
+        if (name === 'backup') {
+          expect(rule).toEqual({ path: 'sys/storage/raft/snapshot', capabilities: ['read'] });
           continue;
         }
         expect(rule.path, name).not.toMatch(/^sys\/|^transit\/(export|backup|restore)\//);
@@ -208,7 +213,8 @@ describe('OpenBao policies', () => {
       for (const other of roles.filter((r) => r !== role)) {
         expect(canRead(role, `kv/data/${other}/x`), `${role} → ${other}`).toBe(false);
       }
-      expect(canRead(role, own(role)), role).toBe(true);
+      // The backup job reads no secret at all, only the Raft snapshot (A10).
+      expect(canRead(role, own(role)), role).toBe(role !== 'backup');
     }
   });
 

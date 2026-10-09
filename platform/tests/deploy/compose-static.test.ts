@@ -47,7 +47,13 @@ const CORE = [
   'valkey',
 ];
 const OBSERVABILITY_ONLY = ['clickhouse', 'langfuse-web', 'langfuse-worker', 'otel-collector'];
-const JOBS = ['openbao-tls-init', 'seaweedfs-init', 'temporal-namespace', 'temporal-schema'];
+const JOBS = [
+  'backup-agent',
+  'openbao-tls-init',
+  'seaweedfs-init',
+  'temporal-namespace',
+  'temporal-schema',
+];
 
 function createdDatabases(): string[] {
   const script = readDeployFile('postgres/init/01-create-databases.sh');

@@ -1,0 +1,11 @@
+# Example systemd timer for the daily backup (task A10 PR 2, runbook T11 §6): every night at 02:30
+# server time. SeaweedFS and ClickHouse stop for about a minute while their volumes are copied.
+[Unit]
+Description=Daily Agentic SDLC platform backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
