@@ -18,6 +18,7 @@
 | **Agent register** | The list of all agents in use, with owner, version, permissions and status | エージェント台帳 |
 | **Agent run** ◆ | One execution of an agent for one intent, from start to stop | エージェント実行 |
 | **API token** ◆ | A personal key (`sdlc_pat_…`) to use the `sdlc` command and the dashboard. Valid 90 days by default; never put it in a chat, a ticket or a command line. Different from a model token | APIトークン |
+| **AppRole** ◆ | OpenBao's login for a machine process (api, worker, runner…): a fixed role ID plus a secret ID that expires after 90 days. Delivered by the `pnpm openbao:bootstrap <process>-credentials` commands (runbook T11 §5c) | AppRole |
 | **Approval** | A decision by a person with authority to let work continue, bound to an exact version | 承認 |
 | **Artifact** | Anything produced during the work: a spec, a design, code, a test report, a release package | 成果物 |
 | **Audit log** | An append-only record of who (or what) did what, when, and on which evidence. Kept at least 2 years | 監査ログ |
@@ -67,11 +68,13 @@
 | **Intent Record** | The written intent for a task (template T1) | インテント記録 |
 | **Invariant** | A business or technical rule that must always hold | 不変条件 |
 | **Iteration cap / time cap** ◆ | The limits of one agent run: at most so many agent steps (30 by default) and so much time (60 minutes by default). The run stops when it reaches either | 反復上限 / 時間上限 |
+| **Key share / unseal** ◆ | OpenBao's data is encrypted; after every restart it is sealed. Three people hold one key share each, and any two of them unseal it (runbook T11 §4) | キーシェア／アンシール |
 | **Kill switch** ◆ | A way to stop a running agent immediately. On the platform: `sdlc run kill` or `/kill`; the run stops and its credentials are revoked within 5 minutes | 緊急停止 |
 | **Last known good version** | The most recent version confirmed to work, used as the rollback target (Chapter 18) | 最終正常版 |
 | **Loop detection** ◆ | The platform stops a run that repeats the same tool call more than 3 times in a row, or makes no progress within a configured time | ループ検知 |
 | **Model** | The AI engine behind a tool (for example a Claude model). Different from the agent that uses it | モデル |
 | **Observation window** | Time after release during which we watch for problems before counting a change as production-qualified (2 weeks) | 観察期間 |
+| **OTLP** | The OpenTelemetry format in which the platform and LiteLLM send their traces to the collector and Langfuse | OTLP |
 | **Operator (platform operator)** ◆ | The person who installs and runs the platform on its server, and uses the `sdlc ops` commands there. Not a project role | 運用担当者 |
 | **Oversight mode** | How people are involved at a gate or action: HITL, HOTL or AUDIT | 監督方式 |
 | **Person A / Person B** | The two people in control of a project in the 2+N model: owner/executor and independent reviewer/approver (Chapter 5) | 担当者A / 承認者B |
@@ -92,6 +95,7 @@
 | Term | Meaning in this handbook | Japanese (reference) |
 |---|---|---|
 | **2+N team** | Two people in control plus N AI agents (Chapter 5) | 2+N体制 |
+| **Raft snapshot** ◆ | A backup file of OpenBao's own storage, taken daily and kept off the server; useless without two key shares (runbook T11 §6) | Raft スナップショット |
 | **Reason code** ◆ | A code that says why a gate was rejected or changes were asked for, such as `spec_unclear` or `out_of_scope`. The platform keeps the code and a link to the comment, never the words | 理由コード |
 | **Recertification** | The regular check (every 3 months) that an agent is still owned, useful, safe and correctly configured | 再認定 |
 | **Release hash / seal** ◆ | At G8 the release approval is bound to the Evidence Pack's release hash (the pack without the G8 parts). When G8 passes, the platform seals one version of the pack: it never changes again | リリースハッシュ / 封印 |
@@ -99,10 +103,13 @@
 | **Remediation record** | The record of a proposed fix in operations: symptom, hypothesis, evidence, action, risk, rollback, verification (template T15) | 対処記録 |
 | **Risk tier** | Low, Medium, High or Critical; decides autonomy and oversight | リスク区分 |
 | **Rollback** | Returning to the last known good state (Chapter 18) | ロールバック |
+| **Root token** | OpenBao's highest-privilege token: made from two key shares only for the initialisation and emergencies, and revoked right after use (runbook T11 §5) | ルートトークン |
 | **Run Contract** ◆ | The platform's signed permission for one agent run: scope, tools, budget, expiry | 実行契約 |
 | **Sandbox** | An isolated environment where an agent can work without affecting real systems | サンドボックス |
+| **Secret ID** ◆ | The part of an AppRole login that expires (90 days); rotated with the credentials commands and never written to a log or a chat | シークレット ID |
 | **Second approver** ◆ | A person with the project role `second_approver`: the second approval at G7 for flagged changes and at Critical risk, and at G8 at Critical risk | 第二承認者 |
 | **Separation of duties** | The person or agent that produced something never approves it | 職務分掌 |
+| **Sidecar** | A helper container that runs next to a service; `litellm-agent` is the sidecar that gives LiteLLM its keys from OpenBao | サイドカー |
 | **Specification (spec)** | The testable description of what to build (Chapter 11) | 仕様書 |
 | **Sprint 0** | A setup sprint before feature work, to prepare people, rules and agents (Chapter 10) | スプリント0 |
 | **Step** | A piece of work in the workflow, such as "run tests". Different from a gate | 作業ステップ |
@@ -121,5 +128,6 @@
 |---|---|---|---|
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content: about 60 terms with Japanese reference terms |
+| 0.4 | 2026-10-09 | Claude (draft), awaiting approval | Docs review E3: operator terms (AppRole, key share / unseal, OTLP, Raft snapshot, root token, secret ID, sidecar) |
 | 0.3 | 2026-10-09 | Claude (draft), awaiting approval | Docs review fixes: Evidence Pack files are kept 180 days (was "6 months") |
 | 0.2 | 2026-10-09 | Claude (draft), awaiting approval | Docs review PR B: 30 new entries for the platform's words (◆); Evidence Pack and Run Contract capitalised; intent is the unit of one change; gate short names; model token vs API token; docs review PR C: **Producer** links to the platform's list (commit authors at G7 only) |

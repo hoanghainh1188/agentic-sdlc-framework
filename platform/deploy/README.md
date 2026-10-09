@@ -8,9 +8,9 @@ This folder runs the infrastructure that the platform reuses, on one server, wit
 |---|---|---|
 | `core` | PostgreSQL, Temporal (+ Temporal UI), LiteLLM, Valkey, SeaweedFS (S3 API), OpenBao | Always. Required by the platform |
 | `observability` | Langfuse (web + worker), ClickHouse, the OpenTelemetry Collector (A08). Reuses PostgreSQL, Valkey and SeaweedFS | Optional. The heaviest part; enable it when the server has room (D-03 section 10.1) |
-| `models` | `litellm-agent`: OpenBao Agent that gives LiteLLM its model provider keys, master key and salt key from OpenBao (task C03, [ADR-M24](../../design/ADR-M24-litellm-cost-controller.md)) | **Always on the server** (`pnpm compose:models`). Needs OpenBao unsealed and configured and the sidecar's credentials (runbook T11 §5d). Without it, LiteLLM has no models and uses the development keys from `.env` |
-| `platform` | `sdlc-api`: the REST API for the CLI (task B03, [ADR-M26](../../design/ADR-M26-api-app.md)); `sdlc-worker`: the GitHub poller and comment commands (task B06, [ADR-M27](../../design/ADR-M27-github-poller.md)), the escalation clocks (B11) and the Temporal worker of the intent workflow (B07, [ADR-M30](../../design/ADR-M30-intent-workflow.md)). Both built from this repo; both reach Temporal on the Compose network | With `core` (`pnpm compose:platform`). Needs OpenBao unsealed and configured, `pnpm openbao:bootstrap api-credentials` and `worker-credentials` first, and the GitHub App key stored (runbook T11 §5b, §5e, §5f) |
-| `sandbox` | `sdlc-runner` (built from this repo), `docker-socket-proxy` (wollomatic/socket-proxy: the runner's only way to Docker), `npm-proxy` (Verdaccio: npm packages for the sandboxes), `registry` (local registry for sandbox images, 127.0.0.1 only) (task C04, [ADR-M25](../../design/ADR-M25-runner-sandbox.md)) | With `core` (`pnpm compose:sandbox`). Needs OpenBao unsealed and configured, `SDLC_DOCKER_GID` right and `pnpm openbao:bootstrap runner-credentials` first (runbook T11 §5g) |
+| `models` | `litellm-agent`: a sidecar (a helper container next to LiteLLM) that reads LiteLLM's model provider keys, master key and salt key from OpenBao and writes its configuration ([ADR-M24](../../design/ADR-M24-litellm-cost-controller.md)) | **Always on the server** (`pnpm compose:models`). Needs OpenBao unsealed and configured and the sidecar's credentials (runbook T11 §5d). Without it, LiteLLM has no models and uses the development keys from `.env` |
+| `platform` | `sdlc-api`: the REST API and the dashboard ([ADR-M26](../../design/ADR-M26-api-app.md)); `sdlc-worker`: the GitHub poller, the intent workflow, the escalation clocks and the retention loop ([ADR-M27](../../design/ADR-M27-github-poller.md), [ADR-M30](../../design/ADR-M30-intent-workflow.md)). Both built from this repository | With `core` (`pnpm compose:platform`). Needs OpenBao unsealed and configured, `pnpm openbao:bootstrap api-credentials` and `worker-credentials` first, and the GitHub App key stored (runbook T11 §5b, §5e, §5f) |
+| `sandbox` | `sdlc-runner` (built from this repository; runs the agent sandboxes), `docker-socket-proxy` (the runner's only way to Docker), `npm-proxy` (Verdaccio: npm packages for the sandboxes), `registry` (sandbox images, 127.0.0.1 only) ([ADR-M25](../../design/ADR-M25-runner-sandbox.md)) | With `core` (`pnpm compose:sandbox`). Needs OpenBao unsealed and configured, `SDLC_DOCKER_GID` right and `pnpm openbao:bootstrap runner-credentials` first (runbook T11 §5g) |
 
 Three one-shot jobs run at every start and then exit: `temporal-schema` (creates or upgrades the Temporal schemas), `temporal-namespace` (creates the namespace) and `seaweedfs-init` (creates the `evidence` and `langfuse` buckets). All three are safe to re-run.
 
@@ -109,6 +109,8 @@ pnpm openbao:bootstrap unseal     # 2 shares at the hidden prompt
 pnpm openbao:bootstrap configure  # root token at the hidden prompt; KV, Transit, every AppRole
 ```
 
+KV is OpenBao's key-value store for secrets; Transit signs the Run Contracts; an AppRole is a login for one platform process (a role ID plus a secret ID that expires).
+
 Details and key custody: runbook T11 §3 and §4. `configure` revokes the root token, so make a new one from two shares, then an admin token for the next two steps (T11 §5.1):
 
 ```bash
@@ -184,7 +186,19 @@ The bootstrap creates the tenant, its first user and that user's first personal 
 - The token is printed **once**. Store it in a password manager; never paste it into a chat, a ticket or a file in a repository.
 - The bootstrap runs once per tenant; a second run with the same slug is refused.
 - Tokens last 90 days by default, at most 365. Only their SHA-256 hash is stored. Every issue and revocation is written to the audit log (IDs only).
-- The operator's commands on the server are `sdlc ops …` (they connect to the database with `SDLC_DB_URL`, actor `system`; renamed from `sdlc admin …` in task B13). Besides `bootstrap`: `sdlc ops token issue|list|revoke`, `sdlc ops audit verify` ([Checking the audit log](#checking-the-audit-log)), `sdlc ops tenant-admin grant|revoke|list` and `sdlc ops role grant|revoke` (for a tenant with one admin, or to recover one that lost its admins), `sdlc ops ai-record set|show`, `sdlc ops agent show|list|suspend|quarantine` (safety moves when the API is down), `sdlc ops run kill`, `sdlc ops retention report`. For example, a token for an existing user:
+- The operator's commands on the server are `sdlc ops …`: they connect to the database with `SDLC_DB_URL` as the actor `system`. Besides `bootstrap`:
+
+  | Command | Use |
+  |---|---|
+  | `sdlc ops token issue\|list\|revoke` | API tokens for an existing user |
+  | `sdlc ops audit verify` | Check the audit log's hash chain ([Checking the audit log](#checking-the-audit-log)) |
+  | `sdlc ops tenant-admin grant\|revoke\|list`, `sdlc ops role grant\|revoke` | A tenant with one admin, or a tenant that lost its admins |
+  | `sdlc ops ai-record set\|show` | The project AI record, on behalf of a person with a write role |
+  | `sdlc ops agent show\|list\|suspend\|quarantine` | Safety moves on the agent register when the API is down |
+  | `sdlc ops run kill` | The kill switch as the system |
+  | `sdlc ops retention report` | What the retention loop would purge |
+
+  For example, a token for an existing user:
 
 ```bash
 pnpm sdlc ops token issue --tenant <slug> --email <email> --name <token name> --days 90
@@ -223,7 +237,7 @@ Then the agent's owner (`--as owner`) and Person B (`--as person_b`) each run `p
 
 ### 12. The project configuration
 
-`pnpm sdlc admin config show --project <project>` gives the version. Write the settings that differ from the defaults into a YAML file outside the repo, at least:
+`pnpm sdlc admin config show --project <project>` shows the current configuration version; `config set` below needs it as `--expected-version`. Write the settings that differ from the defaults into a YAML file outside the repo, at least:
 
 ```yaml
 run:
@@ -424,7 +438,7 @@ Design: [ADR-M35](../../design/ADR-M35-observability.md). Usage for operators: [
   ```
 
   `pnpm compose:obs` alone starts Langfuse and the collector, but no traced process.
-- The **OpenTelemetry Collector** (`otel-collector`, image `sdlc-otel-collector:0.161.0` built from `otel-collector/`) receives OTLP from the api, the worker and LiteLLM without credentials and forwards it to Langfuse v4. It is the only service with the Langfuse project key (`LANGFUSE_INIT_PROJECT_PUBLIC_KEY` / `…_SECRET_KEY` from `.env`; OpenBao with A10). No host port; sandboxes never reach it.
+- The **OpenTelemetry Collector** (`otel-collector`, image `sdlc-otel-collector:0.161.0` built from `otel-collector/`) receives traces (OTLP, the OpenTelemetry format) from the api, the worker and LiteLLM without credentials and forwards it to Langfuse v4. It is the only service with the Langfuse project key (`LANGFUSE_INIT_PROJECT_PUBLIC_KEY` / `…_SECRET_KEY` from `.env`; OpenBao with A10). No host port; sandboxes never reach it.
 - **LiteLLM** traces every model call with its `langfuse_otel` callback (rendered by `litellm/config.ctmpl` when the sidecar has `SDLC_OTEL_ENDPOINT`). Each call is one Langfuse trace tagged with the seven labels (`tenant:`, `project:`, `intent_id:`, `run_id:`, `gate:`, `agent:`, `data_class:`). It holds the prompt and the answer: client data (ADR-M35 §2.5).
 - Langfuse runs v4 in `events_only` mode: read traces through `GET /api/public/v2/observations` (the old `/api/public/traces` answers 404).
 
@@ -471,7 +485,7 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 | What | How |
 |---|---|
 | PostgreSQL: every database (`platform`, `temporal`, `temporal_visibility`, `litellm`, `langfuse`) | `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T postgres pg_dumpall -U postgres > platform-<date>.sql` |
-| OpenBao | A Raft snapshot and the audit volume: runbook [T11 §6](../../handbook/03-templates/T11-openbao-runbook.md#6-daily-snapshot-backup). A snapshot is useless without two key shares, which are kept apart |
+| OpenBao | A Raft snapshot (a backup file of OpenBao's own storage) and the audit volume: runbook [T11 §6](../../handbook/03-templates/T11-openbao-runbook.md#6-daily-snapshot-backup). A snapshot is useless without two key shares, which are kept apart |
 | SeaweedFS (evidence, audit anchors, Langfuse files) | The `seaweedfs-data` volume, copied while the stack is stopped (`pnpm compose:down`) |
 | ClickHouse (profile `observability`) | The `clickhouse-data` volume, while stopped |
 | `platform/deploy/.env` | Into the password manager, never next to the backups |

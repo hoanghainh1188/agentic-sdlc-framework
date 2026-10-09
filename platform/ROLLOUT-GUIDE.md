@@ -2,7 +2,7 @@
 
 For **whoever leads the rollout** (usually the tech lead, with leadership and the platform operator), and for **everyone on the team** who wants to know where to start. It puts the existing guides in order: what to read, who does what, in which order, and how to check each step. It does not replace them.
 
-Version 0.7, 2026-10-09 (docs review E2: links in §1 and §6; the operator installs the GitHub App); 0.6, 2026-10-09 (docs review fixes: the health check runs on the platform server); 0.5, 2026-10-09 (docs review PR C2: step 1 links to the handbook for counting acceptance criteria and for the list of agent instruction files; step 2 for each set-up task; 0.4 for the budgets). Version 0.4, 2026-10-09 (docs review PR C: the producers, the conflicting roles, who decides and the GitHub App permissions link to their sources; the conflicting roles include Person B and the second approver). Version 0.3, 2026-10-09 (the rollout "phases" are now "steps", because the codes table keeps "phase" for P1–P6; words as in the glossary). Version 0.2, 2026-10-08 (step 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
+Version 0.8, 2026-10-09. Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment); this guide only links to it. Changes: the version history at the end.
 
 ---
 
@@ -11,7 +11,7 @@ Version 0.7, 2026-10-09 (docs review E2: links in §1 and §6; the operator inst
 | You are | Read first | Your first action | You can skip |
 |---|---|---|---|
 | **Leadership** | Handbook [Ch.1](../handbook/01-policy/ch01-executive-summary.md) (summary), [Ch.9](../handbook/01-policy/ch09-adoption-roadmap.md) (adoption roadmap) | Choose the pilot project and approve the readiness result (section 3, step 0) | Everything under `platform/` |
-| **Platform operator** | [deploy/README](deploy/README.md) ("Fresh deployment", restart, upgrade, troubleshooting); [runbook T11](../handbook/03-templates/T11-openbao-runbook.md) | Install the platform and create the tenant (step 2) | The handbook's process chapters |
+| **Platform operator** | [deploy/README](deploy/README.md) ("Fresh deployment", restart, upgrade, troubleshooting); [runbook T11](../handbook/03-templates/T11-openbao-runbook.md) | Install the platform and create the tenant (your company's or client's space on the platform; step 2) | The handbook's process chapters |
 | **Tenant admin** (often the tech lead) | This guide; [handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins) | Create the project, the people and their roles (step 2) | — |
 | **Person A** (intent owner) | [USER-GUIDE](USER-GUIDE.md); handbook [Ch.5](../handbook/01-policy/ch05-team-roles-and-accountability.md) (roles) | Write specs with acceptance criteria; take the first Low-risk intent through the gates (step 4) | Admin and operator sections |
 | **Person B** (independent reviewer and approver) | [USER-GUIDE §3](USER-GUIDE.md#3-one-intent-step-by-step), steps 4, 7, 8; handbook [Ch.17](../handbook/02-playbook/ch17-reviewing-ai-output.md) (reviewing AI output) | Link your GitHub account and log in (step 3) | Admin and operator sections |
@@ -25,7 +25,7 @@ The dashboard (read only, on the platform machine only for now: [handbook Ch.19 
 
 ## 2. The rules to know before you start
 
-These are enforced by the platform; plan the team around them.
+These are enforced by the platform; plan the team around them. "Rule M…" names a mandatory rule of the project configuration: the platform refuses a configuration that breaks it.
 
 - **Person A and Person B are two different people**, each with their own GitHub account. One person cannot hold both roles on a project (rule M21). A team of one cannot use the platform.
 - **The producer of a change never approves it** at G7 or G8; the creator still approves G1. Who the producers are: [handbook Ch.15 §15.10.1](../handbook/02-playbook/ch15-p5-release.md#producers).
@@ -40,7 +40,7 @@ Roles are given per project, and any number of people can hold each role.
 
 - **Creating work.** Everyone with `person_a` creates intents, links specs and submits plans (project configuration `access.intent_create_roles`, `spec_link_roles`, `plan_submit_roles`; by default `person_a`, and `pm_brse` may also link specs). To let the PM / BrSE create intents too, add `pm_brse` to `intent_create_roles`; `viewer` never can (rule M16).
 - **Reviewing.** Everyone with `person_b` can decide Person B's gates: G3, G7, G8, and G2 and G6 at High risk and above ([user guide §1](USER-GUIDE.md#who-decides)). When a gate needs one approval, the first valid one counts: the notice on the issue names every holder of the role, so one reviewer's absence does not block the work. **Give `person_b` to at least two people** on each project.
-- **More than one approval.** By default G7 needs Person B **and** the second approver for flagged changes and at Critical risk, and G8 at Critical risk ([user guide §1](USER-GUIDE.md#who-decides)). A project can ask for this at more gates or tiers: each cell of the gate × risk matrix has `approvals`, the approvals from different people. A cell never needs more approvals than the roles it lists (rule M12), and when it needs as many as it lists, each role approves once. So two approvals means two roles, for example Person B and the second approver on every High-risk pull request:
+- **More than one approval.** By default G7 needs Person B **and** the second approver for flagged changes and at Critical risk, and G8 at Critical risk ([user guide §1](USER-GUIDE.md#who-decides)). A project can ask for more approvals at a gate and risk tier (`approvals` in the gate × risk matrix). Each approval must come from a different person, and from a different role when the cell lists as many roles as approvals (rule M12). So two approvals need two roles, for example Person B and the second approver on every High-risk pull request:
 
   ```yaml
   oversight:
@@ -190,7 +190,7 @@ From a spec to a submitted plan:
 |---|---|---|
 | 3.1 | Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and the [tutorial](TUTORIAL-FIRST-FEATURE.md) (about 20 minutes), then `platform/USER-GUIDE.md` and the handbook chapters of your role (section 1) | — |
 | 3.2 | Install the `sdlc` command ([USER-GUIDE §2, "Install the sdlc command"](USER-GUIDE.md#install-the-sdlc-command)). Get a first API token from the tenant admin, log in, create your own API token and revoke the first one (USER-GUIDE §2) | `sdlc whoami` shows your roles |
-| 3.3 | Open the dashboard and sign in with your API token | You see the project's (empty) board |
+| 3.3 | On the platform server, open `http://127.0.0.1:8090/dashboard/` and sign in with your API token ([handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) | You see the project's (empty) board |
 | 3.4 | A 30-minute walk-through together: the eight gates, who decides each, how comment commands work (first line of a new comment), what an escalation is | Everyone can say who approves G3 and G7 on this project |
 
 ### Step 4. Pilot (the whole team; 2–4 weeks)
@@ -249,3 +249,16 @@ Run real intents, one at a time at first. The trial plan of the sample repositor
 | Roles and separation of duties | [Handbook Ch.5](../handbook/01-policy/ch05-team-roles-and-accountability.md); [codes table §5](../handbook/00-introduction/05-codes.md#5-team-model-2n) |
 | The dashboard | [Handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only) |
 | What the web interface may offer later | [design/MVP1-UI-SCOPE.md](../design/MVP1-UI-SCOPE.md) |
+
+## Version history
+
+| Version | Date | Notes |
+|---|---|---|
+| 0.1 | 2026-10-07 | First version: where each role starts, the rules, six phases, the first week, common mistakes |
+| 0.2 | 2026-10-08 | Step 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD |
+| 0.3 | 2026-10-09 | The rollout "phases" are now "steps" (the codes table keeps "phase" for P1–P6); words as in the glossary |
+| 0.4 | 2026-10-09 | Docs review PR C: the producers, the conflicting roles, who decides and the GitHub App permissions link to their sources; the conflicting roles include Person B and the second approver |
+| 0.5 | 2026-10-09 | Docs review PR C2: step 1 links to the handbook for counting acceptance criteria and the list of agent instruction files; step 2 for each set-up task; 0.4 for the budgets |
+| 0.6 | 2026-10-09 | Docs review fixes: the health check runs on the platform server |
+| 0.7 | 2026-10-09 | Docs review E2: links in §1 and §6; the operator installs the GitHub App |
+| 0.8 | 2026-10-09 | Docs review E3 (readability): the rule numbers explained once; §2b "more than one approval" in plain words; "tenant" explained at first use; the dashboard address in 3.3; the version history moved here |

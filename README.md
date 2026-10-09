@@ -11,7 +11,7 @@ The handbook says **what must happen and why**. The platform **makes sure it hap
 
 Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
-**Status (2026-10-09): built and tested, not yet used on a real project.** Every MVP task except A10 is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on the fictional sample repository (milestone M-E) has not started; the first real internal project comes after it (M-F). Before real client data, the internal server still needs TLS and named key holders for OpenBao, a tested backup and restore, and measured resources (task A10).
+**Status (2026-10-09): built and tested, not yet used on a real project.** The platform is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on a fictional sample project has not started; the first real internal project comes after it. Before real client data, the server still needs encrypted connections (TLS) and named key holders for the secret manager, a tested backup and restore, and measured resources (the open task A10).
 
 **Supported today:** GitHub, projects built with Node.js and TypeScript (one sandbox image, `node24`), the OpenHands agent, and one server with Docker Compose. People reach the API and the dashboard on the server itself; access from other machines comes later ([where to run it](platform/deploy/README.md#where-to-run-it)).
 
@@ -31,9 +31,9 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 |---|---|
 | **Leadership** deciding whether to adopt | This page, then handbook Part I: [Ch.1 summary](handbook/01-policy/ch01-executive-summary.md) and [Ch.9 adoption roadmap](handbook/01-policy/ch09-adoption-roadmap.md) |
 | **Bringing a project team onto the platform** (tech lead, leadership) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout step by step, the first week, common mistakes |
-| **Preparing your application's repository** (Person A, repository owner) | [ROLLOUT-GUIDE step 1](platform/ROLLOUT-GUIDE.md#step-1-prepare-the-repository-person-a-the-repository-owner-12-days): the two repositories, what yours needs, the one file of agent instructions, Spec Kit and BMAD |
+| **Preparing your application's repository** (Person A, the intent owner, or the repository owner) | [ROLLOUT-GUIDE step 1](platform/ROLLOUT-GUIDE.md#step-1-prepare-the-repository-person-a-the-repository-owner-12-days): the two repositories, what yours needs, the one file of agent instructions, Spec Kit and BMAD |
 | **New to the platform** | [The platform in five minutes](platform/PLATFORM-IN-5-MINUTES.md), then the [tutorial: your first feature](platform/TUTORIAL-FIRST-FEATURE.md), one real feature from idea to release. Every platform guide in one list: [platform/README.md](platform/README.md) |
-| **A team member** (Person A, Person B, PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one intent from G1 to G8, by role, with the commands and what to do when something goes wrong |
+| **A team member** (Person A, who asks for changes; Person B, who reviews and approves; PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one intent from G1 to G8, by role, with the commands and what to do when something goes wrong |
 | **Installing and operating the platform** (operator) | [platform/deploy/README.md](platform/deploy/README.md): where to run it, the GitHub App, "Fresh deployment" from an empty checkout to the first intent, restart, upgrade, troubleshooting, uninstall; runbook [T11](handbook/03-templates/T11-openbao-runbook.md) (OpenBao) |
 | **Working on the platform's code** (not needed to use it) | [CONTRIBUTING.md](CONTRIBUTING.md) and [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md) (the developers' set-up: dev stack, test GitHub App) |
 | **Working on the handbook** | [CONTRIBUTING.md](CONTRIBUTING.md), the [contents](handbook/00-introduction/01-contents.md) and the [writing style](handbook/00-introduction/06-writing-style.md) |
@@ -42,11 +42,24 @@ A word you do not know? The [glossary](handbook/00-introduction/02-glossary.md) 
 
 ## 3. How it works
 
-**Two repositories.** The platform (this repository) is installed once on a server and serves many projects. Each project keeps its application in its own GitHub repository; the platform reaches it through a GitHub App, runs agents on a temporary clone, and opens pull requests there. It keeps no working copy of the code; it keeps each run's diff as evidence (at least 180 days) and, with the optional `observability` profile, the model prompts and answers in Langfuse until they are purged.
+**Two repositories.** The platform (this repository) is installed once on a server and serves many projects. Each project keeps its application in its own GitHub repository; the platform reaches it through a GitHub App, runs agents on a temporary clone, and opens pull requests there. It keeps no working copy of the code.
+
+What it does keep: each run's diff, as evidence, for at least 180 days. If the optional tracing (Langfuse, the `observability` profile) is on, it also keeps the model prompts and answers until the retention purge.
 
 ![Two repositories: the platform and your project](diagrams/svg/d14-two-repositories.svg)
 
-**An intent goes through eight gates.** An intent is one change to make, with a code such as `INT-2026-0007` ([glossary](handbook/00-introduction/02-glossary.md)). A person describes the change and its risk (G1), links a specification (G2) and a plan that says which files may change (G3). The platform checks the agent, its permissions and the budget (G4), runs the agent in an isolated sandbox, checks that it stayed inside the plan and the budget (G5), pushes the change and waits for CI (continuous integration: the build and the tests) and security scans (G6). Person B, the independent reviewer and approver, reviews and merges the pull request (G7), then approves the release with its evidence (G8).
+**An intent goes through eight gates.** An intent is one change to make, with a code such as `INT-2026-0007` ([glossary](handbook/00-introduction/02-glossary.md)). Person A asks for it; Person B, the independent reviewer and approver, approves what others produced.
+
+| Gate | What happens |
+|---|---|
+| G1 | Person A describes the change, its risk and its data class |
+| G2 | A specification with acceptance criteria is linked |
+| G3 | A plan says which files the agent may change; Person B approves it |
+| G4 | The platform checks the agent, its permissions and the budget |
+| G5 | The agent has worked in an isolated sandbox; the platform checks that it stayed inside the plan and the budget |
+| G6 | The platform pushes the change and waits for CI (continuous integration: the build and the tests) and the security scans |
+| G7 | Person B reviews the pull request and merges it |
+| G8 | Person B approves the release with its evidence |
 
 **The oversight of each gate depends on the risk.** Low-risk work passes some gates automatically when their conditions hold (HOTL, human on the loop), and a person can still block it within the **block window** (4 working hours by default, configurable). High-risk work lets the agent only write a proposal: a patch kept as evidence, never pushed. Critical work never runs an agent.
 
@@ -63,7 +76,7 @@ A word you do not know? The [glossary](handbook/00-introduction/02-glossary.md) 
 
 **What the platform never does:**
 
-- let the producer of a change approve it at review (G7) or release (G8); the creator still approves G1, their own request ([who the producers are](handbook/02-playbook/ch15-p5-release.md#producers));
+- let the producer of a change approve it at review (G7) or release (G8) ([who the producers are](handbook/02-playbook/ch15-p5-release.md#producers)). Exception: at G1 the person who created the intent approves it, because G1 only confirms their own request;
 - merge a pull request or deploy to production: people do;
 - give an agent a real model key, access to secrets, or a way to push to the main branch;
 - change or delete an audit record.
@@ -76,7 +89,7 @@ A word you do not know? The [glossary](handbook/00-introduction/02-glossary.md) 
 | **Agent runs** | OpenHands (an open-source coding agent) in a hardened sandbox per run, network limited to the model gateway and a package proxy; iteration, time and cost caps; loop detection; a kill switch that stops a run within minutes |
 | **Scope and budget** | Changed files compared with the approved plan; budgets per tenant (a client or unit, with its own data), intent and run, with a warning at 80 % and a stop at 100 % |
 | **Evidence** | An Evidence Pack per intent: the hashes and references of the specification, plan and diff, CI, every gate decision, cost, the client AI disclosure note; never the code or the texts. Exportable as Markdown, sealed at release ([what it holds](handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)) |
-| **Audit** | An append-only, hash-chained audit log per tenant, checked by `sdlc audit verify`, with a daily anchor in locked storage |
+| **Audit** | An append-only audit log per tenant. Each record holds the fingerprint (hash) of the record before it, so a changed record breaks the chain; `sdlc audit verify` checks it. Once a day the latest fingerprint is copied to storage that nobody can change |
 | **Escalations** | Time limits per severity, a backup owner for each escalation, then governance; the work stays frozen while nobody answers |
 | **Cost** | Every model call through one gateway (LiteLLM) with labels for tenant, project, intent and run; cost reports, including wasted cost |
 | **Retention** | Evidence kept 180 days by default, longer when configured; holds for disputes; the audit log kept at least two years |
