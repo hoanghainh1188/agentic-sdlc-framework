@@ -114,7 +114,20 @@ Approval points: production changes follow G1–G8 (fast lane for urgent fixes).
 
 ## 16.9. Using the platform
 
-> To be written by Claude Code together with the platform code.
+> **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written 2026-10-09 (docs review E2).
+
+The MVP platform has no feature made for operations and maintenance alone. An agent takes part in P6 the same way as in P3 to P5: a **remediation is an intent** (§16.5), with a spec, a plan and the eight gates; the agent never acts in production (§16.4; the agent register allows `sandbox` only, Chapter 20 §20.5b). What the platform gives P6 today:
+
+| Need in P6 | On the platform | Where |
+|---|---|---|
+| Stop an agent that behaves unexpectedly | The kill switch, within minutes; its escalation | Chapter 18 §18.8d |
+| Loops and runs that make no progress | Loop detection stops the run; G5 raises an escalation | Chapter 18 §18.8d, Chapter 13 §13.10.5 |
+| What a run did, for an incident review | The run's events and the model-call traces (codes, counts, hashes; the prompts in Langfuse when `observability` is on) | Chapter 18 §18.8c |
+| Cost of the agents' work per project or intent | `sdlc cost report` | Chapter 19 §19.8c |
+| Evidence of a released change | The sealed Evidence Pack of the intent | Chapter 15 §15.10.2 |
+| Production data for an operations task | Only what the project AI record allows (`prod_logs_allowed`); the platform refuses an intent whose data class the record does not allow | Chapter 19 §19.8b, Chapter 2 §2.5 |
+
+Not on the platform yet: the incident module and the remediation record (template T15 stays a document), automatic rollback and containment, and the observation window metrics (D-02 §4.2, MVP+1).
 
 ---
 
@@ -152,3 +165,4 @@ Approval points: production changes follow G1–G8 (fast lane for urgent fixes).
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content; platform usage section reserved for Claude Code |
 | 0.2 | 2026-09-24 | Claude (draft) | Separate client consent for AI on production logs and data (Harry) |
+| 0.3 | 2026-10-09 | Claude Code (docs review E2) | §16.9: what the platform gives P6 today (a remediation is an intent; the kill switch, loop detection, run events, the cost report, the Evidence Pack, the AI record) and what is not built yet |

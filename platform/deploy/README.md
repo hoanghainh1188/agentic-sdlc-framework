@@ -1,4 +1,4 @@
-# Platform infrastructure (Docker Compose)
+# Platform deployment and operations (Docker Compose)
 
 This folder runs the infrastructure that the platform reuses, on one server, with Docker Compose (D-03 section 10, task A02). Image versions, licences and trade-offs: [ADR-M17](../../design/ADR-M17-compose-infrastructure.md).
 
@@ -37,16 +37,39 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 
 **Access from other machines: not supported yet.** The API and the dashboard listen on `127.0.0.1:8090` of the server only. TLS and a reverse proxy for team access come later (A10, M-F). Until then, people use the CLI and the dashboard on the server itself; an SSH tunnel to `127.0.0.1:8090` works for one person, but it is not a supported set-up. Comment commands and reviews on GitHub work from anywhere.
 
+## Create the GitHub App (operator)
+
+The platform reaches each project's repository through one **GitHub App** per installation of the platform (`design/ADR-M23-github-adapter.md` §2.2). The operator creates it once, in the browser, and installs it on every project repository. Never let a chat tool or an AI session handle the private key.
+
+1. Open the App settings of the account or organization that owns the project repositories: Settings → Developer settings → GitHub Apps → **New GitHub App**.
+2. Fill in the form:
+
+   | Field | Value |
+   |---|---|
+   | GitHub App name | A name of your own, for example `<company>-sdlc` |
+   | Homepage URL | Any URL (for example this repository) |
+   | Callback URL | Empty |
+   | Webhook → Active | **Off** (the platform polls GitHub) |
+   | Where can this App be installed | Only on this account |
+
+3. Set the repository permissions exactly as listed in [The GitHub App's settings](#github-app-permissions); everything else "No access".
+4. Note the **Client ID** (`Iv…`). It is not a secret.
+5. Generate a **private key** and move the file out of Downloads, outside every repository, readable only by you (`chmod 600`). It goes into OpenBao in [Fresh deployment, step 4](#4-shared-secrets) and nowhere else.
+6. **Install** the App on the account: "Only select repositories", the project's application repository. Add a repository later in the same place when a second project joins ([ROLLOUT-GUIDE step 2](../ROLLOUT-GUIDE.md#step-2-set-up-the-platform-for-the-project-operator-tenant-admin-pm--brse-about-1-day)).
+7. After a later permission change, accept it on the installation, or tokens keep the old permissions.
+
+The development machine uses a separate **test App** on the fictional sample repository ([GETTING-STARTED Step 11](../GETTING-STARTED.md#step-11-create-the-github-app-devtest)); never reuse a production App there.
+
 ## Fresh deployment (operator)
 
 How to bring up the whole platform on a new machine with Docker Compose, from an empty checkout to the first intent at G1 (D-08 E07 AC3). Run every step **yourself, in a terminal, from the repo root**. Several steps print or ask for key shares, tokens or keys at a hidden prompt: never run them through a chat tool, and never paste their output anywhere except your password manager. `pnpm test:fresh-deploy` runs the same steps on a throw-away Compose project with throw-away keys (section [Tests](#tests)).
 
-After the first deployment: to restart the stack after a reboot on the server, follow [Troubleshooting](#troubleshooting) ("Restart after a reboot"); on a development machine, [GETTING-STARTED Step 13](../GETTING-STARTED.md#step-13-restart-the-dev-stack-after-a-break-dev). Use [Step 14](../GETTING-STARTED.md#step-14-prepare-the-pilot-repo-for-live-tests-dev) for the live tests on the pilot repository.
+After the first deployment: [Restart after a reboot](#restart-after-a-reboot), [Upgrade](#upgrade), [Troubleshooting](#troubleshooting). Use [Step 14](../GETTING-STARTED.md#step-14-prepare-the-pilot-repo-for-live-tests-dev) for the live tests on the pilot repository.
 
 ### 1. Prerequisites
 
 - The [Requirements](#requirements) above (Docker Compose v2.24+, Node.js 24, pnpm 10 with `corepack enable`, OpenSSL 3).
-- A GitHub App installed on the project's repository only, and its private key in a file outside the repo. The App's settings are below; how to create one, step by step: [GETTING-STARTED Step 11](../GETTING-STARTED.md#step-11-create-the-github-app-devtest).
+- A GitHub App installed on the project's repository only, and its private key in a file outside the repo. The App's settings are below; how to create one, step by step: [Create the GitHub App](#create-the-github-app-operator).
 - On the internal server: the three OpenBao key holders are named and TLS is in place (runbook T11 §3.2, task A10). Until then, use this procedure on a development machine with throw-away keys only.
 - `pnpm install` and `pnpm build`.
 
@@ -177,7 +200,7 @@ pnpm sdlc admin role grant --project <project> --user <person-a> --role person_a
 pnpm sdlc admin token issue --user <person-a> --name <token-name>
 ```
 
-Do the same for Person B (`--role person_b`) and every other role you need (handbook Ch.19 §19.8d). Person A and Person B are always two different people with two GitHub accounts. The numeric ID comes from `gh api users/<login> --jq .id`. Each person replaces the issued token with their own (`sdlc token create`, then `sdlc token revoke`).
+Do the same for Person B (`--role person_b`) and every other role you need (the rules and every command: [handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)). Person A and Person B are always two different people with two GitHub accounts. The numeric ID comes from `gh api users/<login> --jq .id`. Each person replaces the issued token with their own (`sdlc token create`, then `sdlc token revoke`).
 
 ### 10. The sandbox image
 
@@ -211,7 +234,7 @@ verification:
   required_checks: [<the repository's required CI check>]
 ```
 
-Then `pnpm sdlc admin config set --project <project> --file <file> --expected-version <version>` (handbook Ch.19 §19.8d).
+Then `pnpm sdlc admin config set --project <project> --file <file> --expected-version <version>` ([handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)).
 
 ### 13. The project AI record
 
@@ -257,6 +280,23 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 - `up.sh` fails if a service is not healthy within `SDLC_WAIT_TIMEOUT` seconds (default 300), or if a job does not exit 0.
 - **Reset all data** (destroys databases, buckets and OpenBao storage): add `-v` to the `down` command. Do this only on a development machine.
 - Logs: `docker compose -f platform/deploy/docker-compose.yml logs <service>`.
+
+## Restart after a reboot
+
+After a reboot (or `pnpm compose:down`) OpenBao is sealed again, and LiteLLM, the API, the worker, the runner and `litellm-agent` cannot become healthy until it is unsealed. On the server, `up.sh core` alone never becomes healthy either: LiteLLM gets its keys from OpenBao (profile `models`). The order:
+
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs
+pnpm openbao:bootstrap status     # says sealed
+pnpm openbao:bootstrap unseal     # two key holders, each their share at the hidden prompt (runbook T11 §4)
+platform/deploy/scripts/up.sh core models platform sandbox   # add observability if you use it
+curl -s http://127.0.0.1:8090/health/ready
+```
+
+- **No credentials command is needed** after a plain restart: the AppRole secret IDs stay in the services' volumes for 90 days.
+- After a `git pull` with new code, follow [Upgrade](#upgrade) instead (migrations, images).
+- Record the restart and who unsealed in the operations log (T11 §4).
+- On a development machine, [GETTING-STARTED Step 13](../GETTING-STARTED.md#step-13-restart-the-dev-stack-after-a-break-dev) is the same procedure with `up.sh core` (the LiteLLM keys are in `.env` there).
 
 ## Secrets and `.env`
 
@@ -374,7 +414,7 @@ OpenBao starts **uninitialised and sealed**. `openbao/bootstrap.sh` initialises 
 
 ## Logs and traces (A08)
 
-Design: [ADR-M35](../../design/ADR-M35-observability.md). Usage for operators: handbook Chapter 18 §18.8c.
+Design: [ADR-M35](../../design/ADR-M35-observability.md). Usage for operators: [handbook Chapter 18 §18.8c](../../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188c-using-the-platform-logs-and-traces-of-a-run).
 
 - **Logs.** `sdlc-api`, `sdlc-worker` and `sdlc-runner` write one JSON line per event, with `tenant_id`, `intent_id` and `run_id` when known. Only codes, IDs and counts; never a token, a key or client data.
 - **Traces are off unless `SDLC_OTEL_ENDPOINT` is set.** `up.sh` sets it to `http://otel-collector:4318` when `observability` is one of the profiles of the same call, so start the profiles that use it together:
@@ -446,7 +486,7 @@ Upgrades come from `main` as reviewed changes; read the [CHANGELOG](../../CHANGE
 2. `git pull`, then `pnpm install && pnpm build`.
 3. Add any new `.env` variables (`.env.example` lists them; `init-env.sh` never overwrites `.env`).
 4. Pull the pinned images and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`): `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull`, then the same with `build` (add `--profile observability` when you use it).
-5. Start only OpenBao, PostgreSQL and SeaweedFS ([step 3](#3-openbao)), unseal OpenBao, apply new migrations ([step 6](#6-database)), then start everything ([step 7](#7-start-the-platform)). On the server `up.sh core` alone fails: LiteLLM needs its keys from OpenBao (profile `models`).
+5. Start only OpenBao, PostgreSQL and SeaweedFS, unseal OpenBao ([Restart after a reboot](#restart-after-a-reboot), first three commands), apply new migrations ([step 6](#6-database)), then start everything ([step 7](#7-start-the-platform)).
 6. Run a credentials command only when the CHANGELOG says an update added one or gave one new rights ([Fresh deployment, step 5](#5-credentials-of-every-process)).
 7. Check: `curl -s http://127.0.0.1:8090/health/ready`, and no `…_missing` line in the logs ([Troubleshooting](#troubleshooting)).
 
@@ -457,7 +497,7 @@ Never run `docker volume prune` or `docker system prune --volumes`: they delete 
 | You see | Cause | Do |
 |---|---|---|
 | `sdlc-api`, `sdlc-worker` or `sdlc-runner` restart every minute; the log says "OpenBao at … is sealed" | OpenBao is sealed after a restart | `pnpm openbao:bootstrap status`, then two key holders unseal it (runbook T11 §4) |
-| **Restart after a reboot**; or `up.sh` times out with the `core`, `platform`, `models` or `sandbox` profile | LiteLLM, the API, the worker, the runner and `litellm-agent` cannot become healthy while OpenBao is sealed; on the server `up.sh core` alone never becomes healthy (LiteLLM has no keys without `models`) | `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs`, unseal (T11 §4), then `platform/deploy/scripts/up.sh core models platform sandbox` (add `observability` if you use it). No credentials command is needed after a plain restart |
+| `up.sh` times out with the `core`, `platform`, `models` or `sandbox` profile | OpenBao is sealed, or `up.sh core` was run alone on the server (LiteLLM has no keys without `models`) | Follow [Restart after a reboot](#restart-after-a-reboot) |
 | A log line ending in `_missing` (for example `worker.evidence_missing`) | A process has no credential for that feature | Run the credentials command the message names ([step 5](#5-credentials-of-every-process); `worker-langfuse-credentials`: [step 7](#7-start-the-platform)), then restart the service |
 | "AppRole login failed (HTTP status 400)" in a log | The AppRole secret ID expired (90 days) or was destroyed | That process's credentials command again, then restart it |
 | `worker.runs_off`; every intent waits at G4 | The worker has no `cost-controller` AppRole | `pnpm openbao:bootstrap worker-credentials`, restart `sdlc-worker` |

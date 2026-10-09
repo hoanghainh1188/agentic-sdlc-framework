@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.6, 2026-10-09 (docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate); 0.5, 2026-10-09 (docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists). Version 0.4, 2026-10-09 (docs review PR C: §1 "Who decides each gate" is the one table of the defaults; the second approver at Critical risk at G7; the exit codes, the dashboard and the producers link to their sources). Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block window, the gate short names). Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
+Version 0.7, 2026-10-09 (docs review E2: §1 and §7 link to the handbook sections); 0.6, 2026-10-09 (docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate); 0.5, 2026-10-09 (docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists). Version 0.4, 2026-10-09 (docs review PR C: §1 "Who decides each gate" is the one table of the defaults; the second approver at Critical risk at G7; the exit codes, the dashboard and the producers link to their sources). Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block window, the gate short names). Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
 
 ---
 
@@ -10,7 +10,7 @@ Version 0.6, 2026-10-09 (docs review fixes: the login example, the AI record com
 
 You describe a change; an AI agent writes the code in an isolated sandbox; people approve at eight gates; the platform keeps the evidence and the cost.
 
-<a id="who-decides"></a>**Who decides each gate.** This table is the platform's default (project setting `oversight.matrix`; the policy behind it is the handbook codes table §4). Other documents link here.
+<a id="who-decides"></a>**Who decides each gate.** This table is the platform's default (project setting `oversight.matrix`; the policy behind it is the handbook [codes table §4](../handbook/00-introduction/05-codes.md#4-eight-gates-g1g8-with-risk-based-oversight)). Other documents link here.
 
 | Gate | Question | Who decides (default) |
 |---|---|---|
@@ -29,7 +29,7 @@ Three rules that never change:
 - **No gate passes by silence.** A gate that waits for you waits until a person with the role decides. HOTL gates pass only when their conditions hold, and you can still block them within the **block window** (4 working hours by default; how it works: [handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#block-window)).
 - **The platform never merges and never deploys.** People do.
 
-Risk tiers decide how far the agent may go: Low and Medium → it changes code (L2, controlled change); High → it only writes a proposal (L1, execute in sandbox); Critical → it never runs (L0, assist). Details: handbook codes table (`handbook/00-introduction/05-codes.md`).
+Risk tiers decide how far the agent may go: Low and Medium → it changes code (L2, controlled change); High → it only writes a proposal (L1, execute in sandbox); Critical → it never runs (L0, assist). Details: the handbook [codes table §3](../handbook/00-introduction/05-codes.md#3-risk-tiers).
 
 ## 2. Before your first intent
 
@@ -233,12 +233,12 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 
 | Topic | Handbook |
 |---|---|
-| Comment commands, HOTL gates, deadlines, the AI record | Ch.19 §19.8b |
-| The `sdlc` command, specs, plans, cost and gate reports | Ch.19 §19.8c |
-| Setting up a team (admins) | Ch.19 §19.8d |
-| G4, the run, G5 | Ch.13 §13.10 |
-| The push, the pull request, G6 | Ch.14 §14.10 |
-| G7, the Evidence Pack, G8, retention and holds | Ch.15 §15.10 |
-| Escalations, logs, the kill switch, loop detection | Ch.18 §18.8b–§18.8d |
-| Registering and approving agents | Ch.20 §20.5b |
+| Comment commands, HOTL gates, deadlines, the AI record | [Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#198b-using-the-platform-gate-commands-in-comments) |
+| The `sdlc` command, specs, plans, cost and gate reports | [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command) |
+| Setting up a team (admins) | [Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins) |
+| G4, the run, G5 | [Ch.13 §13.10](../handbook/02-playbook/ch13-p3-coding.md#1310-using-the-platform) |
+| The push, the pull request, G6 | [Ch.14 §14.10](../handbook/02-playbook/ch14-p4-testing.md#1410-using-the-platform) |
+| G7, the Evidence Pack, G8, retention and holds | [Ch.15 §15.10](../handbook/02-playbook/ch15-p5-release.md#1510-using-the-platform) |
+| Escalations, logs, the kill switch, loop detection | [Ch.18 §18.8b–§18.8d](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188b-using-the-platform-escalations-ack-and-decide) |
+| Registering and approving agents | [Ch.20 §20.5b](../handbook/02-playbook/ch20-agent-and-model-lifecycle.md#205b-the-agent-register-on-the-platform) |
 | The plan file format | [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#plan-file) (template T13 is not yet aligned with it) |
