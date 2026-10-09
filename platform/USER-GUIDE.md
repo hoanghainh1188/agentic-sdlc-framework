@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block window, the gate short names). Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
+Version 0.4, 2026-10-09 (docs review PR C: §1 "Who decides each gate" is the one table of the defaults; the second approver at Critical risk at G7; the exit codes, the dashboard and the producers link to their sources). Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block window, the gate short names). Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
 
 ---
 
@@ -10,20 +10,22 @@ Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block wind
 
 You describe a change; an AI agent writes the code in an isolated sandbox; people approve at eight gates; the platform keeps the evidence and the cost.
 
+<a id="who-decides"></a>**Who decides each gate.** This table is the platform's default (project setting `oversight.matrix`; the policy behind it is the handbook codes table §4). Other documents link here.
+
 | Gate | Question | Who decides (default) |
 |---|---|---|
-| G1 Intent, scope, risk | What problem, what scope, what risk? | Person A |
-| G2 Specification | Is the spec complete and clear? | Person A (Person B at High+); at Low risk the platform passes it (HOTL) |
-| G3 Plan | Is the plan right? Which files may change? | Person B; at Low risk the platform passes it (HOTL) |
-| G4 Execution boundary | May the agent run, with which limits? | The platform (policy); Person A at High risk |
-| G5 Scope and budget | Did the run stay in the plan and the budget? | The platform; a person when it did not |
-| G6 Verification | Did CI pass? Any security finding? | The platform; Person B when findings or High risk |
-| G7 Review and merge | Is the pull request good? | Person B (+ second approver for flagged changes), by a **GitHub review**, then a person **merges** |
-| G8 Release | Release it? | Person B (+ second approver at Critical risk) |
+| G1 Intent, scope, risk | What problem, what scope, what risk? | Person A, at every risk tier |
+| G2 Specification | Is the spec complete and clear? | Person A; Person B at High and Critical risk. At Low risk the platform passes it (HOTL) when its condition holds ([acceptance criteria](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria)) |
+| G3 Plan | Is the plan right? Which files may change? | Person B. At Low risk the platform passes it (HOTL), unless a change flag such as `migration` forces Person B |
+| G4 Execution boundary | May the agent run, with which limits? | The platform (policy check) at Low and Medium risk; Person A at High risk. At Critical risk the agent never runs |
+| G5 Scope and budget | Did the run stay in the plan and the budget? | The platform; a person decides the escalation when the run broke a limit |
+| G6 Verification | Did CI pass? Any security finding? | The platform at Low (sampled afterwards, AUDIT) and Medium (HOTL) risk; Person B at High and Critical risk, and at any risk when a security finding is at or above the threshold (default `high`) or the findings cannot be read |
+| G7 Review and merge | Is the pull request good? | Person B, by a **GitHub review**; also the second approver for flagged changes (migration, payment, personal data, production infrastructure, breaking change, safety function) and at Critical risk. Then a person **merges** |
+| G8 Release | Release it? | Person B; also the second approver at Critical risk |
 
 Three rules that never change:
 
-- **The producer of a change never approves it.** Whoever creates the intent, submits the plan, allows the run or authored a commit cannot approve G7 or G8 for it.
+- **The producer of a change never approves it** at G7 or G8; the creator still approves G1. Who the producers are: [handbook Ch.15 §15.10.1](../handbook/02-playbook/ch15-p5-release.md#producers).
 - **No gate passes by silence.** A gate that waits for you waits until a person with the role decides. HOTL gates pass only when their conditions hold, and you can still block them within the **block window** (4 working hours by default, configurable).
 - **The platform never merges and never deploys.** People do.
 
@@ -103,6 +105,7 @@ The spec is a Markdown file **on the default branch** (`main`):
 sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.md
 ```
 
+- **The spec needs at least one acceptance criterion**, at every risk tier; `sdlc spec link` shows the count. How the platform finds them: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria).
 - **Low risk:** the platform passes G2 by itself (HOTL) and says until when it can be blocked (4 working hours by default).
 - **Medium and High:** Person A approves G2 (Person B at High+).
 - If the spec on `main` changes later, the intent goes back to G2 by itself.
@@ -193,11 +196,11 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 | `sdlc metrics gates --project <slug>` | How long gates wait for people |
 | `sdlc evidence build\|list\|show\|export <INT>` | The Evidence Pack |
 
-Every command takes `--json`. Exit codes: 0 done; 1 refused by the platform (no role, not found, conflict, rule broken); 2 wrong command or options, not logged in, or an unsafe saved login; 3 platform unreachable or an unexpected answer; 4 API token missing, expired or revoked (log in again). Same list: handbook Ch.19 §19.8c.
+Every command takes `--json`. Exit code 0 means done; 4 means log in again with a new API token. The other codes: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#exit-codes).
 
 ### The dashboard (read only)
 
-`http://127.0.0.1:8090/dashboard/` on the platform machine shows the board of intents by gate, an intent's decisions and who decides its gate, the open escalations with their deadlines, cost and gate waiting times, and (tenant admins) the audit check. Sign in with your API token; it stays in the tab's memory only. The dashboard never decides anything: use comments, reviews and the CLI. Handbook Ch.19 §19.8e.
+The dashboard shows intents by gate, escalations, cost and gate waiting times; it never decides anything. Where to open it, how to sign in and what each screen shows: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only).
 
 ## 5. When something goes wrong
 

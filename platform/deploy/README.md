@@ -29,9 +29,26 @@ After the first deployment, use [GETTING-STARTED Step 13](../GETTING-STARTED.md#
 ### 1. Prerequisites
 
 - The [Requirements](#requirements) above (Docker Compose v2.24+, Node.js 24, pnpm 10 with `corepack enable`, OpenSSL 3).
-- A GitHub App installed on the project's repository only, and its private key in a file outside the repo ([GETTING-STARTED Step 11](../GETTING-STARTED.md#step-11-create-the-github-app-devtest)).
+- A GitHub App installed on the project's repository only, and its private key in a file outside the repo. The App's settings are below; how to create one, step by step: [GETTING-STARTED Step 11](../GETTING-STARTED.md#step-11-create-the-github-app-devtest).
 - On the internal server: the three OpenBao key holders are named and TLS is in place (runbook T11 §3.2, task A10). Until then, use this procedure on a development machine with throw-away keys only.
 - `pnpm install` and `pnpm build`.
+
+<a id="github-app-permissions"></a>**The GitHub App's settings.** This is the one list of the App's permissions; other documents link here. One App per installation of the platform (`design/ADR-M23-github-adapter.md` §2.2).
+
+| Permission (repository) | Level | Used for |
+|---|---|---|
+| Contents | Read and write | Clone, read specs and plans; the runner pushes `agent/INT-…` branches (C08) |
+| Issues | Read and write | Read comment commands, post status comments and replies |
+| Pull requests | Read and write | Open the pull request (C08), read reviews and their feedback (E01) |
+| Code scanning alerts | Read-only | Security findings at G6 (C08, QUESTIONS #157) |
+| Checks | Read-only | CI results at G6 |
+| Commit statuses | Read-only | CI results at G6 |
+| Metadata | Read-only | Automatic |
+
+- Everything else "No access"; no organization or account permissions.
+- Webhook: **off** (the platform polls GitHub, ADR-M11). Installable only on your own account or organization.
+- Install it on **selected repositories** only: the project's application repository.
+- After a permission change, accept it on each installation (GitHub asks the owner), or tokens keep the old permissions.
 
 ### 2. Settings file
 
@@ -120,7 +137,16 @@ pnpm sdlc ops bootstrap --tenant <slug> --tenant-name "<name>" --email <you> --n
 pnpm sdlc login --api-url http://127.0.0.1:8090
 ```
 
-The token is printed once (section [First admin and API tokens](#first-admin-and-api-tokens-task-b03)); `sdlc login` reads it at a hidden prompt. From here on, everything goes through the API.
+The bootstrap creates the tenant, its first user and that user's first personal API token (`sdlc_pat_…`, [ADR-M26](../../design/ADR-M26-api-app.md) §2.2), and makes the user the first **tenant admin** (task B13). `sdlc login` reads the token at a hidden prompt. From here on, everything goes through the API: people set up projects, users and roles with `sdlc admin …` and their own tokens with `sdlc token …` (handbook [Ch.19 §19.8c](../../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command) and [§19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)).
+
+- The token is printed **once**. Store it in a password manager; never paste it into a chat, a ticket or a file in a repository.
+- The bootstrap runs once per tenant; a second run with the same slug is refused.
+- Tokens last 90 days by default, at most 365. Only their SHA-256 hash is stored. Every issue and revocation is written to the audit log (IDs only).
+- The operator's commands on the server are `sdlc ops …` (they connect to the database with `SDLC_DB_URL`, actor `system`; renamed from `sdlc admin …` in task B13). Besides `bootstrap`: `sdlc ops token issue|list|revoke`, `sdlc ops audit verify` ([Checking the audit log](#checking-the-audit-log)), `sdlc ops tenant-admin grant|revoke|list` and `sdlc ops role grant|revoke` (for a tenant with one admin, or to recover one that lost its admins), `sdlc ops ai-record set|show`, `sdlc ops agent show|list|suspend|quarantine` (safety moves when the API is down), `sdlc ops run kill`, `sdlc ops retention report`. For example, a token for an existing user:
+
+```bash
+pnpm sdlc ops token issue --tenant <slug> --email <email> --name <token name> --days 90
+```
 
 ### 9. The project and its team
 
@@ -233,7 +259,7 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 | LiteLLM | 4000 | Models only with the profile `models` (keys from OpenBao). Without it: no models, development keys from `.env` |
 | SeaweedFS S3 | 8333 | Anonymous access denied. The only SeaweedFS port reachable from outside its container (A12) |
 | Langfuse | 3000 | `observability` profile only |
-| API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI. Also serves the read-only dashboard at `/dashboard/` (U01, `SDLC_API_DASHBOARD_DIR`, built into the image; `off` turns it off). Keep it on `127.0.0.1`: the dashboard is not for other machines (ADR-M54 §2.2) |
+| API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI. Also serves the read-only dashboard at `/dashboard/` (U01, `SDLC_API_DASHBOARD_DIR`, built into the image; `off` turns it off). Keep it on `127.0.0.1`: the dashboard is not for other machines (ADR-M54 §2.2; how people use it: [handbook Ch.19 §19.8e](../../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) |
 | Sandbox image registry | 5050 | `sandbox` profile only. **Always 127.0.0.1** (not `SDLC_BIND_ADDR`): it has no authentication. Not 5000: macOS uses it |
 
 Valkey, ClickHouse, the Langfuse worker, the OpenTelemetry Collector, **OpenBao**, the runner, the socket proxy and the npm proxy publish no port.
@@ -269,20 +295,7 @@ Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. The 
 
 ### First admin and API tokens (task B03)
 
-The API authenticates people with personal API tokens (`sdlc_pat_…`). The first user of a tenant and its token come from a one-time bootstrap, run by the operator on the server ([ADR-M26](../../design/ADR-M26-api-app.md) §2.2). Run it in a terminal: the token is printed **once**. Store it in a password manager; never paste it into a chat, a ticket or a file in a repository.
-
-```bash
-export SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform"
-pnpm sdlc ops bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
-pnpm sdlc ops token issue --tenant internal --email you@example.com --name laptop-you --days 90
-pnpm sdlc ops token list --tenant internal --email you@example.com
-pnpm sdlc ops token revoke --tenant internal --id <token-id>
-```
-
-- The bootstrap runs once per tenant; a second run with the same slug is refused.
-- Tokens last 90 days by default, at most 365. Only the SHA-256 hash is stored. Every issue and revocation is written to the audit log (IDs only).
-- Operator commands are `sdlc ops …` (renamed from `sdlc admin …` in task B13). They also include `sdlc ops tenant-admin grant|revoke|list` and `sdlc ops role grant|revoke` (for a tenant with one admin, or to recover one that lost its admins) and `sdlc ops agent show|list|suspend|quarantine` (safety moves when the API is down). People use the API: `sdlc admin …`, `sdlc token …`.
-- The bootstrap makes the first user a **tenant admin** (task B13). Projects, users, GitHub identities, roles and project configuration are then set up through the API with `sdlc admin project|user|identity|role|config|tenant-admin …` (handbook Ch.19 §19.8d, [ADR-M37](../../design/ADR-M37-admin-onboarding.md)).
+The first admin, the bootstrap token and the operator's `sdlc ops …` commands: [Fresh deployment, step 8](#8-the-tenant-and-its-first-admin). How people log in and manage their own tokens: handbook [Ch.19 §19.8c](../../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command).
 
 ### Reset after a change to migration 0001 (development only)
 
@@ -302,27 +315,11 @@ Alternatively, recreate the whole Compose stack with its volumes (`docker compos
 
 ## OpenBao: initialise, unseal, configure (task A03)
 
-OpenBao starts **uninitialised and sealed**. `openbao/bootstrap.sh` initialises it (3 key shares, any 2 unseal), unseals it and applies the configuration: KV v2, the Ed25519 Transit key `run-contract`, one AppRole per platform process, the `platform-admin` token role. Design: [ADR-M19](../../design/ADR-M19-openbao-bootstrap.md). Procedure, key custody and troubleshooting: [runbook T11](../../handbook/03-templates/T11-openbao-runbook.md).
+OpenBao starts **uninitialised and sealed**. `openbao/bootstrap.sh` initialises it (3 key shares, any 2 unseal), unseals it and applies the configuration ([ADR-M19](../../design/ADR-M19-openbao-bootstrap.md)). After every restart it is sealed again.
 
-On a development machine, with **throw-away keys only**:
-
-```bash
-pnpm compose:core
-pnpm openbao:bootstrap init       # prints 3 shares and a root token ONCE, to the terminal only
-pnpm openbao:bootstrap unseal     # 2 shares, hidden input
-pnpm openbao:bootstrap configure  # root token, hidden input; revoked at the end
-pnpm openbao:bootstrap status
-```
-
-- `init` and `root-token` refuse to run when their output is redirected or piped. Shares and tokens are never written to a file.
-- `configure` is safe to run again. It needs a root token: `pnpm openbao:bootstrap root-token` makes one from 2 shares.
-- After every restart, OpenBao is sealed again: run `unseal`.
-- Settings (shares, threshold, token and secret ID lifetimes) are in `openbao/bootstrap/bootstrap.conf`. Access rules are in `openbao/bootstrap/policies/*.hcl`.
-- AppRole secret IDs and tokens work only from the Compose network subnet (`SDLC_NETWORK_SUBNET`, default `172.30.0.0/24`) **without its gateway** (`SDLC_NETWORK_GATEWAY`, default `172.30.0.1`). On a Linux host every host process reaches the containers from the gateway address, so leaving it out stops logins from the host (`design/QUESTIONS.md` #37). A stack started before A03 has no fixed subnet, and one started before A11 has no fixed gateway: run `pnpm compose:down`, then `pnpm compose:core` once, then `pnpm openbao:bootstrap configure` again.
-- A `.env` created before A11 still has `OPENBAO_HOST_PORT`: delete that line (it is not used), and add `SDLC_NETWORK_GATEWAY=172.30.0.1` (or the `.1` address of your own subnet).
-- The audit log is `/openbao/logs/audit.log` on the volume `openbao-audit`.
-- The real initialisation on the internal server waits until the three key holders are named (runbook T11 section 3.2).
-- TLS is off (development only): `design/QUESTIONS.md` #20.
+- The order of the commands on a new machine: [Fresh deployment, step 3](#3-openbao).
+- The procedure, the key custody, unsealing after a restart, the settings files and troubleshooting: [runbook T11](../../handbook/03-templates/T11-openbao-runbook.md) §3 and §4 (on a development machine with throw-away keys: §3.1).
+- The real initialisation on the internal server waits until the three key holders are named and TLS is in place (T11 §3.2, `design/QUESTIONS.md` #20).
 
 ## Health: what "healthy" means
 

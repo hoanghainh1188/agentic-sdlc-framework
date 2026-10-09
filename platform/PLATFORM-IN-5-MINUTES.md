@@ -38,6 +38,8 @@ More words: the [glossary](../handbook/00-introduction/02-glossary.md).
 
 ## 4. The eight gates in one line each
 
+A simplified view; the full defaults, with the risk tiers and the second approver, are in the [user guide §1](USER-GUIDE.md#who-decides).
+
 | Gate | The question | Usually decided by |
 |---|---|---|
 | G1 Intent, scope, risk | Is this the right change, with the right risk? | Person A |
@@ -53,7 +55,7 @@ The risk tier changes how far the agent may go: **Low and Medium** risk, the age
 
 ## 5. Three rules that never change
 
-1. **Whoever produces a change never approves it** at review and release (G7, G8): the person who created the intent, submitted the plan, allowed a run or authored a commit, and the agent. The creator still approves G1, their own request.
+1. **Whoever produces a change never approves it** at review and release (G7, G8), the agent included. The creator still approves G1, their own request. Who the producers are: [handbook Ch.15 §15.10.1](../handbook/02-playbook/ch15-p5-release.md#producers).
 2. **No gate passes by silence.** If nobody decides, the intent waits, and an escalation goes up the chain.
 3. **The platform never merges and never deploys.** People do.
 

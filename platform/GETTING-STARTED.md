@@ -1,221 +1,8 @@
-# Getting started: from the zip file to the first task
+# Getting started: the platform developer's machine
 
 > **For the developers of the platform** (the repository owner and Claude Code sessions): their machine, the dev stack, the test GitHub App. To use the platform, read [USER-GUIDE.md](USER-GUIDE.md); to install it on a server, read [deploy/README.md](deploy/README.md) "Fresh deployment".
 
-This guide covers: pushing the repo to GitHub, creating the 44 backlog issues, running tasks with Claude Code, and sending handbook comments.
-Done by: the repo owner / tech lead (Harry). Time: about half a day for steps 1–6.
-
-| Current state (2026-09-24) | |
-|---|---|
-| Design | Version 1.0 approved, tag `design-v1.0` |
-| Handbook | Version 1.0, **not yet approved as a whole** |
-| Coding | Whole backlog now, starting with A01; rework accepted after the handbook is approved |
-
----
-
-## Step 0. Prepare before you start
-
-| What | Needed for | Who |
-|---|---|---|
-| GitHub organisation account with rights to create repositories | Step 1 | Harry |
-| GitHub CLI installed and logged in (`gh auth login`) | Step 3 | Harry |
-| Claude Code access through the company plan (not a personal account — handbook Ch.2 Rule 1) | Step 4 | Leadership / tool owner |
-| Developer machine: Git, Node.js LTS, pnpm; Docker from A02; OpenSSL 3.x first in `PATH` from A04 (on macOS not the built-in LibreSSL, see `platform/deploy/README.md`) | A01, A02, A04 | Developer |
-| **Three people to hold the OpenBao key shares** | **Before A03** | Leadership |
-| Infrastructure operator for the internal server | Before A10 | Leadership |
-| Person B for reviewing platform PRs | Every task | Leadership |
-
-Building the platform is **internal work** with no client data, so Claude Code may be used here (handbook Ch.2 Rule 9). The usual rules still apply: own branch, pull request, human review, AI disclosure.
-
----
-
-## Step 1. Create the repo on GitHub and push
-
-1. Create a repository `agentic-sdlc-framework` (it was private until 2026-10-08, public since). Do not add a README, licence or `.gitignore` (the repo already has them).
-   - Current repository: `github.com/hoanghainh1188/agentic-sdlc-framework`, **public** since 2026-10-08, personal account on the **GitHub Free** plan (moved from the organization `harryforge` on 2026-10-06; Harry). The sample repo and the test GitHub App stay in `harryforge`. Suggested mitigations: two-factor authentication for all members; a second trusted owner; an offline mirror (`git clone --mirror`); move to a company-controlled organization before any client or sales use.
-2. Unzip, copy the folder where you want it, and push **one initial commit** (the repository history starts here):
-
-```bash
-cd agentic-sdlc-framework
-git config --global user.name  "<your name>"      # once per machine; commits fail without it
-git config --global user.email "<your email>"
-git init
-git add .
-git commit -m "Initial commit: handbook v1.0 (in review), design v1.0 (approved)"
-git branch -M main
-git remote add origin git@github.com:hoanghainh1188/agentic-sdlc-framework.git
-git push -u origin main
-
-# mark the approved design on this first commit
-git tag -a design-v1.0 -m "Design version 1.0 approved by Harry (2026-09-24)"
-git push origin design-v1.0
-```
-
-Check on GitHub:
-- [ ] Branch `main` with one commit
-- [ ] Tag `design-v1.0`
-- [ ] `handbook/`, `design/`, `platform/`, `scripts/`, `CLAUDE.md`, `.github/` are present (`.github/` is a hidden folder: make sure it was copied)
-
-## Step 2. Configure the repo
-
-Do this **after** the first push, so protection does not block it.
-
-> **Since 2026-10-08 the repository is public:** branch protection and rulesets are available on GitHub Free (see the table below). The compensating controls that were used while it was private (2026-09-24 to 2026-10-08) stay good practice:
-> - Merge settings: squash merge only; delete branch after merge (available on Free).
-> - Local `pre-push` hook that blocks direct pushes to `main` (`.git/hooks/pre-push`; install it on every machine that pushes). Bypass with `--no-verify` only in an emergency, with Harry's approval.
-> - Process: every change through a pull request, reviewed by someone other than its producer (handbook Ch.5).
-> - CI (`.github/workflows/ci.yml`, task A09) runs on every pull request, daily on `main` (Tuesday to Sunday, 03:00 JST: security scans; build, tests and database tests when `main` changed) and weekly with every job (Monday 03:00 JST). A push to `main` runs nothing: the pull request already ran every check. To save Actions minutes, open a pull request as a **draft** while you iterate: the heavy jobs (Compose, sandbox image) wait until you mark it ready for review. A red check cannot block the merge on GitHub Free: **never merge a pull request whose `ci-ok` check is red or still running**. A red scheduled run on `main` means something was merged anyway: fix it first.
-> - Security scan exceptions (`.gitleaks.toml`, `.trivyignore`, `.semgrepignore`) change only with a reason, a date and Person B's approval in the pull request.
-> Turn on the branch protection below. Require at least one approval only once a second person (Person B) has write access: GitHub never lets authors approve their own pull requests, so with one maintainer a required approval blocks every merge.
-
-| Setting | Value | Why |
-|---|---|---|
-| Branch protection on `main` | PR required; at least 1 approval; required status check `ci-ok` (the one summary job of `ci.yml`); no force push; dismiss stale approvals when new commits are pushed | Nobody, including AI, pushes straight to `main`; approval stays bound to what was reviewed |
-| Merge method | Squash merge only | 1 PR = 1 commit |
-| Delete branch after merge | On | Tidy repo |
-| Access | Public read; write access for the maintainers only | Open for everyone (MIT code, CC BY 4.0 documentation) |
-| Secret scanning / push protection (if your plan has it) | On | Blocks leaked secrets |
-
-`.github/CODEOWNERS` (task A09) names Harry as the only owner today; GitHub uses it since the repository is public. Add Person B when they join.
-
-## Step 3. Create milestones, labels and the 49 issues
-
-```bash
-# Dry run: shows what would be created, creates nothing
-python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework --dry-run
-
-# Create: 5 milestones (M-A, M-B, M-0, M-C, M-D), labels, 49 issues
-python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework
-```
-
-- Safe to run again: issues that already exist (same `[ID] ` title prefix) are skipped.
-- After D-08 changes (`scripts/generate-backlog.py`), run it with `--update` (first with `--dry-run`): it brings the **open** issues in line with the CSV (title, body, size label). Closed issues are never changed.
-- `--only A01,A02` creates only some tasks.
-- Tasks `R01–R04` are labelled `repo:pilot`: tracked here, code in the separate repo `pilot-order-inventory`.
-
-Check: 49 issues, each with its milestone, size label and acceptance criteria.
-
-### Tasks most affected by handbook changes
-
-The script labels 12 tasks `handbook-dependent`: B01, B07, B11, B12, C06, C07, C10, C11, E01, E02, E03, E05. They implement rules from handbook chapters still awaiting comments, so they are the most likely to need rework. The list is in `scripts/create-issues.py` (`HANDBOOK_DEPENDENT`).
-
-## Step 4. Prepare Claude Code
-
-1. Install Claude Code following the official guide: https://docs.claude.com/en/docs/claude-code/overview
-2. Open a terminal at the **repo root** and start Claude Code. It reads `CLAUDE.md` at the start of every session.
-3. Keep the permission prompts on. Do not use any mode that skips permission checks.
-4. First session only — ask a check question before giving work:
-
-```text
-Read CLAUDE.md and README.md. Summarise in 10 bullets: the current status, the rules you must follow,
-the order of work, and what you must do when a document is missing or contradictory. Do not write code.
-```
-
-If the summary misses "code the whole backlog, rework accepted", "handbook rules go in config", or "open questions go to `design/QUESTIONS.md`", correct it before continuing.
-
-## Step 5. Run task A01
-
-Paste into Claude Code:
-
-```text
-Task: A01 — Initialise the TypeScript monorepo
-Issue: #<A01 issue number>
-
-Read: CLAUDE.md, design/D-08-mvp-backlog.md (task A01), design/D-03-mvp-architecture.md section 11.
-
-Step 1 — Plan (do NOT code yet):
-- List the files and folders to create.
-- Proposed tools: workspace management, lint, format, test, and how to enforce module boundaries
-  (packages/core must not import packages/adapters/*). Explain each choice and its licence.
-- How each acceptance criterion (AC1–AC3) will be tested.
-- Risks or unclear points.
-Stop and wait for my approval.
-
-Step 2 — After approval: create branch task/A01-monorepo-init, write code and tests for AC1–AC3.
-Step 3 — Run lint, build and tests. Fill in the "Commands" section of CLAUDE.md.
-         Summarise the results and open a PR with the template; put "A01" in the title.
-
-If a document is missing or contradictory: add the question to design/QUESTIONS.md and stop.
-```
-
-## Step 6. Review the plan and the PR
-
-**Plan (step 1):**
-- [ ] Structure matches `platform/apps/{api,worker,runner,cli}` and `platform/packages/{core,contracts,adapters/*,config}`
-- [ ] Tools are reasonable; licences allow commercial use
-- [ ] An **automatic** check stops `core` importing `adapters` (AC3)
-
-**Pull request:**
-- [ ] AI disclosure in the PR template is complete
-- [ ] CI passes
-- [ ] Locally: `pnpm install && pnpm build && pnpm lint && pnpm test`
-- [ ] Add a bad import in `core` on purpose → lint must fail
-- [ ] `Commands` section of `CLAUDE.md` filled in
-- [ ] Reviewer is not the person who ran Claude Code for this task (2+N)
-
-Then squash-merge and close the issue (see step 8).
-
-## Step 7. The standard loop for every task
-
-```text
-pick the next task (step 9 order) → paste the task prompt → review the plan → approve
-→ Claude Code codes on task/<ID>-<short-name> → PR → review (checklist handbook T3) → merge → close issue
-```
-
-Task prompt template (change the ID, title and sections):
-
-```text
-Task: <ID> — <title>
-Issue: #<number>
-Read: CLAUDE.md, design/D-08-mvp-backlog.md (task <ID>), <design sections listed in the task>.
-Step 1 — Plan only; include how each acceptance criterion is tested; list rules that come from the
-handbook and confirm they are read from config, not hard-coded. Stop for approval.
-Step 2 — Code and tests on branch task/<ID>-<short-name>.
-Step 3 — Run lint, build, tests; open a PR with "<ID>" in the title.
-If a document is missing or contradictory: add the question to design/QUESTIONS.md and stop.
-```
-
-Rules for every task:
-- **One task per session.** Start a new session for the next task.
-- Tasks sized **L** are split into 2–3 sessions (the task note says how).
-- Check `design/QUESTIONS.md` after each session; answer or escalate open questions.
-- For `handbook-dependent` tasks, check in review that rules sit in config (oversight matrix, roles, SLAs, thresholds).
-
-## Step 8. After each task
-
-Write on the issue when closing it:
-- actual time spent (to recalibrate sizes);
-- how many times the plan or PR had to change;
-- questions raised (already in `design/QUESTIONS.md`).
-
-This is the framework's first real data: AI used to build the platform itself.
-
-## Step 9. Suggested order after A01
-
-Follow the dependencies in D-08. A practical order:
-
-| # | Tasks | Note |
-|---|---|---|
-| 1 | A02 Docker Compose → C01 OpenHands PoC | Reduce the biggest technical risk early |
-| 2 | A03 OpenBao → A04 secrets client | **Key holders must be named first** |
-| 3 | A05 config, A06 database, A07 audit | Base for everything else |
-| 4 | A08, A09, A10 | A10 needs the infrastructure operator |
-| 5 | M-B: B01 → B02 → … → B11 escalation, B12 AI record → B10 tests | Mostly `handbook-dependent` |
-| 6 | M-0: R01–R04 (sample repo) | Right before M-C |
-| 7 | M-C: C02 → … → C10 agent register, C11 kill switch → C09 tests | |
-| 8 | M-D: E01 → E07 | E07 = MVP definition of done |
-
-## Step 10. When the handbook changes
-
-Coding continues while the handbook is reviewed. When a handbook change is **approved** and affects the platform:
-
-```text
-handbook updated (approved) → design doc updated → change task added in scripts/generate-backlog.py
-→ python3 scripts/generate-backlog.py → create the new issue (--only <ID>) → Claude Code implements it
-```
-
-- Never change code to follow an **unapproved** handbook draft.
-- Label the change issues `handbook-dependent` too.
+This guide covers: the test GitHub App (Step 11), a dev stack from scratch (Step 11b), the first admin on a dev machine (Step 12), restarting the dev stack (Step 13), the live tests on the pilot repository (Step 14), sending handbook comments and maintaining the backlog. The repository's settings and CI: [CONTRIBUTING.md §2](../CONTRIBUTING.md#2-the-repository). How the repository was first set up in September 2026 (Steps 0–10): [History](#history-the-first-set-up-2026-09) at the end. The step numbers are kept, because other documents and code comments cite them.
 
 ---
 
@@ -236,19 +23,7 @@ Done once by the repo owner in the browser. Claude must never read or handle the
 | Webhook → Active | **off** (the MVP polls, QUESTIONS #43, ADR-M11) |
 | Where can this App be installed | Only on this account |
 
-3. **Repository permissions** (everything else "No access"; no organization or account permissions):
-
-| Permission | Level |
-|---|---|
-| Contents | Read and write (C08: the runner pushes `agent/*`) |
-| Issues | Read and write |
-| Pull requests | Read and write (C08: the platform opens the pull request) |
-| Code scanning alerts | Read-only (C08: security findings at G6, QUESTIONS #157) |
-| Checks | Read-only |
-| Commit statuses | Read-only |
-| Metadata | Read-only (automatic) |
-
-   Later tasks add only what they need. After a permission change, accept it on the installation (GitHub asks the account owner), or tokens keep the old permissions.
+3. **Repository permissions:** set them as listed in [deploy/README, "The GitHub App's settings"](deploy/README.md#github-app-permissions); everything else "No access". After a permission change, accept it on the installation, or tokens keep the old permissions.
 
 4. **Note the Client ID** (`Iv…`). It is not a secret; the adapter uses it as the JWT issuer (the numeric App ID also works).
 5. **Private key:** "Generate a private key", then move it out of Downloads, outside the repository:
@@ -398,7 +173,7 @@ The password goes from `.env` into the command without being printed. `up.sh` en
 
 ## Step 12. Start the API and create the first admin (dev)
 
-The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people with personal API tokens. Run the commands below yourself, in a terminal: they print a token **once**. Never run them through a chat tool, and never paste the token anywhere except your password manager.
+The development commands of [deploy/README, Fresh deployment steps 7–9](deploy/README.md#8-the-tenant-and-its-first-admin), which explains the bootstrap, the token and the `sdlc ops …` commands; how people log in and use tokens: handbook [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command). Run the commands below yourself, in a terminal: they print a token **once**. Never run them through a chat tool, and never paste the token anywhere except your password manager.
 
 1. OpenBao is initialised, unsealed and configured (runbook T11 sections 3 and 4; on a new machine, Step 11b does all of item 1). Deliver the API's credentials, then start it:
    ```bash
@@ -406,7 +181,7 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
    pnpm compose:platform
    curl -s http://127.0.0.1:8090/health/ready
    ```
-2. Migrate the database (`pnpm db:migrate`), then create your tenant, your user and your first token. `SDLC_DB_URL` is the `platform_app` URL (`platform/deploy/README.md`, "First admin and API tokens"):
+2. Migrate the database (`pnpm db:migrate`), then create your tenant, your user and your first token. `SDLC_DB_URL` is the `platform_app` URL (deploy/README step 8):
    ```bash
    pnpm sdlc ops bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
    ```
@@ -416,9 +191,9 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
    pnpm sdlc login --api-url http://127.0.0.1:8090
    pnpm sdlc whoami
    ```
-   Then `pnpm sdlc intent …`, `pnpm sdlc gate …`, `pnpm sdlc escalation …` and `pnpm sdlc ai-record …` work through the API (handbook Ch.19 §19.8c). `pnpm sdlc logout` revokes the token on the server, then deletes the saved login.
+   Then every `pnpm sdlc …` command works through the API (handbook Ch.19 §19.8c).
 
-5. Set up a project and its team through the API (task B13, [ADR-M37](../design/ADR-M37-admin-onboarding.md), handbook Ch.19 §19.8d). The bootstrap made you a tenant admin. Nobody gives a role to themselves, so add a second person for each role you need; Person A and Person B are always different people:
+5. Set up a project and its team through the API. The rules (nobody gives a role to themselves; [roles that conflict](../handbook/02-playbook/ch19-approval-queues.md#conflicting-roles)) and every command: handbook [Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins). On a development machine:
    ```bash
    pnpm sdlc admin project create --slug pilot --name "Pilot" --repo harryforge/pilot-order-inventory
    pnpm sdlc admin user create --email colleague@example.com --name "Colleague"
@@ -426,7 +201,7 @@ The API (task B03, [ADR-M26](../design/ADR-M26-api-app.md)) authenticates people
    pnpm sdlc admin role grant --project pilot --user colleague@example.com --role person_b
    pnpm sdlc admin config show --project pilot
    ```
-   The numeric GitHub ID comes from `gh api users/<login> --jq .id`. Nobody gives a role to themselves through the API: a role for yourself comes from a second tenant admin (`pnpm sdlc admin tenant-admin grant --user <email>`), or from the operator on the server (`pnpm sdlc ops role grant --tenant internal --project pilot --email you@example.com --role person_a`, with `SDLC_DB_URL`).
+   The numeric GitHub ID comes from `gh api users/<login> --jq .id`. A role for yourself comes from a second tenant admin, or from the operator on the server (`pnpm sdlc ops role grant --tenant internal --project pilot --email you@example.com --role person_a`, with `SDLC_DB_URL`).
 6. Replace the bootstrap token with your own: `pnpm sdlc token create --name laptop-you`, log in again with it (`pnpm sdlc login`), then revoke the bootstrap token (`pnpm sdlc token list`, `pnpm sdlc token revoke --id <ID>`).
 
 ## Step 13. Restart the dev stack after a break (dev)
@@ -447,12 +222,12 @@ Start `core` alone first: `sdlc-api`, `sdlc-worker`, `sdlc-runner` and `litellm-
 
 **The credentials commands are NOT needed after a plain restart.** The AppRole secret IDs stay in the services' volumes and live 90 days (`APPROLE_SECRET_ID_TTL`); the processes log in again by themselves. Run a credentials command only in these cases (each one asks for an admin token, runbook T11 §5.1, and prints no secret):
 
-| When | Command (then restart that service) |
+| When | Do (then restart that service) |
 |---|---|
-| First set-up, or the secret ID is older than 90 days | `pnpm openbao:bootstrap api-credentials` → `sdlc-api`; `worker-credentials` → `sdlc-worker`; `runner-credentials` → `sdlc-runner`; `litellm-credentials` → `litellm-agent` |
-| Once after the C08 update (pushes need to read the stored diff), or the evidence key may have leaked | `pnpm openbao:bootstrap runner-evidence-credentials` → `sdlc-runner` |
-| Once after the E02 update (Evidence Packs), or the API's evidence key may have leaked | `pnpm openbao:bootstrap api-evidence-credentials` → `sdlc-api` (runbook T11 §5h) |
-| A service log says it cannot log in to OpenBao (`invalid secret id`) | That service's credentials command |
+| First set-up, or a secret ID is older than 90 days | Every credentials command: the full list is [deploy/README, Fresh deployment step 5](deploy/README.md#5-credentials-of-every-process) (one runbook T11 section each) |
+| A service log says it cannot log in to OpenBao (`invalid secret id`), or names a missing credential (`…_missing`, Step 11b part 7) | That service's credentials command |
+| An update on `main` adds a credentials command or new rights to one (the CHANGELOG says so; for example C08: the runner reads stored diffs, E02: the API's evidence identity) | That command, once |
+| A key may have leaked | That command again: it rotates the secret ID (runbook T11 §8.3) |
 
 **After an image update on `main`** (for example issue #177: OpenBao 2.7.1, ClickHouse 26.3.39.7, Langfuse 4.50.0), on an existing dev stack:
 
@@ -472,7 +247,7 @@ Live tests run the platform against the real `harryforge/pilot-order-inventory` 
 
 | # | What | How | Check |
 |---|---|---|---|
-| 1 | Test App permissions | App settings (Step 11): Contents **read and write**, Pull requests **read and write**, Code scanning alerts **read**, Issues read and write, Checks, Commit statuses and Metadata read. Then accept the new permissions on the installation (organization settings → GitHub Apps → Configure) | `gh api /orgs/harryforge/installations --jq '.installations[]\|select(.app_slug=="harryforge-sdlc-dev")\|.permissions'` |
+| 1 | Test App permissions | App settings (Step 11) as listed in [deploy/README](deploy/README.md#github-app-permissions). Then accept the new permissions on the installation (organization settings → GitHub Apps → Configure) | `gh api /orgs/harryforge/installations --jq '.installations[]\|select(.app_slug=="harryforge-sdlc-dev")\|.permissions'` |
 | 2 | The pilot project, its team and AI record | Step 12 item 5; `pnpm sdlc ai-record set …` (handbook Ch.19 §19.8b). Person A and Person B are two different people with two GitHub accounts | `pnpm sdlc admin config show --project pilot`, `pnpm sdlc ai-record show --project pilot` |
 | 3 | The project configuration | `pnpm sdlc admin config show --project pilot` gives the version; write the settings that differ from the defaults into a YAML file outside the repo, then `pnpm sdlc admin config set --project pilot --file <file> --expected-version <version>` (handbook Ch.19 §19.8d). For the pilot: `verification.required_checks: [ci-ok]` (G6 waits only for the pilot's `ci-ok`, handbook Ch.14), `sandbox.image` (Step 14 item 4) and `run.agent_key` (item 5) | `config show` prints the new version and values |
 | 4 | The sandbox image | `pnpm sandbox-image:build node24` prints the reference by digest; on Docker Desktop use `platform/sandbox-images/build.sh node24 --no-push` (runbook T11 §5g). Put it in `sandbox.image` | The reference ends in `@sha256:…` |
@@ -516,7 +291,7 @@ Types: **change** (a rule is different), **add**, **remove**, **wording** (meani
 What happens next:
 1. Claude updates the handbook chapter(s) and lists the effects on design and code.
 2. You approve the chapter change.
-3. If the platform is affected: step 10.
+3. If the platform is affected: update the design document first, add a change task to the backlog, then change the code (CLAUDE.md; [Step 10](#step-10-when-the-handbook-changes) of the history).
 
 Still awaiting comments: Ch.13–20, Part 0 (0.2 glossary, 0.3, 0.4), templates T1, T3–T18.
 
@@ -529,3 +304,203 @@ D-08 and its CSV are generated from `scripts/generate-backlog.py`. Edit the data
 ```bash
 python3 scripts/generate-backlog.py
 ```
+
+---
+
+## History: the first set-up (2026-09)
+
+Steps 0–10 record how the repository was first set up, from a zip file to the first task, on 2026-09-24. They are kept for reference and are not needed to work on the platform today: the repository, its settings ([CONTRIBUTING.md §2](../CONTRIBUTING.md#2-the-repository)) and its issues exist. Done by the repo owner (Harry); about half a day for steps 1–6.
+
+| State on 2026-09-24 | |
+|---|---|
+| Design | Version 1.0 approved, tag `design-v1.0` |
+| Handbook | Version 1.0, **not yet approved as a whole** |
+| Coding | Whole backlog now, starting with A01; rework accepted after the handbook is approved |
+
+### Step 0. Prepare before you start
+
+| What | Needed for | Who |
+|---|---|---|
+| GitHub organisation account with rights to create repositories | Step 1 | Harry |
+| GitHub CLI installed and logged in (`gh auth login`) | Step 3 | Harry |
+| Claude Code access through the company plan (not a personal account — handbook Ch.2 Rule 1) | Step 4 | Leadership / tool owner |
+| Developer machine: Git, Node.js LTS, pnpm; Docker from A02; OpenSSL 3.x first in `PATH` from A04 (on macOS not the built-in LibreSSL, see `platform/deploy/README.md`) | A01, A02, A04 | Developer |
+| **Three people to hold the OpenBao key shares** | **Before A03** | Leadership |
+| Infrastructure operator for the internal server | Before A10 | Leadership |
+| Person B for reviewing platform PRs | Every task | Leadership |
+
+Building the platform is **internal work** with no client data, so Claude Code may be used here (handbook Ch.2 Rule 9). The usual rules still apply: own branch, pull request, human review, AI disclosure.
+
+---
+
+### Step 1. Create the repo on GitHub and push
+
+1. Create a repository `agentic-sdlc-framework` (it was private until 2026-10-08, public since). Do not add a README, licence or `.gitignore` (the repo already has them).
+   - Where the repository is today, and the risks of a personal account: [CONTRIBUTING.md §2](../CONTRIBUTING.md#2-the-repository).
+2. Unzip, copy the folder where you want it, and push **one initial commit** (the repository history starts here):
+
+```bash
+cd agentic-sdlc-framework
+git config --global user.name  "<your name>"      # once per machine; commits fail without it
+git config --global user.email "<your email>"
+git init
+git add .
+git commit -m "Initial commit: handbook v1.0 (in review), design v1.0 (approved)"
+git branch -M main
+git remote add origin git@github.com:hoanghainh1188/agentic-sdlc-framework.git
+git push -u origin main
+
+# mark the approved design on this first commit
+git tag -a design-v1.0 -m "Design version 1.0 approved by Harry (2026-09-24)"
+git push origin design-v1.0
+```
+
+Check on GitHub:
+- [ ] Branch `main` with one commit
+- [ ] Tag `design-v1.0`
+- [ ] `handbook/`, `design/`, `platform/`, `scripts/`, `CLAUDE.md`, `.github/` are present (`.github/` is a hidden folder: make sure it was copied)
+
+### Step 2. Configure the repo
+
+Do this **after** the first push, so protection does not block it. The settings in force today (branch protection, the required check `ci-ok`, merging, CI, scan exceptions): [CONTRIBUTING.md §2](../CONTRIBUTING.md#2-the-repository).
+
+### Step 3. Create milestones, labels and the 49 issues
+
+```bash
+# Dry run: shows what would be created, creates nothing
+python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework --dry-run
+
+# Create: 5 milestones (M-A, M-B, M-0, M-C, M-D), labels, 49 issues
+python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework
+```
+
+- Safe to run again: issues that already exist (same `[ID] ` title prefix) are skipped.
+- After D-08 changes (`scripts/generate-backlog.py`), run it with `--update` (first with `--dry-run`): it brings the **open** issues in line with the CSV (title, body, size label). Closed issues are never changed.
+- `--only A01,A02` creates only some tasks.
+- Tasks `R01–R04` are labelled `repo:pilot`: tracked here, code in the separate repo `pilot-order-inventory`.
+
+Check: 49 issues, each with its milestone, size label and acceptance criteria.
+
+#### Tasks most affected by handbook changes
+
+The script labels 12 tasks `handbook-dependent`: B01, B07, B11, B12, C06, C07, C10, C11, E01, E02, E03, E05. They implement rules from handbook chapters still awaiting comments, so they are the most likely to need rework. The list is in `scripts/create-issues.py` (`HANDBOOK_DEPENDENT`).
+
+### Step 4. Prepare Claude Code
+
+1. Install Claude Code following the official guide: https://docs.claude.com/en/docs/claude-code/overview
+2. Open a terminal at the **repo root** and start Claude Code. It reads `CLAUDE.md` at the start of every session.
+3. Keep the permission prompts on. Do not use any mode that skips permission checks.
+4. First session only — ask a check question before giving work:
+
+```text
+Read CLAUDE.md and README.md. Summarise in 10 bullets: the current status, the rules you must follow,
+the order of work, and what you must do when a document is missing or contradictory. Do not write code.
+```
+
+If the summary misses "code the whole backlog, rework accepted", "handbook rules go in config", or "open questions go to `design/QUESTIONS.md`", correct it before continuing.
+
+### Step 5. Run task A01
+
+Paste into Claude Code:
+
+```text
+Task: A01 — Initialise the TypeScript monorepo
+Issue: #<A01 issue number>
+
+Read: CLAUDE.md, design/D-08-mvp-backlog.md (task A01), design/D-03-mvp-architecture.md section 11.
+
+Step 1 — Plan (do NOT code yet):
+- List the files and folders to create.
+- Proposed tools: workspace management, lint, format, test, and how to enforce module boundaries
+  (packages/core must not import packages/adapters/*). Explain each choice and its licence.
+- How each acceptance criterion (AC1–AC3) will be tested.
+- Risks or unclear points.
+Stop and wait for my approval.
+
+Step 2 — After approval: create branch task/A01-monorepo-init, write code and tests for AC1–AC3.
+Step 3 — Run lint, build and tests. Fill in the "Commands" section of CLAUDE.md.
+         Summarise the results and open a PR with the template; put "A01" in the title.
+
+If a document is missing or contradictory: add the question to design/QUESTIONS.md and stop.
+```
+
+### Step 6. Review the plan and the PR
+
+**Plan (step 1):**
+- [ ] Structure matches `platform/apps/{api,worker,runner,cli}` and `platform/packages/{core,contracts,adapters/*,config}`
+- [ ] Tools are reasonable; licences allow commercial use
+- [ ] An **automatic** check stops `core` importing `adapters` (AC3)
+
+**Pull request:**
+- [ ] AI disclosure in the PR template is complete
+- [ ] CI passes
+- [ ] Locally: `pnpm install && pnpm build && pnpm lint && pnpm test`
+- [ ] Add a bad import in `core` on purpose → lint must fail
+- [ ] `Commands` section of `CLAUDE.md` filled in
+- [ ] Reviewer is not the person who ran Claude Code for this task (2+N)
+
+Then squash-merge and close the issue (see step 8).
+
+### Step 7. The standard loop for every task
+
+```text
+pick the next task (step 9 order) → paste the task prompt → review the plan → approve
+→ Claude Code codes on task/<ID>-<short-name> → PR → review (checklist handbook T3) → merge → close issue
+```
+
+Task prompt template (change the ID, title and sections):
+
+```text
+Task: <ID> — <title>
+Issue: #<number>
+Read: CLAUDE.md, design/D-08-mvp-backlog.md (task <ID>), <design sections listed in the task>.
+Step 1 — Plan only; include how each acceptance criterion is tested; list rules that come from the
+handbook and confirm they are read from config, not hard-coded. Stop for approval.
+Step 2 — Code and tests on branch task/<ID>-<short-name>.
+Step 3 — Run lint, build, tests; open a PR with "<ID>" in the title.
+If a document is missing or contradictory: add the question to design/QUESTIONS.md and stop.
+```
+
+Rules for every task:
+- **One task per session.** Start a new session for the next task.
+- Tasks sized **L** are split into 2–3 sessions (the task note says how).
+- Check `design/QUESTIONS.md` after each session; answer or escalate open questions.
+- For `handbook-dependent` tasks, check in review that rules sit in config (oversight matrix, roles, SLAs, thresholds).
+
+### Step 8. After each task
+
+Write on the issue when closing it:
+- actual time spent (to recalibrate sizes);
+- how many times the plan or PR had to change;
+- questions raised (already in `design/QUESTIONS.md`).
+
+This is the framework's first real data: AI used to build the platform itself.
+
+### Step 9. Suggested order after A01
+
+Follow the dependencies in D-08. A practical order:
+
+| # | Tasks | Note |
+|---|---|---|
+| 1 | A02 Docker Compose → C01 OpenHands PoC | Reduce the biggest technical risk early |
+| 2 | A03 OpenBao → A04 secrets client | **Key holders must be named first** |
+| 3 | A05 config, A06 database, A07 audit | Base for everything else |
+| 4 | A08, A09, A10 | A10 needs the infrastructure operator |
+| 5 | M-B: B01 → B02 → … → B11 escalation, B12 AI record → B10 tests | Mostly `handbook-dependent` |
+| 6 | M-0: R01–R04 (sample repo) | Right before M-C |
+| 7 | M-C: C02 → … → C10 agent register, C11 kill switch → C09 tests | |
+| 8 | M-D: E01 → E07 | E07 = MVP definition of done |
+
+### Step 10. When the handbook changes
+
+Coding continues while the handbook is reviewed. When a handbook change is **approved** and affects the platform:
+
+```text
+handbook updated (approved) → design doc updated → change task added in scripts/generate-backlog.py
+→ python3 scripts/generate-backlog.py → create the new issue (--only <ID>) → Claude Code implements it
+```
+
+- Never change code to follow an **unapproved** handbook draft.
+- Label the change issues `handbook-dependent` too.
+
+---

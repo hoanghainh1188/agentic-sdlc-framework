@@ -159,7 +159,7 @@ The intent is then **paused** at G6, and a **technical** escalation goes to Pers
 | `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on |
 | `terminate` | The intent is closed (`cancelled`). Close the pull request if one is open |
 
-**Platform operator:** the GitHub App needs Contents and Pull requests "Read and write" (`platform/GETTING-STARTED.md` Step 11), and the runner's evidence identity must be created again once after this update (runbook T11 §5g step 3b).
+**Platform operator:** the GitHub App needs Contents and Pull requests "Read and write" ([`platform/deploy/README.md`](../../platform/deploy/README.md#github-app-permissions)), and the runner's evidence identity must be created again once after this update (runbook T11 §5g step 3b).
 
 ### 14.10.2. How G6 reads CI
 
@@ -194,7 +194,7 @@ A project without CI never passes G6.
 
 **Who approves.** Person B, never the person who allowed the run at G4 (the producer). Decide with `/approve G6`, `/reject G6 <reason>` or `/request-changes G6 <reason>` on the intent's issue (Chapter 19 §19.8).
 
-**Platform operator:** for the security counts the GitHub App needs "Code scanning alerts: Read-only" (`platform/GETTING-STARTED.md` Step 11).
+**Platform operator:** for the security counts the GitHub App needs "Code scanning alerts: Read-only" ([`platform/deploy/README.md`](../../platform/deploy/README.md#github-app-permissions)).
 
 ---
 
@@ -236,3 +236,4 @@ A project without CI never passes G6.
 | 0.2 | 2026-09-25 | Claude (draft) | G6 security findings: configurable severity threshold, default HIGH, CRITICAL always (QUESTIONS #19) |
 | 0.3 | 2026-10-03 | Claude Code (task C08, PR 1) | §14.10.1: the push and the pull request (ADR-M38 §2.1–§2.6, QUESTIONS #155, #156) |
 | 0.4 | 2026-10-03 | Claude Code (task C08, PR 2) | §14.10.2: how G6 reads CI, retries, the timeout, security findings (ADR-M38 §2.7, QUESTIONS #157–#159) |
+| 0.5 | 2026-10-09 | Claude Code (docs review PR C) | §14.10.1, §14.10.2: the GitHub App permissions link to the one list in `platform/deploy/README.md` |
