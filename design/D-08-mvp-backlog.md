@@ -23,7 +23,7 @@
 
 | Field | Meaning |
 |---|---|
-| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early), `S` = spec tools and `K` = document knowledge (before the trial M-E) |
+| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early), `S` = spec tools and `K` = document knowledge (before the trial M-E), `V` = the trial M-E (validation by the community) |
 | Size | **S** ≈ 1 session · **M** ≈ 1–2 sessions · **L** ≈ split into 2–3 sessions. [Proposal] Relative estimate, not person-hours |
 | Depends on | Tasks that must be finished first |
 | Acceptance criteria | Conditions for the PR to be approved. Claude Code writes tests for them |
@@ -43,8 +43,9 @@
 | M-C | Run + G4–G6 | 12 | S×3 · M×8 · L×1 |
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
+| M-E | The trial, run by the community (QUESTIONS #340) | 1 | M×1 |
 | MVP+1 | Started early: read-only dashboard (QUESTIONS #255); lighter steps | 4 | S×2 · M×1 · L×1 |
-| **Total** | | **57** | |
+| **Total** | | **58** | |
 
 ### Order and dependencies between milestones
 
@@ -55,7 +56,7 @@ flowchart LR
     M0["M-0 Sample repo"] --> MC
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
-    MP --> ME["M-E Trial"]
+    MP --> ME["M-E Trial by the community (V01)"]
     ME --> MF["M-F Adjustment"]
     MD --> MU["MVP+1 U01 read-only dashboard<br/>(in parallel with M-E)"]
 ```
@@ -65,7 +66,7 @@ flowchart LR
 
 ### Critical path (longest chain) [Proposal]
 
-`A01 → A02 → A06 → A07 → B02 → C02 → C04 → C05 → C06 → C07 → C08 → E01 → E02 → E03 → E07`
+`A01 → A02 → A06 → A07 → B02 → C02 → C04 → C05 → C06 → C07 → C08 → E01 → E02 → E03 → E07 → V01`
 
 - Computed from dependencies and task size (S=1, M=2, L=3). To finish sooner: prioritise tasks on this path and run the others in parallel.
 
@@ -832,6 +833,25 @@ flowchart LR
 > Note: Found in the review of the user commands (Harry, 2026-10-09): T09 of the trial M-E stopped at `proposal_review` with no way to get the patch or end the intent. QUESTIONS #335–#337, ADR-M64. Withdrawing an intent at any gate stays for M-F
 
 
+### M-E — The trial, run by the community (QUESTIONS #340)
+
+#### V01. The trial M-E by the community: a trial guide, a report template, `sdlc trial report`
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | E07, C13, U03 | D-02 §2, §13.3, NFR-08 | TRIAL.md, .github/ISSUE_TEMPLATE/trial-report.yml, README, design/M-E-TRIAL-PLAN.md, design/D-02 §13.3, platform/apps/cli (trial report), platform/tests/cli/*, handbook Ch.19 §19.8c, design/ADR-M65 |
+
+**Acceptance criteria**
+
+- [ ] AC1: `TRIAL.md`: how anyone runs the trial on their own machine: a fresh deployment (README), a fork of the sample repo, their own GitHub App, a model (the local Ollama `gpt-oss:20b` or an API model through LiteLLM), two GitHub accounts for Person A and Person B (QUESTIONS #341), T01 to G8, then T09 (proposal) and T10 (blocked), and how to send the report; the hardware and the time it takes
+- [ ] AC2: An issue template `trial-report.yml` (label `trial`): the JSON of `sdlc trial report`, the manual log of `design/M-E-TRIAL-PLAN.md` §7.2, the model used, problems found; it says never to paste tokens, keys or client data
+- [ ] AC3: `sdlc trial report [--project <slug>] [--from] [--to] [--json]` builds the report from the existing read endpoints only (gate metrics, cost report, intents, escalations); no new endpoint; counts, codes and model names only: projects renamed `project-1`, `project-2`…, never an intent code, title, person, e-mail, repository or URL
+- [ ] AC4: Tests: `pnpm test` (the report from a mocked API; a test that no slug, code, e-mail, login or free text from the fixtures appears in the output); handbook Ch.19 usage; ADR-M65 records the report format and its anonymisation
+- [ ] AC5: M-E is done when enough reports arrived (for example from 3 teams) and `design/M-E-REPORT.md` summarises them (QUESTIONS #340)
+
+> Note: QUESTIONS #340 (Harry, 2026-10-09): the trial M-E is run by the community, not by the project team; M-F adjusts from their reports. Two PRs: PR 1 = the decision and the documents (TRIAL.md, the issue template, M-E-TRIAL-PLAN 2.0, D-02 1.8); PR 2 = `sdlc trial report` (ADR-M65). Then release v0.1.0. A10 PR 3 (the company server) and E07 AC4 (#45, the API-model run) no longer block M-E: A10 PR 3 is for an operator who deploys on a server, and a tester who uses an API model gives the run of #45
+
+
 ### MVP+1 — Started early: read-only dashboard (QUESTIONS #255); lighter steps
 
 #### U01. Read-only web dashboard
@@ -974,6 +994,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.24 | 2026-10-07 | Claude, approved by Harry | New task U03: one CLI command creates an intent and links its spec (`design/POSITIONING.md` §6.1, option B2) |
 | 1.25 | 2026-10-08 | Claude, approved by Harry | New milestone Pre-M-E with tasks S01, S02 (BMAD / Spec Kit structure, plan drafts) and K01, K02 (WeKnora), before the trial M-E (QUESTIONS #285) |
 | 1.29 | 2026-10-09 | Claude, approved by Harry | New task C13 in Pre-M-E: take an L1 proposal forward (download, G4 rejection; ADR-M64, QUESTIONS #335–#337) |
+| 1.30 | 2026-10-09 | Claude, approved by Harry | New milestone M-E with task V01: the trial is run by the community (TRIAL.md, a report issue template, `sdlc trial report`; QUESTIONS #340, #341, ADR-M65) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |

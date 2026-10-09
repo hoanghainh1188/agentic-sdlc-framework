@@ -1,0 +1,78 @@
+name: Trial report
+description: Your report after trying the platform on the sample project (TRIAL.md).
+title: 'Trial report: '
+labels: [trial]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying the platform. This report is public.
+        **Never paste** tokens, keys, `.env` values, key shares, client code or real personal data.
+        A security problem goes through SECURITY.md, never into a public issue.
+  - type: input
+    id: version
+    attributes:
+      label: Platform version
+      description: The release or commit you deployed, for example v0.1.0.
+    validations:
+      required: true
+  - type: dropdown
+    id: team
+    attributes:
+      label: Who held the roles?
+      options:
+        - Two people (Person A and Person B)
+        - One person with two GitHub accounts
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      description: The gateway model name, for example gpt-oss-20b or claude-haiku-4-5-20251001.
+    validations:
+      required: true
+  - type: input
+    id: machine
+    attributes:
+      label: Machine
+      description: Operating system, memory, CPU; Docker Desktop or Docker Engine.
+    validations:
+      required: true
+  - type: checkboxes
+    id: tasks
+    attributes:
+      label: Tasks you ran
+      options:
+        - label: T01 (Low, G1 to G8)
+        - label: T09 (High, proposal only)
+        - label: T10 (Critical, blocked)
+        - label: One or more of T02–T08
+  - type: textarea
+    id: report
+    attributes:
+      label: The output of `sdlc trial report --json`
+      description: Counts and codes only. Read it before you paste it.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Your log, one line per task
+      description: |
+        Task; minutes of human work per step (spec, plan, plan pull request, each review, each decision);
+        did the agent's change meet the spec (yes / partly / no); what was unclear, slow or broken;
+        for a step done by comment or CLI, the screen you would have wanted (design/MVP1-UI-SCOPE.md §3).
+    validations:
+      required: true
+  - type: textarea
+    id: problems
+    attributes:
+      label: Problems and proposals
+      description: Bugs (links to bug issues are best), unclear messages, gates or steps that felt too heavy, and what you would change.
+  - type: textarea
+    id: setup
+    attributes:
+      label: Set-up time and problems
+      description: How long the deployment took, and where you got stuck.

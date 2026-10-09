@@ -11,7 +11,9 @@ The handbook says **what must happen and why**. The platform **makes sure it hap
 
 Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
-**Status (2026-10-09): built and tested, not yet used on a real project.** The platform is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on a fictional sample project has not started; the first real internal project comes after it. Before real client data, the server still needs the company's own certificate and named key holders for the secret manager (encrypted connections to it are built), a first restore drill on the server (backup and restore are built and tested), and measured resources (the open task A10).
+**Status (2026-10-09): built and tested, not yet used on a real project.** The platform is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on a fictional sample project has not started (anyone can run it: see below); the first real internal project comes after it. Before real client data, the server still needs the company's own certificate and named key holders for the secret manager (encrypted connections to it are built), a first restore drill on the server (backup and restore are built and tested), and measured resources (the open task A10).
+
+**Try it: we are looking for teams to run the first trial.** Deploy the platform on your own machine, take a few tasks of a fictional sample project through the 8 gates with an AI agent, and tell us what you found: [TRIAL.md](TRIAL.md).
 
 **Supported today:** GitHub, projects built with Node.js and TypeScript (one sandbox image, `node24`), the OpenHands agent, and one server with Docker Compose. People reach the API and the dashboard on the server itself; access from other machines comes later ([where to run it](platform/deploy/README.md#where-to-run-it)).
 
@@ -29,6 +31,7 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 
 | You are | Read |
 |---|---|
+| **Trying the platform** in the community trial | [TRIAL.md](TRIAL.md): what you need, the set-up, three sample tasks, and the report |
 | **Leadership** deciding whether to adopt | This page, then handbook Part I: [Ch.1 summary](handbook/01-policy/ch01-executive-summary.md) and [Ch.9 adoption roadmap](handbook/01-policy/ch09-adoption-roadmap.md) |
 | **Bringing a project team onto the platform** (tech lead, leadership) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout step by step, the first week, common mistakes |
 | **Preparing your application's repository** (Person A, the intent owner, or the repository owner) | [ROLLOUT-GUIDE step 1](platform/ROLLOUT-GUIDE.md#step-1-prepare-the-repository-person-a-the-repository-owner-12-days): the two repositories, what yours needs, the one file of agent instructions, Spec Kit and BMAD |

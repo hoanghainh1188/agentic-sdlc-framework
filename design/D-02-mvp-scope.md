@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.7 |
+| Version | 1.8 |
 | Date | 2026-10-09 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81); 1.4 approved by Harry on 2026-10-07 (§4.2: a read-only dashboard starts before MVP+1; QUESTIONS #255); 1.5 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 1.6 approved by Harry on 2026-10-08 (§4.2: the BMAD / Spec Kit spec tasks and WeKnora come before the trial M-E; QUESTIONS #285); 1.7 approved by Harry on 2026-10-09 (§5 flow: the order of the merge and G7 corrected; the rest is wording) |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81); 1.4 approved by Harry on 2026-10-07 (§4.2: a read-only dashboard starts before MVP+1; QUESTIONS #255); 1.5 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 1.6 approved by Harry on 2026-10-08 (§4.2: the BMAD / Spec Kit spec tasks and WeKnora come before the trial M-E; QUESTIONS #285); 1.7 approved by Harry on 2026-10-09 (§5 flow: the order of the merge and G7 corrected; the rest is wording); 1.8 approved by Harry on 2026-10-09 (§13.3: the trial M-E is run by the community; QUESTIONS #340) |
 | Readers | Leadership (sections 1–4, 10–12), tech lead / developers (all), Claude Code (sections 5–9, 13) |
 | Related documents | D-01 (build vs buy), D-07 (models and tokens), handbook codes table and Chapters 2–6, 10–20 |
 
@@ -361,7 +361,7 @@ The MVP is done when **all** of the following are true:
 | M-0 Sample repo | Build `pilot-order-inventory` per D-09. Done **right before M-C** as the test environment | D-09 section 10 criteria |
 | M-C Run + G4–G6 | Agent register, Run Manager, agent adapter, Git adapter, Cost Controller, kill switch | FR-30…36, FR-50…52 |
 | M-D G7–G8 + evidence | Evidence Pack, G7 dual approval, G8, disclosure, retention, cost report (tasks `E01…` in D-08) | FR-40, FR-42…44, FR-53 |
-| M-E Trial | Run T01–T10 on the sample repo. Measure gate waiting time, tokens, share of PRs changed | Data report available |
+| M-E Trial | Run T01–T10 on the sample repo. Measure gate waiting time, tokens, share of PRs changed. **Run by the community** (QUESTIONS #340): anyone runs the trial on their own machine (`TRIAL.md`) and sends a report (task V01) | Enough reports arrived (for example from 3 teams) and the data report summarises them |
 | M-F Adjustment | Adjust gates, budgets and rules based on M-E data. Then trial on a real internal tool (C) | At least 1 intent goes through G1 → G8 on the real internal tool |
 
 ---
@@ -407,3 +407,4 @@ The MVP is done when **all** of the following are true:
 | 1.5 | 2026-10-08 | Claude (coordinator), approved by Harry | Sources: citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged |
 | 1.6 | 2026-10-08 | Claude (coordinator), approved by Harry | §4.1 item 10, §4.2: BMAD / Spec Kit structure and plan drafts, and WeKnora, come before the trial M-E (QUESTIONS #285) |
 | 1.7 | 2026-10-09 | Claude (docs review PR B), approved by Harry | §5 flow and diagram D10: "G7 passed → merge" was a wrong order, corrected to "Person B merges, then G7 passes" (ADR-M41: the platform never merges). The rest is wording: "Run Manager" → "Runner", Person A "intent owner", Person B "independent reviewer and approver", "Evidence Pack" |
+| 1.8 | 2026-10-09 | Claude (coordinator, task V01), approved by Harry | §13.3: the trial M-E is run by the community, with a trial guide and a report template; M-F adjusts from their reports (QUESTIONS #340) |
