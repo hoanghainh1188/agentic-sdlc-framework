@@ -90,6 +90,9 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: size=64k,uid=65534,gid=${SDLC_DOCKER_GID:-0},mode=0770
+  # AppRole role ID and secret ID of the backup job (A10 PR 2, design/ADR-M63 §5): it may only read
+  # OpenBao's Raft snapshot. Written by `openbao/bootstrap.sh backup-credentials`.
+  backup-approle:
   # AppRole role ID and secret ID of sdlc-runner (mode 600, owner node). Written by
   # `openbao/bootstrap.sh runner-credentials` (runbook T11).
   runner-approle:
@@ -437,6 +440,29 @@ services:
       test:
         - CMD-SHELL
         - bao status >/dev/null 2>&1; s=$$?; [ "$$s" -eq 0 ] || [ "$$s" -eq 2 ]
+
+  # The Raft snapshot for backup/backup.sh (A10 PR 2, design/ADR-M63 §5). Profile "backup": never
+  # started by up.sh; backup.sh runs it once (`docker compose run`), and it writes the snapshot to
+  # stdout, where backup.sh encrypts it with age. Logs in with the AppRole "backup" (only
+  # sys/storage/raft/snapshot), over TLS with the CA.
+  backup-agent:
+    image: openbao/openbao:2.7.1
+    profiles: [backup]
+    restart: 'no'
+    networks: [sdlc]
+    user: '100:1000'
+    entrypoint: [/bin/sh, /openbao/backup/snapshot.sh]
+    environment:
+      BAO_ADDR: https://openbao:8200
+      BAO_CACERT: /openbao/ca/ca.pem
+    volumes:
+      - ./backup/snapshot.sh:/openbao/backup/snapshot.sh:ro
+      - backup-approle:/openbao/approle
+      - openbao-ca:/openbao/ca:ro
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
 
   # ------------------------------------------------------- observability ----
 

@@ -144,6 +144,7 @@ pnpm openbao:bootstrap api-evidence-credentials     # T11 §5h (Evidence Packs)
 pnpm openbao:bootstrap worker-evidence-credentials  # T11 §5i (G8 release packs)
 pnpm openbao:bootstrap worker-purge-credentials     # T11 §5j (evidence retention)
 pnpm openbao:bootstrap worker-anchor-credentials    # T11 §5k (daily audit anchor)
+pnpm openbao:bootstrap backup-credentials           # T11 §6 (the backup job: OpenBao's snapshot only)
 ```
 
 Record each one in the operations log (role, date, reason; never the secret ID).
@@ -480,23 +481,24 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 
 ## Backup and restore
 
-**Interim: commands only.** The backup script, the off-server copy and a tested restore drill are task A10. Until then, back up these items yourself, off the server and encrypted:
+`pnpm backup` backs up the whole platform into one encrypted folder: every database, OpenBao's snapshot, the volumes of SeaweedFS (evidence, audit anchors), OpenBao's audit log and ClickHouse, the env file and OpenBao's TLS folder (task A10, `design/ADR-M63-openbao-tls-and-backups.md`). Each part is encrypted with `age` as it streams; the server holds only the public key, so it cannot read its own backups.
 
-| What | How |
+| Setting (env file) | Meaning |
 |---|---|
-| PostgreSQL: every database (`platform`, `temporal`, `temporal_visibility`, `litellm`, `langfuse`) | `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T postgres pg_dumpall -U postgres > platform-<date>.sql` |
-| OpenBao | A Raft snapshot (a backup file of OpenBao's own storage) and the audit volume: runbook [T11 §6](../../handbook/03-templates/T11-openbao-runbook.md#6-daily-snapshot-backup). A snapshot is useless without two key shares, which are kept apart |
-| SeaweedFS (evidence, audit anchors, Langfuse files) | The `seaweedfs-data` volume, copied while the stack is stopped (`pnpm compose:down`) |
-| ClickHouse (profile `observability`) | The `clickhouse-data` volume, while stopped |
-| `platform/deploy/.env` | Into the password manager, never next to the backups |
+| `SDLC_BACKUP_DIR` | Target folder, outside the repository: a mounted NAS or an external disk. Copying it further away is the company infrastructure's job |
+| `SDLC_BACKUP_AGE_RECIPIENTS` | File with the age public key (`age1…`). The private key stays offline with the OpenBao key shares |
+| `SDLC_BACKUP_KEEP` | How many backups to keep (default 14) |
 
-The dump holds personal data (names, e-mails, GitHub account IDs) and the database role passwords; the diffs are in the SeaweedFS copy and the prompts in the ClickHouse copy. Treat every copy like the server itself. Restoring OpenBao: [T11 §7](../../handbook/03-templates/T11-openbao-runbook.md#7-restore-on-a-test-machine-recovery-drill). Restoring the whole platform has not been tested yet (A10).
+- Set up once: install `age`, make the key pair away from the server, set the variables, `pnpm openbao:bootstrap backup-credentials`, and the daily systemd timer (`backup/sdlc-backup.service`, `.timer`): [runbook T11 §6](../../handbook/03-templates/T11-openbao-runbook.md#6-daily-backup).
+- SeaweedFS and ClickHouse stop for about a minute during the copy; run it at night (the timer: 02:30).
+- Restore, also the recovery drill every 3 months: `pnpm restore <backup folder> <age private key file>` into an empty stack, then two key holders unseal with their original shares: [runbook T11 §7](../../handbook/03-templates/T11-openbao-runbook.md#7-restore-and-the-recovery-drill). `pnpm test:backup` runs the whole drill on throw-away keys.
+- Every backup holds personal data, client code (the evidence) and every password, encrypted: treat it like the server.
 
 ## Upgrade
 
 Upgrades come from `main` as reviewed changes; read the [CHANGELOG](../../CHANGELOG.md) first.
 
-1. Take a backup ([above](#backup-and-restore)); before an OpenBao image change, a Raft snapshot ([T11 §4b](../../handbook/03-templates/T11-openbao-runbook.md#4b-upgrading-the-openbao-image)).
+1. Take a backup: `pnpm backup` ([above](#backup-and-restore)); it holds OpenBao's snapshot, the way back after an OpenBao image change ([T11 §4b](../../handbook/03-templates/T11-openbao-runbook.md#4b-upgrading-the-openbao-image)).
 2. `git pull`, then `pnpm install && pnpm build`.
 3. Add any new `.env` variables (`.env.example` lists them; `init-env.sh` never overwrites `.env`). After the A10 update (TLS on OpenBao): `pnpm openbao:tls dev` on a development machine; on the server, the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)).
 4. Pull the pinned images and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`): `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull`, then the same with `build` (add `--profile observability` when you use it).
@@ -542,6 +544,7 @@ This deletes every intent, the evidence, the audit log and the secrets. Keep a b
 |---|---|---|
 | `pnpm test` | Static checks of the compose file, `.env.example`, `init-env.sh` and `.gitignore` (`platform/tests/deploy/`) | No |
 | `pnpm test:db` | Migrations and tenant isolation on a throw-away PostgreSQL container (same image and init script). Takes about 10 seconds ([ADR-M09](../../design/ADR-M09-database-tooling.md) section 2.6) | Yes |
+| `pnpm test:backup` | A10 PR 2: the backup and the restore drill on a throw-away Compose project (age, throw-away keys): data in every store, `pnpm backup`, the stack removed, a tampered copy refused, `pnpm restore`, the original shares unseal, every piece of data back. A few minutes. Needs `age` | Yes |
 | `pnpm test:openbao` | OpenBao bootstrap (A03): starts only `openbao` in a throw-away Compose project, runs `init`, `unseal`, `configure`, `root-token`, checks every AppRole's access, re-runs `configure`, then removes everything. Throw-away keys, kept in memory only. Also TLS (A10, `tls.test.ts`): a wrong CA, an address other than `openbao` and plain HTTP are refused, a renewal is read without a restart, a missing file stops OpenBao. A few minutes | Yes |
 | `pnpm test:runner` | The runner on the local Docker Engine: sandbox egress and hardening, the provisioning flow, the clean-up after a restart (throw-away PostgreSQL, fixture image) | Yes |
 | `pnpm test:runner-compose` | The `sdlc-runner` container in the profile `sandbox` on a throw-away Compose project: `runner-credentials`, socket proxy, clean-up at start, health check, no secret in the container. About 1 minute | Yes |

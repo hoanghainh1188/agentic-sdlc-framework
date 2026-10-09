@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.34. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.3 (rekey) give the commands; the recovery drill in task A10 tests them.
+> Status: **v0.35. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -698,40 +698,52 @@ Needs the profiles `core` and `observability` running, and OpenBao unsealed. Run
 | The ClickHouse password and the S3 key (every 90 days, or when they may have leaked) | Make a new Langfuse key as in step 1, run `pnpm openbao:bootstrap worker-langfuse-credentials`, restart `sdlc-worker`, then delete the old Langfuse key in the UI. The old password and S3 key stop working at once |
 | The Langfuse key only (it may have leaked) | The same steps; delete the old key in the Langfuse UI at once |
 
-## 6. Daily snapshot backup
+## 6. Daily backup
 
-> Commands only. The procedure is tested in the recovery drill of task A10, which also adds the backup script.
+The whole platform is backed up by one command, `pnpm backup` (`platform/deploy/backup/backup.sh`, task A10, `design/ADR-M63-openbao-tls-and-backups.md` §5, QUESTIONS #326–#329). It writes one folder per run into `SDLC_BACKUP_DIR`:
 
-Two jobs, both required:
-- the **snapshot** (the encrypted data);
-- the **key shares** (sections 2 and 3), kept separately.
+| File | What |
+|---|---|
+| `postgres.sql.age` | Every database (`pg_dumpall`), while the platform runs |
+| `openbao.snap.age` | OpenBao's Raft snapshot, through the AppRole `backup` (it may read only the snapshot) |
+| `volume-seaweedfs-data.tar.age`, `volume-openbao-audit.tar.age`, `volume-clickhouse-data.tar.age` | The evidence, the audit anchors and Langfuse's files; OpenBao's audit log; ClickHouse (when it exists). SeaweedFS and ClickHouse stop for about a minute while they are copied |
+| `env.tar.age`, `openbao-tls.tar.age` | The env file (passwords and keys: a restore needs them) and OpenBao's TLS folder |
+| `MANIFEST` | The SHA-256 and size of every file, the commit and the images; no secret |
 
-A snapshot is useless without 2 shares.
+**Two jobs, both required:** the backups, and the key shares (sections 2 and 3), kept apart. The snapshot is useless without two shares; the backups are useless without the age private key.
 
-```bash
-# needs a token allowed to read sys/storage/raft/snapshot (root, created per section 5)
-docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T openbao \
-  sh -c 'read -r BAO_TOKEN && export BAO_TOKEN && bao operator raft snapshot save /openbao/file/snapshot.snap'
-```
+**Set up once (infrastructure operator):**
 
-- Copy the snapshot **off the server**, encrypted, daily. Then delete the copy inside the container.
-- Also back up the audit volume `openbao-audit`. The handbook (Ch.3) requires audit records to be kept at least 2 years. Rotation and the copy to evidence storage are tasks A10 and E05.
-- Check each backup: file size is not zero, and the date is today.
+1. Install `age` on the server (`apt-get install age`; macOS `brew install age`).
+2. Make the backup key pair on a machine that is **not** the server, for example the laptop of a key holder: `age-keygen -o sdlc-backup-key.txt`. It prints the public key (`age1…`).
+3. Put the **private key** file offline with the key shares (an encrypted USB drive in the safe, and the password managers of two key holders). It never goes to the server.
+4. On the server, write the public key into a file, for example `/etc/sdlc/backup-recipients.txt`, and set in `platform/deploy/.env`: `SDLC_BACKUP_DIR` (a mounted NAS or an external disk, outside the repository), `SDLC_BACKUP_AGE_RECIPIENTS` (that file), and optionally `SDLC_BACKUP_KEEP` (default 14).
+5. After the A10 update, run `configure` again once (a root token, section 5: it adds the AppRole `backup`), then `pnpm openbao:bootstrap backup-credentials` (admin token; prints no secret). Rotate it with the others every 3 months (section 8.1).
+6. Install the daily timer: copy `platform/deploy/backup/sdlc-backup.service` and `sdlc-backup.timer` to `/etc/systemd/system/`, change `WorkingDirectory` and `User`, then `systemctl enable --now sdlc-backup.timer` (every night at 02:30). Or call `pnpm backup` from cron.
+7. Run `pnpm backup` once by hand and check the folder.
 
-## 7. Restore on a test machine (recovery drill)
+**Every day (automatic) and every week (a person):**
 
-> Commands only. Tested in task A10. Drills: first at milestone M-A, then every 3 months and whenever a key holder changes.
+- `pnpm backup` keeps the newest `SDLC_BACKUP_KEEP` folders and removes the older ones. A failed run writes no folder and exits with an error: `journalctl -u sdlc-backup` shows why.
+- Once a week, check that today's folder exists and its files are not empty. Copying the target folder further away (another site) is the company infrastructure's job.
+- Treat every backup like the server: it holds personal data, client code (the evidence) and every password, encrypted.
 
-1. On a test machine, start a fresh stack (`pnpm compose:env`, `pnpm compose:core`).
-2. Initialise a throw-away instance (section 3.1: `init`, `unseal`). The restore replaces it.
-3. Copy the snapshot into the container, then restore with a root token of the throw-away instance:
-   `bao operator raft snapshot restore -force /openbao/file/snapshot.snap`
-4. OpenBao is now sealed with the **real** keys. Two real key holders unseal it (section 4).
+## 7. Restore and the recovery drill
+
+`pnpm restore <backup folder> <age private key file>` (`platform/deploy/backup/restore.sh`) restores a backup into an **empty** stack: a test machine for the drill, or a new server after a loss. It refuses when the env file or the project's volumes exist.
+
+**The drill: first before the first real data, then every 3 months and whenever a key holder changes.** Tested automatically on throw-away keys by `pnpm test:backup` (CI).
+
+1. On a test machine with Docker, `age` and a checkout of the same commit as the backup (`MANIFEST`, line `commit`): copy one backup folder there, and bring the age private key and two key holders.
+2. `pnpm restore <folder> <private key file>`. It checks every file against `MANIFEST` (a changed or missing file stops it before anything is written), writes `platform/deploy/.env` and the TLS folder, fills the volumes, loads the databases, and restores OpenBao's snapshot over a throw-away initialisation. OpenBao is then **sealed with the original keys**.
+3. Two key holders unseal with their **original** shares: `pnpm openbao:bootstrap unseal` (section 4).
+4. Deliver the credentials of every process again (`platform/deploy/README.md`, "Fresh deployment" step 5; their volumes are not in the backup), then `platform/deploy/scripts/up.sh core models platform sandbox`.
 5. Check:
-   - `bootstrap.sh status` says `unsealed`;
-   - the Transit key `run-contract` exists;
-   - an AppRole can log in from the Compose network.
-6. Destroy the test instance (`down -v`). Record the drill in the operations log.
+   - `pnpm openbao:bootstrap status` says `unsealed`; the Transit key `run-contract` exists;
+   - `SDLC_DB_URL=… pnpm sdlc ops audit verify` passes for every tenant;
+   - `curl -s http://127.0.0.1:8090/health/ready` answers;
+   - an Evidence Pack of a closed intent opens (`sdlc evidence show`).
+6. On a test machine, destroy everything afterwards (`docker compose … down -v`, the env file, the TLS folder). Record the drill, its date and the people in the operations log (section 10).
 
 ## 8. Changing a key holder, rotating secret IDs
 
@@ -739,7 +751,7 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 
 Every 3 months, and when someone changes project:
 - check the list of key holders and people with Docker access on the server;
-- **rotate every AppRole secret ID** with the credentials commands: `api-credentials`, `worker-credentials` (AppRoles `worker` and `cost-controller`), `runner-credentials`, `litellm-credentials` and the evidence, purge, anchor and Langfuse credentials (sections 5d–5m; the full list: `platform/deploy/README.md`, Fresh deployment step 5). Each command:
+- **rotate every AppRole secret ID** with the credentials commands: `api-credentials`, `worker-credentials` (AppRoles `worker` and `cost-controller`), `runner-credentials`, `litellm-credentials`, `backup-credentials` and the evidence, purge, anchor and Langfuse credentials (sections 5d–5m and 6; the full list: `platform/deploy/README.md`, Fresh deployment step 5). Each command:
   1. issues a new secret ID;
   2. writes it with the role ID into the service's volume;
   3. then destroys **every other** secret ID of the AppRole. It keeps the one named by the accessor of the new secret ID, never the newest by time (`design/QUESTIONS.md` #140).
@@ -869,6 +881,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.35 | 2026-10-09 | Claude Code (task A10, PR 2) | Sections 6 and 7 rewritten: `pnpm backup` (every database, OpenBao's snapshot through the AppRole `backup`, the volumes, the env file and the TLS folder, each encrypted with age to `SDLC_BACKUP_DIR`; QUESTIONS #326–#329), the systemd timer, `pnpm restore` into an empty stack and the drill. Tested with throw-away keys (`pnpm test:backup`) |
 | 0.34 | 2026-10-09 | Claude Code (task A10, PR 1) | New section 3c: TLS on 8200 everywhere (QUESTIONS #20, #325), the throw-away CA on development machines, the company CA on the server (`pnpm openbao:tls ca`, `server`), renewal without unsealing (`reload`), the 30-day reminder; section 5c and the troubleshooting rows. Tested with throw-away certificates (`pnpm test:openbao`, `tls.test.ts`) |
 | 0.33 | 2026-10-09 | Claude Code (docs review E3) | Readability: AppRole, tidy, TTL and the wrapping token explained at first use; one name for the wrapping token; section 3.2 step 1 and section 5g step 3b split into short items |
 | 0.32 | 2026-10-09 | Claude Code (docs review E2) | Sections 5d, 5e, 5f, 5g: on the server every profile starts at once after the migrations (Fresh deployment step 7); the tenant bootstrap is Fresh deployment step 8, not a step of 5e |

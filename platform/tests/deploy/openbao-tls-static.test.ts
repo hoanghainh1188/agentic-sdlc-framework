@@ -33,6 +33,7 @@ describe('OpenBao clients in Compose (A10)', () => {
       ([, s]) => s.environment?.SDLC_OPENBAO_ADDR ?? s.environment?.BAO_ADDR,
     );
     expect(clients.map(([name]) => name).sort()).toEqual([
+      'backup-agent',
       'litellm-agent',
       'openbao',
       'sdlc-api',

@@ -1,0 +1,14 @@
+# Example systemd unit for the daily backup (task A10 PR 2, design/ADR-M63 §5, runbook T11 §6).
+# Copy to /etc/systemd/system/ on the server, change WorkingDirectory and User, then:
+#   systemctl daemon-reload && systemctl enable --now sdlc-backup.timer
+[Unit]
+Description=Agentic SDLC platform backup (pnpm backup)
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# The checkout of the platform on the server, and the operator account that runs Docker.
+WorkingDirectory=/opt/agentic-sdlc-framework
+User=sdlc-operator
+ExecStart=/bin/sh platform/deploy/backup/backup.sh
