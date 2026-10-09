@@ -64,6 +64,8 @@ The development machine uses a separate **test App** on the fictional sample rep
 
 How to bring up the whole platform on a new machine with Docker Compose, from an empty checkout to the first intent at G1 (D-08 E07 AC3). Run every step **yourself, in a terminal, from the repo root**. Several steps print or ask for key shares, tokens or keys at a hidden prompt: never run them through a chat tool, and never paste their output anywhere except your password manager. `pnpm test:fresh-deploy` runs the same steps on a throw-away Compose project with throw-away keys (section [Tests](#tests)).
 
+**Trying the platform on a developer machine (the community trial)?** `pnpm trial:up --settings <file>` runs steps 2–13 below for you with throw-away keys, on its own Compose project `sdlc-trial` ([TRIAL.md §3.2](../../TRIAL.md#32-the-platform), D-08 V02). Never on a server.
+
 After the first deployment: [Restart after a reboot](#restart-after-a-reboot), [Upgrade](#upgrade), [Troubleshooting](#troubleshooting). Use [Step 14](../GETTING-STARTED.md#step-14-prepare-the-pilot-repo-for-live-tests-dev) for the live tests on the pilot repository.
 
 ### 1. Prerequisites

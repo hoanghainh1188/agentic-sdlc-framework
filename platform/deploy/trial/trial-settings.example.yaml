@@ -1,0 +1,48 @@
+# Settings of `pnpm trial:up` (D-08 V02; TRIAL.md section 3.2). Copy this file OUTSIDE the
+# repository, fill it in, and run: pnpm trial:up --settings <your copy>
+# It holds paths to secret files, never a secret. Paths may start with ~/.
+
+# Optional: the tenant and project slugs (defaults trial and pilot).
+tenant: trial
+project: pilot
+
+fork:
+  # Your fork of harryforge/pilot-order-inventory (TRIAL.md section 3.1).
+  repo: your-account/pilot-order-inventory
+  # A local clone of the fork: the agent's instructions are read from AGENTS.md on its main branch.
+  clone: ~/src/pilot-order-inventory
+
+github_app:
+  # Your own GitHub App, installed on the fork only (platform/deploy/README.md, Create the GitHub App).
+  client_id: Iv23liEXAMPLE
+  # Its private key: a file outside every repository, mode 600 (chmod 600 <file>).
+  private_key_file: ~/secrets/sdlc-trial-app.private-key.pem
+
+model:
+  # ollama: the local model gpt-oss:20b (ollama pull gpt-oss:20b first; 32 GB of memory).
+  # anthropic: Claude Haiku through the platform's gateway (16 GB of memory; set a spend limit at
+  # the provider first).
+  provider: ollama
+  # ollama only, optional: Ollama as the containers see it. On Docker Desktop the default works;
+  # on Linux give the address of the host on the Docker network, for example http://172.17.0.1:11434
+  # ollama_url: http://host.docker.internal:11434
+  # anthropic only: a file holding the API key alone, mode 600.
+  # api_key_file: ~/secrets/anthropic-trial.key
+
+people:
+  # Two people, two GitHub accounts (TRIAL.md section 2; never one account for both roles).
+  # github_id is the numeric account ID: https://api.github.com/users/<login> shows it as "id".
+  person_a:
+    email: a@example.com
+    name: Person A
+    github_id: 1000001
+    github_login: your-login
+    # Person A's config folder (XDG_CONFIG_HOME): the login is saved in <folder>/sdlc/credentials.json.
+    config_home: ~/.config
+  person_b:
+    email: b@example.com
+    name: Person B
+    github_id: 1000002
+    github_login: second-login
+    # Another folder: run Person B's commands as XDG_CONFIG_HOME=<folder> pnpm sdlc …
+    config_home: ~/.config/sdlc-trial-person-b

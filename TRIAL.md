@@ -45,18 +45,39 @@ Best: two people. If you are alone, you may use a second GitHub account for Pers
 
 ### 3.2. The platform
 
-1. Clone this repository and check out the release: `git checkout v0.1.0` (or later).
-2. Create **your own GitHub App** and install it on your fork only: [Create the GitHub App](platform/deploy/README.md#create-the-github-app-operator). Keep its private key outside every repository.
-3. Follow [**Fresh deployment**](platform/deploy/README.md#fresh-deployment-operator), steps 1–14, on your machine, with these values:
-   - tenant: any slug, for example `trial`; project: `pilot`, repository: your fork;
-   - users: Person A and Person B, each linked to their GitHub account (numeric ID), with the roles `person_a` and `person_b`; the operator (you) is the tenant admin;
-   - step 11 (the agent): the model of section 4, the instructions file `AGENTS.md` of your fork;
-   - step 12 (the configuration): add the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial), at least `verification.required_checks: [ci-ok]` and `oversight.hotl_block_window` of 1 working hour;
-   - step 13 (the AI record): data class `internal` (the project is fictional).
+1. Clone this repository and check out the release: `git checkout v0.1.0` (or later). Then `corepack enable` and `pnpm install`.
+2. Create **your own GitHub App** and install it on your fork only: [Create the GitHub App](platform/deploy/README.md#create-the-github-app-operator). Keep its private key in a file outside every repository, readable only by you (`chmod 600 <file>`).
+3. Clone **your fork** somewhere on the machine (the agent's instructions are read from `AGENTS.md` on its `main` branch).
+4. Choose a model (section 4). For the local model: `ollama pull gpt-oss:20b` first. For an API model: put the key alone in a file, `chmod 600`.
+5. Copy [`platform/deploy/trial/trial-settings.example.yaml`](platform/deploy/trial/trial-settings.example.yaml) to a place **outside the repository**, and fill it in: your fork and its clone, the App's client ID and key file, the model, and Person A and Person B (e-mail, GitHub login and numeric ID, and a config folder each).
+6. Run the whole set-up in one command, in a terminal:
+   ```bash
+   pnpm trial:up --settings ~/trial-settings.yaml
+   ```
+   It follows [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator), steps 2–13, for you, in 20 to 40 minutes: OpenBao with throw-away keys, every credential, the database, the platform (`core models platform sandbox`), the tenant (Person A is its admin), the project with Person A and Person B, the sandbox image, the agent, the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial) and the AI record (data class `internal`). At the end, Person A and Person B are each logged in, in their own config folder. Run Person B's commands as `XDG_CONFIG_HOME=<Person B's folder> pnpm sdlc …`.
+
+What `trial:up` refuses and keeps safe:
+
+- It refuses a machine with another stack of the platform (`platform/deploy/.env` or `sdlc_*` volumes), `NODE_ENV=production`, no Docker, too little memory, a key file others can read, or an existing login in a config folder. It never removes or overwrites them.
+- The OpenBao key shares and root token are **throw-away and kept in memory only**: never in a file, a log or the terminal. So **the trial stack cannot be started again after a reboot** or `pnpm trial:down` (`design/QUESTIONS.md` #345). Then remove it with `pnpm trial:down --wipe --settings ~/trial-settings.yaml` and run `pnpm trial:up` again; your intents are lost. Plan a task so that the machine does not restart in the middle.
+- The same applies when `trial:up` stops with an error: remove the stack with `--wipe`, fix the cause it names, and run it again.
+- `pnpm trial:down` stops the stack; `--wipe` removes its volumes, its env file and the two logins, after you type the project name (`sdlc-trial`). It never touches another Compose project.
+
+The stack is for the trial only. It can never hold client data. For a server, follow [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator) by hand, with real key holders (runbook T11).
+
+**By hand instead (the fallback).** Follow [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator), steps 1–14, with these values:
+
+- tenant: any slug, for example `trial`; project: `pilot`, repository: your fork;
+- users: Person A and Person B, each linked to their GitHub account (numeric ID), with the roles `person_a` and `person_b`; the operator (you) is the tenant admin;
+- step 11 (the agent): the model of section 4, the instructions file `AGENTS.md` of your fork;
+- step 12 (the configuration): add the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial), at least `verification.required_checks: [ci-ok]` and `oversight.hotl_block_window` of 1 working hour;
+- step 13 (the AI record): data class `internal` (the project is fictional).
 
 Steps that print or ask for keys, tokens or key shares: run them **yourself, in a terminal**. Never paste their output into a chat tool, an issue or a report.
 
 ## 4. Choose a model
+
+With `pnpm trial:up`, choose the model in the settings file (`model.provider`): it stores the key or the Ollama address in OpenBao for you. By hand, follow the links in the table.
 
 | Model | How | Notes |
 |---|---|---|
