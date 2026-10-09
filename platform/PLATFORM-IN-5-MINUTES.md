@@ -67,4 +67,5 @@ The risk tier changes how far the agent may go: **Low and Medium** risk, the age
 | Look up a command or what to do when something goes wrong | [User guide](USER-GUIDE.md) |
 | Set up the platform for a whole team | [Rollout guide](ROLLOUT-GUIDE.md) |
 | Look up a word | [Glossary](../handbook/00-introduction/02-glossary.md) |
-| Know the details of a gate or a role | Handbook: [codes table](../handbook/00-introduction/05-codes.md), Ch.5 (roles), Ch.10 (gates) |
+| Know the details of a gate or a role | Handbook: [codes table](../handbook/00-introduction/05-codes.md), [Ch.5](../handbook/01-policy/ch05-team-roles-and-accountability.md) (roles), [Ch.10](../handbook/02-playbook/ch10-framework-and-gates.md) (gates) |
+| See every platform guide in one list | [platform/README.md](README.md) |

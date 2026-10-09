@@ -1,6 +1,6 @@
 # Platform
 
-The code and guides of the Agentic SDLC Framework platform: the system that runs AI coding agents through the eight gates G1–G8 and keeps the evidence, the audit log and the cost. The MVP is a **modular monolith** (`design/D-03`, ADR-M01).
+The code and guides of the [Agentic SDLC Framework](../README.md) platform: the system that runs AI coding agents through the eight gates G1–G8 and keeps the evidence, the audit log and the cost. The MVP is a **modular monolith** ([design/D-03](../design/D-03-mvp-architecture.md), ADR-M01).
 
 ## Guides
 
@@ -10,8 +10,8 @@ The code and guides of the Agentic SDLC Framework platform: the system that runs
 | Follow one feature from idea to release | [TUTORIAL-FIRST-FEATURE.md](TUTORIAL-FIRST-FEATURE.md) |
 | Use the platform (install `sdlc`, log in, take a task through G1–G8) | [USER-GUIDE.md](USER-GUIDE.md) |
 | Bring a project team onto the platform | [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md) |
-| Install the platform on a server (operator) | [deploy/README.md](deploy/README.md) "Fresh deployment"; runbook `handbook/03-templates/T11-openbao-runbook.md` |
-| Develop the platform itself | [GETTING-STARTED.md](GETTING-STARTED.md), `CLAUDE.md` |
+| Install, restart, upgrade or remove the platform (operator) | [deploy/README.md](deploy/README.md); [runbook T11](../handbook/03-templates/T11-openbao-runbook.md) (OpenBao) |
+| Develop the platform itself | [CONTRIBUTING.md](../CONTRIBUTING.md), [GETTING-STARTED.md](GETTING-STARTED.md), [CLAUDE.md](../CLAUDE.md) |
 
 ## Layout
 
@@ -28,4 +28,4 @@ platform/
 └── docs-images/      # screenshots used by the guides
 ```
 
-Details: `design/D-03` section 11. The commands (`pnpm build`, `pnpm test`, …) are listed in `CLAUDE.md`, section "Commands".
+Details: [design/D-03 §11](../design/D-03-mvp-architecture.md#11-code-layout-in-the-monorepo). The commands (`pnpm build`, `pnpm test`, …) are listed in [CLAUDE.md](../CLAUDE.md), section "Commands".

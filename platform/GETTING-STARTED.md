@@ -56,7 +56,7 @@ SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=~/.config/sdlc-secrets/github-
 ```
 
    It issues a one-repository token, posts a comment on the issue, polls it back and reads a file.
-8. **OpenBao (the worker polls GitHub, B06):** store `client_id` and `private_key` in `kv/shared/github-app` of the development OpenBao. The key is read from the file, never typed. Follow runbook T11 §5b.1, in the macOS Terminal (not through a chat tool). Then deliver the worker's credentials (T11 §5f: `pnpm openbao:bootstrap worker-credentials`) and start it with `pnpm compose:platform`.
+8. **OpenBao:** the key goes into the development OpenBao in [Step 11b part 4](#step-11b-set-up-the-dev-stack-from-scratch-dev) (runbook T11 §5b.1, in the macOS Terminal, never through a chat tool). Nothing else to do here: Step 11b starts the worker and the other processes.
 9. **Live test of the poller** (optional, never in CI; needs Docker for the throw-away database). The App posts `/approve G9` on the test issue; the poller must ignore it, because the App is a bot, and post no reply:
 
 ```bash
@@ -171,17 +171,12 @@ The password goes from `.env` into the command without being printed. `up.sh` en
 
 `worker.cost_sync_failed` with `unreachable` right after the start is normal: the worker started before LiteLLM was ready, and the next pass (5 minutes) syncs. Then continue with Step 12 item 2 (the database is migrated and the API is running).
 
-## Step 12. Start the API and create the first admin (dev)
+## Step 12. Create the first admin and the pilot project (dev)
 
-The development commands of [deploy/README, Fresh deployment steps 7–9](deploy/README.md#8-the-tenant-and-its-first-admin), which explains the bootstrap, the token and the `sdlc ops …` commands; how people log in and use tokens: handbook [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command). Run the commands below yourself, in a terminal: they print a token **once**. Never run them through a chat tool, and never paste the token anywhere except your password manager.
+The development version of [deploy/README, Fresh deployment steps 8–9](deploy/README.md#8-the-tenant-and-its-first-admin), which explains the bootstrap, the token and the `sdlc ops …` commands; how people log in and use tokens: handbook [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command). Run the commands below yourself, in a terminal: they print a token **once**. Never run them through a chat tool, and never paste the token anywhere except your password manager.
 
-1. OpenBao is initialised, unsealed and configured (runbook T11 sections 3 and 4; on a new machine, Step 11b does all of item 1). Deliver the API's credentials, then start it:
-   ```bash
-   pnpm openbao:bootstrap api-credentials
-   pnpm compose:platform
-   curl -s http://127.0.0.1:8090/health/ready
-   ```
-2. Migrate the database (`pnpm db:migrate`), then create your tenant, your user and your first token. `SDLC_DB_URL` is the `platform_app` URL (deploy/README step 8):
+1. Step 11b is done: the API answers `curl -s http://127.0.0.1:8090/health/ready` and the database is migrated (Step 11b part 6).
+2. Create your tenant, your user and your first token. `SDLC_DB_URL` is the `platform_app` URL (deploy/README step 8):
    ```bash
    pnpm sdlc ops bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
    ```
@@ -243,15 +238,15 @@ To stop everything and keep the data: `pnpm compose:down`. If you do not need th
 
 ## Step 14. Prepare the pilot repo for live tests (dev)
 
-Live tests run the platform against the real `harryforge/pilot-order-inventory` with the test GitHub App. They never run in CI. Do these once; each line says where the details are.
+Live tests run the platform against the real `harryforge/pilot-order-inventory` with the test GitHub App. They never run in CI. Do these once, in this order (the same order as deploy/README Fresh deployment steps 9–13: the configuration needs the image and the agent); each line says where the details are.
 
 | # | What | How | Check |
 |---|---|---|---|
 | 1 | Test App permissions | App settings (Step 11) as listed in [deploy/README](deploy/README.md#github-app-permissions). Then accept the new permissions on the installation (organization settings → GitHub Apps → Configure) | `gh api /orgs/harryforge/installations --jq '.installations[]\|select(.app_slug=="harryforge-sdlc-dev")\|.permissions'` |
 | 2 | The pilot project, its team and AI record | Step 12 item 5; `pnpm sdlc ai-record set …` (handbook Ch.19 §19.8b). Person A and Person B are two different people with two GitHub accounts | `pnpm sdlc admin config show --project pilot`, `pnpm sdlc ai-record show --project pilot` |
-| 3 | The project configuration | `pnpm sdlc admin config show --project pilot` gives the version; write the settings that differ from the defaults into a YAML file outside the repo, then `pnpm sdlc admin config set --project pilot --file <file> --expected-version <version>` (handbook Ch.19 §19.8d). For the pilot: `verification.required_checks: [ci-ok]` (G6 waits only for the pilot's `ci-ok`, handbook Ch.14), `sandbox.image` (Step 14 item 4) and `run.agent_key` (item 5) | `config show` prints the new version and values |
-| 4 | The sandbox image | `pnpm sandbox-image:build node24` prints the reference by digest; on Docker Desktop use `platform/sandbox-images/build.sh node24 --no-push` (runbook T11 §5g). Put it in `sandbox.image` | The reference ends in `@sha256:…` |
-| 5 | A registered, active agent | `pnpm sdlc admin agent register …`, then the approvals (handbook Ch.20 §20.5b). Its `instructions_ref` points at the pilot's `AGENTS.md` | `pnpm sdlc admin agent show --key <key>` says `active` |
+| 3 | The sandbox image | `pnpm sandbox-image:build node24` prints the reference by digest; on Docker Desktop use `platform/sandbox-images/build.sh node24 --no-push` (runbook T11 §5g). Put it in `sandbox.image` | The reference ends in `@sha256:…` |
+| 4 | A registered, active agent | `pnpm sdlc admin agent register …`, then the approvals (handbook Ch.20 §20.5b). Its `instructions_ref` points at the pilot's `AGENTS.md` | `pnpm sdlc admin agent show --key <key>` says `active` |
+| 5 | The project configuration | `pnpm sdlc admin config show --project pilot` gives the version; write the settings that differ from the defaults into a YAML file outside the repo, then `pnpm sdlc admin config set --project pilot --file <file> --expected-version <version>` (handbook Ch.19 §19.8d). For the pilot: `verification.required_checks: [ci-ok]` (G6 waits only for the pilot's `ci-ok`, handbook Ch.14), `sandbox.image` (item 3) and `run.agent_key` (item 4) | `config show` prints the new version and values |
 | 6 | A model | A provider key in OpenBao (runbook T11 §5d), or on a dev machine the local Ollama model `gpt-oss:20b` (QUESTIONS #78). One real run with an API model is needed before M-F (QUESTIONS #81; the trial M-E runs with the local model) (QUESTIONS #81): `pnpm test:agent-api` (runbook T11 §5d, "The real API-model run") | `curl -s -H "Authorization: Bearer <master key>" http://127.0.0.1:4000/v1/models` lists it (run in the terminal; never paste the key) |
 | 7 | The plan file of the C09 / E07 live test (QUESTIONS #230) | Once a year: open a pull request on the pilot that adds `.sdlc/plans/INT-<UTC year>-0001.yaml` with the content of `platform/tests/integration/pilot/fixtures/live-plan.yaml` (change the year in `intent_id` too), let `ci-ok` pass and merge it yourself. The App and the platform never merge. The plan allows `docs/live-test/**` only: a live run never changes the application code. A file merged before E07 (`allowed_paths: [apps/web/src/features/products/**]`, `[stub:append]`) must be replaced by the new content | `gh api repos/harryforge/pilot-order-inventory/contents/.sdlc/plans/INT-2026-0001.yaml --jq .path` |
 | 8 | Person B's GitHub account (E07 live G8 only) | A second person with their own GitHub account and write access to the pilot (they review and merge). Add to the settings file of the test App (Step 11 item 7): `"person_b_github_id": <numeric ID>` (`gh api users/<login> --jq .id`) and `"person_b_login": "<login>"` | `gh api repos/harryforge/pilot-order-inventory/collaborators/<login>/permission --jq .permission` says `write` or more |

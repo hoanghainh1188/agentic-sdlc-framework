@@ -2,7 +2,7 @@
 
 For **whoever leads the rollout** (usually the tech lead, with leadership and the platform operator), and for **everyone on the team** who wants to know where to start. It puts the existing guides in order: what to read, who does what, in which order, and how to check each step. It does not replace them.
 
-Version 0.6, 2026-10-09 (docs review fixes: the health check runs on the platform server); 0.5, 2026-10-09 (docs review PR C2: step 1 links to the handbook for counting acceptance criteria and for the list of agent instruction files; step 2 for each set-up task; 0.4 for the budgets). Version 0.4, 2026-10-09 (docs review PR C: the producers, the conflicting roles, who decides and the GitHub App permissions link to their sources; the conflicting roles include Person B and the second approver). Version 0.3, 2026-10-09 (the rollout "phases" are now "steps", because the codes table keeps "phase" for P1–P6; words as in the glossary). Version 0.2, 2026-10-08 (step 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
+Version 0.7, 2026-10-09 (docs review E2: links in §1 and §6; the operator installs the GitHub App); 0.6, 2026-10-09 (docs review fixes: the health check runs on the platform server); 0.5, 2026-10-09 (docs review PR C2: step 1 links to the handbook for counting acceptance criteria and for the list of agent instruction files; step 2 for each set-up task; 0.4 for the budgets). Version 0.4, 2026-10-09 (docs review PR C: the producers, the conflicting roles, who decides and the GitHub App permissions link to their sources; the conflicting roles include Person B and the second approver). Version 0.3, 2026-10-09 (the rollout "phases" are now "steps", because the codes table keeps "phase" for P1–P6; words as in the glossary). Version 0.2, 2026-10-08 (step 1: the two repositories, what the project repository needs, the one file of agent instructions, Spec Kit and BMAD). Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment). This guide only links to it.
 
 ---
 
@@ -10,14 +10,14 @@ Version 0.6, 2026-10-09 (docs review fixes: the health check runs on the platfor
 
 | You are | Read first | Your first action | You can skip |
 |---|---|---|---|
-| **Leadership** | Handbook Ch.1 (summary), Ch.9 (adoption roadmap) | Choose the pilot project and approve the readiness result (section 3, step 0) | Everything under `platform/` |
-| **Platform operator** | `platform/deploy/README.md` "Fresh deployment"; runbook T11 | Install the platform and create the tenant (step 2) | The handbook's process chapters |
-| **Tenant admin** (often the tech lead) | This guide; handbook Ch.19 §19.8d | Create the project, the people and their roles (step 2) | — |
-| **Person A** (intent owner) | `platform/USER-GUIDE.md`; handbook Ch.5 (roles) | Write specs with acceptance criteria; take the first Low-risk intent through the gates (step 4) | Admin and operator sections |
-| **Person B** (independent reviewer and approver) | `platform/USER-GUIDE.md` §3, steps 4, 7, 8; handbook Ch.17 (reviewing AI output) | Link your GitHub account and log in (step 3) | Admin and operator sections |
-| **PM / BrSE** | Handbook Ch.2 §2.5 (project AI record), template T7 | Record the client's consent and the allowed data classes (step 2) | Operator sections |
-| **Second approver** | `platform/USER-GUIDE.md` §3, steps 7–8 | Log in; you are asked only for flagged changes and Critical risk | Most of the rest |
-| **Developer of the platform** | `platform/GETTING-STARTED.md`, `CLAUDE.md` | — | This guide |
+| **Leadership** | Handbook [Ch.1](../handbook/01-policy/ch01-executive-summary.md) (summary), [Ch.9](../handbook/01-policy/ch09-adoption-roadmap.md) (adoption roadmap) | Choose the pilot project and approve the readiness result (section 3, step 0) | Everything under `platform/` |
+| **Platform operator** | [deploy/README](deploy/README.md) ("Fresh deployment", restart, upgrade, troubleshooting); [runbook T11](../handbook/03-templates/T11-openbao-runbook.md) | Install the platform and create the tenant (step 2) | The handbook's process chapters |
+| **Tenant admin** (often the tech lead) | This guide; [handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins) | Create the project, the people and their roles (step 2) | — |
+| **Person A** (intent owner) | [USER-GUIDE](USER-GUIDE.md); handbook [Ch.5](../handbook/01-policy/ch05-team-roles-and-accountability.md) (roles) | Write specs with acceptance criteria; take the first Low-risk intent through the gates (step 4) | Admin and operator sections |
+| **Person B** (independent reviewer and approver) | [USER-GUIDE §3](USER-GUIDE.md#3-one-intent-step-by-step), steps 4, 7, 8; handbook [Ch.17](../handbook/02-playbook/ch17-reviewing-ai-output.md) (reviewing AI output) | Link your GitHub account and log in (step 3) | Admin and operator sections |
+| **PM / BrSE** | Handbook [Ch.2 §2.5](../handbook/01-policy/ch02-ai-usage-policy.md#25-the-project-ai-record) (project AI record), [template T7](../handbook/03-templates/T7-contract-nda-checklist.md) | Record the client's consent and the allowed data classes (step 2) | Operator sections |
+| **Second approver** | [USER-GUIDE §3](USER-GUIDE.md#3-one-intent-step-by-step), steps 7–8 | Log in; you are asked only for flagged changes and Critical risk | Most of the rest |
+| **Developer of the platform** | [CONTRIBUTING](../CONTRIBUTING.md), [GETTING-STARTED](GETTING-STARTED.md), [CLAUDE.md](../CLAUDE.md) | — | This guide |
 
 Every document by reader, outside the rollout too: [README §2](../README.md#2-where-to-start).
 
@@ -133,7 +133,7 @@ my-app/
 | 1.4 | `AGENTS.md` at the repository root: build and test commands, conventions | The agent reads it; the platform pins its hash in the agent register | The file exists on `main` |
 | 1.5 | A folder for specs (for example `docs/specs/`), one Markdown file per change (at most 256 KiB) with **acceptance criteria** | G2 passes only when the linked spec has at least one criterion | One example spec merged |
 | 1.6 | The pull request template with the AI disclosure (template T2) and `CODEOWNERS` | Reviewers see who and what wrote the change | A test pull request shows the template |
-| 1.7 | Install the platform's GitHub App on this repository only (its permissions: [deploy/README](deploy/README.md#github-app-permissions)) | Every platform action on GitHub goes through it | The operator sees the installation |
+| 1.7 | Ask the operator to install the platform's GitHub App on this repository ([deploy/README, Create the GitHub App](deploy/README.md#create-the-github-app-operator), item 6; the operator owns the App) | Every platform action on GitHub goes through it | The App appears under the repository's Settings → GitHub Apps |
 | 1.8 | Check that the project builds and tests in the sandbox image (`node24` today) | The agent runs `AGENTS.md`'s commands in it | Step 2.6 |
 
 **Limits today:**
@@ -242,10 +242,10 @@ Run real intents, one at a time at first. The trial plan of the sample repositor
 
 | Topic | Where |
 |---|---|
-| One intent from G1 to G8, commands, troubleshooting | `platform/USER-GUIDE.md` |
-| Installing the platform | `platform/deploy/README.md` "Fresh deployment"; runbook T11 |
-| Setting up a team (admin commands) | Handbook Ch.19 §19.8d |
-| When a team may start, readiness, choosing pilots | Handbook Ch.9; templates T17, T5 |
-| Roles and separation of duties | Handbook Ch.5; codes table §5 |
-| The dashboard | Handbook Ch.19 §19.8e |
-| What the web interface may offer later | `design/MVP1-UI-SCOPE.md` |
+| One intent from G1 to G8, commands, troubleshooting | [USER-GUIDE](USER-GUIDE.md) |
+| Installing, restarting, upgrading the platform | [deploy/README](deploy/README.md); [runbook T11](../handbook/03-templates/T11-openbao-runbook.md) |
+| Setting up a team (admin commands) | [Handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins) |
+| When a team may start, readiness, choosing pilots | [Handbook Ch.9](../handbook/01-policy/ch09-adoption-roadmap.md); templates [T17](../handbook/03-templates/T17-readiness-assessment.md), [T5](../handbook/03-templates/T5-project-raci.md) |
+| Roles and separation of duties | [Handbook Ch.5](../handbook/01-policy/ch05-team-roles-and-accountability.md); [codes table §5](../handbook/00-introduction/05-codes.md#5-team-model-2n) |
+| The dashboard | [Handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only) |
+| What the web interface may offer later | [design/MVP1-UI-SCOPE.md](../design/MVP1-UI-SCOPE.md) |

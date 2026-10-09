@@ -32,9 +32,9 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 | **Leadership** deciding whether to adopt | This page, then handbook Part I: [Ch.1 summary](handbook/01-policy/ch01-executive-summary.md) and [Ch.9 adoption roadmap](handbook/01-policy/ch09-adoption-roadmap.md) |
 | **Bringing a project team onto the platform** (tech lead, leadership) | [platform/ROLLOUT-GUIDE.md](platform/ROLLOUT-GUIDE.md): where each role starts, the rollout step by step, the first week, common mistakes |
 | **Preparing your application's repository** (Person A, repository owner) | [ROLLOUT-GUIDE step 1](platform/ROLLOUT-GUIDE.md#step-1-prepare-the-repository-person-a-the-repository-owner-12-days): the two repositories, what yours needs, the one file of agent instructions, Spec Kit and BMAD |
-| **New to the platform** | [The platform in five minutes](platform/PLATFORM-IN-5-MINUTES.md), then the [tutorial: your first feature](platform/TUTORIAL-FIRST-FEATURE.md), one real feature from idea to release |
+| **New to the platform** | [The platform in five minutes](platform/PLATFORM-IN-5-MINUTES.md), then the [tutorial: your first feature](platform/TUTORIAL-FIRST-FEATURE.md), one real feature from idea to release. Every platform guide in one list: [platform/README.md](platform/README.md) |
 | **A team member** (Person A, Person B, PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one intent from G1 to G8, by role, with the commands and what to do when something goes wrong |
-| **Installing the platform** (operator) | [platform/deploy/README.md](platform/deploy/README.md), "Fresh deployment": from an empty checkout to the first intent with Docker Compose; runbook [T11](handbook/03-templates/T11-openbao-runbook.md) |
+| **Installing and operating the platform** (operator) | [platform/deploy/README.md](platform/deploy/README.md): where to run it, the GitHub App, "Fresh deployment" from an empty checkout to the first intent, restart, upgrade, troubleshooting, uninstall; runbook [T11](handbook/03-templates/T11-openbao-runbook.md) (OpenBao) |
 | **Working on the platform's code** (not needed to use it) | [CONTRIBUTING.md](CONTRIBUTING.md) and [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md) (the developers' set-up: dev stack, test GitHub App) |
 | **Working on the handbook** | [CONTRIBUTING.md](CONTRIBUTING.md), the [contents](handbook/00-introduction/01-contents.md) and the [writing style](handbook/00-introduction/06-writing-style.md) |
 
@@ -127,6 +127,9 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 | What the web interface may offer next | [MVP+1 interface scope (draft)](design/MVP1-UI-SCOPE.md) |
 | Every design document and decision | [design/README.md](design/README.md) |
 | Diagrams | [diagrams/README.md](diagrams/README.md) |
+| The platform guides (five minutes, tutorial, user guide, rollout, deployment, developers) | [platform/README.md](platform/README.md) |
+| Contributing, the repository's rules and CI | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Reporting a security problem | [SECURITY.md](SECURITY.md) |
 | Changes | [CHANGELOG.md](CHANGELOG.md) |
 
 ## 8. Help

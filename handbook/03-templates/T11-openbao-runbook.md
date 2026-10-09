@@ -293,7 +293,7 @@ LiteLLM (the model gateway) gets its keys from OpenBao through a sidecar: an Ope
    pnpm openbao:bootstrap litellm-credentials
    ```
    Record it in the operations log (role `litellm`, date, reason; not the secret ID).
-4. Start: `pnpm compose:models`. LiteLLM waits until the sidecar has written the configuration.
+4. Start: on the server every profile at once (`platform/deploy/README.md`, Fresh deployment step 7); on a development machine `pnpm compose:models`. LiteLLM waits until the sidecar has written the configuration.
 5. Check: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models ps` shows `litellm-agent` and `litellm` as healthy.
 
 **Developer machines only: a local Ollama model** (`design/QUESTIONS.md` #78). Ollama has no key; its entry holds the address LiteLLM uses (on Docker Desktop, `http://host.docker.internal:11434`). Store it with an admin token, then restart `litellm-agent` and `litellm`:
@@ -337,9 +337,9 @@ The API (service `sdlc-api`, task B03) logs in with the AppRole `api` and reads 
    pnpm openbao:bootstrap api-credentials
    ```
    Record it in the operations log (role `api`, date, reason; not the secret ID).
-3. Start: `pnpm compose:platform` (profiles `core` and `platform`). The API listens on `127.0.0.1:8090`.
+3. Start. On the server every profile starts at once, after the migrations (`platform/deploy/README.md`, Fresh deployment steps 6–7); on a development machine `pnpm compose:platform` (profiles `core` and `platform`). The API listens on `127.0.0.1:8090`.
 4. Check: `curl -s http://127.0.0.1:8090/health/ready` answers `{"status":"ok"}`.
-5. Create the tenant and its first tenant admin, once, on the server (`SDLC_DB_URL` is the `platform_app` URL; the token is printed once, so run it in a terminal): `pnpm sdlc ops bootstrap --tenant <slug> --tenant-name <name> --email <email> --name <name>`. Operator commands on the database are `sdlc ops …` (task B13, `design/ADR-M37-admin-onboarding.md`); everything else is done through the API (handbook Ch.19 §19.8d).
+5. The tenant and its first tenant admin: `platform/deploy/README.md`, Fresh deployment step 8 (`sdlc ops bootstrap`, after the migrations; the token is printed once, so run it in a terminal). Operator commands on the database are `sdlc ops …` (task B13, `design/ADR-M37-admin-onboarding.md`); everything else is done through the API (handbook Ch.19 §19.8d).
 
 ### Rotation
 
@@ -361,7 +361,7 @@ The worker (service `sdlc-worker`, task B06) polls GitHub and handles the commen
    ```
    Record it in the operations log (role `worker`, date, reason; not the secret ID).
    The same command also delivers the second AppRole of the worker, `cost-controller`, into the volume `worker-cost-approle` (task C06, `design/ADR-M33-gate-g4.md` §2.5). With it, the worker runs the Cost Controller: it reads the LiteLLM master key (`kv/cost-controller/litellm-master-key`, section 5d) and hands agent runs to the runner. Without it the worker logs `worker.runs_off` and intents wait at G4. Record it in the operations log too (role `cost-controller`).
-3. Start: `pnpm compose:platform` (profiles `core` and `platform`). The worker publishes no port.
+3. Start: on the server every profile at once (Fresh deployment step 7); on a development machine `pnpm compose:platform` (profiles `core` and `platform`). The worker publishes no port.
 4. Check: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env logs sdlc-worker` shows `worker.started`, then one `poll.completed` per project and interval. The logs hold IDs and codes only.
 
 ### Rotation
@@ -390,7 +390,7 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
    pnpm openbao:bootstrap runner-evidence-credentials
    ```
    Without it the runner still starts (log line `runner.evidence_missing`), but every High-risk run fails when it tries to store its proposal, and every other run fails at its end (`agent_changes_unavailable`): no run reaches G5 without its stored diff. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys. Admin work in SeaweedFS: section 5l.
-4. Start: `pnpm compose:sandbox` (profiles `core` and `sandbox`). It also starts the npm package proxy (`npm-proxy`, Verdaccio) and the local image registry (`registry`).
+4. Start: on the server every profile at once (Fresh deployment step 7); on a development machine `pnpm compose:sandbox` (profiles `core` and `sandbox`). It also starts the npm package proxy (`npm-proxy`, Verdaccio) and the local image registry (`registry`).
 5. Check: `docker compose … ps sdlc-runner` shows `healthy`. The runner's log has one line with `"event":"runner.started"`.
 
 ### Sandbox images and the local registry
@@ -839,5 +839,6 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.32 | 2026-10-09 | Claude Code (docs review E2) | Sections 5d, 5e, 5f, 5g: on the server every profile starts at once after the migrations (Fresh deployment step 7); the tenant bootstrap is Fresh deployment step 8, not a step of 5e |
 | 0.31 | 2026-10-09 | Claude Code (docs review fixes) | Title and scope: the processes' credentials are in this runbook; the filer gap note removed (closed by A12, section 5l); sections 8.2 and 8.3 in order; rotation covers sections 5d–5m; "OpenBao admin" for the operator with the admin token |
 | 0.30 | 2026-10-09 | Claude Code (docs review PR C) | Section 3.1: the same first commands as the fresh deployment, and the development notes moved from `platform/deploy/README.md` (configure again, audit log path, subnet and gateway of old stacks, `OPENBAO_HOST_PORT`); section 5b: the GitHub App permissions link to `platform/deploy/README.md` |
