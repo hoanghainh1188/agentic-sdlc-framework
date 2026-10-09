@@ -1,7 +1,7 @@
 // The sdlc command-line tool. See design/D-03 section 5.1.
 // A07 adds `sdlc audit verify`, B03 the operator commands `sdlc admin …` (database, on the
 // server). B04 adds the user commands (through the API, design/ADR-M36): login, logout, whoami,
-// intent, gate, escalation, ai-record. B08 adds `sdlc spec`, B09 `sdlc plan`, C11 `sdlc run`, E04 `sdlc cost`, E06 `sdlc metrics`, E02 `sdlc evidence`. B13 adds the admin commands, `sdlc token` and
+// intent, gate, escalation, ai-record. B08 adds `sdlc spec`, B09 `sdlc plan`, C11 `sdlc run`, E04 `sdlc cost`, E06 `sdlc metrics`, E02 `sdlc evidence`, V01 `sdlc trial`. B13 adds the admin commands, `sdlc token` and
 // `sdlc audit verify` through the API, and moves the operator commands to `sdlc ops` (ADR-M37).
 import { t } from '@sdlc/messages';
 
@@ -20,6 +20,7 @@ import { runPlan } from './commands/plan.js';
 import { runRun } from './commands/run.js';
 import { runSpec } from './commands/spec.js';
 import { runToken } from './commands/token.js';
+import { runTrial } from './commands/trial.js';
 import { EXIT, type CliContext } from './context.js';
 import { clean } from './output.js';
 
@@ -41,6 +42,7 @@ const USER_COMMANDS: Readonly<
   run: runRun,
   cost: runCost,
   metrics: runMetrics,
+  trial: (args, ctx) => runTrial(args, ctx),
   evidence: runEvidence,
   token: runToken,
   admin: runAdminApi,
