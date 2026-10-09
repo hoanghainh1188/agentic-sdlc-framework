@@ -48,7 +48,7 @@
 | **Escalation owner** ◆ | The person who receives an escalation first, chosen by its type (intent, technical, security, policy). Never a producer of the change | エスカレーション担当者 |
 | **Evidence** | Machine-readable proof that a check was done: test results, scan reports, approvals | エビデンス |
 | **Evidence hold** ◆ | A hold on one intent's evidence (for a dispute, an incident or a client request). Held evidence is never purged | エビデンス保全 |
-| **Evidence Pack** ◆ | All evidence for one intent, collected together and sealed at G8 (files kept 6 months by default) | エビデンス一式 |
+| **Evidence Pack** ◆ | All evidence for one intent, collected together and sealed at G8 (files kept 180 days by default) | エビデンス一式 |
 | **Frozen** ◆ | The state of an intent while an escalation waits for an answer: gate moves, runs, pushes and merges wait; safe actions, such as stopping a run, do not | 凍結 |
 | **Gate** ◆ | A decision point that allows, blocks, pauses or escalates work (G1–G8). Different from a step, which does work (Chapter 10). Short names in the guides and the dashboard: G1 Intent, scope, risk · G2 Specification · G3 Plan · G4 Execution boundary · G5 Scope and budget · G6 Verification · G7 Review and merge · G8 Release | ゲート（関門） |
 | **Governance** ◆ | Leadership acting on a project (the project role `governance`): exceptions, raising autonomy, escalations nobody else answered, agent approvals at L3 and above | ガバナンス（経営層） |
@@ -121,4 +121,5 @@
 |---|---|---|---|
 | 0.0 | 2026-09-24 | — | Skeleton |
 | 0.1 | 2026-09-24 | Claude (draft) | First content: about 60 terms with Japanese reference terms |
+| 0.3 | 2026-10-09 | Claude (draft), awaiting approval | Docs review fixes: Evidence Pack files are kept 180 days (was "6 months") |
 | 0.2 | 2026-10-09 | Claude (draft), awaiting approval | Docs review PR B: 30 new entries for the platform's words (◆); Evidence Pack and Run Contract capitalised; intent is the unit of one change; gate short names; model token vs API token; docs review PR C: **Producer** links to the platform's list (commit authors at G7 only) |

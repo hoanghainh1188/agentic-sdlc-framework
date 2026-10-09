@@ -156,7 +156,7 @@ The intent is then **paused** at G6, and a **technical** escalation goes to Pers
 | Decision | What happens |
 |---|---|
 | `resume` | The intent goes back to **G4**, and a new run starts after G4. After `branch_moved`, first restore the branch to the platform's last commit, or delete it |
-| `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on |
+| `modify` or `roll-back` | The intent goes back to **G3**, which is HITL from now on |
 | `terminate` | The intent is closed (`cancelled`). Close the pull request if one is open |
 
 **Platform operator:** the GitHub App needs Contents and Pull requests "Read and write" ([`platform/deploy/README.md`](../../platform/deploy/README.md#github-app-permissions)), and the runner's evidence identity must be created again once after this update (runbook T11 §5g step 3b).
@@ -236,4 +236,5 @@ A project without CI never passes G6.
 | 0.2 | 2026-09-25 | Claude (draft) | G6 security findings: configurable severity threshold, default HIGH, CRITICAL always (QUESTIONS #19) |
 | 0.3 | 2026-10-03 | Claude Code (task C08, PR 1) | §14.10.1: the push and the pull request (ADR-M38 §2.1–§2.6, QUESTIONS #155, #156) |
 | 0.4 | 2026-10-03 | Claude Code (task C08, PR 2) | §14.10.2: how G6 reads CI, retries, the timeout, security findings (ADR-M38 §2.7, QUESTIONS #157–#159) |
+| 0.6 | 2026-10-09 | Claude (docs review fixes) | `roll-back` is the decision's spelling (the CLI refuses `roll_back`) |
 | 0.5 | 2026-10-09 | Claude Code (docs review PR C) | §14.10.1, §14.10.2: the GitHub App permissions link to the one list in `platform/deploy/README.md` |

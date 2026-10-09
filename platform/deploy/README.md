@@ -41,7 +41,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 
 How to bring up the whole platform on a new machine with Docker Compose, from an empty checkout to the first intent at G1 (D-08 E07 AC3). Run every step **yourself, in a terminal, from the repo root**. Several steps print or ask for key shares, tokens or keys at a hidden prompt: never run them through a chat tool, and never paste their output anywhere except your password manager. `pnpm test:fresh-deploy` runs the same steps on a throw-away Compose project with throw-away keys (section [Tests](#tests)).
 
-After the first deployment, use [GETTING-STARTED Step 13](../GETTING-STARTED.md#step-13-restart-the-dev-stack-after-a-break-dev) to restart the stack after a break, and [Step 14](../GETTING-STARTED.md#step-14-prepare-the-pilot-repo-for-live-tests-dev) for the live tests on the pilot repository.
+After the first deployment: to restart the stack after a reboot on the server, follow [Troubleshooting](#troubleshooting) ("Restart after a reboot"); on a development machine, [GETTING-STARTED Step 13](../GETTING-STARTED.md#step-13-restart-the-dev-stack-after-a-break-dev). Use [Step 14](../GETTING-STARTED.md#step-14-prepare-the-pilot-repo-for-live-tests-dev) for the live tests on the pilot repository.
 
 ### 1. Prerequisites
 
@@ -144,7 +144,9 @@ Optional, Langfuse (section [Logs and traces](#logs-and-traces-a08)): add `obser
 
 ```bash
 pnpm openbao:bootstrap worker-langfuse-credentials  # T11 §5m (needs the profile observability)
-``` The worker's retention loop starts in `report` mode: it deletes nothing (runbook T11 §5j).
+```
+
+The worker's retention loop starts in `report` mode: it deletes nothing (runbook T11 §5j).
 
 ### 8. The tenant and its first admin
 
@@ -298,8 +300,8 @@ What leaves the server, and what stays on it. The data classes and which models 
 
 | Stays on the server | Where | Kept |
 |---|---|---|
-| Each run's diff, L1 proposals, Evidence Packs | SeaweedFS | At least 180 days, then purged ([handbook Ch.15 §15.10.2](../../handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)) |
-| Model prompts and answers | Langfuse (profile `observability` only) | Until the retention purge |
+| Each run's diff, L1 proposals, Evidence Packs | SeaweedFS | At least 180 days (object lock); purged after the project's retention only when the retention loop runs in `purge` mode (`report` by default: it deletes nothing) ([handbook Ch.15 §15.10.2](../../handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)) |
+| Model prompts and answers | Langfuse (profile `observability` only) | Until the retention purge of the same loop (`purge` mode only) |
 | Audit log, gate decisions, escalations | PostgreSQL | At least 2 years |
 | Secrets and keys | OpenBao | Until rotated |
 
@@ -434,7 +436,7 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 | ClickHouse (profile `observability`) | The `clickhouse-data` volume, while stopped |
 | `platform/deploy/.env` | Into the password manager, never next to the backups |
 
-The dump holds client data (diffs, prompts) and personal data: treat it like the server itself. Restoring OpenBao: [T11 §7](../../handbook/03-templates/T11-openbao-runbook.md#7-restore-on-a-test-machine-recovery-drill). Restoring the whole platform has not been tested yet (A10).
+The dump holds personal data (names, e-mails, GitHub account IDs) and the database role passwords; the diffs are in the SeaweedFS copy and the prompts in the ClickHouse copy. Treat every copy like the server itself. Restoring OpenBao: [T11 §7](../../handbook/03-templates/T11-openbao-runbook.md#7-restore-on-a-test-machine-recovery-drill). Restoring the whole platform has not been tested yet (A10).
 
 ## Upgrade
 
@@ -443,8 +445,8 @@ Upgrades come from `main` as reviewed changes; read the [CHANGELOG](../../CHANGE
 1. Take a backup ([above](#backup-and-restore)); before an OpenBao image change, a Raft snapshot ([T11 §4b](../../handbook/03-templates/T11-openbao-runbook.md#4b-upgrading-the-openbao-image)).
 2. `git pull`, then `pnpm install && pnpm build`.
 3. Add any new `.env` variables (`.env.example` lists them; `init-env.sh` never overwrites `.env`).
-4. Pull the pinned images and rebuild the platform images: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull`, then the same with `build` (add `--profile observability` when you use it).
-5. Start `core`, unseal OpenBao, apply new migrations, then start the rest: the order of [GETTING-STARTED Step 13](../GETTING-STARTED.md#step-13-restart-the-dev-stack-after-a-break-dev), items 1–6.
+4. Pull the pinned images and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`): `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull`, then the same with `build` (add `--profile observability` when you use it).
+5. Start only OpenBao, PostgreSQL and SeaweedFS ([step 3](#3-openbao)), unseal OpenBao, apply new migrations ([step 6](#6-database)), then start everything ([step 7](#7-start-the-platform)). On the server `up.sh core` alone fails: LiteLLM needs its keys from OpenBao (profile `models`).
 6. Run a credentials command only when the CHANGELOG says an update added one or gave one new rights ([Fresh deployment, step 5](#5-credentials-of-every-process)).
 7. Check: `curl -s http://127.0.0.1:8090/health/ready`, and no `…_missing` line in the logs ([Troubleshooting](#troubleshooting)).
 
@@ -454,12 +456,12 @@ Never run `docker volume prune` or `docker system prune --volumes`: they delete 
 
 | You see | Cause | Do |
 |---|---|---|
-| `sdlc-api`, `sdlc-worker` or `sdlc-runner` restart every minute; "Cannot reach OpenBao" or a login error in the log | OpenBao is sealed after a restart | `pnpm openbao:bootstrap status`, then two key holders unseal it (runbook T11 §4) |
-| `up.sh` times out with the `platform`, `models` or `sandbox` profile | Same: those services cannot become healthy while OpenBao is sealed | Start `core` alone, unseal, then the rest |
-| A log line ending in `_missing` (for example `worker.evidence_missing`) | A process has no credential for that feature | Run that process's credentials command ([step 5](#5-credentials-of-every-process)), then restart the service |
-| `invalid secret id` in a log | The AppRole secret ID expired (90 days) | That process's credentials command again, then restart it |
+| `sdlc-api`, `sdlc-worker` or `sdlc-runner` restart every minute; the log says "OpenBao at … is sealed" | OpenBao is sealed after a restart | `pnpm openbao:bootstrap status`, then two key holders unseal it (runbook T11 §4) |
+| **Restart after a reboot**; or `up.sh` times out with the `core`, `platform`, `models` or `sandbox` profile | LiteLLM, the API, the worker, the runner and `litellm-agent` cannot become healthy while OpenBao is sealed; on the server `up.sh core` alone never becomes healthy (LiteLLM has no keys without `models`) | `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs`, unseal (T11 §4), then `platform/deploy/scripts/up.sh core models platform sandbox` (add `observability` if you use it). No credentials command is needed after a plain restart |
+| A log line ending in `_missing` (for example `worker.evidence_missing`) | A process has no credential for that feature | Run the credentials command the message names ([step 5](#5-credentials-of-every-process); `worker-langfuse-credentials`: [step 7](#7-start-the-platform)), then restart the service |
+| "AppRole login failed (HTTP status 400)" in a log | The AppRole secret ID expired (90 days) or was destroyed | That process's credentials command again, then restart it |
 | `worker.runs_off`; every intent waits at G4 | The worker has no `cost-controller` AppRole | `pnpm openbao:bootstrap worker-credentials`, restart `sdlc-worker` |
-| Intents wait at G8; packs answer `evidence_unavailable` | No evidence credential for the worker or the API | `worker-evidence-credentials` or `api-evidence-credentials` (runbook T11 §5h, §5i) |
+| Intents wait at G8; packs answer `evidence_unavailable` | No evidence credential for the worker or the API | `api-evidence-credentials` (runbook T11 §5h) or `worker-evidence-credentials` (§5i) |
 | `worker.cost_sync_gap` | The spend sync was down longer than its catch-up window | [Scheduled spend sync](#scheduled-spend-sync-c12) |
 | LiteLLM lists no model | Profile `models` not started, or the provider entry is not in OpenBao | `pnpm compose:models`; runbook T11 §5d |
 | A service stays unhealthy | See its log | `docker compose -f platform/deploy/docker-compose.yml logs <service>`; [what "healthy" means](#health-what-healthy-means) |

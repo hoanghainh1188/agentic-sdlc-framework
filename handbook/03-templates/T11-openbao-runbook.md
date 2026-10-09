@@ -1,7 +1,7 @@
-# T11 Runbook: operating OpenBao (unseal, root token, backup, restore)
+# T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.30. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.2 (rekey) give the commands; the recovery drill in task A10 tests them.
-> Readers: key holders, infrastructure operator, platform admin.
+> Status: **v0.31. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6, 7 and 8.3 (rekey) give the commands; the recovery drill in task A10 tests them.
+> Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
 ---
@@ -18,12 +18,13 @@ This runbook covers:
 - root tokens;
 - daily admin work and AppRole secret IDs;
 - the keys of LiteLLM (model provider keys, master key, salt key);
+- the credentials of every platform process (sections 5c–5m) and the image upgrade (4b);
 - snapshot backup and restore;
 - changing a key holder;
 - troubleshooting;
 - the operations log.
 
-It does **not** cover the platform processes that read secrets (task A04) or TLS (open item, `design/QUESTIONS.md` #20).
+It does **not** cover TLS (open item, `design/QUESTIONS.md` #20, task A10).
 
 All commands run from the repo root on the server. They need Docker only. `pnpm openbao:bootstrap <command>` is the same as `platform/deploy/openbao/bootstrap.sh <command>`.
 
@@ -127,7 +128,7 @@ Since 2.7.1, an AppRole secret ID stops working exactly at its expiry (`APPROLE_
 Daily work never uses a root token. A root token is needed only to:
 - run `configure` again (new policies, new AppRoles, changed settings);
 - create `platform-admin` tokens;
-- rekey (section 8.2).
+- rekey (section 8.3).
 
 Steps:
 1. Record the reason in the operations log **before** you start.
@@ -240,7 +241,7 @@ Before: OpenBao is running (`pnpm compose:core`), unsealed and configured (secti
 
 A secret ID + role ID lets a process log in as that AppRole. Treat issuing one like handing over a key.
 
-- Only the platform admin issues secret IDs, only for a process being deployed or rotated, and records it in the operations log (role, date, reason, accessor, not the secret ID).
+- Only the OpenBao admin issues secret IDs, only for a process being deployed or rotated, and records it in the operations log (role, date, reason, accessor, not the secret ID).
 - Every issue is in the OpenBao audit log.
 - A secret ID works only from the Compose network subnet and expires after **90 days**. The tokens a process gets at login work only from the same subnet. The network gateway (`SDLC_NETWORK_GATEWAY`) is left out: every process on the server reaches the containers from the gateway address, so a secret ID or token used on the server outside a container is refused (`design/QUESTIONS.md` #27, #37).
 - Trust model: this stops users of the server without root rights, and credentials that leak out of a container. Root on the server is trusted: root can `docker exec` into any container. Access to root and to Docker on the server is controlled by server administration.
@@ -267,7 +268,7 @@ Each platform process (api, worker, runner, cost-controller) uses the OpenBao cl
 | `SDLC_OPENBAO_SECRET_ID_FILE` | File with the secret ID: mode 600, on a tmpfs mount, readable only by the process |
 
 - The role ID and the secret ID are **files**, never environment variables: anyone allowed to run `docker inspect` can read environment variables.
-- **Rotating a secret ID** (every 90 days, section 8.1): run the service's credentials command (sections 5d–5g). It issues a new secret ID, replaces the file, then destroys the old secret ID. No restart is needed: the client reads the file again at its next login (at the latest when its token reaches the 4-hour maximum).
+- **Rotating a secret ID** (every 90 days, section 8.1): run the service's credentials command (sections 5d–5m, one per credential; the full list: `platform/deploy/README.md`, Fresh deployment step 5). It issues a new secret ID, replaces the file, then destroys the old secret ID. The client reads the file again at its next login (at the latest when its token reaches the 4-hour maximum); restart the service to make it log in at once.
 - The client renews its token by itself and logs in again when needed. It never writes a token, secret ID or secret value to its logs.
 
 ## 5d. LiteLLM keys (Compose profile `models`)
@@ -558,7 +559,6 @@ Nothing in `evidence`.
 
 **When.** In the retention loop (every `SDLC_WORKER_RETENTION_INTERVAL_MINUTES`, 60 by default), before the retention steps, once per tenant and UTC day. Each tenant: first every anchor is read and compared with the row at its `seq`, then today's anchor is written. Days the worker was down get no anchor: an anchor is never back-dated.
 
-> Known gap (QUESTIONS #239, task A12): the SeaweedFS filer API on port 8888 of the Compose network has no authentication and can delete files whatever their lock, anchors included.
 
 ### First set-up
 
@@ -711,7 +711,7 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 
 Every 3 months, and when someone changes project:
 - check the list of key holders and people with Docker access on the server;
-- **rotate every AppRole secret ID** with the credentials commands: `api-credentials`, `worker-credentials` (AppRoles `worker` and `cost-controller`), `runner-credentials` and `litellm-credentials` (sections 5d–5g). Each command:
+- **rotate every AppRole secret ID** with the credentials commands: `api-credentials`, `worker-credentials` (AppRoles `worker` and `cost-controller`), `runner-credentials`, `litellm-credentials` and the evidence, purge, anchor and Langfuse credentials (sections 5d–5m; the full list: `platform/deploy/README.md`, Fresh deployment step 5). Each command:
   1. issues a new secret ID;
   2. writes it with the role ID into the service's volume;
   3. then destroys **every other** secret ID of the AppRole. It keeps the one named by the accessor of the new secret ID, never the newest by time (`design/QUESTIONS.md` #140).
@@ -724,7 +724,7 @@ Secret IDs expire after 90 days in any case, so a missed rotation shows up as a 
 - **One process per AppRole.** After a rotation an AppRole has exactly one secret ID. Do not run a second instance of a service with its own secret ID: the next rotation would cut it off. Several instances of a service need a new design.
 - A lost or leaked secret ID of a process that is not deployed through these commands: destroy it by its accessor, `bao write auth/approle/role/<role>/secret-id-accessor/destroy secret_id_accessor=<accessor>`.
 
-### 8.3. After a leaked secret ID or token
+### 8.2. After a leaked secret ID or token
 
 Destroying a secret ID does **not** end the tokens already issued from it. They stay valid until their TTL (1 hour, at most 4 hours), and they work only from the Compose network.
 
@@ -743,13 +743,13 @@ Destroying a secret ID does **not** end the tokens already issued from it. They 
    The service logs in again with its new secret ID at its next request. Revoke the root token afterwards (section 5).
 3. Record the leak, the rotation and the revocation in the operations log.
 
-### 8.2. Rekey when a key holder changes
+### 8.3. Rekey when a key holder changes
 
 > Not yet tested: the rekey commands need an interactive terminal. The `bao operator rekey` command may call token-protected endpoints, as `bao operator generate-root` does in OpenBao 2.5+. The A10 drill checks the commands below and adds a `bootstrap.sh rekey` command if needed.
 
 When a key holder leaves or changes role, create a **new set of shares** and destroy the old envelopes:
 
-1. The new holder is named by leadership. Record the change in the operations log.
+1. Leadership names the new holder. Record the change in the operations log.
 2. Two current key holders start the rekey inside the container, on the key-holder listener:
    ```bash
    docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao \
@@ -839,4 +839,5 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.31 | 2026-10-09 | Claude Code (docs review fixes) | Title and scope: the processes' credentials are in this runbook; the filer gap note removed (closed by A12, section 5l); sections 8.2 and 8.3 in order; rotation covers sections 5d–5m; "OpenBao admin" for the operator with the admin token |
 | 0.30 | 2026-10-09 | Claude Code (docs review PR C) | Section 3.1: the same first commands as the fresh deployment, and the development notes moved from `platform/deploy/README.md` (configure again, audit log path, subnet and gateway of old stacks, `OPENBAO_HOST_PORT`); section 5b: the GitHub App permissions link to `platform/deploy/README.md` |

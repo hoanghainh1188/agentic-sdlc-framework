@@ -153,7 +153,7 @@ Apply the same rules manually:
 
 ## 13.10. Using the platform
 
-> Written by Claude Code together with the platform code. This version covers gate G4, the start and end of a run (task C06) and gate G5 (task C07). Stopping a run and reading the run record come with the next tasks.
+> Written by Claude Code together with the platform code. This version covers gate G4, the start and end of a run (task C06) and gate G5 (task C07). Stopping a run (the kill switch) and loop detection: Chapter 18 §18.8d; the run's events: §18.8c.
 
 ### 13.10.1. Which agent runs
 
@@ -231,7 +231,7 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 | Decision | What happens |
 |---|---|
 | `resume` | The intent goes back to **G4**, and a new run starts after G4 **from the latest commit of the default branch**, or, once a run of the intent was pushed (Chapter 14 §14.10.1), from the commit the platform pushed. The stopped run's diff stays as evidence. To give the next runs more budget, decide through the API with a budget increase (Chapter 18 §18.8b); a comment never raises a budget |
-| `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on. The earlier G3 approval no longer counts; the approver may approve the same plan again, or Person A submits a changed plan |
+| `modify` or `roll-back` | The intent goes back to **G3**, which is HITL from now on. The earlier G3 approval no longer counts; the approver may approve the same plan again, or Person A submits a changed plan |
 | `terminate` | The intent is closed (`cancelled`). The run's diff stays as evidence |
 
 ### 13.10.6. Recertification warning
@@ -284,4 +284,5 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 | 0.8 | 2026-10-03 | Claude (task C08, PR 1) | §13.10.5: after a push, `resume` starts the new run from the pushed commit (QUESTIONS #134, ADR-M38 §2.6) |
 | 0.9 | 2026-10-03 | Claude (task B09, PR 1) | §13.10.1: the run's tools come from the approved plan (ADR-M40 §2.5) |
 | 0.10 | 2026-10-04 | Claude (task B09, PR 2) | §13.10.4: the agent gets the plan's task text; a failed run: `modify` or `roll-back` → G3 (QUESTIONS #169, #211) |
+| 0.12 | 2026-10-09 | Claude (docs review fixes) | `roll-back` is the decision's spelling (comments accept `roll_back` too; the CLI only `roll-back`); the header note points to Chapter 18 for the kill switch |
 | 0.11 | 2026-10-09 | Claude (docs review PR C2) | §13.10.2 check 6b: the one list of agent instruction files (only the exact pinned path is left out); §13.10.4: "The budgets", the one description with the default amounts (moved from ROLLOUT-GUIDE) |
