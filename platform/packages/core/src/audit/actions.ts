@@ -452,6 +452,14 @@ export const AUDIT_ACTIONS = {
     entityType: 'evidence_item',
     fields: { intent_id: 'uuid', kind: 'code', reason: 'code' },
   },
+  /**
+   * A person downloaded an L1 proposal (C13, ADR-M64 §2.1): the run, the patch's hash and size,
+   * checked before it was served. Never the content.
+   */
+  'evidence.proposal_read': {
+    entityType: 'evidence_item',
+    fields: { intent_id: 'uuid', run_id: 'uuid', sha256: 'sha256', size_bytes: 'count' },
+  },
   /** A stored pack file failed its re-check when it was read (E02): `file` `manifest` or `markdown`. */
   'evidence.pack_check_failed': {
     entityType: 'evidence_pack',

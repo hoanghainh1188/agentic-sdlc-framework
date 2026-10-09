@@ -1,10 +1,15 @@
 // D-08 C09 AC3 and AC5 on the sample repository's shape (see stack.ts), run with `pnpm test:pilot`:
 // - T09 (D-09 §7, High → L1): G4 is HITL; Person A approves; the real run ends with a proposal
 //   only (`succeeded_proposal_only`), stored as evidence; nothing is pushed; the intent is paused
-//   at G4 (FR-03).
+//   at G4 (FR-03). C13 (ADR-M64): Person A saves the patch, then ends the intent with a G4
+//   rejection (`rejected`).
 // - T10 (Critical → L0): G4 blocks the intent; no run, no sandbox.
 // - AC5 (FR-36): a suspended agent, then an agent key that is not registered: G4 fails and the
 //   intent waits at G4; no run starts.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { describeDb } from '../db/helpers.js';
@@ -63,6 +68,25 @@ describePilot(
       expect(await s.noticeKinds(intent)).toContain('proposal_ready');
       expect(s.repo.head(`agent/${intent.code}`)).toBeNull();
       expect(s.openedPulls()).toEqual([]);
+
+      // C13 (ADR-M64): Person A saves the patch, checked against its hash, then ends the intent
+      // with a G4 rejection that links to where the work continues.
+      const file = path.join(os.tmpdir(), `c13-${intent.code}.patch`);
+      fs.rmSync(file, { force: true });
+      await s.cliJson('a', ['evidence', 'proposal', intent.code, '--output', file]);
+      expect(fs.readFileSync(file).equals(s.bucket.objects.get(proposal!)!)).toBe(true);
+      fs.rmSync(file, { force: true });
+      await s.cliJson('a', [
+        'gate',
+        'reject',
+        'G4',
+        intent.code,
+        '--reason-code',
+        'other',
+        '--reason-ref',
+        'https://github.com/example/pilot/pull/1',
+      ]);
+      await s.until(intent, 'rejected', 'G4');
     });
 
     it('AC3 T10: Critical → G4 blocks the intent; the agent never runs', async () => {

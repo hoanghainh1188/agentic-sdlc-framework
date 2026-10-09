@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.9, 2026-10-09. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
+Version 0.10, 2026-10-09. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
 
 ---
 
@@ -143,7 +143,7 @@ Or in one step when you create the intent: add `--spec docs/specs/T01-product-li
 
 When G3 is passed and every block window is closed (section 1), the platform checks the agent, the limits and the budget, and starts the run. You see **run started** on the issue.
 
-- **High risk:** Person A approves the run first: `/approve G4`. The agent then writes only a **proposal** (a patch, stored as evidence; nothing is pushed), and the intent pauses. Person A asks the platform operator for the patch and decides how to take it forward, for example as a pull request written by a person, or as a new intent ([handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#13104-the-run)). The platform starts no new run by itself.
+- **High risk:** Person A approves the run first: `/approve G4`. The agent then writes only a **proposal** (a patch, stored as evidence; nothing is pushed), and the intent pauses. Person A saves the patch with `sdlc evidence proposal <INT> --output <file>`, takes it forward as a person (for example a pull request written by a person, or a new intent), then ends the intent with `sdlc gate reject G4 <INT> --reason-code other --reason-ref <link>` ([handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#l1-proposal)). The platform starts no new run by itself.
 - **Critical risk:** the platform **blocks** the intent; the agent never runs.
 - At 80 % of the run's budget a warning comment appears; at 100 % the run stops ([budgets: handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#budgets)).
 - To stop a run at any time: `/kill` on the issue, or `sdlc run kill INT-2026-0007` (who may, and what happens: [handbook Ch.18 §18.8d](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188d-using-the-platform-the-kill-switch)).
@@ -261,5 +261,6 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 | 0.5 | 2026-10-09 | Docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists |
 | 0.6 | 2026-10-09 | Docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate |
 | 0.7 | 2026-10-09 | Docs review E2: §1 and §7 link to the handbook sections |
+| 0.10 | 2026-10-09 | Task C13: step 5, saving an L1 proposal and ending the intent with a G4 rejection |
 | 0.9 | 2026-10-09 | Task U03: step 3, `sdlc intent create --spec` links the spec in the same command |
 | 0.8 | 2026-10-09 | Docs review E3 (readability): §2 login and token steps as a list; step 4 plan notes as a list; step 5 says how Person A takes an L1 proposal forward; step 8 says `done`; the version history moved here |

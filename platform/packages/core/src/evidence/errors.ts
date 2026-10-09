@@ -18,6 +18,10 @@ export const EVIDENCE_PACK_ERROR_CODES = [
   'evidence_too_large',
   /** The evidence store cannot be reached or refused the credential. */
   'evidence_unavailable',
+  /** C13 (ADR-M64): the intent, or the named run, has no stored L1 proposal. */
+  'proposal_not_found',
+  /** C13: the proposal's file was purged (E05); its row and hash stay. */
+  'proposal_purged',
   /** Concurrent builds kept taking the next version; try again. */
   'pack_conflict',
 ] as const;

@@ -5,8 +5,11 @@
 // `export` checks the file's SHA-256 against the one the platform recorded before it prints or
 // saves it, and never overwrites a file: the pack names the approvers, so it is saved readable by
 // its owner only (mode 600).
+// `proposal` (C13, ADR-M64 §2.1) saves an L1 run's patch: client code, checked against its SHA-256,
+// saved with mode 600 and never printed.
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { t } from '@sdlc/messages';
 
@@ -15,6 +18,9 @@ import {
   evidenceFileSchema,
   evidenceListSchema,
   evidenceShowSchema,
+  PROPOSAL_BASE64_MAX,
+  proposalSchema,
+  runListSchema,
   type EvidencePackView,
 } from '../api/schemas.js';
 import { parseCommand, segment, withApi } from '../api/session.js';
@@ -23,6 +29,7 @@ import { clean, say, sayError, show, toJson } from '../output.js';
 import { intentRef } from './intent.js';
 
 const VERSION = /^[1-9][0-9]{0,6}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function runEvidence(args: readonly string[], ctx: CliContext): Promise<number> {
   const [command, ...rest] = args;
@@ -30,6 +37,7 @@ export async function runEvidence(args: readonly string[], ctx: CliContext): Pro
   if (command === 'list') return list(rest, ctx);
   if (command === 'show') return showPack(rest, ctx);
   if (command === 'export') return exportPack(rest, ctx);
+  if (command === 'proposal') return saveProposal(rest, ctx);
   return usage(ctx);
 }
 
@@ -181,6 +189,102 @@ async function exportPack(args: readonly string[], ctx: CliContext): Promise<num
     }
     return EXIT.ok;
   });
+}
+
+async function saveProposal(args: readonly string[], ctx: CliContext): Promise<number> {
+  const parsed = parseCommand(
+    args,
+    { run: { type: 'string' }, output: { type: 'string' }, force: { type: 'boolean' } },
+    1,
+  );
+  const ref = parsed ? intentRef(parsed.positionals[0] ?? '') : undefined;
+  const run = parsed?.values.run;
+  const output = parsed?.values.output;
+  if (
+    !parsed ||
+    ref === undefined ||
+    (run !== undefined && (typeof run !== 'string' || !UUID.test(run))) ||
+    typeof output !== 'string' ||
+    output.length === 0
+  ) {
+    return usage(ctx);
+  }
+  const json = parsed.values.json === true;
+  return withApi(ctx, json, async (client) => {
+    let runId = typeof run === 'string' ? run.toLowerCase() : undefined;
+    if (runId === undefined) {
+      const runs = await client.get(`/v1/intents/${segment(ref)}/runs`, runListSchema);
+      runId = runs.items.filter((r) => r.status === 'succeeded_proposal_only').at(-1)?.id;
+      if (runId === undefined) {
+        sayError(ctx, 'cli.evidence.no_proposal', { intent: runs.intent });
+        return EXIT.failed;
+      }
+    }
+    const { proposal } = await client.get(
+      `/v1/intents/${segment(ref)}/runs/${segment(runId)}/proposal`,
+      proposalSchema,
+      {},
+      // The base64 patch and its few fields: the one answer larger than the client's default cap.
+      PROPOSAL_BASE64_MAX + 64 * 1024,
+    );
+    const bytes = Buffer.from(proposal.content_base64, 'base64');
+    if (
+      bytes.length !== proposal.size_bytes ||
+      createHash('sha256').update(bytes).digest('hex') !== proposal.sha256
+    ) {
+      sayError(ctx, 'cli.evidence.hash_mismatch', { name: 'proposal' });
+      return EXIT.failed;
+    }
+    try {
+      writeNewFile(output, bytes, parsed.values.force === true);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? 'error';
+      sayError(ctx, 'cli.evidence.write_failed', { path: clean(output), code: clean(code) });
+      return EXIT.failed;
+    }
+    const saved = {
+      intent: proposal.intent,
+      run_id: proposal.run_id,
+      sha256: proposal.sha256,
+      size_bytes: proposal.size_bytes,
+      path: output,
+    };
+    if (json) ctx.stdout(toJson(saved));
+    else {
+      say(ctx, 'cli.evidence.proposal_saved', {
+        intent: proposal.intent,
+        run: proposal.run_id,
+        path: clean(output),
+        sha256: proposal.sha256,
+        size: proposal.size_bytes,
+      });
+    }
+    return EXIT.ok;
+  });
+}
+
+/**
+ * Client code: a new file readable by its owner only (mode 600). Without `force` an existing file
+ * is refused (`wx`). With it, the bytes go to a new temporary file next to the target, which then
+ * replaces it in one rename: a failed write leaves the old file, and a link is replaced, never
+ * followed.
+ */
+function writeNewFile(output: string, bytes: Buffer, force: boolean): void {
+  if (!force) {
+    fs.writeFileSync(output, bytes, { flag: 'wx', mode: 0o600 });
+    return;
+  }
+  const temp = path.join(
+    path.dirname(output),
+    `.${path.basename(output)}.${String(process.pid)}.${String(Date.now())}.tmp`,
+  );
+  try {
+    fs.writeFileSync(temp, bytes, { flag: 'wx', mode: 0o600 });
+    fs.renameSync(temp, output);
+  } catch (error) {
+    fs.rmSync(temp, { force: true });
+    throw error;
+  }
 }
 
 function usage(ctx: CliContext): number {

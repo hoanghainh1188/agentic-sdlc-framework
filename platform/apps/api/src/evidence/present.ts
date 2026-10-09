@@ -30,3 +30,25 @@ export function presentPack(intentCode: string, pack: EvidencePack): Record<stri
     purged_at: pack.purged_at?.toISOString() ?? null,
   };
 }
+
+/**
+ * C13 (ADR-M64 §2.1): an L1 run's patch, checked by core before it is served. Base64, because a
+ * patch is bytes (a file in Shift_JIS stays as it is); the CLI checks the hash again.
+ */
+export function presentProposal(
+  intentCode: string,
+  runId: string,
+  sha256: string,
+  content: Buffer,
+): Record<string, unknown> {
+  return {
+    proposal: {
+      intent: intentCode,
+      run_id: runId,
+      media_type: 'text/x-diff',
+      sha256,
+      size_bytes: content.length,
+      content_base64: content.toString('base64'),
+    },
+  };
+}

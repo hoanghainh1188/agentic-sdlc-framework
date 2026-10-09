@@ -109,6 +109,8 @@ export interface StackOptions {
   readonly clock?: 'fixed' | 'real';
   /** The project configuration the tenant admin uploads. Default: B10's. */
   readonly projectConfig?: string;
+  /** C13: the api's evidence store (proposals, packs); default none (`evidence_unavailable`). */
+  readonly apiEvidence?: ApiDeps['evidence'];
   /** Extra worker activity settings (C09: G4–G7). */
   readonly activities?: (ctx: ActivityContext) => Partial<IntentActivityDeps>;
   /**
@@ -280,6 +282,7 @@ export class Stack {
       intentSignals: this.signals,
       gitHost,
       log: { log: () => undefined },
+      ...(options.apiEvidence ? { evidence: options.apiEvidence } : {}),
     });
 
     await this.#onboard(options, options.live?.repoFullName ?? `${OWNER}/${REPO}`);

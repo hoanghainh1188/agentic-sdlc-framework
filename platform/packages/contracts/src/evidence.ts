@@ -6,6 +6,13 @@
 // from the bytes it sent; E02 checks it again when it reads the file for the Evidence Pack.
 
 /** Kinds of evidence file (design/D-05 section 6.6 `evidence_items.kind`). */
+/**
+ * C13 (ADR-M64 §2.1): the largest L1 proposal a person may download through the API, whatever
+ * the per-item cap of the evidence store. The whole patch travels in one JSON answer (base64),
+ * so a lower cap keeps the api's and the CLI's memory bounded.
+ */
+export const PROPOSAL_MAX_BYTES = 32 * 1024 * 1024;
+
 export const EVIDENCE_KINDS = [
   'spec',
   'plan',
