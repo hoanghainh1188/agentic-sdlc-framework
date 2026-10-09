@@ -3,16 +3,14 @@
 // stays in the repository. The spec is the file on the default branch: `--commit` is optional and
 // must hold the same content as the head (409 `spec_not_on_default_branch`). Who may link:
 // project config `access.spec_link_roles` (default Person A and PM / BrSE).
-import { SPEC_SOURCE_TOOLS } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 
-import { linkedSpecSchema, specListSchema } from '../api/schemas.js';
+import { specListSchema } from '../api/schemas.js';
 import { parseCommand, segment, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
 import { say, toJson } from '../output.js';
 import { intentRef } from './intent.js';
-
-const COMMIT = /^[0-9a-f]{40}$/;
+import { linkSpec, sayLinked, specLinkBody, structureParams } from './spec-link.js';
 
 export async function runSpec(args: readonly string[], ctx: CliContext): Promise<number> {
   const [command, ...rest] = args;
@@ -29,56 +27,17 @@ async function link(args: readonly string[], ctx: CliContext): Promise<number> {
   );
   const ref = parsed ? intentRef(parsed.positionals[0] ?? '') : undefined;
   const values = parsed?.values;
-  const path = values?.path;
-  const commit = values?.commit;
-  const tool = values?.tool;
-  if (
-    !values ||
-    ref === undefined ||
-    typeof path !== 'string' ||
-    path.length === 0 ||
-    path.length > 1024 ||
-    (typeof commit === 'string' && !COMMIT.test(commit)) ||
-    (typeof tool === 'string' && !(SPEC_SOURCE_TOOLS as readonly string[]).includes(tool))
-  ) {
-    return usage(ctx);
-  }
+  const body = values
+    ? specLinkBody({ path: values.path, commit: values.commit, tool: values.tool })
+    : undefined;
+  if (!values || ref === undefined || body === undefined) return usage(ctx);
   const json = values.json === true;
   return withApi(ctx, json, async (client) => {
-    const spec = await client.post(`/v1/intents/${segment(ref)}/specs`, linkedSpecSchema, {
-      path,
-      ...(typeof commit === 'string' ? { commit_sha: commit } : {}),
-      ...(typeof tool === 'string' ? { source_tool: tool } : {}),
-    });
+    const spec = await linkSpec(client, ref, body);
     if (json) ctx.stdout(toJson(spec));
-    else {
-      say(ctx, 'cli.spec.linked', {
-        intent: spec.intent,
-        version: spec.version,
-        path: spec.path,
-        commit: spec.commit_sha,
-        sha256: spec.content_sha256,
-        ...structureParams(spec),
-      });
-      if (!((spec.acceptance_criteria ?? 0) > 0)) {
-        say(ctx, 'cli.spec.no_criteria', { intent: spec.intent });
-      }
-    }
+    else sayLinked(ctx, spec);
     return EXIT.ok;
   });
-}
-
-/** S01 (ADR-M61): the tool, the structure rule and the count; `-` when not known. */
-function structureParams(spec: {
-  readonly source_tool: string | null;
-  readonly structure: string | null;
-  readonly acceptance_criteria: number | null;
-}): { tool: string; structure: string; criteria: string } {
-  return {
-    tool: spec.source_tool ?? '-',
-    structure: spec.structure ?? '-',
-    criteria: spec.acceptance_criteria === null ? '-' : String(spec.acceptance_criteria),
-  };
 }
 
 async function list(args: readonly string[], ctx: CliContext): Promise<number> {

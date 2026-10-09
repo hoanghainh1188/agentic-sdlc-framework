@@ -210,7 +210,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 
 | Command | Does |
 |---|---|
-| `sdlc intent create --project <slug> --title <text> --risk <tier> --data-class <class> [--description <text> \| --description-file <file>] [--budget <USD>] [--issue <number>]` | Creates an intent; you become its intent owner (Person A) |
+| `sdlc intent create --project <slug> --title <text> --risk <tier> --data-class <class> [--description <text> \| --description-file <file>] [--budget <USD>] [--issue <number>] [--spec <path/to/spec.md> [--spec-commit <SHA>] [--spec-tool spec-kit\|bmad\|manual]]` | Creates an intent; you become its intent owner (Person A). With `--spec`, also links its spec, as `sdlc spec link` does (task U03). When the link is refused, the intent stays: the command names it, exits 1 and says how to link again |
 | `sdlc intent list [--project <slug>] [--status <status>] [--limit <n>] [--cursor <c>]` | Lists the intents you can read, newest first |
 | `sdlc intent show <INT-…>` | Shows an intent with its spec, plan and gate decisions, and **what holds it** when the platform holds it ("Held: …", the cause, until when) |
 | `sdlc gate approve <gate> <INT-…>` | Approves the gate the intent waits at |
@@ -467,6 +467,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.21 | 2026-10-08 | Claude (task S02) | §19.8c: `sdlc plan draft` from a Spec Kit `tasks.md` or a BMAD story file (ADR-M62) |
 | 0.22 | 2026-10-08 | Claude (docs fix PR A) | §19.8b: a HOTL G2 also needs an acceptance criterion; §19.8d: `sdlc admin identity list --user <id or email>` |
 | 0.23 | 2026-10-09 | Claude (docs review PR C) | One source per topic: §19.8c holds the G2 condition (acceptance criteria) and the CLI exit codes (exit code 2 also for an HTTP 400); §19.8d the conflicting roles and their defaults; §19.8b links to them and to Ch.15 for producers; the overdue escalation at every gate that waits for a person (route `intent` or `technical`); the gate times report is `sdlc metrics gates` |
+| 0.27 | 2026-10-09 | Claude (task U03) | §19.8c: `sdlc intent create --spec` creates the intent and links its spec in one command |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |
