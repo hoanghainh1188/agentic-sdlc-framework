@@ -11,6 +11,8 @@ stateDiagram-v2
     G4 --> Blocked: Critical / bad config
     Running --> G5: run finished / cost sync
     Running --> Stopped: kill switch / loop / timeout
+    Running --> ProposalReady: L1 run finished (proposal stored, paused at G4)
+    ProposalReady --> Rejected: Person A rejects G4 after taking the proposal forward
     G5 --> G3: changes outside plan
     G5 --> Escalated: instruction files / cost cap / iteration or time cap / stalled
     Escalated --> Running: decision = resume (bound, not expired)
