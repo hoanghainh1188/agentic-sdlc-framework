@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.5, 2026-10-09 (docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists). Version 0.4, 2026-10-09 (docs review PR C: §1 "Who decides each gate" is the one table of the defaults; the second approver at Critical risk at G7; the exit codes, the dashboard and the producers link to their sources). Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block window, the gate short names). Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
+Version 0.6, 2026-10-09 (docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate); 0.5, 2026-10-09 (docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists). Version 0.4, 2026-10-09 (docs review PR C: §1 "Who decides each gate" is the one table of the defaults; the second approver at Critical risk at G7; the exit codes, the dashboard and the producers link to their sources). Version 0.3, 2026-10-09 (words as in the glossary: intent, API token, block window, the gate short names). Version 0.2, 2026-10-08 (§2: install the sdlc command; §4: exit codes). Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20).
 
 ---
 
@@ -64,13 +64,13 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
 2. **API token and login.** You get a first API token (`sdlc_pat_…`) from the tenant admin. Keep it in your password manager, never in chat or a ticket.
 
    ```bash
-   sdlc login --api-url https://<platform address>
+   sdlc login --api-url http://127.0.0.1:8090
    sdlc whoami
    sdlc token create --name laptop
    ```
 
    Today the API listens on the platform server only (`http://127.0.0.1:8090`): run `sdlc` on that server. Access from other machines is not supported yet ([where to run it](deploy/README.md#where-to-run-it)); comment commands and reviews on GitHub work from anywhere. `sdlc login` asks for the API token at a hidden prompt. After `token create`, log in again with your own API token and revoke the first one (`sdlc token list`, `sdlc token revoke --id <ID>`). Details: handbook Ch.19 §19.8c.
-3. **The project AI record** (the client's recorded consent to AI use) must allow the data class of your work (how sensitive its information is) (Person A or PM / BrSE writes it once per project: `sdlc ai-record show --project <slug>`). Without it, intents cannot enter G1.
+3. **The project AI record** (the client's recorded consent to AI use) must allow the data class of your work (how sensitive its information is). Person A or the PM / BrSE writes it once per project with `sdlc ai-record set …` ([handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#ai-record)); check it with `sdlc ai-record show --project <slug>`. Without it, intents cannot enter G1.
 
 ## 3. One intent, step by step
 
@@ -107,12 +107,12 @@ sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.
 
 - **The spec needs at least one acceptance criterion**, at every risk tier; `sdlc spec link` shows the count. How the platform finds them: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria).
 - **Low risk:** the platform passes G2 by itself (HOTL) and says until when it can be blocked (4 working hours by default).
-- **Medium and High:** Person A approves G2 (Person B at High+).
+- **Medium:** Person A approves G2. **High and Critical:** Person B approves G2.
 - If the spec on `main` changes later, the intent goes back to G2 by itself.
 
 ### Step 4. Write and submit the plan → G3 (Person A writes, Person B approves)
 
-1. Write `.sdlc/plans/INT-2026-0007.yaml` (template T13):
+1. Write `.sdlc/plans/INT-2026-0007.yaml` (the format: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#plan-file); template T13 is not yet aligned with it, so do not copy T13 as is):
 
    ```yaml
    plan:
@@ -176,12 +176,12 @@ The platform seals the pack, records the metrics and closes the intent: **releas
 | Command | Use |
 |---|---|
 | `/approve G<n>` | Approve the gate the intent waits at (not G7) |
-| `/reject G<n> [reason_code] <reason>` | Reject. Ends the intent at G1–G3 and G8; back to G3 at G7 |
-| `/request-changes G<n> [reason_code] <reason>` | Ask for changes; the intent stays at the gate (at G7: a new run) |
+| `/reject G<n> [reason_code] <reason>` | Reject. Ends the intent at G1–G6 and G8; at G7 the intent goes back to G3 |
+| `/request-changes G<n> [reason_code] <reason>` | Ask for changes. At G1–G4 and G8 the intent stays at the gate; at G5, G6 (within the block window) and G7 a new run starts after G4 |
 | `/ack ESC-…` / `/decide ESC-… <resume\|modify\|roll-back\|terminate\|escalate>` | Escalations (section 5; [handbook Ch.18 §18.8b](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188b-using-the-platform-escalations-ack-and-decide)) |
 | `/kill` | Stop the intent's agent run |
 
-Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `other`… The platform keeps the code and a link to your comment, never your words: write reasons that can stay on GitHub, with no personal or client data.
+Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_scope`, `policy_denied`, `budget_exceeded`, `ci_failed`, `other` (the full list: `gate_reason_code` in [design D-05 §5](../design/D-05-data-model.md#5-enumerations)). The platform keeps the code and a link to your comment, never your words: write reasons that can stay on GitHub, with no personal or client data.
 
 ### CLI commands you will use most
 
@@ -241,4 +241,4 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 | G7, the Evidence Pack, G8, retention and holds | Ch.15 §15.10 |
 | Escalations, logs, the kill switch, loop detection | Ch.18 §18.8b–§18.8d |
 | Registering and approving agents | Ch.20 §20.5b |
-| The plan template | `handbook/03-templates/T13-task-plan.md` |
+| The plan file format | [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#plan-file) (template T13 is not yet aligned with it) |

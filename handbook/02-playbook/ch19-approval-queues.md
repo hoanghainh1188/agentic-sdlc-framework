@@ -139,18 +139,18 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
   | Submitted, waits at G1 | The intent was created, and the project AI record allows its data class |
   | Cannot enter G1 yet (reason code) | The project has no AI record (`ai_record_missing`), or the record does not allow the intent's data class (`data_class_not_allowed`). See "The project AI record" below |
   | G*n* approved, waits at the next gate | The gate had the approvals it needs, bound to the current spec or plan |
-  | Rejected at G*n* (reason code) | Someone rejected the gate; the intent is closed |
-  | Changes requested at G*n* (reason code) | Someone asked for changes; the intent stays at the gate |
+  | Rejected at G*n* (reason code) | Someone rejected the gate; the intent is closed (at G7: back to G3, Chapter 15 §15.10.1) |
+  | Changes requested at G*n* (reason code) | Someone asked for changes; at G1–G4 and G8 the intent stays at the gate; at G5, G6 and G7 a new run starts after G4 (Chapters 13–15) |
   | The platform passed G*n* (HOTL), waits at the next gate | The gate's conditions hold at Low risk; the comment shows until when you can block it |
   | Back at G*n* | Someone requested changes at a passed gate during its block window; the intent went back |
 
 - The status comment comes a little later than your command: the platform moves the intent, then posts on the next poll (about 30 seconds).
-- **A request for changes** keeps the intent at the gate. Approvals written before it no longer count. Update the gate's input (a new spec version for G2, a new plan for G3), then approve again; an approval of an older spec or plan no longer counts either.
+- **A request for changes** at G1–G4 or G8 keeps the intent at the gate (at G5–G7 it starts a new run after G4, Chapters 13–15). Approvals written before it no longer count. Update the gate's input (a new spec version for G2, a new plan for G3), then approve again; an approval of an older spec or plan no longer counts either.
 - **No gate passes by silence.** At a HITL gate the intent waits until a person with the gate's role approves. HOTL gates pass only when their conditions hold, and you can still block them (below). While an escalation freezes the intent, it does not move on, even with the approvals; it continues once the escalation is decided (Chapter 18 §18.8b).
 - A command that the platform cannot read or refuses gets a reply that says why and shows the syntax. Nothing is recorded in that case: fix the command and write a new comment.
 - If the platform itself fails while handling your command, it tries again on the next polls. After a few failed attempts it gives up and replies that it could not record the command. Nothing is recorded; write the command again later, and tell the platform operator.
 
-<a id="block-window"></a>**HOTL gates (Low risk: G2 and G3 by default).** The project setting `oversight.matrix` says which gates are HOTL at which risk tier.
+<a id="block-window"></a>**HOTL gates (Low risk: G2 and G3 by default).** The project setting `oversight.matrix` says which gates are HOTL at which risk tier. This section describes G2 and G3; G5 (Low to High) and G6 (Medium, and AUDIT at Low) also pass by themselves with a block window, and a block there starts a new run after G4 (Chapter 13 §13.10.5, Chapter 14 §14.10.2).
 
 - The platform **passes** the gate by itself when its conditions hold:
   - G2: a spec with at least one acceptance criterion is linked ([§19.8c](#g2-acceptance-criteria));
@@ -467,4 +467,5 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.21 | 2026-10-08 | Claude (task S02) | §19.8c: `sdlc plan draft` from a Spec Kit `tasks.md` or a BMAD story file (ADR-M62) |
 | 0.22 | 2026-10-08 | Claude (docs fix PR A) | §19.8b: a HOTL G2 also needs an acceptance criterion; §19.8d: `sdlc admin identity list --user <id or email>` |
 | 0.23 | 2026-10-09 | Claude (docs review PR C) | One source per topic: §19.8c holds the G2 condition (acceptance criteria) and the CLI exit codes (exit code 2 also for an HTTP 400); §19.8d the conflicting roles and their defaults; §19.8b links to them and to Ch.15 for producers; the overdue escalation at every gate that waits for a person (route `intent` or `technical`); the gate times report is `sdlc metrics gates` |
+| 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

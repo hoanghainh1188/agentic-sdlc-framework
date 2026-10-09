@@ -11,7 +11,7 @@ The handbook says **what must happen and why**. The platform **makes sure it hap
 
 Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
-**Status (2026-10-09): built and tested, not yet used on a real project.** Every MVP task is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on the fictional sample repository (milestone M-E) has not started; the first real internal project comes after it (M-F). Before real client data, the internal server still needs TLS and named key holders for OpenBao, a tested backup and restore, and measured resources (task A10).
+**Status (2026-10-09): built and tested, not yet used on a real project.** Every MVP task except A10 is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on the fictional sample repository (milestone M-E) has not started; the first real internal project comes after it (M-F). Before real client data, the internal server still needs TLS and named key holders for OpenBao, a tested backup and restore, and measured resources (task A10).
 
 **Supported today:** GitHub, projects built with Node.js and TypeScript (one sandbox image, `node24`), the OpenHands agent, and one server with Docker Compose. People reach the API and the dashboard on the server itself; access from other machines comes later ([where to run it](platform/deploy/README.md#where-to-run-it)).
 
@@ -102,10 +102,11 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 ├── handbook/        # The handbook: introduction, policy (Ch.1–9), playbook (Ch.10–20), templates (T1–T18)
 ├── platform/
 │   ├── apps/        # api, worker, runner, cli, dashboard
-│   ├── packages/    # core, contracts, config, messages, secrets, telemetry, api-schemas, adapters/*
+│   ├── packages/    # core, contracts, config, messages, secrets, telemetry, api-schemas, workflow-client, adapters/*
 │   ├── deploy/      # Docker Compose, OpenBao and SeaweedFS set-up
 │   ├── tests/       # unit, integration and end-to-end tests
-│   ├── USER-GUIDE.md, ROLLOUT-GUIDE.md, GETTING-STARTED.md
+│   ├── README.md    # index of the platform guides
+│   ├── PLATFORM-IN-5-MINUTES.md, TUTORIAL-FIRST-FEATURE.md, USER-GUIDE.md, ROLLOUT-GUIDE.md, GETTING-STARTED.md
 ├── design/          # Design documents (D-xx), decisions (ADR-Mxx), open questions
 ├── diagrams/        # Mermaid sources and SVG
 └── scripts/         # Backlog and issue tools

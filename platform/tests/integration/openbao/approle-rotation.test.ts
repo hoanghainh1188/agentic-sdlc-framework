@@ -247,18 +247,18 @@ describe.skipIf(!enabled)(
       });
     }
 
-    // Runbook T11 §8.3: destroying a secret ID leaves its tokens valid until their TTL; the
+    // Runbook T11 §8.2: destroying a secret ID leaves its tokens valid until their TTL; the
     // runbook's command revokes the tokens of one AppRole only. The loop is taken from the
     // runbook text, so the documented command is the tested one.
-    it('a token issued before a rotation stays valid; the T11 §8.3 command revokes it', () => {
+    it('a token issued before a rotation stays valid; the T11 §8.2 command revokes it', () => {
       const runbook = fs.readFileSync(
         path.join(deployDir, '../../handbook/03-templates/T11-openbao-runbook.md'),
         'utf8',
       );
-      const section = runbook.slice(runbook.indexOf('### 8.3.'));
+      const section = runbook.slice(runbook.indexOf('### 8.2.'));
       const start = section.indexOf('role=api; n=0');
       const stop = section.indexOf('echo "revoked', start);
-      expect(start, 'T11 §8.3 revoke loop').toBeGreaterThan(0);
+      expect(start, 'T11 §8.2 revoke loop').toBeGreaterThan(0);
       // Inside `sh -c '…'` in the runbook: the inner shell gets the text exactly as written.
       const loop = section.slice(start, stop);
       const revoke = `IFS= read -r BAO_TOKEN; export BAO_TOKEN\n${loop}echo "revoked $n"`;
@@ -308,7 +308,7 @@ describe.skipIf(!enabled)(
           ],
           `${rootToken}\n`,
         ),
-        'T11 §8.3 revoke',
+        'T11 §8.2 revoke',
       );
       expect(r.stdout).toMatch(/^revoked [1-9]\d*$/m);
       expect(valid(apiToken), 'api token after the revoke').toBe(false);

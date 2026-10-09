@@ -204,7 +204,7 @@ Acknowledge it, then decide:
 | Decision | What happens |
 |---|---|
 | `resume` | The intent goes back to **G7**, and the platform reads the pull request again. Reopen it or restore the branch first. After an early merge, `resume` accepts the merge: a later approval of the merged commit then counts |
-| `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on. Revert a merged change on the default branch yourself |
+| `modify` or `roll-back` | The intent goes back to **G3**, which is HITL from now on. Revert a merged change on the default branch yourself |
 | `terminate` | The intent is closed (`cancelled`). Close the pull request if it is open |
 
 **Rejecting.** `/reject G7 <reason>` takes the intent back to **G3**, HITL from now on; the G3 approvals in force no longer count. The pull request stays open, and the next run continues from its last commit.
@@ -232,7 +232,7 @@ The new run does not start, and the intent is **paused** at G4 with a `technical
 | Decision | What happens |
 |---|---|
 | `resume` | If the pull request is open and still shows the commit the platform pushed, the intent goes back to **G7**: review that commit again (approve, or request changes again). If the pull request shows another commit or is closed, the intent goes to **G4** for a new run |
-| `modify` or `roll_back` | The intent goes back to **G3**, which is HITL from now on |
+| `modify` or `roll-back` | The intent goes back to **G3**, which is HITL from now on |
 | `terminate` | The intent is closed (`cancelled`) |
 
 **Deadline.** If G7 waits for a person longer than `oversight.hitl_gate_deadline`, an escalation is raised (Chapter 18), until the merge.
@@ -351,4 +351,5 @@ After a person merged the approved pull request (§15.10.1), the intent waits at
 | 0.5 | 2026-10-04 | Claude (task E02) | §15.10.2: the Evidence Pack (contents, versions, who, the disclosure note, failed hash checks, export); ADR-M48 |
 | 0.6 | 2026-10-04 | Claude (task E03) | §15.10.3: gate G8 (the release pack, who decides, approvals bound to the release SHA-256, the client's own disclosure format, no AI record, a failed evidence check, what is recorded); ADR-M49 |
 | 0.7 | 2026-10-04 | Claude (task E05, PR 1) | §15.10.2: retention of the pack files and evidence holds (ADR-M51) |
+| 0.9 | 2026-10-09 | Claude (docs review fixes) | `roll-back` is the decision's spelling (the CLI refuses `roll_back`) |
 | 0.8 | 2026-10-09 | Claude (docs review PR C) | §15.10.1: "Producers", the one list of producers at G7 and G8 (commit authors at G7 only, as D-03 §6 and the code); other documents link here |
