@@ -273,9 +273,22 @@ describe.skipIf(!enabled)('backup and restore drill (live)', { timeout: TEST_TIM
     ).toBe(0);
 
     ok(compose('up', '-d', '--wait', 'seaweedfs'), 'seaweedfs');
-    const object = await s3().send(
-      new GetObjectCommand({ Bucket: 'backup-probe', Key: 'probe.txt' }),
-    );
-    expect((await object.Body!.transformToString()) === s3Value).toBe(true);
+    // "Healthy" means the S3 API answers; right after a start on a slow machine the restored
+    // volume may not be registered yet and a read answers InternalError (seen in CI). Retry a
+    // bounded number of times; any other error, or no success within a minute, fails.
+    const readProbe = async (): Promise<string> => {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          const object = await s3().send(
+            new GetObjectCommand({ Bucket: 'backup-probe', Key: 'probe.txt' }),
+          );
+          return await object.Body!.transformToString();
+        } catch (e) {
+          if (!(e instanceof Error) || e.name !== 'InternalError' || attempt >= 30) throw e;
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
+    };
+    expect((await readProbe()) === s3Value).toBe(true);
   });
 });
