@@ -476,14 +476,14 @@ services:
       CLICKHOUSE_DB: default
       CLICKHOUSE_USER: langfuse
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?set CLICKHOUSE_PASSWORD in .env}
-      # E08 (ADR-M53 §2.3): the user `langfuse` (already the owner of every Langfuse table) may
-      # create users, so `openbao:bootstrap worker-langfuse-credentials` can make `sdlc_purge`
-      # (only ALTER DELETE on events_full and events_core, for APPLY DELETED MASK).
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
+      # No access management for `langfuse` (A10, ADR-M63 §6): the loopback-only user
+      # `sdlc_admin` (clickhouse/sdlc-admin.xml) makes `sdlc_purge` for
+      # `openbao:bootstrap worker-langfuse-credentials`.
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - clickhouse-logs:/var/log/clickhouse-server
       - ./clickhouse/low-memory.xml:/etc/clickhouse-server/config.d/low-memory.xml:ro
+      - ./clickhouse/sdlc-admin.xml:/etc/clickhouse-server/users.d/sdlc-admin.xml:ro
     healthcheck:
       <<: *healthcheck-defaults
       test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:8123/ping || exit 1']

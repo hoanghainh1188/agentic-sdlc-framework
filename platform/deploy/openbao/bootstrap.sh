@@ -532,9 +532,9 @@ cmd_worker_anchor_credentials() { s3_credentials worker anchor sdlcwrkan "$ANCHO
 # - the worker's own Langfuse project key, made by an operator in the Langfuse UI (runbook T11
 #   §5m), read from a hidden prompt (or stdin) and passed to the openbao container on stdin;
 # - a new password of the ClickHouse user `sdlc_purge`: only ALTER DELETE on the two event tables
-#   (APPLY DELETED MASK needs it; it reads nothing). The SQL goes to clickhouse-client on stdin;
-#   clickhouse-client reads the admin user from the container's environment, and ClickHouse masks
-#   the password in its query log (checked live);
+#   (APPLY DELETED MASK needs it; it reads nothing). The SQL goes to clickhouse-client on stdin as
+#   the loopback-only user `sdlc_admin` (clickhouse/sdlc-admin.xml, ADR-M63 §6), and ClickHouse
+#   masks the password in its query log (checked live);
 # - a new key of the SeaweedFS identity `worker-langfuse`: List on the bucket `langfuse`, Write
 #   (delete) under `langfuse/events/otel/*` only, never Read.
 # Every secret is made inside the openbao container and goes through pipes only.
@@ -548,7 +548,7 @@ cmd_worker_langfuse_credentials() {
   case "$lf_public" in pk-lf-*) ;; *) fail "the public key must start with pk-lf-" ;; esac
   case "$lf_secret" in sk-lf-*) ;; *) fail "the secret key must start with sk-lf-" ;; esac
   case "$lf_public$lf_secret" in *[!A-Za-z0-9-]*) fail "the Langfuse key has unexpected characters" ;; esac
-  ch_admin='clickhouse-client --multiquery'
+  ch_admin='clickhouse-client --user sdlc_admin --multiquery'
   compose exec -T clickhouse sh -c "echo 'SELECT 1' | $ch_admin" </dev/null >/dev/null 2>&1 ||
     fail "ClickHouse is not reachable; start the profile observability first (pnpm compose:obs)"
   weed="weed shell -master=127.0.0.1:9333"
@@ -598,7 +598,7 @@ cmd_worker_langfuse_credentials() {
       printf "GRANT ALTER DELETE ON default.events_full TO sdlc_purge;\n"
       printf "GRANT ALTER DELETE ON default.events_core TO sdlc_purge;\n"' |
     compose exec -T clickhouse sh -c "$ch_admin" >/dev/null 2>&1 ||
-    fail "could not create the ClickHouse user sdlc_purge (CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT on? ClickHouse restarted after the update?)"
+    fail "could not create the ClickHouse user sdlc_purge (the user sdlc_admin exists? ClickHouse restarted after the update?)"
   grants="$(compose exec -T clickhouse sh -c "echo 'SHOW GRANTS FOR sdlc_purge' | $ch_admin" </dev/null 2>/dev/null)" ||
     fail "could not read the grants of sdlc_purge; run the command again"
   [ "$(printf '%s\n' "$grants" | grep -c .)" -eq 2 ] &&

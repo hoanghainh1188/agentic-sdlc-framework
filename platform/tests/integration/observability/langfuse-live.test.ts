@@ -486,6 +486,18 @@ describe.skipIf(!enabled)(
           )
         ).status,
       ).not.toBe(200);
+      // A10 (ADR-M63 §6): over the network, nobody manages ClickHouse users. `langfuse` has no
+      // access management; `sdlc_admin` (which made sdlc_purge above) answers on loopback only.
+      const created = await clickhouse(
+        'langfuse',
+        envMap.get('CLICKHOUSE_PASSWORD')!,
+        "CREATE USER sdlc_a10_probe IDENTIFIED WITH sha256_password BY 'probe-a10'",
+      );
+      expect(created.status).not.toBe(200);
+      expect(created.text).toContain('ACCESS_DENIED');
+      const remoteAdmin = await clickhouse('sdlc_admin', '', 'SELECT 1');
+      expect(remoteAdmin.status).not.toBe(200);
+      expect(remoteAdmin.text).toContain('AUTHENTICATION_FAILED');
       const s3Endpoint = `http://127.0.0.1:${envMap.get('SEAWEEDFS_S3_HOST_PORT')!}`;
       const s3 = new S3Client({
         endpoint: s3Endpoint,
