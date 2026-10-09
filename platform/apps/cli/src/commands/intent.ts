@@ -1,4 +1,6 @@
 // `sdlc intent create|list|show` over the API (D-08 B04 AC1, FR-20; ADR-M26 §2.8).
+// `create --spec` (U03) links the spec right after, with the same call as `sdlc spec link`; a
+// refused link keeps the intent and says how to link again.
 import { readFile } from 'node:fs/promises';
 
 import { DATA_CLASSES, INTENT_STATUSES, RISK_TIERS } from '@sdlc/contracts';
@@ -14,9 +16,13 @@ import {
   type IntentDetail,
   type IntentView,
 } from '../api/schemas.js';
+import { ApiCallError } from '../api/client.js';
+import { exitCodeOf, reportApiFailure } from '../api/errors.js';
 import { CommandExit, parseCommand, segment, withApi, type Values } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
 import { say, sayError, show, toJson } from '../output.js';
+import { linkSpec, sayLinked, specLinkBody } from './spec-link.js';
+import type { ApiClient } from '../api/client.js';
 
 /** The API's limits (ADR-M26 §2.8, `createIntentSchema`). */
 const MAX_DESCRIPTION = 10_000;
@@ -34,6 +40,9 @@ const OPTIONS = {
     'data-class': { type: 'string' },
     budget: { type: 'string' },
     issue: { type: 'string' },
+    spec: { type: 'string' },
+    'spec-commit': { type: 'string' },
+    'spec-tool': { type: 'string' },
   },
   list: {
     project: { type: 'string' },
@@ -63,6 +72,8 @@ async function create(args: readonly string[], ctx: CliContext): Promise<number>
   const parsed = parseCommand(args, OPTIONS.create);
   const values = parsed?.values;
   if (!values || !validCreate(values)) return usage(ctx);
+  const specBody = specOptions(values);
+  if (specBody === null) return usage(ctx);
   const json = values.json === true;
   return withApi(ctx, json, async (client) => {
     const body = {
@@ -75,10 +86,59 @@ async function create(args: readonly string[], ctx: CliContext): Promise<number>
       ...(typeof values.issue === 'string' ? { issue_number: Number(values.issue) } : {}),
     };
     const intent = await client.post('/v1/intents', intentSchema, body);
-    if (json) ctx.stdout(toJson(intent));
-    else say(ctx, 'cli.intent.created', summary(intent));
-    return EXIT.ok;
+    if (specBody === undefined) {
+      if (json) ctx.stdout(toJson(intent));
+      else say(ctx, 'cli.intent.created', summary(intent));
+      return EXIT.ok;
+    }
+    if (!json) say(ctx, 'cli.intent.created', summary(intent));
+    return linkAfterCreate(ctx, client, intent, specBody, json);
   });
+}
+
+/**
+ * The spec options as a link request body: undefined without `--spec`, null when malformed
+ * (`--spec-commit` or `--spec-tool` without `--spec` too), checked before any API call.
+ */
+function specOptions(values: Values): Record<string, string> | undefined | null {
+  if (values.spec === undefined) {
+    return values['spec-commit'] === undefined && values['spec-tool'] === undefined
+      ? undefined
+      : null;
+  }
+  return (
+    specLinkBody({ path: values.spec, commit: values['spec-commit'], tool: values['spec-tool'] }) ??
+    null
+  );
+}
+
+/** U03: links the spec of the intent just created; a failure keeps the intent and names it. */
+async function linkAfterCreate(
+  ctx: CliContext,
+  client: ApiClient,
+  intent: IntentView,
+  specBody: Record<string, string>,
+  json: boolean,
+): Promise<number> {
+  try {
+    const spec = await linkSpec(client, intent.code, specBody);
+    if (json) ctx.stdout(toJson({ intent, spec, spec_error: null }));
+    else sayLinked(ctx, spec);
+    return EXIT.ok;
+  } catch (error) {
+    if (!(error instanceof ApiCallError)) throw error;
+    if (json) {
+      const specError = error.envelope?.error ?? {
+        code: `cli_${error.kind}`,
+        ...(error.status === undefined ? {} : { status: error.status }),
+      };
+      ctx.stdout(toJson({ intent, spec: null, spec_error: specError }));
+      return exitCodeOf(error);
+    }
+    const exit = reportApiFailure(ctx, error, false);
+    sayError(ctx, 'cli.intent.spec_link_refused', { code: intent.code, path: specBody.path ?? '' });
+    return exit;
+  }
 }
 
 function validCreate(values: Values): boolean {

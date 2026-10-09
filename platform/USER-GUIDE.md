@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.8, 2026-10-09. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
+Version 0.9, 2026-10-09. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
 
 ---
 
@@ -107,6 +107,8 @@ The spec is a Markdown file **on the default branch** (`main`); the rules: [hand
 ```bash
 sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.md
 ```
+
+Or in one step when you create the intent: add `--spec docs/specs/T01-product-list-japanese-labels.md` to `sdlc intent create`. If the link is refused, the intent is still created; run `sdlc spec link` as above.
 
 - **The spec needs at least one acceptance criterion**, at every risk tier; `sdlc spec link` shows the count. How the platform finds them: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria).
 - **Low risk:** the platform passes G2 by itself (HOTL) and says until when it can be blocked (4 working hours by default).
@@ -259,4 +261,5 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 | 0.5 | 2026-10-09 | Docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists |
 | 0.6 | 2026-10-09 | Docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate |
 | 0.7 | 2026-10-09 | Docs review E2: §1 and §7 link to the handbook sections |
+| 0.9 | 2026-10-09 | Task U03: step 3, `sdlc intent create --spec` links the spec in the same command |
 | 0.8 | 2026-10-09 | Docs review E3 (readability): §2 login and token steps as a list; step 4 plan notes as a list; step 5 says how Person A takes an L1 proposal forward; step 8 says `done`; the version history moved here |
