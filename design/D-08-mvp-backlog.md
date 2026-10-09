@@ -43,9 +43,9 @@
 | M-C | Run + G4–G6 | 12 | S×3 · M×8 · L×1 |
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
-| M-E | The trial, run by the community (QUESTIONS #340) | 1 | M×1 |
+| M-E | The trial, run by the community (QUESTIONS #340) | 4 | S×1 · M×3 |
 | MVP+1 | Started early: read-only dashboard (QUESTIONS #255); lighter steps | 4 | S×2 · M×1 · L×1 |
-| **Total** | | **58** | |
+| **Total** | | **61** | |
 
 ### Order and dependencies between milestones
 
@@ -56,7 +56,7 @@ flowchart LR
     M0["M-0 Sample repo"] --> MC
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
-    MP --> ME["M-E Trial by the community (V01)"]
+    MP --> ME["M-E Trial by the community (V01–V04)"]
     ME --> MF["M-F Adjustment"]
     MD --> MU["MVP+1 U01 read-only dashboard<br/>(in parallel with M-E)"]
 ```
@@ -66,7 +66,7 @@ flowchart LR
 
 ### Critical path (longest chain) [Proposal]
 
-`A01 → A02 → A06 → A07 → B02 → C02 → C04 → C05 → C06 → C07 → C08 → E01 → E02 → E03 → E07 → V01`
+`A01 → A02 → A06 → A07 → B02 → C02 → C04 → C05 → C06 → C07 → C08 → E01 → E02 → E03 → E07 → V01 → V02`
 
 - Computed from dependencies and task size (S=1, M=2, L=3). To finish sooner: prioritise tasks on this path and run the others in parallel.
 
@@ -851,6 +851,52 @@ flowchart LR
 
 > Note: QUESTIONS #340 (Harry, 2026-10-09): the trial M-E is run by the community, not by the project team; M-F adjusts from their reports. Two PRs: PR 1 = the decision and the documents (TRIAL.md, the issue template, M-E-TRIAL-PLAN 2.0, D-02 1.8); PR 2 = `sdlc trial report` (ADR-M65). Then release v0.1.0. A10 PR 3 (the company server) and E07 AC4 (#45, the API-model run) no longer block M-E: A10 PR 3 is for an operator who deploys on a server, and a tester who uses an API model gives the run of #45
 
+#### V02. `pnpm trial:up`: the whole trial set-up on a developer machine in one command
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | V01 | NFR-01, NFR-03, NFR-08 | package.json, platform/deploy/trial/*, platform/tests/integration/deploy/*, platform/tests/deploy/*, TRIAL.md, platform/deploy/README.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: `pnpm trial:up` runs the steps of "Fresh deployment" (platform/deploy/README.md) on a developer machine, from an empty checkout to a project ready for T01: settings file, OpenBao (init, unseal, configure) with **throw-away keys**, every credentials command, migrations, start, the tenant, Person A and Person B with their GitHub IDs, the project, the sandbox image, the agent, the trial configuration (M-E-TRIAL-PLAN §6) and the AI record; the inputs (fork, App ID and key file, model, the two GitHub accounts) come from one settings file outside the repo
+- [ ] AC2: Refuses to run where it may hurt: an existing `platform/deploy/.env` or `sdlc_*` volumes (never overwrites or removes them), `NODE_ENV=production`, a machine without Docker or with too little memory (a clear message from the catalog)
+- [ ] AC3: Throw-away keys never reach a file, a log or the terminal: the key shares and the root token live in the process memory only and are dropped after `configure`; the script prints that this stack is for the trial only and can never hold client data; the personal API tokens of Person A and Person B are written only to their own credentials files (mode 600)
+- [ ] AC4: `pnpm trial:down` stops the stack; `pnpm trial:down --wipe` removes only the volumes of the trial's own Compose project, after a confirmation
+- [ ] AC5: Tests: a static test that the script follows the README steps (like `fresh-deploy-readme.test.ts`), a live test on a throw-away Compose project to the first intent at G1 (CI job `fresh-deploy`, weekly and on demand); `TRIAL.md` §3.2 uses it
+
+> Note: QUESTIONS #342 (Harry, 2026-10-09): before v0.1.0, to lower the cost of the first try. Reuses the steps of `pnpm test:fresh-deploy` (platform/tests/integration/deploy/fresh-deploy.test.ts). Never for a server: the operator follows the README there (A10)
+
+#### V03. Create the GitHub App from a manifest
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | V01 | NFR-03, NFR-08 | platform/deploy/github-app/*, platform/deploy/README.md (Create the GitHub App), TRIAL.md, platform/tests/deploy/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: A GitHub App manifest in the repository with exactly the permissions of the README's list (Contents, Issues, Pull requests read and write; Code scanning alerts, Checks, Commit statuses, Metadata read), webhook off, installable on the owner's account only
+- [ ] AC2: A small local page or command that sends the manifest to GitHub (the manifest flow) and saves the returned App ID and private key to a file outside the repository, mode 600; the key is never printed
+- [ ] AC3: A static test fails when the manifest and the README's permission list differ
+- [ ] AC4: README "Create the GitHub App" and TRIAL.md §3.2 use it; the manual steps stay as the fallback
+
+> Note: QUESTIONS #342 (Harry, 2026-10-09): before v0.1.0. GitHub's manifest flow: https://docs.github.com/apps/sharing-github-apps/registering-a-github-app-from-a-manifest
+
+#### V04. Publish the platform's images to GHCR for each release
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | V01 | NFR-01, NFR-04 | .github/workflows/*, platform/deploy/docker-compose.yml, platform/deploy/README.md, TRIAL.md, design/ADR-M66 |
+
+**Acceptance criteria**
+
+- [ ] AC1: A release workflow builds the images of `sdlc-api`, `sdlc-worker`, `sdlc-runner`, the otel-collector and the `node24` sandbox image, scans them (Trivy), and pushes them to GHCR, tagged with the release and pinned by digest
+- [ ] AC2: The images are signed and carry an SBOM and provenance (decided in ADR-M66); the README says how to verify them
+- [ ] AC3: Compose uses the published images by digest for a release checkout and builds locally otherwise; a static test checks the digests
+- [ ] AC4: TRIAL.md and the README's fresh deployment skip the local builds when the images are published
+
+> Note: QUESTIONS #342 (Harry, 2026-10-09): after v0.1.0, while the first reports come in. ADR-M66 records the registry, signing (for example cosign keyless) and the supply-chain checks
+
 
 ### MVP+1 — Started early: read-only dashboard (QUESTIONS #255); lighter steps
 
@@ -995,6 +1041,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.25 | 2026-10-08 | Claude, approved by Harry | New milestone Pre-M-E with tasks S01, S02 (BMAD / Spec Kit structure, plan drafts) and K01, K02 (WeKnora), before the trial M-E (QUESTIONS #285) |
 | 1.29 | 2026-10-09 | Claude, approved by Harry | New task C13 in Pre-M-E: take an L1 proposal forward (download, G4 rejection; ADR-M64, QUESTIONS #335–#337) |
 | 1.30 | 2026-10-09 | Claude, approved by Harry | New milestone M-E with task V01: the trial is run by the community (TRIAL.md, a report issue template, `sdlc trial report`; QUESTIONS #340, #341, ADR-M65) |
+| 1.31 | 2026-10-09 | Claude, approved by Harry | M-E tasks V02 (`pnpm trial:up`), V03 (the GitHub App from a manifest), both before v0.1.0, and V04 (images on GHCR, after v0.1.0) (QUESTIONS #342) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
