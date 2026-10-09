@@ -2,10 +2,10 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.6 |
-| Date | 2026-10-08 |
-| Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed; D6 (the local model, QUESTIONS #81) |
-| Readers | Harry, the trial team (Person A, Person B, second approver), Claude Code |
+| Version | 2.0 |
+| Date | 2026-10-09 |
+| Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed; D6 (the local model, QUESTIONS #81); 2.0 (Harry, 2026-10-09): the trial is run by the community (D8, QUESTIONS #340) |
+| Readers | Harry, every trial team (Person A, Person B, second approver), Claude Code |
 | Related documents | D-02 §2, §10, §13.3 (milestones M-E, M-F); D-09 §7 (tasks T01–T10, scenarios N1–N10); `design/MVP-DONE.md`; `platform/GETTING-STARTED.md` Steps 11–14 |
 
 ---
@@ -15,7 +15,8 @@
 - Run the ten sample tasks T01–T10 of D-09 through the platform, G1 to G8, on the sample repo `harryforge/pilot-order-inventory`.
 - Collect real numbers (D-02 §2 "Expected results"): gate waiting time, tokens and cost, the share of pull requests that needed changes.
 - Find what is too heavy or missing before M-F adjusts gates, budgets and rules.
-- M-E is done when the data report (section 8) exists (D-02 §13.3).
+- **Since version 2.0 the community runs the trial** (decision D8, QUESTIONS #340): anyone may run it on their own machine with a fork of the sample repo, following [`TRIAL.md`](../TRIAL.md), and sends a report as a GitHub issue (template `trial-report`). Each team that sends a report is a **trial team**; this plan is the full version of what `TRIAL.md` asks.
+- M-E is done when enough reports arrived (for example from 3 teams) and the data report (section 8) summarises them (D-02 §13.3).
 
 ## 2. Scope
 
@@ -28,6 +29,8 @@
 | Scenarios N1–N10 when they happen naturally | Forcing every unhappy scenario again (they are proven by tests: `design/MVP-DONE.md` §2) |
 
 ## 3. Before the trial starts (checklist)
+
+Since version 2.0 each trial team does items 3–11 on its own machine, as `TRIAL.md` describes, with its own fork of the sample repo and its own GitHub App. Items 1, 2 and 12 were the project team's own preparation; a trial team may use any model (decision D8).
 
 | # | Item | Who | How to check |
 |---|---|---|---|
@@ -46,7 +49,7 @@
 
 ## 4. People and roles
 
-- Separation of duties is the point of the trial: Person A and Person B must be **two different people** with two GitHub accounts (rule M21). One person with two accounts would make the waiting times and the review numbers meaningless.
+- Separation of duties is the point of the trial: Person A and Person B must be **two different people** with two GitHub accounts (rule M21). One person with two accounts would make the waiting times and the review numbers meaningless. Since version 2.0 (QUESTIONS #341): the platform keeps the rule, there is no single-person mode; a team where one person uses two accounts says so in its report, and its waiting times are counted apart.
 - Proposed holders (decision D2):
 
 | Role | Does in the trial | Holder |
@@ -121,7 +124,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 
 ## 8. The data report (the M-E deliverable)
 
-`design/M-E-REPORT.md`, written by Claude from section 7 and reviewed by Harry:
+`design/M-E-REPORT.md`, written by Claude from section 7 and reviewed by Harry. Since version 2.0 its input is the reports of the trial teams (issues with the label `trial`): the JSON of `sdlc trial report` (section 7.1, counts and codes only) and their manual log (section 7.2). Each team stays anonymous in the report (team 1, team 2…):
 
 1. Summary: did the 8-gate flow work, and was it too heavy? Say that the agent used the local model (D6): its quality and cost are not those of an API model.
 2. Per task: path, lead time, runs, cost, wasted cost, requests for changes, quality.
@@ -151,6 +154,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | D5 | Time frame | Harry decides; phases 1–2 first, a short review, then phases 3–5 |
 | D6 | Which model? (QUESTIONS #81, 2026-10-06) | The local Ollama model `gpt-oss:20b` on the owner's machine: there is no API key yet, and the pilot is fictional. The report marks quality and cost numbers as the local model's (internal cost per token, D-07 §3; not API prices). One run with an API model passes before M-F. On a 24 GB machine, run without the profile `observability` (the model needs about 14 GB). **Memory (K01, ADR-M59 §3.5, 2026-10-08):** with `gpt-oss:20b` (12 GB), `bge-m3` and an 8 GB Docker VM the host swapped (1 % free; Japanese answers 70–168 s). Before phase 1, run one task with the dev stack up and record the time; if it swaps, give Docker less memory, leave `observability` off, or decide again |
 | D7 | How long is the HOTL block window? (2026-10-07) | 1 working hour instead of the default 4, to measure the flow without most of its waiting. The report counts the blocks within a window per gate (§7.1): none at all supports a shorter or per-gate window after M-E (`design/POSITIONING.md` §6) |
+| D8 | Who runs the trial? (2026-10-09, QUESTIONS #340) | **The community.** The project team has no second person for Person B. Anyone runs T01–T10 on their own machine (`TRIAL.md`): their own deployment, fork, GitHub App and model (the local `gpt-oss:20b` or an API model through LiteLLM); D1, D2, D3 and D6 then apply per team. Reports come as GitHub issues; M-E is done when enough arrived (for example from 3 teams). A10 PR 3 and the API-model run of #45 no longer block M-E: a team that uses an API model gives that run |
 
 ## Version history
 
@@ -164,3 +168,4 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | 1.4 | 2026-10-07 | Claude (coordinator), approved by Harry | D7: the HOTL block window is 1 working hour for the trial; §6, §7.1 counts the blocks within a window |
 | 1.5 | 2026-10-08 | Claude (coordinator), approved by Harry | §3 item 12: the trial waits for S01, S02, K01 and K02 (or its deferral) (QUESTIONS #285) |
 | 1.6 | 2026-10-08 | Claude (coordinator), approved by Harry | §3 item 12 done (K02 deferred, QUESTIONS #300); D6: the memory finding of K01 and a timed task before phase 1 |
+| 2.0 | 2026-10-09 | Claude (coordinator, task V01), approved by Harry | D8: the community runs the trial (`TRIAL.md`, the issue template `trial-report`); §1, §3, §4 (QUESTIONS #341), §8 (QUESTIONS #340) |
