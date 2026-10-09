@@ -76,7 +76,7 @@ Each step names who does it, a usual duration and a check. Do not start a step b
 | 0.1 | Choose the project: clear scope, Low or Medium risk work, no client data at first (handbook Ch.9 §9.7) | The project is named in the rollout notes |
 | 0.2 | Name the people: Person A, Person B, PM / BrSE, a second approver if flagged changes are likely, governance (leadership) | Template T5 (RACI) filled in |
 | 0.3 | Run the readiness assessment with the team (half a day) | Template T17: **Go** or **Conditional Go** (handbook Ch.9 §9.6) |
-| 0.4 | Set the budget: per month for the tenant, per intent and per run (the defaults and how they apply: [handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#budgets)) | The amounts written down; leadership agrees |
+| 0.4 | Set the budget: per month for the tenant, per intent and per run (the defaults and how they apply: [handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#budgets)) | The amounts written down; leadership agrees. There is no measured cost per intent yet: the trial M-E produces the first numbers; until then, start small and read `sdlc cost report` ([handbook Ch.19](../handbook/02-playbook/ch19-approval-queues.md#cost-report)) every week |
 | 0.5 | Choose the model: an API model, or a self-hosted one for `client_restricted` data (D-07) | The model is in the platform's gateway list |
 
 ### Step 1. Prepare the repository (Person A, the repository owner; 1–2 days)
@@ -181,6 +181,8 @@ From a spec to a submitted plan:
 | 2.6 | Operator, tenant admin | Build the sandbox image for the project's toolchain and pin it by digest ([deploy/README step 10](deploy/README.md#10-the-sandbox-image); other toolchains need a new image) | The reference ends in `@sha256:…` |
 | 2.7 | Tenant admin, agent owner, Person B | Register the agent, then the agent owner and Person B approve it ([handbook Ch.20 §20.5b](../handbook/02-playbook/ch20-agent-and-model-lifecycle.md#205b-the-agent-register-on-the-platform)) | `sdlc admin agent show --key <key>` says `active` |
 | 2.8 | Tenant admin | Upload the project configuration: at least `run.agent_key`, `sandbox.image`, `verification.required_checks` (the aggregate check of 1.2); the budgets of 0.4 ([deploy/README step 12](deploy/README.md#12-the-project-configuration)) | `sdlc admin config show --project <slug>` shows the new version |
+
+**A second project or tenant.** One installation serves many projects: the operator skips 2.1, and 2.2 is needed only for a new tenant (a client or unit with its own data and budget: `pnpm sdlc ops bootstrap`, deploy/README step 8). For each new project: install the GitHub App on its repository too (selected repositories), then 2.3–2.8. A project with another toolchain than Node.js needs a new sandbox image (2.6), which does not exist yet.
 
 ### Step 3. Prepare the people (each team member; half a day)
 

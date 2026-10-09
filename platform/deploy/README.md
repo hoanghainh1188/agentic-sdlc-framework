@@ -20,6 +20,23 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 - OpenSSL 3.x as `openssl` on the `PATH` (for `init-env.sh` and the TLS tests of `@sdlc/secrets`). On macOS, `/usr/bin/openssl` is LibreSSL, and the TLS tests stop with a message when they find it: install OpenSSL 3 (`brew install openssl@3`) and put it first (`export PATH="$(brew --prefix openssl@3)/bin:$PATH"`).
 - Node.js 24 + pnpm 10 (`corepack enable` once). The fresh deployment below needs them (`pnpm install`, `pnpm openbao:bootstrap`, `pnpm db:migrate`, `pnpm sdlc ops …`), and so do the `pnpm` shortcuts and the tests. Only starting and stopping the containers works without them (`init-env.sh`, `up.sh`).
 
+## Where to run it
+
+[Proposal] Recommended until task A10 measures and hardens the target server:
+
+| Item | Recommendation |
+|---|---|
+| Host | One internal Linux server (or VM) with Docker Engine and Docker Compose. Docker Desktop on a laptop is for development and the trial only |
+| Network | Outbound HTTPS only: to GitHub, the model providers, the npm registry and the image registries ([Network and data flows](#network-and-data-flows)). No inbound connection from the internet: the platform polls GitHub and needs no webhook |
+| Size | See [Resource estimate](#resource-estimate): about 3 GiB RAM and 2 vCPU for `core`, 6 GiB and 4 vCPU with `observability`, plus up to 2 GiB per running sandbox. Estimates only, not measured on a server yet (A10) |
+| GPU | Not needed with API models. Only for a self-hosted model on the same machine (D-07 §3) |
+| Sandboxes | 1 by default (`SDLC_RUNNER_MAX_SANDBOXES`); 2 on a larger server |
+| The runner | In its own VM or with rootless Docker, because it controls Docker (ADR-M25 §2.5). Not yet done (A10) |
+| OpenBao | TLS on port 8200 and three named key holders before any real secret or client data (runbook T11 §3.2). Not yet done (A10) |
+| Backups | Off the server, encrypted ([Backup and restore](#backup-and-restore)) |
+
+**Access from other machines: not supported yet.** The API and the dashboard listen on `127.0.0.1:8090` of the server only. TLS and a reverse proxy for team access come later (A10, M-F). Until then, people use the CLI and the dashboard on the server itself; an SSH tunnel to `127.0.0.1:8090` works for one person, but it is not a supported set-up. Comment commands and reviews on GitHub work from anywhere.
+
 ## Fresh deployment (operator)
 
 How to bring up the whole platform on a new machine with Docker Compose, from an empty checkout to the first intent at G1 (D-08 E07 AC3). Run every step **yourself, in a terminal, from the repo root**. Several steps print or ask for key shares, tokens or keys at a hidden prompt: never run them through a chat tool, and never paste their output anywhere except your password manager. `pnpm test:fresh-deploy` runs the same steps on a throw-away Compose project with throw-away keys (section [Tests](#tests)).
@@ -268,6 +285,26 @@ OpenBao is reachable only on the Compose network (`design/QUESTIONS.md` #27, tas
 
 SeaweedFS (task A12, `design/ADR-M52-seaweedfs-internal-access.md`): only the S3 API (8333) listens on the Compose network; every platform process uses it with its own identity. The master, volume server and filer listen on `127.0.0.1` inside the container and need JWT keys that `seaweedfs/start.sh` makes at every start (kept nowhere else; no keys, no start). Admin work: `docker compose … exec seaweedfs weed shell -master=127.0.0.1:9333` (runbook T11 §5l). `seaweedfs-init` runs in the container's network namespace.
 
+## Network and data flows
+
+What leaves the server, and what stays on it. The data classes and which models may receive them: [D-07 §4](../../design/D-07-model-and-token-management.md).
+
+| Goes out to | From | What is sent |
+|---|---|---|
+| GitHub API (`api.github.com`) and Git over HTTPS | `sdlc-api`, `sdlc-worker`, `sdlc-runner` | Reads issues, comments, reviews, CI results, specs and plans; clones; pushes `agent/INT-…` branches; opens pull requests and posts comments with codes only |
+| The model providers (for example Anthropic), through LiteLLM | `litellm` | The agent's prompts: the task, the spec, the plan and **parts of the project's code**. A self-hosted model keeps them on your infrastructure; `client_restricted` data may go only to self-hosted models |
+| The npm registry (`registry.npmjs.org`) | `npm-proxy` (Verdaccio) | Package downloads for the sandboxes |
+| Image registries (Docker Hub, GHCR) | Docker, at pull and build time | Image downloads |
+
+| Stays on the server | Where | Kept |
+|---|---|---|
+| Each run's diff, L1 proposals, Evidence Packs | SeaweedFS | At least 180 days, then purged ([handbook Ch.15 §15.10.2](../../handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)) |
+| Model prompts and answers | Langfuse (profile `observability` only) | Until the retention purge |
+| Audit log, gate decisions, escalations | PostgreSQL | At least 2 years |
+| Secrets and keys | OpenBao | Until rotated |
+
+Sandboxes reach only LiteLLM and the package proxy; never GitHub, OpenBao or the internet. The platform keeps no working copy of the code: clones are removed when a run ends.
+
 ## Platform database roles
 
 The `platform` database has two roles ([ADR-M09](../../design/ADR-M09-database-tooling.md) section 2.3):
@@ -384,6 +421,62 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 - Disk for images: about 4.5 GB for `core` and about 4.7 GB more for `observability`. Data volumes start small and grow with use.
 - Add room for the platform processes (api, worker, runner) and 1–2 agent sandboxes (D-03 section 10.1).
 - Profile `sandbox` (estimates, A10 measures): socket proxy about 10 MiB, runner about 100–150 MiB, Verdaccio about 100–200 MiB, registry about 20 MiB, so about 0.3–0.4 GiB in total, plus **up to 2 GiB per sandbox** (`SDLC_RUNNER_SANDBOX_MEMORY_MB`, 1 sandbox by default). Disk: the `node24` image is about 0.85 GB compressed and about 3 GB unpacked; the npm cache grows with use (1–5 GB typical); clones up to `SDLC_RUNNER_WORKSPACE_MAX_MB` per running sandbox.
+
+## Backup and restore
+
+**Interim: commands only.** The backup script, the off-server copy and a tested restore drill are task A10. Until then, back up these items yourself, off the server and encrypted:
+
+| What | How |
+|---|---|
+| PostgreSQL: every database (`platform`, `temporal`, `temporal_visibility`, `litellm`, `langfuse`) | `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec -T postgres pg_dumpall -U postgres > platform-<date>.sql` |
+| OpenBao | A Raft snapshot and the audit volume: runbook [T11 §6](../../handbook/03-templates/T11-openbao-runbook.md#6-daily-snapshot-backup). A snapshot is useless without two key shares, which are kept apart |
+| SeaweedFS (evidence, audit anchors, Langfuse files) | The `seaweedfs-data` volume, copied while the stack is stopped (`pnpm compose:down`) |
+| ClickHouse (profile `observability`) | The `clickhouse-data` volume, while stopped |
+| `platform/deploy/.env` | Into the password manager, never next to the backups |
+
+The dump holds client data (diffs, prompts) and personal data: treat it like the server itself. Restoring OpenBao: [T11 §7](../../handbook/03-templates/T11-openbao-runbook.md#7-restore-on-a-test-machine-recovery-drill). Restoring the whole platform has not been tested yet (A10).
+
+## Upgrade
+
+Upgrades come from `main` as reviewed changes; read the [CHANGELOG](../../CHANGELOG.md) first.
+
+1. Take a backup ([above](#backup-and-restore)); before an OpenBao image change, a Raft snapshot ([T11 §4b](../../handbook/03-templates/T11-openbao-runbook.md#4b-upgrading-the-openbao-image)).
+2. `git pull`, then `pnpm install && pnpm build`.
+3. Add any new `.env` variables (`.env.example` lists them; `init-env.sh` never overwrites `.env`).
+4. Pull the pinned images and rebuild the platform images: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull`, then the same with `build` (add `--profile observability` when you use it).
+5. Start `core`, unseal OpenBao, apply new migrations, then start the rest: the order of [GETTING-STARTED Step 13](../GETTING-STARTED.md#step-13-restart-the-dev-stack-after-a-break-dev), items 1–6.
+6. Run a credentials command only when the CHANGELOG says an update added one or gave one new rights ([Fresh deployment, step 5](#5-credentials-of-every-process)).
+7. Check: `curl -s http://127.0.0.1:8090/health/ready`, and no `…_missing` line in the logs ([Troubleshooting](#troubleshooting)).
+
+Never run `docker volume prune` or `docker system prune --volumes`: they delete the platform's data.
+
+## Troubleshooting
+
+| You see | Cause | Do |
+|---|---|---|
+| `sdlc-api`, `sdlc-worker` or `sdlc-runner` restart every minute; "Cannot reach OpenBao" or a login error in the log | OpenBao is sealed after a restart | `pnpm openbao:bootstrap status`, then two key holders unseal it (runbook T11 §4) |
+| `up.sh` times out with the `platform`, `models` or `sandbox` profile | Same: those services cannot become healthy while OpenBao is sealed | Start `core` alone, unseal, then the rest |
+| A log line ending in `_missing` (for example `worker.evidence_missing`) | A process has no credential for that feature | Run that process's credentials command ([step 5](#5-credentials-of-every-process)), then restart the service |
+| `invalid secret id` in a log | The AppRole secret ID expired (90 days) | That process's credentials command again, then restart it |
+| `worker.runs_off`; every intent waits at G4 | The worker has no `cost-controller` AppRole | `pnpm openbao:bootstrap worker-credentials`, restart `sdlc-worker` |
+| Intents wait at G8; packs answer `evidence_unavailable` | No evidence credential for the worker or the API | `worker-evidence-credentials` or `api-evidence-credentials` (runbook T11 §5h, §5i) |
+| `worker.cost_sync_gap` | The spend sync was down longer than its catch-up window | [Scheduled spend sync](#scheduled-spend-sync-c12) |
+| LiteLLM lists no model | Profile `models` not started, or the provider entry is not in OpenBao | `pnpm compose:models`; runbook T11 §5d |
+| A service stays unhealthy | See its log | `docker compose -f platform/deploy/docker-compose.yml logs <service>`; [what "healthy" means](#health-what-healthy-means) |
+| Valkey writes fail in Langfuse and LiteLLM | Valkey is full | [Shared Valkey](#shared-valkey-memory-limit) |
+
+Problems with a gate or an intent (refused commands, held intents, escalations): [USER-GUIDE §5](../USER-GUIDE.md#5-when-something-goes-wrong). Still stuck: open an issue with the bug report template, and never paste a log line with a secret or client data. Security problems: [SECURITY.md](../../SECURITY.md).
+
+## Uninstall
+
+This deletes every intent, the evidence, the audit log and the secrets. Keep a backup first if the records must be kept (the audit log at least 2 years, handbook Ch.3).
+
+1. Stop and remove the containers and their volumes: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox down -v`.
+2. Remove the per-run objects the runner may have left after a crash: containers, networks and volumes whose name starts with `sdlc-sandbox-`, `sdlc-run-` or `sdlc-ws-` (`docker ps -a`, `docker network ls`, `docker volume ls`).
+3. Remove the images if you want the disk back (`docker image ls`).
+4. On GitHub: uninstall the GitHub App from the repositories, then delete the App and its private key.
+5. Revoke the model provider keys that were stored in OpenBao, at each provider.
+6. Delete `platform/deploy/.env` and the checkout.
 
 ## Tests
 

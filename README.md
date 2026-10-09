@@ -11,6 +11,10 @@ The handbook says **what must happen and why**. The platform **makes sure it hap
 
 Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
+**Status (2026-10-09): built and tested, not yet used on a real project.** Every MVP task is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on the fictional sample repository (milestone M-E) has not started; the first real internal project comes after it (M-F). Before real client data, the internal server still needs TLS and named key holders for OpenBao, a tested backup and restore, and measured resources (task A10).
+
+**Supported today:** GitHub, projects built with Node.js and TypeScript (one sandbox image, `node24`), the OpenHands agent, and one server with Docker Compose. People reach the API and the dashboard on the server itself; access from other machines comes later ([where to run it](platform/deploy/README.md#where-to-run-it)).
+
 ---
 
 ## 1. In one sentence
@@ -124,6 +128,13 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 | Diagrams | [diagrams/README.md](diagrams/README.md) |
 | Changes | [CHANGELOG.md](CHANGELOG.md) |
 
-## 8. Licence
+## 8. Help
+
+- Questions, problems and ideas: [open an issue](https://github.com/hoanghainh1188/agentic-sdlc-framework/issues/new/choose) with the bug report or feature request template. Never paste a secret, a token or client data.
+- Security problems: never in a public issue; see [SECURITY.md](SECURITY.md).
+- Operators: [troubleshooting](platform/deploy/README.md#troubleshooting). Team members: [when something goes wrong](platform/USER-GUIDE.md#5-when-something-goes-wrong).
+- Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## 9. Licence
 
 The code is [MIT](LICENSE). The documentation (`handbook/`, `design/`, `diagrams/`) is [CC BY 4.0](LICENSE-docs.md): reuse it, also commercially, with credit. Both stay open. The components the platform reuses keep their own licences; every one allows commercial use ([build vs buy](design/D-01-build-vs-buy.md)).

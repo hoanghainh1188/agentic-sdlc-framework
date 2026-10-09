@@ -69,7 +69,7 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
    sdlc token create --name laptop
    ```
 
-   `sdlc login` asks for the API token at a hidden prompt. After `token create`, log in again with your own API token and revoke the first one (`sdlc token list`, `sdlc token revoke --id <ID>`). Details: handbook Ch.19 §19.8c.
+   Today the API listens on the platform server only (`http://127.0.0.1:8090`): run `sdlc` on that server. Access from other machines is not supported yet ([where to run it](deploy/README.md#where-to-run-it)); comment commands and reviews on GitHub work from anywhere. `sdlc login` asks for the API token at a hidden prompt. After `token create`, log in again with your own API token and revoke the first one (`sdlc token list`, `sdlc token revoke --id <ID>`). Details: handbook Ch.19 §19.8c.
 3. **The project AI record** (the client's recorded consent to AI use) must allow the data class of your work (how sensitive its information is) (Person A or PM / BrSE writes it once per project: `sdlc ai-record show --project <slug>`). Without it, intents cannot enter G1.
 
 ## 3. One intent, step by step
