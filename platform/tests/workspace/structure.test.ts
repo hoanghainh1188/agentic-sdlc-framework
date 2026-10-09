@@ -47,9 +47,14 @@ describe('workspace structure (D-03 section 11)', () => {
     const { references } = readJson<{ references: { path: string }[] }>(
       path.join(root, 'tsconfig.json'),
     );
-    // Plus `pnpm trial:up` (D-08 V02): a TypeScript project, not a workspace package.
+    // Plus `pnpm trial:up` (D-08 V02) and `pnpm github-app:create` (V03): TypeScript projects,
+    // not workspace packages.
     expect(references.map((r) => r.path).sort()).toEqual(
-      [...EXPECTED_PACKAGES.map((p) => p.dir), 'platform/deploy/trial'].sort(),
+      [
+        ...EXPECTED_PACKAGES.map((p) => p.dir),
+        'platform/deploy/trial',
+        'platform/deploy/github-app',
+      ].sort(),
     );
   });
 

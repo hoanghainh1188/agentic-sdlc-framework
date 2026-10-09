@@ -41,6 +41,22 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 
 The platform reaches each project's repository through one **GitHub App** per installation of the platform (`design/ADR-M23-github-adapter.md` §2.2). The operator creates it once, in the browser, and installs it on every project repository. Never let a chat tool or an AI session handle the private key.
 
+### Option A: from the manifest (recommended)
+
+`platform/deploy/github-app/manifest.json` holds the App's settings: exactly the permissions of [The GitHub App's settings](#github-app-permissions), webhook off, installable only on your own account (D-08 V03). Run, **yourself, in a terminal** (never through a chat tool):
+
+```bash
+pnpm github-app:create --out ~/secrets/sdlc-app.private-key.pem
+```
+
+- Add `--org <organization>` to create the App in an organization you administer, `--name <name>` to choose its name (default `sdlc-<random>`, at most 34 characters), `--force` to replace an existing key file.
+- It prints a local page (`http://127.0.0.1:<port>/`). Open it in the browser where you are signed in to GitHub and press the button; GitHub shows the App with its permissions; confirm with **Create GitHub App**. GitHub sends the browser back to `127.0.0.1`, and the command finishes the App (`POST /app-manifests/{code}/conversions`).
+- It saves the private key to `--out` with mode 600 (never inside the repository, never over an existing file without `--force`) and prints only the App ID, the **Client ID** (`Iv…`, not a secret) and the install link. The key is never printed. GitHub also returns a client secret and a webhook secret: the platform uses neither, so they are dropped at once (`design/QUESTIONS.md` #351).
+- If the browser cannot open `127.0.0.1` after GitHub (a remote desktop, a browser on another machine), copy the whole address from the browser's address bar and paste it at the command's hidden prompt (QUESTIONS #350). The code from GitHub works once, within one hour; the command waits at most 15 minutes.
+- Then **install** the App with the printed link: "Only select repositories", the project's application repository (step 6 below).
+
+### Option B: by hand (the fallback)
+
 1. Open the App settings of the account or organization that owns the project repositories: Settings → Developer settings → GitHub Apps → **New GitHub App**.
 2. Fill in the form:
 

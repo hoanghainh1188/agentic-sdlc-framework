@@ -12,6 +12,8 @@ The GitHub adapter (B05, ADR-M23) talks to GitHub through a **GitHub App**. Use 
 
 Done once by the repo owner in the browser. Claude must never read or handle the private key.
 
+A new test App can also be made from the manifest: `pnpm github-app:create --org harryforge --name <name> --out ~/.config/sdlc-secrets/github-app-dev.pem`, run by the owner in the macOS Terminal ([deploy/README, option A](deploy/README.md#option-a-from-the-manifest-recommended)). The steps below are the manual way.
+
 1. **Test repository.** Public repository `harryforge/pilot-order-inventory` (fictional data only) with a README, and one open issue for the live test (issue #1, "Live test issue (GitHub adapter)").
 2. **Create the App:** organization settings → Developer settings → GitHub Apps → **New GitHub App** (`https://github.com/organizations/harryforge/settings/apps/new`).
 

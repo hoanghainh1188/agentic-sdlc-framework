@@ -20,6 +20,7 @@
     "test:compose": "SDLC_COMPOSE_IT=1 vitest run --config vitest.integration.config.ts platform/tests/integration/deploy",
     "trial:up": "pnpm build && node platform/deploy/trial/dist/main.js up",
     "trial:down": "tsc -b platform/deploy/trial && node platform/deploy/trial/dist/main.js down",
+    "github-app:create": "tsc -b platform/deploy/github-app && node platform/deploy/github-app/dist/main.js",
     "test:trial-up": "pnpm build && SDLC_TRIAL_UP_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/deploy/trial-up.test.ts",
     "test:fresh-deploy": "pnpm build && SDLC_FRESH_DEPLOY_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/deploy/fresh-deploy.test.ts",
     "test:seaweedfs": "SDLC_COMPOSE_IT=1 vitest run --config vitest.integration.config.ts platform/tests/integration/deploy/seaweedfs-access.test.ts",
