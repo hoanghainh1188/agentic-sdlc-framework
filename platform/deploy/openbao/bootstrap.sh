@@ -79,6 +79,10 @@ Commands:
                        the identity "worker-anchor": Write, Read, List and GetObjectRetention on
                        the bucket audit-anchors (object lock COMPLIANCE) only. The old key stops
                        working. Prints no secret. Run it again to rotate, then restart sdlc-worker.
+  backup-credentials   Ask for an admin token (hidden), issue a new secret ID for the AppRole
+                       "backup" (only OpenBao's Raft snapshot, A10, ADR-M63) and write it with the
+                       role ID into the volume of the backup job (Compose profile "backup"). Prints
+                       no secret. Run it again to rotate (runbook T11 section 6).
   worker-langfuse-credentials
                        The worker's Langfuse purge (E08, ADR-M53): asks for the worker's own Langfuse
                        project key (made once in the Langfuse UI; public key, then secret key, hidden)
@@ -133,7 +137,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | backup-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -352,7 +356,8 @@ cmd_litellm_credentials() {
 # environment variable. The platform services drop every capability; this one-shot root container
 # gets back only what it needs to write the files and give them to the user node. It prints the
 # new accessor only after the files are written; then the old secret IDs are revoked. Needs $token.
-# deliver_approle <AppRole> <Compose service> <directory in the service> <profile>
+# deliver_approle <AppRole> <Compose service> <directory in the service> <profile> [owner]
+# The owner is node:node (the platform services) unless given (backup-agent: openbao:openbao).
 deliver_approle() {
   accessor="$(issue_secret_id "$1" |
     compose --profile core --profile "$4" run --rm -T --no-deps --user root \
@@ -366,9 +371,9 @@ deliver_approle() {
         { echo "no role ID or secret ID received" >&2; exit 1; }
       printf "%s\n" "$role_id" >"$0/role_id"
       printf "%s\n" "$secret_id" >"$0/secret_id"
-      chown -R node:node "$0"
+      chown -R "$1" "$0"
       chmod 700 "$0"
-      printf "%s\n" "$accessor"' "$3")" ||
+      printf "%s\n" "$accessor"' "$3" "${5:-node:node}")" ||
     fail "could not deliver the $1 credentials (token valid? OpenBao configured with the $1 AppRole?)"
   revoke_other_secret_ids "$1" "$accessor"
 }
@@ -603,6 +608,16 @@ cmd_worker_langfuse_credentials() {
   say "kv/worker/langfuse stored (the worker's Langfuse key); SeaweedFS identity worker-langfuse ($LANGFUSE_RAW_ACTIONS) and ClickHouse user sdlc_purge (ALTER DELETE on events_full, events_core) applied; restart sdlc-worker to use them"
 }
 
+# The backup job's AppRole (A10 PR 2, ADR-M63 §5): into the volume backup-approle of the one-shot
+# service backup-agent, whose user is openbao.
+cmd_backup_credentials() {
+  require_unsealed
+  token="$(read_secret 'Admin or root token (hidden)')"
+  [ -n "$token" ] || fail "no token given"
+  deliver_approle backup backup-agent /openbao/approle backup openbao:openbao
+  say "backup AppRole credentials written to the backup-approle volume, old secret IDs revoked"
+}
+
 cmd_api_evidence_credentials() { pack_evidence_credentials api sdlcapiev sdlc-api; }
 cmd_worker_evidence_credentials() { pack_evidence_credentials worker sdlcwrkev sdlc-worker; }
 
@@ -613,6 +628,7 @@ case "$command" in
   configure) cmd_configure ;;
   root-token) cmd_root_token ;;
   litellm-credentials) cmd_litellm_credentials ;;
+  backup-credentials) cmd_backup_credentials ;;
   api-credentials) cmd_api_credentials ;;
   worker-credentials) cmd_worker_credentials ;;
   runner-credentials) cmd_runner_credentials ;;

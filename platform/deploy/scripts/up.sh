@@ -15,7 +15,7 @@
 set -eu
 
 # One-shot jobs (restart: "no"). A static test keeps this list in sync with docker-compose.yml.
-JOBS="openbao-tls-init temporal-schema temporal-namespace seaweedfs-init"
+JOBS="backup-agent openbao-tls-init temporal-schema temporal-namespace seaweedfs-init"
 
 [ "$#" -gt 0 ] || { echo "usage: $0 <profile>..." >&2; exit 2; }
 

@@ -138,7 +138,7 @@ jobs:
           # tests need Docker.
           decide_heavy run_compose "Compose integration job" \
             "platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner, the intent workflow or a live test" \
-            platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts platform/tests/integration/deploy/seaweedfs-access.test.ts
+            platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts platform/tests/integration/deploy/seaweedfs-access.test.ts platform/tests/integration/backup/
 
           # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
           decide_heavy run_sandbox_image "Sandbox image job" \
@@ -326,6 +326,10 @@ jobs:
       # B07 session 2: the intent workflow on the real Temporal (sticky queues), workers stopped
       # and started; own throw-away Compose project and a throw-away platform PostgreSQL.
       - run: pnpm test:workflow-compose
+      # A10 PR 2: the backup and the restore drill (age, throw-away keys), own throw-away project.
+      - name: Install age (backups, A10)
+        run: sudo apt-get install -y --no-install-recommends age
+      - run: pnpm test:backup
       - name: Show service state and logs
         if: failure()
         run: |
