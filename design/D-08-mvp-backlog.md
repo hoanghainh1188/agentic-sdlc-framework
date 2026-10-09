@@ -42,9 +42,9 @@
 | M-0 | Sample pilot repo (separate repo, right before M-C) | 4 | S×1 · M×2 · L×1 |
 | M-C | Run + G4–G6 | 12 | S×3 · M×8 · L×1 |
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
-| Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 3 | S×1 · M×2 |
+| Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
 | MVP+1 | Started early: read-only dashboard (QUESTIONS #255); lighter steps | 4 | S×2 · M×1 · L×1 |
-| **Total** | | **56** | |
+| **Total** | | **57** | |
 
 ### Order and dependencies between milestones
 
@@ -54,7 +54,7 @@ flowchart LR
     MB --> MC["M-C Run + G4–G6"]
     M0["M-0 Sample repo"] --> MC
     MC --> MD["M-D G7–G8 + evidence"]
-    MD --> MP["Pre-M-E S01, S02, K01<br/>spec tools, WeKnora spike (K02 deferred)"]
+    MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial"]
     ME --> MF["M-F Adjustment"]
     MD --> MU["MVP+1 U01 read-only dashboard<br/>(in parallel with M-E)"]
@@ -816,6 +816,21 @@ flowchart LR
 
 > Note: QUESTIONS #285 (Harry, 2026-10-08): before the trial M-E. No client data. QUESTIONS #300–#304, ADR-M59
 
+#### C13. Take an L1 proposal forward: download the patch, end the intent with a G4 rejection
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | C06, E02 | FR-03, FR-10, FR-11, D-09 T09 | platform/apps/api (evidence), platform/apps/cli (evidence proposal), platform/packages/core (commands, workflow run-lifecycle, audit), platform/tests/*, handbook Ch.13 §13.10.4, Ch.19 §19.8c, design/ADR-M64 |
+
+**Acceptance criteria**
+
+- [ ] AC1: `GET /v1/intents/:intent/runs/:run/proposal` and `sdlc evidence proposal <INT> [--run <id>] --output <file> [--force]`: the roles in `access.evidence_read_roles` and tenant admins (404 / 403 as the other evidence reads); the api reads the patch with `api-evidence`, checks its SHA-256 and size against `evidence_items` first (fail closed, `evidence.check_failed`), audits every read (`evidence.proposal_read`: run, hash, size); the CLI checks the hash again and writes mode 600, never to standard output
+- [ ] AC2: A `reject` at G4 is accepted while the intent is `paused` at G4 after an L1 proposal (`proposal_review`), from a holder of G4's role (the run's `triggered_by` included: a rejection is not an approval); the workflow ends the intent `rejected` with the gate decision, the audit event and the status comment; every other paused case keeps its escalation path, and `approve` / `request_changes` stay refused there
+- [ ] AC3: Tests: `pnpm test` (CLI, the gate rule, the audit action), `pnpm test:db` (download, a tampered patch refused, roles, tenants, the rejection ends the intent, other paused cases refused), `pnpm test:openbao` (the read on real SeaweedFS), `test:pilot` T09 to `rejected`
+- [ ] AC4: Handbook Ch.13 §13.10.4 and Ch.19 §19.8c, USER-GUIDE step 5: the patch download and the end of the intent replace "ask the platform operator"
+
+> Note: Found in the review of the user commands (Harry, 2026-10-09): T09 of the trial M-E stopped at `proposal_review` with no way to get the patch or end the intent. QUESTIONS #335–#337, ADR-M64. Withdrawing an intent at any gate stays for M-F
+
 
 ### MVP+1 — Started early: read-only dashboard (QUESTIONS #255); lighter steps
 
@@ -958,6 +973,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.23 | 2026-10-07 | Claude, approved by Harry | New task U02: the workflow's waiting reason in the API and one oversight resolution for the plan and spec notices (QUESTIONS #264, #265) |
 | 1.24 | 2026-10-07 | Claude, approved by Harry | New task U03: one CLI command creates an intent and links its spec (`design/POSITIONING.md` §6.1, option B2) |
 | 1.25 | 2026-10-08 | Claude, approved by Harry | New milestone Pre-M-E with tasks S01, S02 (BMAD / Spec Kit structure, plan drafts) and K01, K02 (WeKnora), before the trial M-E (QUESTIONS #285) |
+| 1.29 | 2026-10-09 | Claude, approved by Harry | New task C13 in Pre-M-E: take an L1 proposal forward (download, G4 rejection; ADR-M64, QUESTIONS #335–#337) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
