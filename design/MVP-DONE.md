@@ -60,7 +60,7 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 
 | Item | Source | When |
 |---|---|---|
-| ClickHouse's `langfuse` user has access management (needed to create `sdlc_purge`), so Langfuse itself could create ClickHouse users. Turn it off after `sdlc_purge` exists, or create the user from a separate admin account | ADR-M53 (E08) | A10, before the real server |
+| ~~ClickHouse's `langfuse` user has access management (needed to create `sdlc_purge`), so Langfuse itself could create ClickHouse users~~ **Done:** `langfuse` has no access management; the loopback-only user `sdlc_admin` makes `sdlc_purge` | ADR-M53 (E08), ADR-M63 §6 | Done (A10) |
 | An un-archive command for projects (today a mistaken archive is undone only during the grace period, by a database change on the server) | ADR-M51 §2.6 (E05) | M-F |
 | Whether a retention hold must be released by a different person than the one who set it | ADR-M51 (E05) | M-F |
 | Every intent needs a merged pull request with its plan file before G3 (the plan is a file on the protected default branch) | QUESTIONS #230 (C09) | M-F, from the trial's waiting times |

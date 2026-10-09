@@ -73,7 +73,7 @@ It needs the retention loop (`worker-purge`) to run. Langfuse is behind an inter
 - It runs as the ClickHouse user `sdlc_purge`, which has only `ALTER DELETE` on those two tables. Checked live: `ALTER UPDATE` is not enough for `APPLY DELETED MASK`; `sdlc_purge` cannot `SELECT` (code 497); a wrong key gets 403.
 - **Gap:** `ALTER DELETE` also allows `ALTER TABLE … DELETE WHERE …`, so this user could delete every row of the two tables (never read them). The credential lives only in `kv/worker/langfuse`.
 - The adapter knows the two table names of Langfuse 4.47.0. A Langfuse upgrade that renames them fails the live test (`pnpm test:observability`). Checked again on Langfuse 4.50.0 with ClickHouse 26.3.39.7 (issue #177): the same tables, API and tag filter; the live test passes.
-- To create the user, ClickHouse's admin user `langfuse` (already the owner of every Langfuse table) gets access management: `CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1`. ClickHouse masks the password in its query log (checked live).
+- To create the user, ClickHouse's admin user `langfuse` (already the owner of every Langfuse table) gets access management: `CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1`. ClickHouse masks the password in its query log (checked live). **Superseded by ADR-M63 §6 (A10):** a loopback-only user `sdlc_admin` makes `sdlc_purge`; `langfuse` has no access management.
 
 ### 2.6. The key and the credentials (D3, QUESTIONS #252; AC2)
 
@@ -120,7 +120,7 @@ It needs the retention loop (`worker-purge`) to run. Langfuse is behind an inter
 - **Gaps:**
   - unscoped Langfuse keys (§2.6);
   - `sdlc_purge` could delete every row of the two tables (§2.5);
-  - ClickHouse's admin user `langfuse` now has access management (`CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1`): `langfuse-web`, `langfuse-worker` and anyone with that password (`.env`) can create ClickHouse users and grants. It already owns every Langfuse table;
+  - ~~ClickHouse's admin user `langfuse` now has access management~~ closed by ADR-M63 §6 (A10): `langfuse` cannot create users or grants; the loopback-only `sdlc_admin` makes `sdlc_purge`;
   - the compaction owed and the set-aside intents live only in memory (§2.2, §2.5);
   - a confirmation is final: a purge confirmed wrongly can be undone only by the migration owner on the server (the project check of §2.2 is the guard against it);
   - `not_deployed` relies on the URL setting or the ClickHouse volume (§2.7);
@@ -137,3 +137,4 @@ It needs the retention loop (`worker-purge`) to run. Langfuse is behind an inter
 | 0.1 | 2026-10-05 | Claude (task E08) | First version: the spike (AC1), the step of the retention pass, selection by run IDs and the tag check, request then confirm, the raw file sweep, the ClickHouse compaction, the worker's key and credentials, `not_deployed` and `unavailable` |
 | 0.2 | 2026-10-05 | Claude (task E08) | After the code review: the key's project checked before any Langfuse step; the tenant guard; no starvation (order, set aside); the request recorded before the delete is sent; `up.sh` keeps the purge on when Langfuse's volume exists; the gaps |
 | 0.3 | 2026-10-07 | Claude (issue #177, PR 2), approved by Harry | §2.5: checked again on Langfuse 4.50.0 and ClickHouse 26.3.39.7 |
+| 0.4 | 2026-10-09 | Claude (task A10), approved by Harry | §2.3 and the gaps: access management of `langfuse` replaced by the loopback-only `sdlc_admin` (ADR-M63 §6, QUESTIONS #330) |
