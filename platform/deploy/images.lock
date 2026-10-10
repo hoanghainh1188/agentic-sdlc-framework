@@ -3,8 +3,8 @@
 # never by hand. Empty until the first release with published images.
 #
 # scripts/images.sh reads this file. Compose uses these images (docker-compose.images.yml) only on
-# a release checkout: HEAD is the tag v$SDLC_IMAGES_VERSION with no local change, or a source
-# archive of that release. Everywhere else the images are built locally from the checkout.
+# a release checkout: HEAD is the tag v$SDLC_IMAGES_VERSION with no local change (a source archive
+# needs SDLC_IMAGES=published). Everywhere else the images are built locally from the checkout.
 SDLC_IMAGES_VERSION=
 SDLC_IMAGE_API=
 SDLC_IMAGE_WORKER=

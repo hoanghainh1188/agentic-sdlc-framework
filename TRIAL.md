@@ -7,7 +7,7 @@ The platform is built and tested, but no team has used it on a project yet. **We
 - **What it costs:** your time (about one day to set up, half a day per task, mostly waiting) and, with an API model, a few US dollars of tokens. The platform caps the spend of each task.
 - **No real data.** The sample project is fictional. Never use client code or real personal data in the trial.
 
-> **Status (2026-10-10):** the first release, **v0.1.0**, is out. Start the trial from that release or later.
+> **Status (2026-10-10):** the latest release is **v0.1.1** (the `sdlc` command on npm, `sdlc next`, published images). Start the trial from v0.1.0 or later; v0.1.1 is faster to set up.
 
 The full plan behind this page, with every measure and rule: [`design/M-E-TRIAL-PLAN.md`](design/M-E-TRIAL-PLAN.md).
 
