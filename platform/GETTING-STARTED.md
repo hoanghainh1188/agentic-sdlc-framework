@@ -282,15 +282,18 @@ The `sdlc` command is published as `agentic-sdlc-cli` by `.github/workflows/npm-
 **Once, before the first tag** (🧑):
 
 1. GitHub → the repository → Settings → Environments → **New environment** `npm`. Add yourself under **Required reviewers**, and under **Deployment branches and tags** allow only tags `v*`. Create it before the first tag: a workflow that names a missing environment creates it without protection.
-2. Make sure your npm account has two-factor authentication on, and that the name `agentic-sdlc-cli` is still free (`npm view agentic-sdlc-cli` answers 404).
+2. Turn on two-factor authentication on your npm account first (npmjs.com → Account → Two-Factor Authentication; a passkey or an authenticator app; mode **Authorization and writes**; keep the recovery codes in your password manager). Without it `npm publish` answers `403 … Two-factor authentication … is required`; never create a token that bypasses 2FA. Check that the name `agentic-sdlc-cli` is still free (`npm view agentic-sdlc-cli` answers 404).
 
 **The first version** (npm adds a trusted publisher only to a package that exists; QUESTIONS #365):
 
 1. Release as usual, then push the tag (for example `v0.1.1`). Approve the `npm` environment when GitHub asks. The workflow builds and checks the package and keeps it as the artifact `agentic-sdlc-cli`; its last step (`npm publish`) fails, because npm does not know the workflow yet.
 2. Download the artifact and check it: `tar -tzf agentic-sdlc-cli-0.1.1.tgz` lists only `package/` with `bin/sdlc.cjs`, `defaults/project-config.default.yaml`, `LICENSE`, `README.md`, `THIRD-PARTY-NOTICES` and `package.json`.
-3. In a terminal: `npm login`, then `npm publish agentic-sdlc-cli-0.1.1.tgz --access public` (npm asks for the 2FA code). This one version has no provenance.
-4. npmjs.com → the package → **Settings** → **Trusted publishing** → GitHub Actions: organisation or user `hoanghainh1188`, repository `agentic-sdlc-framework`, workflow `npm-publish.yml`, environment `npm`. On the same page, under **Publishing access**, choose "Require two-factor authentication and disallow tokens".
-5. Check: `npm install -g agentic-sdlc-cli && sdlc --version` in a new terminal.
+3. In the macOS Terminal: `npm login`, then `npm publish agentic-sdlc-cli-0.1.1.tgz --access public --provenance=false`. The package asks for provenance (`publishConfig.provenance`), which only a CI run can give, so without `--provenance=false` npm stops with `Automatic provenance generation not supported for provider: null`. This one version has no provenance.
+4. npm uses **staged publishing** for a new package: the command uploads the version to a waiting area and creates a placeholder version `0.0.0-stage` (tagged `latest` until then). On npmjs.com, open the package and approve the waiting version (2FA again); `npm view agentic-sdlc-cli dist-tags` must then show `latest: 0.1.1`. Mark the placeholder deprecated: `npm deprecate agentic-sdlc-cli@0.0.0-stage "Placeholder of staged publishing; install agentic-sdlc-cli@0.1.1 or later"`.
+5. npmjs.com → the package → **Settings** → **Trusted publishing** → GitHub Actions: organisation or user `hoanghainh1188`, repository `agentic-sdlc-framework`, workflow `npm-publish.yml`, environment `npm`. On the same page, under **Publishing access**, choose "Require two-factor authentication and disallow tokens".
+6. Check: `npm install -g agentic-sdlc-cli && sdlc --version` in a new terminal.
+
+Done for v0.1.1 on 2026-10-10. The images on GHCR need no step: the packages are linked to this public repository and are public already (check: an anonymous pull of a release image works).
 
 **Every later release:** push the tag, approve the `npm` environment; the workflow publishes with provenance. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
 
