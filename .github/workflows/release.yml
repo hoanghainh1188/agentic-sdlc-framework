@@ -1,0 +1,129 @@
+# The release of a pushed tag vX.Y.Z (task V12, RELEASING.md, QUESTIONS #364, #370, #390).
+#
+# A person (Harry) makes the tag, on the merge commit of the images.lock pull request. The
+# images of the release were built, scanned, signed and attested BEFORE the tag by
+# release-images.yml on main (ADR-M66 §2.5), so this workflow builds nothing:
+# - check: platform/tools/release/release-check.mjs (the tag equals package.json and
+#   PLATFORM_VERSION, the CHANGELOG section with its Upgrade notes, images.lock for this version
+#   with five digests), and the tagged commit is on main;
+# - verify-images: every digest of images.lock carries a cosign signature and a build provenance
+#   attestation made by release-images.yml on refs/heads/main (read only);
+# - release: creates the GitHub Release from the CHANGELOG section; an existing release is never
+#   changed.
+# npm-publish.yml runs on the same tag with the same release-check.mjs, in its own file: npm's
+# trusted publisher names that file and the environment `npm` (ADR-M72 §2.3).
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  COSIGN_VERSION: v3.1.3
+  # The only signer of the platform's images (ADR-M66 §2.4), checked against the v0.1.1
+  # signatures and attestations on 2026-10-10.
+  SIGNER_IDENTITY: https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/heads/main
+  SIGNER_ISSUER: https://token.actions.githubusercontent.com
+
+jobs:
+  check:
+    name: check the tag, the versions, the CHANGELOG and images.lock
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the ancestry check reads main's history
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: The release gate
+        env:
+          TAG: ${{ github.ref_name }}
+        run: node platform/tools/release/release-check.mjs tag "$TAG"
+      - name: The tagged commit is on main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "::error::the tagged commit $GITHUB_SHA is not on main"; exit 1; }
+
+  verify-images:
+    name: verify the signatures and attestations of the release images
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read # pull the signatures from GHCR
+      attestations: read # gh attestation verify
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: The image references
+        env:
+          TAG: ${{ github.ref_name }}
+        run: node platform/tools/release/release-check.mjs tag "$TAG" --images-out "$RUNNER_TEMP/images.txt"
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: ${{ env.COSIGN_VERSION }}
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: cosign verify and gh attestation verify, every image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while read -r ref; do
+            [ -n "$ref" ] || continue
+            echo "::group::$ref"
+            cosign verify --certificate-identity "$SIGNER_IDENTITY" \
+              --certificate-oidc-issuer "$SIGNER_ISSUER" "$ref" > /dev/null
+            gh attestation verify "oci://$ref" --repo "$GITHUB_REPOSITORY" \
+              --cert-identity "$SIGNER_IDENTITY" --cert-oidc-issuer "$SIGNER_ISSUER" > /dev/null
+            echo "::endgroup::"
+          done < "$RUNNER_TEMP/images.txt"
+          [ "$(grep -c . "$RUNNER_TEMP/images.txt")" = 5 ] || {
+            echo "::error::expected five images"; exit 1; }
+
+  release:
+    name: create the GitHub Release
+    needs: [check, verify-images]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write # the GitHub Release; nothing else
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: The notes from the CHANGELOG section
+        env:
+          TAG: ${{ github.ref_name }}
+        run: node platform/tools/release/release-check.mjs tag "$TAG" --notes-out "$RUNNER_TEMP/notes.md"
+      - name: Create the release (never change an existing one)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "::error::the release $TAG already exists; it is never changed by this workflow"
+            exit 1
+          fi
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"

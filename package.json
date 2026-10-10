@@ -59,6 +59,7 @@
     "compose:sandbox": "platform/deploy/scripts/up.sh core sandbox",
     "sandbox-image:build": "platform/sandbox-images/build.sh",
     "images": "platform/deploy/scripts/images.sh",
+    "release:lock": "node platform/tools/release/lock.mjs",
     "diagrams:render": "python3 scripts/diagrams.py render",
     "diagrams:check": "python3 scripts/diagrams.py check",
     "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox down",

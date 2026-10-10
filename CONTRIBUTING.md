@@ -51,7 +51,7 @@ This section is the one description of the repository's settings and CI; other d
 1. Branch from `main` (platform tasks: `task/<ID>-<short-name>`). Never rebase or force-push a branch under review; merge `main` into it.
 2. Open a pull request with the template (AI disclosure, template T2). Put the task ID in the title.
 3. Handbook changes: a separate pull request, approved by the handbook owner. Changes to **approved** documents in `design/`: a separate pull request with the reason; a new technical decision gets an ADR.
-4. Record notable changes in [CHANGELOG.md](CHANGELOG.md).
+4. Record notable changes in [CHANGELOG.md](CHANGELOG.md), under `[Unreleased]`. A change that needs an upgrade step (a migration, a changed setting, a credentials command) says so: the release's "Upgrade notes" list it. Versions and releases: [RELEASING.md](RELEASING.md).
 5. Platform code: one task per session, plan first, tests for every acceptance criterion ([CLAUDE.md](CLAUDE.md), [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md)). Before a pull request: `pnpm build && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`.
 
 ## 4. Conventions

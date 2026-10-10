@@ -6,8 +6,9 @@
 # npm token in the repository or its secrets, and every version carries npm provenance.
 # Before the first run: create the environment `npm` with its reviewer (GitHub would otherwise
 # create it without protection) and add this workflow as the package's trusted publisher on
-# npmjs.com (platform/GETTING-STARTED.md, "Publishing the CLI on npm"). V12 may fold this job into the release
-# workflow later.
+# npmjs.com (platform/GETTING-STARTED.md, "Publishing the CLI on npm").
+# V12 (RELEASING.md, QUESTIONS #390): this stays its own tag workflow, next to release.yml, with the
+# same release gate. Never rename this file or the environment: npm's trusted publisher names both.
 name: npm-publish
 
 on:
@@ -41,15 +42,12 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: The tag names the release version
+      # The same release gate as release.yml (task V12): the tag, package.json, PLATFORM_VERSION,
+      # the CHANGELOG section with its Upgrade notes, images.lock for this version.
+      - name: The release gate
         env:
           TAG: ${{ github.ref_name }}
-        run: |
-          version="$(node -p "require('./package.json').version")"
-          if [ "$TAG" != "v$version" ]; then
-            echo "::error::tag $TAG does not match package.json version $version"
-            exit 1
-          fi
+        run: node platform/tools/release/release-check.mjs tag "$TAG"
       - name: Build and check the package
         run: |
           mkdir -p "$RUNNER_TEMP/npm"
