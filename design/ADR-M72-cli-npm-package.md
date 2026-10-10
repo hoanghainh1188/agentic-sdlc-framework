@@ -4,7 +4,7 @@
 |---|---|
 | Status | **Proposed** (task V05) |
 | Date | 2026-10-10 |
-| Decided by | Harry (V05 plan approved 2026-10-10; QUESTIONS #365–#367 answered in the proposal) |
+| Decided by | Harry (V05 plan approved 2026-10-10; QUESTIONS #365–#367 answered 2026-10-10) |
 | Related | D-08 task V05; QUESTIONS #357, #364, #365–#367; ADR-M16 (monorepo tooling); ADR-M36 (the CLI's API client); `platform/USER-GUIDE.md` §2; task V12 (the release process) |
 
 ## 1. Context
@@ -43,7 +43,7 @@ Exactly: `bin/sdlc.cjs`, `defaults/project-config.default.yaml`, `THIRD-PARTY-NO
 
 npm **trusted publishing** (OpenID Connect, `id-token: write`) proves the workflow to npm: no npm token lives in the repository or in its secrets, and every version carries npm provenance (which commit and workflow built it). `actions/setup-node` gets no `registry-url`, so no `.npmrc` expects a token.
 
-**The first version** (QUESTIONS #365): npm lets a package's owner add a trusted publisher only to a package that exists. So the first version is published once by Harry, by hand, from the tarball the tag workflow checked and kept (2FA, no provenance for that version); then Harry adds the trusted publisher (repository `hoanghainh1188/agentic-sdlc-framework`, workflow `npm-publish.yml`, environment `npm`) and sets "Require two-factor authentication and disallow tokens". Every later version goes through the workflow. The steps are in `platform/GETTING-STARTED.md`, "Publishing the CLI on npm".
+**The first version** (QUESTIONS #365, Harry 2026-10-10): npm lets a package's owner add a trusted publisher only to a package that exists. So the first version is published once by Harry, by hand (version 0.1.1), from the tarball the tag workflow checked and kept (2FA, no provenance for that version); then Harry adds the trusted publisher (repository `hoanghainh1188/agentic-sdlc-framework`, workflow `npm-publish.yml`, environment `npm`) and sets "Require two-factor authentication and disallow tokens". Every later version goes through the workflow. The steps are in `platform/GETTING-STARTED.md`, "Publishing the CLI on npm".
 
 Task V12 may fold this job into the release workflow; V04 (images on GHCR) has its own job.
 
