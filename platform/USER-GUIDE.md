@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.10, 2026-10-09. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
+Version 0.11, 2026-10-10. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
 
 ---
 
@@ -35,7 +35,19 @@ Risk tiers decide how far the agent may go: Low and Medium → it changes code (
 
 ### Install the sdlc command
 
-The `sdlc` command is not published as a package yet. You run it from a checkout of this repository (Node.js 24, pnpm 10; `corepack enable` once):
+From release v0.1.1 on, the `sdlc` command is on npm as **`agentic-sdlc-cli`**. You need Node.js 24 only; no checkout, pnpm or build:
+
+```bash
+npm install -g agentic-sdlc-cli
+sdlc --version
+```
+
+- **Use the platform's version.** `sdlc --version` prints the release; install the one your platform runs (ask your operator), for example `npm install -g agentic-sdlc-cli@0.1.1`. To update: the same command with the new version.
+- **Trust.** Every version is published by this repository's GitHub Actions from a release tag, with npm provenance (npm shows the commit and the workflow that built it). The package has no dependencies: everything it needs is in one file, and `THIRD-PARTY-NOTICES` lists the bundled open-source packages.
+- **Operator commands.** `sdlc ops …` is in the package too, but works only on the platform server, with `SDLC_DB_URL` ([deploy/README.md](deploy/README.md)).
+- To remove it: `npm uninstall -g agentic-sdlc-cli`.
+
+**From a checkout (developers, and before v0.1.1).** Run the CLI from a checkout of this repository (Node.js 24, pnpm 10; `corepack enable` once):
 
 ```bash
 git clone https://github.com/hoanghainh1188/agentic-sdlc-framework.git
@@ -261,6 +273,7 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 | 0.5 | 2026-10-09 | Docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists |
 | 0.6 | 2026-10-09 | Docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate |
 | 0.7 | 2026-10-09 | Docs review E2: §1 and §7 link to the handbook sections |
+| 0.11 | 2026-10-10 | Task V05: §2, install the `sdlc` command from npm (`agentic-sdlc-cli`); the checkout ways stay for developers |
 | 0.10 | 2026-10-09 | Task C13: step 5, saving an L1 proposal and ending the intent with a G4 rejection |
 | 0.9 | 2026-10-09 | Task U03: step 3, `sdlc intent create --spec` links the spec in the same command |
 | 0.8 | 2026-10-09 | Docs review E3 (readability): §2 login and token steps as a list; step 4 plan notes as a list; step 5 says how Person A takes an L1 proposal forward; step 8 says `done`; the version history moved here |

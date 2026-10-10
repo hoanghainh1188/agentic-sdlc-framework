@@ -20,6 +20,8 @@ export default tseslint.config(
       '**/node_modules/',
       '**/dist/',
       '**/coverage/',
+      // The npm package build of the CLI (V05): a generated bundle.
+      'platform/apps/cli/npm-dist/',
     ],
   },
 

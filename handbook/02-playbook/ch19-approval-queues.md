@@ -191,6 +191,8 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 
 The `sdlc` command does through the API what the comment commands do on GitHub, and more: create and read intents, decide gates, act on escalations, keep the project AI record.
 
+**Install it.** `npm install -g agentic-sdlc-cli` (Node.js 24; from release v0.1.1 on), at the version of your platform; `sdlc --version` prints it. From a checkout of the repository, `pnpm sdlc …` works too ([USER-GUIDE §2](../../platform/USER-GUIDE.md#install-the-sdlc-command)).
+
 **Log in once.**
 
 1. Get your first API token (`sdlc_pat_…`) from a tenant admin (it lasts at most 7 days) or, for the first person of a tenant, from the platform operator. Keep it in your password manager. After you log in, create your own API token (`sdlc token create`), log in again with it, and revoke the first one.
@@ -472,6 +474,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.28 | 2026-10-09 | Claude (task C13) | §19.8c: `sdlc evidence proposal` |
 | 0.29 | 2026-10-09 | Claude (task V01, PR 2) | §19.8c: `sdlc trial report`, the anonymous report of the community trial (ADR-M65) |
 | 0.27 | 2026-10-09 | Claude (task U03) | §19.8c: `sdlc intent create --spec` creates the intent and links its spec in one command |
+| 0.30 | 2026-10-10 | Claude (task V05) | §19.8c: install the `sdlc` command from npm (`agentic-sdlc-cli`), `sdlc --version` |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

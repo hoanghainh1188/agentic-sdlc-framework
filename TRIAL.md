@@ -56,6 +56,8 @@ Best: two people. If you are alone, you may use a second GitHub account for Pers
    ```
    It follows [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator), steps 2–13, for you, in 20 to 40 minutes: OpenBao with throw-away keys, every credential, the database, the platform (`core models platform sandbox`), the tenant (Person A is its admin), the project with Person A and Person B, the sandbox image (published, or built when the release has none), the agent, the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial) and the AI record (data class `internal`). At the end, Person A and Person B are each logged in, in their own config folder. Run Person B's commands as `XDG_CONFIG_HOME=<Person B's folder> pnpm sdlc …`.
 
+   From v0.1.1 on you may also install the command from npm, at the version of your checkout (`npm install -g agentic-sdlc-cli@<version>`, [USER-GUIDE §2](platform/USER-GUIDE.md#install-the-sdlc-command)), and write `sdlc …` instead of `pnpm sdlc …`; the logins are the same.
+
 What `trial:up` refuses and keeps safe:
 
 - It refuses a machine with another stack of the platform (`platform/deploy/.env` or `sdlc_*` volumes), `NODE_ENV=production`, no Docker, too little memory, a key file others can read, or an existing login in a config folder. It never removes or overwrites them.
@@ -107,6 +109,7 @@ Stop and report at once if you see a `security` escalation, if `sdlc audit verif
    ```bash
    pnpm sdlc trial report --json > trial-report.json
    ```
+   (Or `sdlc trial report --json …` with the npm package.)
    Read the file before you send it.
 2. Open an issue in this repository with the template **"Trial report"**: paste the JSON, your log, the model you used, your machine, and the problems you found (one issue per bug is even better: link them).
 3. Never paste tokens, keys, `.env` values or client data into an issue. A security problem goes through [SECURITY.md](SECURITY.md), never into a public issue.

@@ -95,6 +95,9 @@ importers:
       prettier:
         specifier: 3.9.9
         version: 3.9.9
+      rolldown:
+        specifier: 1.2.11
+        version: 1.2.11
       rxjs:
         specifier: 7.8.2
         version: 7.8.2
