@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- The plan toward v0.2.0 (QUESTIONS #355–#357): D-08 1.32, new milestone UX with V04 (images on GHCR) and V05–V11 (the CLI on npm as `agentic-sdlc-cli`, `sdlc next`, `doctor`, the trial stack surviving a reboot, team access through a TLS reverse proxy, a friendlier CLI with `sdlc help`, a plan for the dashboard's actions). English only for now.
+
 ## [0.1.0] - 2026-10-10
 
 The first release. The MVP is done: one intent goes through all eight gates (G1–G8) on the sample repository, with the evidence and the tests listed in `design/MVP-DONE.md`. This release starts the community trial (milestone M-E): anyone can try the platform on their own machine and send a report. Start with `TRIAL.md`: `pnpm trial:up` sets up the trial stack in one command, `pnpm github-app:create` creates the GitHub App from a manifest, and `sdlc trial report` builds the anonymous report for the issue template `trial-report`. Known limits: `pnpm trial:up` is for developer machines with throw-away keys only (the stack cannot be unsealed after a reboot); a server deployment needs task A10 PR 3; the images are built locally until task V04.
