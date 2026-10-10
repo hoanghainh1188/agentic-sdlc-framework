@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-10
+
+A small release of the milestone UX: easier to install and to use. **The `sdlc` command on npm** (`npm install -g agentic-sdlc-cli`, Node.js 24, no checkout; `sdlc --version`), **`sdlc next <INT>`** (where an intent is and what you do now), and **the platform's images on GHCR**, built for amd64 and arm64, scanned, signed with cosign keyless and carrying an SBOM and provenance: a checkout of the tag `v0.1.1` pulls them by digest instead of building them (`platform/deploy/README.md`, "Verify the published images").
+
+### Upgrade notes
+- No migration, no changed setting, no credentials command to run again.
+- A checkout of the tag `v0.1.1` uses the published images: run `platform/deploy/scripts/up.sh …` as before (it pulls them); `pnpm images mode` prints `published`. Any other checkout keeps building the images locally: rebuild them once (`docker compose … build`) for the slimmer runtime images of the api, worker and runner (no npm, Debian security updates).
+- The `sdlc` command: install it from npm at the platform's version (`npm install -g agentic-sdlc-cli@0.1.1`), or keep `pnpm sdlc` from a checkout.
+
 ### Fixed
 - V06 follow-up (post-merge review of #277): `sdlc next` tells only a holder of G7's role (person_b, and the second approver when two approvals are needed) who is not a producer to merge; everyone else waits for them (before, any non-producer, a viewer included, was told to merge). At G5 and G6 the person who allowed the last run (the latest G4 approval, as core `runProducers` counts it) is a producer and is never told to approve; G6 was missing. Tests in `cli/next.test.ts`.
 
