@@ -15,3 +15,6 @@ openbao-tls/
 # Dashboard smoke test output (U01): screenshots go to the PR, not the repository.
 platform/tests/e2e/screenshots/
 platform/tests/e2e/test-results/
+
+# The npm package build of the CLI (V05): made by pnpm cli:pack, never committed.
+platform/apps/cli/npm-dist/

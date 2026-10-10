@@ -267,6 +267,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm test
+      # V05: the npm package of the CLI packs, installs into an empty folder and runs.
+      - run: pnpm cli:pack-check
       - name: Lint workflows (actionlint)
         run: |
           archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"

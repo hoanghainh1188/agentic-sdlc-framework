@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- V05 (ADR-M72, QUESTIONS #365–#367): **the `sdlc` command on npm as `agentic-sdlc-cli`** (from the next release): `npm install -g agentic-sdlc-cli` on Node.js 24, no checkout or build. `pnpm cli:pack` bundles the CLI and every package it uses into one CommonJS file with Rolldown (pinned; already in the lockfile through Vite 8), with the shipped default project configuration, `THIRD-PARTY-NOTICES` and no source map; the build refuses a version mismatch and any bundled licence outside MIT, ISC, Apache-2.0, BSD and 0BSD. `pnpm cli:pack-check` (CI job `checks`) packs it, refuses any extra file, absolute path, source map reference, token or private key, installs the tarball into an empty folder and runs `sdlc --version` and `sdlc`. New workflow `npm-publish.yml`: only on a release tag, in the environment `npm` (owner's approval), npm trusted publishing with provenance, no npm token anywhere. New **`sdlc --version`** (`-V`). USER-GUIDE 0.11 §2, TRIAL.md, handbook Ch.19 0.30 §19.8c, GETTING-STARTED "Publishing the CLI on npm" (the first version is published once by hand, then the trusted publisher is added). The `ops …` commands are in the package and still need the server. Tests: `cli/version.test.ts`, `cli/npm-package.test.ts`.
+
 ### Changed
 - `scripts/create-issues.py` labels backlog issues `backlog` instead of `backlog-mvp` (QUESTIONS #360); the GitHub label is renamed after the merge, so existing issues keep it.
 - The roadmap after v0.1 (QUESTIONS #360–#364): **"MVP" is retired**, v0.1.0 is the v0.1 baseline and unscheduled work is "Later" (living documents reworded, meaning unchanged; file names and history kept). D-08 1.34: milestone UX gains V12 (release process) and L02 (model benchmark); new milestones EXT (X01–X04, X07, X09), Models (L01, L03), Server (A10, O01–O03) and Later (X05, X06, X08, X10; K02 superseded by X04). New public `ROADMAP.md`, generated with D-08.

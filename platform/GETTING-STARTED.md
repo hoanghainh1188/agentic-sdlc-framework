@@ -275,6 +275,25 @@ The fifth (E07, D-08 E07 AC1) is the same run taken on to G8; it needs items 7 a
 
 The merged change is one fixed, fictional line appended to `docs/live-test/RUNS.md` on the pilot's `main`. Each live G8 run adds one more line there; nothing under `apps/` changes, so the pilot stays clean for the T01–T10 trials. Do not revert it.
 
+## Publishing the CLI on npm (owner)
+
+The `sdlc` command is published as `agentic-sdlc-cli` by `.github/workflows/npm-publish.yml`, only from a release tag (task V05, `design/ADR-M72-cli-npm-package.md`). Tags, releases and npm publishes are public actions: only the owner starts them. Claude never pushes a tag or publishes.
+
+**Once, before the first tag** (🧑):
+
+1. GitHub → the repository → Settings → Environments → **New environment** `npm`. Add yourself under **Required reviewers**, and under **Deployment branches and tags** allow only tags `v*`. Create it before the first tag: a workflow that names a missing environment creates it without protection.
+2. Make sure your npm account has two-factor authentication on, and that the name `agentic-sdlc-cli` is still free (`npm view agentic-sdlc-cli` answers 404).
+
+**The first version** (npm adds a trusted publisher only to a package that exists; QUESTIONS #365):
+
+1. Release as usual, then push the tag (for example `v0.1.1`). Approve the `npm` environment when GitHub asks. The workflow builds and checks the package and keeps it as the artifact `agentic-sdlc-cli`; its last step (`npm publish`) fails, because npm does not know the workflow yet.
+2. Download the artifact and check it: `tar -tzf agentic-sdlc-cli-0.1.1.tgz` lists only `package/` with `bin/sdlc.cjs`, `defaults/project-config.default.yaml`, `LICENSE`, `README.md`, `THIRD-PARTY-NOTICES` and `package.json`.
+3. In a terminal: `npm login`, then `npm publish agentic-sdlc-cli-0.1.1.tgz --access public` (npm asks for the 2FA code). This one version has no provenance.
+4. npmjs.com → the package → **Settings** → **Trusted publishing** → GitHub Actions: organisation or user `hoanghainh1188`, repository `agentic-sdlc-framework`, workflow `npm-publish.yml`, environment `npm`. On the same page, under **Publishing access**, choose "Require two-factor authentication and disallow tokens".
+5. Check: `npm install -g agentic-sdlc-cli && sdlc --version` in a new terminal.
+
+**Every later release:** push the tag, approve the `npm` environment; the workflow publishes with provenance. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
+
 ## Sending handbook comments
 
 Any format works. To make changes fast, one line per comment is ideal:

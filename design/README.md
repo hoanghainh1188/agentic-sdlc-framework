@@ -59,6 +59,7 @@
 | ADR-M63 | [OpenBao TLS everywhere, and backups](ADR-M63-openbao-tls-and-backups.md) (task A10) | Proposed | |
 | ADR-M64 | [Taking an L1 proposal forward: the download and the end of the intent](ADR-M64-l1-proposal-hand-over.md) (task C13) | Proposed | |
 | ADR-M65 | [The trial report: an anonymous summary built from the existing reads](ADR-M65-trial-report.md) (task V01) | Proposed | |
+| ADR-M72 | [The CLI on npm: one bundled file, published from a tag with provenance](ADR-M72-cli-npm-package.md) (task V05) | Proposed | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 
