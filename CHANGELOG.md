@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-10
+
+The first release. The MVP is done: one intent goes through all eight gates (G1–G8) on the sample repository, with the evidence and the tests listed in `design/MVP-DONE.md`. This release starts the community trial (milestone M-E): anyone can try the platform on their own machine and send a report. Start with `TRIAL.md`: `pnpm trial:up` sets up the trial stack in one command, `pnpm github-app:create` creates the GitHub App from a manifest, and `sdlc trial report` builds the anonymous report for the issue template `trial-report`. Known limits: `pnpm trial:up` is for developer machines with throw-away keys only (the stack cannot be unsealed after a reboot); a server deployment needs task A10 PR 3; the images are built locally until task V04.
+
 ### Changed
 - V03 follow-up: QUESTIONS #350 confirmed by Harry's live check of `pnpm github-app:create` on github.com (the loopback redirect works; no key printed; key file mode 600). Documentation only.
 - V03 (QUESTIONS #350, #351): **`pnpm github-app:create --out <file> [--org <org>] [--name <name>] [--force]`** creates the platform's GitHub App from a manifest (`platform/deploy/github-app/manifest.json`: exactly the README's seven permissions, webhook off, private, no events). It serves a script-free page on 127.0.0.1 whose button posts the manifest to GitHub, accepts one callback with the right state (or the pasted address at a hidden prompt, when the browser cannot reach 127.0.0.1), finishes the App with `POST /app-manifests/{code}/conversions`, and saves the private key to a file outside the repository with mode 600. It prints only the App ID, the client ID and the install link; the client secret and webhook secret are dropped. deploy/README "Create the GitHub App": option A (the command), option B (by hand, the fallback); TRIAL.md §3.2 step 2; GETTING-STARTED Step 11. `readHiddenLine` (CLI) takes an optional abort signal. Tests: `pnpm test` (`deploy/github-app.test.ts`, a fake GitHub only).
