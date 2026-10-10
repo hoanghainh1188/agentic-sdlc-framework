@@ -91,7 +91,10 @@ export interface UpDeps {
   readonly exec: Exec;
   readonly sdlc: Sdlc;
   readonly progress: (key: MessageKey, params?: MessageParams) => void;
-  /** A sandbox image already built, by digest (`SDLC_SANDBOX_IMAGE`), or build one. */
+  /**
+   * A sandbox image already built, by digest (`SDLC_SANDBOX_IMAGE`); else the release's published
+   * image on a release checkout (V04), else build one.
+   */
   readonly sandboxImage?: string;
   readonly dockerDesktop: boolean;
 }
@@ -402,6 +405,11 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
   // Step 10: the sandbox image, by digest.
   step('10');
   let image = deps.sandboxImage ?? '';
+  // A release checkout uses the release's published image by digest (V04, design/ADR-M66 §2.5).
+  const images = path.join(deployDir, 'scripts/images.sh');
+  if (!image && ok(await run(images, ['mode']), 'images mode').stdout.trim() === 'published') {
+    image = ok(await run(images, ['get', 'SANDBOX_NODE24']), 'images get').stdout.trim();
+  }
   if (!image) {
     const built = ok(
       await run(

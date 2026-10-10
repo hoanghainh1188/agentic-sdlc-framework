@@ -20,6 +20,12 @@ interface NetworkedService {
   network_mode?: string;
 }
 
+// Compose's own tags (`!reset` in docker-compose.images.yml, V04) read as plain values.
+const COMPOSE_TAGS = {
+  merge: true,
+  customTags: [{ tag: '!reset', resolve: () => null }],
+};
+
 const composeFiles = (): string[] => {
   const files = fs.readdirSync(deployDir).filter((f) => /^docker-compose.*\.ya?ml$/.test(f));
   expect(files).toContain('docker-compose.yml');
@@ -81,7 +87,7 @@ describe('A12 AC4: SeaweedFS listens on 127.0.0.1 except the S3 API', () => {
 
   it('no compose file publishes or exposes an internal SeaweedFS port of the seaweedfs container', () => {
     for (const file of composeFiles()) {
-      const parsed = parse(readDeployFile(file), { merge: true }) as {
+      const parsed = parse(readDeployFile(file), COMPOSE_TAGS) as {
         services?: Record<string, NetworkedService & { expose?: unknown[] }>;
       };
       const s = parsed.services?.seaweedfs;
@@ -102,7 +108,7 @@ describe('A12 AC4: SeaweedFS listens on 127.0.0.1 except the S3 API', () => {
 
   it('no other service, in any compose file, joins the seaweedfs namespace or another container namespace', () => {
     for (const file of composeFiles()) {
-      const parsed = parse(readDeployFile(file), { merge: true }) as {
+      const parsed = parse(readDeployFile(file), COMPOSE_TAGS) as {
         services?: Record<string, NetworkedService>;
       };
       const joiners = Object.entries(parsed.services ?? {})

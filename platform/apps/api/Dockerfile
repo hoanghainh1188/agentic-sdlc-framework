@@ -17,6 +17,13 @@ RUN pnpm install --frozen-lockfile --ignore-scripts \
   && pnpm --filter @sdlc/api deploy --legacy --prod /out
 
 FROM node:24.13.0-bookworm-slim
+# Debian's security updates at build time, and no npm, npx or corepack at run time: the process
+# runs `node` only, and npm's own dependencies carried CRITICAL findings (V04, design/ADR-M66 §2.6).
+RUN apt-get update \
+  && apt-get upgrade -y --no-install-recommends \
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=root:root /out /app

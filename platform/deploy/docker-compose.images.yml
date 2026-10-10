@@ -1,0 +1,25 @@
+# The published images of a release, pinned by digest (task V04, design/ADR-M66 §2.5). An overlay of
+# docker-compose.yml, added by scripts/up.sh only on a release checkout (scripts/images.sh mode
+# prints `published`), with the variables of images.lock.env. Every service that docker-compose.yml
+# builds is here: `build` is removed (`!reset`, Compose v2.24+) and the image comes from GHCR.
+# Verify an image: README "Verify the published images".
+services:
+  otel-collector:
+    image: ${SDLC_IMAGE_OTEL_COLLECTOR:?run through scripts/up.sh (images.lock.env)}
+    build: !reset null
+    pull_policy: missing
+
+  sdlc-api:
+    image: ${SDLC_IMAGE_API:?run through scripts/up.sh (images.lock.env)}
+    build: !reset null
+    pull_policy: missing
+
+  sdlc-worker:
+    image: ${SDLC_IMAGE_WORKER:?run through scripts/up.sh (images.lock.env)}
+    build: !reset null
+    pull_policy: missing
+
+  sdlc-runner:
+    image: ${SDLC_IMAGE_RUNNER:?run through scripts/up.sh (images.lock.env)}
+    build: !reset null
+    pull_policy: missing

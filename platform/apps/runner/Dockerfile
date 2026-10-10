@@ -17,10 +17,15 @@ RUN pnpm install --frozen-lockfile --ignore-scripts \
   && pnpm --filter @sdlc/runner deploy --legacy --prod /out
 
 FROM node:24.13.0-bookworm-slim
-# git for the clone; ca-certificates for HTTPS to the Git host.
+# git for the clone; ca-certificates for HTTPS to the Git host. Debian's security updates at build
+# time, and no npm, npx or corepack at run time: the process runs `node` only, and npm's own
+# dependencies carried CRITICAL findings (V04, design/ADR-M66 §2.6).
 RUN apt-get update \
+  && apt-get upgrade -y --no-install-recommends \
   && apt-get install -y --no-install-recommends git ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
   && mkdir -p /var/lib/sdlc-runner/work \
   && chown node:node /var/lib/sdlc-runner/work \
   && chmod 0700 /var/lib/sdlc-runner/work
