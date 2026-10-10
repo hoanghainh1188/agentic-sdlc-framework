@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.0 |
+| Version | 1.1 |
 | Date | 2026-10-10 |
-| Status | **Proposed** (task V11, design only). Harry chose the main options on 2026-10-10 (QUESTIONS #375–#379). This is a plan, not approved scope: D-02 §4.2, D-03, D-05 and ADR-M54 do not change, and no backlog task is added, until Harry approves this document (section 8). It is revised once `design/M-E-REPORT.md` exists (section 9) |
+| Status | **Approved** (Harry, 2026-10-10). Decided in ADR-M73; built by U05–U07 (milestone UX) and U08–U09 (Later). Revised once `design/M-E-REPORT.md` exists (section 9) |
 | Readers | Harry, the trial teams, Claude Code |
 | Related documents | D-02 §3, §4.2, FR-11, FR-16, FR-17; D-03 §5.1, §9, §12 (ADR-M03); D-05 §6.3; ADR-M54 (the read-only dashboard); ADR-M41 (G7); ADR-M42 (kill switch); ADR-M28 (escalations); D-08 V03, V09, V11; QUESTIONS #255, #355, #358, #375–#379; handbook codes table §5 (2+N) |
 
@@ -175,9 +175,9 @@ V09 (ADR-M67, not done yet) publishes the API and the dashboard on one LAN port 
 
 V09 keeps the token only in the `Authorization` header for the CLI; the dashboard moves to the session cookie for actions.
 
-## 7. Design changes after approval (not in this PR)
+## 7. Design changes (made after approval, 2026-10-10)
 
-One design PR, after Harry approves this document. Nothing in it is applied now.
+The design PR after Harry's approval made these changes: D-02 1.10, D-03 1.40, D-05 1.40, ADR-M54 0.5, ADR-M73 1.0, D-08 1.35.
 
 | Document | Change |
 |---|---|
@@ -186,21 +186,20 @@ One design PR, after Harry approves this document. Nothing in it is applied now.
 | D-05 | Tables `web_sessions`, `webauthn_credentials`; source code `web`; audit actions `web_session.*`, `passkey.*` |
 | ADR-M54 | A pointer: the read-only decision stays; actions are decided in ADR-M73 |
 | **ADR-M73** (new, QUESTIONS #379) | Dashboard actions: GitHub sign-in, sessions, CSRF, passkeys (and the WebAuthn library), `expected_input_sha256`, settings, alternatives considered |
-| D-08 V03 | The App keeps its client secret in OpenBao and lists the callback URLs |
-| Handbook Ch.19 (usage) | Signing in, passkeys, the actions |
+| D-08 U05 (a change of V03) | The App keeps its client secret in OpenBao and lists the callback URLs |
+| Handbook Ch.19 (usage) | Signing in, passkeys, the actions: written by U05–U07 with the code |
 
-## 8. Implementation tasks (proposed, added to `scripts/generate-backlog.py` only after approval)
+## 8. Implementation tasks (in D-08 since version 1.35)
 
 | ID | Task | Size | Depends on | Main acceptance criteria |
 |---|---|---|---|---|
-| U04 | Design PR: ADR-M73, D-02 §4.2, D-03, D-05, D-08 V03 | S | this plan approved | Harry approves each change |
-| U05 | GitHub sign-in and server-side sessions | M | U04, V03 change | OAuth with `state` and PKCE; the GitHub user token dropped; match by numeric ID among linked identities; `web_sessions` (hashes only); guard takes bearer or cookie; revocation; audit; tests: tenant isolation, unlinked or disabled user refused |
+| U05 | GitHub sign-in and server-side sessions | M | U01, V03 (U05 changes V03) | OAuth with `state` and PKCE; the GitHub user token dropped; match by numeric ID among linked identities; `web_sessions` (hashes only); guard takes bearer or cookie; revocation; audit; tests: tenant isolation, unlinked or disabled user refused |
 | U06 | CSRF, origin check, passkeys and step-up | M | U05 | Three CSRF layers; WebAuthn registration and per-action assertions bound to the action; `webauthn_credentials`; tests: a request from another origin, without the CSRF token, or with a reused assertion is refused |
 | U07 | Wave 1 in the dashboard: kill, gate decisions, escalations | M | U06 | Confirmation step with the input hash; `expected_input_sha256` (409); source `web`; Playwright tests: producer, wrong role and the same person twice refused through the page (N5), G7 only as a link; screenshots at 375, 768, 1440 px, light and dark |
 | U08 | Wave 2: create an intent with its spec, submit a plan, evidence packs | M | U07 | The U03 flow (a refused link keeps the intent); refusals from the catalog |
 | U09 | Wave 3: administration | L | U07 | Self-grant and Person A = Person B refused; config upload shows the difference before saving |
 
-Teams on other machines also need V09. The milestone of U04–U09 (UX toward v0.2.0, or Later) is decided when the tasks are added.
+U05–U07 are in the milestone UX (toward v0.2.0), U08–U09 in Later (QUESTIONS #380). Wave 1 works on `localhost` first; teams on other machines also need V09, but U05–U07 do not depend on it.
 
 ## 9. How the trial data will change this plan (AC5)
 
@@ -221,6 +220,7 @@ Teams on other machines also need V09. The milestone of U04–U09 (UX toward v0.
 | #377 | Wave 1 = kill, gate decisions, escalations; writes only on loopback or behind V09 |
 | #378 | Source code `web`; optional `expected_input_sha256` on gate decisions |
 | #379 | A new ADR-M73 for the dashboard's actions; ADR-M54 stays the read-only record |
+| #380 | Plan approved; U05–U07 in the milestone UX, U08–U09 Later; wave 1 on `localhost` first, no dependency on V09 |
 
 ## Version history
 
@@ -229,3 +229,4 @@ Teams on other machines also need V09. The milestone of U04–U09 (UX toward v0.
 | 0.1 | 2026-10-07 | Claude (coordinator) | Draft for the trial: candidate functions by role, what never goes in the interface, conditions for actions, proposed order |
 | 0.2 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |
 | 1.0 | 2026-10-10 | Claude (task V11) | The plan of the dashboard's actions: three waves through the existing endpoints, what never goes in, the security design for writes (GitHub sign-in, sessions, CSRF, passkey step-up, the two-person rule, audit source `web`, `expected_input_sha256`, CSP unchanged), V09, the design changes and tasks after approval, how the trial data changes it (QUESTIONS #375–#379). Proposed: nothing changes before Harry approves it |
+| 1.1 | 2026-10-10 | Claude (task V11), approved by Harry | Approved: status, §7 the changes made, §8 the tasks U05–U09 in D-08 1.35 with their milestones, §10 #380 |
