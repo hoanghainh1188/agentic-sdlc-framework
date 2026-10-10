@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- `scripts/create-issues.py` labels backlog issues `backlog` instead of `backlog-mvp` (QUESTIONS #360); the GitHub label is renamed after the merge, so existing issues keep it.
 - The roadmap after v0.1 (QUESTIONS #360–#364): **"MVP" is retired**, v0.1.0 is the v0.1 baseline and unscheduled work is "Later" (living documents reworded, meaning unchanged; file names and history kept). D-08 1.34: milestone UX gains V12 (release process) and L02 (model benchmark); new milestones EXT (X01–X04, X07, X09), Models (L01, L03), Server (A10, O01–O03) and Later (X05, X06, X08, X10; K02 superseded by X04). New public `ROADMAP.md`, generated with D-08.
 - The plan toward v0.2.0 (QUESTIONS #355–#357): D-08 1.32, new milestone UX with V04 (images on GHCR) and V05–V11 (the CLI on npm as `agentic-sdlc-cli`, `sdlc next`, `doctor`, the trial stack surviving a reboot, team access through a TLS reverse proxy, a friendlier CLI with `sdlc help`, a plan for the dashboard's actions). English only for now.
 - Review of the milestone UX (QUESTIONS #358): D-08 1.33. V05 adds `sdlc --version` and its smoke test runs `sdlc` without arguments; V08 also updates CLAUDE.md and runbook T11 (CLAUDE.md and QUESTIONS #345 note the exception for the trial stack's encrypted key shares); V09 names both places that say "not supported"; V11 starts now and supersedes the E07 note.

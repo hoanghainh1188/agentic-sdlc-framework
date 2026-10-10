@@ -43,7 +43,7 @@ LABELS = {
     "size:S": "c2e0c6",
     "size:M": "fef2c0",
     "size:L": "f9d0c4",
-    "backlog-mvp": "0e8a16",
+    "backlog": "0e8a16",
     "repo:pilot": "d4c5f9",
     "handbook-dependent": "5319e7",
 }
@@ -92,7 +92,7 @@ def existing_issues(repo):
 
 
 def labels_for(row):
-    labels = ["backlog-mvp", f"size:{row['size']}"]
+    labels = ["backlog", f"size:{row['size']}"]
     if row["milestone"] == "M-0":
         labels.append("repo:pilot")
     if row["id"] in HANDBOOK_DEPENDENT:
