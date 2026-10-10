@@ -1,25 +1,25 @@
-# D-03. MVP architecture
+# D-03. Platform architecture (v0.1 baseline, updated by later releases)
 
 | Item | Value |
 |---|---|
-| Version | 1.37 |
-| Date | 2026-10-09 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29); 1.9 approved by Harry on 2026-09-27 in the B07 session 2 plan (HOTL block window, C06 waits for it, the gate deadline timer; ADR-M30); 1.10 approved by Harry on 2026-09-27 in the B12 plan (project AI record module: codes only, write roles, G1 check at the submit; ADR-M32); 1.11 approved by Harry on 2026-09-27 in the C06 plan (G4 checks and decisions, `getBranchHead`, the worker holds the Cost Controller AppRole; QUESTIONS #108–#112; ADR-M33); 1.12 approved by Harry on 2026-09-27 in the C06 session 2 plan (the run's round after G4, the task queue `sdlc-runner`, a failed or lost run is escalated, `revokeRunKey`; ADR-M33 §2.6–§2.7); 1.13 approved by Harry on 2026-09-27 in the C06 session 2 plan, PR 2b (the L1 proposal as evidence, `EvidenceStore` as built, the runner reads a sandbox's workspace; ADR-M33 §2.9); 1.14 approved by Harry on 2026-09-30 in the A08 plan (OpenTelemetry Collector in the profile `observability`, one OTLP pipeline to Langfuse v4; QUESTIONS #4; ADR-M35); 1.15 approved by Harry on 2026-09-28 in the C07 plan (`listPaths`, the run's changes checked and stored by the runner, the in-run spend check; QUESTIONS #126, #130; ADR-M34); 1.16 approved by Harry on 2026-09-28 in the C07 plan and on 2026-10-03 (decisions A–C) (the G5 step, the G5 escalation and its decisions, the budget warning during the run; QUESTIONS #131–#134; ADR-M34 §2.8–§2.9); 1.17 approved by Harry on 2026-10-03 in the B08 plan (the spec is the file on the default branch, checked again at G2–G4; QUESTIONS #160–#164; ADR-M39); 1.18 approved by Harry on 2026-10-03 in the C08 plan (the push after G5, the pull request, `openPullRequest` and `findOpenPullRequest`, the push token, the runner reads run diffs; QUESTIONS #155, #156; ADR-M38 §2.1–§2.6); 1.19 approved by Harry on 2026-10-03 in the C08 plan (G6 reads CI: checks, retries, the CI timeout, security findings and their fail-closed rule, `getSecurityFindings`; QUESTIONS #157–#159; ADR-M38 §2.7); 1.20 approved by Harry on 2026-10-03 in the B09 plan (the plan is a submitted file on the default branch, checked again at G3–G4, the run's tools from the plan; QUESTIONS #165–#169; ADR-M40); 1.21 approved by Harry on 2026-10-03 in the E01 plan (G7: reviews are the approvals, producers, dual approval, the merge by a person, G7 → G3 on a rejection, `getReviews`, `getCommitAuthors`, the merge event; QUESTIONS #175–#179; ADR-M41); 1.22 approved by Harry on 2026-10-03 in the C11 plan (the kill switch: who, the path through the database and the workflow signal, the escalation at the kill, tokens revoked after use, `revokeShortLivedToken`; QUESTIONS #180–#184; ADR-M42); 1.23 approved by Harry on 2026-10-04 in the E01 PR 2 plan (a request for changes at G7 starts a new run with the reviewer's feedback, read by the runner with its own token; the API and the CLI cannot request changes at G7; `getReviewFeedback`, `getIssueComment`; the way back to G7 after the feedback was gone; QUESTIONS #179, #190, #191; ADR-M41 §2.7); 1.24 approved by Harry on 2026-10-04 in the C11 PR 2 plan (loop detection as built: the adapter's counts, the runner's checks, the order of stops, rule M27; QUESTIONS #184; ADR-M42 §2.7); 1.25 approved by Harry on 2026-10-04 in the E02 plan (the Evidence Builder in the api process, one pack per build, the hash re-check, the api's SeaweedFS identity `api-evidence` and its read of proposals and diffs, `EvidenceStore.get` with `maxBytes`; QUESTIONS #215–#219; ADR-M48); 1.26 approved by Harry on 2026-10-04 in the B09 PR 2 plan (the runner reads the plan file for the agent's prompt; `modify` or `roll_back` on a failed run's escalation → G3; QUESTIONS #169, #210, #211; ADR-M40 §2.7, ADR-M33 §2.7); 1.27 approved by Harry on 2026-10-04 in the E03 plan (G8: the release approval bound to the pack's release hash, the worker builds the release pack with its own SeaweedFS identity `worker-evidence`, the pack sealed once, every G8 is production in the MVP, a failed evidence check stops G8; QUESTIONS #220–#222; ADR-M49); 1.28 approved by Harry on 2026-10-04 in the E05 plan (evidence retention: a GOVERNANCE object lock on the bucket `evidence`, the worker's retention loop and its purge identity `worker-purge`, holds, the archive purge after a grace period; QUESTIONS #235–#239; ADR-M51); 1.29 approved by Harry on 2026-10-04 in the E05 PR 2 plan (the daily audit anchor: a COMPLIANCE bucket `audit-anchors` and the worker's identity `worker-anchor`; ADR-M51 §2.9); 1.30 approved by Harry on 2026-10-04 in the A12 plan (SeaweedFS's master, volume server and filer listen on 127.0.0.1 inside the container only and need JWT keys made at each start; the S3 gateway's gRPC port needs the filer key; QUESTIONS #239, #245, #246; ADR-M52); 1.31 approved by Harry on 2026-10-05 in the E08 plan (the Langfuse purge in the retention loop: the intents' traces deleted by their run tags with a tag check, confirmed on a later pass, the raw OTLP files swept for every tenant, ClickHouse compacted; the worker's own Langfuse key, the ClickHouse user `sdlc_purge` and the SeaweedFS identity `worker-langfuse` in `kv/worker/langfuse`; QUESTIONS #250–#253; ADR-M53); 1.32 approved by Harry on 2026-10-07 in the U01 plan (the read-only dashboard served by the api under `/dashboard/`, 127.0.0.1 only; one oversight resolution for the workflow and the API's `waiting_for`; QUESTIONS #255, #260–#263; ADR-M54); 1.33 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 1.34 approved by Harry on 2026-10-08 in the S01 plan (G2 needs acceptance criteria: the spec's structure counted with its hash, codes and a count only; QUESTIONS #290–#292; ADR-M61); 1.35 approved by Harry on 2026-10-09 in the A10 plan (§9: TLS on OpenBao 8200 everywhere, a throw-away CA on development machines and in CI; QUESTIONS #325; ADR-M63); 1.36 approved by Harry on 2026-10-09 in the A10 plan (§10: no ClickHouse user manages users over the network; a loopback-only `sdlc_admin` makes `sdlc_purge`; QUESTIONS #330; ADR-M63 §6); 1.37 approved by Harry on 2026-10-09 in the C13 plan (§6: an L1 proposal is downloaded by a person and the intent ends with a G4 rejection; QUESTIONS #335–#337; ADR-M64) |
+| Version | 1.38 |
+| Date | 2026-10-10 |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-25 in the B01 plan (G6 security threshold, policy interface details); 1.2 approved by Harry on 2026-09-25 (QUESTIONS #1, #20); 1.3 approved by Harry on 2026-09-26 in the C02 plan (Run Contract fields, QUESTIONS #33, #34); 1.4 approved by Harry on 2026-09-26 in the B05 plan (worker reads the GitHub App key, Git host interface notes; QUESTIONS #42, #43); 1.5 approved by Harry on 2026-09-26 in the C03 plan (model gateway interface, one source for the LiteLLM master key; ADR-M24); 1.6 approved by Harry on 2026-09-27 in the C04 plan (sandbox egress, runner reaches GitHub, token handoff, sandbox image registry; QUESTIONS #44, #52–#54, #59; ADR-M25); 1.7 approved by Harry on 2026-09-27 in the B11 plan (escalation clocks in the database, not Temporal timers; QUESTIONS #73; ADR-M28); 1.8 approved by Harry on 2026-09-27 in the C05 session 2 plan (agent interface notes; ADR-M29); 1.9 approved by Harry on 2026-09-27 in the B07 session 2 plan (HOTL block window, C06 waits for it, the gate deadline timer; ADR-M30); 1.10 approved by Harry on 2026-09-27 in the B12 plan (project AI record module: codes only, write roles, G1 check at the submit; ADR-M32); 1.11 approved by Harry on 2026-09-27 in the C06 plan (G4 checks and decisions, `getBranchHead`, the worker holds the Cost Controller AppRole; QUESTIONS #108–#112; ADR-M33); 1.12 approved by Harry on 2026-09-27 in the C06 session 2 plan (the run's round after G4, the task queue `sdlc-runner`, a failed or lost run is escalated, `revokeRunKey`; ADR-M33 §2.6–§2.7); 1.13 approved by Harry on 2026-09-27 in the C06 session 2 plan, PR 2b (the L1 proposal as evidence, `EvidenceStore` as built, the runner reads a sandbox's workspace; ADR-M33 §2.9); 1.14 approved by Harry on 2026-09-30 in the A08 plan (OpenTelemetry Collector in the profile `observability`, one OTLP pipeline to Langfuse v4; QUESTIONS #4; ADR-M35); 1.15 approved by Harry on 2026-09-28 in the C07 plan (`listPaths`, the run's changes checked and stored by the runner, the in-run spend check; QUESTIONS #126, #130; ADR-M34); 1.16 approved by Harry on 2026-09-28 in the C07 plan and on 2026-10-03 (decisions A–C) (the G5 step, the G5 escalation and its decisions, the budget warning during the run; QUESTIONS #131–#134; ADR-M34 §2.8–§2.9); 1.17 approved by Harry on 2026-10-03 in the B08 plan (the spec is the file on the default branch, checked again at G2–G4; QUESTIONS #160–#164; ADR-M39); 1.18 approved by Harry on 2026-10-03 in the C08 plan (the push after G5, the pull request, `openPullRequest` and `findOpenPullRequest`, the push token, the runner reads run diffs; QUESTIONS #155, #156; ADR-M38 §2.1–§2.6); 1.19 approved by Harry on 2026-10-03 in the C08 plan (G6 reads CI: checks, retries, the CI timeout, security findings and their fail-closed rule, `getSecurityFindings`; QUESTIONS #157–#159; ADR-M38 §2.7); 1.20 approved by Harry on 2026-10-03 in the B09 plan (the plan is a submitted file on the default branch, checked again at G3–G4, the run's tools from the plan; QUESTIONS #165–#169; ADR-M40); 1.21 approved by Harry on 2026-10-03 in the E01 plan (G7: reviews are the approvals, producers, dual approval, the merge by a person, G7 → G3 on a rejection, `getReviews`, `getCommitAuthors`, the merge event; QUESTIONS #175–#179; ADR-M41); 1.22 approved by Harry on 2026-10-03 in the C11 plan (the kill switch: who, the path through the database and the workflow signal, the escalation at the kill, tokens revoked after use, `revokeShortLivedToken`; QUESTIONS #180–#184; ADR-M42); 1.23 approved by Harry on 2026-10-04 in the E01 PR 2 plan (a request for changes at G7 starts a new run with the reviewer's feedback, read by the runner with its own token; the API and the CLI cannot request changes at G7; `getReviewFeedback`, `getIssueComment`; the way back to G7 after the feedback was gone; QUESTIONS #179, #190, #191; ADR-M41 §2.7); 1.24 approved by Harry on 2026-10-04 in the C11 PR 2 plan (loop detection as built: the adapter's counts, the runner's checks, the order of stops, rule M27; QUESTIONS #184; ADR-M42 §2.7); 1.25 approved by Harry on 2026-10-04 in the E02 plan (the Evidence Builder in the api process, one pack per build, the hash re-check, the api's SeaweedFS identity `api-evidence` and its read of proposals and diffs, `EvidenceStore.get` with `maxBytes`; QUESTIONS #215–#219; ADR-M48); 1.26 approved by Harry on 2026-10-04 in the B09 PR 2 plan (the runner reads the plan file for the agent's prompt; `modify` or `roll_back` on a failed run's escalation → G3; QUESTIONS #169, #210, #211; ADR-M40 §2.7, ADR-M33 §2.7); 1.27 approved by Harry on 2026-10-04 in the E03 plan (G8: the release approval bound to the pack's release hash, the worker builds the release pack with its own SeaweedFS identity `worker-evidence`, the pack sealed once, every G8 is production in the MVP, a failed evidence check stops G8; QUESTIONS #220–#222; ADR-M49); 1.28 approved by Harry on 2026-10-04 in the E05 plan (evidence retention: a GOVERNANCE object lock on the bucket `evidence`, the worker's retention loop and its purge identity `worker-purge`, holds, the archive purge after a grace period; QUESTIONS #235–#239; ADR-M51); 1.29 approved by Harry on 2026-10-04 in the E05 PR 2 plan (the daily audit anchor: a COMPLIANCE bucket `audit-anchors` and the worker's identity `worker-anchor`; ADR-M51 §2.9); 1.30 approved by Harry on 2026-10-04 in the A12 plan (SeaweedFS's master, volume server and filer listen on 127.0.0.1 inside the container only and need JWT keys made at each start; the S3 gateway's gRPC port needs the filer key; QUESTIONS #239, #245, #246; ADR-M52); 1.31 approved by Harry on 2026-10-05 in the E08 plan (the Langfuse purge in the retention loop: the intents' traces deleted by their run tags with a tag check, confirmed on a later pass, the raw OTLP files swept for every tenant, ClickHouse compacted; the worker's own Langfuse key, the ClickHouse user `sdlc_purge` and the SeaweedFS identity `worker-langfuse` in `kv/worker/langfuse`; QUESTIONS #250–#253; ADR-M53); 1.32 approved by Harry on 2026-10-07 in the U01 plan (the read-only dashboard served by the api under `/dashboard/`, 127.0.0.1 only; one oversight resolution for the workflow and the API's `waiting_for`; QUESTIONS #255, #260–#263; ADR-M54); 1.33 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 1.34 approved by Harry on 2026-10-08 in the S01 plan (G2 needs acceptance criteria: the spec's structure counted with its hash, codes and a count only; QUESTIONS #290–#292; ADR-M61); 1.35 approved by Harry on 2026-10-09 in the A10 plan (§9: TLS on OpenBao 8200 everywhere, a throw-away CA on development machines and in CI; QUESTIONS #325; ADR-M63); 1.36 approved by Harry on 2026-10-09 in the A10 plan (§10: no ClickHouse user manages users over the network; a loopback-only `sdlc_admin` makes `sdlc_purge`; QUESTIONS #330; ADR-M63 §6); 1.37 approved by Harry on 2026-10-09 in the C13 plan (§6: an L1 proposal is downloaded by a person and the intent ends with a G4 rejection; QUESTIONS #335–#337; ADR-M64); 1.38 approved by Harry on 2026-10-10 (wording only: "MVP" retired, v0.1 baseline and Later; meaning unchanged; QUESTIONS #360) |
 | Readers | Tech lead / architect, developers, Claude Code |
-| Related documents | D-01 (build vs buy), D-02 (MVP scope), D-07 (models, tokens), D-09 (sample repo) |
+| Related documents | D-01 (build vs buy), D-02 (v0.1 scope), D-07 (models, tokens), D-09 (sample repo) |
 
 ---
 
 ## 1. Purpose
 
-- Describe the parts of the MVP platform, what each part does and how they talk to each other.
+- Describe the parts of the v0.1 platform, what each part does and how they talk to each other.
 - Fix the **interfaces**, so that later we can replace GitHub → GitLab, OpenHands → another agent, simple rules → OPA/Cedar without changing the core.
 - Serve as input for D-05 (data model) and D-08 (backlog).
 
 ## 2. Scope
 
-- **MVP** architecture only (D-02 section 4.1).
-- The full architecture (8 planes, Signed Run Contract with KMS, multi-agent…) is outside the MVP. The MVP **goes in the same direction**, in a lighter form.
+- **v0.1** architecture only (D-02 section 4.1).
+- The full architecture (8 planes, Signed Run Contract with KMS, multi-agent…) is outside v0.1. v0.1 **goes in the same direction**, in a lighter form.
 
 ---
 
@@ -33,7 +33,7 @@
 | AP4 | Everything external goes through an **interface (adapter)** | [Doc] + D-02 NFR-05 |
 | AP5 | **Gates, budgets and rules are configuration**, not hard-coded | [Proposal] For tuning in M-F |
 | AP6 | **Multi-tenant at the data layer** from day one | D-02 NFR-02 |
-| AP7 | **Modular monolith** for the MVP: few processes, clear module boundaries. Split into services when needed | [Proposal] See ADR-M01 |
+| AP7 | **Modular monolith** for v0.1: few processes, clear module boundaries. Split into services when needed | [Proposal] See ADR-M01 |
 
 ---
 
@@ -82,7 +82,7 @@ flowchart TB
 
     CLI --> API
     GHUI -. "comment /approve" .-> GH
-    WK -- "event polling (MVP)" --> GH
+    WK -- "event polling (v0.1)" --> GH
     API --> MOD
     WK --> MOD
     API <--> TMP
@@ -129,7 +129,7 @@ SVG version: [d11-mvp-architecture.svg](../diagrams/svg/d11-mvp-architecture.svg
 | Escalation | Create escalations from triggers; route to owner / backup / governance; run acknowledge and resolve clocks (Temporal timers); freeze work on no answer; record decisions | `escalations` |
 | Agent Register | Register agents; check status, pinned model and instructions hash before a run; recertification warnings | `agents` |
 | Project AI Record | Store client consent and allowed data classes (codes only; the human record is linked); checked at the submit (Draft → G1: the intent waits in `draft` with a G1 `fail` until the record allows its data class) and at G4. Written by the roles in config `access.ai_record_write_roles` (ADR-M32) | `project_ai_records`, `project_ai_record_versions` |
-| Policy | Autonomy (L0–L4), oversight matrix, model routing, file scope, forbidden actions. MVP: rules in code behind an interface | YAML config |
+| Policy | Autonomy (L0–L4), oversight matrix, model routing, file scope, forbidden actions. v0.1: rules in code behind an interface | YAML config |
 | Cost Controller | Create a LiteLLM virtual key per run, set caps, read spend, warn at 80% / stop at 100% | `cost_records` |
 | Evidence Builder | Collect diff, CI, tests, scans, gate decisions → JSON + Markdown pack. Version 1.25 (E02, ADR-M48): runs in the **api** process on request (E03 calls it at G8); every build is a new version, never changed (the same content returns the existing version); every stored file is read back and its hash checked first, fail closed; the pack holds codes, IDs, hashes, counts and references only (no diff, spec, plan or review text), the approvers' names in the Markdown only, and the client AI disclosure note in the project's format. Version 1.27 (E03, ADR-M49): the **worker** builds the release pack at G8 with the same code (actor `system`, its own identity `worker-evidence`), and G8 seals one version. Version 1.28 (E05, ADR-M51): the worker's **retention loop** purges the files of finished intents past `evidence_retention_days` (≥ 180) and of archived projects after a grace period, keeps the rows and hashes, skips held intents (legal hold in the store), and sweeps pack files without a row; `report` mode by default. Version 1.31 (E08, ADR-M53): the same pass deletes the due intents' model-call traces in Langfuse (selected by the intents' run tags, every trace's tags checked, confirmed on a later pass), sweeps Langfuse's raw OTLP files older than a day for every tenant, and removes deleted rows from ClickHouse's disk; an archived project is complete only when Langfuse is | `evidence_items`, `evidence_packs`, `evidence_holds`, `langfuse_purges` + SeaweedFS, Langfuse |
 | Audit Log | Append-only events, hash chain, integrity check. Version 1.29 (E05 PR 2, ADR-M51 §2.9): the worker writes each tenant's latest hash once a day to the COMPLIANCE bucket `audit-anchors` and checks the earlier anchors against the chain (D-05 §7.4) | `audit_log` + SeaweedFS (`audit-anchors`) |
@@ -253,7 +253,7 @@ General rules:
 - **G8, the release** (version 1.27, ADR-M49, QUESTIONS #220–#222): after the merge the intent waits at G8.
   - **The release pack.** The step recomputes the pack's hashes from the database (no file read). When the latest version is not current, the workflow calls the worker activity `buildReleasePack` (15 minutes, one attempt, idempotent), which reads every stored evidence file back and checks it (ADR-M48 §2.3), then steps again. The worker uses its own SeaweedFS identity `worker-evidence` (the same rights as `api-evidence`); without it the intent waits (`evidence_unavailable`).
   - **The binding** (FR-17). Every pack stores `release_sha256`: its content hash without the G8 parts (G8 decisions, escalations raised at G8). The G8 input binds the merged run, the pull request, the pushed head, the merge commit and that release hash. Any change of the evidence before G8 (an item, an escalation, CI, cost, the AI record's disclosure facts) voids earlier G8 approvals; a new G8 approval makes a new pack version with the same release hash and voids none.
-  - **Who** (FR-11): Person B, and the second approver at Critical risk (rule M3). The producers of the merged change (the creator, the people who allowed its runs, the plan submitters) never decide G8. Every G8 is production in the MVP, so always HITL (QUESTIONS #220).
+  - **Who** (FR-11): Person B, and the second approver at Critical risk (rule M3). The producers of the merged change (the creator, the people who allowed its runs, the plan submitters) never decide G8. Every G8 is production in v0.1, so always HITL (QUESTIONS #220).
   - **The disclosure note** (FR-43): no project AI record, so no note → a system `fail ai_record_missing` once, and the intent waits. For the client's own format, Person B's approval confirms that the client's note is ready (QUESTIONS #222).
   - **The release.** Approvals complete → the G8 overdue escalation is closed, the pack built again, every HOTL block window must be closed and `release` must not be frozen; then the latest version is sealed (once), `evidence.pack_sealed` and `intent.closed` (coded metrics) are recorded, and the intent ends `done`. A rejection → `rejected`; a request for changes keeps the intent at G8 (the change is merged: a fix needs a new intent). The gate deadline applies (FR-12).
   - **A failed evidence check** (a stored file changed or missing) → `paused` at G8, a `security` escalation (QUESTIONS #221); `resume` → back to G8 (the pack is built again), `terminate` → `cancelled`.
@@ -269,7 +269,7 @@ if gate == G6 and findings at or above g6_security_findings.min_severity > 0:
 if gate == G6 and findings unknown (code scanning off or not allowed): mode = HITL   # version 1.19
 if gate == G5 and limit breached:                   mode = matrix[G5][risk_tier].on_breach (if set)
 if gate == G7: mode = HITL; approvals_needed = 2 if plan.change_flags ∩ DUAL_APPROVAL_G7 or risk == critical else 1
-if gate == G8 and environment == production:        mode = HITL   # version 1.27: every G8 is production in the MVP (QUESTIONS #220)
+if gate == G8 and environment == production:        mode = HITL   # version 1.27: every G8 is production in v0.1 (QUESTIONS #220)
 ```
 
 The resolved mode is stored in the gate decision. Changing the matrix is a configuration change (new `config_hash`, audit event).
@@ -355,11 +355,11 @@ interface GitHostAdapter {
   getSecurityFindings(ref: RepoRef, pr: number): Promise<SecurityFindings>;
   getReviewFeedback(token: RedactedSecret, ref: RepoRef, pr: number, reviewId: string): Promise<ReviewFeedback>;
   getIssueComment(token: RedactedSecret, ref: RepoRef, commentId: string): Promise<IssueCommentText>;
-  listEventsSince(ref: RepoRef, cursor: EventCursor): Promise<{ events: GitEvent[]; next: EventCursor }>; // MVP: polling
+  listEventsSince(ref: RepoRef, cursor: EventCursor): Promise<{ events: GitEvent[]; next: EventCursor }>; // v0.1: polling
   verifyWebhook(headers: Record<string, string>, rawBody: Buffer): GitEvent; // enabled later
 }
 ```
-MVP: `GitHubAdapter` through a **GitHub App** (short-lived per-repo tokens), reading events by **polling**. MVP+1: `GitLabAdapter`, webhooks.
+v0.1: `GitHubAdapter` through a **GitHub App** (short-lived per-repo tokens), reading events by **polling**. Later: `GitLabAdapter`, webhooks.
 
 - Polling and webhooks return the same `GitEvent` type → one handler for `/approve` commands, reviews and CI.
 - The `EventCursor` is stored per project in the database, so events are not processed twice after a restart.
@@ -389,7 +389,7 @@ interface AgentAdapter {
   collectOutputs(handle: AgentRunHandle): Promise<AgentOutputs>; // plan, log, changed files
 }
 ```
-MVP: `OpenHandsAdapter`.
+v0.1: `OpenHandsAdapter`.
 - [External] The OpenHands SDK offers Python and REST APIs. The agent can run in an ephemeral workspace (Docker/Kubernetes) through the **Agent Server**.
 - [Proposal] The platform (TypeScript) calls the **Agent Server over REST**; it does not embed the Python SDK. The Agent Server runs inside the sandbox container.
 - [Proposal] OpenHands points its model at **LiteLLM**, using the run's virtual key.
@@ -406,7 +406,7 @@ MVP: `OpenHandsAdapter`.
 
 ```ts
 interface PolicyEngine {
-  maxAutonomy(input: { riskTier: RiskTier; dataClass: DataClass }): AutonomyLevel; // L0–L4 (MVP: up to L2)
+  maxAutonomy(input: { riskTier: RiskTier; dataClass: DataClass }): AutonomyLevel; // L0–L4 (v0.1: up to L2)
   oversightMode(input: { gate: GateCode; riskTier: RiskTier; changeFlags: ChangeFlag[]; context: GateContext }): { mode: OversightMode; approvalsNeeded: number };
   allowedModels(input: { dataClass: DataClass; taskKind: TaskKind }): string[];
   checkScope(input: { plannedFiles: string[]; changedFiles: string[] }): ScopeResult;
@@ -414,12 +414,12 @@ interface PolicyEngine {
   isForbidden(input: { action: AgentAction }): boolean; // handbook Ch.4 §4.7 — never overridable
 }
 ```
-MVP: `SimplePolicyEngine` reading YAML. MVP+1: `OpaPolicyEngine` or `CedarPolicyEngine`.
+v0.1: `SimplePolicyEngine` reading YAML. Later: `OpaPolicyEngine` or `CedarPolicyEngine`.
 
 - The exact TypeScript interface is `PolicyEngine` in `@sdlc/contracts` (`platform/packages/contracts/src/policy.ts`, task B01). Differences from the sketch above, same responsibilities:
   - The engine is created from a `ValidatedProjectConfig`: a configuration that `@sdlc/config` has checked against the mandatory rules M1–M15. The adapter never repeats those checks.
   - `canApprove` receives the actor's role bindings (revoked ones never count), the producers for this gate, and the approvals already recorded. It returns the role the person approves under, or a refusal reason. POLICY and AUDIT cells have no approval step; a listed role may still approve a HOTL gate explicitly. Callers decide who the producers are for each gate; for example the intent creator is a producer at G7 but not at G1 (design/QUESTIONS.md #16).
-  - `allowedModels` filters the gateway's model list (given when the engine is created) by the provider types allowed for the data class. `taskKind` is not used in the MVP (design/QUESTIONS.md #17).
+  - `allowedModels` filters the gateway's model list (given when the engine is created) by the provider types allowed for the data class. `taskKind` is not used in v0.1 (design/QUESTIONS.md #17).
   - `maxAutonomy` returns L0 for a data class that may go to no model (`prohibited`) (design/QUESTIONS.md #18).
   - `isForbidden` uses the two action lists in `@sdlc/contracts` (`FORBIDDEN_AGENT_ACTIONS`, `GRANT_REQUIRED_AGENT_ACTIONS`). They are not configuration.
 
@@ -432,7 +432,7 @@ interface ModelGateway {
   getSpend(keyId: string): Promise<SpendInfo>;
 }
 ```
-MVP: `LiteLLMGateway`.
+v0.1: `LiteLLMGateway`.
 
 - The exact TypeScript interface is `ModelGateway` in `@sdlc/contracts` (`platform/packages/contracts/src/model-gateway.ts`, task C03, ADR-M24). Same responsibilities; differences from the sketch above:
   - Money is a decimal string (`maxBudgetUsd: "0.5"`, D-05 D6). `createRunKey` also takes the key lifetime and the tenant's budget group.
@@ -450,7 +450,7 @@ interface EvidenceStore {
   get(uri: string): Promise<Buffer>;
 }
 ```
-MVP: `S3EvidenceStore` (on SeaweedFS).
+v0.1: `S3EvidenceStore` (on SeaweedFS).
 
 - The exact TypeScript interface is `EvidenceStore` in `@sdlc/contracts` (`platform/packages/contracts/src/evidence.ts`, task C06 session 2b, ADR-M33 §2.9); the adapter is `@sdlc/adapter-evidence-s3` (`@aws-sdk/client-s3`, pinned exactly). Same two methods; notes:
   - `put` returns the size too (`{ uri, sha256, sizeBytes }`). The key is `<store prefix><tenant>/<path>`; every put sends `If-None-Match: *`, so a taken path is refused (`EvidenceError('exists')`) and evidence is never overwritten. Errors are `EvidenceError` codes (`invalid_input`, `exists`, `forbidden`, `not_found`, `unavailable`), never the service's text.
@@ -460,11 +460,11 @@ MVP: `S3EvidenceStore` (on SeaweedFS).
 
 ---
 
-## 8. Run Contract (light version for the MVP)
+## 8. Run Contract (light version for v0.1)
 
 [Doc] An earlier internal draft designs a **Signed Run Contract**: a digitally signed "execution contract" that the control plane issues for each run, stating what the agent may do, on which resources, for how long. The full version uses KMS/HSM and mTLS.
 
-The MVP builds a light version that **keeps the main idea**:
+v0.1 builds a light version that **keeps the main idea**:
 
 | Field | Example |
 |---|---|
@@ -487,11 +487,11 @@ The MVP builds a light version that **keeps the main idea**:
 - The signing key lives in **OpenBao** (Transit engine). The platform sends the contract content to be signed; **the key never leaves OpenBao**.
 - The runner verifies the signature with the public key obtained from OpenBao.
 - The runner **rejects** contracts that are expired, wrongly signed, or not in the database. It also rejects contracts that differ from the stored one, are not yet valid, are revoked, or belong to a run that already left `queued`. The signature names its key version, so contracts signed before a key rotation verify until they expire (ADR-M22 §2.4).
-- MVP+: add revocation and scheduled key rotation.
+- Later: add revocation and scheduled key rotation.
 
 ### 8.1. Secret manager: OpenBao or HashiCorp Vault
 
-Harry's decision (2026-09-24): **run a Vault-type secret manager from the MVP**.
+Harry's decision (2026-09-24): **run a Vault-type secret manager from v0.1**.
 
 Licence note [External]:
 
@@ -501,7 +501,7 @@ Licence note [External]:
 | Origin | HashiCorp, now owned by IBM | Fork of Vault 1.14.0, under the Linux Foundation |
 | Internal use | Allowed | Allowed |
 | **Inside a product we sell** | BSL forbids offering the software as a competing product → **needs legal review** | No such restriction |
-| MVP features needed (KV, Transit, AppRole) | Yes | Yes (Vault-compatible API) |
+| v0.1 features needed (KV, Transit, AppRole) | Yes | Yes (Vault-compatible API) |
 
 **Decision (Harry, 2026-09-24): use OpenBao.** Platform code uses the **standard Vault API**, so switching remains possible.
 
@@ -528,7 +528,7 @@ Licence note [External]:
 
 ## 9. Security
 
-| Topic | What the MVP does |
+| Topic | What v0.1 does |
 |---|---|
 | GitHub permissions | GitHub App with minimal permissions. Short-lived tokens, issued by the worker, for the run's repo only: `contents: read` to clone, and (version 1.18) `contents: write` for one push after G5. Used by the runner only; never given to the sandbox. Opening the pull request needs `pull_requests: write`, minted by the adapter for that call. Branch protection on the default branch refuses any push to it (N6). Version 1.22: the runner revokes the clone and push tokens right after their use (C11, ADR-M42 §2.4). Version 1.23: a run that answers a request for changes at G7 gets a third token, `pull_requests: read` (or `issues: read` for a comment on the intent's issue), revoked by the runner right after it read the feedback (E01 PR 2, ADR-M41 §2.7) |
 | Branches | The agent only pushes `agent/*`. `main` has branch protection (D-09 section 6) |
@@ -536,16 +536,16 @@ Licence note [External]:
 | Sandbox network | Outbound only to LiteLLM and the package proxy (npm first), on an internal Docker network per run; no route to the internet. GitHub is reached by the runner, never by the sandbox: the runner clones and pushes `agent/*` with the run's short-lived single-repository token. Everything else is blocked (ADR-M25) |
 | TLS for internal services | OpenBao 8200: internal CA, server certificate 1 year, CA 5 years, CA key offline; clients always verify (no skip-verify). Other internal services may reuse the CA later (QUESTIONS #20). Version 1.35 (A10, ADR-M63, QUESTIONS #325): TLS on 8200 on every machine; development machines and CI use a throw-away CA whose key is deleted at once; the files reach OpenBao and the clients through the volumes `openbao-tls` and `openbao-ca` |
 | Secrets | Not in the repo, not in images. Fetched from OpenBao at runtime with short-lived tokens |
-| GitHub events | MVP: polling through the GitHub App (no inbound port). When webhooks are enabled: verify signatures, expose only `/webhooks/github` |
+| GitHub events | v0.1: polling through the GitHub App (no inbound port). When webhooks are enabled: verify signatures, expose only `/webhooks/github` |
 | Approvers | Map GitHub accounts ↔ platform users. Check roles + block self-approval |
-| Tenant isolation | Every query filters by `tenant_id`. [Proposal] Add PostgreSQL Row-Level Security in MVP+1 |
+| Tenant isolation | Every query filters by `tenant_id`. [Proposal] Add PostgreSQL Row-Level Security in Later |
 | Object storage (version 1.30, ADR-M52) | Only the S3 API (8333) of SeaweedFS is reachable on the Compose network, each process with its own identity. The master, volume server and filer (HTTP and gRPC) listen on 127.0.0.1 inside the container only, and need JWT keys that `start.sh` makes at each start and keeps nowhere else; the S3 gateway's gRPC port (18333, which SeaweedFS cannot bind apart) refuses calls without the filer key. Iceberg and Lance are off. Admin work only with `docker compose exec seaweedfs weed shell -master=127.0.0.1:9333` |
 | Audit | Append-only, hash chain, `verify` command; kept at least 2 years |
 | Kill switch | Stop any run and revoke its credentials within 5 minutes (6.5; version 1.22: the path, who, the escalation, ADR-M42) |
 | Agents | Only registered, active agents with a pinned model and a matching instructions hash may run |
 | Dashboard (version 1.32, ADR-M54) | Served by the api on 127.0.0.1 only; exposing it to other machines (TLS, reverse proxy) is out of scope. `GET` only; a strict Content-Security-Policy (no inline script, no third-party origin); the personal token in memory only (never a URL, storage, cookie or log); server text rendered as text. The api serves only the files it listed at start-up |
 
-[Doc] Draft section 4.14 has a full threat model based on the OWASP Top 10 for Agentic Applications (ASI01–ASI10). Applied fully in MVP+1.
+[Doc] Draft section 4.14 has a full threat model based on the OWASP Top 10 for Agentic Applications (ASI01–ASI10). Applied fully in Later.
 
 ---
 
@@ -574,7 +574,7 @@ Harry's decision (2026-09-24): **an internal server; no need for a high spec yet
 - **Limit concurrent runs**: 1–2 sandboxes (configurable). A third run waits in Temporal.
 - **Docker Compose profiles**: `core` (required) and `observability` (Langfuse + ClickHouse, the heaviest part). On a small server, enable `observability` later and use LiteLLM spend data meanwhile.
 - **Temporal uses PostgreSQL**; no Elasticsearch.
-- **API models only** in the MVP. The internal server needs no GPU.
+- **API models only** in v0.1. The internal server needs no GPU.
 - **Measure real resource use in M-A** before fixing the server spec. No numbers set in advance.
 - If possible, run the runner in a **separate VM** on the same server, to isolate Docker permissions.
 - **OpenBao**: needs an unseal procedure after a reboot, and unseal keys backed up somewhere safe, off the server.
@@ -630,7 +630,7 @@ Harry's decision (2026-09-24): **an internal server; no need for a high spec yet
 
 [Proposal] This procedure becomes a **runbook** in the handbook (Part III, T11).
 
-#### Later (not in the MVP)
+#### Later (not in v0.1)
 
 - **Auto-unseal**: opens automatically at start-up using an HSM or a key-management service. More convenient, but needs extra hardware or a service. Consider it when selling to clients or running several servers.
 
@@ -676,10 +676,10 @@ platform/
 | ADR-M06 | Simple YAML policy behind an interface | Fast. A path to OPA/Cedar | Complex rules are hard to express |
 | ADR-M07 | G7 relies on PR approvals on GitHub | Reuses existing review | Depends on correct branch protection settings |
 | ADR-M08 | One internal server, limited concurrent runs, Compose profiles | Matches the infrastructure decision; saves cost | No failover if the server breaks → regular backups |
-| ADR-M11 | GitHub events by polling in the MVP, webhooks later | The internal server does not accept inbound internet connections | Delay of tens of seconds; uses API quota → configurable interval |
+| ADR-M11 | GitHub events by polling in v0.1, webhooks later | The internal server does not accept inbound internet connections | Delay of tens of seconds; uses API quota → configurable interval |
 | ADR-M13 | Oversight as a data-driven matrix (gate × risk + change flags) in project config | The handbook defines oversight by risk; tuning must not need code changes | Matrix must be validated; wrong config can loosen control → config changes audited and reviewed |
 | ADR-M14 | Escalations as part of the Temporal intent workflow (timers, signals). **Partly superseded by ADR-M28:** the clocks live in the database, advanced by the worker | Durable clocks, no extra scheduler | Workflow grows more complex → escalation logic kept in its own module with tests |
-| ADR-M15 | Minimal agent register in the platform database | Handbook requires owned, pinned, recertified agents | Recertification workflow deferred to MVP+1 |
+| ADR-M15 | Minimal agent register in the platform database | Handbook requires owned, pinned, recertified agents | Recertification workflow deferred to Later |
 | ADR-M12 | SeaweedFS instead of MinIO, Valkey instead of Redis | MinIO is no longer maintained; Redis licence does not fit a product we sell | Team learns new tools; S3 API / Redis protocol unchanged, so code is unaffected |
 
 ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written during tasks A06 and C01.
@@ -695,11 +695,11 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | Modular monolith turns into a "big ball of mud" | Lint checks on module dependencies. Architecture review at every milestone |
 | Too much infrastructure on one server | Measure in M-A. Limit concurrent runs. Compose profiles |
 | Losing the OpenBao unseal key = losing all secrets | Shamir 3-of-2, 3 holders, printed copies in the safe, drills every 3 months (section 10.2) |
-| Server reboots when not enough key holders are available | The platform stays down until unsealed. Accepted for the MVP. Auto-unseal later |
+| Server reboots when not enough key holders are available | The platform stays down until unsealed. Accepted for v0.1. Auto-unseal later |
 
 ## 14. Open questions
 
-- ~~Where to store keys and secrets?~~ → Decided: **OpenBao** from the MVP (section 8.1).
+- ~~Where to store keys and secrets?~~ → Decided: **OpenBao** from v0.1 (section 8.1).
 - ~~Which server?~~ → Decided: internal server, moderate spec (section 10.1).
 - Choose **the actual people** for the three key-holder roles (section 10.2). The procedure is proposed.
 
@@ -767,3 +767,4 @@ ADR-M09 (database/migration tool) and ADR-M10 (OpenHands PoC result) are written
 | 1.37 | 2026-10-09 | Claude (task C13, PR 1), approved by Harry | §6: the L1 proposal's download and the end of the intent by a G4 rejection; state machine and diagram D12: Running → ProposalReady → Rejected (ADR-M64, QUESTIONS #335–#337) |
 | 1.35 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | §9: TLS on OpenBao 8200 on every machine; the throw-away CA of development machines and CI; the volumes `openbao-tls` and `openbao-ca` (ADR-M63, QUESTIONS #325) |
 | 1.36 | 2026-10-09 | Claude (task A10), approved by Harry | §10: ClickHouse's access management moves from `langfuse` to the loopback-only `sdlc_admin` (ADR-M63 §6, QUESTIONS #330) |
+| 1.38 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |

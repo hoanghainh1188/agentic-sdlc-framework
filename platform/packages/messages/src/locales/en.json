@@ -32,7 +32,7 @@
   "config.rule.dual_approval_role_missing": "{path}: the role {role} must stay in the G7 dual-approval roles (rule {rule}, codes table §4).",
   "config.rule.g6_security_hitl": "{path}: security findings at G6 must be HITL; found {found} (rule {rule}, codes table §4).",
   "config.rule.g6_security_critical": "{path}: the G6 security threshold {found} must include {severity} findings (rule {rule}, codes table §4).",
-  "config.rule.autonomy_above_mvp": "{path}: autonomy {found} is above the MVP maximum {maximum} (rule {rule}, D-02 §4.2).",
+  "config.rule.autonomy_above_mvp": "{path}: autonomy {found} is above the v0.1 maximum {maximum} (rule {rule}, D-02 §4.2).",
   "config.rule.autonomy_critical_l0": "{path}: Critical risk must have autonomy L0; found {found} (rule {rule}, D-02 FR-03).",
   "config.rule.autonomy_high_l1": "{path}: High risk may have at most autonomy L1; found {found} (rule {rule}, D-02 FR-03).",
   "config.rule.autonomy_order": "{path}: {tier} risk may not have more autonomy than {lower_tier} risk (rule {rule}, codes table §3).",

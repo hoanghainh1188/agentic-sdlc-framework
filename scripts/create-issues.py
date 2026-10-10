@@ -33,8 +33,11 @@ MILESTONES = {
     "M-D": "G7–G8 + evidence + cost",
     "Pre-M-E": "Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)",
     "M-E": "The trial, run by the community (QUESTIONS #340)",
-    "UX": "Friendlier for users and deployers, toward v0.2.0 (QUESTIONS #355)",
-    "MVP+1": "Started early: read-only dashboard (QUESTIONS #255)",
+    "UX": "Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364)",
+    "EXT": "Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361)",
+    "Models": "Self-hosted models (QUESTIONS #362)",
+    "Server": "A team on a server: toward v1.0 (QUESTIONS #363)",
+    "Later": "Not scheduled yet (was MVP+1)",
 }
 LABELS = {
     "size:S": "c2e0c6",

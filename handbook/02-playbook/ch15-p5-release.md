@@ -286,7 +286,7 @@ The **Evidence Pack** of an intent lists what the platform recorded for it, in o
 
 > Written by Claude Code together with the platform code (task E03, `design/ADR-M49-gate-g8.md`).
 
-After a person merged the approved pull request (§15.10.1), the intent waits at **G8**. The platform never deploys: in the MVP the release is the merge plus the delivery to the client, and **every G8 is a production release**, so a person always decides (HITL).
+After a person merged the approved pull request (§15.10.1), the intent waits at **G8**. The platform never deploys: in v0.1 the release is the merge plus the delivery to the client, and **every G8 is a production release**, so a person always decides (HITL).
 
 **What the platform does first:** it builds the Evidence Pack (§15.10.2) itself. It reads every stored evidence file back and checks its hash. Then it posts **waits for the release approval** on the intent's issue and mentions Person B (and the second approver at Critical risk).
 

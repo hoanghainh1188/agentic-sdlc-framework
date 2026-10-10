@@ -1,4 +1,4 @@
-# D-08. MVP backlog
+# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
@@ -15,7 +15,7 @@
 
 ## 1. Purpose
 
-- Split the MVP into **small tasks, each fitting one Claude Code session**.
+- Split the platform's work into **small tasks, each fitting one Claude Code session**, release after release (v0.1.0 is the baseline; QUESTIONS #360).
 - Each task has: dependencies, related requirements (FR/NFR), code area, **acceptance criteria**.
 - Serves as the list for GitHub issues and assignments.
 
@@ -23,7 +23,7 @@
 
 | Field | Meaning |
 |---|---|
-| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early), `S` = spec tools and `K` = document knowledge (before the trial M-E), `V` = the trial M-E (validation by the community) and its usability round UX |
+| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early), `S` = spec tools and `K` = document knowledge (before the trial M-E), `V` = the trial M-E (validation by the community) and its usability round UX, `X` = extensions (agents, tools, knowledge, Git hosts), `L` = models, `O` = operations on a server |
 | Size | **S** ≈ 1 session · **M** ≈ 1–2 sessions · **L** ≈ split into 2–3 sessions. [Proposal] Relative estimate, not person-hours |
 | Depends on | Tasks that must be finished first |
 | Acceptance criteria | Conditions for the PR to be approved. Claude Code writes tests for them |
@@ -37,16 +37,19 @@
 
 | Milestone | Content | Tasks | Sizes |
 |---|---|---|---|
-| M-A | Foundation: infrastructure, security, audit | 12 | S×7 · M×5 |
+| M-A | Foundation: infrastructure, security, audit | 11 | S×7 · M×4 |
 | M-B | Intent + G1–G3 | 13 | S×4 · M×8 · L×1 |
 | M-0 | Sample pilot repo (separate repo, right before M-C) | 4 | S×1 · M×2 · L×1 |
 | M-C | Run + G4–G6 | 12 | S×3 · M×8 · L×1 |
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
-| UX | Friendlier for users and deployers, toward v0.2.0 (QUESTIONS #355) | 8 | S×2 · M×5 · L×1 |
-| MVP+1 | Started early: read-only dashboard (QUESTIONS #255); lighter steps | 4 | S×2 · M×1 · L×1 |
-| **Total** | | **68** | |
+| UX | Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364) | 10 | S×3 · M×6 · L×1 |
+| EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361) | 6 | S×3 · M×1 · L×2 |
+| Models | Self-hosted models (QUESTIONS #362) | 2 | S×1 · M×1 |
+| Server | A team on a server: toward v1.0 (QUESTIONS #363) | 4 | M×4 |
+| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 8 | S×3 · M×1 · L×4 |
+| **Total** | | **85** | |
 
 ### Order and dependencies between milestones
 
@@ -58,9 +61,12 @@ flowchart LR
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
-    ME --> UX["UX V04–V11, friendlier (v0.2.0)"]
-    UX --> MF["M-F Adjustment"]
-    MD --> MU["MVP+1 U01 read-only dashboard<br/>(in parallel with M-E)"]
+    ME --> UX["UX V04–V12, L02: friendlier (v0.1.x → v0.2.0)"]
+    UX --> EXT["EXT X01–X04, X07, X09 (v0.3.0)"]
+    EXT --> MO["Models L01, L03"]
+    MO --> SV["Server A10, O01–O03 (v1.0)"]
+    ME --> MF["M-F Adjustment (from trial data)"]
+    MD --> MU["U01–U03 read-only dashboard, done (Later)"]
 ```
 
 - M-0 lives in a **separate repo** (`pilot-order-inventory`). Done at the end of M-B, before C09.
@@ -196,22 +202,6 @@ flowchart LR
 - [ ] AC1: Lint, type check and unit tests on every PR
 - [ ] AC2: Integration test job running the Compose core profile
 - [ ] AC3: Gitleaks, Semgrep, Trivy run and block critical findings
-
-#### A10. Resource measurement + backup / restore drill + internal CA / TLS
-
-| Size | Depends on | Requirements | Code area |
-|---|---|---|---|
-| M | A03, A07, A11 | — | platform/deploy/backup/*, platform/deploy/openbao/tls.sh, handbook/03-templates/T11-openbao-runbook.md |
-
-**Acceptance criteria**
-
-- [ ] AC1: Internal CA + TLS on OpenBao 8200 (QUESTIONS #20): script creates the CA (5 years) and the server certificate (1 year); the CA key is kept offline; renewal steps and a 30-day reminder in T11; clients verify the CA
-- [ ] AC2: Backup script: OpenBao snapshot (Raft), PostgreSQL dump, to storage off the server
-- [ ] AC3: Restore drill succeeds on a test machine; OpenBao unsealed with 2 shares
-- [ ] AC4: Record RAM/CPU/disk usage for the core and observability profiles
-- [ ] AC5: Runbook T11 written in full
-
-> Note: Three PRs (ADR-M63, QUESTIONS #325–#327): PR 1 = TLS on 8200 everywhere (AC1; a throw-away CA on development machines and in CI, `pnpm openbao:tls`, renewal without unsealing); PR 2 = backup and restore scripts, encrypted with age to a target folder, and a live restore drill with throw-away keys (AC2, AC3); PR 3 = with the infrastructure operator and the three key holders on the internal server (the company CA, AC4, AC5). Done together with the infrastructure operator. Also before the real server: the runner in its own VM or rootless Docker (ADR-M25 §2.5); done: ClickHouse's `langfuse` user has no access management, a loopback-only `sdlc_admin` makes `sdlc_purge` (ADR-M63 §6, QUESTIONS #330)
 
 #### A11. Stop publishing the OpenBao port on the host
 
@@ -755,7 +745,7 @@ flowchart LR
 
 > Note: Found by E05 (QUESTIONS #238): LiteLLM's traces in Langfuse carry prompts and responses (client data, ADR-M35); OSS self-hosted Langfuse has no automatic retention. Until E08, `project.purged` says `langfuse: manual` and runbook T11 lists the manual steps
 
-#### E07. MVP definition-of-done check
+#### E07. v0.1 definition-of-done check
 
 | Size | Depends on | Requirements | Code area |
 |---|---|---|---|
@@ -768,7 +758,7 @@ flowchart LR
 - [ ] AC3: README explains a fresh deployment with Docker Compose
 - [ ] AC4: QUESTIONS #81 is resolved: one real run with an API model has passed before M-F (the trial M-E runs with the local Ollama model, Harry 2026-10-06)
 
-> Note: The MVP+1 user interface scope (Harry, 2026-10-04: after the trial M-E, from its data) is superseded by V11 (QUESTIONS #358): the plan is written before the trial data and revised with it
+> Note: The web UI scope (Harry, 2026-10-04: after the trial M-E, from its data) is superseded by V11 (QUESTIONS #358): the plan is written before the trial data and revised with it
 
 
 ### Pre-M-E — Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)
@@ -885,7 +875,7 @@ flowchart LR
 > Note: QUESTIONS #342 (Harry, 2026-10-09): before v0.1.0. GitHub's manifest flow: https://docs.github.com/apps/sharing-github-apps/registering-a-github-app-from-a-manifest
 
 
-### UX — Friendlier for users and deployers, toward v0.2.0 (QUESTIONS #355)
+### UX — Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364)
 
 #### V04. Publish the platform's images to GHCR for each release
 
@@ -1003,14 +993,226 @@ flowchart LR
 
 - [ ] AC1: `design/MVP1-UI-SCOPE.md` version 1.0 proposes which actions the dashboard adds (for example approve or reject a gate, create an intent and link its spec, submit a plan, acknowledge and decide an escalation, kill a run), who may use each, and what stays on GitHub (the G7 review and the merge)
 - [ ] AC2: The security design for writes from a browser: sign-in and session (not the personal token in memory only), CSRF protection, re-authentication before an approval, the two-person rule shown and enforced by the same API checks, the audit actor
-- [ ] AC3: The design changes D-02 §4.2 ("actions in a web UI stay MVP+1") and ADR-M54 only after Harry approves it; then the implementation tasks are added to the backlog
+- [ ] AC3: The design changes D-02 §4.2 ("actions in a web UI stay Later") and ADR-M54 only after Harry approves it; then the implementation tasks are added to the backlog
 - [ ] AC4: No code in this task
 - [ ] AC5: Revised once `design/M-E-REPORT.md` exists (the trial data: who needs which screen, read-only or actions, sign-in)
 
 > Note: QUESTIONS #355 (Harry, 2026-10-10): the dashboard should have a plan for the other actions; read-only stays until the plan is approved. QUESTIONS #358 (Harry, 2026-10-10): V11 starts now, before the trial data, and supersedes the E07 note
 
+#### V12. Release process: SemVer, a tag-driven release workflow, upgrade notes
 
-### MVP+1 — Started early: read-only dashboard (QUESTIONS #255); lighter steps
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | V01 | NFR-07, NFR-08 | .github/workflows/* (release), CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, platform/tests/workspace/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: A written versioning policy (SemVer; before v1.0 a minor release may break, with its "Upgrade notes"; support = the latest release only; security advisories through GitHub Security Advisories, SECURITY.md)
+- [ ] AC2: A release workflow on a pushed tag `vX.Y.Z`: refuses a tag that differs from the root `package.json` and `PLATFORM_VERSION`, creates the GitHub Release from the CHANGELOG section, and starts the image (V04) and npm (V05) jobs when they exist; the tag is always made by a person
+- [ ] AC3: Every CHANGELOG release section has "Upgrade notes" (migrations, credentials commands to run again, changed settings), checked by a test
+- [ ] AC4: Small releases: a v0.1.x when something useful lands without an upgrade step (for example the CLI on npm and `sdlc next`); v0.2.0 when the milestone UX is done or an upgrade step is needed
+
+> Note: QUESTIONS #364 (Harry, 2026-10-10). Releases, tags and npm publishes are public actions: ask Harry first. The upgrade test between two releases is O02 (Server)
+
+#### L02. Model benchmark on the pilot tasks (data for the GPU decision)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | C05 | D-07 §3, §4, NFR-01 | platform/tests/integration/agent/*, package.json, design/D-07 (results), docs of the benchmark |
+
+**Acceptance criteria**
+
+- [ ] AC1: `pnpm test:model-bench` (developer machines, never in CI): runs pilot tasks (T01–T08 shapes) with one model behind LiteLLM and records time, model calls, tokens, cost (internal for self-hosted), CI result and the share of acceptance criteria met; the same task set for every model
+- [ ] AC2: Runs with local models on Ollama (small and medium sizes) and, when a key exists, one API model for comparison; never a `:cloud` model; the report holds numbers only, never prompts or code
+- [ ] AC3: A short result table for leadership: which model size reaches which quality, the memory it needed, the speed; input for L03
+- [ ] AC4: Reuses `pnpm test:agent-real` (C05) and the pilot stack (C09); no new runtime dependency
+
+> Note: QUESTIONS #362 (Harry, 2026-10-10): many clients are `client_restricted`, so a self-hosted model is a condition to sell; the company has no GPU yet. Runs early, in parallel with the milestone UX, on a developer machine
+
+
+### EXT — Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361)
+
+#### X01. Spike: a second, open-source coding agent (Aider or OpenCode)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | C05 | NFR-04, NFR-05, D-02 §4.2 | platform/spikes/agent2/* (thrown away), design/ADR-M68 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Run Aider and OpenCode (pinned) in the node24 sandbox: the model only through LiteLLM with the run's virtual key, no other egress, no Git push; iteration and time caps, a stop on request, and counts for loop detection (`events`, `identicalCalls`)
+- [ ] AC2: Compare them on two pilot tasks with the same model: result, time, tokens, how they report progress and stop
+- [ ] AC3: Licences and supply chain (NFR-04): images, dependencies, Trivy
+- [ ] AC4: ADR-M68: the choice, the `AgentAdapter` mapping (start, status, stop, commitWork, collectOutputs), what the agent register needs (an adapter column), the gaps
+
+> Note: QUESTIONS #361 (Harry, 2026-10-10): an open-source agent first, to prove the interface is vendor-neutral; Claude Code later (licence and gateway to check first)
+
+#### X02. Design: a tool register and MCP tools for agents
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | C04 | NFR-03, NFR-05, FR-33 | design/ADR-M69, design/D-03 §9, design/D-05, design/QUESTIONS.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: ADR-M69: a tool register like the agent register (owner, version pinned by image digest, permissions, allowed data classes, approval by Person B or governance, statuses, never deleted)
+- [ ] AC2: How a tool runs: a service on the run's own network through `docker/guard.ts` (like LiteLLM), or stdio inside the sandbox; a run gets a tool only when the plan, the agent register and the Run Contract all allow it; a short-lived, read-only credential handed over as a single-use wrapping token
+- [ ] AC3: What is recorded: a run event per tool use with IDs, hashes and counts only, never queries or text; the kill switch revokes tool credentials too
+- [ ] AC4: D-03 §9 and D-05 changes proposed in the same PR, for Harry's approval
+
+> Note: QUESTIONS #361 (Harry, 2026-10-10): direction 2 (tools for agents); the first tool is X04
+
+#### X03. A second agent adapter and the agent register's adapter column
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| L | X01 | NFR-05, FR-31, FR-32, FR-35, FR-36 | platform/packages/adapters/agent-<name>/*, platform/packages/contracts, platform/packages/core (agents), migrations, platform/apps/runner, platform/sandbox-images/*, platform/tests/*, design/D-05, design/ADR-M31, handbook Ch.20 |
+
+**Acceptance criteria**
+
+- [ ] AC1: The adapter chosen in ADR-M68 implements `AgentAdapter`; the runner drives it with the same caps, stops, kill switch and loop detection as OpenHands
+- [ ] AC2: `agents.adapter` (migration, D-05, ADR-M31): every agent names its adapter; a project picks the agent by `run.agent_key` as today
+- [ ] AC3: The pilot suite (`pnpm test:pilot`) and `pnpm test:agent` pass with the new adapter on the stub model; the sandbox egress and hardening tests unchanged
+- [ ] AC4: Handbook Ch.20: registering an agent with another adapter
+
+> Note: QUESTIONS #361. Multi-agent (several agents in one intent) stays after X03
+
+#### X04. The tool register and the first tool: search the project's documents
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| L | X02 | FR-33, FR-44, NFR-03 | platform/packages/core (tools, retention), migrations, platform/deploy (profile knowledge), platform/apps/runner, platform/apps/worker (retention), platform/tests/*, handbook Ch.19, Ch.20, runbook T11 |
+
+**Acceptance criteria**
+
+- [ ] AC1: The tool register of ADR-M69 and one read-only tool: search the project's Markdown documents in its repository (bge-m3 embeddings and a plain vector search, as K01 measured; no WeKnora), through MCP
+- [ ] AC2: The index is built from the run's `base_sha`, so a run reads the documents of its own commit; one index per project and tenant
+- [ ] AC3: The embedding model follows the data class rules (D-07 §4): `client_restricted` only with a self-hosted model, `prohibited` never
+- [ ] AC4: Retention (FR-44, ADR-M51): the index holds client content, so the retention loop deletes it by the evidence rules and when a project is archived (unless held); `knowledge.purged` audited
+- [ ] AC5: A run event `knowledge_read` per search (document IDs, content hashes, counts; never queries or text); the egress probe from a sandbox; another project's index refused
+
+> Note: QUESTIONS #361 (Harry, 2026-10-10). Supersedes K02. ADR-M59 §5 lists the limits learned from K01
+
+#### X07. A context snapshot for every run
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | X04 | FR-40, FR-41 | platform/apps/runner, platform/packages/core (run events, evidence), platform/tests/*, handbook Ch.15 §15.10.2 |
+
+**Acceptance criteria**
+
+- [ ] AC1: For every run, a record of what the agent read: repository files (paths hashed, never paths in clear in append-only tables), documents found by tools (IDs, content hashes), the plan and spec versions; counts and hashes only
+- [ ] AC2: The Evidence Pack lists the snapshot's hash and counts per run
+- [ ] AC3: Never text, prompts or code in run events, logs or tables
+- [ ] AC4: Tests: a stub-model run reads files and searches documents; the snapshot appears in the pack
+
+> Note: QUESTIONS #361 (Harry, 2026-10-10): D-02 §4.2 "full context snapshots"
+
+#### X09. Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | B05 | NFR-05 | platform/spikes/git-hosts/* (thrown away), design/ADR-M70 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Check each host's API against the 19 methods of `GitHostAdapter`: a short-lived token for one repository, polling of comments, reviews, merges and CI results, opening a pull request, reviews bound to a commit, who merged, CI checks, security findings, branch protection
+- [ ] AC2: For each host: what works, what is missing for G6 and G7, and a workaround or a refusal
+- [ ] AC3: ADR-M70: a ranking and the effort of each adapter
+
+> Note: QUESTIONS #361 (Harry, 2026-10-10): clients use GitLab, Backlog Git and Bitbucket besides GitHub; adapters wait for a real project (X10)
+
+
+### Models — Self-hosted models (QUESTIONS #362)
+
+#### L01. A self-hosted model service (vLLM) on an optional GPU host
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | L02 | D-07 §3, §4, NFR-01 | platform/deploy (profile models-local), platform/deploy/litellm/config.ctmpl, design/D-03 §10.1, design/D-07, design/ADR-M71, handbook T11 |
+
+**Acceptance criteria**
+
+- [ ] AC1: A Compose profile `models-local` with vLLM pinned (Apache-2.0), a health check and a limit of concurrent requests, on the server or a separate GPU host
+- [ ] AC2: A LiteLLM entry `provider_type: self_hosted` with an internal cost per token above 0 (budgets keep working)
+- [ ] AC3: D-03 §10.1 and D-07 changed and ADR-M71 written first (today: "API models only, no GPU"); runbook T11 and the deploy README
+- [ ] AC4: A `client_restricted` project runs an agent end to end with the self-hosted model (stub or real)
+
+> Note: QUESTIONS #362 (Harry, 2026-10-10): milestone Models after EXT; earlier when the company has a GPU
+
+#### L03. GPU sizing note for leadership
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | L02 | D-07 | design/ (a short note) |
+
+**Acceptance criteria**
+
+- [ ] AC1: From the L02 numbers: which model size meets the quality bar, the GPU memory and count it needs, buy or rent (with the legal question of rented hardware for `client_restricted` data), the cost per month
+
+> Note: QUESTIONS #362
+
+
+### Server — A team on a server: toward v1.0 (QUESTIONS #363)
+
+#### A10. Resource measurement + backup / restore drill + internal CA / TLS
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | A03, A07, A11 | — | platform/deploy/backup/*, platform/deploy/openbao/tls.sh, handbook/03-templates/T11-openbao-runbook.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: Internal CA + TLS on OpenBao 8200 (QUESTIONS #20): script creates the CA (5 years) and the server certificate (1 year); the CA key is kept offline; renewal steps and a 30-day reminder in T11; clients verify the CA
+- [ ] AC2: Backup script: OpenBao snapshot (Raft), PostgreSQL dump, to storage off the server
+- [ ] AC3: Restore drill succeeds on a test machine; OpenBao unsealed with 2 shares
+- [ ] AC4: Record RAM/CPU/disk usage for the core and observability profiles
+- [ ] AC5: Runbook T11 written in full
+
+> Note: Three PRs (ADR-M63, QUESTIONS #325–#327): PR 1 = TLS on 8200 everywhere (AC1; a throw-away CA on development machines and in CI, `pnpm openbao:tls`, renewal without unsealing); PR 2 = backup and restore scripts, encrypted with age to a target folder, and a live restore drill with throw-away keys (AC2, AC3); PR 3 = with the infrastructure operator and the three key holders on the internal server (the company CA, AC4, AC5). Done together with the infrastructure operator. Also before the real server: the runner in its own VM or rootless Docker (ADR-M25 §2.5); done: ClickHouse's `langfuse` user has no access management, a loopback-only `sdlc_admin` makes `sdlc_purge` (ADR-M63 §6, QUESTIONS #330)
+
+#### O01. The runner in its own VM or with rootless Docker
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | C04 | NFR-03 | platform/deploy/*, platform/apps/runner, platform/deploy/README.md, design/ADR-M25, platform/tests/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: The runner, which controls Docker, runs isolated from the other services: a separate VM, or rootless Docker (ADR-M25 §2.5)
+- [ ] AC2: The socket proxy allowlist and the sandbox hardening unchanged; the live runner tests pass in that set-up
+- [ ] AC3: The deploy README: how to set it up on the server
+
+> Note: QUESTIONS #363 (Harry, 2026-10-10): milestone Server, toward v1.0
+
+#### O02. A tested upgrade between two releases
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | V12 | NFR-01, NFR-07 | platform/tests/integration/deploy/*, platform/deploy/README.md (Upgrade), CHANGELOG.md, .github/workflows/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: A live test: deploy the previous release, create an intent and move it to a gate, upgrade to the new release (images, migrations, credentials commands of the upgrade notes), and the intent goes on; the audit chain verifies
+- [ ] AC2: The deploy README's "Upgrade" section follows the test; a static test keeps them in step
+
+> Note: QUESTIONS #363, #364
+
+#### O03. Operational alerts
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | V07 | NFR-06 | platform/deploy/*, platform/apps/worker, platform/deploy/README.md, handbook T11 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Alerts when a service stops being healthy, OpenBao is sealed, the disk or the backup target fills up, a backup did not run, or a TLS certificate nears its end; delivered to the operator (for example e-mail or a chat webhook, configured), never with a secret
+- [ ] AC2: Built on `doctor` (V07) and the existing health checks; works with the profile `observability` off
+
+> Note: QUESTIONS #363
+
+
+### Later — Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done)
 
 #### U01. Read-only web dashboard
 
@@ -1075,7 +1277,59 @@ flowchart LR
 - [ ] AC4: A run event records which documents the agent read: IDs and hashes, never text (context snapshot)
 - [ ] AC5: D-03 §9 and §10 updated (sandbox egress); tests: the egress probe from a sandbox, a stub-model run that searches, another project's workspace refused
 
-> Note: QUESTIONS #285 (Harry, 2026-10-08): only if ADR-M59 (K01) says go. **Deferred** (QUESTIONS #300, Harry 2026-10-08): K01 found WeKnora no better than a plain bge-m3 + cosine search on the pilot, slow LLM summaries, and a document reader image with 202 critical vulnerabilities and an AGPL-3.0 library; revisit at M-F when a project has Office or PDF documents outside its repository, with the limits of ADR-M59 §5. QUESTIONS #305–#309, ADR-M60. Code index and full context snapshots stay MVP+1
+> Note: QUESTIONS #285 (Harry, 2026-10-08): only if ADR-M59 (K01) says go. **Deferred** (QUESTIONS #300, Harry 2026-10-08): K01 found WeKnora no better than a plain bge-m3 + cosine search on the pilot, slow LLM summaries, and a document reader image with 202 critical vulnerabilities and an AGPL-3.0 library; revisit at M-F when a project has Office or PDF documents outside its repository, with the limits of ADR-M59 §5. QUESTIONS #305–#309, ADR-M60. Code index and full context snapshots stay Later. **Superseded by X04** (QUESTIONS #361): document search without WeKnora; WeKnora is looked at again only for documents outside the repository (X05)
+
+#### X05. Documents outside the repository (Office, PDF, Confluence, Drive, Backlog)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| L | X04 | FR-33, FR-44 | platform/deploy (profile knowledge), platform/packages/core (tools), platform/tests/*, design/ADR (next free) |
+
+**Acceptance criteria**
+
+- [ ] AC1: Read requirement documents that live outside the repository (Office and PDF files; Confluence, Google Drive or Backlog wiki), with WeKnora's document reader or another, by the limits of ADR-M59 §5
+- [ ] AC2: Same rules as X04: per project and tenant, data classes, retention and purge, `knowledge_read`
+
+> Note: QUESTIONS #361: when a real project has such documents (Japanese projects: 要件定義書, 設計書). Re-run the K01 spike on them first
+
+#### X06. A code index for agents (Tree-sitter or SCIP and pgvector)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| L | X04 | NFR-05 | platform/packages/core (tools), platform/deploy, platform/tests/*, design/ADR (next free) |
+
+**Acceptance criteria**
+
+- [ ] AC1: A read-only tool that finds symbols and related files in the project's code at the run's `base_sha`
+- [ ] AC2: Shares the tool register, the index lifecycle and retention of X04
+
+> Note: QUESTIONS #361: D-01 §5.8b code context
+
+#### X08. Knowledge for people and the G8 learning loop (design first)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | X07 | FR-40, FR-42 | design/ (a new design document), design/QUESTIONS.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: A design for people to find past intents, decisions and evidence (search, links), and for lessons recorded at G8 ("Release / Learning") that propose changes to `AGENTS.md` or the handbook
+- [ ] AC2: No code in this task; implementation tasks follow Harry's approval
+
+> Note: QUESTIONS #361
+
+#### X10. An adapter for a second Git host
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| L | X09 | NFR-05 | platform/packages/adapters/git-<host>/*, platform/tests/*, platform/deploy/README.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: The host ranked first in ADR-M70 implements `GitHostAdapter`; the gate tests pass on its stub
+- [ ] AC2: One task per host when a real project needs it
+
+> Note: QUESTIONS #361
 
 ---
 
@@ -1156,6 +1410,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.31 | 2026-10-09 | Claude, approved by Harry | M-E tasks V02 (`pnpm trial:up`), V03 (the GitHub App from a manifest), both before v0.1.0, and V04 (images on GHCR, after v0.1.0) (QUESTIONS #342) |
 | 1.32 | 2026-10-10 | Claude, approved by Harry | New milestone UX (v0.2.0): V04 moved there, new tasks V05 (CLI on npm), V06 (`sdlc next`), V07 (`doctor`), V08 (the trial stack survives a reboot), V09 (team access, TLS reverse proxy), V10 (a friendlier CLI, `sdlc help`), V11 (plan the dashboard's actions) (QUESTIONS #355–#357) |
 | 1.33 | 2026-10-10 | Claude, approved by Harry | Review of the milestone UX: V05 adds `sdlc --version` and its smoke test runs `sdlc` without arguments (`sdlc help` comes with V10); V08 also updates CLAUDE.md and runbook T11; V09 names both sources of "not supported"; V11 starts now, before the trial data, and supersedes the E07 note (QUESTIONS #358) |
+| 1.34 | 2026-10-10 | Claude, approved by Harry | "MVP" retired: the platform backlog, v0.1.0 is the baseline (QUESTIONS #360); milestone UX gains V12 (release process) and L02 (model benchmark, early); new milestones EXT (X01–X04, X07, X09; QUESTIONS #361), Models (L01, L03; #362), Server (A10 moved there, O01–O03; #363), Later (was MVP+1: U01–U03 done, K02 superseded by X04, X05, X06, X08, X10); a public ROADMAP.md generated with D-08 |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |

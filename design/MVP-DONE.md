@@ -1,16 +1,16 @@
-# MVP done: the definition-of-done check
+# v0.1 baseline: definition of done
 
 | Item | Value |
 |---|---|
-| Version | 0.7 |
-| Date | 2026-10-08 |
-| Status | **Draft** (task E07). AC4 prepared, waiting for the API-model run, now before M-F (QUESTIONS #81) |
+| Version | 0.8 |
+| Date | 2026-10-10 |
+| Status | **Draft** (task E07). AC4 prepared, waiting for the API-model run, now before M-F (QUESTIONS #81); 0.8 approved by Harry on 2026-10-10 (wording only: "MVP" retired, v0.1 baseline and Later; meaning unchanged; QUESTIONS #360) |
 | Readers | Leadership, tech lead, Claude Code |
 | Related documents | D-02 §10 (the criteria), D-08 task E07, D-09 §7 and §10, QUESTIONS #81 |
 
 ## 1. Purpose
 
-- Show, for each criterion of the MVP definition of done (D-02 §10), **which automated test proves it** and where it runs.
+- Show, for each criterion of the v0.1 definition of done (D-02 §10), **which automated test proves it** and where it runs.
 - List what is still open before the trial M-E, and the numbers measured so far.
 - A criterion counts as met only when a test proves it. A claim without a test is listed as a gap.
 
@@ -50,13 +50,13 @@ D-08 E07 AC4 (QUESTIONS #81): **prepared, waiting for the run, now before M-F.**
 | Item | Owner | Blocks |
 |---|---|---|
 | QUESTIONS #81: one real run with an API model (`pnpm test:agent-api`) | Owner (an API key in OpenBao, T11 §5d) | M-F (the trial on a real internal tool); issue #45. Not the trial M-E, which runs with the local model |
-| The live G1 → G8 run on the real pilot (`SDLC_PILOT_LIVE_G8=1 pnpm test:pilot-live`): the plan file merged on the pilot, a second GitHub account for Person B, the dev stack running (GETTING-STARTED Steps 13–14) | Owner | Nothing in the MVP; it is the first real G1 → G8 on GitHub |
+| The live G1 → G8 run on the real pilot (`SDLC_PILOT_LIVE_G8=1 pnpm test:pilot-live`): the plan file merged on the pilot, a second GitHub account for Person B, the dev stack running (GETTING-STARTED Steps 13–14) | Owner | Nothing in v0.1; it is the first real G1 → G8 on GitHub |
 | A10: TLS on OpenBao (PR 1) and backup and restore (PR 2, `pnpm test:backup`) are built (ADR-M63); the company CA, the first drill and the resource measurement on the server (PR 3) | Infrastructure operator | The real deployment on the internal server |
-| MVP+1 user interface scope (web UI, dashboard; D-02 §4.2), written from the trial data after M-E | Claude, for the owner's approval | Nothing in the MVP (D-08 E07 note) |
+| Web UI scope (web UI, dashboard; D-02 §4.2), written from the trial data after M-E | Claude, for the owner's approval | Nothing in v0.1 (D-08 E07 note) |
 
 ## 5. Kept for later
 
-Decisions taken during the MVP that left a known item for a later milestone. Each has its source.
+Decisions taken during v0.1 that left a known item for a later milestone. Each has its source.
 
 | Item | Source | When |
 |---|---|---|
@@ -67,8 +67,8 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 | Redone runs (sent back by G6 or G7) do not count as wasted tokens in the cost report | ADR-M45 §2.3 (E04) | M-F |
 | No manual spend-sync command; a gap longer than the catch-up window is only logged (`worker.cost_sync_gap`) | ADR-M24 §3 (C12) | M-F |
 | ~~Upgrade the deploy images (LiteLLM, OpenBao, ClickHouse, Langfuse)~~ **Done before M-E:** LiteLLM v1.104.0 (#195: a budget block answers 422 `budget_exceeded`; cached tokens are billed at the input price when a model has no cache price), OpenBao 2.7.1, ClickHouse 26.3.39.7, Langfuse 4.50.0 (#197) | Issue #177 (closed) | Done |
-| A per-project `release.environment` and the non-production HOTL path at G8; an explicit PM/BrSE confirmation of the client's own disclosure note | QUESTIONS #220, #222 (E03) | MVP+1 |
-| The MVP+1 user interface scope (web UI with actions, other users), written from the trial data; candidate list in `design/MVP1-UI-SCOPE.md` 0.1. The read-only dashboard is done: U01, U02 (QUESTIONS #255) | D-02 §4.2, D-08 E07 note | After M-E (U01: in parallel with M-E) |
+| A per-project `release.environment` and the non-production HOTL path at G8; an explicit PM/BrSE confirmation of the client's own disclosure note | QUESTIONS #220, #222 (E03) | Later |
+| The web UI scope (web UI with actions, other users), written from the trial data; candidate list in `design/MVP1-UI-SCOPE.md` 0.1. The read-only dashboard is done: U01, U02 (QUESTIONS #255) | D-02 §4.2, D-08 E07 note | After M-E (U01: in parallel with M-E) |
 | Template T13 differs from the plan schema v1 (platform fields, `change_flags`, tool names) | B09 PR 2 (#150) | Handbook authors |
 | Who owns the project AI record: D-02 §3 and handbook Ch.2 §2.5 differ | QUESTIONS #103 | Docs follow-up |
 
@@ -83,3 +83,4 @@ Decisions taken during the MVP that left a known item for a later milestone. Eac
 | 0.5 | 2026-10-07 | Claude (coordinator), approved by Harry | §5: the read-only dashboard U01 starts in parallel with M-E (QUESTIONS #255) |
 | 0.6 | 2026-10-07 | Claude (coordinator), approved by Harry | §5: the interface scope's candidate list (`design/MVP1-UI-SCOPE.md`); U01 and U02 done |
 | 0.7 | 2026-10-08 | Claude (coordinator), approved by Harry | §5: the deploy image upgrade (#177) is done before M-E (#195, #197) |
+| 0.8 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |

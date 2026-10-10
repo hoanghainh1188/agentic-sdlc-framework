@@ -181,7 +181,7 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 - The token lives **at most 1 hour** and cannot be renewed.
 - It can store and update secrets under `kv/`, read AppRole role IDs, issue and revoke secret IDs, and read the public Run Contract key.
 - It cannot change policies, mounts, the audit device or the Transit key, and cannot delete secrets.
-- Admin work is rare in the MVP (storing secrets once, rotating secret IDs every 3 months). Each admin session therefore needs two key holders for the root token. A personal admin login (for example user and password, or company single sign-on) is an open item (`design/ADR-M19-openbao-bootstrap.md` section 3).
+- Admin work is rare in v0.1 (storing secrets once, rotating secret IDs every 3 months). Each admin session therefore needs two key holders for the root token. A personal admin login (for example user and password, or company single sign-on) is an open item (`design/ADR-M19-openbao-bootstrap.md` section 3).
 
 ## 5b. Secrets and AppRole secret IDs
 

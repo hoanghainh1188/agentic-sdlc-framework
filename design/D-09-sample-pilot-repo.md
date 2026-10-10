@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.0 |
-| Date | 2026-09-24 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
+| Version | 1.1 |
+| Date | 2026-10-10 |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-10-10 (wording only: "MVP" retired, v0.1 baseline and Later; meaning unchanged; QUESTIONS #360) |
 | Readers | Tech lead, developers, Claude Code |
 | Related decisions | D-02 Q4: A → C → B. Domain: orders / inventory. Stack: Vue + NestJS + PostgreSQL |
 
@@ -23,7 +23,7 @@
 |---|---|---|
 | **A** | This sample repo (`pilot-order-inventory`) | M-C, M-D, and long-term integration tests |
 | **C** | A real internal tool (not chosen yet) | M-F |
-| **B** | The platform repo itself | After the MVP |
+| **B** | The platform repo itself | After v0.1 |
 
 ## 3. Fictional context
 
@@ -189,3 +189,4 @@ Apply the tax rate (10% / 8%) to each order line and calculate the order's total
 | 0.2 | 2026-09-24 | Claude (draft) | After review: sample repo built right before M-C; T09, N5 updated |
 | 1.0 | 2026-09-24 | Claude, approved by Harry | Autonomy codes L0–L2; N5 rewritten (separation of duties); new N7–N10 |
 | 0.3 | 2026-09-24 | Claude | Translated into English. Specs now bilingual Japanese–English. Step C belongs to M-F (matches D-02) |
+| 1.1 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |
