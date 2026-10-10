@@ -13,6 +13,7 @@ import type { SaveProjectAiRecord } from '../../../packages/core/src/db/reposito
 import type { Intent } from '../../../packages/core/src/db/schema.js';
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
 import { stepIntent } from '../../../packages/core/src/workflow/step.js';
+import { tokenIssuedAt } from '../token-clock.js';
 import { createWorkflowFixture, type WorkflowFixture } from '../workflow/fixture.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
@@ -231,11 +232,13 @@ describeDb('B12: the project AI record on PostgreSQL', () => {
     beforeAll(async () => {
       await projectWithoutRecord('api');
       for (const [key, id] of Object.entries({ pm, viewer, a: f.users.a, b: f.users.b })) {
-        tokens[key] = (await issueApiToken(f.scope, { userId: id, name: key, now: T0 })).token;
+        tokens[key] = (
+          await issueApiToken(f.scope, { userId: id, name: key, now: tokenIssuedAt() })
+        ).token;
       }
       const outsider = await f.scope.users.create({ display_name: 'o', email: 'o@example.com' });
       tokens.outsider = (
-        await issueApiToken(f.scope, { userId: outsider.id, name: 'o', now: T0 })
+        await issueApiToken(f.scope, { userId: outsider.id, name: 'o', now: tokenIssuedAt() })
       ).token;
       app = await createApp({
         db: db.app as unknown as ApiDeps['db'],

@@ -17,7 +17,9 @@ import { createTestDatabase, describeDb, tamper, type TestDatabase } from './hel
 
 type App = Awaited<ReturnType<typeof createApp>>;
 const asApiDb = (db: TestDatabase): ApiDeps['db'] => db.app as unknown as ApiDeps['db'];
-const NOW = new Date('2026-10-03T03:00:00.000Z');
+// The api's clock, near the real one: `api_tokens.created_at` is the database's `now()`, and the
+// CHECK `expires_at > created_at` refuses a token whose fixed-clock expiry is already past.
+const NOW = new Date(Math.floor(Date.now() / 1000) * 1000);
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface Body {

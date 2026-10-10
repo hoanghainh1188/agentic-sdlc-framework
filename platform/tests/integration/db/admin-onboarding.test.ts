@@ -13,6 +13,7 @@ import { issueApiToken } from '../../../packages/core/src/admin/tokens.js';
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
 import type { TenantScope } from '../../../packages/core/src/db/tenant-scope.js';
 import { createJsonLogger } from '../../../packages/core/src/observability/index.js';
+import { tokenIssuedAt } from '../token-clock.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
 type App = Awaited<ReturnType<typeof createApp>>;
@@ -87,7 +88,7 @@ describeDb('B13: admin onboarding on PostgreSQL', () => {
       tenantName: slug,
       adminEmail: `admin@${slug}.example.com`,
       adminName: `Admin ${slug}`,
-      now: NOW,
+      now: tokenIssuedAt(),
     });
     return {
       slug,
@@ -106,7 +107,11 @@ describeDb('B13: admin onboarding on PostgreSQL', () => {
       }),
       201,
     );
-    const issued = await issueApiToken(tenant.scope, { userId: created.id, name: key, now: NOW });
+    const issued = await issueApiToken(tenant.scope, {
+      userId: created.id,
+      name: key,
+      now: tokenIssuedAt(),
+    });
     return { id: created.id, token: issued.token };
   }
 

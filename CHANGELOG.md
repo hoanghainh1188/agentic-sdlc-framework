@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Database tests that would fail on a known day: they seeded API tokens with a fixed test clock, so the expiry (clock + 90 days) fell behind `api_tokens.created_at`, which is the database's real `now()`, and the CHECK `expires_at > created_at` refused the insert. The first would have failed on 2026-12-25 (`escalation-commands`), then `api` (2026-12-26), `ai-records`, `plan-submission`, `spec-linking` (2026-12-27), `admin-onboarding` (2027-01-01), `cost-report` and `metrics-gates` (2027-01-02); `admin-tokens` already failed on 2026-10-10 (same change as #281). Seeded tokens now take their issue time from the real clock (`platform/tests/integration/token-clock.ts`); the api's clock stays the fixed test clock, so assertions stay deterministic. `api.test.ts` counts the 90-day expiry from the token's own issue time. Checked by running `pnpm test:db` with the database (libfaketime) and Node clocks moved to 2027-01-08, 2027-06-07, 2028-06-01 and 2030-01-22: every file passes. No other test combines a fixed clock with a real-clock check: the other `CHECK`s against `created_at` (`role_bindings`, `tenant_role_bindings`, `user_identities`) are never given a fixed clock by the tests, and the API checks token expiry against its injected clock.
+
 ## [0.1.1] - 2026-10-10
 
 A small release of the milestone UX: easier to install and to use. **The `sdlc` command on npm** (`npm install -g agentic-sdlc-cli`, Node.js 24, no checkout; `sdlc --version`), **`sdlc next <INT>`** (where an intent is and what you do now), and **the platform's images on GHCR**, built for amd64 and arm64, scanned, signed with cosign keyless and carrying an SBOM and provenance: a checkout of the tag `v0.1.1` pulls them by digest instead of building them (`platform/deploy/README.md`, "Verify the published images").
