@@ -141,7 +141,7 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 | Data model | [D-05](design/D-05-data-model.md) |
 | Models, tokens and cost | [D-07](design/D-07-model-and-token-management.md) |
 | The sample repository used for tests | [D-09](design/D-09-sample-pilot-repo.md) |
-| What the web interface may offer next | [Web UI scope (draft)](design/MVP1-UI-SCOPE.md) |
+| What the web interface may offer next | [Web UI scope: the dashboard's actions (proposed)](design/MVP1-UI-SCOPE.md) |
 | Every design document and decision | [design/README.md](design/README.md) |
 | Diagrams | [diagrams/README.md](diagrams/README.md) |
 | The platform guides (five minutes, tutorial, user guide, rollout, deployment, developers) | [platform/README.md](platform/README.md) |
