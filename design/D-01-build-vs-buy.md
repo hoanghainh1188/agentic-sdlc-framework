@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.8 |
-| Date | 2026-10-08 |
-| Status | **Approved** (Harry, 2026-09-24); 0.6 approved by Harry on 2026-10-08 (open for everyone instead of "sell later"; `design/POSITIONING.md` §7); 0.7 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 0.8 approved by Harry on 2026-10-08 (docs fix PR A: §3 and §4b worded like 0.6; meaning unchanged) |
+| Version | 0.9 |
+| Date | 2026-10-10 |
+| Status | **Approved** (Harry, 2026-09-24); 0.6 approved by Harry on 2026-10-08 (open for everyone instead of "sell later"; `design/POSITIONING.md` §7); 0.7 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 0.8 approved by Harry on 2026-10-08 (docs fix PR A: §3 and §4b worded like 0.6; meaning unchanged); 0.9 approved by Harry on 2026-10-10 (wording only: "MVP" retired, v0.1 baseline and Later; meaning unchanged; QUESTIONS #360) |
 | Readers | Leadership, tech lead / architect |
 | Related decisions | Option C (build the full platform ourselves). Monorepo. Internal first, then open for everyone (MIT code, CC BY 4.0 documentation; 2026-10-08). GitHub + GitLab. Fully self-hosted. Models: both API and self-hosted |
 
@@ -135,7 +135,7 @@ Conclusion labels:
 
 | Option | Type | Price | Notes |
 |---|---|---|---|
-| Docker + git worktree | Open source | Infrastructure only | Proposed for the MVP in an earlier internal draft |
+| Docker + git worktree | Open source | Infrastructure only | Proposed for v0.1 in an earlier internal draft |
 | OpenHands sandbox | Open source | Infrastructure only | Included when using OpenHands |
 | AgentCore Runtime | AWS, pay per use | About USD 0.0895 per vCPU-hour + USD 0.00945 per GB-hour (mid-2026) | Serverless; nothing to operate |
 
@@ -265,9 +265,9 @@ Details: D-03 section 8.1.
 | 3 | **Run Manager**: manages agent runs, assigns run_id | Temporal + agent adapter | High |
 | 4 | **Evidence Pack**: collects CI, tests, scans, reviews per task | Existing CI results + SeaweedFS | High |
 | 5 | **Compliance audit log**: append-only, hash chain | PostgreSQL + hash anchored to S3 storage | High |
-| 6 | **Git adapter**: GitHub (MVP), GitLab (later) | GitHub, GitLab APIs | High |
+| 6 | **Git adapter**: GitHub (v0.1), GitLab (later) | GitHub, GitLab APIs | High |
 | 7 | **Cost Controller**: token budgets per intent / run / gate, cost reports per client | LiteLLM + Langfuse | High |
-| 8 | **Policy bundle**: autonomy rules, tool permissions, model routing | YAML (MVP) → OPA or Cedar | Medium |
+| 8 | **Policy bundle**: autonomy rules, tool permissions, model routing | YAML (v0.1) → OPA or Cedar | Medium |
 | 9 | **Agent adapter**: plug in OpenHands / Claude / Copilot | Each agent's SDK / REST API | Medium |
 | 10 | **Spec adapter**: import BMAD / Spec Kit output into the registry | Markdown / YAML files | Medium |
 | 11 | **Context layer**: code index + context snapshots. Documents via WeKnora | WeKnora + Tree-sitter/SCIP + pgvector | Medium |
@@ -355,3 +355,4 @@ Reliability notes:
 | 0.6 | 2026-10-08 | Claude (coordinator), approved by Harry | Header and §8: open for everyone instead of "sell later" (`design/POSITIONING.md` §7) |
 | 0.7 | 2026-10-08 | Claude (coordinator), approved by Harry | Sources: citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged |
 | 0.8 | 2026-10-08 | Claude (docs fix PR A), approved by Harry | §3 criterion 1 and §4b: the remaining "sell to clients" wording follows 0.6 (open for everyone); meaning unchanged |
+| 0.9 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |

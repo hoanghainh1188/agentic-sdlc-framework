@@ -106,10 +106,10 @@ Rules the platform enforces:
 - **A change is a new version** (§20.9). The model, instructions, tools, maximum autonomy and environments change only while the agent is proposed or suspended, and only with a new version label.
 - **Model**: the model is the name of a model in the platform's model gateway, and the name includes the model version (for example `claude-haiku-4-5-20251001`). If the model behind a name changes, register a new agent version.
 - **Instructions**: the platform stores the SHA-256 of the instructions file (for example `AGENTS.md`) and compares it with the file in the repository before each run. **Every edit of `AGENTS.md` stops the agent's runs** (error "instructions differ") until you register a new agent version with the new file. Review the edit, then `suspend`, `update --version … --instructions-file AGENTS.md`, and approve the change.
-- **Autonomy**: at most L2 in the MVP.
+- **Autonomy**: at most L2 in v0.1.
 - **Recertification**: every 3 months (the project configuration may choose a shorter time). The first activation counts as the first certification. When the time has passed, the run still starts, and the agent owner gets a warning. `list --overdue` shows the agents to recertify.
 
-Not yet on the platform (MVP): agents with L3 or more (leadership and the security owner approve, §20.7), and suspension from a GitHub comment. In the MVP the table of who approves what is fixed in the platform, not in a setting (`design/ADR-M37-admin-onboarding.md` §2.8); it moves into a tenant setting later.
+Not yet on the platform (v0.1): agents with L3 or more (leadership and the security owner approve, §20.7), and suspension from a GitHub comment. In v0.1 the table of who approves what is fixed in the platform, not in a setting (`design/ADR-M37-admin-onboarding.md` §2.8); it moves into a tenant setting later.
 
 ---
 

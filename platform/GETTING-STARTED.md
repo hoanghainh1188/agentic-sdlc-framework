@@ -22,7 +22,7 @@ A new test App can also be made from the manifest: `pnpm github-app:create --org
 | GitHub App name | `harryforge-sdlc-dev` |
 | Homepage URL | `https://github.com/hoanghainh1188/agentic-sdlc-framework` (any URL works; the App was created with the old one) |
 | Callback URL | empty |
-| Webhook → Active | **off** (the MVP polls, QUESTIONS #43, ADR-M11) |
+| Webhook → Active | **off** (v0.1 polls, QUESTIONS #43, ADR-M11) |
 | Where can this App be installed | Only on this account |
 
 3. **Repository permissions:** set them as listed in [deploy/README, "The GitHub App's settings"](deploy/README.md#github-app-permissions); everything else "No access". After a permission change, accept it on the installation, or tokens keep the old permissions.
@@ -488,7 +488,7 @@ Follow the dependencies in D-08. A practical order:
 | 5 | M-B: B01 → B02 → … → B11 escalation, B12 AI record → B10 tests | Mostly `handbook-dependent` |
 | 6 | M-0: R01–R04 (sample repo) | Right before M-C |
 | 7 | M-C: C02 → … → C10 agent register, C11 kill switch → C09 tests | |
-| 8 | M-D: E01 → E07 | E07 = MVP definition of done |
+| 8 | M-D: E01 → E07 | E07 = v0.1 definition of done |
 
 ### Step 10. When the handbook changes
 

@@ -2,11 +2,11 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.3 |
-| Date | 2026-10-07 |
-| Status | **Draft** (coordinator, from a discussion with Harry). Hypotheses to test with the trial M-E and with real clients; not approved, except §7 (decided by Harry, 2026-10-08) |
+| Version | 0.4 |
+| Date | 2026-10-10 |
+| Status | **Draft** (coordinator, from a discussion with Harry). Hypotheses to test with the trial M-E and with real clients; not approved, except §7 (decided by Harry, 2026-10-08); 0.4 approved by Harry on 2026-10-10 (wording only: "MVP" retired, v0.1 baseline and Later; meaning unchanged; QUESTIONS #360) |
 | Readers | Harry, leadership |
-| Related documents | D-01 (build vs buy, the alternatives), D-02 §2 (MVP goal), `design/M-E-TRIAL-PLAN.md`, `design/MVP1-UI-SCOPE.md`, handbook Ch.1, Ch.9 |
+| Related documents | D-01 (build vs buy, the alternatives), D-02 §2 (v0.1 goal), `design/M-E-TRIAL-PLAN.md`, `design/MVP1-UI-SCOPE.md`, handbook Ch.1, Ch.9 |
 
 ---
 
@@ -16,7 +16,7 @@
 - List the risks of that position and what must be measured to confirm it.
 - Prepare the decisions that follow from it (business model, scope, what to measure in M-E).
 
-Everything here is an assessment **[Proposal]** built from the design documents and the MVP. There is no market data or trial data yet.
+Everything here is an assessment **[Proposal]** built from the design documents and v0.1. There is no market data or trial data yet.
 
 ## 2. What the framework sells
 
@@ -74,7 +74,7 @@ Most of the weight of a Low-risk task is waiting, not approvals.
 | A1 | A shorter block window (1 working hour) | Configuration only | For the trial M-E (`design/M-E-TRIAL-PLAN.md` D7) |
 | B1 | A block window per gate, for example none after a G6 AUDIT pass | Design (D-03 §6, ADR-M30), then a task | Only if M-E shows nobody blocks within a window |
 | B2 | One CLI command creates the intent and links its spec | A small task (D-08 U03) | Added to the backlog, after M-E |
-| B3 | A per-project `release.environment`: a non-production release at Low risk is HOTL at G8 | Design and a task; the codes table already allows it (QUESTIONS #220) | MVP+1 |
+| B3 | A per-project `release.environment`: a non-production release at Low risk is HOTL at G8 | Design and a task; the codes table already allows it (QUESTIONS #220) | Later |
 | C1 | G1 passes on its own at Low risk | Handbook (rule M1) | Not proposed: G1 sets the risk tier every later gate depends on |
 
 G1, G7 and production G8 stay HITL: they are the record the framework sells (who asked, who approved, who released).
@@ -109,3 +109,4 @@ Before the repository is made public, one session does the content review: `_rev
 | 0.1 | 2026-10-07 | Claude (coordinator) | Draft from the discussion with Harry: what the framework sells, the alternatives, segments, a positioning statement, risks, business models, what to confirm |
 | 0.2 | 2026-10-07 | Claude (coordinator) | §6.1: what a Low-risk task costs (human steps, block-window waits) and the ways to make it lighter |
 | 0.3 | 2026-10-08 | Claude (coordinator), approved by Harry | §7 decided: open for everyone (MIT code, CC BY 4.0 documentation), services only; the content review before going public |
+| 0.4 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |

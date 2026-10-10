@@ -1,6 +1,6 @@
 # Platform
 
-The code and guides of the [Agentic SDLC Framework](../README.md) platform: the system that runs AI coding agents through the eight gates G1–G8 and keeps the evidence, the audit log and the cost. The MVP is a **modular monolith** ([design/D-03](../design/D-03-mvp-architecture.md), ADR-M01).
+The code and guides of the [Agentic SDLC Framework](../README.md) platform: the system that runs AI coding agents through the eight gates G1–G8 and keeps the evidence, the audit log and the cost. v0.1 is a **modular monolith** ([design/D-03](../design/D-03-mvp-architecture.md), ADR-M01).
 
 ## Guides
 

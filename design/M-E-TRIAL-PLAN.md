@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 2.0 |
-| Date | 2026-10-09 |
-| Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed; D6 (the local model, QUESTIONS #81); 2.0 (Harry, 2026-10-09): the trial is run by the community (D8, QUESTIONS #340) |
+| Version | 2.1 |
+| Date | 2026-10-10 |
+| Status | **Approved** (Harry, 2026-10-06): decisions D1–D5 as proposed; D6 (the local model, QUESTIONS #81); 2.0 (Harry, 2026-10-09): the trial is run by the community (D8, QUESTIONS #340); 2.1 approved by Harry on 2026-10-10 (wording only: "MVP" retired, v0.1 baseline and Later; meaning unchanged; QUESTIONS #360) |
 | Readers | Harry, every trial team (Person A, Person B, second approver), Claude Code |
 | Related documents | D-02 §2, §10, §13.3 (milestones M-E, M-F); D-09 §7 (tasks T01–T10, scenarios N1–N10); `design/MVP-DONE.md`; `platform/GETTING-STARTED.md` Steps 11–14 |
 
@@ -24,7 +24,7 @@
 |---|---|
 | T01–T10 on the sample repo, with the local model `gpt-oss:20b` (decision D6) | Real client code or data (M-F, step C) |
 | | The API model: one run before M-F (QUESTIONS #81) |
-| The trial team working through comments, reviews and the CLI | A web UI (MVP+1, written from this trial's data) |
+| The trial team working through comments, reviews and the CLI | A web UI (Later, written from this trial's data) |
 | Numbers from the platform (`sdlc metrics gates`, `sdlc cost report`, evidence packs, audit) and a short manual log | Changing gates, budgets or rules during the trial (M-F) |
 | Scenarios N1–N10 when they happen naturally | Forcing every unhappy scenario again (they are proven by tests: `design/MVP-DONE.md` §2) |
 
@@ -131,7 +131,7 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 3. Per gate: waiting time (first round, after changes), auto-passed share, overdue escalations.
 4. Totals: tokens, cost, the share of PRs that needed changes.
 5. Problems found, with their fix status.
-6. Proposals for M-F (gates, budgets, rules, the plan-file step #230), and the input for the MVP+1 user interface scope: the interface column counted per function of `design/MVP1-UI-SCOPE.md` §3, which then becomes version 1.0 for Harry's approval.
+6. Proposals for M-F (gates, budgets, rules, the plan-file step #230), and the input for the web UI scope: the interface column counted per function of `design/MVP1-UI-SCOPE.md` §3, which then becomes version 1.0 for Harry's approval.
 
 ## 9. Stop rules
 
@@ -169,3 +169,4 @@ Use the defaults unless a line below says otherwise. The values are the defaults
 | 1.5 | 2026-10-08 | Claude (coordinator), approved by Harry | §3 item 12: the trial waits for S01, S02, K01 and K02 (or its deferral) (QUESTIONS #285) |
 | 1.6 | 2026-10-08 | Claude (coordinator), approved by Harry | §3 item 12 done (K02 deferred, QUESTIONS #300); D6: the memory finding of K01 and a timed task before phase 1 |
 | 2.0 | 2026-10-09 | Claude (coordinator, task V01), approved by Harry | D8: the community runs the trial (`TRIAL.md`, the issue template `trial-report`); §1, §3, §4 (QUESTIONS #341), §8 (QUESTIONS #340) |
+| 2.1 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |

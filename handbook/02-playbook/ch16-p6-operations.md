@@ -116,7 +116,7 @@ Approval points: production changes follow G1–G8 (fast lane for urgent fixes).
 
 > **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written 2026-10-09 (docs review E2).
 
-The MVP platform has no feature made for operations and maintenance alone. An agent takes part in P6 the same way as in P3 to P5: a **remediation is an intent** (§16.5), with a spec, a plan and the eight gates; the agent never acts in production (§16.4; the agent register allows `sandbox` only, Chapter 20 §20.5b). What the platform gives P6 today:
+The v0.1 platform has no feature made for operations and maintenance alone. An agent takes part in P6 the same way as in P3 to P5: a **remediation is an intent** (§16.5), with a spec, a plan and the eight gates; the agent never acts in production (§16.4; the agent register allows `sandbox` only, Chapter 20 §20.5b). What the platform gives P6 today:
 
 | Need in P6 | On the platform | Where |
 |---|---|---|
@@ -127,7 +127,7 @@ The MVP platform has no feature made for operations and maintenance alone. An ag
 | Evidence of a released change | The sealed Evidence Pack of the intent | Chapter 15 §15.10.2 |
 | Production data for an operations task | Only what the project AI record allows (`prod_logs_allowed`); the platform refuses an intent whose data class the record does not allow | Chapter 19 §19.8b, Chapter 2 §2.5 |
 
-Not on the platform yet: the incident module and the remediation record (template T15 stays a document), automatic rollback and containment, and the observation window metrics (D-02 §4.2, MVP+1).
+Not on the platform yet: the incident module and the remediation record (template T15 stays a document), automatic rollback and containment, and the observation window metrics (D-02 §4.2, Later).
 
 ---
 

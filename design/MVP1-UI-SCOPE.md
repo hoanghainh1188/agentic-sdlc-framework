@@ -1,10 +1,10 @@
-# MVP+1 user interface scope (draft)
+# Web UI scope (draft)
 
 | Item | Value |
 |---|---|
-| Version | 0.1 |
-| Date | 2026-10-07 |
-| Status | **Draft** (coordinator). Candidate list only: it is checked against the trial data and approved by Harry after M-E (D-08 E07 note). No backlog task comes from this version |
+| Version | 0.2 |
+| Date | 2026-10-10 |
+| Status | **Draft** (coordinator). Candidate list only: it is checked against the trial data and approved by Harry after M-E (D-08 E07 note). No backlog task comes from this version; 0.2 approved by Harry on 2026-10-10 (wording only: "MVP" retired, v0.1 baseline and Later; meaning unchanged; QUESTIONS #360) |
 | Readers | Harry, the trial team, Claude Code |
 | Related documents | D-02 §3 (users), §4.2; QUESTIONS #255; ADR-M54 (the read-only dashboard, U01, U02); `design/M-E-TRIAL-PLAN.md` §7.2, §8; handbook codes table (`handbook/00-introduction/05-codes.md`) |
 
@@ -115,3 +115,4 @@ The trial team adds an **interface** column to the manual log (M-E plan §7.2): 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-07 | Claude (coordinator) | Draft for the trial: candidate functions by role, what never goes in the interface, conditions for actions, proposed order |
+| 0.2 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |

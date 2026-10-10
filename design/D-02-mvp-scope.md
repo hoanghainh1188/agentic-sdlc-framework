@@ -1,10 +1,10 @@
-# D-02. MVP scope of the platform
+# D-02. Scope of the platform (v0.1 baseline)
 
 | Item | Value |
 |---|---|
-| Version | 1.8 |
-| Date | 2026-10-09 |
-| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81); 1.4 approved by Harry on 2026-10-07 (§4.2: a read-only dashboard starts before MVP+1; QUESTIONS #255); 1.5 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 1.6 approved by Harry on 2026-10-08 (§4.2: the BMAD / Spec Kit spec tasks and WeKnora come before the trial M-E; QUESTIONS #285); 1.7 approved by Harry on 2026-10-09 (§5 flow: the order of the merge and G7 corrected; the rest is wording); 1.8 approved by Harry on 2026-10-09 (§13.3: the trial M-E is run by the community; QUESTIONS #340) |
+| Version | 1.9 |
+| Date | 2026-10-10 |
+| Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`); 1.1 approved by Harry on 2026-09-27 in the C05 session 2 plan (local Ollama model on developer machines for the C05 proof only; QUESTIONS #78); 1.2 approved by Harry on 2026-10-03 in the C08 plan (§5 flow: the runner pushes after G5, the platform opens the pull request; QUESTIONS #52); 1.3 approved by Harry on 2026-10-06 (§4.2, §12: the trial M-E runs with the local Ollama model; the API-model run moves to before M-F; QUESTIONS #81); 1.4 approved by Harry on 2026-10-07 (§4.2: a read-only dashboard starts before MVP+1; QUESTIONS #255); 1.5 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); 1.6 approved by Harry on 2026-10-08 (§4.2: the BMAD / Spec Kit spec tasks and WeKnora come before the trial M-E; QUESTIONS #285); 1.7 approved by Harry on 2026-10-09 (§5 flow: the order of the merge and G7 corrected; the rest is wording); 1.8 approved by Harry on 2026-10-09 (§13.3: the trial M-E is run by the community; QUESTIONS #340); 1.9 approved by Harry on 2026-10-10 (wording only: "MVP" retired, v0.1 baseline and Later; meaning unchanged; QUESTIONS #360) |
 | Readers | Leadership (sections 1–4, 10–12), tech lead / developers (all), Claude Code (sections 5–9, 13) |
 | Related documents | D-01 (build vs buy), D-07 (models and tokens), handbook codes table and Chapters 2–6, 10–20 |
 
@@ -12,11 +12,11 @@
 
 ## 1. Purpose
 
-- Fix **what the MVP does and does not do**.
+- Fix **what v0.1 does and does not do**.
 - Serve as input for breaking down the work and handing it to Claude Code.
-- MVP = the smallest version that is **really usable** on one pilot project.
+- v0.1 = the smallest version that is **really usable** on one pilot project.
 
-## 2. MVP goal (one sentence)
+## 2. v0.1 goal (one sentence)
 
 > One task goes **all the way from G1 to G8** on a real repo, with an agent writing code in a sandbox. Every step has **the right human approver**, **evidence**, an **audit log** and **measured token cost**.
 
@@ -25,11 +25,11 @@
 - Real numbers: tokens, cost, gate waiting time, share of PRs that needed changes.
 - A base to grow from: multi-tenancy, more agents, more Git hosts.
 
-## 3. MVP users
+## 3. v0.1 users
 
 The platform follows the handbook's **2+N team** (handbook Chapter 5).
 
-| Role (project role in D-05) | Uses the MVP to |
+| Role (project role in D-05) | Uses v0.1 to |
 |---|---|
 | Person A (`person_a`) — owner / executor | Create intents, approve G1 and G2 (Low/Medium risk), operate runs, receive escalations about intent and budget |
 | Person B (`person_b`) — independent reviewer / approver | Approve G2 (High+), G3, G6 (High+), G7, G8; receive technical and security escalations; freeze or lower autonomy |
@@ -44,9 +44,9 @@ The **producer of a change never approves it**. One person may hold several role
 
 ## 4. Scope
 
-### 4.1. IN scope for the MVP
+### 4.1. IN scope for v0.1
 
-| # | Component (from D-01) | What the MVP does |
+| # | Component (from D-01) | What v0.1 does |
 |---|---|---|
 | 1 | Gate Orchestrator | Runs the G1–G8 workflow on Temporal. Stores every gate decision |
 | 2 | Intent / Spec Registry | Creates intents; links a spec file in the repo (path + hash); versions |
@@ -68,33 +68,33 @@ The **producer of a change never approves it**. One person may hold several role
 | — | User interface | CLI + commands in PR/issue comments (see 6.3). **No separate web UI** |
 | — | Deployment | Docker Compose on one self-hosted server |
 
-### 4.2. OUT of scope for the MVP (later)
+### 4.2. OUT of scope for v0.1 (Later)
 
 | Item | When |
 |---|---|
-| Second Git host | MVP+1 |
-| Second agent, multi-agent | MVP+1 |
+| Second Git host | Later |
+| Second agent, multi-agent | Later |
 | WeKnora (document knowledge) | **Before the trial M-E** (QUESTIONS #285): a spike first (K01), the agent's access over MCP only if the spike says go (K02) |
-| Code index, full context snapshots (#11) | MVP+1 |
-| Self-hosted models (vLLM) | When the GPU decision is made. The MVP gateway only needs to be able to add models. Exception: a local Ollama model on a **developer machine** proves the agent path in C05 (QUESTIONS #78) and runs the trial M-E on the fictional sample repo (QUESTIONS #81); it is not a deployment target |
-| Converting BMAD/Spec Kit specs into our own format | **Before the trial M-E** (QUESTIONS #285): their structure and acceptance criteria (S01), a plan draft from their tasks (S02). A full conversion into our own format stays MVP+1 |
-| Full OPA/Cedar policy engine (#8) | MVP+1. The MVP uses simple rules in code, behind an interface |
-| Backlog / Jira integration (#12) | MVP+1 |
-| Client reports (#13) | MVP+2 |
-| Web UI, dedicated dashboard | MVP+1. The MVP uses Langfuse + Temporal UI. Exception: a **read-only** dashboard (intents and gates, escalations, cost and gate waiting times, evidence and audit), signed in with the personal API tokens, starts in parallel with the trial M-E (task U01, QUESTIONS #255). Actions in a web UI stay MVP+1 |
+| Code index, full context snapshots (#11) | Later |
+| Self-hosted models (vLLM) | When the GPU decision is made. The v0.1 gateway only needs to be able to add models. Exception: a local Ollama model on a **developer machine** proves the agent path in C05 (QUESTIONS #78) and runs the trial M-E on the fictional sample repo (QUESTIONS #81); it is not a deployment target |
+| Converting BMAD/Spec Kit specs into our own format | **Before the trial M-E** (QUESTIONS #285): their structure and acceptance criteria (S01), a plan draft from their tasks (S02). A full conversion into our own format stays Later |
+| Full OPA/Cedar policy engine (#8) | Later. v0.1 uses simple rules in code, behind an interface |
+| Backlog / Jira integration (#12) | Later |
+| Client reports (#13) | Later |
+| Web UI, dedicated dashboard | Later. v0.1 uses Langfuse + Temporal UI. Exception: a **read-only** dashboard (intents and gates, escalations, cost and gate waiting times, evidence and audit), signed in with the personal API tokens, starts in parallel with the trial M-E (task U01, QUESTIONS #255). Actions in a web UI stay Later |
 | SSO, Kubernetes, multiple installations | When selling to clients |
-| Autonomy level 3 (agent acting in production) | Not in the MVP |
+| Autonomy level 3 (agent acting in production) | Not in v0.1 |
 | Agent deploying to production | **Never automatic.** G8 production is always HITL |
-| Incident module (records, workflow) | MVP+1. MVP: escalations at "Incident" level create an audit event and notify; the record uses handbook template T9 |
-| Break-glass access | MVP+1 |
-| Deferred approval queue (independent branches continue while waiting) | MVP+1. MVP runs one agent task at a time per intent |
-| Automatic rollback / containment controller | MVP+1. MVP: kill switch and credential revocation only; agents never deploy |
-| PQC metrics and observation-window automation | MVP+1. MVP records the events needed to compute them later |
-| Recertification workflow | MVP+1. MVP stores the last recertification date and warns when older than 3 months |
+| Incident module (records, workflow) | Later. v0.1: escalations at "Incident" level create an audit event and notify; the record uses handbook template T9 |
+| Break-glass access | Later |
+| Deferred approval queue (independent branches continue while waiting) | Later. v0.1 runs one agent task at a time per intent |
+| Automatic rollback / containment controller | Later. v0.1: kill switch and credential revocation only; agents never deploy |
+| PQC metrics and observation-window automation | Later. v0.1 records the events needed to compute them later |
+| Recertification workflow | Later. v0.1 stores the last recertification date and warns when older than 3 months |
 
 ---
 
-## 5. MVP end-to-end flow
+## 5. v0.1 end-to-end flow
 
 ```mermaid
 sequenceDiagram
@@ -144,13 +144,13 @@ Code: `FR-xx`. Each requirement has acceptance criteria (AC) so that Claude Code
 |---|---|---|
 | FR-01 | Create an intent: title, description, repo, tenant, project, data_class, risk tier, token budget | The intent has an ID `INT-YYYY-NNNN` and status `draft` |
 | FR-02 | Link a spec: file path in the repo + commit + hash | If the spec content changes after G2 → report the mismatch, require G2 again |
-| FR-03 | The risk tier sets the maximum autonomy level (L0–L4) | Critical → L0 (the agent may not run). High → L1 (proposal only). Medium and Low → L2. L3–L4 not available in the MVP |
+| FR-03 | The risk tier sets the maximum autonomy level (L0–L4) | Critical → L0 (the agent may not run). High → L1 (proposal only). Medium and Low → L2. L3–L4 not available in v0.1 |
 
 ### 6.2. Gates G1–G8
 
 Oversight per gate comes from the **gate × risk matrix** (handbook codes table §4), stored in the project config. Defaults:
 
-| Gate | Low | Medium | High | Critical | Approver | How the MVP enforces it |
+| Gate | Low | Medium | High | Critical | Approver | How v0.1 enforces it |
 |---|---|---|---|---|---|---|
 | G1 Intent/Scope/Risk | HITL | HITL | HITL | HITL | Person A | `approve` command; required fields; **project AI record present and consistent with the data class** |
 | G2 Specification | HOTL | HITL | HITL | HITL | Person A; Person B for High+ | Acceptance criteria present; spec hash recorded |
@@ -181,12 +181,12 @@ HOTL at a human gate means: the gate passes automatically when the policy condit
 | Code | Requirement | Acceptance criteria |
 |---|---|---|
 | FR-20 | CLI: create intents, view status, approve gates | `sdlc intent create`, `sdlc gate approve G2 INT-...` work |
-| FR-21 | Commands in issue/PR comments: `/approve G3`, `/reject G3 <reason>` | MVP: the platform **polls GitHub** regularly to read new comments; webhooks come later. The commenter's permissions are checked |
+| FR-21 | Commands in issue/PR comments: `/approve G3`, `/reject G3 <reason>` | v0.1: the platform **polls GitHub** regularly to read new comments; webhooks come later. The commenter's permissions are checked |
 | FR-22 | The platform posts gate status as a comment on the issue/PR | One summary comment for each status change |
 
 [Proposal] Using comments on the Git host instead of a web UI means we do not build a UI, and users already know how to do it.
 
-**Receiving GitHub events (decided by Harry, 2026-09-24):** the internal server does not accept connections from the internet → the MVP **polls** the GitHub API (default every 30 seconds, configurable). Webhooks are enabled later when public infrastructure exists. Both paths feed the same event handler (ADR-M11).
+**Receiving GitHub events (decided by Harry, 2026-09-24):** the internal server does not accept connections from the internet → v0.1 **polls** the GitHub API (default every 30 seconds, configurable). Webhooks are enabled later when public infrastructure exists. Both paths feed the same event handler (ADR-M11).
 
 ### 6.4. Running the agent
 
@@ -236,7 +236,7 @@ HOTL at a human gate means: the gate passes automatically when the policy condit
 
 ---
 
-## 8. MVP stack
+## 8. v0.1 stack
 
 | Layer | Choice | Status |
 |---|---|---|
@@ -248,7 +248,7 @@ HOTL at a human gate means: the gate passes automatically when the policy condit
 | LLM gateway | LiteLLM Proxy + PostgreSQL + Valkey | Chosen (D-07). Valkey replaces Redis for licence reasons (review R2) |
 | Observability | Langfuse + OpenTelemetry | Chosen (D-01) |
 | Sandbox | Docker + git worktree | Chosen (D-01) |
-| Policy | Simple rules in code, behind an interface for OPA/Cedar later | [Proposal] for the MVP |
+| Policy | Simple rules in code, behind an interface for OPA/Cedar later | [Proposal] for v0.1 |
 | Agent | OpenHands | Decided (Q1) |
 | First Git host | GitHub | Decided (Q2) |
 
@@ -277,11 +277,11 @@ Details in D-05.
 
 ---
 
-## 10. MVP definition of done
+## 10. v0.1 definition of done
 
-The MVP is done when **all** of the following are true:
+v0.1 is done when **all** of the following are true:
 
-1. One intent goes **all the way from G1 to G8** on the sample repo (A). (The trial on a real internal tool belongs to milestone M-F; it is not an MVP criterion.)
+1. One intent goes **all the way from G1 to G8** on the sample repo (A). (The trial on a real internal tool belongs to milestone M-F; it is not a v0.1 criterion.)
 2. The agent never bypasses a human gate.
 3. The Evidence Pack is complete and readable.
 4. `sdlc audit verify` passes.
@@ -299,11 +299,11 @@ The MVP is done when **all** of the following are true:
 | # | Question | Decision | Date |
 |---|---|---|---|
 | Q1 | First agent | **OpenHands** | 2026-09-24 |
-| Q2 | First Git host | **GitHub**. GitLab in MVP+1 through the same interface | 2026-09-24 |
+| Q2 | First Git host | **GitHub**. GitLab in Later through the same interface | 2026-09-24 |
 | Q3 | Platform language | **TypeScript** (Node.js) | 2026-09-24 |
 | Q4 | Pilot repo | **A → C → B**. Step A: a sample "order / inventory" repo, Vue + NestJS + PostgreSQL (see D-09) | 2026-09-24 |
 | Q5 | Repo language | **English** for everything (see NFR-08) | 2026-09-24 |
-| Q6 | Handbook alignment | The design follows the handbook. MVP includes items 1–10 of the alignment list; incidents, break-glass, deferred queue, automatic rollback and PQC automation are MVP+1 | 2026-09-24 |
+| Q6 | Handbook alignment | The design follows the handbook. v0.1 includes items 1–10 of the alignment list; incidents, break-glass, deferred queue, automatic rollback and PQC automation are Later | 2026-09-24 |
 
 ### 11.1. Pilot repos
 
@@ -311,15 +311,15 @@ The MVP is done when **all** of the following are true:
 |---|---|---|
 | A | Sample repo `pilot-order-inventory` (fictional, see [D-09](D-09-sample-pilot-repo.md)) | M-C, M-D, long-term integration tests |
 | C | A real internal tool (not chosen yet) | M-F |
-| B | The platform repo itself | After the MVP |
+| B | The platform repo itself | After v0.1 |
 
 ## 12. Assumptions and parameters (not decided yet)
 
-| Item | Assumption in the MVP | Who decides, when |
+| Item | Assumption in v0.1 | Who decides, when |
 |---|---|---|
 | Monthly token budget | A **config parameter**. The pilot uses a small cap approved by Harry | Leadership, after 2–4 weeks of trial |
-| GPUs / self-hosted models | The MVP **uses API models only**. The gateway is ready to add vLLM. Only exception: a local Ollama model on a developer machine for the C05 proof (QUESTIONS #78) and the trial M-E on the fictional sample repo; one API-model run is still needed before M-F (QUESTIONS #81) | Leadership, when token data exists |
-| Charging clients for tokens | The MVP **records cost per tenant**. No charging yet | Leadership, before selling |
+| GPUs / self-hosted models | v0.1 **uses API models only**. The gateway is ready to add vLLM. Only exception: a local Ollama model on a developer machine for the C05 proof (QUESTIONS #78) and the trial M-E on the fictional sample repo; one API-model run is still needed before M-F (QUESTIONS #81) | Leadership, when token data exists |
+| Charging clients for tokens | v0.1 **records cost per tenant**. No charging yet | Leadership, before selling |
 | Team and timeline for building | Not set | Leadership |
 
 ---
@@ -331,7 +331,7 @@ The MVP is done when **all** of the following are true:
 | Item | Where | Status |
 |---|---|---|
 | Main instructions for Claude Code | `CLAUDE.md` at the repo root | ✅ |
-| MVP scope | `design/D-02` (this file) | ✅ |
+| v0.1 scope | `design/D-02` (this file) | ✅ |
 | Build vs buy | `design/D-01` | ✅ |
 | Models and tokens | `design/D-07` | ✅ |
 | Gate and autonomy codes | `handbook/00-introduction/05-codes.md` | ✅ |
@@ -370,7 +370,7 @@ The MVP is done when **all** of the following are true:
 
 | Risk | Mitigation |
 |---|---|
-| Scope creep | Every new request goes to "MVP+1" unless it blocks a section 10 criterion |
+| Scope creep | Every new request goes to "Later" unless it blocks a section 10 criterion |
 | 8 gates slow people down | Measure waiting time per gate (FR-12). Review after 2 weeks of trial |
 | Temporal is hard for a small team | Set it up early in M-A; build one sample workflow before the real one |
 | Agent changes files outside the plan | G5 compares actual changes with the plan. Branch protection |
@@ -408,3 +408,4 @@ The MVP is done when **all** of the following are true:
 | 1.6 | 2026-10-08 | Claude (coordinator), approved by Harry | §4.1 item 10, §4.2: BMAD / Spec Kit structure and plan drafts, and WeKnora, come before the trial M-E (QUESTIONS #285) |
 | 1.7 | 2026-10-09 | Claude (docs review PR B), approved by Harry | §5 flow and diagram D10: "G7 passed → merge" was a wrong order, corrected to "Person B merges, then G7 passes" (ADR-M41: the platform never merges). The rest is wording: "Run Manager" → "Runner", Person A "intent owner", Person B "independent reviewer and approver", "Evidence Pack" |
 | 1.8 | 2026-10-09 | Claude (coordinator, task V01), approved by Harry | §13.3: the trial M-E is run by the community, with a trial guide and a report template; M-F adjusts from their reports (QUESTIONS #340) |
+| 1.9 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |

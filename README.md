@@ -135,12 +135,13 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 | Codes: phases, gates, autonomy levels, oversight modes, risk tiers, roles | [Codes table](handbook/00-introduction/05-codes.md) |
 | Words: intent, block window, producer, tenant admin… | [Glossary](handbook/00-introduction/02-glossary.md) |
 | Handbook contents | [Contents](handbook/00-introduction/01-contents.md) |
-| MVP scope and requirements | [D-02](design/D-02-mvp-scope.md) |
+| Scope and requirements (v0.1 baseline) | [D-02](design/D-02-mvp-scope.md) |
+| What comes next, release by release | [ROADMAP.md](ROADMAP.md) |
 | Architecture | [D-03](design/D-03-mvp-architecture.md) |
 | Data model | [D-05](design/D-05-data-model.md) |
 | Models, tokens and cost | [D-07](design/D-07-model-and-token-management.md) |
 | The sample repository used for tests | [D-09](design/D-09-sample-pilot-repo.md) |
-| What the web interface may offer next | [MVP+1 interface scope (draft)](design/MVP1-UI-SCOPE.md) |
+| What the web interface may offer next | [Web UI scope (draft)](design/MVP1-UI-SCOPE.md) |
 | Every design document and decision | [design/README.md](design/README.md) |
 | Diagrams | [diagrams/README.md](diagrams/README.md) |
 | The platform guides (five minutes, tutorial, user guide, rollout, deployment, developers) | [platform/README.md](platform/README.md) |
