@@ -215,6 +215,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc intent create --project <slug> --title <text> --risk <tier> --data-class <class> [--description <text> \| --description-file <file>] [--budget <USD>] [--issue <number>] [--spec <path/to/spec.md> [--spec-commit <SHA>] [--spec-tool spec-kit\|bmad\|manual]]` | Creates an intent; you become its intent owner (Person A). With `--spec`, also links its spec, as `sdlc spec link` does (task U03). When the link is refused, the intent stays: the command names it, exits 1 and says how to link again |
 | `sdlc intent list [--project <slug>] [--status <status>] [--limit <n>] [--cursor <c>]` | Lists the intents you can read, newest first |
 | `sdlc intent show <INT-…>` | Shows an intent with its spec, plan and gate decisions, and **what holds it** when the platform holds it ("Held: …", the cause, until when) |
+| `sdlc next <INT>` | What you do next for this intent (task V06): the gate, who it waits for, why it is held (the reason the workflow recorded), and one advice for you: the command or comment to type, or the roles it waits for. It reads only the intent and your roles (`GET /v1/intents/:intent`, `GET /v1/me`) and changes nothing. A producer of the change (the intent's creator at G7 and G8, the person who approved G4 at G5, G7 and G8) is never told to approve; at G3 it reminds you that the person who submitted the plan cannot approve it. For an escalation it points to `sdlc escalation list --intent <INT>`. For actions outside a gate (link a spec, submit a plan, the AI record) it uses the default access roles and says so |
 | `sdlc gate approve <gate> <INT-…>` | Approves the gate the intent waits at |
 | `sdlc gate reject <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Rejects the gate |
 | `sdlc gate request-changes <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Requests changes |
@@ -474,6 +475,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.28 | 2026-10-09 | Claude (task C13) | §19.8c: `sdlc evidence proposal` |
 | 0.29 | 2026-10-09 | Claude (task V01, PR 2) | §19.8c: `sdlc trial report`, the anonymous report of the community trial (ADR-M65) |
 | 0.27 | 2026-10-09 | Claude (task U03) | §19.8c: `sdlc intent create --spec` creates the intent and links its spec in one command |
+| 0.31 | 2026-10-10 | Claude (task V06) | §19.8c: `sdlc next <INT>` |
 | 0.30 | 2026-10-10 | Claude (task V05) | §19.8c: install the `sdlc` command from npm (`agentic-sdlc-cli`), `sdlc --version` |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |

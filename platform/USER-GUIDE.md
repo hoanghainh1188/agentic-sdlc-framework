@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.11, 2026-10-10. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
+Version 0.12, 2026-10-10. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
 
 ---
 
@@ -90,6 +90,8 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
 ## 3. One intent, step by step
 
 The example is task T01 of the sample repo, Low risk. Where Medium or High risk differs, it says so.
+
+**Lost? Ask the platform.** At any step, `sdlc next <INT>` prints where the intent is, who it waits for, why it is held, and what **you** do now: the command or comment to type, or that it waits for someone else. It reads the intent and your roles only and changes nothing; it never tells a producer of a change to approve it.
 
 ### Step 1. Create the intent (Person A)
 
@@ -207,6 +209,7 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 
 | Command | Use |
 |---|---|
+| `sdlc next <INT>` | What do I do now: the next command or comment for you, or who it waits for |
 | `sdlc intent list` / `sdlc intent show <INT>` | Where is my intent, what waits for whom |
 | `sdlc gate approve\|reject\|request-changes <G> <INT>` | Decide a gate (codes only; `--reason-code`) |
 | `sdlc spec link` / `sdlc plan submit` | Inputs of G2 and G3 |
@@ -229,7 +232,7 @@ The dashboard shows intents by gate, escalations, cost and gate waiting times; i
 | **Cannot enter G1** (`ai_record_missing`, `data_class_not_allowed`) | The project's AI record is missing or does not allow the data class | Person A or PM / BrSE fixes the record; the intent enters G1 by itself |
 | Your command gets a **reply** instead of a status comment | It was refused (wrong gate, no role, you are a producer, bad syntax) | Read the reason, write a new comment |
 | **Plan resubmit needed** | The plan file on `main` is not the one you submitted | `sdlc plan submit <INT>` again (Person B approves G3 again if it was at G4) |
-| **Your intent does not move** | The platform holds it | `sdlc intent show <INT>` prints "Held: …" with the reason (and for a failed G4 check, which one); the dashboard shows the same under "What holds it" |
+| **Your intent does not move** | The platform holds it | `sdlc next <INT>` says what to do about it; `sdlc intent show <INT>` prints "Held: …" with the reason (and for a failed G4 check, which one); the dashboard shows the same under "What holds it" |
 | **Back at G2** (spec changed) | Someone edited the spec on `main` | Approve G2 again (passed by itself at Low risk) |
 | **Budget warning** | The run used 80 % of its budget | Nothing yet; at 100 % it stops and escalates |
 | **An escalation** (ESC-…) | A run or a gate needs a person: over budget, out of scope, overdue gate, CI timeout, early merge… | The escalation owner named in the notice: `/ack ESC-…`, look at the cause, then `/decide ESC-… <decision>`. Who may, and what each decision does: [handbook Ch.18 §18.8b](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188b-using-the-platform-escalations-ack-and-decide) |
@@ -273,6 +276,7 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 | 0.5 | 2026-10-09 | Docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists |
 | 0.6 | 2026-10-09 | Docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate |
 | 0.7 | 2026-10-09 | Docs review E2: §1 and §7 link to the handbook sections |
+| 0.12 | 2026-10-10 | Task V06: `sdlc next <INT>`, what to do now (§3, §4, §5) |
 | 0.11 | 2026-10-10 | Task V05: §2, install the `sdlc` command from npm (`agentic-sdlc-cli`); the checkout ways stay for developers |
 | 0.10 | 2026-10-09 | Task C13: step 5, saving an L1 proposal and ending the intent with a G4 rejection |
 | 0.9 | 2026-10-09 | Task U03: step 3, `sdlc intent create --spec` links the spec in the same command |
