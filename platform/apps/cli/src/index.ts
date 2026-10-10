@@ -1,7 +1,7 @@
 // The sdlc command-line tool. See design/D-03 section 5.1.
 // A07 adds `sdlc audit verify`, B03 the operator commands `sdlc admin …` (database, on the
 // server). B04 adds the user commands (through the API, design/ADR-M36): login, logout, whoami,
-// intent, gate, escalation, ai-record. B08 adds `sdlc spec`, B09 `sdlc plan`, C11 `sdlc run`, E04 `sdlc cost`, E06 `sdlc metrics`, E02 `sdlc evidence`, V01 `sdlc trial`, V05 `sdlc --version`. B13 adds the admin commands, `sdlc token` and
+// intent, gate, escalation, ai-record. B08 adds `sdlc spec`, B09 `sdlc plan`, C11 `sdlc run`, E04 `sdlc cost`, E06 `sdlc metrics`, E02 `sdlc evidence`, V01 `sdlc trial`, V05 `sdlc --version`, V06 `sdlc next`. B13 adds the admin commands, `sdlc token` and
 // `sdlc audit verify` through the API, and moves the operator commands to `sdlc ops` (ADR-M37).
 import { t } from '@sdlc/messages';
 
@@ -14,6 +14,7 @@ import { runEvidence } from './commands/evidence.js';
 import { runGate } from './commands/gate.js';
 import { runIntent } from './commands/intent.js';
 import { runMetrics } from './commands/metrics.js';
+import { runNext } from './commands/next.js';
 import { runLogin, runLogout, runWhoami } from './commands/login.js';
 import { runOps } from './commands/ops.js';
 import { runPlan } from './commands/plan.js';
@@ -36,6 +37,7 @@ const USER_COMMANDS: Readonly<
   logout: runLogout,
   whoami: runWhoami,
   intent: runIntent,
+  next: runNext,
   gate: runGate,
   escalation: runEscalation,
   'ai-record': runAiRecord,
