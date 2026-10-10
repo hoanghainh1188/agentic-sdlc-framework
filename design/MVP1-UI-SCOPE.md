@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.1 |
+| Version | 1.2 |
 | Date | 2026-10-10 |
 | Status | **Approved** (Harry, 2026-10-10). Decided in ADR-M73; built by U05–U07 (milestone UX) and U08–U09 (Later). Revised once `design/M-E-REPORT.md` exists (section 9) |
 | Readers | Harry, the trial teams, Claude Code |
@@ -54,7 +54,7 @@ Words used here:
 |---|---|---|---|---|
 | W7 | Create an intent, then link its spec (the two calls of `sdlc intent create --spec`, U03) | `POST /v1/intents`, `POST /v1/intents/:intent/specs` | `access.*` create roles (never `viewer`, M16); `access.spec_link_roles` (M23) | No |
 | W8 | Submit the plan file of an intent | `POST /v1/intents/:intent/plans` | `access.plan_submit_roles` (M24); the submitter never approves G3 | No |
-| W9 | Build an evidence pack; download an L1 proposal | `POST /v1/intents/:intent/evidence-packs`; `GET …/runs/:run/proposal` | `access.evidence_build_roles`, `access.evidence_read_roles` (M30); tenant admins | No |
+| W9 | Build an evidence pack. The L1 proposal download stays in the CLI (§5.10): the page shows the `sdlc evidence proposal` command | `POST /v1/intents/:intent/evidence-packs` | `access.evidence_build_roles`, `access.evidence_read_roles` (M30); tenant admins | No |
 
 ### 3.4. Wave 3: administration
 
@@ -93,7 +93,9 @@ These follow the platform's rules. The trial data does not change them.
 
 ### 5.1. Sign-in: GitHub OAuth through the platform's GitHub App (QUESTIONS #375)
 
-- The person picks the tenant (its slug) and selects "Sign in with GitHub". The api redirects the browser to GitHub with the App's client ID, a random `state` (32 bytes, kept server-side with the tenant and an expiry of 10 minutes) and PKCE.
+- The person picks the tenant (its slug) and selects "Sign in with GitHub". The api redirects the browser to GitHub with the App's client ID, a random `state` (32 bytes, kept server-side with the tenant and an expiry of 10 minutes) and PKCE (S256).
+- **Login CSRF:** the flow is bound to the browser that started it. With the redirect, the api sets a short-lived **pre-login cookie** `__Host-sdlc_oauth` (`HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, about 10 minutes) that holds the hash of `state` and the PKCE verifier (or a handle to them, kept server-side). The callback needs **both**: the `state` in the URL must match the cookie's hash, and the code is exchanged only with that browser's verifier. A callback opened in another browser, or a link made by someone else with their own code, fails. The cookie is deleted at the callback, whatever the result.
+- **Why `SameSite=Lax` here:** the redirect back from `github.com` to the callback is a cross-site top-level navigation. A `Strict` cookie is not sent on it, so the callback could never see the cookie. `Lax` is sent on a top-level `GET` navigation and never on a cross-site `POST`, image or `fetch`. The session cookie (§5.2) stays `Strict`.
 - GitHub sends the browser back to the api's callback. The api checks `state`, exchanges the code, reads the person's **numeric GitHub account ID** (`GET /user`), then **drops the GitHub user token at once**: the platform never keeps it and never acts on GitHub as the person.
 - The api finds the user by (tenant, `github`, numeric ID) among the **linked** identities in `user_identities`, and checks that the user is active. No match → refused, with the same message whatever the cause (no account, unlinked, disabled).
 - The browser does the redirects, so the server still needs no inbound connection from the internet. The api only calls GitHub outbound, as it already does.
@@ -103,10 +105,12 @@ These follow the platform's rules. The trial data does not change them.
 
 ### 5.2. Session
 
-- After sign-in the api creates a **server-side session**. A new table `web_sessions` holds: ID, `tenant_id`, `user_id`, the SHA-256 of the session secret and of its CSRF token, created, last seen, idle expiry, absolute expiry, revoked. Never the secret itself. It is not an append-only table (D-05 change, section 7).
+- After sign-in the api creates a **new session with a new random ID and secret**. It never reuses or upgrades a cookie that existed before the sign-in (no session fixation): any session cookie the browser sent is ignored and its row, if any, revoked.
+- The session is **server-side**. A new table `web_sessions` holds: ID, `tenant_id`, `user_id`, the SHA-256 of the session secret and of its CSRF token, created, last seen, idle expiry, absolute expiry, revoked. Never the secret itself. It is not an append-only table (D-05 change, section 7).
 - The cookie: `__Host-sdlc_session`, `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`, no `Domain`. Browsers accept `Secure` cookies on `http://localhost`.
 - Timeouts (config): idle 30 minutes, absolute 8 hours.
-- Revoked at sign-out, when the user is disabled, when their GitHub identity is unlinked, and by a tenant admin. A role change needs no revocation: the API checks roles on every request.
+- Revoked at sign-out, when the user is disabled, when their GitHub identity is unlinked, and by a tenant admin.
+- **Sign out everywhere:** a person can revoke all their own sessions at once (every browser, every device); a tenant admin can do it for a person. Audit `web_session.ended` with the reason code `all`. A role change needs no revocation: the API checks roles on every request.
 - The api's guard accepts **either** a bearer token (CLI, unchanged) **or** a session cookie. A request with both is refused.
 - Audit: `web_session.started` and `web_session.ended` (IDs and a reason code only).
 
@@ -122,7 +126,8 @@ Also: request bodies must be `application/json` (no form posts), and actions ans
 ### 5.4. Re-authentication before a decision: passkeys (QUESTIONS #376)
 
 - A **passkey** (WebAuthn) per person and device. It is local, phishing-resistant and needs no outside service.
-- **Step-up per action:** the page asks the api for a challenge. The api derives the challenge from the session, the action, the intent or escalation, the gate, the decision and the expected input hash (section 5.6). The person confirms with the passkey; the decision request carries the assertion; the api checks it and uses it once. A passkey confirmation is therefore valid for **this one decision only**.
+- **Step-up per action:** the page asks the api for a challenge for one action. The api makes a **random** challenge (32 bytes from a secure random source; never derived from the request) and **stores it server-side with the action it is bound to**: the session, the action, the intent or escalation, the gate, the decision and the expected input hash (section 5.6). The challenge lives a short time (about 2 minutes) and is **used once**.
+- The person confirms with the passkey; the decision request carries the assertion. The api loads the stored challenge, checks that the request is exactly the stored action (same session, action, subject, gate, decision and hash), verifies the assertion, and marks the challenge used in the same transaction as the decision. Any difference, an expired or used challenge, or another session → refused. A passkey confirmation is therefore valid for **this one decision only**.
 - Step-up is required for the actions marked "Yes" in section 3, and never for a kill or an acknowledgement.
 - **Registering a passkey** needs a GitHub sign-in done in the last 5 minutes, writes `passkey.registered` to the audit log and posts nothing elsewhere. A person can list and remove their passkeys; a tenant admin can remove them (`passkey.revoked`). A new table `webauthn_credentials` holds the credential ID, the public key, the counter, `tenant_id`, `user_id`, created, revoked; no free-text name.
 - WebAuthn cannot use an IP address as its site name. On a developer machine the dashboard must be opened at `http://localhost:8090`, not `http://127.0.0.1:8090`. Behind V09 the site name is the proxy's host name.
@@ -159,6 +164,13 @@ Also: request bodies must be `application/json` (no form posts), and actions ans
 - Actions are **off by default** (`SDLC_API_DASHBOARD_ACTIONS=off`).
 - They may be turned on only on **loopback** (`http://localhost`) or **behind the V09 `access` profile** (a TLS reverse proxy). The api refuses to start with actions on when `SDLC_API_PUBLIC_ORIGIN` is missing, or is plain `http://` on a host other than `localhost`.
 
+### 5.10. Known limits and risks
+
+| Risk | What the plan does |
+|---|---|
+| **Safari and `Secure` cookies on `http://localhost`.** Chrome and Firefox treat `http://localhost` as a secure context and keep `Secure` and `__Host-` cookies there; Safari (WebKit) may not, so sign-in on `localhost` could fail in Safari | U05 tests the sign-in and the session in Safari, Chrome and Firefox on `http://localhost`. If Safari refuses the cookies, it is a **known limit**, written in the handbook: on `localhost` use Chrome or Firefox; Safari works behind the V09 HTTPS origin. The cookie rules are never weakened for it (no cookie without `Secure`) |
+| **The L1 proposal through a browser.** A browser download lands in the person's Downloads folder with the usual permissions, and may be synced or scanned by other tools; the CLI checks the hash again and writes the file with mode 600 (ADR-M64). The patch is client code | The download **stays in the CLI only**. The page shows the run, the hash and the size, and the exact `sdlc evidence proposal <INT> --run <id> --output <file>` command; no download link |
+
 ## 6. What changes with V09 (team access)
 
 V09 (ADR-M67, not done yet) publishes the API and the dashboard on one LAN port through a TLS reverse proxy. For actions:
@@ -166,7 +178,7 @@ V09 (ADR-M67, not done yet) publishes the API and the dashboard on one LAN port 
 | Topic | On loopback | Behind V09 |
 |---|---|---|
 | Public origin | `http://localhost:8090` | `https://<proxy host>` |
-| Cookie | `__Host-…; Secure` (localhost counts as secure) | same, over TLS; the proxy adds HSTS |
+| Cookie | `__Host-…; Secure` (localhost counts as secure in Chrome and Firefox; Safari: §5.10) | same, over TLS; the proxy adds HSTS |
 | Origin check | `localhost` | the proxy's origin only |
 | GitHub callback URL | `http://localhost:8090/…` | `https://<proxy host>/…` (one App can list both) |
 | Passkey site name | `localhost` | the proxy's host name; passkeys registered on localhost do not work there |
@@ -183,7 +195,7 @@ The design PR after Harry's approval made these changes: D-02 1.10, D-03 1.40, D
 |---|---|
 | D-02 §4.2 | "Actions in a web UI stay Later" → the dashboard's actions of sections 3.2–3.4, in waves, with the rules of section 5 |
 | D-03 §5.1, §9, §12 (ADR-M03 note) | The dashboard row gains actions and sessions; ADR-M03 notes that the dashboard is a second way to decide, through the same handlers |
-| D-05 | Tables `web_sessions`, `webauthn_credentials`; source code `web`; audit actions `web_session.*`, `passkey.*` |
+| D-05 | Tables `web_sessions`, `webauthn_credentials`, the pending passkey challenges (random, with their bound action, short-lived, used once); source code `web`; audit actions `web_session.*`, `passkey.*` |
 | ADR-M54 | A pointer: the read-only decision stays; actions are decided in ADR-M73 |
 | **ADR-M73** (new, QUESTIONS #379) | Dashboard actions: GitHub sign-in, sessions, CSRF, passkeys (and the WebAuthn library), `expected_input_sha256`, settings, alternatives considered |
 | D-08 U05 (a change of V03) | The App keeps its client secret in OpenBao and lists the callback URLs |
@@ -193,10 +205,10 @@ The design PR after Harry's approval made these changes: D-02 1.10, D-03 1.40, D
 
 | ID | Task | Size | Depends on | Main acceptance criteria |
 |---|---|---|---|---|
-| U05 | GitHub sign-in and server-side sessions | M | U01, V03 (U05 changes V03) | OAuth with `state` and PKCE; the GitHub user token dropped; match by numeric ID among linked identities; `web_sessions` (hashes only); guard takes bearer or cookie; revocation; audit; tests: tenant isolation, unlinked or disabled user refused |
-| U06 | CSRF, origin check, passkeys and step-up | M | U05 | Three CSRF layers; WebAuthn registration and per-action assertions bound to the action; `webauthn_credentials`; tests: a request from another origin, without the CSRF token, or with a reused assertion is refused |
+| U05 | GitHub sign-in and server-side sessions | M | U01, V03 (U05 changes V03) | OAuth with `state`, PKCE and the pre-login cookie (login CSRF); a new session ID at sign-in; sign out everywhere; sign-in tested in Safari, Chrome and Firefox on `localhost`; the GitHub user token dropped; match by numeric ID among linked identities; `web_sessions` (hashes only); guard takes bearer or cookie; revocation; audit; tests: tenant isolation, unlinked or disabled user refused |
+| U06 | CSRF, origin check, passkeys and step-up | M | U05 | Three CSRF layers; WebAuthn registration and per-action assertions against a random, stored, single-use challenge bound to the action; `webauthn_credentials`; tests: a request from another origin, without the CSRF token, or with a reused assertion is refused |
 | U07 | Wave 1 in the dashboard: kill, gate decisions, escalations | M | U06 | Confirmation step with the input hash; `expected_input_sha256` (409); source `web`; Playwright tests: producer, wrong role and the same person twice refused through the page (N5), G7 only as a link; screenshots at 375, 768, 1440 px, light and dark |
-| U08 | Wave 2: create an intent with its spec, submit a plan, evidence packs | M | U07 | The U03 flow (a refused link keeps the intent); refusals from the catalog |
+| U08 | Wave 2: create an intent with its spec, submit a plan, evidence packs | M | U07 | The U03 flow (a refused link keeps the intent); refusals from the catalog; the proposal download stays in the CLI (§5.10) |
 | U09 | Wave 3: administration | L | U07 | Self-grant and Person A = Person B refused; config upload shows the difference before saving |
 
 U05–U07 are in the milestone UX (toward v0.2.0), U08–U09 in Later (QUESTIONS #380). Wave 1 works on `localhost` first; teams on other machines also need V09, but U05–U07 do not depend on it.
@@ -229,4 +241,5 @@ U05–U07 are in the milestone UX (toward v0.2.0), U08–U09 in Later (QUESTIONS
 | 0.1 | 2026-10-07 | Claude (coordinator) | Draft for the trial: candidate functions by role, what never goes in the interface, conditions for actions, proposed order |
 | 0.2 | 2026-10-10 | Claude (coordinator), approved by Harry | Wording only: "MVP" retired; v0.1.0 is the "v0.1 baseline", unscheduled work is "Later"; meaning unchanged (QUESTIONS #360) |
 | 1.0 | 2026-10-10 | Claude (task V11) | The plan of the dashboard's actions: three waves through the existing endpoints, what never goes in, the security design for writes (GitHub sign-in, sessions, CSRF, passkey step-up, the two-person rule, audit source `web`, `expected_input_sha256`, CSP unchanged), V09, the design changes and tasks after approval, how the trial data changes it (QUESTIONS #375–#379). Proposed: nothing changes before Harry approves it |
-| 1.1 | 2026-10-10 | Claude (task V11), approved by Harry | Approved: status, §7 the changes made, §8 the tasks U05–U09 in D-08 1.35 with their milestones, §10 #380 |
+| 1.1 | 2026-10-10 | Claude (task V11), after Harry's review of PR #280 | Still proposed. §5.1 login CSRF: the pre-login cookie `__Host-sdlc_oauth` (`SameSite=Lax`, about 10 minutes) with the hash of `state` and the PKCE verifier, both needed at the callback; why Lax. §5.2 a new session ID at sign-in (no fixation), "sign out everywhere". §5.4 the passkey challenge is random, stored with its action, short-lived and used once (not derived). §5.10 known limits: Safari and `Secure` cookies on `localhost` (tested in U05), the L1 proposal download stays in the CLI (W9) |
+| 1.2 | 2026-10-10 | Claude (task V11), approved by Harry | Approved (QUESTIONS #380): status, §7 the changes made (ADR-M73, D-02 1.10, D-03 1.40, D-05 1.40, ADR-M54 0.5, D-08 1.35), §8 the tasks U05–U09 in D-08 with their milestones, §10 #380 |

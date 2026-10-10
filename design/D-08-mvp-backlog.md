@@ -1014,7 +1014,7 @@ flowchart LR
 - [ ] AC5: The api guard accepts a bearer token or a session cookie, never both; `GET` reads work with the session; the personal-token sign-in of ADR-M54 stays for read-only use
 - [ ] AC6: Tests: `pnpm test` (OAuth with a fake GitHub: wrong state, missing or foreign pre-login cookie, reused code, unlinked or disabled user), the sign-in checked in Safari, Chrome and Firefox on `http://localhost` (a Safari refusal is written as a known limit, never fixed by weaker cookies), `pnpm test:db` (sessions, tenant isolation, revocation), `pnpm test:dashboard` (sign-in and sign-out)
 
-> Note: ADR-M73, MVP1-UI-SCOPE 1.1 §5.1–§5.2 (QUESTIONS #375, #380). Works on `localhost`; other machines need V09 (no dependency, #380)
+> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §5.1–§5.2 (QUESTIONS #375, #380). Works on `localhost`; other machines need V09 (no dependency, #380)
 
 #### U06. Dashboard writes: CSRF, origin check, passkey step-up
 
@@ -1030,7 +1030,7 @@ flowchart LR
 - [ ] AC4: Step-up per decision: a random challenge made by the api and stored with its bound action (session, action, subject, gate, decision, `expected_input_sha256`), about 2 minutes, used once in the decision's transaction; a request that differs from the stored action is refused; never for a kill or an acknowledgement
 - [ ] AC5: Tests: a request from another origin, without the CSRF token, with a reused or foreign assertion, or with a session of another tenant is refused; the CSP of ADR-M54 unchanged (static test)
 
-> Note: ADR-M73, MVP1-UI-SCOPE 1.1 §5.3–§5.4, §5.8–§5.9 (QUESTIONS #376, #377)
+> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §5.3–§5.4, §5.8–§5.9 (QUESTIONS #376, #377)
 
 #### U07. Dashboard wave 1: kill a run, gate decisions, escalations
 
@@ -1046,7 +1046,7 @@ flowchart LR
 - [ ] AC4: G7 is a link to the pull request only (no approve, no request changes); refusals are shown with their catalog code (producer, missing role, same person twice, frozen); the page has no rule set of its own
 - [ ] AC5: Playwright: the producer, a wrong role and the same person twice are refused through the page (N5); screenshots at 375, 768, 1440 px, light and dark; `pnpm test:db` for the 409 and the source
 
-> Note: ADR-M73, MVP1-UI-SCOPE 1.1 §3.2, §5.5–§5.7 (QUESTIONS #377, #378)
+> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378)
 
 #### V12. Release process: SemVer, a tag-driven release workflow, upgrade notes
 
@@ -1340,7 +1340,7 @@ flowchart LR
 - [ ] AC2: Submit the plan file; build an evidence pack; the L1 proposal download stays in the CLI (the page shows the `sdlc evidence proposal` command)
 - [ ] AC3: Refusals from the catalog; no step-up (ADR-M73); Playwright tests per action and role
 
-> Note: MVP1-UI-SCOPE 1.1 §3.3. Ordered again from `design/M-E-REPORT.md` (§9)
+> Note: MVP1-UI-SCOPE 1.2 §3.3. Ordered again from `design/M-E-REPORT.md` (§9)
 
 #### U09. Dashboard wave 3: administration
 
@@ -1354,7 +1354,7 @@ flowchart LR
 - [ ] AC2: Project configuration upload with the difference to the stored version before saving; the agent register and its approvals; the AI record; evidence holds; project archive
 - [ ] AC3: Step-up for every admin change; API tokens stay in the CLI; Playwright tests per action and role
 
-> Note: MVP1-UI-SCOPE 1.1 §3.4. Ordered again from `design/M-E-REPORT.md` (§9)
+> Note: MVP1-UI-SCOPE 1.2 §3.4. Ordered again from `design/M-E-REPORT.md` (§9)
 
 #### X05. Documents outside the repository (Office, PDF, Confluence, Drive, Backlog)
 
@@ -1488,7 +1488,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.32 | 2026-10-10 | Claude, approved by Harry | New milestone UX (v0.2.0): V04 moved there, new tasks V05 (CLI on npm), V06 (`sdlc next`), V07 (`doctor`), V08 (the trial stack survives a reboot), V09 (team access, TLS reverse proxy), V10 (a friendlier CLI, `sdlc help`), V11 (plan the dashboard's actions) (QUESTIONS #355–#357) |
 | 1.33 | 2026-10-10 | Claude, approved by Harry | Review of the milestone UX: V05 adds `sdlc --version` and its smoke test runs `sdlc` without arguments (`sdlc help` comes with V10); V08 also updates CLAUDE.md and runbook T11; V09 names both sources of "not supported"; V11 starts now, before the trial data, and supersedes the E07 note (QUESTIONS #358) |
 | 1.34 | 2026-10-10 | Claude, approved by Harry | "MVP" retired: the platform backlog, v0.1.0 is the baseline (QUESTIONS #360); milestone UX gains V12 (release process) and L02 (model benchmark, early); new milestones EXT (X01–X04, X07, X09; QUESTIONS #361), Models (L01, L03; #362), Server (A10 moved there, O01–O03; #363), Later (was MVP+1: U01–U03 done, K02 superseded by X04, X05, X06, X08, X10); a public ROADMAP.md generated with D-08 |
-| 1.35 | 2026-10-10 | Claude (task V11), approved by Harry | V11 done (`design/MVP1-UI-SCOPE.md` 1.1, ADR-M73): new tasks U05–U07 in UX (GitHub sign-in and sessions, CSRF and passkey step-up, wave 1: kill, gate decisions, escalations) and U08–U09 in Later (waves 2 and 3); U05 includes the V03 change (the App keeps its client secret); no dependency on V09 (QUESTIONS #375–#380) |
+| 1.35 | 2026-10-10 | Claude (task V11), approved by Harry | V11 done (`design/MVP1-UI-SCOPE.md` 1.2, ADR-M73): new tasks U05–U07 in UX (GitHub sign-in and sessions, CSRF and passkey step-up, wave 1: kill, gate decisions, escalations) and U08–U09 in Later (waves 2 and 3); U05 includes the V03 change (the App keeps its client secret); no dependency on V09 (QUESTIONS #375–#380) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
