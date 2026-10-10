@@ -378,13 +378,62 @@ t("V03","M-E","Create the GitHub App from a manifest","S",["V01"],"NFR-03, NFR-0
   "A static test fails when the manifest and the README's permission list differ",
   "README \"Create the GitHub App\" and TRIAL.md §3.2 use it; the manual steps stay as the fallback"],
  "QUESTIONS #342 (Harry, 2026-10-09): before v0.1.0. GitHub's manifest flow: https://docs.github.com/apps/sharing-github-apps/registering-a-github-app-from-a-manifest")
-t("V04","M-E","Publish the platform's images to GHCR for each release","M",["V01"],"NFR-01, NFR-04",
+t("V04","UX","Publish the platform's images to GHCR for each release","M",["V01"],"NFR-01, NFR-04",
  ".github/workflows/*, platform/deploy/docker-compose.yml, platform/deploy/README.md, TRIAL.md, design/ADR-M66",
  ["A release workflow builds the images of `sdlc-api`, `sdlc-worker`, `sdlc-runner`, the otel-collector and the `node24` sandbox image, scans them (Trivy), and pushes them to GHCR, tagged with the release and pinned by digest",
   "The images are signed and carry an SBOM and provenance (decided in ADR-M66); the README says how to verify them",
   "Compose uses the published images by digest for a release checkout and builds locally otherwise; a static test checks the digests",
   "TRIAL.md and the README's fresh deployment skip the local builds when the images are published"],
- "QUESTIONS #342 (Harry, 2026-10-09): after v0.1.0, while the first reports come in. ADR-M66 records the registry, signing (for example cosign keyless) and the supply-chain checks")
+ "QUESTIONS #342 (Harry, 2026-10-09): after v0.1.0, while the first reports come in; moved to the milestone UX with v0.2.0 (QUESTIONS #355). ADR-M66 records the registry, signing (for example cosign keyless) and the supply-chain checks")
+t("V05","UX","Install the `sdlc` command with one command (npm package `agentic-sdlc-cli`)","M",["V01"],"FR-20, NFR-08",
+ "platform/apps/cli (bundle, package.json), .github/workflows/* (publish on a release tag), platform/USER-GUIDE.md, TRIAL.md, platform/tests/cli/*",
+ ["`npm install -g agentic-sdlc-cli` gives the `sdlc` command (Node.js 24): the CLI and the workspace packages it uses bundled into the published package; no repository checkout, pnpm or build on the user's machine",
+  "Published only from a release tag by a workflow, with npm provenance (trusted publishing, no long-lived npm token in the repository); the package version equals the release (`PLATFORM_VERSION`, root `package.json`)",
+  "The published package holds no test fixture, source map with absolute paths, `.env` or other secret; a CI step packs it (`npm pack --dry-run`) and installs the tarball in a clean folder, then runs `sdlc --version` and `sdlc help`",
+  "USER-GUIDE §2 and TRIAL.md use it; `pnpm sdlc` from a checkout stays for developers; the operator commands (`sdlc ops …`) keep needing the server"],
+ "QUESTIONS #357 (Harry, 2026-10-10): npm under a new name (`@sdlc` may be taken; `agentic-sdlc-cli` is free on 2026-10-10). Harry owns the npm account and sets up trusted publishing; the first publish is a public action: ask him first")
+t("V06","UX","`sdlc next <INT>`: where an intent is and what to do now","S",["V01"],"FR-20, FR-22, NFR-08",
+ "platform/apps/cli (next), platform/packages/messages, platform/tests/cli/*, handbook Ch.19 §19.8c, platform/USER-GUIDE.md",
+ ["`sdlc next <INT> [--json]` reads only `GET /v1/intents/:intent` (no new endpoint) and prints the gate, its oversight mode, who it waits for (`waiting_for`), why it waits (`waiting_reason`, `waiting_cause`) and the next action for the person who runs it, as a command or comment to type (for example `/approve G3` on the issue, or `sdlc plan submit INT-…`)",
+  "The advice follows the caller's roles (`/v1/me`): an action the person may not take is shown as \"waits for <role>\", never offered; a producer is never told to approve",
+  "Every text from the catalog; one advice per waiting reason and gate (a test covers every `IntentWaitReason`)",
+  "Tests against a mocked API: each gate and reason, each role, a finished intent"],
+ "QUESTIONS #355 (Harry, 2026-10-10): users do not know the next step. Reuses U01/U02 fields (`waiting_for`, `waiting_reason`); the dashboard may show the same advice later (V11)")
+t("V07","UX","`doctor`: check a deployment and a login, and say what to fix","M",["V02"],"NFR-01, NFR-06, NFR-08",
+ "platform/deploy/doctor/* (operator), platform/apps/cli (sdlc doctor), package.json, platform/packages/messages, platform/tests/*, platform/deploy/README.md (Troubleshooting), TRIAL.md",
+ ["`pnpm doctor` (operator, on the machine of the stack): Docker and Compose versions, memory and disk, the env file and its mode, each service healthy, OpenBao initialised and sealed or unsealed, the TLS certificate's end date, migrations applied, each process's credentials delivered, the GitHub App reachable with the README's permissions on the project repositories, the sandbox image pinned; one line per check (ok, warning, failed) and, for each problem, the exact command or README section that fixes it",
+  "`sdlc doctor` (a person): the API reachable over TLS, the login valid and not near its end, the person's roles per project, the CLI's version against the API's",
+  "Read only: it changes nothing, prints no secret (never a token, key share, password or key), and works on a stopped or sealed stack (it says so instead of failing)",
+  "Tests: each check with a fake host (pure functions), a static test that every README troubleshooting case has a check or says why not"],
+ "QUESTIONS #355 (Harry, 2026-10-10): deployers lack a single place that tells what is wrong")
+t("V08","UX","The trial stack survives a reboot","M",["V02"],"NFR-03, NFR-08",
+ "platform/deploy/trial/*, platform/deploy/openbao/bootstrap.sh (trial only), platform/tests/trial/*, platform/tests/integration/deploy/trial-up.test.ts, TRIAL.md, design/QUESTIONS.md",
+ ["`pnpm trial:up` asks the person for a passphrase (hidden prompt, twice) and keeps the trial's throw-away OpenBao key shares encrypted with it (age, scrypt) in a file next to the trial's env file, mode 600; never the root token (revoked as today)",
+  "`pnpm trial:start` starts the trial stack again after a reboot or `trial:down`: asks the passphrase, unseals OpenBao, starts the rest; a wrong passphrase unseals nothing and says so",
+  "Only for the trial's own Compose project (`sdlc-trial…`): the key file and `trial:start` refuse any other env file, `NODE_ENV=production`, or a stack that is not a trial stack; the server keeps the key-holder rules (runbook T11); `trial:down --wipe` removes the key file",
+  "Tests: encrypt and decrypt, a wrong passphrase, the refusals; the live test stops and starts the stack again and finds the intent it created"],
+ "QUESTIONS #356 (Harry, 2026-10-10): revisits #345 for the trial stack only, whose data is fictional; the details go into the V08 plan for Harry's approval")
+t("V09","UX","Team access from other machines (TLS reverse proxy)","L",["V07"],"NFR-01, NFR-03",
+ "platform/deploy/docker-compose.yml (profile access), platform/deploy/access/*, platform/deploy/README.md, design/D-03 §9, §10, design/ADR-M67, platform/tests/deploy/*, platform/tests/integration/*",
+ ["A Compose profile `access`: a pinned reverse proxy (for example Caddy, Apache-2.0) publishes the API and the dashboard on one LAN port over TLS, with a certificate from the company CA or a throw-away CA on a test machine; nothing else is published; the API and the dashboard keep listening on 127.0.0.1 inside",
+  "Security headers, request size limits and a rate limit per client; the token only in the `Authorization` header; the CSP of the dashboard unchanged; plain HTTP refused or redirected",
+  "The CLI and the dashboard work through it (`NODE_EXTRA_CA_CERTS` for a company CA); `pnpm doctor` checks it",
+  "D-03 §9 and §10 updated and ADR-M67 written in the same task (design change: today \"access from other machines: not supported\"); live test: from another container, only the proxy answers, TLS is verified, plain HTTP is refused"],
+ "QUESTIONS #355 (Harry, 2026-10-10): needed before a team uses the platform on a server. Design change first: the D-03 update and ADR-M67 go in the task's first PR for Harry's approval")
+t("V10","UX","A friendlier CLI: `sdlc help`, hints, clearer errors","M",["V06"],"FR-20, NFR-08",
+ "platform/apps/cli (help, output), platform/packages/messages, platform/tests/cli/*, platform/USER-GUIDE.md",
+ ["`sdlc help [topic|command]`: short guides from the catalog (getting started, roles and the two-person rule, the gates and what each needs, the comment commands, troubleshooting) and every command with its options and one example; `sdlc <command> --help` works for every command",
+  "After a command that moves an intent, one line with the likely next step (the advice of `sdlc next`); an error names the cause and the command that fixes it (for example `sdlc login`)",
+  "Tables and colours only on a terminal (`NO_COLOR` and `--json` give plain output); nothing changes in `--json` output",
+  "Tests: every command has a help text (a test fails on a command without one), hints and errors per case, `NO_COLOR`"],
+ "QUESTIONS #355 (Harry, 2026-10-10). English only: translations into Vietnamese and Japanese are not planned now (QUESTIONS #357)")
+t("V11","UX","Plan the dashboard's actions (design only)","S",["V06"],"D-02 §4.2, NFR-08",
+ "design/MVP1-UI-SCOPE.md, design/QUESTIONS.md",
+ ["`design/MVP1-UI-SCOPE.md` version 1.0 proposes which actions the dashboard adds (for example approve or reject a gate, create an intent and link its spec, submit a plan, acknowledge and decide an escalation, kill a run), who may use each, and what stays on GitHub (the G7 review and the merge)",
+  "The security design for writes from a browser: sign-in and session (not the personal token in memory only), CSRF protection, re-authentication before an approval, the two-person rule shown and enforced by the same API checks, the audit actor",
+  "The design changes D-02 §4.2 (\"actions in a web UI stay MVP+1\") and ADR-M54 only after Harry approves it; then the implementation tasks are added to the backlog",
+  "No code in this task"],
+ "QUESTIONS #355 (Harry, 2026-10-10): the dashboard should have a plan for the other actions; read-only stays until the plan is approved")
 # ---------- rendering ----------
 IDX={x['id']:x for x in T}; W={'S':1,'M':2,'L':3}
 @functools.lru_cache(None)
@@ -395,7 +444,7 @@ def lp(k):
         if c[0]>b[0]: b=c
     return (b[0]+W[IDX[k]['size']],b[1]+[k])
 CP=" → ".join(max((lp(k) for k in IDX),key=lambda x:x[0])[1])
-MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("MVP+1","Started early: read-only dashboard (QUESTIONS #255); lighter steps")]
+MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers, toward v0.2.0 (QUESTIONS #355)"),("MVP+1","Started early: read-only dashboard (QUESTIONS #255); lighter steps")]
 o=[];w=o.append
 w(f"""# D-08. MVP backlog
 
@@ -422,7 +471,7 @@ w(f"""# D-08. MVP backlog
 
 | Field | Meaning |
 |---|---|
-| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early), `S` = spec tools and `K` = document knowledge (before the trial M-E), `V` = the trial M-E (validation by the community) |
+| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early), `S` = spec tools and `K` = document knowledge (before the trial M-E), `V` = the trial M-E (validation by the community) and its usability round UX |
 | Size | **S** ≈ 1 session · **M** ≈ 1–2 sessions · **L** ≈ split into 2–3 sessions. [Proposal] Relative estimate, not person-hours |
 | Depends on | Tasks that must be finished first |
 | Acceptance criteria | Conditions for the PR to be approved. Claude Code writes tests for them |
@@ -449,8 +498,9 @@ flowchart LR
     M0["M-0 Sample repo"] --> MC
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
-    MP --> ME["M-E Trial by the community (V01–V04)"]
-    ME --> MF["M-F Adjustment"]
+    MP --> ME["M-E Trial by the community (V01–V03, v0.1.0 preview)"]
+    ME --> UX["UX V04–V11, friendlier (v0.2.0)"]
+    UX --> MF["M-F Adjustment"]
     MD --> MU["MVP+1 U01 read-only dashboard<br/>(in parallel with M-E)"]
 ```
 
@@ -554,6 +604,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.29 | 2026-10-09 | Claude, approved by Harry | New task C13 in Pre-M-E: take an L1 proposal forward (download, G4 rejection; ADR-M64, QUESTIONS #335–#337) |
 | 1.30 | 2026-10-09 | Claude, approved by Harry | New milestone M-E with task V01: the trial is run by the community (TRIAL.md, a report issue template, `sdlc trial report`; QUESTIONS #340, #341, ADR-M65) |
 | 1.31 | 2026-10-09 | Claude, approved by Harry | M-E tasks V02 (`pnpm trial:up`), V03 (the GitHub App from a manifest), both before v0.1.0, and V04 (images on GHCR, after v0.1.0) (QUESTIONS #342) |
+| 1.32 | 2026-10-10 | Claude, approved by Harry | New milestone UX (v0.2.0): V04 moved there, new tasks V05 (CLI on npm), V06 (`sdlc next`), V07 (`doctor`), V08 (the trial stack survives a reboot), V09 (team access, TLS reverse proxy), V10 (a friendlier CLI, `sdlc help`), V11 (plan the dashboard's actions) (QUESTIONS #355–#357) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |

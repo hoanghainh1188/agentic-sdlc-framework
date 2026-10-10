@@ -7,7 +7,7 @@ The platform is built and tested, but no team has used it on a project yet. **We
 - **What it costs:** your time (about one day to set up, half a day per task, mostly waiting) and, with an API model, a few US dollars of tokens. The platform caps the spend of each task.
 - **No real data.** The sample project is fictional. Never use client code or real personal data in the trial.
 
-> **Status (2026-10-09):** the report command `sdlc trial report` comes with the first release, **v0.1.0** (task V01). Start the trial from that release or later.
+> **Status (2026-10-10):** start from the release **v0.1.0**, a **preview for technical testers**: you need Docker, Node.js 24 and pnpm, and you build the images on your machine. v0.2.0 brings published images, the `sdlc` command on npm, `doctor`, a trial stack that survives a reboot and `sdlc help` (milestone UX). Your report helps us choose what comes first.
 
 The full plan behind this page, with every measure and rule: [`design/M-E-TRIAL-PLAN.md`](design/M-E-TRIAL-PLAN.md).
 
