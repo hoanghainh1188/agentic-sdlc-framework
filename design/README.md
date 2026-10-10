@@ -14,7 +14,7 @@
 | — | [Open questions raised while coding](QUESTIONS.md) | In use | |
 | — | [v0.1 baseline: definition of done](MVP-DONE.md) (task E07): each D-02 §10 criterion with the test that proves it, open items, numbers | Draft | |
 | — | [Positioning](POSITIONING.md): what the framework offers and to whom, compared with the alternatives; risks, what to confirm; the business model (open for everyone, services only) | Draft; §7 decided 2026-10-08 | |
-| — | [Web UI scope](MVP1-UI-SCOPE.md): the plan of the dashboard's actions (waves, what never goes in, the security of writes from a browser, tasks after approval); revised with the M-E data | Proposed (V11) | |
+| — | [Web UI scope](MVP1-UI-SCOPE.md): the plan of the dashboard's actions (waves, what never goes in, the security of writes from a browser, tasks after approval); revised with the M-E data | Approved (V11) | |
 | — | [M-E trial plan](M-E-TRIAL-PLAN.md): tasks T01–T10 on the sample repo, prerequisites, roles, order, what is measured, the data report, stop rules | Approved (Harry, 2026-10-06) | |
 | ADR-M09 | [Database access and migration tooling](ADR-M09-database-tooling.md) (task A06) | Proposed | |
 | ADR-M10 | [OpenHands Agent Server: result of the C01 PoC](ADR-M10-openhands-agent-server.md) (task C01) | Proposed | |
@@ -61,6 +61,7 @@
 | ADR-M65 | [The trial report: an anonymous summary built from the existing reads](ADR-M65-trial-report.md) (task V01) | Proposed | |
 | ADR-M66 | [The platform's images on GHCR for each release](ADR-M66-ghcr-images.md) (task V04) | Proposed | |
 | ADR-M72 | [The CLI on npm: one bundled file, published from a tag with provenance](ADR-M72-cli-npm-package.md) (task V05) | Proposed | |
+| ADR-M73 | [Actions in the web dashboard: GitHub sign-in, sessions, CSRF, passkey step-up](ADR-M73-dashboard-actions.md) (task V11; built by U05–U09) | Accepted | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

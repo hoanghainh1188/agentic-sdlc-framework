@@ -44,12 +44,12 @@
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
-| UX | Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364) | 10 | S×3 · M×6 · L×1 |
+| UX | Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364) | 13 | S×3 · M×9 · L×1 |
 | EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361) | 6 | S×3 · M×1 · L×2 |
 | Models | Self-hosted models (QUESTIONS #362) | 2 | S×1 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 4 | M×4 |
-| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 8 | S×3 · M×1 · L×4 |
-| **Total** | | **85** | |
+| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 10 | S×3 · M×2 · L×5 |
+| **Total** | | **90** | |
 
 ### Order and dependencies between milestones
 
@@ -74,7 +74,7 @@ flowchart LR
 
 ### Critical path (longest chain) [Proposal]
 
-`A01 → A02 → A06 → A07 → B02 → C02 → C04 → C05 → C06 → C07 → C08 → E01 → E02 → E03 → E07 → V01 → V02 → V07 → V09`
+`A01 → A02 → A06 → A07 → B02 → C02 → C04 → C05 → C06 → C07 → C08 → E01 → E02 → E03 → E07 → V01 → V03 → U05 → U06 → U07 → U09`
 
 - Computed from dependencies and task size (S=1, M=2, L=3). To finish sooner: prioritise tasks on this path and run the others in parallel.
 
@@ -999,6 +999,55 @@ flowchart LR
 
 > Note: QUESTIONS #355 (Harry, 2026-10-10): the dashboard should have a plan for the other actions; read-only stays until the plan is approved. QUESTIONS #358 (Harry, 2026-10-10): V11 starts now, before the trial data, and supersedes the E07 note
 
+#### U05. Dashboard sign-in with GitHub and server-side sessions
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | U01, V03 | FR-11, NFR-02, NFR-03 | platform/apps/api (auth, web sessions), platform/packages/core (sessions, audit actions), migrations, platform/deploy/github-app/*, platform/deploy/openbao/bootstrap/*, platform/apps/dashboard (sign-in), platform/tests/*, handbook Ch.19, runbook T11 |
+
+**Acceptance criteria**
+
+- [ ] AC1: GitHub OAuth through the platform's GitHub App (ADR-M73 §2.2): a random `state` and PKCE kept server-side with the tenant and bound to the browser by the pre-login cookie `__Host-sdlc_oauth` (`SameSite=Lax`, about 10 minutes; the callback needs both), the code exchanged by the api, the person's numeric GitHub account ID read, the GitHub user token dropped at once and never stored or logged
+- [ ] AC2: The user is found by (tenant, `github`, numeric ID) among linked identities and must be active; any other case is refused with one message
+- [ ] AC3: The App keeps its client secret in OpenBao (`kv/api/github-oauth`, readable by the `api` AppRole only) and lists the callback URLs; `pnpm github-app:create` and the README updated (a change of V03); an existing App gets a new client secret entered by the owner in a terminal
+- [ ] AC4: Table `web_sessions` (D-05; hashes only, tenant guard), cookie `__Host-sdlc_session` (`HttpOnly`, `Secure`, `SameSite=Strict`), idle and absolute timeouts from settings; a new session ID at every sign-in (no fixation); revoked at sign-out, user disable, identity unlink and by a tenant admin; sign out everywhere; audit `web_session.started|ended` (IDs and codes only)
+- [ ] AC5: The api guard accepts a bearer token or a session cookie, never both; `GET` reads work with the session; the personal-token sign-in of ADR-M54 stays for read-only use
+- [ ] AC6: Tests: `pnpm test` (OAuth with a fake GitHub: wrong state, missing or foreign pre-login cookie, reused code, unlinked or disabled user), the sign-in checked in Safari, Chrome and Firefox on `http://localhost` (a Safari refusal is written as a known limit, never fixed by weaker cookies), `pnpm test:db` (sessions, tenant isolation, revocation), `pnpm test:dashboard` (sign-in and sign-out)
+
+> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §5.1–§5.2 (QUESTIONS #375, #380). Works on `localhost`; other machines need V09 (no dependency, #380)
+
+#### U06. Dashboard writes: CSRF, origin check, passkey step-up
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | U05 | FR-11, FR-17, NFR-03 | platform/apps/api (auth, passkeys), platform/packages/core (passkeys, audit actions), migrations, platform/apps/dashboard, platform/tests/*, handbook Ch.19 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Every write with a session cookie needs all three CSRF layers (ADR-M73 §2.3): `SameSite=Strict`, the session's CSRF token in `X-SDLC-CSRF`, and `Origin` equal to `SDLC_API_PUBLIC_ORIGIN` (`Sec-Fetch-Site: same-origin` when sent); JSON bodies only; bearer requests unchanged
+- [ ] AC2: Actions are off by default (`SDLC_API_DASHBOARD_ACTIONS=off`); the api refuses to start with actions on and a missing public origin, or a plain `http://` origin on a host other than `localhost`
+- [ ] AC3: Passkeys (WebAuthn, the library chosen in ADR-M73): registration needs a GitHub sign-in in the last 5 minutes; table `webauthn_credentials` (D-05; no free text); list and remove one's own passkeys, a tenant admin may remove them; audit `passkey.registered|revoked`
+- [ ] AC4: Step-up per decision: a random challenge made by the api and stored with its bound action (session, action, subject, gate, decision, `expected_input_sha256`), about 2 minutes, used once in the decision's transaction; a request that differs from the stored action is refused; never for a kill or an acknowledgement
+- [ ] AC5: Tests: a request from another origin, without the CSRF token, with a reused or foreign assertion, or with a session of another tenant is refused; the CSP of ADR-M54 unchanged (static test)
+
+> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §5.3–§5.4, §5.8–§5.9 (QUESTIONS #376, #377)
+
+#### U07. Dashboard wave 1: kill a run, gate decisions, escalations
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | U06 | FR-10, FR-11, FR-16, FR-17, FR-18, FR-34 | platform/apps/dashboard, platform/apps/api (intents, runs, escalations), platform/packages/core (commands, gate input hash), migrations (source `web`), platform/packages/messages, platform/tests/*, handbook Ch.19, USER-GUIDE |
+
+**Acceptance criteria**
+
+- [ ] AC1: The dashboard calls only the existing endpoints: `POST /v1/runs/:run/kill`, `POST /v1/intents/:intent/gates/:gate/decisions`, `POST /v1/escalations/:code/ack|decisions`; no new business endpoint; the same core handlers decide
+- [ ] AC2: A confirmation step shows what the decision is bound to and the current gate input hash (a new read-only field of the intent's `GET` answer, resolved by the workflow's own function); the decision sends `expected_input_sha256` and the API answers 409 when the input changed (optional for the CLI)
+- [ ] AC3: Source code `web` in `gate_decisions.source` and the kill source (D-05 migration); the actor is the person's user ID; no session or passkey ID in an append-only table
+- [ ] AC4: G7 is a link to the pull request only (no approve, no request changes); refusals are shown with their catalog code (producer, missing role, same person twice, frozen); the page has no rule set of its own
+- [ ] AC5: Playwright: the producer, a wrong role and the same person twice are refused through the page (N5); screenshots at 375, 768, 1440 px, light and dark; `pnpm test:db` for the 409 and the source
+
+> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378)
+
 #### V12. Release process: SemVer, a tag-driven release workflow, upgrade notes
 
 | Size | Depends on | Requirements | Code area |
@@ -1279,6 +1328,34 @@ flowchart LR
 
 > Note: QUESTIONS #285 (Harry, 2026-10-08): only if ADR-M59 (K01) says go. **Deferred** (QUESTIONS #300, Harry 2026-10-08): K01 found WeKnora no better than a plain bge-m3 + cosine search on the pilot, slow LLM summaries, and a document reader image with 202 critical vulnerabilities and an AGPL-3.0 library; revisit at M-F when a project has Office or PDF documents outside its repository, with the limits of ADR-M59 §5. QUESTIONS #305–#309, ADR-M60. Code index and full context snapshots stay Later. **Superseded by X04** (QUESTIONS #361): document search without WeKnora; WeKnora is looked at again only for documents outside the repository (X05)
 
+#### U08. Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | U07 | FR-01, FR-02, FR-20, FR-40 | platform/apps/dashboard, platform/packages/messages, platform/tests/*, handbook Ch.19 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Create an intent and link its spec with the two calls of U03; a refused link keeps the intent and says so
+- [ ] AC2: Submit the plan file; build an evidence pack; the L1 proposal download stays in the CLI (the page shows the `sdlc evidence proposal` command)
+- [ ] AC3: Refusals from the catalog; no step-up (ADR-M73); Playwright tests per action and role
+
+> Note: MVP1-UI-SCOPE 1.2 §3.3. Ordered again from `design/M-E-REPORT.md` (§9)
+
+#### U09. Dashboard wave 3: administration
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| L | U07 | FR-11, FR-19 | platform/apps/dashboard, platform/packages/messages, platform/tests/*, handbook Ch.19 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Projects, users, GitHub identities (numeric ID), project roles and tenant admins; a self-grant and Person A = Person B refused (M21)
+- [ ] AC2: Project configuration upload with the difference to the stored version before saving; the agent register and its approvals; the AI record; evidence holds; project archive
+- [ ] AC3: Step-up for every admin change; API tokens stay in the CLI; Playwright tests per action and role
+
+> Note: MVP1-UI-SCOPE 1.2 §3.4. Ordered again from `design/M-E-REPORT.md` (§9)
+
 #### X05. Documents outside the repository (Office, PDF, Confluence, Drive, Backlog)
 
 | Size | Depends on | Requirements | Code area |
@@ -1411,6 +1488,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.32 | 2026-10-10 | Claude, approved by Harry | New milestone UX (v0.2.0): V04 moved there, new tasks V05 (CLI on npm), V06 (`sdlc next`), V07 (`doctor`), V08 (the trial stack survives a reboot), V09 (team access, TLS reverse proxy), V10 (a friendlier CLI, `sdlc help`), V11 (plan the dashboard's actions) (QUESTIONS #355–#357) |
 | 1.33 | 2026-10-10 | Claude, approved by Harry | Review of the milestone UX: V05 adds `sdlc --version` and its smoke test runs `sdlc` without arguments (`sdlc help` comes with V10); V08 also updates CLAUDE.md and runbook T11; V09 names both sources of "not supported"; V11 starts now, before the trial data, and supersedes the E07 note (QUESTIONS #358) |
 | 1.34 | 2026-10-10 | Claude, approved by Harry | "MVP" retired: the platform backlog, v0.1.0 is the baseline (QUESTIONS #360); milestone UX gains V12 (release process) and L02 (model benchmark, early); new milestones EXT (X01–X04, X07, X09; QUESTIONS #361), Models (L01, L03; #362), Server (A10 moved there, O01–O03; #363), Later (was MVP+1: U01–U03 done, K02 superseded by X04, X05, X06, X08, X10); a public ROADMAP.md generated with D-08 |
+| 1.35 | 2026-10-10 | Claude (task V11), approved by Harry | V11 done (`design/MVP1-UI-SCOPE.md` 1.2, ADR-M73): new tasks U05–U07 in UX (GitHub sign-in and sessions, CSRF and passkey step-up, wave 1: kill, gate decisions, escalations) and U08–U09 in Later (waves 2 and 3); U05 includes the V03 change (the App keeps its client secret); no dependency on V09 (QUESTIONS #375–#380) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
