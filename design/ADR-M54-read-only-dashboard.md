@@ -7,6 +7,8 @@
 | Decided by | Harry (QUESTIONS #255; U01 plan approved 2026-10-07 with the answers to QUESTIONS #260–#263: the four read-only fields, #263 option B, the token in memory only) |
 | Related | D-08 task U01 (AC1–AC6); D-02 §4.2 (version 1.4); D-03 §5.1, §9, §11 (version 1.32); ADR-M03 (no web UI in the MVP), ADR-M26 (the API), ADR-M36 (the CLI's API client), ADR-M30 (intent workflow), ADR-M28 (escalations), ADR-M45 (cost report), ADR-M47 (gate metrics), ADR-M48 (Evidence Packs); handbook Ch.19 §19.8e; QUESTIONS #255, #260–#265; task U02 |
 
+> **Actions:** since 2026-10-10 the dashboard's actions are decided in [ADR-M73](ADR-M73-dashboard-actions.md). This ADR stays the record of the read-only decision; the token sign-in of §2.3 stays for read-only use.
+
 ## 1. Context
 
 The MVP has no web UI (ADR-M03): people use the CLI, comments and reviews on GitHub, and the Temporal and Langfuse UIs. During the trial M-E, Person A, Person B and the coordinator need an overview that the CLI gives only one command at a time: which intents wait where and for whom, which escalations are close to their SLA, what the trial costs, and how long the gates wait (the measures of `design/M-E-TRIAL-PLAN.md` §7.1).
@@ -125,6 +127,7 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 0.5 | 2026-10-10 | Claude (task V11), approved by Harry | A pointer to ADR-M73 (the dashboard's actions); this ADR unchanged otherwise (QUESTIONS #379) |
 | 0.4 | 2026-10-07 | Claude (task U02) | §2.4b what holds an intent (the step's record, the cause, `hotl_block_window`, the display), #264; §4 gaps closed |
 | 0.3 | 2026-10-07 | Claude (task U01, PR 2) | §2.5b as built (the shared schemas package, the build, the catalog plugin, the routes, the size), §2.6 the smoke test and the CI flag `run_dashboard` |
 | 0.2 | 2026-10-07 | Claude (task U01, PR 1) | After the code review: what `waiting_for` does not say (§2.4); Harry: task U02 exposes the workflow's last waiting reason and moves the notice audiences to the shared function (QUESTIONS #264, #265; §4) |

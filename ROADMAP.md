@@ -28,6 +28,9 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V09** Team access from other machines (TLS reverse proxy)
 - **V10** A friendlier CLI: `sdlc help`, hints, clearer errors
 - **V11** Plan the dashboard's actions (design only)
+- **U05** Dashboard sign-in with GitHub and server-side sessions
+- **U06** Dashboard writes: CSRF, origin check, passkey step-up
+- **U07** Dashboard wave 1: kill a run, gate decisions, escalations
 - **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes
 - **L02** Model benchmark on the pilot tasks (data for the GPU decision)
 
@@ -54,6 +57,8 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 
 ## Later: Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done)
 
+- **U08** Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs
+- **U09** Dashboard wave 3: administration
 - **X05** Documents outside the repository (Office, PDF, Confluence, Drive, Backlog)
 - **X06** A code index for agents (Tree-sitter or SCIP and pgvector)
 - **X08** Knowledge for people and the G8 learning loop (design first)

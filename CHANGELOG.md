@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- V11 design (QUESTIONS #380): the plan of the dashboard's actions is **approved** (`design/MVP1-UI-SCOPE.md` 1.2). New **ADR-M73** (GitHub sign-in through the platform's App, server-side sessions, three CSRF layers, a passkey before each decision, audit source `web`, `expected_input_sha256`); D-02 1.10 §4.2, D-03 1.40 §5.1, §9, §12, D-05 1.40 (planned tables `web_sessions`, `webauthn_credentials`), ADR-M54 0.5 (a pointer). D-08 1.35: new tasks U05–U07 in the milestone UX and U08–U09 in Later. No code yet.
+
 ## [0.1.1] - 2026-10-10
 
 A small release of the milestone UX: easier to install and to use. **The `sdlc` command on npm** (`npm install -g agentic-sdlc-cli`, Node.js 24, no checkout; `sdlc --version`), **`sdlc next <INT>`** (where an intent is and what you do now), and **the platform's images on GHCR**, built for amd64 and arm64, scanned, signed with cosign keyless and carrying an SBOM and provenance: a checkout of the tag `v0.1.1` pulls them by digest instead of building them (`platform/deploy/README.md`, "Verify the published images").
