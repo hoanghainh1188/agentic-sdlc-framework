@@ -8,5 +8,5 @@
 # sdlc-runner; release scan of V04, design/ADR-M66 §2.6): Debian marks it "will not fix". The flaw
 # is in minizip (zipOpenNewFileInZip4_6), which Debian ships apart (libminizip1), not in zlib1g;
 # no platform image installs minizip. Remove when Debian 12 ships a fix or the base moves on.
-# Approval: Person B in the V04 pull request.
+# Approved by Harry (Person B) in PR #276.
 CVE-2023-45853

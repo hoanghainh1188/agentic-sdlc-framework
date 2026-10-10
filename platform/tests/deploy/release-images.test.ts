@@ -1,7 +1,7 @@
 // D-08 V04 (design/ADR-M66): the platform's images on GHCR for a release.
 // - the release workflow builds and scans the five images before any push, and only then pushes,
 //   tags, signs and attests them; its thresholds equal ci.yml;
-// - Compose uses the published images by digest on a release checkout (images.lock.env, the
+// - Compose uses the published images by digest on a release checkout (images.lock, the
 //   overlay docker-compose.images.yml, scripts/images.sh) and builds locally everywhere else;
 // - the README says how to verify them, with the identity the workflow signs with.
 import { spawnSync } from 'node:child_process';
@@ -163,6 +163,17 @@ describe('V04: the release workflow', () => {
     expect(build.steps[push]?.if).toBe('inputs.push');
     expect(build.steps[push]?.with).toMatchObject({ provenance: 'mode=max', sbom: true });
     expect(String(build.steps[push]?.with?.outputs)).toContain('push-by-digest=true');
+    // The pushed digest is scanned again from GHCR before its digest reaches publish.
+    const rescan = stepIndex(build, (s) =>
+      (s.name ?? '').startsWith('Trivy scan of the pushed digest'),
+    );
+    const keep = stepIndex(build, (s) => s.name === 'Keep the digest');
+    expect(push).toBeLessThan(rescan);
+    expect(rescan).toBeLessThan(keep);
+    expect(build.steps[rescan]?.if).toBe('inputs.push');
+    expect(build.steps[rescan]?.run).toContain('--image-src remote');
+    expect(build.steps[rescan]?.run).toContain('--exit-code 1');
+    expect(build.steps[rescan]?.run).toContain('$TRIVY_BLOCK_SEVERITY');
   });
 
   it('never moves a tag, signs with cosign keyless and records a build provenance attestation', () => {
@@ -183,18 +194,24 @@ describe('V04: the release workflow', () => {
     expect(readme).toContain(PREFIX);
   });
 
-  it('writes a lock file with the same names as platform/deploy/images.lock.env', () => {
+  it('writes a lock file with the same names as platform/deploy/images.lock', () => {
     const run = job('lock')
       .steps.map((s) => s.run ?? '')
       .join('\n');
     const written = [...run.matchAll(/echo "(SDLC_IMAGE[A-Z0-9_]*)=/g)].map((m) => m[1]);
-    const lock = [...parseEnvFile(readDeployFile('images.lock.env')).keys()];
+    const lock = [...parseEnvFile(readDeployFile('images.lock')).keys()];
     expect(written).toEqual(lock);
   });
 });
 
 describe('V04: Compose uses the published images on a release checkout only', () => {
-  const lock = parseEnvFile(readDeployFile('images.lock.env'));
+  const lock = parseEnvFile(readDeployFile('images.lock'));
+
+  it('the lock file is tracked: no ignore rule hides it (`*.env` did, review of PR #276)', () => {
+    const r = spawnSync('git', ['-C', root, 'check-ignore', '-q', 'platform/deploy/images.lock']);
+    expect(r.status).toBe(1);
+    expect(fs.existsSync(path.join(root, 'platform/deploy/images.lock'))).toBe(true);
+  });
 
   it('the lock file is empty, or complete and pinned by digest, never ahead of package.json', () => {
     expect([...lock.keys()]).toEqual([
@@ -269,7 +286,7 @@ describe('V04: scripts/images.sh', () => {
       path.join(root, 'platform/deploy/scripts/images.sh'),
       path.join(dir, 'platform/deploy/scripts/images.sh'),
     );
-    fs.writeFileSync(path.join(dir, 'platform/deploy/images.lock.env'), opts.lock);
+    fs.writeFileSync(path.join(dir, 'platform/deploy/images.lock'), opts.lock);
     fs.writeFileSync(
       path.join(dir, 'package.json'),
       `{\n  "name": "x",\n  "version": "${opts.pkg}"\n}\n`,
@@ -317,51 +334,52 @@ describe('V04: scripts/images.sh', () => {
   });
 
   it('published on the release tag with no change; local otherwise', () => {
-    const lock = completeLock('0.2.0');
-    expect(images(tree({ lock, pkg: '0.2.0', git: 'tagged' }), ['mode']).out).toBe('published');
-    expect(images(tree({ lock, pkg: '0.2.0', git: 'untagged' }), ['mode']).out).toBe('local');
-    expect(images(tree({ lock, pkg: '0.2.0', git: 'dirty' }), ['mode']).out).toBe('local');
+    const lock = completeLock('0.1.1');
+    expect(images(tree({ lock, pkg: '0.1.1', git: 'tagged' }), ['mode']).out).toBe('published');
+    expect(images(tree({ lock, pkg: '0.1.1', git: 'untagged' }), ['mode']).out).toBe('local');
+    expect(images(tree({ lock, pkg: '0.1.1', git: 'dirty' }), ['mode']).out).toBe('local');
     // A tag of another version (main after the next version bump) is not a release checkout.
-    expect(images(tree({ lock, pkg: '0.3.0', git: 'tagged' }), ['mode']).out).toBe('local');
+    expect(images(tree({ lock, pkg: '0.1.2', git: 'tagged' }), ['mode']).out).toBe('local');
   });
 
-  it('a source archive (no .git) is a release checkout when package.json has the lock version', () => {
-    const lock = completeLock('0.2.0');
-    expect(images(tree({ lock, pkg: '0.2.0' }), ['mode']).out).toBe('published');
-    expect(images(tree({ lock, pkg: '0.2.1' }), ['mode']).out).toBe('local');
+  it('a source archive (no .git) builds locally, unless SDLC_IMAGES=published', () => {
+    // An archive of main between two releases holds the last release's lock file and version.
+    const archive = tree({ lock: completeLock('0.1.1'), pkg: '0.1.1' });
+    expect(images(archive, ['mode']).out).toBe('local');
+    expect(images(archive, ['mode'], { SDLC_IMAGES: 'published' }).out).toBe('published');
   });
 
   it('an empty or foreign lock file is never used', () => {
-    const empty = readDeployFile('images.lock.env').replace(/=.*$/gm, '=');
-    expect(images(tree({ lock: empty, pkg: '0.2.0' }), ['mode']).out).toBe('local');
-    const foreign = completeLock('0.2.0', 'ghcr.io/someone-else/fork');
-    expect(images(tree({ lock: foreign, pkg: '0.2.0', git: 'tagged' }), ['mode']).out).toBe(
+    const empty = readDeployFile('images.lock').replace(/=.*$/gm, '=');
+    expect(images(tree({ lock: empty, pkg: '0.1.1' }), ['mode']).out).toBe('local');
+    const foreign = completeLock('0.1.1', 'ghcr.io/someone-else/fork');
+    expect(images(tree({ lock: foreign, pkg: '0.1.1', git: 'tagged' }), ['mode']).out).toBe(
       'local',
     );
-    const r = images(tree({ lock: empty, pkg: '0.2.0' }), ['get', 'API']);
+    const r = images(tree({ lock: empty, pkg: '0.1.1' }), ['get', 'API']);
     expect(r.status).toBe(1);
     expect(r.err).toContain('not complete');
   });
 
   it('SDLC_IMAGES overrides the choice; published needs a complete lock file', () => {
-    const lock = completeLock('0.2.0');
-    const untagged = tree({ lock, pkg: '0.2.0', git: 'untagged' });
+    const lock = completeLock('0.1.1');
+    const untagged = tree({ lock, pkg: '0.1.1', git: 'untagged' });
     expect(images(untagged, ['mode'], { SDLC_IMAGES: 'published' }).out).toBe('published');
-    const tagged = tree({ lock, pkg: '0.2.0', git: 'tagged' });
+    const tagged = tree({ lock, pkg: '0.1.1', git: 'tagged' });
     expect(images(tagged, ['mode'], { SDLC_IMAGES: 'local' }).out).toBe('local');
-    const empty = tree({ lock: 'SDLC_IMAGES_VERSION=\n', pkg: '0.2.0' });
+    const empty = tree({ lock: 'SDLC_IMAGES_VERSION=\n', pkg: '0.1.1' });
     expect(images(empty, ['mode'], { SDLC_IMAGES: 'published' }).status).toBe(1);
     expect(images(tagged, ['mode'], { SDLC_IMAGES: 'yes' }).status).toBe(1);
   });
 
   it('get and export print the pinned references; an unknown name is refused', () => {
-    const dir = tree({ lock: completeLock('0.2.0'), pkg: '0.2.0' });
+    const dir = tree({ lock: completeLock('0.1.1'), pkg: '0.1.1' });
     expect(images(dir, ['get', 'SANDBOX_NODE24']).out).toBe(
       `${PREFIX}/sandbox-node24@${digest('e')}`,
     );
     expect(images(dir, ['get', 'POSTGRES']).status).toBe(1);
     expect(images(dir, ['export']).out.split('\n')).toEqual(
-      completeLock('0.2.0').trim().split('\n'),
+      completeLock('0.1.1').trim().split('\n'),
     );
     expect(images(dir, []).status).toBe(2);
   });

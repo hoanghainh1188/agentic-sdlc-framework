@@ -63,14 +63,14 @@ if ! SDLC_ENV_FILE="$env_file" "$deploy_dir/openbao/tls.sh" check >/dev/null 2>&
 fi
 
 # Published images (V04, design/ADR-M66 §2.5): on a release checkout, the images of
-# images.lock.env pinned by digest (overlay docker-compose.images.yml); everywhere else they are
+# images.lock pinned by digest (overlay docker-compose.images.yml); everywhere else they are
 # built locally from the checkout. SDLC_IMAGES=published|local overrides it (scripts/images.sh).
 images_mode="$("$deploy_dir/scripts/images.sh" mode)"
 if [ "$images_mode" = published ]; then
   for line in $("$deploy_dir/scripts/images.sh" export); do
     export "${line?}"
   done
-  echo "up: using the published images of v$SDLC_IMAGES_VERSION (platform/deploy/images.lock.env)" >&2
+  echo "up: using the published images of v$SDLC_IMAGES_VERSION (platform/deploy/images.lock)" >&2
 fi
 
 set -- $(for p in "$@"; do printf -- '--profile %s ' "$p"; done)

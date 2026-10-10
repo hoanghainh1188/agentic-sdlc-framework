@@ -82,7 +82,7 @@ How to bring up the whole platform on a new machine with Docker Compose, from an
 
 **Trying the platform on a developer machine (the community trial)?** `pnpm trial:up --settings <file>` runs steps 2–13 below for you with throw-away keys, on its own Compose project `sdlc-trial` ([TRIAL.md §3.2](../../TRIAL.md#32-the-platform), D-08 V02). Never on a server.
 
-**A release checkout uses the published images.** On a checkout of a release tag (`git checkout v0.2.0`, no local change) or its source archive, `up.sh` and `trial:up` pull the release's images from GHCR, pinned by digest in `platform/deploy/images.lock.env`, instead of building them; step 10 takes the sandbox image from there too. `pnpm images mode` prints `published` or `local` (`SDLC_IMAGES=local` builds anyway). Check them first: [Verify the published images](#verify-the-published-images). Anywhere else (`main`, a branch) every image is built locally (D-08 V04, `design/ADR-M66-ghcr-images.md`).
+**A release checkout uses the published images.** On a checkout of a release tag (`git checkout v0.1.1`, no local change), `up.sh` and `trial:up` pull the release's images from GHCR, pinned by digest in `platform/deploy/images.lock`, instead of building them; step 10 takes the sandbox image from there too. `pnpm images mode` prints `published` or `local` (`SDLC_IMAGES=local` builds anyway). A source archive without `.git` builds locally unless you set `SDLC_IMAGES=published`, and only for the archive of a release tag. Check them first: [Verify the published images](#verify-the-published-images). Anywhere else (`main`, a branch) every image is built locally (D-08 V04, `design/ADR-M66-ghcr-images.md`).
 
 After the first deployment: [Restart after a reboot](#restart-after-a-reboot), [Upgrade](#upgrade), [Troubleshooting](#troubleshooting). Use [Step 14](../GETTING-STARTED.md#step-14-prepare-the-pilot-repo-for-live-tests-dev) for the live tests on the pilot repository.
 
@@ -536,7 +536,7 @@ Never run `docker volume prune` or `docker system prune --volumes`: they delete 
 
 ## Verify the published images
 
-Each release publishes five images on GHCR (D-08 V04, `design/ADR-M66-ghcr-images.md`), for `linux/amd64` and `linux/arm64`: `sdlc-api`, `sdlc-worker`, `sdlc-runner`, `sdlc-otel-collector` and `sandbox-node24`, under `ghcr.io/hoanghainh1188/agentic-sdlc-framework/`. `platform/deploy/images.lock.env` pins each one by digest. They are built by `.github/workflows/release-images.yml` and scanned with Trivy before the push (no CRITICAL finding), signed with cosign keyless (GitHub OIDC, Sigstore's public transparency log), and carry an SPDX SBOM and SLSA build provenance.
+Each release publishes five images on GHCR (D-08 V04, `design/ADR-M66-ghcr-images.md`), for `linux/amd64` and `linux/arm64`: `sdlc-api`, `sdlc-worker`, `sdlc-runner`, `sdlc-otel-collector` and `sandbox-node24`, under `ghcr.io/hoanghainh1188/agentic-sdlc-framework/`. `platform/deploy/images.lock` pins each one by digest. They are built by `.github/workflows/release-images.yml` and scanned with Trivy before the push and again by digest after it (no CRITICAL finding), signed with cosign keyless (GitHub OIDC, Sigstore's public transparency log), and carry an SPDX SBOM and SLSA build provenance.
 
 Check an image before you deploy it; `pnpm images get <NAME>` prints its reference (`API`, `WORKER`, `RUNNER`, `OTEL_COLLECTOR`, `SANDBOX_NODE24`). With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3.x:
 
@@ -557,7 +557,7 @@ docker buildx imagetools inspect "$(pnpm --silent images get API)" --format '{{ 
 docker buildx imagetools inspect "$(pnpm --silent images get API)" --format '{{ json (index .Provenance "linux/amd64").SLSA }}'
 ```
 
-A tag (`0.2.0`, `sha-<commit>`) never moves, but use the digest anyway: the platform always does.
+A tag (`0.1.1`, `sha-<commit>`) never moves, but use the digest anyway: the platform always does.
 
 ## Troubleshooting
 

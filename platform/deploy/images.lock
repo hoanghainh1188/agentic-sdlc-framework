@@ -1,0 +1,13 @@
+# The platform's published images of the latest release, pinned by digest (task V04, ADR-M66 §2.5).
+# Written by the release pull request from the artifact of .github/workflows/release-images.yml;
+# never by hand. Empty until the first release with published images.
+#
+# scripts/images.sh reads this file. Compose uses these images (docker-compose.images.yml) only on
+# a release checkout: HEAD is the tag v$SDLC_IMAGES_VERSION with no local change, or a source
+# archive of that release. Everywhere else the images are built locally from the checkout.
+SDLC_IMAGES_VERSION=
+SDLC_IMAGE_API=
+SDLC_IMAGE_WORKER=
+SDLC_IMAGE_RUNNER=
+SDLC_IMAGE_OTEL_COLLECTOR=
+SDLC_IMAGE_SANDBOX_NODE24=

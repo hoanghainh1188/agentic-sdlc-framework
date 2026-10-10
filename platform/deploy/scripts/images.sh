@@ -5,21 +5,22 @@
 #        platform/deploy/scripts/images.sh get <NAME>  # prints SDLC_IMAGE_<NAME> of the lock file
 #        platform/deploy/scripts/images.sh export      # prints the lock file's NAME=value lines
 #
-# `published` only on a release checkout, with a complete platform/deploy/images.lock.env:
-# - a Git checkout whose HEAD is exactly the tag v$SDLC_IMAGES_VERSION, with no change to a
-#   tracked file; or
-# - a source archive of the release (no .git), whose root package.json has that version.
+# `published` only on a release checkout, with a complete platform/deploy/images.lock: a Git
+# checkout whose HEAD is exactly the tag v$SDLC_IMAGES_VERSION, with no change to a tracked file.
 # Everything else (main, a branch, a changed file, an empty lock file) builds the images locally.
+# Without .git (a source archive) it is `local` too: an archive of main between two releases holds
+# the last release's lock file and version, but not its code (review of PR #276).
 #
 # Environment:
-#   SDLC_IMAGES   `published` or `local` overrides the choice (`published` needs a complete lock)
+#   SDLC_IMAGES   `published` or `local` overrides the choice (`published` needs a complete lock);
+#                 `published` is the way to use the images from a release's source archive
 set -eu
 
 NAMES="API WORKER RUNNER OTEL_COLLECTOR SANDBOX_NODE24"
 PREFIX="ghcr.io/hoanghainh1188/agentic-sdlc-framework"
 
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
-lock="$root/platform/deploy/images.lock.env"
+lock="$root/platform/deploy/images.lock"
 
 die() { echo "images: $*" >&2; exit 1; }
 value() { sed -n "s/^$1=//p" "$lock" | tail -n 1; }
@@ -44,15 +45,10 @@ lock_complete() {
 }
 
 release_checkout() {
-  version="$(value SDLC_IMAGES_VERSION)"
-  if [ -e "$root/.git" ] && command -v git >/dev/null 2>&1; then
-    tag="$(git -C "$root" describe --exact-match --tags HEAD 2>/dev/null || true)"
-    [ "$tag" = "v$version" ] || return 1
-    [ -z "$(git -C "$root" status --porcelain --untracked-files=no)" ] || return 1
-    return 0
-  fi
-  pkg="$(sed -n 's/^  "version": "\([^"]*\)".*/\1/p' "$root/package.json" | head -n 1)"
-  [ "$pkg" = "$version" ]
+  [ -e "$root/.git" ] && command -v git >/dev/null 2>&1 || return 1
+  tag="$(git -C "$root" describe --exact-match --tags HEAD 2>/dev/null || true)"
+  [ "$tag" = "v$(value SDLC_IMAGES_VERSION)" ] || return 1
+  [ -z "$(git -C "$root" status --porcelain --untracked-files=no)" ]
 }
 
 mode() {
