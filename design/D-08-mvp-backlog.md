@@ -57,7 +57,7 @@ flowchart LR
     M0["M-0 Sample repo"] --> MC
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
-    MP --> ME["M-E Trial by the community (V01–V03, v0.1.0 preview)"]
+    MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V11, friendlier (v0.2.0)"]
     UX --> MF["M-F Adjustment"]
     MD --> MU["MVP+1 U01 read-only dashboard<br/>(in parallel with M-E)"]
