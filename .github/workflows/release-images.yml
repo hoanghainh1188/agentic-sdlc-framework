@@ -12,7 +12,9 @@
 #
 # Run by a person only (Harry): Actions → release-images → Run workflow, from `main`, with the
 # version of the root package.json. `push: false` (the default) builds and scans only: nothing
-# leaves the runner. V12 calls this file with `workflow_call` from its tag-driven release workflow.
+# leaves the runner. The images are built BEFORE the tag (QUESTIONS #370): release.yml (V12) runs
+# on the tag and only verifies the signatures and attestations made here on main (QUESTIONS #390);
+# it does not call this file. `workflow_call` and the tag ref stay accepted for a later change.
 # A push and a public package are public actions (CLAUDE.md "Current constraints").
 name: release-images
 

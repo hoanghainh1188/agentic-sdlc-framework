@@ -122,8 +122,15 @@ describe('workflow hardening (all workflows)', () => {
   // Every change to main goes through a reviewed pull request (CLAUDE.md "Current constraints"),
   // and no workflow commits to a pull request branch either: a commit pushed by a workflow waits
   // for approval and leaves the PR head without ci-ok (the render-diagrams bot, removed).
-  it.each(workflows)('$file never writes contents and never pushes', ({ wf }) => {
-    const grants = [wf.permissions, ...Object.values(wf.jobs).map((job) => job.permissions)];
+  // One exception (V12, RELEASING.md): release.yml's job `release` writes contents to create the
+  // GitHub Release of a tag a person pushed; it pushes nothing (release.test.ts).
+  it.each(workflows)('$file never writes contents and never pushes', ({ file, wf }) => {
+    const grants = [
+      wf.permissions,
+      ...Object.entries(wf.jobs)
+        .filter(([name]) => !(file === '.github/workflows/release.yml' && name === 'release'))
+        .map(([, job]) => job.permissions),
+    ];
     for (const grant of grants) {
       if (grant && typeof grant === 'object') {
         expect((grant as Record<string, string>).contents).not.toBe('write');

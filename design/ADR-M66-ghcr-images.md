@@ -25,7 +25,7 @@ Many trial users run Docker Desktop on Apple Silicon. Every base image is publis
 
 ### 2.3 The workflow: scan before the push
 
-`.github/workflows/release-images.yml`, `workflow_dispatch` (a person) and `workflow_call` (V12's release workflow), inputs `version` (must equal the root `package.json`) and `push` (default `false`). Separate from `ci.yml` and from V05's npm job.
+`.github/workflows/release-images.yml`, `workflow_dispatch` (a person) and `workflow_call` (kept for a later change; V12 does not call it, §2.5), inputs `version` (must equal the root `package.json`) and `push` (default `false`). Separate from `ci.yml` and from V05's npm job.
 
 1. **check**: the version and, for a push, the ref (`main`, or the tag `v<version>` when V12 calls it).
 2. **build** (10 jobs: 5 images × 2 architectures): build into the runner's Docker Engine; **Trivy** scans it with the version and thresholds of `ci.yml` (`HIGH` reported, `CRITICAL` blocks; the sandbox image also blocks the CRITICAL licence category, ADR-M10 §2.1). Only then, with `push: true`, the same build again with the same builder pushes the image **by digest** (no tag). Every layer comes from the cache of the scanned build; only the attestations are added. Then Trivy scans **the pushed digest itself** again, from GHCR (`--image-src remote`, `CRITICAL` blocks; review of PR #276), so the image that publish tags and signs is the scanned one even if the push missed the cache. A failure leaves that digest untagged and unsigned, and publish never runs.
@@ -49,7 +49,9 @@ The images of a release are **built before its tag** (option A):
 3. A second small pull request copies the workflow's `images.lock` over `platform/deploy/images.lock`.
 4. Harry tags its merge commit `v<version>`.
 
-So the tag holds the digests of its own images. The images were built from the commit before (the lock file is the only difference), which their provenance names. V12 automates this order: its release workflow calls this one before the tag, not on it (V12 AC2 follows this decision).
+So the tag holds the digests of its own images. The images were built from the commit before (the lock file is the only difference), which their provenance names.
+
+**On the tag (V12, QUESTIONS #390, `RELEASING.md`):** `.github/workflows/release.yml` builds nothing. It runs the release gate (`platform/tools/release/release-check.mjs`: the tag equals `package.json` and `PLATFORM_VERSION`, the CHANGELOG section with its Upgrade notes, `images.lock` for this version with the five digests), checks that the tagged commit is on `main`, and verifies every digest with `cosign verify` and `gh attestation verify`, both pinned to the exact signer `https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/heads/main` and the GitHub OIDC issuer (checked against the v0.1.1 signature and attestation bundles on 2026-10-10). Only then it creates the GitHub Release. Step 3 is `pnpm release:lock <run-id>`, which downloads the run's artifact and refuses a run that is not a successful `release-images` run on `main`.
 
 - `platform/deploy/images.lock` (not `.env`: the repository ignores `*.env`): `SDLC_IMAGES_VERSION` and `SDLC_IMAGE_<NAME>` = `ghcr.io/…/<image>@sha256:…` for the five images. Empty until the first release with published images. A static test refuses a partial file, another registry, a tag instead of a digest, or a version ahead of `package.json`.
 - `platform/deploy/docker-compose.images.yml`: an overlay that gives the four services Compose builds their published image and removes their `build` (`!reset`, Compose v2.24+, already a requirement).
@@ -81,6 +83,6 @@ The first scan (2026-10-10) found CRITICAL findings in `node:24.13.0-bookworm-sl
 
 ## 5. Open items
 
-- V12: the tag-driven release workflow calls this one before the tag (§2.5) and writes the lock file pull request.
+- ~~V12: the tag-driven release workflow calls this one before the tag (§2.5) and writes the lock file pull request.~~ Done differently in V12 (QUESTIONS #390): the tag workflow verifies the images instead of calling this one; `pnpm release:lock` prepares the lock file pull request, which a person opens (a pull request opened by a workflow token would not start CI).
 - O02 (Server): the upgrade test between two releases uses the published images.
 - After the first real push: Harry sets the five packages to public and runs `cosign verify` once from a clean machine.
