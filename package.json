@@ -61,7 +61,9 @@
     "diagrams:render": "python3 scripts/diagrams.py render",
     "diagrams:check": "python3 scripts/diagrams.py check",
     "compose:down": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox down",
-    "test:dashboard": "pnpm build && playwright test --config platform/tests/e2e/playwright.config.ts"
+    "test:dashboard": "pnpm build && playwright test --config platform/tests/e2e/playwright.config.ts",
+    "cli:pack": "tsc -b platform/apps/cli && node platform/tools/cli-package/build.mjs",
+    "cli:pack-check": "pnpm cli:pack && node platform/tools/cli-package/check.mjs"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "3.1141.0",
@@ -93,6 +95,7 @@
     "kysely": "0.29.6",
     "pg": "8.23.0",
     "prettier": "3.9.9",
+    "rolldown": "1.2.11",
     "rxjs": "7.8.2",
     "typescript": "6.0.3",
     "typescript-eslint": "8.70.1",
