@@ -214,7 +214,7 @@ describe('AC2: the advice follows the caller roles; producers never approve', ()
     expect(adviceText(next)).not.toContain('sdlc gate approve');
   });
 
-  it.each(['G5', 'G7', 'G8'])(
+  it.each(['G5', 'G6', 'G7', 'G8'])(
     'the person who approved G4 (allowed the run) is a producer at %s',
     (gate) => {
       const next = adviseNext(
@@ -245,10 +245,93 @@ describe('AC2: the advice follows the caller roles; producers never approve', ()
           created_by: OTHER_USER,
           pr_number: 31,
         },
+        waitingFor: waitsFor('G7', ['person_b']),
       }),
       me(['person_b']),
     );
     expect(next.code).toBe('producer');
+  });
+
+  describe('g7_merge: only a holder of G7 role who is not a producer merges (AC2)', () => {
+    const merge = (roles: string[], needed = 1) =>
+      detail({
+        intent: { current_gate: 'G7', waiting_reason: 'g7_merge', pr_number: 31 },
+        waitingFor: waitsFor(
+          'G7',
+          needed > 1 ? ['person_b', 'second_approver'] : ['person_b'],
+          needed,
+        ),
+        decisions: [],
+      });
+
+    it('person_b, not a producer: merge the pull request', () => {
+      const next = adviseNext(merge([]), me(['person_b']));
+      expect(next).toMatchObject({ kind: 'you_act', code: 'merge_g7' });
+      expect(adviceText(next)).toContain('pull request #31');
+    });
+
+    it('the second approver merges when two approvals are needed', () => {
+      expect(adviseNext(merge([], 2), me(['second_approver'])).code).toBe('merge_g7');
+    });
+
+    it.each([[['viewer']], [['person_a']], [['pm_brse']], [[]], [['second_approver']]])(
+      'roles %j with one approval needed: waits for person_b, never told to merge',
+      (roles) => {
+        const next = adviseNext(merge([]), me(roles));
+        expect(next).toMatchObject({ kind: 'waits_for', code: 'waits_role', roles: ['person_b'] });
+        expect(adviceText(next)).not.toContain('merge');
+      },
+    );
+
+    it('a tenant admin without G7 role waits', () => {
+      expect(adviseNext(merge([]), me([], OTHER_USER, true)).code).toBe('waits_role');
+    });
+
+    it('without waiting_for: person_b, plus the second approver only for two approvals', () => {
+      const noWaiting = detail({
+        intent: { current_gate: 'G7', waiting_reason: 'g7_merge', pr_number: 31 },
+        waitingFor: null,
+      });
+      expect(adviseNext(noWaiting, me(['person_b'])).code).toBe('merge_g7');
+      expect(adviseNext(noWaiting, me(['second_approver'])).code).toBe('waits_role');
+    });
+  });
+
+  describe('G5 and G6: the person who allowed the last run is a producer (core runProducers)', () => {
+    const LAST = new Date('2026-10-05T00:00:00.000Z');
+    const runs = [
+      decisionBody({ gate: 'G4', decided_by: USER, approver_role: 'person_a' }),
+      decisionBody({
+        id: '66666666-6666-4666-8666-666666666666',
+        gate: 'G4',
+        decided_by: OTHER_USER,
+        approver_role: 'person_a',
+        created_at: LAST,
+      }),
+    ];
+    const at = (gate: string) =>
+      detail({
+        intent: { current_gate: gate as never, waiting_reason: 'decision', created_by: USER },
+        waitingFor: waitsFor(gate, ['person_a', 'person_b']),
+        decisions: runs,
+      });
+
+    it.each(['G5', 'G6'])('%s: the latest G4 approver is never told to approve', (gate) => {
+      const next = adviseNext(at(gate), me(['person_b']));
+      expect(next).toMatchObject({ kind: 'waits_for', code: 'producer', producer: true });
+      expect(adviceText(next)).not.toContain('sdlc gate approve');
+    });
+
+    it.each([
+      ['G5', 'decide_g5'],
+      ['G6', 'decide_g6'],
+    ])("%s: an earlier run's G4 approver may decide (%s)", (gate, code) => {
+      expect(adviseNext(at(gate), me(['person_b'], USER)).code).toBe(code);
+    });
+
+    it.each(['G7', 'G8'])('%s: every G4 approver is a producer', (gate) => {
+      expect(adviseNext(at(gate), me(['person_b'], USER)).code).toBe('producer');
+    });
   });
 
   it('QUESTIONS #368: at G3 the plan submitter note is shown', () => {

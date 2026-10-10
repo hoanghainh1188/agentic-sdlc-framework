@@ -275,6 +275,26 @@ function setupAgent(facts: Facts): Advice {
   return advice('fix_setup', 'setup_agent', facts, {}, [], ['admin_only']);
 }
 
+/**
+ * G7's approvals are complete; a person merges (ADR-M41 §2.5). Only a holder of G7's role who is
+ * not a producer is told to merge (D-08 V06 AC2): person_b, and the second approver when two
+ * approvals are needed. Everyone else waits for them.
+ */
+function mergeAtG7(facts: Facts): Advice {
+  const waiting = facts.intent.waiting_for;
+  const roles =
+    waiting && waiting.roles.length > 0
+      ? waiting.roles
+      : (waiting?.approvals_needed ?? 1) > 1
+        ? ['person_b', 'second_approver']
+        : ['person_b'];
+  const params = { roles: roles.join(', '), needed: String(waiting?.approvals_needed ?? 1) };
+  if (!holdsAny(facts.caller, roles))
+    return advice('waits_for', 'waits_role', facts, params, roles);
+  if (facts.caller.producer) return advice('waits_for', 'producer', facts, params, roles);
+  return advice('you_act', 'merge_g7', facts);
+}
+
 /** One rule per waiting reason; `Record` makes the compiler check that none is missing. */
 export const REASON_RULES: Readonly<Record<IntentWaitReason, Rule>> = {
   decision: decideAtGate,
@@ -282,10 +302,7 @@ export const REASON_RULES: Readonly<Record<IntentWaitReason, Rule>> = {
   g6_decision: decide('decide_g6'),
   g7_decision: decide('review_g7'),
   g8_decision: decide('decide_g8'),
-  g7_merge: (facts) =>
-    facts.caller.producer
-      ? advice('waits_for', 'producer', facts, { roles: 'person_b', needed: '0' }, ['person_b'])
-      : advice('you_act', 'merge_g7', facts),
+  g7_merge: mergeAtG7,
   input_missing: inputMissing,
   new_plan_needed: (facts) => byAccess(facts, DEFAULT_ACCESS.plan_submit, 'new_plan'),
   plan_resubmit_needed: (facts) => byAccess(facts, DEFAULT_ACCESS.plan_submit, 'resubmit_plan'),
@@ -335,16 +352,28 @@ function byStatus(facts: Facts): Advice {
 }
 
 /**
- * Producers known from the two reads (QUESTIONS #368): the intent's creator (G7, G8) and the
- * people who approved G4, who allowed the run (G5, G7, G8). The plan submitter is not known here.
+ * Producers known from the two reads (QUESTIONS #368), as the platform counts them (core
+ * `gate-command.ts` `producersOf`): at G5 and G6 the person who allowed the last run (the latest
+ * G4 approval); at G7 and G8 the intent's creator and every G4 approver. The plan submitter (G3,
+ * G7, G8) and commit authors (G7) are not in these answers.
  */
 function isProducer(intent: IntentDetail, userId: string): boolean {
   const gate = intent.current_gate;
-  if (gate !== 'G5' && gate !== 'G7' && gate !== 'G8') return false;
-  const allowedRun = intent.decisions.some(
-    (d) => d.gate === 'G4' && d.decision === 'approve' && d.decided_by === userId,
-  );
-  return allowedRun || ((gate === 'G7' || gate === 'G8') && intent.created_by === userId);
+  const g4Approvals = intent.decisions.filter((d) => d.gate === 'G4' && d.decision === 'approve');
+  // G5, G6: the person who allowed the last run (`runProducers` in core `gate-command.ts`), that
+  // is the latest G4 approval.
+  if (gate === 'G5' || gate === 'G6') {
+    const latest = g4Approvals.reduce<(typeof g4Approvals)[number] | undefined>(
+      (last, d) => (last === undefined || d.created_at > last.created_at ? d : last),
+      undefined,
+    );
+    return latest?.decided_by === userId;
+  }
+  // G7, G8: the creator and every run's starter (`g7Producers`, `g8Producers`).
+  if (gate === 'G7' || gate === 'G8') {
+    return intent.created_by === userId || g4Approvals.some((d) => d.decided_by === userId);
+  }
+  return false;
 }
 
 /** The caller already approved the current gate in this visit (after it entered the gate). */
