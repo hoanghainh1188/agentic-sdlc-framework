@@ -4,6 +4,7 @@
 
 ### Changed
 - The plan toward v0.2.0 (QUESTIONS #355–#357): D-08 1.32, new milestone UX with V04 (images on GHCR) and V05–V11 (the CLI on npm as `agentic-sdlc-cli`, `sdlc next`, `doctor`, the trial stack surviving a reboot, team access through a TLS reverse proxy, a friendlier CLI with `sdlc help`, a plan for the dashboard's actions). English only for now.
+- Review of the milestone UX (QUESTIONS #358): D-08 1.33. V05 adds `sdlc --version` and its smoke test runs `sdlc` without arguments; V08 also updates CLAUDE.md and runbook T11 (CLAUDE.md and QUESTIONS #345 note the exception for the trial stack's encrypted key shares); V09 names both places that say "not supported"; V11 starts now and supersedes the E07 note.
 
 ## [0.1.0] - 2026-10-10
 
