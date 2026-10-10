@@ -82,6 +82,8 @@ How to bring up the whole platform on a new machine with Docker Compose, from an
 
 **Trying the platform on a developer machine (the community trial)?** `pnpm trial:up --settings <file>` runs steps 2–13 below for you with throw-away keys, on its own Compose project `sdlc-trial` ([TRIAL.md §3.2](../../TRIAL.md#32-the-platform), D-08 V02). Never on a server.
 
+**A release checkout uses the published images.** On a checkout of a release tag (`git checkout v0.1.1`, no local change), `up.sh` and `trial:up` pull the release's images from GHCR, pinned by digest in `platform/deploy/images.lock`, instead of building them; step 10 takes the sandbox image from there too. `pnpm images mode` prints `published` or `local` (`SDLC_IMAGES=local` builds anyway). A source archive without `.git` builds locally unless you set `SDLC_IMAGES=published`, and only for the archive of a release tag. Check them first: [Verify the published images](#verify-the-published-images). Anywhere else (`main`, a branch) every image is built locally (D-08 V04, `design/ADR-M66-ghcr-images.md`).
+
 After the first deployment: [Restart after a reboot](#restart-after-a-reboot), [Upgrade](#upgrade), [Troubleshooting](#troubleshooting). Use [Step 14](../GETTING-STARTED.md#step-14-prepare-the-pilot-repo-for-live-tests-dev) for the live tests on the pilot repository.
 
 ### 1. Prerequisites
@@ -182,7 +184,7 @@ platform/deploy/scripts/up.sh core models platform sandbox
 curl -s http://127.0.0.1:8090/health/ready
 ```
 
-This starts everything else of `core` too. The script waits until every service is healthy. Then check that no process lacks a credential: the logs of `sdlc-api`, `sdlc-worker` and `sdlc-runner` must have no `…_missing` event (GETTING-STARTED Step 11b part 7). A missing one names the credentials command to run again.
+This starts everything else of `core` too. On a release checkout it pulls the published `sdlc-api`, `sdlc-worker`, `sdlc-runner` and `otel-collector` images and says so (`up: using the published images of v…`); elsewhere Compose builds them. The script waits until every service is healthy. Then check that no process lacks a credential: the logs of `sdlc-api`, `sdlc-worker` and `sdlc-runner` must have no `…_missing` event (GETTING-STARTED Step 11b part 7). A missing one names the credentials command to run again.
 
 Optional, Langfuse (section [Logs and traces](#logs-and-traces-a08)): add `observability` to the `up.sh` call. Then create the worker's own Langfuse key in the Langfuse UI and deliver the worker's purge credentials (runbook T11 §5m), so the retention loop can delete a purged project's traces:
 
@@ -242,6 +244,12 @@ pnpm sandbox-image:build node24
 ```
 
 It prints the image reference by digest (`…@sha256:…`) for the project configuration (runbook T11 §5g; on Docker Desktop add `--no-push`).
+
+On a release checkout, skip the build: the release's published image is already pinned by digest, and the runner pulls it from GHCR.
+
+```bash
+pnpm images get SANDBOX_NODE24   # ghcr.io/…/sandbox-node24@sha256:…, for sandbox.image
+```
 
 ### 11. The agent
 
@@ -519,12 +527,37 @@ Upgrades come from `main` as reviewed changes; read the [CHANGELOG](../../CHANGE
 1. Take a backup: `pnpm backup` ([above](#backup-and-restore)); it holds OpenBao's snapshot, the way back after an OpenBao image change ([T11 §4b](../../handbook/03-templates/T11-openbao-runbook.md#4b-upgrading-the-openbao-image)).
 2. `git pull`, then `pnpm install && pnpm build`.
 3. Add any new `.env` variables (`.env.example` lists them; `init-env.sh` never overwrites `.env`). After the A10 update (TLS on OpenBao): `pnpm openbao:tls dev` on a development machine; on the server, the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)).
-4. Pull the pinned images and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`): `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull`, then the same with `build` (add `--profile observability` when you use it).
+4. Pull the pinned images and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`): `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull`, then the same with `build` (add `--profile observability` when you use it). Upgrading to a release tag (`git checkout v<version>`): nothing to build; `up.sh` in step 5 pulls the release's images, and `sandbox.image` takes `pnpm images get SANDBOX_NODE24` ([Verify the published images](#verify-the-published-images) first).
 5. Start only OpenBao, PostgreSQL and SeaweedFS, unseal OpenBao ([Restart after a reboot](#restart-after-a-reboot), first three commands), apply new migrations ([step 6](#6-database)), then start everything ([step 7](#7-start-the-platform)).
 6. Run a credentials command only when the CHANGELOG says an update added one or gave one new rights ([Fresh deployment, step 5](#5-credentials-of-every-process)).
 7. Check: `curl -s http://127.0.0.1:8090/health/ready`, and no `…_missing` line in the logs ([Troubleshooting](#troubleshooting)).
 
 Never run `docker volume prune` or `docker system prune --volumes`: they delete the platform's data.
+
+## Verify the published images
+
+Each release publishes five images on GHCR (D-08 V04, `design/ADR-M66-ghcr-images.md`), for `linux/amd64` and `linux/arm64`: `sdlc-api`, `sdlc-worker`, `sdlc-runner`, `sdlc-otel-collector` and `sandbox-node24`, under `ghcr.io/hoanghainh1188/agentic-sdlc-framework/`. `platform/deploy/images.lock` pins each one by digest. They are built by `.github/workflows/release-images.yml` and scanned with Trivy before the push and again by digest after it (no CRITICAL finding), signed with cosign keyless (GitHub OIDC, Sigstore's public transparency log), and carry an SPDX SBOM and SLSA build provenance.
+
+Check an image before you deploy it; `pnpm images get <NAME>` prints its reference (`API`, `WORKER`, `RUNNER`, `OTEL_COLLECTOR`, `SANDBOX_NODE24`). With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3.x:
+
+```bash
+cosign verify --certificate-identity-regexp '^https://github\.com/hoanghainh1188/agentic-sdlc-framework/\.github/workflows/release-images\.yml@' --certificate-oidc-issuer https://token.actions.githubusercontent.com "$(pnpm --silent images get API)"
+```
+
+The certificate must name that workflow file: a signature from any other workflow or person fails. With the GitHub CLI, the build provenance:
+
+```bash
+gh attestation verify "oci://$(pnpm --silent images get API)" --repo hoanghainh1188/agentic-sdlc-framework
+```
+
+The SBOM (the packages inside, SPDX JSON) and BuildKit's provenance:
+
+```bash
+docker buildx imagetools inspect "$(pnpm --silent images get API)" --format '{{ json (index .SBOM "linux/amd64").SPDX }}'
+docker buildx imagetools inspect "$(pnpm --silent images get API)" --format '{{ json (index .Provenance "linux/amd64").SLSA }}'
+```
+
+A tag (`0.1.1`, `sha-<commit>`) never moves, but use the digest anyway: the platform always does.
 
 ## Troubleshooting
 

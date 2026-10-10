@@ -8,6 +8,7 @@
 # Environment:
 #   SDLC_ENV_FILE      env file (default: platform/deploy/.env, created by init-env.sh)
 #   SDLC_WAIT_TIMEOUT  seconds to wait for health (default: 300)
+#   SDLC_IMAGES        published | local: the platform images (default: scripts/images.sh mode)
 #
 # "docker compose up --wait" reports one-shot jobs that exit 0 as failures, so this
 # script waits for long-running services to be healthy and, separately, checks that
@@ -61,8 +62,26 @@ if ! SDLC_ENV_FILE="$env_file" "$deploy_dir/openbao/tls.sh" check >/dev/null 2>&
   echo "up: warning: OpenBao's TLS certificate is missing or ends soon (runbook T11 section 3c)" >&2
 fi
 
+# Published images (V04, design/ADR-M66 §2.5): on a release checkout, the images of
+# images.lock pinned by digest (overlay docker-compose.images.yml); everywhere else they are
+# built locally from the checkout. SDLC_IMAGES=published|local overrides it (scripts/images.sh).
+images_mode="$("$deploy_dir/scripts/images.sh" mode)"
+if [ "$images_mode" = published ]; then
+  for line in $("$deploy_dir/scripts/images.sh" export); do
+    export "${line?}"
+  done
+  echo "up: using the published images of v$SDLC_IMAGES_VERSION (platform/deploy/images.lock)" >&2
+fi
+
 set -- $(for p in "$@"; do printf -- '--profile %s ' "$p"; done)
-compose() { docker compose -f "$deploy_dir/docker-compose.yml" --env-file "$env_file" "$@"; }
+compose() {
+  if [ "$images_mode" = published ]; then
+    docker compose -f "$deploy_dir/docker-compose.yml" -f "$deploy_dir/docker-compose.images.yml" \
+      --env-file "$env_file" "$@"
+  else
+    docker compose -f "$deploy_dir/docker-compose.yml" --env-file "$env_file" "$@"
+  fi
+}
 
 services="$(compose "$@" config --services)"
 long_running=""

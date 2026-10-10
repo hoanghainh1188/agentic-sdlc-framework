@@ -4,3 +4,9 @@
 # in the pull request, for example:
 #   # 2026-10-01 no fix released; not reachable from our code; approved by <name> in #<PR>
 #   CVE-2026-00000
+# 2026-10-10 zlib1g in the Debian 12 base of node:24.13.0-bookworm-slim (sdlc-api, sdlc-worker,
+# sdlc-runner; release scan of V04, design/ADR-M66 §2.6): Debian marks it "will not fix". The flaw
+# is in minizip (zipOpenNewFileInZip4_6), which Debian ships apart (libminizip1), not in zlib1g;
+# no platform image installs minizip. Remove when Debian 12 ships a fix or the base moves on.
+# Approved by Harry (Person B) in PR #276.
+CVE-2023-45853

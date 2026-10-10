@@ -45,7 +45,7 @@ Best: two people. If you are alone, you may use a second GitHub account for Pers
 
 ### 3.2. The platform
 
-1. Clone this repository and check out the release: `git checkout v0.1.0` (or later). Then `corepack enable` and `pnpm install`.
+1. Clone this repository and check out the release: `git checkout v0.1.0` (or later). Then `corepack enable` and `pnpm install`. From the first release that publishes its images on GHCR (`platform/deploy/images.lock` is filled), a release checkout pulls the platform images and the sandbox image, pinned by digest, instead of building them: faster, and the images you run are the scanned and signed ones ([Verify the published images](platform/deploy/README.md#verify-the-published-images)). Keep the checkout unchanged, or the images are built locally again (`pnpm images mode` says which).
 2. Create **your own GitHub App** and install it on your fork only. In a terminal, run `pnpm github-app:create --out ~/secrets/sdlc-trial-app.private-key.pem`, open the local page it prints, press the button and confirm on GitHub; it saves the private key (mode 600) and prints the client ID and the install link ([Create the GitHub App](platform/deploy/README.md#create-the-github-app-operator), option A). By hand instead: option B there. Keep the private key in a file outside every repository, readable only by you (`chmod 600 <file>`).
 3. Clone **your fork** somewhere on the machine (the agent's instructions are read from `AGENTS.md` on its `main` branch).
 4. Choose a model (section 4). For the local model: `ollama pull gpt-oss:20b` first. For an API model: put the key alone in a file, `chmod 600`.
@@ -54,7 +54,7 @@ Best: two people. If you are alone, you may use a second GitHub account for Pers
    ```bash
    pnpm trial:up --settings ~/trial-settings.yaml
    ```
-   It follows [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator), steps 2–13, for you, in 20 to 40 minutes: OpenBao with throw-away keys, every credential, the database, the platform (`core models platform sandbox`), the tenant (Person A is its admin), the project with Person A and Person B, the sandbox image, the agent, the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial) and the AI record (data class `internal`). At the end, Person A and Person B are each logged in, in their own config folder. Run Person B's commands as `XDG_CONFIG_HOME=<Person B's folder> pnpm sdlc …`.
+   It follows [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator), steps 2–13, for you, in 20 to 40 minutes: OpenBao with throw-away keys, every credential, the database, the platform (`core models platform sandbox`), the tenant (Person A is its admin), the project with Person A and Person B, the sandbox image (published, or built when the release has none), the agent, the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial) and the AI record (data class `internal`). At the end, Person A and Person B are each logged in, in their own config folder. Run Person B's commands as `XDG_CONFIG_HOME=<Person B's folder> pnpm sdlc …`.
 
    From v0.1.1 on you may also install the command from npm, at the version of your checkout (`npm install -g agentic-sdlc-cli@<version>`, [USER-GUIDE §2](platform/USER-GUIDE.md#install-the-sdlc-command)), and write `sdlc …` instead of `pnpm sdlc …`; the logins are the same.
 
