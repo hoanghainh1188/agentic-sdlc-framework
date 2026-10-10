@@ -29,6 +29,7 @@ import { pollProject } from '../../../packages/core/src/git-events/poll-project.
 import { Registry } from '../../../packages/core/src/registry/registry.js';
 import { startHarness, type Harness } from '../../git-github/helpers.js';
 import { comment, user } from '../../git-github/stub-github.js';
+import { tokenIssuedAt } from '../token-clock.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
 const HASH = 'e'.repeat(64);
@@ -178,7 +179,7 @@ describeDb('B11 PR 2: acknowledge, decide, comments, API and notices on PostgreS
         external_login: GH[person][1],
       });
       tokens[person] = (
-        await issueApiToken(scope, { userId: created.id, name: person, now: T0 })
+        await issueApiToken(scope, { userId: created.id, name: person, now: tokenIssuedAt() })
       ).token;
     }
     target = { tenantId, projectId: project.id, repoFullName: 'acme/shop' };

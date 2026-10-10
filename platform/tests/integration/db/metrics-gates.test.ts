@@ -22,6 +22,7 @@ import type { TenantScope } from '../../../packages/core/src/db/tenant-scope.js'
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
 import { stepIntent } from '../../../packages/core/src/workflow/step.js';
 import { seedAiRecord } from '../ai-record-seed.js';
+import { tokenIssuedAt } from '../token-clock.js';
 import { createWorkflowFixture, type WorkflowFixture } from '../workflow/fixture.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
@@ -166,7 +167,9 @@ describeDb('E06: gate waiting-time metrics on PostgreSQL', () => {
     }
     await scope.tenantRoles.grant({ user_id: ids.admin, role: 'tenant_admin' });
     for (const who of Object.keys(ids) as Who[]) {
-      tokens[who] = (await issueApiToken(scope, { userId: ids[who], name: who, now: NOW })).token;
+      tokens[who] = (
+        await issueApiToken(scope, { userId: ids[who], name: who, now: tokenIssuedAt() })
+      ).token;
     }
 
     // X1 (Medium): G1 after 1 h, G2 after 2 h, G3: changes asked after 1 h, approved 3 h later.
@@ -279,7 +282,9 @@ describeDb('E06: gate waiting-time metrics on PostgreSQL', () => {
     setClock(at(9 * HOUR));
     await decide(other, await reload(other, y), 'G1', 'approve', otherA.id);
     await settle(other, y);
-    otherAdmin = (await issueApiToken(other, { userId: otherA.id, name: 'a', now: NOW })).token;
+    otherAdmin = (
+      await issueApiToken(other, { userId: otherA.id, name: 'a', now: tokenIssuedAt() })
+    ).token;
 
     app = await createApp({
       db: asApiDb(db),

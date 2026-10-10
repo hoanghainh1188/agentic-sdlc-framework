@@ -17,6 +17,7 @@ import type { Intent } from '../../../packages/core/src/db/schema.js';
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
 import type { TenantScope } from '../../../packages/core/src/db/tenant-scope.js';
 import { createJsonLogger } from '../../../packages/core/src/observability/index.js';
+import { tokenIssuedAt } from '../token-clock.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
 type App = Awaited<ReturnType<typeof createApp>>;
@@ -96,7 +97,9 @@ describeDb('B03: API app on PostgreSQL', () => {
       });
       users[key] = user.id;
       if (role) await scope.roleBindings.grant({ user_id: user.id, project_id: project.id, role });
-      tokens[key] = (await issueApiToken(scope, { userId: user.id, name: key, now: NOW })).token;
+      tokens[key] = (
+        await issueApiToken(scope, { userId: user.id, name: key, now: tokenIssuedAt() })
+      ).token;
     }
     await scope.roleBindings.grant({
       user_id: users.b,
@@ -192,11 +195,17 @@ describeDb('B03: API app on PostgreSQL', () => {
     });
 
     it('refuses a token after its expiry (default 90 days)', async () => {
+      const issuedAt = tokenIssuedAt();
+      const issued = await issueApiToken(tenantA.scope, {
+        userId: tenantA.users.viewer,
+        name: 'expiry',
+        now: issuedAt,
+      });
       const later = (days: number) =>
         createApp({
           db: asApiDb(t0),
           settings: { rateLimitPerMinute: 1000, authFailuresPerMinute: 1000 },
-          now: () => new Date(NOW.getTime() + days * DAY_MS),
+          now: () => new Date(issuedAt.getTime() + days * DAY_MS),
         });
       for (const [days, status] of [
         [89, 200],
@@ -210,7 +219,7 @@ describeDb('B03: API app on PostgreSQL', () => {
             .inject({
               method: 'GET',
               url: '/v1/me',
-              headers: { authorization: `Bearer ${tenantA.tokens.viewer}` },
+              headers: { authorization: `Bearer ${issued.token}` },
             });
           expect(reply.statusCode).toBe(status);
         } finally {
@@ -223,7 +232,7 @@ describeDb('B03: API app on PostgreSQL', () => {
       const issued = await issueApiToken(tenantA.scope, {
         userId: tenantA.users.a,
         name: 'laptop',
-        now: NOW,
+        now: tokenIssuedAt(),
       });
       expect((await inject('GET', '/v1/me', issued.token)).statusCode).toBe(200);
       const before = await auditCount(tenantA);

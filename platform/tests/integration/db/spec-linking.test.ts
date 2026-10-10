@@ -25,6 +25,7 @@ import { linkSpecFromGitHost } from '../../../packages/core/src/specs/link.js';
 import { stepIntent, type StepDeps } from '../../../packages/core/src/workflow/step.js';
 import { FakeSpecGitHost as FakeGitHost, SPEC_PATH, SPEC_TEXT } from '../fake-spec-git-host.js';
 import { waitingRow } from '../g4-harness.js';
+import { tokenIssuedAt } from '../token-clock.js';
 import { createWorkflowFixture, PLAN_HASH, type WorkflowFixture } from '../workflow/fixture.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
@@ -144,7 +145,9 @@ describeDb('B08: spec linking and the spec hash check on PostgreSQL', () => {
     }
     const ids = { a: f.users.a, b: f.users.b, ...users };
     for (const [key, userId] of Object.entries(ids) as [keyof typeof tokens, string][]) {
-      tokens[key] = (await issueApiToken(f.scope, { userId, name: key, now: NOW })).token;
+      tokens[key] = (
+        await issueApiToken(f.scope, { userId, name: key, now: tokenIssuedAt() })
+      ).token;
     }
     app = await createApp({
       db: db.app as unknown as ApiDeps['db'],

@@ -11,6 +11,7 @@ import { createApp, type ApiDeps } from '../../../apps/api/src/app.js';
 import { issueApiToken } from '../../../packages/core/src/admin/tokens.js';
 import type { TenantScope } from '../../../packages/core/src/db/tenant-scope.js';
 import { issueRun, seedRun, type SeededRun } from '../cost-seed.js';
+import { tokenIssuedAt } from '../token-clock.js';
 import { createTestDatabase, describeDb, tamper, type TestDatabase } from './helpers.js';
 
 type App = Awaited<ReturnType<typeof createApp>>;
@@ -133,7 +134,9 @@ describeDb('E04: cost report on PostgreSQL', () => {
         });
       }
       if (who === 'admin') await scope.tenantRoles.grant({ user_id: user, role: 'tenant_admin' });
-      tokens[who] = (await issueApiToken(scope, { userId: user, name: who, now: NOW })).token;
+      tokens[who] = (
+        await issueApiToken(scope, { userId: user, name: who, now: tokenIssuedAt() })
+      ).token;
     }
     const ids = {
       intentId: seeded.intentId,
