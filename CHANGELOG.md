@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- GETTING-STARTED "Publishing the CLI on npm": what the first publish of v0.1.1 taught: two-factor authentication on before `npm publish` (else 403), `--provenance=false` for the one manual publish, npm's staged publishing (approve the waiting version on npmjs.com, deprecate the placeholder `0.0.0-stage`); GHCR packages of a public repository are public already. Documentation only.
 - V11 design (QUESTIONS #380): the plan of the dashboard's actions is **approved** (`design/MVP1-UI-SCOPE.md` 1.2). New **ADR-M73** (GitHub sign-in through the platform's App, server-side sessions, three CSRF layers, a passkey before each decision, audit source `web`, `expected_input_sha256`); D-02 1.10 §4.2, D-03 1.40 §5.1, §9, §12, D-05 1.40 (planned tables `web_sessions`, `webauthn_credentials`), ADR-M54 0.5 (a pointer). D-08 1.35: new tasks U05–U07 in the milestone UX and U08–U09 in Later. No code yet.
 
 ### Fixed
