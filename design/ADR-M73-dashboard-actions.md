@@ -19,16 +19,19 @@ Writes from a browser need what the read-only dashboard avoids: a sign-in that i
 
 - Actions in three waves, all through **existing API endpoints and core handlers** (MVP1-UI-SCOPE §3). Wave 1 (U07): kill a run; approve, reject or request changes at a gate, never at G7; acknowledge and decide an escalation. Wave 2 (U08): create an intent with its spec, submit a plan, evidence packs. Wave 3 (U09): administration.
 - No new business endpoint. New endpoints only for sign-in, the session and passkeys; they change no intent, gate, run or escalation.
+- The L1 proposal download stays in the CLI (hash checked again, file mode 600, ADR-M64); a browser download would land in the Downloads folder with the usual permissions. The page shows the command.
 - Never in the dashboard: merging, approving or requesting changes at G7, editing append-only rows, entering secrets, a self-grant, getting around a refusal, showing a new API token (MVP1-UI-SCOPE §4).
 
 ### 2.2. Sign-in and session (QUESTIONS #375)
 
-- **GitHub OAuth through the platform's GitHub App** (the same App as the poller), with a random `state` and PKCE kept server-side together with the chosen tenant (10 minutes, used once).
+- **GitHub OAuth through the platform's GitHub App** (the same App as the poller), with a random `state` and PKCE (S256) kept server-side together with the chosen tenant (10 minutes, used once).
+- **Login CSRF:** a short-lived pre-login cookie `__Host-sdlc_oauth` (`HttpOnly`, `Secure`, `SameSite=Lax`, about 10 minutes) holds the hash of `state` and the PKCE verifier; the callback needs both, and deletes the cookie whatever the result. `Lax`, because the redirect back from `github.com` is a cross-site top-level navigation that never carries a `Strict` cookie.
 - The api reads the person's **numeric GitHub account ID** and **drops the GitHub user token at once**: never stored, logged or used to act on GitHub.
 - The user is the active user with a **linked** identity (tenant, `github`, numeric ID) in `user_identities`. Every other case gets the same refusal.
 - The App's **client secret** lives in OpenBao at `kv/api/github-oauth`, readable by the `api` AppRole only. The App lists the callback URLs (localhost, and the V09 origin). This changes V03, which dropped the client secret; U05 does it.
+- At sign-in the api always makes a **new session ID and secret**; a cookie that existed before is never reused or upgraded (its row, if any, is revoked).
 - A **server-side session** in a new table `web_sessions` (D-05): only the SHA-256 of the session secret and of its CSRF token, the tenant, the user, timestamps, the idle expiry (default 30 minutes) and the absolute expiry (default 8 hours), and `revoked_at`. The cookie is `__Host-sdlc_session; HttpOnly; Secure; SameSite=Strict; Path=/`.
-- A session is revoked at sign-out, when the user is disabled, when the identity is unlinked, and by a tenant admin. Audit `web_session.started`, `web_session.ended`.
+- A session is revoked at sign-out, when the user is disabled, when the identity is unlinked, and by a tenant admin. A person can **sign out everywhere** (all their sessions); a tenant admin can do it for a person. Audit `web_session.started`, `web_session.ended` (reason code, `all` for sign out everywhere).
 - The guard accepts a bearer token **or** a session cookie, never both. The personal-token sign-in of ADR-M54 stays for read-only use.
 - Company single sign-on (OIDC) stays Later.
 
@@ -40,7 +43,7 @@ Writes from a browser need what the read-only dashboard avoids: a sign-in that i
 
 ### 2.4. Passkey step-up (QUESTIONS #376)
 
-- Every gate decision, escalation decision and admin change needs a **passkey assertion** (WebAuthn) made for that one request. The challenge is single-use and bound to the session, the action, the intent or escalation, the gate, the decision and `expected_input_sha256`. A kill and an acknowledgement need none.
+- Every gate decision, escalation decision and admin change needs a **passkey assertion** (WebAuthn) made for that one request. The challenge is **random** (32 bytes, made by the server, never derived from the request), **stored server-side with the action it is bound to** (the session, the action, the intent or escalation, the gate, the decision and `expected_input_sha256`), lives about 2 minutes and is **used once**: marked used in the same transaction as the decision. A request that differs from the stored action is refused. A kill and an acknowledgement need none.
 - Registering a passkey needs a GitHub sign-in in the last 5 minutes. A new table `webauthn_credentials` (D-05) holds the credential ID, the public key, the counter, the tenant, the user, `created_at`, `revoked_at`; no free text. Audit `passkey.registered`, `passkey.revoked`.
 - Library: `@simplewebauthn/server` and `@simplewebauthn/browser` (MIT), pinned exactly by U06 to a version at least two weeks old; the version is recorded here then.
 - WebAuthn refuses an IP address as its site name: on a developer machine the dashboard is opened at `http://localhost:8090`.
@@ -82,10 +85,11 @@ Writes from a browser need what the read-only dashboard avoids: a sign-in that i
 - A person without a passkey can read and kill but not decide in the page; they use the CLI or a comment.
 - Passkeys registered on `localhost` do not work behind V09 (another site name); people register again there.
 - Until V09, only someone on the machine of the stack can use the actions.
+- Safari may refuse `Secure` (and `__Host-`) cookies on `http://localhost`. U05 tests Safari, Chrome and Firefox; if Safari refuses, it is a known limit (use Chrome or Firefox on `localhost`, Safari behind V09); the cookie rules are never weakened.
 - Revised from `design/M-E-REPORT.md` (MVP1-UI-SCOPE §9): the order of the waves, the sign-in, the step-up method (never removed for approvals).
 
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
-| 1.0 | 2026-10-10 | Claude (task V11, design PR), accepted by Harry | First version, from `design/MVP1-UI-SCOPE.md` 1.0 (QUESTIONS #375–#380) |
+| 1.0 | 2026-10-10 | Claude (task V11, design PR), accepted by Harry | First version, from `design/MVP1-UI-SCOPE.md` 1.0 and Harry's review in 1.1 (QUESTIONS #375–#380): login CSRF with a pre-login cookie, a new session ID at sign-in, sign out everywhere, a random stored single-use passkey challenge, the proposal download in the CLI only, the Safari limit |

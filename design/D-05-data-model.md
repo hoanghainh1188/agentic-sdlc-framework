@@ -221,9 +221,10 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 
 - Tokens are `sdlc_pat_` + 32 random bytes in base64url, so secret scanners find leaks (Gitleaks rule `sdlc-api-token`). Default lifetime 90 days, maximum 365 days (platform settings). Issuing and revoking append `api_token.issued` / `api_token.revoked` to the audit log, with IDs only (ADR-M26).
 
-**Planned: `web_sessions` and `webauthn_credentials`** (version 1.40, ADR-M73 §2.2, §2.4; built by U05 and U06, which add them to the ERD and give their exact columns and triggers)
+**Planned: `web_sessions`, passkey challenges and `webauthn_credentials`** (version 1.40, ADR-M73 §2.2, §2.4; built by U05 and U06, which add them to the ERD and give their exact columns and triggers)
 
 - `web_sessions`: a dashboard sign-in. ID, `tenant_id`, `user_id`, the SHA-256 of the session secret and of its CSRF token (never the secrets), `created_at`, `last_seen_at`, idle and absolute expiry, `revoked_at` (set once). Not append-only; rows may be deleted after they expire.
+- Pending passkey challenges: a random challenge (stored as its hash or the value, never derived), the session, the bound action (action code, intent or escalation, gate, decision, expected input hash), the expiry (about 2 minutes) and `used_at` (set once, in the decision's transaction). Rows deleted after they expire.
 - `webauthn_credentials`: a person's passkeys. ID, `tenant_id`, `user_id`, the credential ID, the public key, the signature counter (only grows), `created_at`, `revoked_at` (set once); no free text.
 - Audit actions (IDs and codes only): `web_session.started`, `web_session.ended`, `passkey.registered`, `passkey.revoked`. No session or credential ID in an append-only table.
 

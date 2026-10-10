@@ -1007,12 +1007,12 @@ flowchart LR
 
 **Acceptance criteria**
 
-- [ ] AC1: GitHub OAuth through the platform's GitHub App (ADR-M73 §2.1): a random `state` and PKCE kept server-side with the tenant, the code exchanged by the api, the person's numeric GitHub account ID read, the GitHub user token dropped at once and never stored or logged
+- [ ] AC1: GitHub OAuth through the platform's GitHub App (ADR-M73 §2.2): a random `state` and PKCE kept server-side with the tenant and bound to the browser by the pre-login cookie `__Host-sdlc_oauth` (`SameSite=Lax`, about 10 minutes; the callback needs both), the code exchanged by the api, the person's numeric GitHub account ID read, the GitHub user token dropped at once and never stored or logged
 - [ ] AC2: The user is found by (tenant, `github`, numeric ID) among linked identities and must be active; any other case is refused with one message
 - [ ] AC3: The App keeps its client secret in OpenBao (`kv/api/github-oauth`, readable by the `api` AppRole only) and lists the callback URLs; `pnpm github-app:create` and the README updated (a change of V03); an existing App gets a new client secret entered by the owner in a terminal
-- [ ] AC4: Table `web_sessions` (D-05; hashes only, tenant guard), cookie `__Host-sdlc_session` (`HttpOnly`, `Secure`, `SameSite=Strict`), idle and absolute timeouts from settings; revoked at sign-out, user disable, identity unlink and by a tenant admin; audit `web_session.started|ended` (IDs and codes only)
+- [ ] AC4: Table `web_sessions` (D-05; hashes only, tenant guard), cookie `__Host-sdlc_session` (`HttpOnly`, `Secure`, `SameSite=Strict`), idle and absolute timeouts from settings; a new session ID at every sign-in (no fixation); revoked at sign-out, user disable, identity unlink and by a tenant admin; sign out everywhere; audit `web_session.started|ended` (IDs and codes only)
 - [ ] AC5: The api guard accepts a bearer token or a session cookie, never both; `GET` reads work with the session; the personal-token sign-in of ADR-M54 stays for read-only use
-- [ ] AC6: Tests: `pnpm test` (OAuth with a fake GitHub: wrong state, reused code, unlinked or disabled user), `pnpm test:db` (sessions, tenant isolation, revocation), `pnpm test:dashboard` (sign-in and sign-out)
+- [ ] AC6: Tests: `pnpm test` (OAuth with a fake GitHub: wrong state, missing or foreign pre-login cookie, reused code, unlinked or disabled user), the sign-in checked in Safari, Chrome and Firefox on `http://localhost` (a Safari refusal is written as a known limit, never fixed by weaker cookies), `pnpm test:db` (sessions, tenant isolation, revocation), `pnpm test:dashboard` (sign-in and sign-out)
 
 > Note: ADR-M73, MVP1-UI-SCOPE 1.1 §5.1–§5.2 (QUESTIONS #375, #380). Works on `localhost`; other machines need V09 (no dependency, #380)
 
@@ -1027,7 +1027,7 @@ flowchart LR
 - [ ] AC1: Every write with a session cookie needs all three CSRF layers (ADR-M73 §2.3): `SameSite=Strict`, the session's CSRF token in `X-SDLC-CSRF`, and `Origin` equal to `SDLC_API_PUBLIC_ORIGIN` (`Sec-Fetch-Site: same-origin` when sent); JSON bodies only; bearer requests unchanged
 - [ ] AC2: Actions are off by default (`SDLC_API_DASHBOARD_ACTIONS=off`); the api refuses to start with actions on and a missing public origin, or a plain `http://` origin on a host other than `localhost`
 - [ ] AC3: Passkeys (WebAuthn, the library chosen in ADR-M73): registration needs a GitHub sign-in in the last 5 minutes; table `webauthn_credentials` (D-05; no free text); list and remove one's own passkeys, a tenant admin may remove them; audit `passkey.registered|revoked`
-- [ ] AC4: Step-up per decision: a single-use challenge bound to the session, the action, the subject, the gate, the decision and `expected_input_sha256`; checked and spent by the api; never for a kill or an acknowledgement
+- [ ] AC4: Step-up per decision: a random challenge made by the api and stored with its bound action (session, action, subject, gate, decision, `expected_input_sha256`), about 2 minutes, used once in the decision's transaction; a request that differs from the stored action is refused; never for a kill or an acknowledgement
 - [ ] AC5: Tests: a request from another origin, without the CSRF token, with a reused or foreign assertion, or with a session of another tenant is refused; the CSP of ADR-M54 unchanged (static test)
 
 > Note: ADR-M73, MVP1-UI-SCOPE 1.1 §5.3–§5.4, §5.8–§5.9 (QUESTIONS #376, #377)
@@ -1337,7 +1337,7 @@ flowchart LR
 **Acceptance criteria**
 
 - [ ] AC1: Create an intent and link its spec with the two calls of U03; a refused link keeps the intent and says so
-- [ ] AC2: Submit the plan file; build an evidence pack; download an L1 proposal (hash checked, never shown in the page)
+- [ ] AC2: Submit the plan file; build an evidence pack; the L1 proposal download stays in the CLI (the page shows the `sdlc evidence proposal` command)
 - [ ] AC3: Refusals from the catalog; no step-up (ADR-M73); Playwright tests per action and role
 
 > Note: MVP1-UI-SCOPE 1.1 §3.3. Ordered again from `design/M-E-REPORT.md` (§9)
