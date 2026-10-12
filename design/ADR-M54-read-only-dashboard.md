@@ -9,6 +9,8 @@
 
 > **Actions:** since 2026-10-10 the dashboard's actions are decided in [ADR-M73](ADR-M73-dashboard-actions.md). This ADR stays the record of the read-only decision; the token sign-in of §2.3 stays for read-only use.
 
+> **Other machines:** since 2026-10-12 access from other machines (TLS, a reverse proxy) is decided in [ADR-M67](ADR-M67-team-access.md) (task V09). "For 127.0.0.1 only" in §2.2 still holds for the api itself; other machines reach it only through the proxy of the profile `access`.
+
 ## 1. Context
 
 The MVP has no web UI (ADR-M03): people use the CLI, comments and reviews on GitHub, and the Temporal and Langfuse UIs. During the trial M-E, Person A, Person B and the coordinator need an overview that the CLI gives only one command at a time: which intents wait where and for whom, which escalations are close to their SLA, what the trial costs, and how long the gates wait (the measures of `design/M-E-TRIAL-PLAN.md` §7.1).
@@ -127,6 +129,7 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 0.6 | 2026-10-12 | Claude (task V09, PR 1) | A pointer to ADR-M67 (team access from other machines); this ADR unchanged otherwise (QUESTIONS #405–#409) |
 | 0.5 | 2026-10-10 | Claude (task V11), approved by Harry | A pointer to ADR-M73 (the dashboard's actions); this ADR unchanged otherwise (QUESTIONS #379) |
 | 0.4 | 2026-10-07 | Claude (task U02) | §2.4b what holds an intent (the step's record, the cause, `hotl_block_window`, the display), #264; §4 gaps closed |
 | 0.3 | 2026-10-07 | Claude (task U01, PR 2) | §2.5b as built (the shared schemas package, the build, the catalog plugin, the routes, the size), §2.6 the smoke test and the CI flag `run_dashboard` |
