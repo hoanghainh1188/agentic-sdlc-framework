@@ -27,7 +27,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V08** The trial stack survives a reboot (done, v0.2.0)
 - **V09** Team access from other machines (TLS reverse proxy) (done, v0.2.0)
 - **V10** A friendlier CLI: `sdlc help`, hints, clearer errors
-- **V11** Plan the dashboard's actions (design only) (done, v0.2.0)
+- **V11** Plan the dashboard's actions (design only) (done, v0.1.1)
 - **U05** Dashboard sign-in with GitHub and server-side sessions (done, v0.2.0)
 - **U06** Dashboard writes: CSRF, origin check, passkey step-up (done, v0.2.0)
 - **U07** Dashboard wave 1: kill a run, gate decisions, escalations

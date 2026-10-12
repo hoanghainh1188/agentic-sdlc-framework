@@ -793,8 +793,8 @@ RM_MS=["M-E","UX","EXT","Models","Server","Later"]
 SKIP_LATER={"U01","U02","U03","K02"}
 # Released tasks shown in ROADMAP.md: task -> the release that shipped it.
 DONE={**{t:"v0.1.0" for t in ("V01","V02","V03")},
-      **{t:"v0.1.1" for t in ("V04","V05","V06")},
-      **{t:"v0.2.0" for t in ("V07","V08","V09","V11","V12","U05","U06")}}
+      **{t:"v0.1.1" for t in ("V04","V05","V06","V11")},
+      **{t:"v0.2.0" for t in ("V07","V08","V09","V12","U05","U06")}}
 r=[]; a=r.append
 a("""# Roadmap
 
