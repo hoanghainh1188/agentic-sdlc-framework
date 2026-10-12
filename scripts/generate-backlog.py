@@ -495,12 +495,16 @@ t("L02","UX","Evaluation harness: agents, models and prompts measured on a fixed
  "QUESTIONS #362 (Harry, 2026-10-10): many clients are `client_restricted`, so a self-hosted model is a condition to sell; the company has no GPU yet. QUESTIONS #422 (Harry, 2026-10-12): the benchmark becomes an evaluation harness for agents, models and prompts. Runs on a developer machine, in parallel with the milestone UX; split into PRs (spike and harness with the task set, then statistics, the pairwise ranking and the report). QUESTIONS #423 (Harry, 2026-10-12): follow established practice (SWE-bench-style hidden tests, pass^k, error bars, judged pairs, fresh tasks) and reuse a framework where it fits")
 t("V13","UX","Agent efficiency report from real runs: `sdlc metrics agents`","M",["E04","E06"],"FR-12, FR-53, D-07 §5",
  "platform/packages/core (metrics), platform/apps/api (metrics endpoint), platform/apps/cli (metrics agents), platform/packages/api-schemas, platform/tests/*, handbook Ch.19 §19.8c",
- ["`GET /v1/metrics/agents` and `sdlc metrics agents [--project] [--agent] [--model] [--from] [--to] [--json]`: per agent version and model, from data the platform already records (runs, run events, gate decisions, `intent.closed`, cost records); no new table",
+ ["`GET /v1/metrics/agents` and `sdlc metrics agents [--project] [--agent] [--model] [--from] [--to] [--json]`: per agent version and the model of the run's contract (QUESTIONS #432), from data the platform already records (runs, run events, gate decisions, `intent.closed`, cost records); no new table",
   "Measures: runs and how they ended (succeeded, proposal only, failed, each stop reason), CI on the first try at G6, the share of intents merged without a request for changes at G7, G5 scope breaches, retries, lead time, tokens and cost per run, **cost per merged intent**, wasted cost (ended runs that did not count), cache share of input tokens",
-  "Same access rules as the cost report and gate metrics (config `access.*_read_roles`, never `viewer`; tenant admins); range half-open UTC, default the last 30 days; sums in SQL; money as decimal strings; numbers and codes only, never a person or a text",
-  "Optional baseline: a person may record an estimate of the human effort for an intent (hours, a number) so that the report can show the time compared with it; empty by default",
+  "Access (QUESTIONS #430): a role in both `access.cost_read_roles` and `access.metrics_read_roles` (never `viewer`), tenant admins always; no new config key; range half-open UTC, default the last 30 days; sums in SQL; money as decimal strings; numbers and codes only, never a person or a text",
   "Tests: `pnpm test` (the CLI, the rules), `pnpm test:db` (each measure on seeded runs, tenants, roles); handbook Ch.19 usage; the dashboard may show it later"],
- "QUESTIONS #422 (Harry, 2026-10-12): measure whether agents and models are worth it in real work, next to the evaluation harness (L02). The `sdlc trial report` (V01) may include its numbers later")
+ "QUESTIONS #422 (Harry, 2026-10-12): measure whether agents and models are worth it in real work, next to the evaluation harness (L02). The `sdlc trial report` (V01) may include its numbers later. QUESTIONS #430–#433, ADR-M79 (V13 plan, 2026-10-12): intent-level measures count under the run that was merged; the human-effort baseline moved to V14")
+t("V14","Later","Human-effort baseline for the agent report","S",["V13"],"FR-53",
+ "platform/packages/core (intents), migrations, platform/apps/api, platform/apps/cli, platform/tests/*, design/D-05",
+ ["A person with a write role may record an estimate of the human effort for an intent (hours, a number; codes and numbers only, no text); empty by default",
+  "`sdlc metrics agents` shows the time compared with the estimate when one exists; D-05 and a migration in the same task"],
+ "QUESTIONS #431 (Harry, 2026-10-12): split out of V13 AC4 so that V13 stays read-only with no migration")
 t("X09","EXT","Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)","S",["B05"],"NFR-05",
  "platform/spikes/git-hosts/* (thrown away), design/ADR-M70",
  ["Check each host's API against the 19 methods of `GitHostAdapter`: a short-lived token for one repository, polling of comments, reviews, merges and CI results, opening a pull request, reviews bound to a commit, who merged, CI checks, security findings, branch protection",
@@ -626,7 +630,7 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.43 |
+| Version | 1.44 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -795,6 +799,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.41 | 2026-10-12 | Claude, approved by Harry | L02 becomes an evaluation harness for agents, models and prompts (hidden tests, N runs, pass^k, confidence intervals, ADR-M78), size L; new task V13, the agent efficiency report from real runs (QUESTIONS #422) |
 | 1.42 | 2026-10-12 | Claude, approved by Harry | L02: a blind pairwise ranking by a reviewer, a growing task set reported per version, and a spike that reuses an existing evaluation framework where it fits (QUESTIONS #423) |
 | 1.43 | 2026-10-12 | Claude, approved by Harry | Plan review after v0.2.1 (QUESTIONS #424): U07 moves to Later until trial users ask for it; v0.3.0 = V13, L02, V10; X09 first in EXT and L01 early in v0.4.0 |
+| 1.44 | 2026-10-12 | Claude (task V13), approved by Harry | V13: access rule and model attribution (QUESTIONS #430–#433); its human-effort baseline (AC4) split out as V14 in Later |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
