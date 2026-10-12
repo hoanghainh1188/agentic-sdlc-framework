@@ -2,15 +2,19 @@
 // GitHub sign-in when the platform has actions on. A passkey confirms each decision made in the
 // dashboard (U07); it is added within 5 minutes of a GitHub sign-in. The WebAuthn ceremony runs
 // in the browser (`@simplewebauthn/browser`); the API checks the answer.
+//
+// One status region only (a screen reader hears one message at a time): it says "Loading" the
+// first time, then the result of the last action. A reload after an action keeps the list on the
+// screen, marked busy, instead of replacing it with a second loading message.
 import type { PasskeyView } from '@sdlc/api-schemas';
 import { startRegistration } from '@simplewebauthn/browser';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 
 import { ApiError } from '../api/client.js';
 import { readPasskeys } from '../api/reads.js';
 import { useApi } from '../api/use-api.js';
 import { passkeyRegistrationOptions, registerPasskey, removePasskey } from '../api/writes.js';
-import { Empty, Show, Txt, When } from '../components/common.js';
+import { Empty, ErrorMessage, Txt, When } from '../components/common.js';
 import { t } from '../i18n.js';
 
 type Notice =
@@ -35,6 +39,18 @@ export function Passkeys() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  // The last list the API answered: kept on the screen while it loads again.
+  const [shown, setShown] = useState<readonly PasskeyView[] | null>(null);
+  useEffect(() => {
+    if (result.state === 'ok') setShown(result.data.items);
+  }, [result]);
+  const loading = result.state === 'loading';
+  const status =
+    notice?.kind === 'ok'
+      ? t(notice.key)
+      : loading && shown === null
+        ? t('dashboard.state.loading')
+        : '';
 
   const add = async () => {
     setBusy(true);
@@ -93,50 +109,50 @@ export function Passkeys() {
         </div>
       </div>
       <p class="hint">{t('dashboard.passkeys.intro')}</p>
-      {notice && (
-        <p
-          class={notice.kind === 'error' ? 'notice notice-error' : 'notice'}
-          role={notice.kind === 'error' ? 'alert' : 'status'}
-        >
+      <p class={status === '' ? 'visually-hidden' : 'notice'} role="status" aria-live="polite">
+        {status}
+      </p>
+      {notice?.kind === 'error' && (
+        <p class="notice notice-error" role="alert">
           {t(notice.key)}
         </p>
       )}
-      <Show loaded={result}>
-        {({ items }) => {
-          const active = items.filter((item) => item.revoked_at === null);
-          if (active.length === 0) return <Empty messageKey="dashboard.passkeys.empty" />;
-          return (
-            <div class="table-wrap">
-              <table class="passkey-table">
-                <caption class="visually-hidden">{t('dashboard.passkeys.caption')}</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">{t('dashboard.passkeys.col.added')}</th>
-                    <th scope="col">{t('dashboard.passkeys.col.last_used')}</th>
-                    <th scope="col">{t('dashboard.passkeys.col.model')}</th>
-                    <th scope="col">
-                      <span class="visually-hidden">{t('dashboard.passkeys.col.actions')}</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {active.map((item) => (
+      {result.state === 'error' && <ErrorMessage error={result.error} />}
+      {shown !== null &&
+        (shown.filter((item) => item.revoked_at === null).length === 0 ? (
+          <Empty messageKey="dashboard.passkeys.empty" />
+        ) : (
+          <div class="table-wrap" aria-busy={loading}>
+            <table class="passkey-table">
+              <caption class="visually-hidden">{t('dashboard.passkeys.caption')}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">{t('dashboard.passkeys.col.added')}</th>
+                  <th scope="col">{t('dashboard.passkeys.col.last_used')}</th>
+                  <th scope="col">{t('dashboard.passkeys.col.model')}</th>
+                  <th scope="col">
+                    <span class="visually-hidden">{t('dashboard.passkeys.col.actions')}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown
+                  .filter((item) => item.revoked_at === null)
+                  .map((item) => (
                     <PasskeyRow
                       key={item.id}
                       item={item}
-                      busy={busy}
+                      busy={busy || loading}
                       confirming={confirming === item.id}
                       onAsk={() => setConfirming(item.id)}
                       onCancel={() => setConfirming(null)}
                       onRemove={() => void remove(item.id)}
                     />
                   ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        }}
-      </Show>
+              </tbody>
+            </table>
+          </div>
+        ))}
     </section>
   );
 }

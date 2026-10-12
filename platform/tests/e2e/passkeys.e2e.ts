@@ -66,17 +66,26 @@ test('U06: add a passkey, list it, remove it; every write carries the CSRF token
 
   await page.getByRole('link', { name: 'Passkeys' }).click();
   await expect(page.getByRole('heading', { name: 'Passkeys', exact: true })).toBeVisible();
-  await expect(page.getByText('You have no passkey yet.')).toBeVisible();
+  // The stub keeps one list for the demo person (other tests add to it): counts are relative.
+  const rows = page.locator('.passkey-table tbody tr');
+  await expect(page.locator('.table-wrap, .notice-empty')).toBeVisible();
+  const before = await rows.count();
 
   await page.getByRole('button', { name: 'Add a passkey' }).click();
+  // One status region at a time: the result stays while the list loads again (CI run
+  // 38237609111 found a second "Loading" region next to it).
   await expect(page.getByRole('status')).toHaveText('Passkey added.');
-  await expect(page.getByRole('row')).toHaveCount(2); // the header and one passkey
-  await expect(page.getByRole('cell', { name: 'Never used' })).toBeVisible();
+  await expect(rows).toHaveCount(before + 1);
+  await expect(page.locator('.table-wrap')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByRole('status')).toHaveCount(1);
+  await expect(rows.last().getByRole('cell', { name: 'Never used' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Remove', exact: true }).click();
-  await page.getByRole('button', { name: 'Remove this passkey' }).click();
+  await rows.last().getByRole('button', { name: 'Remove', exact: true }).click();
+  await rows.last().getByRole('button', { name: 'Remove this passkey' }).click();
   await expect(page.getByRole('status')).toHaveText('Passkey removed.');
-  await expect(page.getByText('You have no passkey yet.')).toBeVisible();
+  await expect(rows).toHaveCount(before);
+  if (before === 0) await expect(page.getByText('You have no passkey yet.')).toBeVisible();
+  await expect(page.getByRole('status')).toHaveCount(1);
 
   expect(w.writes).toEqual([
     'POST /v1/me/passkeys/registration-options',
@@ -127,6 +136,7 @@ for (const width of [375, 768, 1440]) {
     await page.goto(`${LOCAL}/dashboard/#/passkeys`);
     await page.getByRole('button', { name: 'Add a passkey' }).click();
     await expect(page.getByRole('status')).toHaveText('Passkey added.');
+    await expect(page.locator('.table-wrap')).toHaveAttribute('aria-busy', 'false');
     for (const scheme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width, height: 900 });
       await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
