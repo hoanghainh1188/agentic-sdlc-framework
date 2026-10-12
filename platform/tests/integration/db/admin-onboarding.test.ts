@@ -206,13 +206,19 @@ describeDb('B13: admin onboarding on PostgreSQL', () => {
       const first = ok(await inject('GET', '/v1/admin/tenant-admins', a.adminToken)).items.find(
         (row) => row.user_id === a.adminId,
       )!;
-      // Each admin removes the other at the same time: only one may succeed.
+      // Each admin removes the other at the same time: only one may succeed. The other is refused
+      // in one of two correct ways, depending on timing: 409 `last_tenant_admin` when both pass the
+      // access check before either commits, or 403 `forbidden` when the winner commits first and
+      // the loser is no longer a tenant admin when its request is checked.
       const replies = await Promise.all([
         inject('DELETE', `/v1/admin/tenant-admins/${String(first.id)}`, second.token),
         inject('DELETE', `/v1/admin/tenant-admins/${granted.id}`, a.adminToken),
       ]);
-      expect(replies.map((reply) => reply.statusCode).sort()).toEqual([200, 409]);
       const winner = replies.findIndex((reply) => reply.statusCode === 200);
+      expect(winner, JSON.stringify(replies.map((reply) => reply.statusCode))).not.toBe(-1);
+      const loser = replies[1 - winner]!;
+      if (loser.statusCode === 403) refused(loser, 403, 'forbidden');
+      else refused(loser, 409, 'last_tenant_admin');
       // Put the tenant back in its start state: the original admin stays, the second goes.
       if (winner === 0) {
         const back = ok(
