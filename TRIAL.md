@@ -54,16 +54,25 @@ Best: two people. If you are alone, you may use a second GitHub account for Pers
    ```bash
    pnpm trial:up --settings ~/trial-settings.yaml
    ```
-   It follows [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator), steps 2–13, for you, in 20 to 40 minutes: OpenBao with throw-away keys, every credential, the database, the platform (`core models platform sandbox`), the tenant (Person A is its admin), the project with Person A and Person B, the sandbox image (published, or built when the release has none), the agent, the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial) and the AI record (data class `internal`). At the end, Person A and Person B are each logged in, in their own config folder. Run Person B's commands as `XDG_CONFIG_HOME=<Person B's folder> pnpm sdlc …`.
+   First it asks you to choose a **passphrase** (at least 12 characters, typed twice, not shown). Then it follows [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator), steps 2–13, for you, in 20 to 40 minutes: OpenBao with throw-away keys, every credential, the database, the platform (`core models platform sandbox`), the tenant (Person A is its admin), the project with Person A and Person B, the sandbox image (published, or built when the release has none), the agent, the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial) and the AI record (data class `internal`). At the end, Person A and Person B are each logged in, in their own config folder. Run Person B's commands as `XDG_CONFIG_HOME=<Person B's folder> pnpm sdlc …`.
 
    From v0.1.1 on you may also install the command from npm, at the version of your checkout (`npm install -g agentic-sdlc-cli@<version>`, [USER-GUIDE §2](platform/USER-GUIDE.md#install-the-sdlc-command)), and write `sdlc …` instead of `pnpm sdlc …`; the logins are the same.
 
 What `trial:up` refuses and keeps safe:
 
 - It refuses a machine with another stack of the platform (`platform/deploy/.env` or `sdlc_*` volumes), `NODE_ENV=production`, no Docker, too little memory, a key file others can read, or an existing login in a config folder. It never removes or overwrites them.
-- The OpenBao key shares and root token are **throw-away and kept in memory only**: never in a file, a log or the terminal. So **the trial stack cannot be started again after a reboot** or `pnpm trial:down` (`design/QUESTIONS.md` #345). Then remove it with `pnpm trial:down --wipe --settings ~/trial-settings.yaml` and run `pnpm trial:up` again; your intents are lost. Plan a task so that the machine does not restart in the middle.
-- The same applies when `trial:up` stops with an error: remove the stack with `--wipe`, fix the cause it names, and run it again.
-- `pnpm trial:down` stops the stack; `--wipe` removes its volumes, its env file and the two logins, after you type the project name (`sdlc-trial`). It never touches another Compose project.
+- The OpenBao keys are **throw-away**. The root token is kept in memory only and revoked at the end. The two key shares that unseal OpenBao are kept in the **key file** `trial-openbao-keys.age` next to the env file (`platform/deploy/trial-openbao-keys.age`), encrypted with your passphrase (age, scrypt), mode 600, ignored by Git; they never reach the terminal or a log (`design/QUESTIONS.md` #356, `design/ADR-M76-trial-key-file.md`).
+- **After a reboot or `pnpm trial:down`**, start the stack again, in a terminal:
+  ```bash
+  pnpm trial:start
+  ```
+  It asks for your passphrase (three tries), unseals OpenBao, applies the database migrations and starts the platform; your intents and logins are kept. When OpenBao is still unsealed it asks nothing. A wrong passphrase unseals nothing.
+- **If you forget the passphrase**, nobody can unseal the stack again. Its data is fictional: remove it with `pnpm trial:down --wipe --settings ~/trial-settings.yaml` and run `pnpm trial:up` again; your intents are lost.
+- **A trial stack lives at most 90 days.** Its processes' credentials end after 90 days and a trial stack cannot renew them (no root token). `trial:start` warns from day 80; then wipe it and set it up again.
+- A trial stack set up before `trial:start` existed has no key file: it works until the next reboot or `trial:down`, then `trial:start` says so; wipe it and set it up again.
+- When `trial:up` stops with an error: remove the stack with `--wipe`, fix the cause it names, and run it again.
+- `pnpm trial:down` stops the stack and keeps its key file; `--wipe` removes its volumes, its env file, its key file and the two logins, after you type the project name (`sdlc-trial`). It never touches another Compose project.
+- In a script (not a terminal), give the passphrase on the first line of standard input with `--passphrase-stdin`; never as an argument or an environment variable (other users of the machine can see both).
 
 The stack is for the trial only. It can never hold client data. For a server, follow [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator) by hand, with real key holders (runbook T11).
 

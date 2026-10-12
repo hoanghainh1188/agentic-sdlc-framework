@@ -80,7 +80,15 @@ describe('V02: pnpm trial:up follows the README "Fresh deployment"', () => {
   });
 
   it('never prints a secret: no console call, child output only through redact', () => {
-    for (const file of ['up.ts', 'host.ts', 'main.ts', 'down.ts']) {
+    for (const file of [
+      'up.ts',
+      'host.ts',
+      'main.ts',
+      'down.ts',
+      'start.ts',
+      'keys.ts',
+      'passphrase.ts',
+    ]) {
       const src = read(`platform/deploy/trial/src/${file}`);
       expect(src, file).not.toMatch(/console\./);
       expect(src, file).not.toMatch(/stdio:\s*'inherit'|inherit'\]/);
@@ -156,5 +164,68 @@ describe('V02: scripts, CI and the trial guide', () => {
     const s32 = trial.slice(trial.indexOf('### 3.2.'), trial.indexOf('## 4.'));
     expect(s32).toContain('pnpm trial:up --settings');
     expect(s32).toContain('trial-settings.example.yaml');
+  });
+});
+
+describe('V08: the key file and pnpm trial:start', () => {
+  const pkg = JSON.parse(read('package.json')) as {
+    scripts: Record<string, string>;
+    devDependencies: Record<string, string>;
+  };
+  const keysSource = read('platform/deploy/trial/src/keys.ts');
+  const mainSource = read('platform/deploy/trial/src/main.ts');
+  const trialSources = ['main.ts', 'up.ts', 'start.ts', 'keys.ts', 'passphrase.ts'].map((f) =>
+    read(`platform/deploy/trial/src/${f}`),
+  );
+
+  it('Git ignores the key file and its temporary file, in the default place (QUESTIONS #418)', () => {
+    for (const file of [
+      'platform/deploy/trial-openbao-keys.age',
+      'platform/deploy/.trial-openbao-keys.age.0a1b2c',
+    ]) {
+      const r = spawnSync('git', ['check-ignore', '-q', file], { cwd: root });
+      expect(r.status, file).toBe(0);
+    }
+    expect(keysSource).toContain("KEY_FILE_NAME = 'trial-openbao-keys.age'");
+    // pnpm doctor names the same file (V08, the trial hint).
+    expect(read('platform/deploy/doctor/src/host.ts')).toContain(
+      "TRIAL_KEY_FILE = 'trial-openbao-keys.age'",
+    );
+  });
+
+  it('the library is pinned exactly (QUESTIONS #415, design/ADR-M76)', () => {
+    expect(pkg.devDependencies['age-encryption']).toBe('0.3.1');
+  });
+
+  it('pnpm trial:start exists', () => {
+    expect(pkg.scripts['trial:start']).toContain('platform/deploy/trial/dist/main.js start');
+  });
+
+  it('the passphrase never comes from an argument or an environment variable (AC1)', () => {
+    // Only the flag that reads it from standard input; never a `--passphrase <value>` option.
+    expect(mainSource).toContain("'passphrase-stdin': { type: 'boolean'");
+    expect(mainSource).not.toMatch(/['"]?passphrase['"]?\s*:\s*\{\s*type:\s*'string'/);
+    for (const src of trialSources) expect(src).not.toMatch(/process\.env\.[A-Z_]*PASS/);
+  });
+
+  it('trial:up writes the key file right after the first unseal, before configure', () => {
+    const unseal = upSource.indexOf("['unseal']");
+    const write = upSource.indexOf('writeKeyFile(');
+    const configure = upSource.indexOf("['configure', '--keep-token']");
+    expect(unseal).toBeGreaterThan(0);
+    expect(write).toBeGreaterThan(unseal);
+    expect(configure).toBeGreaterThan(write);
+    // Never the root token: the record holds the shares only.
+    expect(upSource).not.toMatch(/encryptKeys\([^)]*rootToken/);
+  });
+
+  it('TRIAL.md section 3.2 and runbook T11 describe it', () => {
+    const trial = read('TRIAL.md');
+    const s32 = trial.slice(trial.indexOf('### 3.2.'), trial.indexOf('## 4.'));
+    expect(s32).toContain('pnpm trial:start');
+    expect(s32).toContain('trial-openbao-keys.age');
+    expect(read('handbook/03-templates/T11-openbao-runbook.md')).toContain(
+      'trial-openbao-keys.age',
+    );
   });
 });

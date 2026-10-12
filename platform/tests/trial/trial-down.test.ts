@@ -37,6 +37,8 @@ function world() {
   fs.writeFileSync(path.join(deploy, 'openbao-tls/ca.pem'), 'ca');
   const envFile = path.join(deploy, '.env');
   fs.writeFileSync(envFile, `COMPOSE_PROJECT_NAME=${TRIAL_PROJECT}\n`);
+  // V08: the key file next to the env file.
+  fs.writeFileSync(path.join(deploy, 'trial-openbao-keys.age'), 'ciphertext', { mode: 0o600 });
   const other = path.join(deploy, 'other-file');
   fs.writeFileSync(other, 'keep me');
   const credA = path.join(root, 'a/sdlc/credentials.json');
@@ -68,7 +70,14 @@ describe('trial:down', () => {
     const args = w.calls[0]!;
     expect(args.slice(0, 4)).toEqual(['docker', 'compose', '-p', TRIAL_PROJECT]);
     expect(args).not.toContain('--volumes');
-    for (const f of [w.envFile, w.credA, w.credB, path.join(w.deploy, 'openbao-tls/ca.pem')]) {
+    for (const f of [
+      w.envFile,
+      w.credA,
+      w.credB,
+      path.join(w.deploy, 'openbao-tls/ca.pem'),
+      // V08 AC3: kept, so trial:start can unseal the stack again.
+      path.join(w.deploy, 'trial-openbao-keys.age'),
+    ]) {
       expect(fs.existsSync(f)).toBe(true);
     }
   });
@@ -90,6 +99,8 @@ describe('trial:down', () => {
     expect(w.calls[0]).toContain('--volumes');
     expect(fs.existsSync(w.envFile)).toBe(false);
     expect(fs.existsSync(path.join(w.deploy, 'openbao-tls'))).toBe(false);
+    // V08 AC3: the key file goes with the volumes.
+    expect(fs.existsSync(path.join(w.deploy, 'trial-openbao-keys.age'))).toBe(false);
     expect(fs.existsSync(w.credA)).toBe(false);
     // A login to another platform, saved at the same path later, is kept and reported.
     expect(fs.existsSync(w.credB)).toBe(true);
@@ -111,6 +122,7 @@ describe('trial:down', () => {
     });
     expect(r.status).toBe(1);
     expect(fs.existsSync(w.envFile)).toBe(true);
+    expect(fs.existsSync(path.join(w.deploy, 'trial-openbao-keys.age'))).toBe(true);
     expect(fs.existsSync(w.credA)).toBe(true);
   });
 
@@ -183,7 +195,30 @@ people:
     ],
     forkInstructions: true,
     existingCredentials: [],
+    keyFile: {
+      path: '/repo/platform/deploy/trial-openbao-keys.age',
+      exists: false,
+      gitIgnored: true,
+    },
     ...over,
+  });
+
+  it('V08: an existing key file, or one Git would not ignore, is a refusal', () => {
+    const key = (over: Partial<HostFacts['keyFile']>) => ({
+      path: '/repo/platform/deploy/trial-openbao-keys.age',
+      exists: false,
+      gitIgnored: true as boolean | null,
+      ...over,
+    });
+    const keys = (f: HostFacts) => preflight(settings, f).map((r) => r.key);
+    expect(keys(facts({ keyFile: key({ exists: true }) }))).toContain(
+      'trial.refused.key_file_exists',
+    );
+    expect(keys(facts({ keyFile: key({ gitIgnored: false }) }))).toContain(
+      'trial.refused.key_file_not_ignored',
+    );
+    // Outside a Git repository (the live test's folder) nothing can commit it.
+    expect(keys(facts({ keyFile: key({ gitIgnored: null }) }))).toEqual([]);
   });
 
   it('unknown volumes are a refusal, never "none"', () => {

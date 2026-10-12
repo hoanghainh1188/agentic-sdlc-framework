@@ -38,6 +38,15 @@ export interface HostFacts {
   /** The fork's clone has `AGENTS.md` on its `main` branch. */
   readonly forkInstructions: boolean;
   readonly existingCredentials: readonly string[];
+  /**
+   * The key file `trial:up` writes (V08): whether one exists already, and whether Git ignores it
+   * (`null`: the folder is not in a Git repository, so nothing can commit it by mistake).
+   */
+  readonly keyFile: {
+    readonly path: string;
+    readonly exists: boolean;
+    readonly gitIgnored: boolean | null;
+  };
 }
 
 export interface Refusal {
@@ -105,5 +114,9 @@ export function preflight(settings: TrialSettings, facts: HostFacts): Refusal[] 
   if (!facts.forkInstructions) no('trial.refused.fork_instructions', { path: settings.forkClone });
   for (const file of facts.existingCredentials)
     no('trial.refused.credentials_exist', { path: file });
+  if (facts.keyFile.exists) no('trial.refused.key_file_exists', { path: facts.keyFile.path });
+  if (facts.keyFile.gitIgnored === false) {
+    no('trial.refused.key_file_not_ignored', { path: facts.keyFile.path });
+  }
   return out;
 }

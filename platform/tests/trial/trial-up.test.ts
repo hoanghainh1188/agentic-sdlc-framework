@@ -66,6 +66,11 @@ function facts(over: Partial<HostFacts> = {}): HostFacts {
     secretFiles: [{ path: '/secure/app.pem', mode: 0o100600 }],
     forkInstructions: true,
     existingCredentials: [],
+    keyFile: {
+      path: '/repo/platform/deploy/trial-openbao-keys.age',
+      exists: false,
+      gitIgnored: true,
+    },
     ...over,
   };
 }

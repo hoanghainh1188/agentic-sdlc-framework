@@ -3,7 +3,7 @@
 import type { MessageKey } from '@sdlc/messages';
 
 import { LOG_EVENT_FIXES } from '../logs.js';
-import type { CheckResult, OperatorFacts, ServiceState } from '../types.js';
+import type { CheckResult, OperatorFacts, ServiceState, Text } from '../types.js';
 import { ok, problem, skipped, text } from './result.js';
 
 /** Long-running services of the profile `core` (static test against docker-compose.yml). */
@@ -37,6 +37,16 @@ const running = (services: readonly ServiceState[], name: string) =>
 
 const t11 = (section: string) => text('doctor.fix.runbook', { section });
 const readme = (section: string) => text('doctor.fix.readme', { section });
+
+/**
+ * A trial stack (V08) is started and unsealed with `pnpm trial:start`, never by key holders; one
+ * without a key file cannot be unsealed again. Undefined for any other stack.
+ */
+function trialFix(f: OperatorFacts): Text | undefined {
+  const key = f.envFile.trialKeyFile;
+  if (!key) return undefined;
+  return key.mode === null ? text('doctor.fix.trial_rebuild') : text('doctor.fix.trial_start');
+}
 
 function serviceChecks(services: readonly ServiceState[]): CheckResult[] {
   const out: CheckResult[] = [];
@@ -166,7 +176,7 @@ function openbaoCheck(f: OperatorFacts, services: readonly ServiceState[]): Chec
         'openbao.state',
         'failed',
         text('doctor.openbao.sealed'),
-        text('doctor.fix.unseal'),
+        trialFix(f) ?? text('doctor.fix.unseal'),
       );
     case 'uninitialised':
       return problem(
@@ -412,7 +422,7 @@ export function stackChecks(f: OperatorFacts): CheckResult[] {
         'services.health',
         'warning',
         text('doctor.services.stopped'),
-        readme('Restart after a reboot'),
+        trialFix(f) ?? readme('Restart after a reboot'),
       ),
       skipped('openbao.state', 'doctor.skipped.stopped'),
       ...tls,

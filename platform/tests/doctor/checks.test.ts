@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { evaluate } from '../../deploy/doctor/src/checks/index.js';
 import {
+  isTrialProject,
   parseAppRole,
   parseOpenBaoStatus,
   parsePs,
@@ -175,6 +176,42 @@ describe('pnpm doctor: the checks', () => {
       status: 'skipped',
       text: { key: 'doctor.skipped.openbao_sealed' },
     });
+  });
+
+  it('V08: a sealed trial stack points to pnpm trial:start, or to a new set-up without its key file', () => {
+    const trial = (mode: number | null): OperatorFacts['envFile'] => ({
+      ...healthyFacts().envFile,
+      facts: { values: { COMPOSE_PROJECT_NAME: 'sdlc-trial' }, secrets: {} },
+      trialKeyFile: { path: '/repo/platform/deploy/trial-openbao-keys.age', mode },
+    });
+    const sealed = evaluate(
+      healthyFacts({ openbao: 'sealed', github: undefined, envFile: trial(0o100600) }),
+    );
+    expect(one(sealed, 'openbao.state').fix).toEqual({ key: 'doctor.fix.trial_start' });
+    expect(one(sealed, 'env.file', 'trial key file')).toMatchObject({
+      status: 'ok',
+      text: { key: 'doctor.trial_key.ok' },
+    });
+    const stopped = evaluate(healthyFacts({ services: [], envFile: trial(0o100600) }));
+    expect(one(stopped, 'services.health').fix).toEqual({ key: 'doctor.fix.trial_start' });
+
+    const lost = evaluate(
+      healthyFacts({ openbao: 'sealed', github: undefined, envFile: trial(null) }),
+    );
+    expect(one(lost, 'openbao.state').fix).toEqual({ key: 'doctor.fix.trial_rebuild' });
+    expect(one(lost, 'env.file', 'trial key file')).toMatchObject({
+      status: 'warning',
+      text: { key: 'doctor.trial_key.missing' },
+    });
+    const open = evaluate(healthyFacts({ envFile: trial(0o100644) }));
+    expect(one(open, 'env.file', 'trial key file')).toMatchObject({
+      status: 'failed',
+      fix: { key: 'doctor.fix.chmod' },
+    });
+    // A server never gets the trial hints.
+    expect(
+      one(evaluate(healthyFacts({ openbao: 'sealed', github: undefined })), 'openbao.state').fix,
+    ).toEqual({ key: 'doctor.fix.unseal' });
   });
 
   it('TLS: a missing file fails; a certificate within 30 days warns; an ended one fails', () => {
@@ -370,6 +407,14 @@ describe('pnpm doctor: parsing command output', () => {
     ).toHaveLength(2);
     expect(parsePs('')).toEqual([]);
     expect(parsePs('not json')).toBeNull();
+  });
+
+  it('V08: a trial project is sdlc-trial (or the live test sdlctrialit…), never the server', () => {
+    expect(isTrialProject('sdlc-trial')).toBe(true);
+    expect(isTrialProject('sdlctrialit123')).toBe(true);
+    expect(isTrialProject('sdlc')).toBe(false);
+    expect(isTrialProject('sdlc-trial_x')).toBe(false);
+    expect(isTrialProject(undefined)).toBe(false);
   });
 
   it('OpenBao status, Valkey memory, AppRole age', () => {

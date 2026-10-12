@@ -9,6 +9,10 @@
 // logged; the first intent needs no GitHub call), a random Anthropic key (no model call is made),
 // fake GitHub IDs, a local Git repository as the fork's clone. The test checks the program's whole
 // output for anything that looks like a secret (AC3) and the credentials files' modes.
+//
+// V08 AC4: the passphrase comes on stdin (`--passphrase-stdin`); after the first intent, `trial:down`
+// (no wipe: the containers go, so OpenBao comes back sealed, as after a reboot), `trial:start` with a
+// wrong passphrase (nothing unsealed), then the right one: the intent is still there.
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -45,6 +49,9 @@ describe.skipIf(!enabled)(
       format: 'pem',
     }) as string;
     const modelKey = `sk-ant-${randomBytes(24).toString('hex')}`;
+    const passphrase = `trial it ${randomBytes(12).toString('hex')}`;
+    const keyFile = path.join(tmp, 'trial-openbao-keys.age');
+    let intentCode = '';
     const env = {
       ...process.env,
       SDLC_TRIAL_ENV_FILE: envFile,
@@ -56,9 +63,11 @@ describe.skipIf(!enabled)(
     let up: Result = { status: null, output: '' };
 
     /** The program, like a tester runs it; the whole output is kept for the secret check. */
-    const program = (args: string[]): Promise<Result> =>
+    const program = (args: string[], input?: string): Promise<Result> =>
       new Promise((resolve) => {
-        const child = spawn('node', [main, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+        const child = spawn('node', [main, ...args], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+        child.stdin.on('error', () => undefined);
+        child.stdin.end(input ?? '');
         const chunks: Buffer[] = [];
         child.stdout.on('data', (d: Buffer) => chunks.push(d));
         child.stderr.on('data', (d: Buffer) => chunks.push(d));
@@ -117,7 +126,10 @@ describe.skipIf(!enabled)(
           '',
         ].join('\n'),
       );
-      up = await program(['up', '--settings', settingsFile]);
+      up = await program(
+        ['up', '--settings', settingsFile, '--passphrase-stdin'],
+        `${passphrase}\n`,
+      );
       if (up.status !== 0) throw new Error(`trial:up failed:\n${up.output.slice(-6000)}`);
     }, SETUP_TIMEOUT_MS);
 
@@ -137,6 +149,7 @@ describe.skipIf(!enabled)(
       expect(up.output).not.toMatch(/sdlc_pat_|hvs\.|Initial Root Token: \S|Unseal Key \d+: \S/);
       expect(up.output).not.toContain(modelKey);
       expect(up.output).not.toContain('PRIVATE KEY');
+      expect(up.output).not.toContain(passphrase);
       for (const dir of [configA, configB]) {
         const file = path.join(dir, 'sdlc', 'credentials.json');
         expect(fs.statSync(file).mode & 0o777, file).toBe(0o600);
@@ -176,6 +189,7 @@ describe.skipIf(!enabled)(
         'internal',
       ]);
       const code = String(created.code);
+      intentCode = code;
       expect(code).toMatch(/^INT-\d{4}-0001$/);
       const deadline = Date.now() + 120_000;
       let shown: Record<string, unknown>;
@@ -188,8 +202,64 @@ describe.skipIf(!enabled)(
       expect(await sdlc(configA, ['audit', 'verify'])).toMatchObject({ ok: true, broken: null });
     });
 
+    it('V08 AC1: the key file is next to the env file, mode 600, and holds no share in clear', () => {
+      expect(up.output).toContain(keyFile);
+      expect(fs.statSync(keyFile).mode & 0o777).toBe(0o600);
+      const bytes = fs.readFileSync(keyFile).toString('latin1');
+      expect(bytes.startsWith('age-encryption.org/v1\n-> scrypt ')).toBe(true);
+      expect(bytes).not.toContain(passphrase);
+      expect(fs.readdirSync(tmp).filter((f) => f.startsWith('.trial-openbao-keys'))).toEqual([]);
+    });
+
+    it(
+      'V08 AC2, AC4: after trial:down, trial:start unseals with the passphrase; the intent is kept',
+      async () => {
+        expect(intentCode).not.toBe('');
+        const stopped = await program(['down']);
+        expect(stopped.status, stopped.output).toBe(0);
+        expect(stopped.output).toContain('pnpm trial:start');
+        expect(fs.existsSync(keyFile)).toBe(true);
+
+        const wrong = await program(['start', '--passphrase-stdin'], 'not the passphrase at all\n');
+        expect(wrong.status).toBe(1);
+        expect(wrong.output).toContain('Wrong passphrase: nothing was unsealed');
+        expect(wrong.output).not.toContain('Starting the platform');
+
+        const started = await program(['start', '--passphrase-stdin'], `${passphrase}\n`);
+        expect(started.status, started.output.slice(-4000)).toBe(0);
+        expect(started.output).toContain('is unsealed and running');
+        for (const out of [stopped.output, wrong.output, started.output]) {
+          expect(out).not.toContain(passphrase);
+          expect(out).not.toMatch(/sdlc_pat_|hvs\.|Unseal Key \d+: \S/);
+        }
+
+        const deadline = Date.now() + 180_000;
+        let shown: Record<string, unknown> | undefined;
+        for (;;) {
+          try {
+            shown = await sdlc(configA, ['intent', 'show', intentCode]);
+            break;
+          } catch (error) {
+            if (Date.now() > deadline) throw error;
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        }
+        expect(shown).toMatchObject({ code: intentCode, current_gate: 'G1' });
+        expect(await sdlc(configA, ['audit', 'verify'])).toMatchObject({ ok: true, broken: null });
+
+        // Again, already unsealed: no passphrase needed (nothing on stdin).
+        const again = await program(['start', '--passphrase-stdin'], '');
+        expect(again.status, again.output.slice(-2000)).toBe(0);
+        expect(again.output).toContain('was already unsealed');
+      },
+      30 * 60 * 1000,
+    );
+
     it('AC2: a second trial:up refuses the existing stack and touches nothing', async () => {
-      const again = await program(['up', '--settings', settingsFile]);
+      const again = await program(
+        ['up', '--settings', settingsFile, '--passphrase-stdin'],
+        `${passphrase}\n`,
+      );
       expect(again.status).toBe(1);
       expect(again.output).toContain('Refused:');
       expect(again.output).not.toContain('Step 2 of 13');
@@ -200,6 +270,13 @@ describe.skipIf(!enabled)(
       expect(refused.status).toBe(1);
       expect(fs.existsSync(envFile)).toBe(true);
     });
+
+    it('V08 AC3: trial:down --wipe removes the key file with the stack', async () => {
+      const wiped = await program(['down', '--wipe', '--yes', '--settings', settingsFile]);
+      expect(wiped.status, wiped.output).toBe(0);
+      expect(fs.existsSync(keyFile)).toBe(false);
+      expect(fs.existsSync(envFile)).toBe(false);
+    }, 300_000);
   },
   SETUP_TIMEOUT_MS,
 );

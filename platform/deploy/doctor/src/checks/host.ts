@@ -129,5 +129,33 @@ export function hostChecks(f: OperatorFacts): CheckResult[] {
         )
       : ok('env.secrets', text('doctor.env.secrets_ok')),
   );
+  // A trial stack's key file (V08): `pnpm trial:start` unseals with it.
+  const key = env.trialKeyFile;
+  if (key) {
+    const subject = 'trial key file';
+    if (key.mode === null) {
+      out.push(
+        problem(
+          'env.file',
+          'warning',
+          text('doctor.trial_key.missing', { path: key.path }),
+          text('doctor.fix.trial_rebuild'),
+          subject,
+        ),
+      );
+    } else if ((key.mode & 0o077) !== 0) {
+      out.push(
+        problem(
+          'env.file',
+          'failed',
+          text('doctor.env.mode', { path: key.path, mode: (key.mode & 0o777).toString(8) }),
+          text('doctor.fix.chmod', { path: key.path }),
+          subject,
+        ),
+      );
+    } else {
+      out.push(ok('env.file', text('doctor.trial_key.ok', { path: key.path }), subject));
+    }
+  }
   return out;
 }

@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.38. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.39. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -72,6 +72,15 @@ Notes for a development machine:
 - A `.env` created before task A11 still has `OPENBAO_HOST_PORT`: delete that line (it is not used), and add `SDLC_NETWORK_GATEWAY=172.30.0.1` (or the `.1` address of your own subnet).
 
 To start again from zero: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core down -v` (this deletes **all** data of the stack).
+
+### 3.1b. The trial stack's key file (`pnpm trial:up`, `pnpm trial:start`)
+
+The community trial's stack (`pnpm trial:up`, `TRIAL.md` §3.2) runs on a developer machine with **throw-away keys**, and its data is fictional. It is the only place where key shares are kept in a file (task V08, `design/QUESTIONS.md` #356, `design/ADR-M76-trial-key-file.md`):
+
+- **What:** `trial-openbao-keys.age` next to the trial's env file (by default `platform/deploy/trial-openbao-keys.age`), ignored by Git, mode 600. It holds the two shares that unseal OpenBao (the threshold), the Compose project and the time it was made, encrypted with a passphrase the person chose (age, scrypt). **Never the root token**: it is revoked at the end of `trial:up`, as on the server.
+- **Who reads it:** only `pnpm trial:start`, only for the trial's own Compose project (`sdlc-trial`), never with `NODE_ENV=production`. It asks the passphrase, unseals with `bootstrap.sh unseal` (the shares on stdin), applies the migrations and starts the platform. By hand: `age -d platform/deploy/trial-openbao-keys.age` asks the passphrase and prints the record; do it only to debug a trial stack, never on a shared screen.
+- **Its limits:** a forgotten passphrase means the stack cannot be unsealed again (wipe it: `pnpm trial:down --wipe`, then `pnpm trial:up`). The processes' secret IDs end after 90 days and a trial stack cannot renew them (no root token): `trial:start` warns from day 80. `pnpm trial:down --wipe` deletes the key file with the volumes.
+- **Never on a server.** The internal server keeps the key-holder rules of sections 3.2 and 4: three holders, two shares to unseal, never a share in a file, a log or a chat. Never copy a trial key file, or its way of working, to a server.
 
 ### 3.2. On the internal server (real keys): described, not yet done
 
@@ -937,6 +946,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |
 | 0.37 | 2026-10-12 | Claude Code (task V07, PR 2) | Sections 3c and 4: `pnpm doctor` shows the certificates' end dates and checks the platform after an unseal |
 | 0.36 | 2026-10-10 | Claude Code (task U05) | New section 5n: the GitHub App's client secret for the dashboard's GitHub sign-in (`kv/api/github-oauth`, `pnpm openbao:bootstrap api-github-oauth-credentials`), turning sign-in on, rotation, signing everyone out (ADR-M73 §2.2, QUESTIONS #385–#389) |
