@@ -8,6 +8,7 @@ import { actorOf } from '../admin/actor.js';
 import { presentIssuedToken, presentToken } from '../admin/present.js';
 import { idSchema, issueTokenSchema } from '../admin/schemas.js';
 import { CurrentPrincipal, type Principal } from '../auth/principal.js';
+import { ApiError } from '../errors/api-error.js';
 import { CLOCK } from '../tokens.js';
 import { parseRequest } from '../validation.js';
 
@@ -37,7 +38,11 @@ export class MeTokensController {
 
   @Delete('current')
   async revokeCurrent(@CurrentPrincipal() p: Principal): Promise<Body> {
-    return presentToken(await revokeTokenOf(p.scope, actorOf(p), p.userId, p.tokenId, this.now()));
+    // A dashboard session never reaches here (the guard allows it no writes, U05).
+    if (p.credential.kind !== 'token') throw new ApiError(404, 'token_not_found');
+    return presentToken(
+      await revokeTokenOf(p.scope, actorOf(p), p.userId, p.credential.id, this.now()),
+    );
   }
 
   @Delete(':id')

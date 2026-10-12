@@ -5,6 +5,8 @@ erDiagram
     users ||--o{ role_bindings : "is assigned"
     users ||--o{ tenant_role_bindings : "is tenant admin"
     users ||--o{ api_tokens : "owns"
+    users ||--o{ web_sessions : "signs in"
+    user_identities ||--o{ web_sessions : "opened with"
     projects ||--o{ role_bindings : "within"
     projects ||--|| project_configs : "configured by"
     projects ||--|| git_event_cursors : "reads events"

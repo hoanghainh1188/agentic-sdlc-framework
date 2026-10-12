@@ -1,34 +1,74 @@
-// Bearer-token authentication for every route that is not public (D-08 B03 AC1, AC2).
-// The token is checked for shape, hashed, and looked up by its hash only; it is never logged.
+// Authentication for every route that is not public (D-08 B03 AC1, AC2; U05, ADR-M73 §2.2).
+//
+// - A bearer token (CLI): checked for shape, hashed, and looked up by its hash only.
+// - A dashboard session cookie (U05): the same, by the SHA-256 of the session secret; idle and
+//   absolute timeouts, active user and tenant, identity still linked.
+// - Never both: a request with an `Authorization` header and a session cookie is refused.
+// - Until U06 adds CSRF protection (QUESTIONS #387), a session may only read (`GET`, `HEAD`) and
+//   use the handlers marked `@SessionWrite()` (sign out, sign out everywhere), each with an
+//   `Origin` equal to the public origin.
+// Tokens and secrets are never logged.
 import { SetMetadata, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import type { Reflector } from '@nestjs/core';
-import { hashApiToken, isApiTokenFormat, type PlatformDatabase } from '@sdlc/core';
+import {
+  hashApiToken,
+  hashSessionSecret,
+  isApiTokenFormat,
+  type PlatformDatabase,
+  type TenantId,
+} from '@sdlc/core';
 
 import { ApiError } from '../errors/api-error.js';
-import type { AuthenticatedRequest } from './principal.js';
+import { clearCookie, hasCookie, readCookie, SESSION_COOKIE } from './cookies.js';
+import type { AuthenticatedRequest, Credential } from './principal.js';
 import type { RateLimiter } from './rate-limiter.js';
 
 const PUBLIC = 'sdlc:public';
+const SESSION_WRITE = 'sdlc:session-write';
 
-/** Marks a route that needs no token (health checks only). */
+/** Marks a route that needs no token (health checks, the sign-in redirects). */
 export const Public = (): MethodDecorator & ClassDecorator => SetMetadata(PUBLIC, true);
 
-/** `last_used_at` is written at most once per token per interval (ADR-M26 D6). */
+/**
+ * Marks a write a dashboard session may send before U06 (sign out only). The guard still checks
+ * the `Origin` header against the public origin.
+ */
+export const SessionWrite = (): MethodDecorator => SetMetadata(SESSION_WRITE, true);
+
+/** `last_used_at` / `last_seen_at` are written at most once per credential per interval. */
 const TOUCH_INTERVAL_MS = 60_000;
+
+const READ_METHODS = new Set(['GET', 'HEAD']);
 
 interface GuardRequest extends AuthenticatedRequest {
   readonly headers: Readonly<Record<string, string | string[] | undefined>>;
   readonly ip: string;
+  readonly method: string;
+}
+
+export interface SessionGuardSettings {
+  /** The idle timeout (setting `SDLC_API_SESSION_IDLE_MINUTES`). */
+  readonly idleMs: number;
+  /** The only `Origin` a session's sign-out may come from. */
+  readonly publicOrigin: string;
 }
 
 export interface AuthGuardDeps {
   readonly reflector: Reflector;
   readonly db: PlatformDatabase;
-  /** Requests per token and minute. */
+  /** Requests per token or session and minute. */
   readonly requests: RateLimiter;
   /** Failed authentications per client address and minute. */
   readonly failures: RateLimiter;
   readonly now: () => Date;
+  /** Dashboard sessions (U05). Undefined: sign-in is off and session cookies are ignored. */
+  readonly sessions?: SessionGuardSettings;
+}
+
+interface Resolved {
+  readonly tenantId: TenantId;
+  readonly userId: string;
+  readonly credential: Credential;
 }
 
 export class AuthGuard implements CanActivate {
@@ -47,39 +87,113 @@ export class AuthGuard implements CanActivate {
     const client = `ip:${request.ip}`;
     if (this.deps.failures.blocked(client)) throw new ApiError(429, 'rate_limited');
 
-    const token = bearerToken(request.headers.authorization);
+    const sessions = this.deps.sessions;
+    const cookieSent = sessions !== undefined && hasCookie(request.headers.cookie, SESSION_COOKIE);
+    if (cookieSent && request.headers.authorization !== undefined) {
+      this.deps.failures.hit(client);
+      throw new ApiError(400, 'credentials_ambiguous');
+    }
+
     const now = this.deps.now();
-    const resolved =
-      token !== undefined && isApiTokenFormat(token)
-        ? await this.deps.db.system.resolveApiToken(hashApiToken(token), now)
-        : undefined;
+    const resolved = cookieSent
+      ? await this.#session(request, sessions, now)
+      : await this.#token(request, now);
+    if (!resolved && cookieSent) {
+      // An ended or expired session is normal: never counted against the address (the secret is
+      // 32 random bytes, not guessable), and the browser is told to drop the cookie, so a stale
+      // cookie neither blocks other clients on the address nor turns later bearer requests into
+      // `credentials_ambiguous` (security review of U05, MEDIUM-2).
+      context
+        .switchToHttp()
+        .getResponse<{ header(name: string, value: string): unknown }>()
+        .header('set-cookie', clearCookie(SESSION_COOKIE));
+      throw new ApiError(401, 'session_ended');
+    }
     if (!resolved) {
       this.deps.failures.hit(client);
       throw new ApiError(401, 'unauthorized');
     }
-    if (!this.deps.requests.hit(`token:${resolved.tokenId}`)) {
+    if (resolved.credential.kind === 'session') {
+      this.#checkSessionMethod(context, request, sessions!);
+    }
+    if (!this.deps.requests.hit(`${resolved.credential.kind}:${resolved.credential.id}`)) {
       throw new ApiError(429, 'rate_limited');
     }
     const scope = this.deps.db.forTenant(resolved.tenantId);
-    await this.#touch(resolved.tokenId, scope, now);
+    await this.#touch(resolved.credential, scope, now);
     request.principal = { ...resolved, scope };
     return true;
   }
 
+  async #token(request: GuardRequest, now: Date): Promise<Resolved | undefined> {
+    const token = bearerToken(request.headers.authorization);
+    if (token === undefined || !isApiTokenFormat(token)) return undefined;
+    const found = await this.deps.db.system.resolveApiToken(hashApiToken(token), now);
+    return found
+      ? {
+          tenantId: found.tenantId,
+          userId: found.userId,
+          credential: { kind: 'token', id: found.tokenId },
+        }
+      : undefined;
+  }
+
+  async #session(
+    request: GuardRequest,
+    settings: SessionGuardSettings | undefined,
+    now: Date,
+  ): Promise<Resolved | undefined> {
+    const secret = readCookie(request.headers.cookie, SESSION_COOKIE);
+    if (secret === undefined || settings === undefined) return undefined;
+    const idleSince = new Date(now.getTime() - settings.idleMs);
+    const found = await this.deps.db.system.resolveWebSession(
+      hashSessionSecret(secret),
+      now,
+      idleSince,
+    );
+    return found
+      ? {
+          tenantId: found.tenantId,
+          userId: found.userId,
+          credential: { kind: 'session', id: found.sessionId },
+        }
+      : undefined;
+  }
+
+  /** Before U06: reads only, plus the handlers marked `@SessionWrite()` from the public origin. */
+  #checkSessionMethod(
+    context: ExecutionContext,
+    request: GuardRequest,
+    settings: SessionGuardSettings,
+  ): void {
+    if (READ_METHODS.has(request.method)) return;
+    const allowed = this.deps.reflector.get<boolean | undefined>(
+      SESSION_WRITE,
+      context.getHandler(),
+    );
+    const origin = request.headers.origin;
+    const fetchSite = request.headers['sec-fetch-site'];
+    const sameOrigin =
+      origin === settings.publicOrigin && (fetchSite === undefined || fetchSite === 'same-origin');
+    if (allowed !== true || !sameOrigin) throw new ApiError(403, 'session_write_not_allowed');
+  }
+
   async #touch(
-    tokenId: string,
+    credential: Credential,
     scope: ReturnType<PlatformDatabase['forTenant']>,
     now: Date,
   ): Promise<void> {
+    const key = `${credential.kind}:${credential.id}`;
     const at = now.getTime();
-    const last = this.#lastTouch.get(tokenId);
+    const last = this.#lastTouch.get(key);
     if (last !== undefined && at - last < TOUCH_INTERVAL_MS) return;
-    // Keep only tokens used within the interval, so the map never grows with old tokens.
+    // Keep only credentials used within the interval, so the map never grows with old ones.
     for (const [id, time] of this.#lastTouch) {
       if (at - time >= TOUCH_INTERVAL_MS) this.#lastTouch.delete(id);
     }
-    this.#lastTouch.set(tokenId, at);
-    await scope.apiTokens.touchLastUsed(tokenId, now);
+    this.#lastTouch.set(key, at);
+    if (credential.kind === 'token') await scope.apiTokens.touchLastUsed(credential.id, now);
+    else await scope.webSessions.touch(credential.id, now);
   }
 }
 

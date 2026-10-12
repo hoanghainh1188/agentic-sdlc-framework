@@ -6,6 +6,7 @@ import type { User, UserIdentity } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { assertTenantAdmin, auditActor, type AdminActor } from './actor.js';
 import { AdminError } from './errors.js';
+import { endSessionsAfterAdminChange } from '../web-sessions/index.js';
 import { alreadyExists } from './projects.js';
 import { assertAdminRemains } from './tenant-roles.js';
 import {
@@ -92,6 +93,7 @@ export async function setUserActive(
   actor: AdminActor,
   userId: string,
   active: boolean,
+  now?: Date,
 ): Promise<User> {
   return scope.transaction(async (tx) => {
     await assertTenantAdmin(tx, actor);
@@ -110,6 +112,15 @@ export async function setUserActive(
       entityId: changed.id,
       payload: {},
     });
+    // U05 (ADR-M73 §2.2): a disabled user's dashboard sessions end with the change.
+    if (!active) {
+      await endSessionsAfterAdminChange(
+        tx,
+        actor,
+        { kind: 'user_disabled', userId: changed.id },
+        now ?? new Date(),
+      );
+    }
     return changed;
   });
 }
@@ -194,6 +205,13 @@ export async function unlinkIdentity(
       entityId: unlinked.id,
       payload: { user_id: unlinked.user_id, provider: unlinked.provider },
     });
+    // U05 (ADR-M73 §2.2): the dashboard sessions opened with this identity end with it.
+    await endSessionsAfterAdminChange(
+      tx,
+      actor,
+      { kind: 'identity_unlinked', userId: unlinked.user_id, identityId: unlinked.id },
+      now ?? new Date(),
+    );
     return unlinked;
   });
 }

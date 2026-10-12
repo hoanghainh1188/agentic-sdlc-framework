@@ -15,10 +15,12 @@ export {
   type OpenIntent,
   type PollableProject,
   type ResolvedApiToken,
+  type ResolvedWebSession,
   type SpendSyncLockResult,
 } from './system-scope.js';
 export { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 export { hashApiToken } from './repositories/api-tokens.js';
+export { hashSessionSecret } from './repositories/web-sessions.js';
 export type { AgentQuery, AgentUpdate, NewAgent } from './repositories/agents.js';
 export type { AuditEvent } from './repositories/audit-log.js';
 export type { NewCostRecord } from './repositories/cost-records.js';
@@ -111,5 +113,7 @@ export type {
   TenantRoleBinding,
   User,
   UserIdentity,
+  WebSession,
+  WebSessionEndReason,
 } from './schema.js';
 export * from './vocabulary.js';

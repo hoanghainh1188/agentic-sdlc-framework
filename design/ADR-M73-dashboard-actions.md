@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Accepted** (Harry, 2026-10-10). Built by tasks U05–U07 (UX) and U08–U09 (Later) |
+| Status | **Accepted** (Harry, 2026-10-10). Built by tasks U05–U07 (UX) and U08–U09 (Later). Version 1.1: U05's details (§2.2b, QUESTIONS #385–#389) |
 | Date | 2026-10-10 |
 | Decided by | Harry (V11: `design/MVP1-UI-SCOPE.md` 1.0 approved 2026-10-10; QUESTIONS #375–#380) |
 | Related | `design/MVP1-UI-SCOPE.md` 1.2 (the plan); ADR-M54 (the read-only dashboard); ADR-M03 (approvals through comments and the CLI); ADR-M26 (the API); ADR-M37 (admin); ADR-M41 (G7); ADR-M42 (kill switch); ADR-M28 (escalations); ADR-M67 (V09, team access, not written yet); D-02 §4.2 (1.10); D-03 §5.1, §9, §12 (1.40); D-05 (1.40); D-08 U05–U09, V03 |
@@ -34,6 +34,17 @@ Writes from a browser need what the read-only dashboard avoids: a sign-in that i
 - A session is revoked at sign-out, when the user is disabled, when the identity is unlinked, and by a tenant admin. A person can **sign out everywhere** (all their sessions); a tenant admin can do it for a person. Audit `web_session.started`, `web_session.ended` (reason code, `all` for sign out everywhere).
 - The guard accepts a bearer token **or** a session cookie, never both. The personal-token sign-in of ADR-M54 stays for read-only use.
 - Company single sign-on (OIDC) stays Later.
+
+### 2.2b. As built by U05 (QUESTIONS #385–#389)
+
+- **Settings** (all off by default): `SDLC_API_WEB_SIGNIN` (`off`, `github`), `SDLC_API_PUBLIC_ORIGIN` (required with `github`; `https://`, or `http://` on `localhost` only, never `127.0.0.1`), `SDLC_API_SESSION_IDLE_MINUTES` (30, 5–120), `SDLC_API_SESSION_MAX_HOURS` (8, 1–24), `SDLC_API_GITHUB_WEB_URL`, `SDLC_API_GITHUB_OAUTH_SECRET_PATH` (`api/github-oauth`). In development mode (no OpenBao) sign-in stays off.
+- **Endpoints** (no business state): `GET /v1/auth/config`, `GET /v1/auth/github/start?tenant=<slug>`, `GET /v1/auth/github/callback`, `POST /v1/auth/sign-out`, `DELETE /v1/me/sessions` (sign out everywhere), `DELETE /v1/admin/users/:user/sessions` (a tenant admin; CLI `sdlc admin user sign-out`). A refusal redirects to `/dashboard/?signin=refused` (or `unavailable` when GitHub or the client secret cannot be used); the cause is logged as a code only. Start and callback are rate-limited per address.
+- **Pending sign-ins** live in the api process's memory (#385): keyed by the SHA-256 of the pre-login cookie's random handle, 10 minutes, used once whatever the result, at most 10,000. The cookie holds the handle only.
+- **The GitHub user token** is revoked right after the account ID is read (`DELETE /applications/{client_id}/token`, #388); a failed revoke is logged as a code.
+- **Before U06, a session only reads** (#387): `GET`, `HEAD`, plus sign out and sign out everywhere with an `Origin` equal to the public origin (and `Sec-Fetch-Site: same-origin` when sent). Every other write answers 403 `session_write_not_allowed`. A request with a bearer token and a session cookie answers 400 `credentials_ambiguous`. With sign-in off, a session cookie is ignored.
+- **`web_sessions`** (D-05 1.41): hashes, IDs and times only; the CSRF token's hash comes with U06 (#386). **No DELETE for `platform_app`** (Harry, 2026-10-10): ended and expired rows stay; removing them is a later retention-loop task with its own grant.
+- **Security review** (before PR 1): the callback does the GitHub round trip before it looks up the tenant (no tenant enumeration by timing); an ended session is not counted against the address and its 401 deletes the cookie; start and callback have their own limits per address (20, 30 a minute); a full pending map drops its oldest entry; only a matching state uses a pending sign-in up; a callback error redirects (`unavailable`). Accepted: a link opened in the person's browser can cancel their pending sign-in (the pre-login cookie is deleted at every callback, as above); the person signs in again. **`http://localhost` is for development only:** cookies are not scoped by port, so another local server on `localhost` sees and can set them; teams use the V09 HTTPS origin.
+- **The client secret**: `pnpm github-app:create` keeps it in `<key file>.client-secret` (mode 600) and lists the callback URLs (`--callback-url`, default `http://localhost:8090/v1/auth/github/callback`); `pnpm openbao:bootstrap api-github-oauth-credentials` stores it at `kv/api/github-oauth` (runbook T11 §5n). The api reads it again within 10 minutes of a rotation. `pnpm trial:up` leaves sign-in off (#389).
 
 ### 2.3. CSRF and origin (QUESTIONS #377)
 
@@ -92,4 +103,5 @@ Writes from a browser need what the read-only dashboard avoids: a sign-in that i
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 1.1 | 2026-10-10 | Claude (task U05), approved by Harry | §2.2b: U05 as built: settings, endpoints, pending sign-ins in memory, the user token revoked, reads only before U06, no DELETE on `web_sessions`, the client secret's path (QUESTIONS #385–#389) |
 | 1.0 | 2026-10-10 | Claude (task V11, design PR), accepted by Harry | First version, from `design/MVP1-UI-SCOPE.md` 1.0 and Harry's review in 1.1 (QUESTIONS #375–#380): login CSRF with a pre-login cookie, a new session ID at sign-in, sign out everywhere, a random stored single-use passkey challenge, the proposal download in the CLI only, the Safari limit |

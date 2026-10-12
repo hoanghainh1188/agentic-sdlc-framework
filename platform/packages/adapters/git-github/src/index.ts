@@ -3,3 +3,8 @@
 export { ADAPTER_PERMISSIONS } from './app-auth.js';
 export { GitHubAdapter, MAX_COMMENT_CHARS, MAX_PULL_REQUEST_FILES } from './adapter.js';
 export { DEFAULT_GITHUB_APP_SECRET_PATH, type GitHubAdapterOptions } from './options.js';
+export {
+  DEFAULT_GITHUB_OAUTH_SECRET_PATH,
+  GitHubSignIn,
+  type GitHubSignInOptions,
+} from './sign-in.js';

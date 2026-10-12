@@ -544,6 +544,28 @@ export interface LangfusePurgesTable {
   created_at: CreatedAt;
 }
 
+/** A dashboard sign-in (U05, migration 0027, ADR-M73 §2.2). Hashes, IDs and times only. */
+export interface WebSessionsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  user_id: Immutable<string>;
+  /** The linked GitHub identity used to sign in: unlinking it ends the session. */
+  identity_id: Immutable<string>;
+  /** SHA-256 of the session secret, lowercase hex. The secret itself is never stored. */
+  secret_sha256: Immutable<string>;
+  /** Only grows (trigger SDA18); the idle timeout counts from it. */
+  last_seen_at: ColumnType<Date, Date, Date>;
+  /** The absolute end of the session. */
+  expires_at: Immutable<Date>;
+  revoked_at: ColumnType<Date | null, never, Date>;
+  end_reason: ColumnType<WebSessionEndReason | null, never, WebSessionEndReason>;
+  created_at: CreatedAt;
+}
+
+/** Why a session ended (`web_session.ended`). */
+export type WebSessionEndReason =
+  'sign_out' | 'all' | 'admin' | 'user_disabled' | 'identity_unlinked' | 'replaced';
+
 type Mutable<T> = ColumnType<T, T | undefined, T>;
 type MutableNullable<T> = ColumnType<T | null, T | null | undefined, T | null>;
 
@@ -680,6 +702,7 @@ export interface Database {
   project_ai_record_versions: ProjectAiRecordVersionsTable;
   tenant_role_bindings: TenantRoleBindingsTable;
   agent_approvals: AgentApprovalsTable;
+  web_sessions: WebSessionsTable;
 }
 
 export type TableName = keyof Database;
@@ -1122,6 +1145,18 @@ export const TABLE_COLUMNS = {
     'round_at',
     'created_at',
   ]),
+  web_sessions: columns<WebSessionsTable>()([
+    'id',
+    'tenant_id',
+    'user_id',
+    'identity_id',
+    'secret_sha256',
+    'last_seen_at',
+    'expires_at',
+    'revoked_at',
+    'end_reason',
+    'created_at',
+  ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
 /**
@@ -1159,6 +1194,7 @@ export const TENANT_COLUMN = {
   langfuse_purges: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
+  web_sessions: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -1169,6 +1205,7 @@ export type User = Selectable<UsersTable>;
 export type UserIdentity = Selectable<UserIdentitiesTable>;
 export type RoleBinding = Selectable<RoleBindingsTable>;
 export type ApiToken = Selectable<ApiTokensTable>;
+export type WebSession = Selectable<WebSessionsTable>;
 export type GitEventCursor = Selectable<GitEventCursorsTable>;
 export type AuditLogRow = Selectable<AuditLogTable>;
 export type Intent = Selectable<IntentsTable>;

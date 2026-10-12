@@ -19,7 +19,9 @@ export class MeController {
     return {
       user: { id: user.id, display_name: user.display_name, email: user.email },
       tenant_id: p.tenantId,
-      token_id: p.tokenId,
+      // U05: the token of this request; null for a dashboard session (`auth`).
+      token_id: p.credential.kind === 'token' ? p.credential.id : null,
+      auth: p.credential.kind,
       /** B13 (QUESTIONS #150): the caller may use the admin endpoints. */
       tenant_admin: tenantAdmin,
       roles: bindings.map((binding) => ({

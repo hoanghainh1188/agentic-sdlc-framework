@@ -4,7 +4,12 @@ import { Logger, Module, type DynamicModule, type LoggerService } from '@nestjs/
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, NestFactory, Reflector } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type { EvidenceStore, GitHostAdapter, IntentWorkflowSignals } from '@sdlc/contracts';
+import type {
+  EvidenceStore,
+  GitHostAdapter,
+  IntentWorkflowSignals,
+  WebSignInProvider,
+} from '@sdlc/contracts';
 import { Registry, type PlatformDatabase, type PlatformLogger } from '@sdlc/core';
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
@@ -16,7 +21,15 @@ import { AdminUsersController } from './admin/users.controller.js';
 import { AiRecordsController } from './ai-records/ai-records.controller.js';
 import { AiRecordsService } from './ai-records/ai-records.service.js';
 import { AuthGuard } from './auth/auth.guard.js';
+import { OAuthStates } from './auth/oauth-states.js';
 import { RateLimiter } from './auth/rate-limiter.js';
+import {
+  SIGN_IN_CALLBACKS_PER_MINUTE,
+  SIGN_IN_STARTS_PER_MINUTE,
+  SignInController,
+  type SignInEndpoints,
+} from './auth/sign-in.controller.js';
+import { SignInService } from './auth/sign-in.service.js';
 import { ErrorFilter } from './errors/error.filter.js';
 import { EscalationsController } from './escalations/escalations.controller.js';
 import { EvidenceController } from './evidence/evidence.controller.js';
@@ -42,7 +55,7 @@ import { SpecsService } from './specs/specs.service.js';
 import { registerDashboard, type DashboardFiles, type RouteHost } from './dashboard/static.js';
 import { LogContextInterceptor } from './observability/log-context.interceptor.js';
 import { createApiLogger } from './observability/logging.js';
-import type { ApiSettings } from './settings.js';
+import type { ApiSettings, WebSignInSettings } from './settings.js';
 import {
   AI_RECORDS,
   CLOCK,
@@ -56,6 +69,7 @@ import {
   METRICS,
   REGISTRY,
   SETTINGS,
+  SIGN_IN,
   SPECS,
 } from './tokens.js';
 
@@ -95,6 +109,16 @@ export interface ApiDeps {
    * (`SDLC_API_DASHBOARD_DIR=off`): no dashboard routes.
    */
   readonly dashboard?: DashboardFiles;
+  /**
+   * Dashboard sign-in with GitHub (U05, ADR-M73 §2.2): the settings and the GitHub App's OAuth
+   * client. Undefined (`SDLC_API_WEB_SIGNIN=off`): no sign-in, session cookies are ignored.
+   */
+  readonly webSignIn?: {
+    readonly settings: WebSignInSettings;
+    readonly provider: WebSignInProvider;
+    /** Starts and callbacks per address and minute. Default 20 and 30; tests raise them. */
+    readonly limits?: { readonly starts: number; readonly callbacks: number };
+  };
 }
 
 @Module({})
@@ -103,10 +127,23 @@ class ApiModule {
     const now = deps.now ?? (() => new Date());
     const signals = deps.intentSignals ?? NO_INTENT_SIGNALS;
     const wakeLogger = deps.log ?? createApiLogger();
+    const signIn: SignInEndpoints | undefined = deps.webSignIn && {
+      service: new SignInService({
+        db: deps.db,
+        provider: deps.webSignIn.provider,
+        states: new OAuthStates(() => now().getTime()),
+        settings: deps.webSignIn.settings,
+        now,
+        log: wakeLogger,
+      }),
+      starts: new RateLimiter(deps.webSignIn.limits?.starts ?? SIGN_IN_STARTS_PER_MINUTE),
+      callbacks: new RateLimiter(deps.webSignIn.limits?.callbacks ?? SIGN_IN_CALLBACKS_PER_MINUTE),
+    };
     return {
       module: ApiModule,
       controllers: [
         HealthController,
+        SignInController,
         MeController,
         IntentsController,
         SpecsController,
@@ -130,6 +167,7 @@ class ApiModule {
         { provide: DATABASE, useValue: deps.db },
         { provide: SETTINGS, useValue: deps.settings },
         { provide: CLOCK, useValue: now },
+        { provide: SIGN_IN, useValue: signIn },
         {
           provide: REGISTRY,
           useValue: new Registry({
@@ -184,6 +222,14 @@ class ApiModule {
               requests: new RateLimiter(deps.settings.rateLimitPerMinute),
               failures: new RateLimiter(deps.settings.authFailuresPerMinute),
               now,
+              ...(deps.webSignIn
+                ? {
+                    sessions: {
+                      idleMs: deps.webSignIn.settings.idleMs,
+                      publicOrigin: deps.webSignIn.settings.publicOrigin,
+                    },
+                  }
+                : {}),
             }),
           inject: [Reflector],
         },

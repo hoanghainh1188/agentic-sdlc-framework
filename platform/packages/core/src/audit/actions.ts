@@ -93,6 +93,17 @@ export const AUDIT_ACTIONS = {
   /** A disabled user was enabled again (B13). */
   'user.enabled': { entityType: 'user', fields: {} },
   /**
+   * A person signed in to the dashboard with GitHub (U05, ADR-M73 §2.2). The user is the entity;
+   * never the session ID, the GitHub account ID or a login.
+   */
+  'web_session.started': { entityType: 'user', fields: { provider: 'code' } },
+  /**
+   * Dashboard sessions of a user ended (U05): `reason` is `sign_out`, `all` (sign out everywhere),
+   * `admin`, `user_disabled`, `identity_unlinked` or `replaced` (a new sign-in in the same
+   * browser); `count` how many. Never a session ID. The idle and absolute timeouts are not events.
+   */
+  'web_session.ended': { entityType: 'user', fields: { reason: 'code', count: 'count' } },
+  /**
    * A Git host account was linked to a user (B13 AC3, QUESTIONS #45). Never the account ID or
    * login: the identity row is the entity.
    */

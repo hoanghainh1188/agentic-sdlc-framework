@@ -20,6 +20,7 @@ describe('api settings', () => {
       temporal: { address: 'temporal:7233', namespace: 'default' },
       githubApiUrl: 'https://api.github.com',
       dashboardDir: null,
+      webSignIn: null,
       evidence: {
         url: 'http://seaweedfs:8333',
         bucket: 'evidence',
@@ -114,5 +115,61 @@ describe('api settings', () => {
       '/app/dashboard',
     );
     expect(() => loadSettings({ SDLC_API_DASHBOARD_DIR: 'dist' })).toThrow(SettingsError);
+  });
+
+  it('U05: GitHub sign-in is off by default; on, it needs a public origin', () => {
+    expect(loadSettings({ SDLC_API_WEB_SIGNIN: 'off' }).webSignIn).toBeNull();
+    expect(
+      loadSettings({
+        SDLC_API_WEB_SIGNIN: 'github',
+        SDLC_API_PUBLIC_ORIGIN: 'http://localhost:8090',
+      }).webSignIn,
+    ).toEqual({
+      publicOrigin: 'http://localhost:8090',
+      callbackUrl: 'http://localhost:8090/v1/auth/github/callback',
+      githubWebUrl: 'https://github.com',
+      githubApiUrl: 'https://api.github.com',
+      oauthSecretPath: 'api/github-oauth',
+      idleMs: 30 * 60_000,
+      maxAgeMs: 8 * 3_600_000,
+    });
+    expect(
+      loadSettings({
+        SDLC_API_WEB_SIGNIN: 'github',
+        SDLC_API_PUBLIC_ORIGIN: 'https://sdlc.example.com',
+        SDLC_API_SESSION_IDLE_MINUTES: '15',
+        SDLC_API_SESSION_MAX_HOURS: '4',
+      }).webSignIn,
+    ).toMatchObject({
+      publicOrigin: 'https://sdlc.example.com',
+      idleMs: 900_000,
+      maxAgeMs: 14_400_000,
+    });
+    expect(() => loadSettings({ SDLC_API_WEB_SIGNIN: 'github' })).toThrowError(
+      expect.objectContaining({ key: 'api.settings.public_origin_missing' }),
+    );
+    for (const origin of [
+      'http://127.0.0.1:8090',
+      'http://sdlc.example.com',
+      'http://192.168.1.10:8090',
+    ]) {
+      expect(
+        () => loadSettings({ SDLC_API_WEB_SIGNIN: 'github', SDLC_API_PUBLIC_ORIGIN: origin }),
+        origin,
+      ).toThrowError(expect.objectContaining({ key: 'api.settings.public_origin_insecure' }));
+    }
+  });
+
+  it.each([
+    ['SDLC_API_WEB_SIGNIN', 'oidc'],
+    ['SDLC_API_PUBLIC_ORIGIN', 'https://sdlc.example.com/dashboard'],
+    ['SDLC_API_GITHUB_WEB_URL', 'http://github.com'],
+    ['SDLC_API_GITHUB_OAUTH_SECRET_PATH', 'worker/github-oauth'],
+    ['SDLC_API_SESSION_IDLE_MINUTES', '1'],
+    ['SDLC_API_SESSION_MAX_HOURS', '48'],
+  ])('U05: refuses %s=%s', (name, value) => {
+    expect(() => loadSettings({ [name]: value })).toThrowError(
+      expect.objectContaining({ key: 'api.settings.invalid', setting: name }),
+    );
   });
 });

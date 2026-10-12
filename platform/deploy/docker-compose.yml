@@ -629,6 +629,11 @@ services:
       SDLC_API_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
       # The read-only dashboard (U01, ADR-M54): built into the image; `off` turns it off.
       SDLC_API_DASHBOARD_DIR: /app/dashboard
+      # Dashboard sign-in with GitHub (U05, ADR-M73 §2.2): off by default. With `github`, the
+      # public origin is the address people open (http only on localhost) and the GitHub App's
+      # client secret is in OpenBao (kv/api/github-oauth, runbook T11 §5n).
+      SDLC_API_WEB_SIGNIN: ${SDLC_API_WEB_SIGNIN:-off}
+      SDLC_API_PUBLIC_ORIGIN: ${SDLC_API_PUBLIC_ORIGIN:-}
       # E02 (ADR-M48): Evidence Packs in SeaweedFS with the api's identity from OpenBao
       # (kv/api/evidence, `openbao:bootstrap api-evidence-credentials`): reads proposals and diffs
       # to re-check their hashes, reads and writes packs/ only.

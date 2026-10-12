@@ -32,13 +32,23 @@ export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;
 export const meSchema = z.object({
   user: z.object({ id, display_name: z.string().max(200), email: z.string().max(320) }),
   tenant_id: id,
-  token_id: id,
+  // U05: null for a dashboard session; `auth` says which credential the request used.
+  token_id: id.nullable(),
+  auth: z.enum(['token', 'session']).optional(),
   tenant_admin: z.boolean().optional(),
   roles: z
     .array(z.object({ project: z.object({ id, slug: code.nullable() }), role: code }))
     .max(10_000),
 });
 export type Me = z.infer<typeof meSchema>;
+
+/** `DELETE /v1/me/sessions`, `DELETE /v1/admin/users/:user/sessions` (U05). */
+export const endedSessionsSchema = z.object({ ended: z.number().int().min(0).max(1_000_000) });
+export type EndedSessions = z.infer<typeof endedSessionsSchema>;
+
+/** `GET /v1/auth/config` (U05): is dashboard sign-in with GitHub on? */
+export const authConfigSchema = z.object({ github: z.boolean() });
+export type AuthConfig = z.infer<typeof authConfigSchema>;
 
 export const intentSchema = z.object({
   id,

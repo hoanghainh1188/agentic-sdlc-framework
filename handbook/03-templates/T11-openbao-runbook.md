@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.35. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.36. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -698,6 +698,45 @@ Needs the profiles `core` and `observability` running, and OpenBao unsealed. Run
 | The ClickHouse password and the S3 key (every 90 days, or when they may have leaked) | Make a new Langfuse key as in step 1, run `pnpm openbao:bootstrap worker-langfuse-credentials`, restart `sdlc-worker`, then delete the old Langfuse key in the UI. The old password and S3 key stop working at once |
 | The Langfuse key only (it may have leaked) | The same steps; delete the old key in the Langfuse UI at once |
 
+## 5n. The dashboard's GitHub sign-in: the App's client secret
+
+People sign in to the dashboard with GitHub through the platform's GitHub App (task U05, `design/ADR-M73-dashboard-actions.md` §2.2). The api exchanges the sign-in code with the App's **client secret**. It lives in OpenBao at `kv/api/github-oauth` (field `client_secret`), read only by the `api` AppRole. The client ID stays in `kv/shared/github-app`. Sign-in is off until you turn it on.
+
+**Never** paste the client secret into a chat, an issue, a log or a file in a repository. Run every step yourself, in a terminal on the machine of the stack (the macOS Terminal app on a developer machine), never through a chat tool.
+
+### First set-up
+
+Needs `core` running and OpenBao unsealed.
+
+1. **The App.**
+   - A new App from `pnpm github-app:create`: the client secret is in `<key file>.client-secret` (mode 600), and the App already lists the callback URL `http://localhost:8090/v1/auth/github/callback` (add others with `--callback-url`).
+   - An existing App (for example the development App `harryforge-sdlc-dev`): on GitHub, open the App's settings. Add the callback URL `<public origin>/v1/auth/github/callback` (on a developer machine `http://localhost:8090/v1/auth/github/callback`). Keep **Expire user authorization tokens** on and **Request user authorization (OAuth) during installation** off. Press **Generate a new client secret**; it is shown once.
+2. **Store it.** From a file:
+   ```bash
+   pnpm openbao:bootstrap api-github-oauth-credentials < ~/secrets/sdlc-app.private-key.pem.client-secret
+   ```
+   or at the hidden prompt (copy it from GitHub, paste it, press Enter):
+   ```bash
+   pnpm openbao:bootstrap api-github-oauth-credentials
+   ```
+   Both ask for an admin token at a hidden prompt first. The answer is `stored: kv/api/github-oauth (client_secret)`. Delete the `.client-secret` file afterwards.
+3. **Turn it on.** In `platform/deploy/.env`: `SDLC_API_WEB_SIGNIN=github` and `SDLC_API_PUBLIC_ORIGIN=http://localhost:8090` (the address people open; `https://…` behind a proxy; plain `http://` only on `localhost`, never `127.0.0.1`). Restart `sdlc-api` (`pnpm compose:platform`). The start log has no `api.web_signin_off`.
+4. **Check.** Open `http://localhost:8090/dashboard/`, choose the tenant and **Sign in with GitHub**. Only active users with a linked GitHub identity get in (`sdlc admin identity link`). A refusal shows the same message whatever the cause; the api logs `api.signin_refused` with a code (`cause`).
+5. Record the date in the operations log.
+
+### Rotation
+
+| What | Steps |
+|---|---|
+| The client secret (every 90 days, or when it may have leaked) | On GitHub, generate a new client secret, store it as in step 2. The api reads it again within 10 minutes; no restart. Then delete the old client secret on GitHub |
+| Everyone signed in must sign in again (an incident) | A tenant admin: `sdlc admin user sign-out --user <id or email>` for each person; a person: **Sign out everywhere** in the dashboard |
+
+### Notes
+
+- Sessions are stored as hashes in `web_sessions`; they end after 30 idle minutes or 8 hours (`SDLC_API_SESSION_IDLE_MINUTES`, `SDLC_API_SESSION_MAX_HOURS`), at sign-out, when a user is disabled or an identity unlinked.
+- The api revokes each person's GitHub token right after it read the account ID; the platform never acts on GitHub as the person.
+- Safari may refuse the `Secure` cookies on `http://localhost`; use Chrome or Firefox there (ADR-M73 §4).
+
 ## 6. Daily backup
 
 The whole platform is backed up by one command, `pnpm backup` (`platform/deploy/backup/backup.sh`, task A10, `design/ADR-M63-openbao-tls-and-backups.md` §5, QUESTIONS #326–#329). It writes one folder per run into `SDLC_BACKUP_DIR`:
@@ -881,6 +920,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.36 | 2026-10-10 | Claude Code (task U05) | New section 5n: the GitHub App's client secret for the dashboard's GitHub sign-in (`kv/api/github-oauth`, `pnpm openbao:bootstrap api-github-oauth-credentials`), turning sign-in on, rotation, signing everyone out (ADR-M73 §2.2, QUESTIONS #385–#389) |
 | 0.35 | 2026-10-09 | Claude Code (task A10, PR 2) | Sections 6 and 7 rewritten: `pnpm backup` (every database, OpenBao's snapshot through the AppRole `backup`, the volumes, the env file and the TLS folder, each encrypted with age to `SDLC_BACKUP_DIR`; QUESTIONS #326–#329), the systemd timer, `pnpm restore` into an empty stack and the drill. Tested with throw-away keys (`pnpm test:backup`) |
 | 0.34 | 2026-10-09 | Claude Code (task A10, PR 1) | New section 3c: TLS on 8200 everywhere (QUESTIONS #20, #325), the throw-away CA on development machines, the company CA on the server (`pnpm openbao:tls ca`, `server`), renewal without unsealing (`reload`), the 30-day reminder; section 5c and the troubleshooting rows. Tested with throw-away certificates (`pnpm test:openbao`, `tls.test.ts`) |
 | 0.33 | 2026-10-09 | Claude Code (docs review E3) | Readability: AppRole, tidy, TTL and the wrapping token explained at first use; one name for the wrapping token; section 3.2 step 1 and section 5g step 3b split into short items |

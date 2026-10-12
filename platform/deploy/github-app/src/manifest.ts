@@ -6,7 +6,10 @@ import fs from 'node:fs';
 
 export type PermissionLevel = 'read' | 'write';
 
-/** The fields of `manifest.json`. `name` and `redirect_url` are added at run time. */
+/**
+ * The fields of `manifest.json`. `name`, `redirect_url` and `callback_urls` (the dashboard's
+ * sign-in callbacks, U05) are added at run time.
+ */
 export interface BaseManifest {
   readonly url: string;
   readonly description: string;
@@ -21,6 +24,38 @@ export interface BaseManifest {
 export interface Manifest extends BaseManifest {
   readonly name: string;
   readonly redirect_url: string;
+  readonly callback_urls: readonly string[];
+}
+
+/** The path of the api's sign-in callback (U05, ADR-M73 §2.2). */
+export const SIGN_IN_CALLBACK_PATH = '/v1/auth/github/callback';
+
+/** The default callback: the dashboard on a developer machine (`SDLC_API_PUBLIC_ORIGIN`). */
+export const DEFAULT_CALLBACK_URL = `http://localhost:8090${SIGN_IN_CALLBACK_PATH}`;
+
+/** At most this many callback URLs (GitHub allows 10). */
+export const MAX_CALLBACK_URLS = 10;
+
+/**
+ * A sign-in callback URL: the api's callback path on an `https://` origin, or plain `http://` on
+ * `localhost` only (the same rule as `SDLC_API_PUBLIC_ORIGIN`, ADR-M73 §2.3).
+ */
+export function isCallbackUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  return (
+    (url.protocol === 'https:' || (url.protocol === 'http:' && url.hostname === 'localhost')) &&
+    url.username === '' &&
+    url.password === '' &&
+    url.pathname === SIGN_IN_CALLBACK_PATH &&
+    url.search === '' &&
+    url.hash === '' &&
+    url.href === value
+  );
 }
 
 export class ManifestError extends Error {}
@@ -58,8 +93,13 @@ export function loadManifest(file: string): BaseManifest {
   return parseManifest(fs.readFileSync(file, 'utf8'));
 }
 
-export function buildManifest(base: BaseManifest, name: string, redirectUrl: string): Manifest {
-  return { ...base, name, redirect_url: redirectUrl };
+export function buildManifest(
+  base: BaseManifest,
+  name: string,
+  redirectUrl: string,
+  callbackUrls: readonly string[],
+): Manifest {
+  return { ...base, name, redirect_url: redirectUrl, callback_urls: [...callbackUrls] };
 }
 
 /** An organization login: letters, digits and single hyphens, at most 39 characters. */

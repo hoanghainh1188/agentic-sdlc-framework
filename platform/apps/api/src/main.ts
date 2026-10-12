@@ -6,7 +6,7 @@ import { SERVICE_NAME, tracing, tracingEndpointValid } from './telemetry.js';
 
 import 'reflect-metadata';
 
-import { GitHubAdapter } from '@sdlc/adapter-git-github';
+import { GitHubAdapter, GitHubSignIn } from '@sdlc/adapter-git-github';
 import { checkStoredConfigsAtStart, SPEC_MAX_BYTES } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 import { OpenBaoClient } from '@sdlc/secrets';
@@ -57,6 +57,23 @@ async function main(): Promise<void> {
     ? await loadDashboardFiles(settings.dashboardDir)
     : undefined;
   if (!dashboard) log.log('info', 'api.dashboard_off', { message: t('api.start.dashboard_off') });
+  // Dashboard sign-in with GitHub (U05, ADR-M73 §2.2): needs OpenBao for the App's client secret
+  // (`kv/api/github-oauth`), so it stays off in dev mode.
+  const webSignIn =
+    settings.webSignIn && secrets
+      ? {
+          settings: settings.webSignIn,
+          provider: new GitHubSignIn({
+            secrets,
+            oauthSecretPath: settings.webSignIn.oauthSecretPath,
+            webUrl: settings.webSignIn.githubWebUrl,
+            apiUrl: settings.webSignIn.githubApiUrl,
+          }),
+        }
+      : undefined;
+  if (settings.webSignIn && !webSignIn) {
+    log.log('warn', 'api.web_signin_off', { message: t('api.start.web_signin_dev_mode') });
+  }
   const app = await createApp({
     db,
     settings,
@@ -65,6 +82,7 @@ async function main(): Promise<void> {
     ...(gitHost ? { gitHost } : {}),
     ...(evidence ? { evidence } : {}),
     ...(dashboard ? { dashboard } : {}),
+    ...(webSignIn ? { webSignIn } : {}),
     ...(temporal ? { intentSignals: new TemporalIntentSignals(temporal.client) } : {}),
   });
   app
