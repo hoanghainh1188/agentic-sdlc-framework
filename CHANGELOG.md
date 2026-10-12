@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- `platform/DEVELOPMENT.md` (QUESTIONS #424, #425): the test suites and where they run, the live tests the owner runs, the test helpers and rules, and the test map by area, which `CLAUDE.md` held until now. A static test (`workspace/development-doc.test.ts`) checks that every `pnpm test:*` script has an entry there. `design/README.md` "Number blocks" keeps the full history of QUESTIONS and ADR numbers. A second pull request slims `CLAUDE.md`.
+
 ## [0.2.1] - 2026-10-12
 
 A small release of documentation and one fix of the release workflows: the npm page of `agentic-sdlc-cli` now tells newcomers that `sdlc` needs a running platform and which address to use; the guides are up to date with v0.2.0 (one wrong login instruction in the deploy README fixed); and the release workflows install cosign so that a short outage of GitHub's downloads no longer stops a release.
