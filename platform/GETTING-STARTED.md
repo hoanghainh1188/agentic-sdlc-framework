@@ -295,7 +295,7 @@ The `sdlc` command is published as `agentic-sdlc-cli` by `.github/workflows/npm-
 
 Done for v0.1.1 on 2026-10-10. The images on GHCR need no step: the packages are linked to this public repository and are public already (check: an anonymous pull of a release image works).
 
-**Every later release:** push the tag, approve the `npm` environment; the workflow publishes with provenance. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
+**Every later release:** follow [RELEASING.md](../RELEASING.md) (the whole release, steps 1–7); for npm, approve the `npm` environment when GitHub asks, and the workflow publishes with provenance after the same release gate as `release.yml`. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
 
 ## Sending handbook comments
 

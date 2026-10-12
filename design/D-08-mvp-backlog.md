@@ -1052,7 +1052,7 @@ flowchart LR
 
 | Size | Depends on | Requirements | Code area |
 |---|---|---|---|
-| S | V01 | NFR-07, NFR-08 | .github/workflows/* (release), CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, platform/tests/workspace/* |
+| S | V01 | NFR-07, NFR-08 | .github/workflows/* (release), platform/tools/release/*, RELEASING.md, CHANGELOG.md, CONTRIBUTING.md, SECURITY.md, platform/tests/workspace/* |
 
 **Acceptance criteria**
 
@@ -1061,7 +1061,7 @@ flowchart LR
 - [ ] AC3: Every CHANGELOG release section has "Upgrade notes" (migrations, credentials commands to run again, changed settings), checked by a test
 - [ ] AC4: Small releases: a v0.1.x when something useful lands without an upgrade step (for example the CLI on npm and `sdlc next`); v0.2.0 when the milestone UX is done or an upgrade step is needed
 
-> Note: QUESTIONS #364 (Harry, 2026-10-10). Releases, tags and npm publishes are public actions: ask Harry first. The upgrade test between two releases is O02 (Server)
+> Note: QUESTIONS #364 (Harry, 2026-10-10). Releases, tags and npm publishes are public actions: ask Harry first. The upgrade test between two releases is O02 (Server). AC2 as built (QUESTIONS #370, #390): the images are built before the tag, so `release.yml` on the tag runs the release gate `release-check.mjs`, verifies the images' signatures and attestations (never builds them) and creates the GitHub Release; npm stays its own tag workflow `npm-publish.yml` with the same gate (its trusted-publisher identity); `pnpm release:lock` prepares the lock file pull request. AC3: from 0.1.1 on (0.1.0, the first release, is exempt). RELEASING.md
 
 #### L02. Model benchmark on the pilot tasks (data for the GPU decision)
 
@@ -1489,6 +1489,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.33 | 2026-10-10 | Claude, approved by Harry | Review of the milestone UX: V05 adds `sdlc --version` and its smoke test runs `sdlc` without arguments (`sdlc help` comes with V10); V08 also updates CLAUDE.md and runbook T11; V09 names both sources of "not supported"; V11 starts now, before the trial data, and supersedes the E07 note (QUESTIONS #358) |
 | 1.34 | 2026-10-10 | Claude, approved by Harry | "MVP" retired: the platform backlog, v0.1.0 is the baseline (QUESTIONS #360); milestone UX gains V12 (release process) and L02 (model benchmark, early); new milestones EXT (X01–X04, X07, X09; QUESTIONS #361), Models (L01, L03; #362), Server (A10 moved there, O01–O03; #363), Later (was MVP+1: U01–U03 done, K02 superseded by X04, X05, X06, X08, X10); a public ROADMAP.md generated with D-08 |
 | 1.35 | 2026-10-10 | Claude (task V11), approved by Harry | V11 done (`design/MVP1-UI-SCOPE.md` 1.2, ADR-M73): new tasks U05–U07 in UX (GitHub sign-in and sessions, CSRF and passkey step-up, wave 1: kill, gate decisions, escalations) and U08–U09 in Later (waves 2 and 3); U05 includes the V03 change (the App keeps its client secret); no dependency on V09 (QUESTIONS #375–#380) |
+| 1.36 | 2026-10-10 | Claude (task V12), approved by Harry | V12 note: AC2 as built (the tag verifies the images built before it; npm stays its own workflow with the same gate; `pnpm release:lock`), AC3 from 0.1.1 on (QUESTIONS #390) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |

@@ -16,7 +16,7 @@ Never include real secrets, real client data or personal data in a report.
 ## What happens next
 
 - We confirm that we received the report within 5 working days.
-- We assess it, agree on a fix and a disclosure date with you, and credit you in the release notes unless you prefer not.
+- We assess it, agree on a fix and a disclosure date with you, and credit you in the release notes and the advisory unless you prefer not.
 - Until the fix is released, please keep the details private.
 
 ## Scope
@@ -35,4 +35,4 @@ Out of scope: problems in the reused components themselves (report them to their
 
 ## Supported versions
 
-Only the latest commit on `main` is supported while the project is before version 1.0.
+Only **the latest release** is supported ([RELEASING.md](RELEASING.md)): a fix, also a security fix, comes in a new release, and older releases get no patches. After the fix is released, the advisory is published as a GitHub Security Advisory.

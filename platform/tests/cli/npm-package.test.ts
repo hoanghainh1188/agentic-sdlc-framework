@@ -135,7 +135,10 @@ describe('npm-publish workflow', () => {
 
   it('checks the tag against the version, checks the package, then publishes with provenance', () => {
     const runs = job?.steps.flatMap((step) => (step.run ? [step.run] : [])) ?? [];
-    const tagCheck = runs.findIndex((r) => r.includes('"$TAG" != "v$version"'));
+    // V12: the release gate shared with release.yml (tag, package.json, PLATFORM_VERSION, ...).
+    const tagCheck = runs.findIndex((r) =>
+      r.includes('node platform/tools/release/release-check.mjs tag "$TAG"'),
+    );
     const packCheck = runs.findIndex((r) => r.includes('pnpm cli:pack-check'));
     const publishStep = runs.findIndex((r) => r.startsWith('npm publish'));
     expect(tagCheck).toBeGreaterThanOrEqual(0);
