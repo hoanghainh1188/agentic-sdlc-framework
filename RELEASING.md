@@ -58,6 +58,7 @@ Try the gate before you tag: `node platform/tools/release/release-check.mjs tag 
 | `release.yml` refuses the tag | Nothing was released: `npm-publish` refuses the same tag. The owner, as the tag ruleset's bypass actor (§4), deletes the tag (`git push origin :refs/tags/vX.Y.Z`) **only while it has no GitHub Release and no npm version**, fixes the cause in a pull request, and tags again. A tag that was released is never deleted: release the next patch version |
 | `release.yml` fails after a check passed (a network error) | Re-run the failed jobs. An existing GitHub Release is never changed: a release made by hand stays |
 | `npm-publish` fails | Fix the cause, then re-run the workflow. A version is never published twice |
+| A workflow fails while it installs cosign (a network error from GitHub) | `platform/tools/release/install-cosign.sh` already retried for about three minutes: re-run the failed jobs later. A new cosign version changes `COSIGN_VERSION` in the three release workflows and the SHA-256 pins in the script together (a test checks both) |
 | A released version is broken | Release the fix as the next patch version; `npm deprecate agentic-sdlc-cli@X.Y.Z "<reason>"` |
 
 ## 4. Repository settings (owner, once)
