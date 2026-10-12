@@ -7,7 +7,7 @@ The platform is built and tested, but no team has used it on a project yet. **We
 - **What it costs:** your time (about one day to set up, half a day per task, mostly waiting) and, with an API model, a few US dollars of tokens. The platform caps the spend of each task.
 - **No real data.** The sample project is fictional. Never use client code or real personal data in the trial.
 
-> **Status (2026-10-10):** the latest release is **v0.1.1** (the `sdlc` command on npm, `sdlc next`, published images). Start the trial from v0.1.0 or later; v0.1.1 is faster to set up.
+> **Status (2026-10-12):** the latest release is **v0.2.0** ([CHANGELOG](CHANGELOG.md)): `pnpm doctor` and `sdlc doctor`, a trial stack that survives a reboot (`pnpm trial:start` with your passphrase), and team access. Start the trial from v0.2.0 or a later release.
 
 The full plan behind this page, with every measure and rule: [`design/M-E-TRIAL-PLAN.md`](design/M-E-TRIAL-PLAN.md).
 
@@ -45,7 +45,7 @@ Best: two people. If you are alone, you may use a second GitHub account for Pers
 
 ### 3.2. The platform
 
-1. Clone this repository and check out the release: `git checkout v0.1.0` (or later). Then `corepack enable` and `pnpm install`. From the first release that publishes its images on GHCR (`platform/deploy/images.lock` is filled), a release checkout pulls the platform images and the sandbox image, pinned by digest, instead of building them: faster, and the images you run are the scanned and signed ones ([Verify the published images](platform/deploy/README.md#verify-the-published-images)). Keep the checkout unchanged, or the images are built locally again (`pnpm images mode` says which).
+1. Clone this repository and check out v0.2.0 or a later release (`git checkout v0.2.0`): the passphrase and `pnpm trial:start` need it. Then `corepack enable` and `pnpm install`. Every release since v0.1.1 publishes its images on GHCR, so a release checkout pulls the platform images and the sandbox image, pinned by digest, instead of building them: faster, and the images you run are the scanned and signed ones ([Verify the published images](platform/deploy/README.md#verify-the-published-images)). Keep the checkout unchanged, or the images are built locally again (`pnpm images mode` says which).
 2. Create **your own GitHub App** and install it on your fork only. In a terminal, run `pnpm github-app:create --out ~/secrets/sdlc-trial-app.private-key.pem`, open the local page it prints, press the button and confirm on GitHub; it saves the private key (mode 600) and prints the client ID and the install link ([Create the GitHub App](platform/deploy/README.md#create-the-github-app-operator), option A). By hand instead: option B there. Keep the private key in a file outside every repository, readable only by you (`chmod 600 <file>`).
 3. Clone **your fork** somewhere on the machine (the agent's instructions are read from `AGENTS.md` on its `main` branch).
 4. Choose a model (section 4). For the local model: `ollama pull gpt-oss:20b` first. For an API model: put the key alone in a file, `chmod 600`.
@@ -119,6 +119,7 @@ Stop and report at once if you see a `security` escalation, if `sdlc audit verif
    pnpm sdlc trial report --json > trial-report.json
    ```
    (Or `sdlc trial report --json …` with the npm package.)
+   A report for the whole tenant needs a tenant admin. After `pnpm trial:up` that is Person A, whose login is in the default config folder: run it as Person A, without Person B's `XDG_CONFIG_HOME`. If you set the platform up by hand, the operator runs it (the first user of `sdlc ops bootstrap` is the tenant admin).
    Read the file before you send it.
 2. Open an issue in this repository with the template **"Trial report"**: paste the JSON, your log, the model you used, your machine, and the problems you found (one issue per bug is even better: link them).
 3. Never paste tokens, keys, `.env` values or client data into an issue. A security problem goes through [SECURITY.md](SECURITY.md), never into a public issue.
@@ -127,6 +128,6 @@ Thank you. When enough reports have arrived (for example from three teams), we p
 
 ## 7. Help
 
-- Something does not work: first `pnpm doctor --env <the trial env file>` (the stack) and `sdlc doctor` (your login): both say what to fix and change nothing ([Doctor](platform/deploy/README.md#doctor-pnpm-doctor)). Then [platform/deploy/README.md, Troubleshooting](platform/deploy/README.md#troubleshooting) and [USER-GUIDE §5](platform/USER-GUIDE.md#5-when-something-goes-wrong).
+- Something does not work: first `pnpm doctor` (the stack; the trial uses the default env file `platform/deploy/.env`) and `sdlc doctor` (your login): both say what to fix and change nothing ([Doctor](platform/deploy/README.md#doctor-pnpm-doctor)). Then [platform/deploy/README.md, Troubleshooting](platform/deploy/README.md#troubleshooting) and [USER-GUIDE §5](platform/USER-GUIDE.md#5-when-something-goes-wrong).
 - A bug: open an issue with the bug template; say that you were in the trial.
 - A word or a code you do not know: the [glossary](handbook/00-introduction/02-glossary.md) and the [codes table](handbook/00-introduction/05-codes.md).
