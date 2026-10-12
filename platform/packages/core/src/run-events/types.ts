@@ -21,13 +21,22 @@ import { isUuid } from '../db/tenant-id.js';
  * - `code`: a short code such as `expired` or `G5` (letters, digits, `_ . : -`; max 64)
  * - `decimal`: an amount of money in USD as a decimal string with at most 6 decimals, never a
  *   float (D-05 D6; C07)
+ * - `model`: a model gateway name, which may hold `/` and be 128 characters long (V13,
+ *   QUESTIONS #434); still no space and no `@`, as the database CHECK requires
  */
-export type RunEventFieldKind = 'uuid' | 'sha256' | 'version' | 'count' | 'code' | 'decimal';
+export type RunEventFieldKind =
+  'uuid' | 'sha256' | 'version' | 'count' | 'code' | 'decimal' | 'model';
 export type RunEventFieldSpec = RunEventFieldKind | `${RunEventFieldKind}?`;
 
 export const RUN_EVENT_TYPES = {
   /** The worker issued and stored the signed Run Contract (C02). */
   contract_issued: { contract_sha256: 'sha256', key_version: 'version' },
+  /**
+   * The model the run calls (V13, QUESTIONS #434, ADR-M79 §2.3): the agent version's `model_ref`
+   * that G4 bound into the run proposal and the runner gives the agent. Written by `prepareRun`
+   * before the key is issued; skipped when the name does not fit the `model` format.
+   */
+  model_selected: { model: 'model' },
   /** The runner verified the contract and may start the sandbox (C02). */
   contract_accepted: { contract_sha256: 'sha256', key_version: 'version' },
   /** The runner refused the contract; `reason` is a `RunContractRejectReason` (C02). */
@@ -241,7 +250,16 @@ export const RUN_EVENT_TYPES = {
 export type RunEventType = keyof typeof RUN_EVENT_TYPES;
 
 type FieldValue<K> = K extends
-  'uuid' | 'uuid?' | 'sha256' | 'sha256?' | 'code' | 'code?' | 'decimal' | 'decimal?'
+  | 'uuid'
+  | 'uuid?'
+  | 'sha256'
+  | 'sha256?'
+  | 'code'
+  | 'code?'
+  | 'decimal'
+  | 'decimal?'
+  | 'model'
+  | 'model?'
   ? string
   : number;
 type Fields<T extends RunEventType> = (typeof RUN_EVENT_TYPES)[T];
@@ -261,6 +279,13 @@ export const MAX_RUN_EVENT_PAYLOAD_BYTES = 2048;
 const SHA256 = /^[0-9a-f]{64}$/;
 // No spaces (no sentences) and no '@' (no e-mail addresses).
 const CODE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
+// A gateway model name as the database CHECK accepts it: no space, no '@', no '+'.
+const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+
+/** Whether a model name can be recorded in a run event (`model_selected`, V13). */
+export function isRecordableModel(value: unknown): value is string {
+  return typeof value === 'string' && MODEL.test(value);
+}
 
 function isValidField(kind: RunEventFieldKind, value: unknown): boolean {
   switch (kind) {
@@ -276,6 +301,8 @@ function isValidField(kind: RunEventFieldKind, value: unknown): boolean {
       return typeof value === 'string' && CODE.test(value);
     case 'decimal':
       return isUsd(value);
+    case 'model':
+      return isRecordableModel(value);
   }
 }
 

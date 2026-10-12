@@ -38,6 +38,7 @@ import type { CostController } from '../cost/controller.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import type { Registry } from '../registry/registry.js';
 import { issueRunContract } from '../run-contract/issue.js';
+import { isRecordableModel } from '../run-events/types.js';
 import { gatherG4Facts, projectRepoRef, type G4Deps, type RunProposal } from './g4-proposal.js';
 import { evaluateG4, g4Decided } from './g4.js';
 import {
@@ -217,6 +218,11 @@ export async function prepareRun(
   }
 
   try {
+    // V13 (QUESTIONS #434): the model the run calls, so reports group runs by the model used. A
+    // name outside the event format is not recorded; the report then reads the cost records.
+    if (isRecordableModel(proposal.modelRef)) {
+      await scope.runEvents.append(runId, 'model_selected', { model: proposal.modelRef });
+    }
     // C07 (ADR-M34 §2.6): the key's cap and which budget set it (run, intent or tenant), so G5 and
     // the runner's spend check can be traced. The key and its ID never go into run events.
     await scope.runEvents.append(runId, 'key_issued', {
