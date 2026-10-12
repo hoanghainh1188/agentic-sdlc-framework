@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.41 |
+| Version | 1.42 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -1077,9 +1077,12 @@ flowchart LR
 - [ ] AC4: A comparison report with **confidence intervals** (bootstrap) and a paired test between two configurations on the same tasks (McNemar for pass/fail); one factor changes at a time; a quality-against-cost (Pareto) chart; scores also sent to Langfuse (datasets and scores) when the profile `observability` is on
 - [ ] AC5: Optional, measured before use: an LLM judge with a fixed rubric for what tests cannot check (readability, fit with `AGENTS.md`), checked against a human-scored sample (agreement reported); never the only signal
 - [ ] AC6: Runs with local models on Ollama (small and medium sizes) and, when a key exists, one API model; never a `:cloud` model; the report holds numbers only, never prompts, task text or code
-- [ ] AC7: ADR-M78 records the task set, the scoring, the statistics and how a new task or configuration is added; a short result table for leadership (which model size reaches which quality, the memory and speed), input for L01, L03 and X01
+- [ ] AC7: Pairwise comparison: Person B (or another reviewer) picks the better of two configurations' results for the same task, blind to which is which; the choices give a ranking (Elo or Bradley-Terry) next to the automatic scores
+- [ ] AC8: The task set grows: new tasks are added on a schedule and results are reported per task-set version, so a model cannot do well only because it has seen the tasks before
+- [ ] AC9: Before building the harness, a short spike compares existing open-source evaluation frameworks (for example Inspect, promptfoo, the SWE-bench harness, Langfuse experiments) for licence, maintenance and fit; reuse one if it fits, record the choice in ADR-M78
+- [ ] AC10: ADR-M78 records the task set, the scoring, the statistics and how a new task or configuration is added; a short result table for leadership (which model size reaches which quality, the memory and speed), input for L01, L03 and X01
 
-> Note: QUESTIONS #362 (Harry, 2026-10-10): many clients are `client_restricted`, so a self-hosted model is a condition to sell; the company has no GPU yet. QUESTIONS #422 (Harry, 2026-10-12): the benchmark becomes an evaluation harness for agents, models and prompts. Runs on a developer machine, in parallel with the milestone UX; split into PRs (harness and task set, then statistics and report)
+> Note: QUESTIONS #362 (Harry, 2026-10-10): many clients are `client_restricted`, so a self-hosted model is a condition to sell; the company has no GPU yet. QUESTIONS #422 (Harry, 2026-10-12): the benchmark becomes an evaluation harness for agents, models and prompts. Runs on a developer machine, in parallel with the milestone UX; split into PRs (spike and harness with the task set, then statistics, the pairwise ranking and the report). QUESTIONS #423 (Harry, 2026-10-12): follow established practice (SWE-bench-style hidden tests, pass^k, error bars, judged pairs, fresh tasks) and reuse a framework where it fits
 
 #### V13. Agent efficiency report from real runs: `sdlc metrics agents`
 
@@ -1558,6 +1561,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.39 | 2026-10-12 | Claude (task U06, PR 1), approved by Harry | U07 note: how to wire the step-up and the session routes that U06 built (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414). Numbered 1.38 at first, like the row above; renumbered in 1.40 |
 | 1.40 | 2026-10-12 | Claude (docs review for v0.2.0), approved by Harry | The header shows the latest version; the second 1.38 row renumbered 1.39; ROADMAP.md marks each released task with its release (v0.1.0, v0.1.1, v0.2.0). No task changed |
 | 1.41 | 2026-10-12 | Claude, approved by Harry | L02 becomes an evaluation harness for agents, models and prompts (hidden tests, N runs, pass^k, confidence intervals, ADR-M78), size L; new task V13, the agent efficiency report from real runs (QUESTIONS #422) |
+| 1.42 | 2026-10-12 | Claude, approved by Harry | L02: a blind pairwise ranking by a reviewer, a growing task set reported per version, and a spike that reuses an existing evaluation framework where it fits (QUESTIONS #423) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
