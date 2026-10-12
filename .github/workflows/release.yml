@@ -7,11 +7,12 @@
 #   PLATFORM_VERSION, the CHANGELOG section with its Upgrade notes, images.lock for this version
 #   with five digests), and the tagged commit is on main;
 # - verify-images: every digest of images.lock carries a cosign signature and a build provenance
-#   attestation made by release-images.yml on refs/heads/main (read only);
+#   attestation made by release-images.yml on refs/heads/main (platform/tools/release/
+#   verify-images.sh, read only);
 # - release: creates the GitHub Release from the CHANGELOG section; an existing release is never
 #   changed.
-# npm-publish.yml runs on the same tag with the same release-check.mjs, in its own file: npm's
-# trusted publisher names that file and the environment `npm` (ADR-M72 §2.3).
+# npm-publish.yml runs on the same tag with the same release-check.mjs and verify-images.sh, in
+# its own file: npm's trusted publisher names that file and the environment `npm` (ADR-M72 §2.3).
 name: release
 
 on:
@@ -27,10 +28,6 @@ concurrency:
 
 env:
   COSIGN_VERSION: v3.1.3
-  # The only signer of the platform's images (ADR-M66 §2.4), checked against the v0.1.1
-  # signatures and attestations on 2026-10-10.
-  SIGNER_IDENTITY: https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/heads/main
-  SIGNER_ISSUER: https://token.actions.githubusercontent.com
 
 jobs:
   check:
@@ -81,22 +78,12 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }} # the job's own token, read only; no repository secret
+      # The signer is pinned in the script, shared with npm-publish.yml: release-images.yml on main.
       - name: cosign verify and gh attestation verify, every image
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          while read -r ref; do
-            [ -n "$ref" ] || continue
-            echo "::group::$ref"
-            cosign verify --certificate-identity "$SIGNER_IDENTITY" \
-              --certificate-oidc-issuer "$SIGNER_ISSUER" "$ref" > /dev/null
-            gh attestation verify "oci://$ref" --repo "$GITHUB_REPOSITORY" \
-              --cert-identity "$SIGNER_IDENTITY" --cert-oidc-issuer "$SIGNER_ISSUER" > /dev/null
-            echo "::endgroup::"
-          done < "$RUNNER_TEMP/images.txt"
-          [ "$(grep -c . "$RUNNER_TEMP/images.txt")" = 5 ] || {
-            echo "::error::expected five images"; exit 1; }
+        run: platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt"
 
   release:
     name: create the GitHub Release

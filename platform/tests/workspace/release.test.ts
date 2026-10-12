@@ -287,19 +287,15 @@ describe('V12 AC2: release.yml', () => {
     }
   });
 
-  it('verifies every image with the exact signer of release-images.yml on main', () => {
-    expect(wf.env?.SIGNER_IDENTITY).toBe(SIGNER);
-    expect(wf.env?.SIGNER_ISSUER).toBe('https://token.actions.githubusercontent.com');
-    // Continuation lines joined, so the test reads one command per line.
-    const text = runs(job('verify-images')).replace(/\s*\\\n\s*/g, ' ');
-    expect(text).toContain(
-      'cosign verify --certificate-identity "$SIGNER_IDENTITY" --certificate-oidc-issuer "$SIGNER_ISSUER" "$ref"',
+  it('verifies every image with the shared script, which pins the exact signer', () => {
+    const verify = job('verify-images');
+    expect(runs(verify)).toContain(
+      'release-check.mjs tag "$TAG" --images-out "$RUNNER_TEMP/images.txt"',
     );
-    expect(text).toContain(
-      '--cert-identity "$SIGNER_IDENTITY" --cert-oidc-issuer "$SIGNER_ISSUER"',
+    expect(runs(verify)).toContain(
+      'platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt"',
     );
-    expect(text).not.toMatch(/regexp/);
-    expect(text).toContain('expected five images');
+    expect(verify.steps.some((st) => st.uses?.startsWith('sigstore/cosign-installer@'))).toBe(true);
   });
 
   it('the release comes after both checks, from the CHANGELOG section, and never changes an existing one', () => {
@@ -321,20 +317,62 @@ describe('V12 AC2: release.yml', () => {
   });
 });
 
-describe('V12: npm-publish.yml keeps its trusted-publisher identity and shares the gate', () => {
+describe('V12: verify-images.sh, the image check of both tag workflows', () => {
+  const script = read('platform/tools/release/verify-images.sh');
+  // Continuation lines joined, so the test reads one command per line.
+  const text = script.replace(/\s*\\\n\s*/g, ' ');
+
+  it('pins the exact signer and issuer of release-images.yml on main, never a pattern', () => {
+    expect(script).toContain(`SIGNER_IDENTITY='${SIGNER}'`);
+    expect(script).toContain("SIGNER_ISSUER='https://token.actions.githubusercontent.com'");
+    expect(text).toContain(
+      'cosign verify --certificate-identity "$SIGNER_IDENTITY" --certificate-oidc-issuer "$SIGNER_ISSUER" "$ref"',
+    );
+    expect(text).toContain(
+      '--cert-identity "$SIGNER_IDENTITY" --cert-oidc-issuer "$SIGNER_ISSUER"',
+    );
+    expect(script).not.toMatch(/regexp|--signer-workflow/);
+  });
+
+  it('fails on an error and unless it verified five images', () => {
+    expect(script).toContain('set -euo pipefail');
+    expect(script).toContain('if [ "$count" != 5 ]; then');
+    expect(
+      fs.statSync(path.join(root, 'platform/tools/release/verify-images.sh')).mode & 0o111,
+    ).not.toBe(0);
+  });
+});
+
+describe('V12: npm-publish.yml keeps its trusted-publisher identity and shares the checks', () => {
   const wf = parse(read('.github/workflows/npm-publish.yml')) as Workflow;
   const publish = wf.jobs.publish!;
+  const verify = wf.jobs['verify-images']!;
+  const runs = (j: Job) => j.steps.map((st) => st.run ?? '').join('\n');
 
   it('the file, the trigger and the environment npm are unchanged (npm names them)', () => {
     expect(fs.existsSync(path.join(root, '.github/workflows/npm-publish.yml'))).toBe(true);
     expect(wf.on).toEqual({ push: { tags: ['v*'] } });
+    expect(Object.keys(wf.jobs).sort()).toEqual(['publish', 'verify-images']);
     expect(publish.environment).toBe('npm');
     expect(publish.permissions).toEqual({ contents: 'read', 'id-token': 'write' });
   });
 
+  it('verifies the release images first, read only, and publish waits for it', () => {
+    expect(verify.permissions).toEqual({
+      contents: 'read',
+      packages: 'read',
+      attestations: 'read',
+    });
+    expect(verify.environment).toBeUndefined();
+    expect(runs(verify)).toContain(
+      'platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt"',
+    );
+    expect(publish.needs).toBe('verify-images');
+  });
+
   it('runs release-check.mjs on the tag before it builds the package', () => {
-    const gate = publish.steps.findIndex((s) => s.run?.includes('release-check.mjs tag "$TAG"'));
-    const build = publish.steps.findIndex((s) => s.run?.includes('cli:pack-check'));
+    const gate = publish.steps.findIndex((st) => st.run?.includes('release-check.mjs tag "$TAG"'));
+    const build = publish.steps.findIndex((st) => st.run?.includes('cli:pack-check'));
     expect(gate).toBeGreaterThan(-1);
     expect(gate).toBeLessThan(build);
   });

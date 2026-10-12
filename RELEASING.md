@@ -37,7 +37,7 @@ The images are built **before** the tag (QUESTIONS #370), so the tag holds the d
 | 3. The lock file pull request | Claude, merged by the owner | `pnpm release:lock <run-id>` copies that run's `images.lock` over `platform/deploy/images.lock`; it refuses a run that is not a successful `release-images` run on `main` or a lock file for another version |
 | 4. The tag | 🧑 owner | Tag **the merge commit of step 3** and push it: `git tag vX.Y.Z <commit> && git push origin vX.Y.Z` |
 | 5. The release | `release.yml` | Runs the release gate, checks that the commit is on `main`, verifies every image's cosign signature and build provenance attestation (signer: `release-images.yml` on `main`), then creates the GitHub Release from the CHANGELOG section |
-| 6. npm | `npm-publish.yml`, 🧑 owner approves | Runs the same release gate, builds and checks the package, waits for the owner's approval of the environment `npm`, publishes with provenance |
+| 6. npm | `npm-publish.yml`, 🧑 owner approves | Runs the same release gate and the same image check (job `verify-images`, `platform/tools/release/verify-images.sh`); only then does GitHub ask the owner to approve the environment `npm`. Approve it only when `release.yml` is green too. Then it builds and checks the package and publishes with provenance |
 | 7. Check | 🧑 owner | The GitHub Release exists; `npm view agentic-sdlc-cli version` shows `X.Y.Z`; on a clean checkout of the tag `pnpm images mode` prints `published` |
 
 The release gate is `platform/tools/release/release-check.mjs`. Both tag workflows run it; it refuses the tag when:
@@ -46,14 +46,16 @@ The release gate is `platform/tools/release/release-check.mjs`. Both tag workflo
 - the CHANGELOG has no `## [X.Y.Z] - YYYY-MM-DD` section, or its Upgrade notes are missing or empty;
 - `platform/deploy/images.lock` is for another version, or does not pin all five images by digest on `ghcr.io/hoanghainh1188/agentic-sdlc-framework`.
 
-Try it before you tag: `node platform/tools/release/release-check.mjs tag vX.Y.Z` on the commit you will tag.
+Both tag workflows also verify every image with `platform/tools/release/verify-images.sh`: a cosign signature and a build provenance attestation whose certificate names exactly `release-images.yml` on `refs/heads/main`. npm never publishes a release whose images fail this check.
+
+Try the gate before you tag: `node platform/tools/release/release-check.mjs tag vX.Y.Z` on the commit you will tag.
 
 ## 3. When something fails
 
 | Problem | What to do |
 |---|---|
 | `release-images` fails (a scan, a push) | Fix it in a pull request and run step 2 again. A version already on GHCR is refused: delete its packages' version on purpose first, or take the next patch version |
-| `release.yml` refuses the tag | Nothing was released. Delete the tag (`git push origin :refs/tags/vX.Y.Z`; only before any release or npm publish of it), fix the cause in a pull request, tag again |
+| `release.yml` refuses the tag | Nothing was released: `npm-publish` refuses the same tag. The owner, as the tag ruleset's bypass actor (§4), deletes the tag (`git push origin :refs/tags/vX.Y.Z`) **only while it has no GitHub Release and no npm version**, fixes the cause in a pull request, and tags again. A tag that was released is never deleted: release the next patch version |
 | `release.yml` fails after a check passed (a network error) | Re-run the failed jobs. An existing GitHub Release is never changed: a release made by hand stays |
 | `npm-publish` fails | Fix the cause, then re-run the workflow. A version is never published twice |
 | A released version is broken | Release the fix as the next patch version; `npm deprecate agentic-sdlc-cli@X.Y.Z "<reason>"` |
@@ -61,7 +63,7 @@ Try it before you tag: `node platform/tools/release/release-check.mjs tag vX.Y.Z
 ## 4. Repository settings (owner, once)
 
 - The environment `npm` with the owner as required reviewer, tags `v*` only (GETTING-STARTED, "Publishing the CLI on npm").
-- A **tag ruleset** for `v*`: only the owner may create tags; nobody may update or delete them.
+- A **tag ruleset** for `v*`: only the owner may create tags; nobody may update or delete them. The owner is the ruleset's only **bypass actor**, used for one case only: deleting a refused tag before any GitHub Release or npm publish of it (§3).
 - The five GHCR packages are public.
 - Never rename `npm-publish.yml` or the environment `npm`: npm's trusted publisher names both (ADR-M72 §2.3).
 
