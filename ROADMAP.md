@@ -42,6 +42,8 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **X04** The tool register and the first tool: search the project's documents
 - **X07** A context snapshot for every run
 - **X09** Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
+- **X11** Context condensing for agent runs
+- **X12** Design: agent memory across runs
 
 ## Models: Self-hosted models (QUESTIONS #362)
 
@@ -63,5 +65,6 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **X06** A code index for agents (Tree-sitter or SCIP and pgvector)
 - **X08** Knowledge for people and the G8 learning loop (design first)
 - **X10** An adapter for a second Git host
+- **X13** Agent memory
 
 Also later, not yet planned as tasks: webhooks instead of polling, a full policy engine (OPA or Cedar), an incident module, break-glass access, automatic rollback, the recertification workflow, client reports, SSO and Kubernetes, several agents in one intent (D-02 §4.2).
