@@ -3,8 +3,11 @@
 // schemas (`@sdlc/api-schemas`). A static test refuses any other `fetch` or method.
 //
 // U05 (ADR-M73 §2.2): with a GitHub sign-in the browser sends its `HttpOnly` session cookie
-// (`credentials: 'same-origin'`) and no Authorization header: never both. The only writes are the
-// two sign-out calls of `endSession`, which change no intent, gate, run or escalation.
+// (`credentials: 'same-origin'`) and no Authorization header: never both.
+//
+// U06 (ADR-M73 §2.3): writes go through `send` only, with the session cookie and the session's
+// CSRF token in `X-SDLC-CSRF`, a JSON body or none. The paths are fixed in `writes.ts` (sign out,
+// passkeys); a static test refuses any other. No write changes an intent, gate, run or escalation.
 import { errorEnvelopeSchema, webSessionSchema } from '@sdlc/api-schemas';
 import type { z } from 'zod';
 
@@ -86,30 +89,52 @@ export async function getPublicJson<S extends z.ZodType>(
   return parsed.data;
 }
 
+/** The session's CSRF token: from memory, or read once from `GET /v1/auth/session` (U06). */
+async function csrfToken(): Promise<string> {
+  const known = session.csrf();
+  if (known !== null) return known;
+  const read = await getJson(apiPath('/v1/auth/session'), webSessionSchema, { cookie: true });
+  session.setWebSession({ csrfToken: read.csrf_token, actions: read.actions });
+  return read.csrf_token;
+}
+
 /**
- * Ends the GitHub session (U05): `this` = this browser (`POST /v1/auth/sign-out`), `everywhere`
- * = every session of the person (`DELETE /v1/me/sessions`). The browser adds the `Origin` header;
- * U06 (ADR-M73 §2.3): the session's CSRF token, read just before from `GET /v1/auth/session`, goes
- * in `X-SDLC-CSRF` and is not kept. The API checks both. Fixed paths only.
+ * A write of the GitHub session (U06): POST or DELETE to a fixed path of `writes.ts`, the cookie,
+ * the CSRF token, a JSON body or none. The answer is checked with `schema`; `null` for no body.
  */
-export async function endSession(scope: 'this' | 'everywhere'): Promise<void> {
-  const { csrf_token: csrf } = await getJson('/v1/auth/session', webSessionSchema, {
-    cookie: true,
-  });
-  if (scope === 'this') await request('/v1/auth/sign-out', 'POST', { cookie: true }, csrf);
-  else await request('/v1/me/sessions', 'DELETE', { cookie: true }, csrf);
+export async function send<S extends z.ZodType>(
+  path: string,
+  method: 'POST' | 'DELETE',
+  schema: S | null,
+  body?: unknown,
+): Promise<z.infer<S> | undefined> {
+  if (!session.cookie()) throw new ApiError(401, 'unauthorized');
+  const csrf = await csrfToken();
+  const answer = await request(path, method, { cookie: true }, { csrf, body });
+  if (schema === null) return undefined;
+  const parsed = schema.safeParse(answer);
+  if (!parsed.success) throw new ApiError(200, 'invalid_response');
+  return parsed.data;
+}
+
+/** A write's CSRF token and JSON body (U06). */
+interface Write {
+  readonly csrf: string;
+  readonly body?: unknown;
 }
 
 async function request(
   path: string,
   method: 'GET' | 'POST' | 'DELETE',
   credential: Credential,
-  csrfOrSignal?: string | AbortSignal,
+  writeOrSignal?: Write | AbortSignal,
 ): Promise<unknown> {
-  const signal = typeof csrfOrSignal === 'string' ? undefined : csrfOrSignal;
+  const write = writeOrSignal instanceof AbortSignal ? undefined : writeOrSignal;
+  const signal = writeOrSignal instanceof AbortSignal ? writeOrSignal : undefined;
   const headers: Record<string, string> = { accept: 'application/json' };
   if ('token' in credential) headers.authorization = `Bearer ${credential.token}`;
-  if (typeof csrfOrSignal === 'string') headers['x-sdlc-csrf'] = csrfOrSignal;
+  if (write) headers['x-sdlc-csrf'] = write.csrf;
+  if (write?.body !== undefined) headers['content-type'] = 'application/json';
   let response: Response;
   try {
     response = await fetch(path, {
@@ -122,6 +147,7 @@ async function request(
       // a non-CORS mode the Fetch standard sends `Origin: null` (security review of U05 PR 2).
       referrerPolicy: method === 'GET' ? 'no-referrer' : 'same-origin',
       mode: 'same-origin',
+      ...(write?.body !== undefined ? { body: JSON.stringify(write.body) } : {}),
       ...(signal ? { signal } : {}),
     });
   } catch (error) {

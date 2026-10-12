@@ -1,11 +1,14 @@
 // The dashboard (task U01, design/ADR-M54): sign-in, then the screens of the route. Read only.
 // U05 (ADR-M73 §2.2): at start it asks whether GitHub sign-in is on and whether this browser is
 // signed in with GitHub already (its session cookie), and shows what the API's callback said.
+// U06 (ADR-M73 §2.3, §2.4): with a GitHub session it reads the session's CSRF token and whether
+// actions are on; then the person's passkeys have a screen.
 import type { Me } from '@sdlc/api-schemas';
 import { useEffect, useState } from 'preact/hooks';
 
-import { ApiError, endSession } from './api/client.js';
-import { readAuthConfig, readMeWithCookie } from './api/reads.js';
+import { ApiError } from './api/client.js';
+import { readAuthConfig, readMeWithCookie, readWebSession } from './api/reads.js';
+import { endSession } from './api/writes.js';
 import { Txt } from './components/common.js';
 import { t } from './i18n.js';
 import { href, useRoute, type Route } from './router.js';
@@ -15,6 +18,7 @@ import { Escalations } from './views/Escalations.js';
 import { IntentDetail } from './views/IntentDetail.js';
 import { IntentsBoard } from './views/IntentsBoard.js';
 import { Numbers } from './views/Numbers.js';
+import { Passkeys } from './views/Passkeys.js';
 import { SignIn, type SignInNotice } from './views/SignIn.js';
 
 /**
@@ -65,6 +69,8 @@ export function App() {
         if (config.github) {
           const found = await readMeWithCookie({ signal: abort.signal });
           session.signInWithCookie();
+          const web = await readWebSession({ signal: abort.signal });
+          session.setWebSession({ csrfToken: web.csrf_token, actions: web.actions });
           setMe(found);
         }
       } catch {
@@ -119,6 +125,9 @@ export function App() {
               <NavItem route={route} name="numbers" label={t('dashboard.nav.numbers')} />
               {me.tenant_admin === true && (
                 <NavItem route={route} name="audit" label={t('dashboard.nav.audit')} />
+              )}
+              {session.actions() && (
+                <NavItem route={route} name="passkeys" label={t('dashboard.nav.passkeys')} />
               )}
             </ul>
           </nav>
@@ -181,6 +190,8 @@ function Screen({ route, me }: { readonly route: Route; readonly me: Me }) {
       return <Escalations />;
     case 'numbers':
       return <Numbers me={me} query={route.query} />;
+    case 'passkeys':
+      return session.actions() ? <Passkeys /> : <IntentsBoard me={me} query={route.query} />;
     case 'audit':
       return me.tenant_admin === true ? <Audit /> : <IntentsBoard me={me} query={route.query} />;
     default:

@@ -6,7 +6,8 @@ export type Route =
   | { readonly name: 'intent'; readonly code: string; readonly query: URLSearchParams }
   | { readonly name: 'escalations'; readonly query: URLSearchParams }
   | { readonly name: 'numbers'; readonly query: URLSearchParams }
-  | { readonly name: 'audit'; readonly query: URLSearchParams };
+  | { readonly name: 'audit'; readonly query: URLSearchParams }
+  | { readonly name: 'passkeys'; readonly query: URLSearchParams };
 
 const INTENT_CODE = /^INT-[0-9]{4}-[0-9]{4,}$/;
 
@@ -21,6 +22,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'escalations') return { name: 'escalations', query };
   if (parts[0] === 'numbers') return { name: 'numbers', query };
   if (parts[0] === 'audit') return { name: 'audit', query };
+  if (parts[0] === 'passkeys') return { name: 'passkeys', query };
   return { name: 'intents', query };
 }
 

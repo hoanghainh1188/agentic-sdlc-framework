@@ -601,3 +601,27 @@ export type PasskeyView = z.infer<typeof passkeySchema>;
 
 /** `GET /v1/me/passkeys`, `GET /v1/admin/users/:user/passkeys` (U06). */
 export const passkeyListSchema = z.object({ items: z.array(passkeySchema).max(1000) });
+
+/**
+ * `POST /v1/me/passkeys/registration-options` (U06): the challenge's ID and the WebAuthn options,
+ * handed as they are to the browser's passkey library (it checks their shape).
+ */
+export const passkeyRegistrationOptionsSchema = z.object({
+  challenge_id: z.string().regex(UUID_TEXT),
+  options: z
+    .object({
+      challenge: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),
+      rp: z.object({ name: z.string().max(200), id: z.string().max(253).optional() }),
+      user: z.object({
+        id: z.string().max(200),
+        name: z.string().max(320),
+        displayName: z.string().max(200),
+      }),
+      pubKeyCredParams: z
+        .array(z.object({ type: z.literal('public-key'), alg: z.number() }))
+        .max(10),
+    })
+    .passthrough(),
+  expires_in_seconds: z.number().int().min(1).max(600),
+});
+export type PasskeyRegistrationOptions = z.infer<typeof passkeyRegistrationOptionsSchema>;

@@ -795,3 +795,36 @@ tbody th.mono {
     transform: none;
   }
 }
+
+/* U06: the person's passkeys */
+.passkey-table td {
+  vertical-align: middle;
+}
+
+.passkey-model {
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  overflow-wrap: anywhere;
+}
+
+.row-actions-cell {
+  text-align: end;
+}
+
+.row-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.button-danger {
+  border-color: var(--alert);
+  color: var(--alert);
+}
+
+.button-danger:hover {
+  background: var(--alert);
+  border-color: var(--alert);
+  color: var(--paper);
+}

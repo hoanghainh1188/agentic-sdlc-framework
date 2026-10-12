@@ -414,7 +414,17 @@ The dashboard shows in one page what the CLI shows one command at a time. **It o
 1. Paste your API token (`sdlc_pat_…`, the one you use for the CLI; create one with `sdlc token create`) and choose **Sign in**.
 2. The API token stays in the memory of that browser tab only. A reload, closing the tab or **Sign out** forgets it. The dashboard never puts it in the address, in browser storage or in a cookie. **Sign out** does not revoke the API token: `sdlc token revoke` does.
 
-Either way the dashboard only reads: signing in with GitHub adds no action. Decisions in the dashboard come later (ADR-M73).
+Either way the dashboard decides nothing yet: decisions in the dashboard come with task U07 (ADR-M73). Its only changes are your own session (sign out) and, with actions on, your own passkeys.
+
+**Passkeys** (task U06, when the operator turned actions on: `SDLC_API_DASHBOARD_ACTIONS=on`). A passkey is a key that your device keeps and unlocks with your fingerprint, face or PIN. The dashboard will ask for it before each decision you make there (task U07), so a stolen session alone cannot decide.
+
+1. Sign in **with GitHub** (the personal token has no passkey screen). The menu then shows **Passkeys**.
+2. Within **5 minutes** of signing in, open **Passkeys** and choose **Add a passkey**. Your browser asks your device; confirm with your fingerprint, face or PIN. After 5 minutes the platform refuses: sign out, sign in with GitHub again, and add it at once.
+3. Add one on each device you use; at most 10. The list shows when each was added and last used, and the authenticator's model number when the device reports one. The platform keeps only the public part of the key, never a name or a secret.
+4. **Remove** a passkey you no longer use (a lost or replaced device): choose **Remove**, then **Remove this passkey**. A tenant admin can list and remove a person's passkeys: `sdlc admin passkey list --user <id or email> [--all]`, `sdlc admin passkey revoke --user <id or email> --id <passkey-id>`.
+5. A passkey belongs to the address you made it on: one made on `http://localhost:8090` does not work on the team address, and the other way round. Add one where you work.
+6. Each change the page sends carries a security token of your session and comes from the dashboard's own address; the platform refuses anything else. If a change fails with "did not come from the dashboard page", reload the page.
+7. Without a passkey you can still read in the dashboard and decide with the CLI or a comment on GitHub.
 
 The dashboard is for the platform machine itself. Do not open the API's port to other machines for it: that needs TLS and a review first.
 
@@ -427,6 +437,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | **Escalations** | Open and acknowledged escalations, the nearest deadline first: severity, route, the role that holds the current step, the acknowledge or resolve clock | `sdlc escalation list` |
 | **Cost and gate times** | Per project (or the whole tenant, for tenant admins): how long each gate waits for people (average, 90th percentile, longest, waiting now), and the model cost by intent, model or run status, with the wasted part | `sdlc metrics gates`, `sdlc cost report` |
 | **Audit check** | Tenant admins only: checks the tenant's audit chain, on request | `sdlc audit verify` |
+| **Passkeys** | With a GitHub sign-in and actions on: your passkeys; add and remove them | `sdlc admin passkey list` (tenant admins, for a person) |
 
 **"Who decides this gate" and "what holds it".** "Who decides this gate" names the people (or the platform) that decide the gate. **What holds it** shows why the platform keeps the intent where it is, as the workflow recorded it the last time it looked: a failed G4 check and which one, a plan to submit again, a spec that cannot be read, a frozen intent, CI still running, a HOTL block window and when it closes. The board shows it on the card as **held**. A plain wait for a person's decision is not a hold. The same reason is printed by `sdlc intent show`.
 
@@ -495,6 +506,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.33 | 2026-10-12 | Claude (task U05) | §19.8e: sign in to the dashboard with GitHub, the session, sign out, sign out everywhere, `sdlc admin user sign-out` (ADR-M73 §2.2) |
 | 0.30 | 2026-10-10 | Claude (task V05) | §19.8c: install the `sdlc` command from npm (`agentic-sdlc-cli`), `sdlc --version` |
 | 0.34 | 2026-10-12 | Claude (task V09, PR 2) | §19.8c, §19.8e: the team address through the TLS proxy, `NODE_EXTRA_CA_CERTS` with the operator's `ca.pem`, the dashboard and the GitHub sign-in on the team address, Safari there |
+| 0.35 | 2026-10-12 | Claude (task U06, PR 2) | §19.8e: passkeys in the dashboard (add within 5 minutes of a GitHub sign-in, remove, `sdlc admin passkey`), the session's security token on each change; decisions still to come (ADR-M73 §2.3, §2.4) |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

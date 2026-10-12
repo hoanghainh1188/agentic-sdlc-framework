@@ -10,7 +10,9 @@ import {
   intentDetailSchema,
   intentPageSchema,
   meSchema,
+  passkeyListSchema,
   runListSchema,
+  webSessionSchema,
   type EscalationView,
   type IntentView,
 } from '@sdlc/api-schemas';
@@ -28,6 +30,14 @@ export const readMe = (token?: string, o: Signal = {}) =>
 /** U05: is this browser signed in with GitHub? (`GET /v1/me` with the session cookie only.) */
 export const readMeWithCookie = (o: Signal = {}) =>
   getJson(apiPath('/v1/me'), meSchema, { ...o, cookie: true });
+
+/** U06: the GitHub session's CSRF token and whether actions are on (`GET /v1/auth/session`). */
+export const readWebSession = (o: Signal = {}) =>
+  getJson(apiPath('/v1/auth/session'), webSessionSchema, { ...o, cookie: true });
+
+/** U06: the person's own passkeys (active and removed). */
+export const readPasskeys = (o: Signal = {}) =>
+  getJson(apiPath('/v1/me/passkeys'), passkeyListSchema, o);
 
 /** U05: is GitHub sign-in on? A public read, no credential. */
 export const readAuthConfig = (o: Signal = {}) =>

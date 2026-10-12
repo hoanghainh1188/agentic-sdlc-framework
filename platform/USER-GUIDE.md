@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.12, 2026-10-10. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
+Version 0.14, 2026-10-12. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
 
 ---
 
@@ -226,7 +226,7 @@ Every command takes `--json`. Exit code 0 means done; 4 means log in again with 
 
 ### The dashboard (read only)
 
-The dashboard shows intents by gate, escalations, cost and gate waiting times; it never decides anything. Where to open it, how to sign in and what each screen shows: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only).
+The dashboard shows intents by gate, escalations, cost and gate waiting times; it decides nothing yet. With a GitHub sign-in and actions on, add a **passkey** there within 5 minutes of signing in: the dashboard will ask for it before each decision made there (coming with task U07). Where to open it, how to sign in, passkeys and what each screen shows: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only).
 
 ## 5. When something goes wrong
 
@@ -280,6 +280,7 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 | 0.5 | 2026-10-09 | Docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists |
 | 0.6 | 2026-10-09 | Docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate |
 | 0.7 | 2026-10-09 | Docs review E2: §1 and §7 link to the handbook sections |
+| 0.14 | 2026-10-12 | Task U06: §4, passkeys in the dashboard |
 | 0.13 | 2026-10-12 | Task V07: `sdlc doctor`, check your login and the API (§2, §4, §5) |
 | 0.12 | 2026-10-10 | Task V06: `sdlc next <INT>`, what to do now (§3, §4, §5) |
 | 0.11 | 2026-10-10 | Task V05: §2, install the `sdlc` command from npm (`agentic-sdlc-cli`); the checkout ways stay for developers |
