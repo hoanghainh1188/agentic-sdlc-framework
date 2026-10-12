@@ -480,13 +480,24 @@ t("V12","UX","Release process: SemVer, a tag-driven release workflow, upgrade no
   "Every CHANGELOG release section has \"Upgrade notes\" (migrations, credentials commands to run again, changed settings), checked by a test",
   "Small releases: a v0.1.x when something useful lands without an upgrade step (for example the CLI on npm and `sdlc next`); v0.2.0 when the milestone UX is done or an upgrade step is needed"],
  "QUESTIONS #364 (Harry, 2026-10-10). Releases, tags and npm publishes are public actions: ask Harry first. The upgrade test between two releases is O02 (Server). AC2 as built (QUESTIONS #370, #390): the images are built before the tag, so `release.yml` on the tag runs the release gate `release-check.mjs`, verifies the images' signatures and attestations (never builds them) and creates the GitHub Release; npm stays its own tag workflow `npm-publish.yml` with the same gate (its trusted-publisher identity); `pnpm release:lock` prepares the lock file pull request. AC3: from 0.1.1 on (0.1.0, the first release, is exempt). RELEASING.md")
-t("L02","UX","Model benchmark on the pilot tasks (data for the GPU decision)","M",["C05"],"D-07 §3, §4, NFR-01",
- "platform/tests/integration/agent/*, package.json, design/D-07 (results), docs of the benchmark",
- ["`pnpm test:model-bench` (developer machines, never in CI): runs pilot tasks (T01–T08 shapes) with one model behind LiteLLM and records time, model calls, tokens, cost (internal for self-hosted), CI result and the share of acceptance criteria met; the same task set for every model",
-  "Runs with local models on Ollama (small and medium sizes) and, when a key exists, one API model for comparison; never a `:cloud` model; the report holds numbers only, never prompts or code",
-  "A short result table for leadership: which model size reaches which quality, the memory it needed, the speed; input for L03",
-  "Reuses `pnpm test:agent-real` (C05) and the pilot stack (C09); no new runtime dependency"],
- "QUESTIONS #362 (Harry, 2026-10-10): many clients are `client_restricted`, so a self-hosted model is a condition to sell; the company has no GPU yet. Runs early, in parallel with the milestone UX, on a developer machine")
+t("L02","UX","Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision)","L",["C05"],"D-07 §3, §4, §5, NFR-01",
+ "platform/tests/integration/agent/* (or platform/eval/*), package.json, design/ADR-M78, design/D-07 (results), docs of the harness",
+ ["`pnpm eval` (developer machines, never in CI) runs a fixed task set on the sample repository: T01–T08 shapes plus a few seeded bug fixes, each with **hidden acceptance tests** the agent never sees (fail-to-pass for the new behaviour, pass-to-pass for what must not break)",
+  "One configuration = agent × model × instructions version (the agent register already pins the model and the hash of the instructions); each task runs **N times** (default 5) per configuration, because model output varies",
+  "Per configuration and task, numbers only: resolve rate (hidden tests pass), **pass@k and pass^k** (at least one / all of k runs), CI on the first try, scope breaches (G5), stops (loop, caps), new static-analysis findings, diff size, time, model calls, tokens, cost (internal cost for self-hosted), cost per resolved task",
+  "A comparison report with **confidence intervals** (bootstrap) and a paired test between two configurations on the same tasks (McNemar for pass/fail); one factor changes at a time; a quality-against-cost (Pareto) chart; scores also sent to Langfuse (datasets and scores) when the profile `observability` is on",
+  "Optional, measured before use: an LLM judge with a fixed rubric for what tests cannot check (readability, fit with `AGENTS.md`), checked against a human-scored sample (agreement reported); never the only signal",
+  "Runs with local models on Ollama (small and medium sizes) and, when a key exists, one API model; never a `:cloud` model; the report holds numbers only, never prompts, task text or code",
+  "ADR-M78 records the task set, the scoring, the statistics and how a new task or configuration is added; a short result table for leadership (which model size reaches which quality, the memory and speed), input for L01, L03 and X01"],
+ "QUESTIONS #362 (Harry, 2026-10-10): many clients are `client_restricted`, so a self-hosted model is a condition to sell; the company has no GPU yet. QUESTIONS #422 (Harry, 2026-10-12): the benchmark becomes an evaluation harness for agents, models and prompts. Runs on a developer machine, in parallel with the milestone UX; split into PRs (harness and task set, then statistics and report)")
+t("V13","UX","Agent efficiency report from real runs: `sdlc metrics agents`","M",["E04","E06"],"FR-12, FR-53, D-07 §5",
+ "platform/packages/core (metrics), platform/apps/api (metrics endpoint), platform/apps/cli (metrics agents), platform/packages/api-schemas, platform/tests/*, handbook Ch.19 §19.8c",
+ ["`GET /v1/metrics/agents` and `sdlc metrics agents [--project] [--agent] [--model] [--from] [--to] [--json]`: per agent version and model, from data the platform already records (runs, run events, gate decisions, `intent.closed`, cost records); no new table",
+  "Measures: runs and how they ended (succeeded, proposal only, failed, each stop reason), CI on the first try at G6, the share of intents merged without a request for changes at G7, G5 scope breaches, retries, lead time, tokens and cost per run, **cost per merged intent**, wasted cost (ended runs that did not count), cache share of input tokens",
+  "Same access rules as the cost report and gate metrics (config `access.*_read_roles`, never `viewer`; tenant admins); range half-open UTC, default the last 30 days; sums in SQL; money as decimal strings; numbers and codes only, never a person or a text",
+  "Optional baseline: a person may record an estimate of the human effort for an intent (hours, a number) so that the report can show the time compared with it; empty by default",
+  "Tests: `pnpm test` (the CLI, the rules), `pnpm test:db` (each measure on seeded runs, tenants, roles); handbook Ch.19 usage; the dashboard may show it later"],
+ "QUESTIONS #422 (Harry, 2026-10-12): measure whether agents and models are worth it in real work, next to the evaluation harness (L02). The `sdlc trial report` (V01) may include its numbers later")
 t("X01","EXT","Spike: a second, open-source coding agent (Aider or OpenCode)","S",["C05"],"NFR-04, NFR-05, D-02 §4.2",
  "platform/spikes/agent2/* (thrown away), design/ADR-M68",
  ["Run Aider and OpenCode (pinned) in the node24 sandbox: the model only through LiteLLM with the run's virtual key, no other egress, no Git push; iteration and time caps, a stop on request, and counts for loop detection (`events`, `identicalCalls`)",
@@ -612,7 +623,7 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.40 |
+| Version | 1.41 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -661,7 +672,7 @@ flowchart LR
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
-    ME --> UX["UX V04–V12, U05–U07, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
+    ME --> UX["UX V04–V13, U05–U07, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
     UX --> EXT["EXT X01–X04, X07, X09, X11, X12 (v0.4.0)"]
     EXT --> MO["Models L01, L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
@@ -778,6 +789,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.38 | 2026-10-12 | Claude, approved by Harry | Release v0.2.0 after V08, without waiting for U06 and U07; the rest of the milestone UX (U07, V10, L02) goes into v0.3.0 and EXT moves to v0.4.0 (QUESTIONS #420) |
 | 1.39 | 2026-10-12 | Claude (task U06, PR 1), approved by Harry | U07 note: how to wire the step-up and the session routes that U06 built (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414). Numbered 1.38 at first, like the row above; renumbered in 1.40 |
 | 1.40 | 2026-10-12 | Claude (docs review for v0.2.0), approved by Harry | The header shows the latest version; the second 1.38 row renumbered 1.39; ROADMAP.md marks each released task with its release (v0.1.0, v0.1.1, v0.2.0). No task changed |
+| 1.41 | 2026-10-12 | Claude, approved by Harry | L02 becomes an evaluation harness for agents, models and prompts (hidden tests, N runs, pass^k, confidence intervals, ADR-M78), size L; new task V13, the agent efficiency report from real runs (QUESTIONS #422) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |

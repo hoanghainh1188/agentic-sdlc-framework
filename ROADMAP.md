@@ -32,7 +32,8 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **U06** Dashboard writes: CSRF, origin check, passkey step-up (done, v0.2.0)
 - **U07** Dashboard wave 1: kill a run, gate decisions, escalations
 - **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes (done, v0.2.0)
-- **L02** Model benchmark on the pilot tasks (data for the GPU decision)
+- **L02** Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision)
+- **V13** Agent efficiency report from real runs: `sdlc metrics agents`
 
 ## EXT: Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420)
 
