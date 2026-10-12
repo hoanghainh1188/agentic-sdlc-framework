@@ -2,7 +2,16 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-12
+
+A small release of documentation and one fix of the release workflows: the npm page of `agentic-sdlc-cli` now tells newcomers that `sdlc` needs a running platform and which address to use; the guides are up to date with v0.2.0 (one wrong login instruction in the deploy README fixed); and the release workflows install cosign so that a short outage of GitHub's downloads no longer stops a release.
+
+### Upgrade notes
+- No migration, no changed setting, no credentials command, nothing to rebuild for a running stack. Update the `sdlc` command if you like: `npm install -g agentic-sdlc-cli@0.2.1` (its behaviour does not change; its npm page does).
+- If you followed the old "Team access" text and set `SDLC_API_URL` in your shell without `SDLC_API_TOKEN`, remove it: every `sdlc` command fails with it. Sign in with `sdlc login --api-url https://<host name>:8443` instead.
+
 ### Changed
+- ADR-M67 1.1 (QUESTIONS #421, Harry): §2.8 says the CLI signs in with `sdlc login --api-url`, like the deploy README. Wording fix; the design does not change.
 - The npm page of `agentic-sdlc-cli` (its README) and USER-GUIDE §2: `sdlc` is a client that needs a running platform (links to the trial and the fresh deployment), which address to use where the platform runs (`http://127.0.0.1:8090` on the same machine, `https://<server name>:8443` through team access, `NODE_EXTRA_CA_CERTS` for a company CA), where the token comes from, and `sdlc doctor` and `sdlc next` as the first commands. The npm page changes with the next published version. Documentation only.
 - GETTING-STARTED "Publishing the CLI on npm" and RELEASING.md §3: what the first workflow publish (v0.2.0) taught: `ENEEDAUTH` means the npm trusted publisher is wrong or expired (delete it and add it again, publish only), npm shows a new version as "validating" for some minutes, and how to check the provenance. Documentation only.
 - Documentation review after v0.2.0: deploy/README "Team access" said to set `SDLC_API_URL` for `sdlc login`, which fails without `SDLC_API_TOKEN` (`cli.env.incomplete`): it now says `sdlc login --api-url https://<host name>:8443`; ADR-M67 §2.8 has the same sentence and waits for Harry (QUESTIONS #421). TRIAL.md, USER-GUIDE and the npm page follow v0.2.0 (the release to check out, `pnpm doctor` on the default env file, who runs `sdlc trial report`, npm provenance from v0.2.0 on, the first token lives at most 7 days, the dashboard's address); README, ROLLOUT-GUIDE, deploy/README "Upgrade" (to a release tag, with its Upgrade notes), handbook Ch.19 and RELEASING.md §1 follow v0.2.0 too; ROADMAP marks the tasks released in v0.1.1 and v0.2.0, and the D-08 header shows its latest version. Documentation only.

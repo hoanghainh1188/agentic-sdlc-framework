@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Accepted** (Harry, 2026-10-12; PR #301 merged). Built by task V09 PR 2; version 1.0 records the names as built (§2.2b) |
+| Status | **Accepted** (Harry, 2026-10-12; PR #301 merged). Built by task V09 PR 2; version 1.1 corrects the CLI sentence of §2.8 (QUESTIONS #421); version 1.0 records the names as built (§2.2b) |
 | Date | 2026-10-12 |
 | Decided by | Harry (V09 plan approved 2026-10-12 with the answers to QUESTIONS #405–#409, plus two changes: the proxy allows `/health/ready`, and the upgrade step for the fixed proxy address is written down) |
 | Related | D-08 task V09 (AC1–AC4); D-03 §9, §10, §10.1, §12 (version 1.41); ADR-M26 §2.7 (the api's per-address limits and `trustProxy`); ADR-M36 (the CLI's TLS rules); ADR-M54 (the dashboard, 127.0.0.1 only); ADR-M63 (OpenBao TLS, the internal CA); ADR-M73 (the dashboard's actions, `SDLC_API_PUBLIC_ORIGIN`, `__Host-` cookies); ADR-M66 (published images); D-08 V07 (`doctor`), U05–U07, O01, O03; QUESTIONS #405–#409 |
@@ -98,7 +98,7 @@ An allow-list; everything else answers `404`:
 ### 2.8. With the rest of the platform
 
 - **The dashboard's actions (ADR-M73):** with the profile `access`, `SDLC_API_PUBLIC_ORIGIN` must be the proxy's origin, `https://<host name>[:port]`; `up.sh` and `pnpm doctor` check it. There is **one** public origin (QUESTIONS #409): while access is on, the GitHub sign-in on `http://localhost:8090` stops working. The GitHub App lists `https://<host name>[:port]/v1/auth/github/callback` (`pnpm github-app:create --callback-url` for a new App, added by hand in the App's settings for an existing one). `__Host-` cookies work over the HTTPS origin, in WebKit too. Passkeys use the host name: people register them again there. Actions stay off until the operator turns them on.
-- **The CLI:** `SDLC_API_URL=https://<host name>[:port]` and `NODE_EXTRA_CA_CERTS=<ca.pem>`; the CLI's rules do not change. `sdlc doctor` names `NODE_EXTRA_CA_CERTS` when it sees a CA error.
+- **The CLI:** `sdlc login --api-url https://<host name>[:port]` and `NODE_EXTRA_CA_CERTS=<ca.pem>`; the CLI's rules do not change (`SDLC_API_URL` with `SDLC_API_TOKEN` replaces the login in CI only). `sdlc doctor` names `NODE_EXTRA_CA_CERTS` when it sees a CA error.
 - **`pnpm doctor` (V07)** adds: the proxy healthy (skipped when the profile is not configured), the certificate files, their end date (warning within 30 days), the host name in the certificate, the published ports (only `sdlc-access` on a non-loopback address, every other port on `127.0.0.1`), the public origin, and `SDLC_API_TRUSTED_PROXY` equal to the proxy's address.
 - **The trial stack** (`pnpm trial:up`) never turns access on.
 
@@ -134,6 +134,7 @@ An allow-list; everything else answers `404`:
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 1.1 | 2026-10-12 | Claude (coordinator), approved by Harry | §2.8: the CLI signs in with `sdlc login --api-url`; `SDLC_API_URL` alone makes every command fail (QUESTIONS #421). Wording fix; the design does not change |
 | 1.0 | 2026-10-12 | Claude (task V09, PR 2) | Accepted (PR #301 merged, Harry 2026-10-12). §2.2b: the names as built (`SDLC_ACCESS_HOST_PORT` instead of `SDLC_ACCESS_PORT`, the rate settings, nginx-unprivileged 1.30.4, the throw-away projects' own network `access`); meaning unchanged |
 | 0.2 | 2026-10-12 | Claude (task V09, PR 1), after Harry's review of PR #301 | §2.5: a small network `access` for the proxy and the api only (its own subnet, the proxy's fixed address there, the api always on it), the proxy not on `sdlc`; §2.6: existing stacks need no network step, `up.sh` checks; §3: the `ip_range` option rejected; §4 |
 | 0.1 | 2026-10-12 | Claude (task V09, PR 1) | First version: nginx, one LAN port, routes (with `/health/ready`), headers and limits, the trusted forwarded address and the network's allocation range with its upgrade step (replaced in 0.2), certificates, ADR-M73, the CLI and doctor, tests (QUESTIONS #405–#409) |
