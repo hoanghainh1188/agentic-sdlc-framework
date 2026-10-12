@@ -612,8 +612,8 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.0 |
-| Date | 2026-09-24 |
+| Version | 1.40 |
+| Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-05 (data), D-07 (tokens), D-09 (sample repo) |
@@ -776,7 +776,8 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.36 | 2026-10-10 | Claude (task V12), approved by Harry | V12 note: AC2 as built (the tag verifies the images built before it; npm stays its own workflow with the same gate; `pnpm release:lock`), AC3 from 0.1.1 on (QUESTIONS #390) |
 | 1.37 | 2026-10-12 | Claude, approved by Harry | New tasks X11 (context condensing for agent runs) and X12 (design: agent memory across runs) in EXT, X13 (agent memory) in Later (QUESTIONS #395) |
 | 1.38 | 2026-10-12 | Claude, approved by Harry | Release v0.2.0 after V08, without waiting for U06 and U07; the rest of the milestone UX (U07, V10, L02) goes into v0.3.0 and EXT moves to v0.4.0 (QUESTIONS #420) |
-| 1.38 | 2026-10-12 | Claude (task U06, PR 1), approved by Harry | U07 note: how to wire the step-up and the session routes that U06 built (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414) |
+| 1.39 | 2026-10-12 | Claude (task U06, PR 1), approved by Harry | U07 note: how to wire the step-up and the session routes that U06 built (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414). Numbered 1.38 at first, like the row above; renumbered in 1.40 |
+| 1.40 | 2026-10-12 | Claude (docs review for v0.2.0), approved by Harry | The header shows the latest version; the second 1.38 row renumbered 1.39; ROADMAP.md marks each released task with its release (v0.1.0, v0.1.1, v0.2.0). No task changed |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
@@ -790,7 +791,10 @@ with open('design/D-08-backlog.csv','w',newline='',encoding='utf-8') as f:
 # ---------- ROADMAP.md (public, generated) ----------
 RM_MS=["M-E","UX","EXT","Models","Server","Later"]
 SKIP_LATER={"U01","U02","U03","K02"}
-DONE={"V01","V02","V03"}
+# Released tasks shown in ROADMAP.md: task -> the release that shipped it.
+DONE={**{t:"v0.1.0" for t in ("V01","V02","V03")},
+      **{t:"v0.1.1" for t in ("V04","V05","V06")},
+      **{t:"v0.2.0" for t in ("V07","V08","V09","V11","V12","U05","U06")}}
 r=[]; a=r.append
 a("""# Roadmap
 
@@ -806,7 +810,7 @@ for m,d in MS:
     ts=[x for x in T if x['ms']==m and x['id'] not in SKIP_LATER]
     if not ts: continue
     a(f"\n## {m}: {d}\n")
-    for x in ts: a(f"- **{x['id']}** {x['title']}" + (" (done, v0.1.0)" if x['id'] in DONE else ""))
+    for x in ts: a(f"- **{x['id']}** {x['title']}" + (f" (done, {DONE[x['id']]})" if x['id'] in DONE else ""))
 a("""
 Also later, not yet planned as tasks: webhooks instead of polling, a full policy engine (OPA or Cedar), an incident module, break-glass access, automatic rollback, the recertification workflow, client reports, SSO and Kubernetes, several agents in one intent (D-02 §4.2).
 """)

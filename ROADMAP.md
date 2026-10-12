@@ -20,18 +20,18 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 
 ## UX: Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420)
 
-- **V04** Publish the platform's images to GHCR for each release
-- **V05** Install the `sdlc` command with one command (npm package `agentic-sdlc-cli`)
-- **V06** `sdlc next <INT>`: where an intent is and what to do now
-- **V07** `doctor`: check a deployment and a login, and say what to fix
-- **V08** The trial stack survives a reboot
-- **V09** Team access from other machines (TLS reverse proxy)
+- **V04** Publish the platform's images to GHCR for each release (done, v0.1.1)
+- **V05** Install the `sdlc` command with one command (npm package `agentic-sdlc-cli`) (done, v0.1.1)
+- **V06** `sdlc next <INT>`: where an intent is and what to do now (done, v0.1.1)
+- **V07** `doctor`: check a deployment and a login, and say what to fix (done, v0.2.0)
+- **V08** The trial stack survives a reboot (done, v0.2.0)
+- **V09** Team access from other machines (TLS reverse proxy) (done, v0.2.0)
 - **V10** A friendlier CLI: `sdlc help`, hints, clearer errors
-- **V11** Plan the dashboard's actions (design only)
-- **U05** Dashboard sign-in with GitHub and server-side sessions
-- **U06** Dashboard writes: CSRF, origin check, passkey step-up
+- **V11** Plan the dashboard's actions (design only) (done, v0.2.0)
+- **U05** Dashboard sign-in with GitHub and server-side sessions (done, v0.2.0)
+- **U06** Dashboard writes: CSRF, origin check, passkey step-up (done, v0.2.0)
 - **U07** Dashboard wave 1: kill a run, gate decisions, escalations
-- **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes
+- **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes (done, v0.2.0)
 - **L02** Model benchmark on the pilot tasks (data for the GPU decision)
 
 ## EXT: Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420)
