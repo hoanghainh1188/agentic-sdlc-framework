@@ -109,7 +109,8 @@ describe.skipIf(!enabled)('team access through the TLS proxy (live)', { timeout:
 const tls = require('node:tls'); const https = require('node:https'); const http = require('node:http');
 const fs = require('node:fs');
 const [host, port, apiPort, token, mode] = process.argv.slice(1);
-const ca = fs.existsSync('/ca/ca.pem') ? fs.readFileSync('/ca/ca.pem') : undefined;
+// With a CA mounted, an unreadable file fails the run at once (never a silent fallback).
+const ca = process.env.SDLC_CA_MOUNTED === '1' ? fs.readFileSync('/ca/ca.pem') : undefined;
 const pick = (h) => Object.fromEntries(['strict-transport-security','x-content-type-options',
   'x-frame-options','referrer-policy','permissions-policy','content-security-policy','content-type',
   'server'].filter((k) => h[k] !== undefined).map((k) => [k, String(h[k])]));
@@ -164,6 +165,19 @@ async function forgedRun() {
 })();
 `;
 
+  // What the operator hands people: a copy of ca.pem only (the public CA certificate), readable
+  // by the client's user. SDLC_ACCESS_TLS_DIR itself is mode 700 and holds the key: on Linux the
+  // client container's user cannot read it (Docker Desktop hides that).
+  let caCopies = 0;
+  const clientCa = (dir: string): string => {
+    caCopies += 1;
+    const out = path.join(tmp, `client-ca-${caCopies}`);
+    fs.mkdirSync(out, { mode: 0o755 });
+    fs.chmodSync(out, 0o755);
+    fs.copyFileSync(path.join(dir, 'ca.pem'), path.join(out, 'ca.pem'));
+    fs.chmodSync(path.join(out, 'ca.pem'), 0o644);
+    return out;
+  };
   const client = (ca: string | null, mode: 'main' | 'forged' = 'main'): Probe[] => {
     const args = [
       'run',
@@ -177,7 +191,7 @@ async function forgedRun() {
       'ALL',
       '--entrypoint',
       'node',
-      ...(ca ? ['-v', `${ca}:/ca:ro`] : []),
+      ...(ca ? ['-v', `${clientCa(ca)}:/ca:ro`, '-e', 'SDLC_CA_MOUNTED=1'] : []),
       apiImage,
       '-e',
       CLIENT,
