@@ -4,6 +4,9 @@
 // (its only writes are the two sign-out calls). The stub API plays GitHub (stub-api.mjs); on
 // 127.0.0.1 GitHub sign-in is off, so the other tests see the token page they always saw.
 // Chromium by default; Firefox and WebKit run the same file when their browsers are installed.
+// WebKit keeps no `Secure` cookie on `http://localhost` (2026-10-12, Playwright WebKit 26.6): the
+// known limit of ADR-M73 §4. The cookie tests are skipped there and one test pins the limit, so a
+// WebKit that starts keeping the cookie is noticed. The cookie rules are never weakened for it.
 import path from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
@@ -41,10 +44,25 @@ async function signInWithGitHub(page: Page, tenant = 'demo'): Promise<void> {
   await page.getByRole('button', { name: 'Sign in with GitHub' }).click();
 }
 
+const WEBKIT_LIMIT = 'WebKit keeps no Secure cookie on http://localhost (ADR-M73 §4)';
+
+test('U05: WebKit on http://localhost: no Secure cookie, so the sign-in is refused (known limit)', async ({
+  page,
+  context,
+  browserName,
+}) => {
+  test.skip(browserName !== 'webkit', 'the limit is WebKit’s');
+  await signInWithGitHub(page);
+  await expect(page.getByRole('alert')).toContainText('Sign-in with GitHub was refused');
+  expect((await context.cookies(LOCAL)).map((c) => c.name)).toEqual([]);
+});
+
 test('U05: sign in with GitHub, the session cookie, reload, sign out', async ({
   page,
   context,
+  browserName,
 }) => {
+  test.skip(browserName === 'webkit', WEBKIT_LIMIT);
   const w = watchApi(page);
   await signInWithGitHub(page);
   await expect(page.getByRole('heading', { name: 'Where every intent waits' })).toBeVisible();
@@ -77,7 +95,11 @@ test('U05: sign in with GitHub, the session cookie, reload, sign out', async ({
   expect(w.problems.filter((p) => !/401/.test(p))).toEqual([]);
 });
 
-test('U05: sign out everywhere ends every session of the person', async ({ browser }) => {
+test('U05: sign out everywhere ends every session of the person', async ({
+  browser,
+  browserName,
+}) => {
+  test.skip(browserName === 'webkit', WEBKIT_LIMIT);
   const one = await browser.newContext();
   const two = await browser.newContext();
   try {

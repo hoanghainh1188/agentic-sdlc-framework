@@ -404,7 +404,7 @@ The dashboard shows in one page what the CLI shows one command at a time. **It o
 3. Only an active user whose GitHub account is linked by a tenant admin gets in (`sdlc admin identity link`). Every other case shows the same message: **Sign-in with GitHub was refused**. Check the tenant's name, then ask a tenant admin.
 4. The platform reads only your GitHub account number and gives up GitHub's access at once: it never acts on GitHub as you.
 5. The session ends after **30 minutes without use**, and after **8 hours** at most. A reload keeps it. **Sign out** ends it in this browser; **Sign out everywhere** ends every session you have, in every browser. A tenant admin can sign a person out everywhere: `sdlc admin user sign-out --user <id or email>`. Disabling a user or unlinking their GitHub account ends their sessions too.
-6. Safari may refuse the sign-in on `http://localhost`: use Chrome or Firefox there.
+6. On `http://localhost`, **Safari cannot sign in with GitHub**: WebKit, Safari's engine, keeps no `Secure` cookie there, so the sign-in is refused (tested 2026-10-12). Use Chrome or Firefox on the platform machine; Safari works once the dashboard has an HTTPS address (team access, later). The personal token works in Safari too.
 
 **Sign in with your API token** (always possible).
 
