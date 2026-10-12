@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- GETTING-STARTED "Publishing the CLI on npm" and RELEASING.md §3: what the first workflow publish (v0.2.0) taught: `ENEEDAUTH` means the npm trusted publisher is wrong or expired (delete it and add it again, publish only), npm shows a new version as "validating" for some minutes, and how to check the provenance. Documentation only.
+
 ### Fixed
 - The release workflows (`release-images.yml`, `release.yml`, `npm-publish.yml`) install cosign with `platform/tools/release/install-cosign.sh` instead of `sigstore/cosign-installer`: the official binary, checked against a SHA-256 pinned in the script (amd64 and arm64), downloaded with retries for about three minutes. The action gave up after about 7 seconds of network errors, so v0.2.0's `npm-publish` failed three times on HTTP 504 while GitHub was degraded. Nothing to do on upgrade.
 

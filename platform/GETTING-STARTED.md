@@ -298,6 +298,12 @@ Done for v0.1.1 on 2026-10-10. The images on GHCR need no step: the packages are
 
 **Every later release:** follow [RELEASING.md](../RELEASING.md) (the whole release, steps 1–7); for npm, approve the `npm` environment when GitHub asks, and the workflow publishes with provenance after the same release gate as `release.yml`. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
 
+What v0.2.0 (2026-10-12, the first publish by the workflow) taught:
+
+- **`npm error code ENEEDAUTH` in the step `npm publish`**: npm did not accept the workflow, so it asked for a login. Check the trusted publisher (npmjs.com → the package → **Settings** → **Trusted publishing**). It can **expire**: the page then says "This trusted publisher configuration has expired. Delete it and create a new one." Delete it and add it again with exactly the values of step 5 above; if the form asks for **allowed actions**, choose publish only. Then **Re-run failed jobs** and approve the `npm` environment again. Nothing was published, so the re-run is safe.
+- **After a successful publish** npm answers "Your package is being processed" and shows the version as **validating** on npmjs.com for a few minutes (about 15 for v0.2.0). Wait: the version then appears (`npm view agentic-sdlc-cli dist-tags`). If npmjs.com shows it as waiting for approval (staged publishing), approve it.
+- Check the new version: `npm view agentic-sdlc-cli@X.Y.Z dist.attestations.provenance.predicateType` prints `https://slsa.dev/provenance/v1`, and after an install `npm audit signatures` reports a verified attestation.
+
 ## Sending handbook comments
 
 Any format works. To make changes fast, one line per comment is ideal:
