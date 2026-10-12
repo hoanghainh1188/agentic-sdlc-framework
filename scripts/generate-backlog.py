@@ -460,7 +460,7 @@ t("U07","UX","Dashboard wave 1: kill a run, gate decisions, escalations","M",["U
   "Source code `web` in `gate_decisions.source` and the kill source (D-05 migration); the actor is the person's user ID; no session or passkey ID in an append-only table",
   "G7 is a link to the pull request only (no approve, no request changes); refusals are shown with their catalog code (producer, missing role, same person twice, frozen); the page has no rule set of its own",
   "Playwright: the producer, a wrong role and the same person twice are refused through the page (N5); screenshots at 375, 768, 1440 px, light and dark; `pnpm test:db` for the 409 and the source"],
- "ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378)")
+ "ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378). U06 built the mechanism (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414): mark the decision, kill and acknowledgement routes `@SessionAction('actions')` (they refuse sessions until then); in the gate and escalation decisions call `PasskeysService.verifyStepUp` on the body's `step_up`, then core `consumeStepUp` inside the decision's transaction with the binding (`stepUpRequestSha256` of the body without `step_up`); the page asks `POST /v1/auth/step-up` with the same body")
 t("U08","Later","Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs","M",["U07"],"FR-01, FR-02, FR-20, FR-40",
  "platform/apps/dashboard, platform/packages/messages, platform/tests/*, handbook Ch.19",
  ["Create an intent and link its spec with the two calls of U03; a refused link keeps the intent and says so",
@@ -775,6 +775,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.35 | 2026-10-10 | Claude (task V11), approved by Harry | V11 done (`design/MVP1-UI-SCOPE.md` 1.2, ADR-M73): new tasks U05–U07 in UX (GitHub sign-in and sessions, CSRF and passkey step-up, wave 1: kill, gate decisions, escalations) and U08–U09 in Later (waves 2 and 3); U05 includes the V03 change (the App keeps its client secret); no dependency on V09 (QUESTIONS #375–#380) |
 | 1.36 | 2026-10-10 | Claude (task V12), approved by Harry | V12 note: AC2 as built (the tag verifies the images built before it; npm stays its own workflow with the same gate; `pnpm release:lock`), AC3 from 0.1.1 on (QUESTIONS #390) |
 | 1.37 | 2026-10-12 | Claude, approved by Harry | New tasks X11 (context condensing for agent runs) and X12 (design: agent memory across runs) in EXT, X13 (agent memory) in Later (QUESTIONS #395) |
+| 1.38 | 2026-10-12 | Claude (task U06, PR 1), approved by Harry | U07 note: how to wire the step-up and the session routes that U06 built (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |

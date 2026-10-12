@@ -24,6 +24,7 @@ export const ADMIN_API_GROUPS = [
   'token',
   'agent',
   'evidence',
+  'passkey',
 ] as const;
 
 const COMMANDS: Readonly<Record<string, AdminApiCommand>> = {

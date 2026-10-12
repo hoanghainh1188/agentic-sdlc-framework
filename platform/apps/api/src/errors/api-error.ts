@@ -8,6 +8,7 @@ import {
   AiRecordError,
   CommandError,
   KillError,
+  PasskeyError,
   PLAN_ERROR_MESSAGES,
   PLAN_REFUSAL_MESSAGES,
   PlanError,
@@ -22,6 +23,7 @@ import {
   type AdminErrorCode,
   type CommandErrorCode,
   type KillErrorCode,
+  type PasskeyErrorCode,
   type DbErrorCode,
   type EscalationErrorCode,
   type EvidencePackErrorCode,
@@ -35,6 +37,15 @@ export const API_ERROR_CODES = [
   'session_ended',
   'credentials_ambiguous',
   'session_write_not_allowed',
+  'dashboard_actions_off',
+  'csrf_refused',
+  'recent_signin_required',
+  'too_many_passkeys',
+  'too_many_challenges',
+  'challenge_refused',
+  'passkey_not_found',
+  'passkey_refused',
+  'step_up_refused',
   'rate_limited',
   'invalid_request',
   'not_found',
@@ -109,6 +120,15 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   session_ended: 'api.error.session_ended',
   credentials_ambiguous: 'api.error.credentials_ambiguous',
   session_write_not_allowed: 'api.error.session_write_not_allowed',
+  dashboard_actions_off: 'api.error.dashboard_actions_off',
+  csrf_refused: 'api.error.csrf_refused',
+  recent_signin_required: 'api.error.recent_signin_required',
+  too_many_passkeys: 'api.error.too_many_passkeys',
+  too_many_challenges: 'api.error.too_many_challenges',
+  challenge_refused: 'api.error.challenge_refused',
+  passkey_not_found: 'api.error.passkey_not_found',
+  passkey_refused: 'api.error.passkey_refused',
+  step_up_refused: 'api.error.step_up_refused',
   rate_limited: 'api.error.rate_limited',
   invalid_request: 'api.error.invalid_request',
   not_found: 'api.error.not_found',
@@ -365,11 +385,28 @@ const EVIDENCE: Readonly<Record<EvidencePackErrorCode, [number, ApiErrorCode]>> 
   pack_conflict: [409, 'conflict'],
 };
 
+/** Passkey and step-up refusals (U06, ADR-M73 §2.4). */
+const PASSKEY: Readonly<Record<PasskeyErrorCode, [number, ApiErrorCode]>> = {
+  recent_signin_required: [403, 'recent_signin_required'],
+  too_many_passkeys: [409, 'too_many_passkeys'],
+  too_many_challenges: [429, 'too_many_challenges'],
+  challenge_refused: [409, 'challenge_refused'],
+  passkey_not_found: [404, 'passkey_not_found'],
+  step_up_refused: [403, 'step_up_refused'],
+  invalid_value: [400, 'invalid_request'],
+};
+
 /** Maps any thrown value to an `ApiError`. Unknown errors become `internal` (500). */
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
   if (error instanceof CommandError) return new ApiError(...COMMAND[error.code]);
   if (error instanceof KillError) return new ApiError(...KILL[error.code]);
+  if (error instanceof PasskeyError) {
+    const [status, code] = PASSKEY[error.code];
+    const details =
+      error.field === undefined ? undefined : [{ path: `body.${error.field}`, issue: 'invalid' }];
+    return new ApiError(status, code, undefined, details);
+  }
   if (error instanceof EvidencePackError) return new ApiError(...EVIDENCE[error.code]);
   if (error instanceof EvidenceHoldError) {
     return new ApiError(error.code === 'evidence_hold_exists' ? 409 : 404, error.code);

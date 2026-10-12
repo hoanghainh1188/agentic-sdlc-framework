@@ -5,7 +5,7 @@
 // U05 (ADR-M73 §2.2): with a GitHub sign-in the browser sends its `HttpOnly` session cookie
 // (`credentials: 'same-origin'`) and no Authorization header: never both. The only writes are the
 // two sign-out calls of `endSession`, which change no intent, gate, run or escalation.
-import { errorEnvelopeSchema } from '@sdlc/api-schemas';
+import { errorEnvelopeSchema, webSessionSchema } from '@sdlc/api-schemas';
 import type { z } from 'zod';
 
 import { session } from '../session.js';
@@ -88,22 +88,28 @@ export async function getPublicJson<S extends z.ZodType>(
 
 /**
  * Ends the GitHub session (U05): `this` = this browser (`POST /v1/auth/sign-out`), `everywhere`
- * = every session of the person (`DELETE /v1/me/sessions`). The browser adds the `Origin` header,
- * which the API checks. Fixed paths only.
+ * = every session of the person (`DELETE /v1/me/sessions`). The browser adds the `Origin` header;
+ * U06 (ADR-M73 §2.3): the session's CSRF token, read just before from `GET /v1/auth/session`, goes
+ * in `X-SDLC-CSRF` and is not kept. The API checks both. Fixed paths only.
  */
 export async function endSession(scope: 'this' | 'everywhere'): Promise<void> {
-  if (scope === 'this') await request('/v1/auth/sign-out', 'POST', { cookie: true });
-  else await request('/v1/me/sessions', 'DELETE', { cookie: true });
+  const { csrf_token: csrf } = await getJson('/v1/auth/session', webSessionSchema, {
+    cookie: true,
+  });
+  if (scope === 'this') await request('/v1/auth/sign-out', 'POST', { cookie: true }, csrf);
+  else await request('/v1/me/sessions', 'DELETE', { cookie: true }, csrf);
 }
 
 async function request(
   path: string,
   method: 'GET' | 'POST' | 'DELETE',
   credential: Credential,
-  signal?: AbortSignal,
+  csrfOrSignal?: string | AbortSignal,
 ): Promise<unknown> {
+  const signal = typeof csrfOrSignal === 'string' ? undefined : csrfOrSignal;
   const headers: Record<string, string> = { accept: 'application/json' };
   if ('token' in credential) headers.authorization = `Bearer ${credential.token}`;
+  if (typeof csrfOrSignal === 'string') headers['x-sdlc-csrf'] = csrfOrSignal;
   let response: Response;
   try {
     response = await fetch(path, {

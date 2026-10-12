@@ -7,7 +7,7 @@
 // - Sessions end at sign-out, sign out everywhere, by a tenant admin, when the user is disabled and
 //   when the identity is unlinked (see `admin/users.ts`). Each end is audited with a reason code;
 //   the audit log never holds a session ID.
-import { randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 
 import { assertTenantAdmin, auditActor, type AdminActor } from '../admin/actor.js';
 import { AdminError } from '../admin/errors.js';
@@ -18,6 +18,21 @@ import type { TenantScope } from '../db/tenant-scope.js';
 
 /** The session secret in the cookie: 32 random bytes, base64url (43 characters). */
 export const WEB_SESSION_SECRET_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * The CSRF token of a session (U06, ADR-M73 §2.3, QUESTIONS #410): HMAC-SHA256 of a fixed label
+ * with the session secret as the key, base64url. The api gives it to the page from the session
+ * cookie (`GET /v1/auth/session`) without storing it; the database keeps its SHA-256. A page on
+ * another site can read neither the `HttpOnly` cookie nor the token.
+ */
+export function deriveCsrfToken(sessionSecret: string): string {
+  return createHmac('sha256', sessionSecret).update('sdlc-csrf-1', 'utf8').digest('base64url');
+}
+
+/** SHA-256 of a CSRF token, lowercase hex: what `web_sessions.csrf_sha256` holds. */
+export function hashCsrfToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
+}
 
 /** The GitHub numeric account ID, as `user_identities.external_id` stores it (QUESTIONS #45). */
 const GITHUB_ID = /^[1-9][0-9]{0,19}$/;
@@ -72,6 +87,7 @@ export async function startWebSession(
       user_id: input.userId,
       identity_id: input.identityId,
       secret_sha256: hashSessionSecret(secret),
+      csrf_sha256: hashCsrfToken(deriveCsrfToken(secret)),
       last_seen_at: input.now,
       expires_at: new Date(input.now.getTime() + input.maxAgeMs),
     });

@@ -4,14 +4,20 @@
 // - A dashboard session cookie (U05): the same, by the SHA-256 of the session secret; idle and
 //   absolute timeouts, active user and tenant, identity still linked.
 // - Never both: a request with an `Authorization` header and a session cookie is refused.
-// - Until U06 adds CSRF protection (QUESTIONS #387), a session may only read (`GET`, `HEAD`) and
-//   use the handlers marked `@SessionWrite()` (sign out, sign out everywhere), each with an
-//   `Origin` equal to the public origin.
+// - A session reads (`GET`, `HEAD`). It writes only to a route marked `@SessionAction()` (U06,
+//   ADR-M73 §2.3, QUESTIONS #410), and only with all three CSRF layers: the cookie is
+//   `SameSite=Strict`; `X-SDLC-CSRF` holds the session's CSRF token; `Origin` equals the public
+//   origin (and `Sec-Fetch-Site` is `same-origin` when the browser sends it). The body is
+//   `application/json`, or there is none. A route marked `'actions'` also needs
+//   `SDLC_API_DASHBOARD_ACTIONS=on`. Bearer requests are unchanged.
 // Tokens and secrets are never logged.
 import { SetMetadata, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import type { Reflector } from '@nestjs/core';
+import { timingSafeEqual } from 'node:crypto';
+
 import {
   hashApiToken,
+  hashCsrfToken,
   hashSessionSecret,
   isApiTokenFormat,
   type PlatformDatabase,
@@ -24,16 +30,23 @@ import type { AuthenticatedRequest, Credential } from './principal.js';
 import type { RateLimiter } from './rate-limiter.js';
 
 const PUBLIC = 'sdlc:public';
-const SESSION_WRITE = 'sdlc:session-write';
+const SESSION_ACTION = 'sdlc:session-action';
 
 /** Marks a route that needs no token (health checks, the sign-in redirects). */
 export const Public = (): MethodDecorator & ClassDecorator => SetMetadata(PUBLIC, true);
 
 /**
- * Marks a write a dashboard session may send before U06 (sign out only). The guard still checks
- * the `Origin` header against the public origin.
+ * Which writes a dashboard session may send (U06, ADR-M73 §2.3). `always`: sign out, open whatever
+ * `SDLC_API_DASHBOARD_ACTIONS` says; `actions`: only with actions on. A write route without this
+ * marker refuses every session (`session_write_not_allowed`). The CSRF layers apply to both.
  */
-export const SessionWrite = (): MethodDecorator => SetMetadata(SESSION_WRITE, true);
+export type SessionActionKind = 'always' | 'actions';
+
+export const SessionAction = (kind: SessionActionKind): MethodDecorator =>
+  SetMetadata(SESSION_ACTION, kind);
+
+/** The header that carries the session's CSRF token (ADR-M73 §2.3). */
+export const CSRF_HEADER = 'x-sdlc-csrf';
 
 /** `last_used_at` / `last_seen_at` are written at most once per credential per interval. */
 const TOUCH_INTERVAL_MS = 60_000;
@@ -49,8 +62,10 @@ interface GuardRequest extends AuthenticatedRequest {
 export interface SessionGuardSettings {
   /** The idle timeout (setting `SDLC_API_SESSION_IDLE_MINUTES`). */
   readonly idleMs: number;
-  /** The only `Origin` a session's sign-out may come from. */
+  /** The only `Origin` a session's write may come from. */
   readonly publicOrigin: string;
+  /** `SDLC_API_DASHBOARD_ACTIONS=on` (U06): routes marked `'actions'` take sessions. */
+  readonly actions: boolean;
 }
 
 export interface AuthGuardDeps {
@@ -69,6 +84,8 @@ interface Resolved {
   readonly tenantId: TenantId;
   readonly userId: string;
   readonly credential: Credential;
+  /** A session's CSRF token hash (U06); null before U06; undefined for a token. */
+  readonly csrfSha256?: string | null;
 }
 
 export class AuthGuard implements CanActivate {
@@ -114,7 +131,7 @@ export class AuthGuard implements CanActivate {
       throw new ApiError(401, 'unauthorized');
     }
     if (resolved.credential.kind === 'session') {
-      this.#checkSessionMethod(context, request, sessions!);
+      this.#checkSessionWrite(context, request, sessions!, resolved.csrfSha256 ?? null);
     }
     if (!this.deps.requests.hit(`${resolved.credential.kind}:${resolved.credential.id}`)) {
       throw new ApiError(429, 'rate_limited');
@@ -155,27 +172,41 @@ export class AuthGuard implements CanActivate {
       ? {
           tenantId: found.tenantId,
           userId: found.userId,
-          credential: { kind: 'session', id: found.sessionId },
+          credential: { kind: 'session', id: found.sessionId, signedInAt: found.createdAt },
+          csrfSha256: found.csrfSha256,
         }
       : undefined;
   }
 
-  /** Before U06: reads only, plus the handlers marked `@SessionWrite()` from the public origin. */
-  #checkSessionMethod(
+  /**
+   * U06 (ADR-M73 §2.3): a session reads; it writes only to a marked route, with the three CSRF
+   * layers and a JSON body (or none). Every session write answers `no-store`.
+   */
+  #checkSessionWrite(
     context: ExecutionContext,
     request: GuardRequest,
     settings: SessionGuardSettings,
+    csrfSha256: string | null,
   ): void {
     if (READ_METHODS.has(request.method)) return;
-    const allowed = this.deps.reflector.get<boolean | undefined>(
-      SESSION_WRITE,
+    const kind = this.deps.reflector.get<SessionActionKind | undefined>(
+      SESSION_ACTION,
       context.getHandler(),
     );
-    const origin = request.headers.origin;
-    const fetchSite = request.headers['sec-fetch-site'];
+    if (kind === undefined) throw new ApiError(403, 'session_write_not_allowed');
+    if (kind === 'actions' && !settings.actions) throw new ApiError(403, 'dashboard_actions_off');
+    const headers = request.headers;
+    const fetchSite = headers['sec-fetch-site'];
     const sameOrigin =
-      origin === settings.publicOrigin && (fetchSite === undefined || fetchSite === 'same-origin');
-    if (allowed !== true || !sameOrigin) throw new ApiError(403, 'session_write_not_allowed');
+      headers.origin === settings.publicOrigin &&
+      (fetchSite === undefined || fetchSite === 'same-origin');
+    if (!sameOrigin || !csrfMatches(headers[CSRF_HEADER], csrfSha256) || !jsonOrEmpty(headers)) {
+      throw new ApiError(403, 'csrf_refused');
+    }
+    context
+      .switchToHttp()
+      .getResponse<{ header(name: string, value: string): unknown }>()
+      .header('cache-control', 'no-store');
   }
 
   async #touch(
@@ -195,6 +226,31 @@ export class AuthGuard implements CanActivate {
     if (credential.kind === 'token') await scope.apiTokens.touchLastUsed(credential.id, now);
     else await scope.webSessions.touch(credential.id, now);
   }
+}
+
+/** The header's token matches the session's stored hash (constant time). */
+function csrfMatches(header: string | string[] | undefined, stored: string | null): boolean {
+  if (stored === null || typeof header !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(header)) {
+    return false;
+  }
+  return timingSafeEqual(Buffer.from(hashCsrfToken(header), 'utf8'), Buffer.from(stored, 'utf8'));
+}
+
+/**
+ * The body is JSON, or there is none. A cross-site form can send `text/plain`, which Fastify
+ * would parse too (ADR-M73 §2.3: JSON bodies only).
+ */
+function jsonOrEmpty(headers: Readonly<Record<string, string | string[] | undefined>>): boolean {
+  const type = headers['content-type'];
+  if (typeof type === 'string') {
+    return /^application\/json\s*(;\s*charset=utf-8\s*)?$/i.test(type.trim());
+  }
+  const length = headers['content-length'];
+  return (
+    type === undefined &&
+    headers['transfer-encoding'] === undefined &&
+    (length === undefined || length === '0')
+  );
 }
 
 function bearerToken(header: string | string[] | undefined): string | undefined {

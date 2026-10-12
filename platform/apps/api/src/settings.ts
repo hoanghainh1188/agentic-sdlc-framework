@@ -30,6 +30,7 @@ export const API_ENV = {
   sessionIdleMinutes: 'SDLC_API_SESSION_IDLE_MINUTES',
   sessionMaxHours: 'SDLC_API_SESSION_MAX_HOURS',
   trustedProxy: 'SDLC_API_TRUSTED_PROXY',
+  dashboardActions: 'SDLC_API_DASHBOARD_ACTIONS',
 } as const;
 
 /** Fields of the KV entry written by `openbao:bootstrap api-evidence-credentials` (E02). */
@@ -111,6 +112,8 @@ const schema = z.object({
     .default('api/github-oauth'),
   [API_ENV.sessionIdleMinutes]: z.coerce.number().int().min(5).max(120).default(30),
   [API_ENV.sessionMaxHours]: z.coerce.number().int().min(1).max(24).default(8),
+  // Writes from the dashboard (U06, ADR-M73 §2.3): off by default; on needs the GitHub sign-in.
+  [API_ENV.dashboardActions]: z.enum(['off', 'on']).default('off'),
   // Team access (V09, ADR-M67 §2.5): the one address whose X-Forwarded-For the api trusts, the
   // proxy's fixed address on the network `access`. Empty: trust no forwarded header.
   [API_ENV.trustedProxy]: z
@@ -192,6 +195,11 @@ export interface WebSignInSettings {
   readonly oauthSecretPath: string;
   readonly idleMs: number;
   readonly maxAgeMs: number;
+  /**
+   * `SDLC_API_DASHBOARD_ACTIONS=on` (U06, ADR-M73 §2.3): sessions may use the routes marked
+   * `'actions'` (passkeys, the step-up; the decisions with U07). Default false.
+   */
+  readonly actions?: boolean;
 }
 
 /** The callback path of the sign-in (the GitHub App lists `<origin>` + this). */
@@ -219,7 +227,8 @@ export class SettingsError extends Error {
       | 'api.settings.dev_url_missing'
       | 'api.settings.temporal_off_in_production'
       | 'api.settings.public_origin_missing'
-      | 'api.settings.public_origin_insecure',
+      | 'api.settings.public_origin_insecure'
+      | 'api.settings.actions_need_signin',
     readonly setting: string,
   ) {
     super(`${key}: ${setting}`);
@@ -254,6 +263,12 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
       secretPath: v[API_ENV.dbSecretPath],
     };
   }
+  // U06 (ADR-M73 §2.3): actions are writes of a dashboard session, so they need the sign-in, and
+  // with it a public origin that is https://, or http:// on localhost (checked below).
+  const actions = v[API_ENV.dashboardActions] === 'on';
+  if (actions && v[API_ENV.webSignIn] !== 'github') {
+    throw new SettingsError('api.settings.actions_need_signin', API_ENV.dashboardActions);
+  }
   let webSignIn: WebSignInSettings | null = null;
   if (v[API_ENV.webSignIn] === 'github') {
     const origin = v[API_ENV.publicOrigin];
@@ -272,6 +287,7 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
       oauthSecretPath: v[API_ENV.githubOauthSecretPath],
       idleMs: v[API_ENV.sessionIdleMinutes] * 60_000,
       maxAgeMs: v[API_ENV.sessionMaxHours] * 3_600_000,
+      actions,
     };
   }
   return {

@@ -34,6 +34,8 @@ import { TenantRoleBindingRepository } from './repositories/tenant-role-bindings
 import { UserIdentityRepository } from './repositories/user-identities.js';
 import { UserRepository } from './repositories/users.js';
 import { WebSessionRepository } from './repositories/web-sessions.js';
+import { PasskeyChallengeRepository } from './repositories/passkey-challenges.js';
+import { WebauthnCredentialRepository } from './repositories/webauthn-credentials.js';
 
 /**
  * Repositories bound to one tenant. Every query they send passes the tenant guard, which
@@ -72,6 +74,8 @@ export class TenantScope {
   readonly agents: AgentRepository;
   readonly agentApprovals: AgentApprovalRepository;
   readonly webSessions: WebSessionRepository;
+  readonly webauthnCredentials: WebauthnCredentialRepository;
+  readonly passkeyChallenges: PasskeyChallengeRepository;
 
   private readonly db: Kysely<Database>;
   #savepoints = 0;
@@ -112,6 +116,8 @@ export class TenantScope {
     this.agents = new AgentRepository(this.db, this.tenantId);
     this.agentApprovals = new AgentApprovalRepository(this.db, this.tenantId);
     this.webSessions = new WebSessionRepository(this.db, this.tenantId);
+    this.webauthnCredentials = new WebauthnCredentialRepository(this.db, this.tenantId);
+    this.passkeyChallenges = new PasskeyChallengeRepository(this.db, this.tenantId);
   }
 
   /**

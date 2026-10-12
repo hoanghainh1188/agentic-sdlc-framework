@@ -30,6 +30,13 @@ import {
   type SignInEndpoints,
 } from './auth/sign-in.controller.js';
 import { SignInService } from './auth/sign-in.service.js';
+import {
+  PASSKEY_REQUESTS_PER_MINUTE,
+  PasskeysController,
+  type PasskeyEndpoints,
+} from './passkeys/passkeys.controller.js';
+import { PasskeysService } from './passkeys/passkeys.service.js';
+import { WebAuthnCeremonies } from './passkeys/webauthn.js';
 import { ErrorFilter } from './errors/error.filter.js';
 import { EscalationsController } from './escalations/escalations.controller.js';
 import { EvidenceController } from './evidence/evidence.controller.js';
@@ -69,6 +76,7 @@ import {
   METRICS,
   REGISTRY,
   SETTINGS,
+  PASSKEYS,
   SIGN_IN,
   SPECS,
 } from './tokens.js';
@@ -117,8 +125,15 @@ export interface ApiDeps {
   readonly webSignIn?: {
     readonly settings: WebSignInSettings;
     readonly provider: WebSignInProvider;
-    /** Starts and callbacks per address and minute. Default 20 and 30; tests raise them. */
-    readonly limits?: { readonly starts: number; readonly callbacks: number };
+    /**
+     * Starts, callbacks and passkey requests per address and minute. Default 20, 30 and 30;
+     * tests raise them.
+     */
+    readonly limits?: {
+      readonly starts: number;
+      readonly callbacks: number;
+      readonly passkeys?: number;
+    };
   };
 }
 
@@ -139,12 +154,25 @@ class ApiModule {
       }),
       starts: new RateLimiter(deps.webSignIn.limits?.starts ?? SIGN_IN_STARTS_PER_MINUTE),
       callbacks: new RateLimiter(deps.webSignIn.limits?.callbacks ?? SIGN_IN_CALLBACKS_PER_MINUTE),
+      actions: deps.webSignIn.settings.actions === true,
+    };
+    // U06 (ADR-M73 §2.4): passkeys need a session, so the ceremonies exist with sign-in only.
+    const passkeys: PasskeyEndpoints = {
+      service: new PasskeysService({
+        ceremonies: deps.webSignIn
+          ? new WebAuthnCeremonies(deps.webSignIn.settings.publicOrigin)
+          : undefined,
+        now,
+        log: wakeLogger,
+      }),
+      perAddress: new RateLimiter(deps.webSignIn?.limits?.passkeys ?? PASSKEY_REQUESTS_PER_MINUTE),
     };
     return {
       module: ApiModule,
       controllers: [
         HealthController,
         SignInController,
+        PasskeysController,
         MeController,
         IntentsController,
         SpecsController,
@@ -169,6 +197,7 @@ class ApiModule {
         { provide: SETTINGS, useValue: deps.settings },
         { provide: CLOCK, useValue: now },
         { provide: SIGN_IN, useValue: signIn },
+        { provide: PASSKEYS, useValue: passkeys },
         {
           provide: REGISTRY,
           useValue: new Registry({
@@ -228,6 +257,7 @@ class ApiModule {
                     sessions: {
                       idleMs: deps.webSignIn.settings.idleMs,
                       publicOrigin: deps.webSignIn.settings.publicOrigin,
+                      actions: deps.webSignIn.settings.actions === true,
                     },
                   }
                 : {}),

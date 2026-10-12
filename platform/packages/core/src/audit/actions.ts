@@ -104,6 +104,13 @@ export const AUDIT_ACTIONS = {
    */
   'web_session.ended': { entityType: 'user', fields: { reason: 'code', count: 'count' } },
   /**
+   * A person registered a passkey for the dashboard's step-up (U06, ADR-M73 §2.4). Never the
+   * credential ID, the passkey's row ID or the session ID: the user is the entity.
+   */
+  'passkey.registered': { entityType: 'user', fields: {} },
+  /** A passkey was removed (U06): `reason` is `self` or `admin` (QUESTIONS #414). */
+  'passkey.revoked': { entityType: 'user', fields: { reason: 'code' } },
+  /**
    * A Git host account was linked to a user (B13 AC3, QUESTIONS #45). Never the account ID or
    * login: the identity row is the entity.
    */
