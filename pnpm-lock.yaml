@@ -140,6 +140,9 @@ importers:
       '@sdlc/adapter-policy-simple':
         specifier: workspace:*
         version: link:../../packages/adapters/policy-simple
+      '@sdlc/api-schemas':
+        specifier: workspace:*
+        version: link:../../packages/api-schemas
       '@sdlc/config':
         specifier: workspace:*
         version: link:../../packages/config

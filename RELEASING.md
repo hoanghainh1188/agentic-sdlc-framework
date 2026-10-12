@@ -6,7 +6,7 @@ How the platform is versioned and released (D-08 task V12, QUESTIONS #364, #370,
 
 | Rule | What it means |
 |---|---|
-| [Semantic Versioning](https://semver.org/) `X.Y.Z` | One version for the whole repository: the root `package.json`, `PLATFORM_VERSION` (`platform/apps/cli/src/version.ts`), the images on GHCR and the npm package `agentic-sdlc-cli` |
+| [Semantic Versioning](https://semver.org/) `X.Y.Z` | One version for the whole repository: the root `package.json`, `PLATFORM_VERSION` (`platform/packages/api-schemas/src/version.ts`, shared by the API, the CLI and the dashboard), the images on GHCR and the npm package `agentic-sdlc-cli` |
 | Before v1.0 | A **minor** release (`0.2.0`) may break things: a migration, a changed setting, a credentials command to run again. Its "Upgrade notes" say exactly what to do. A **patch** release (`0.1.2`) never needs an upgrade step |
 | A patch release `v0.1.x` | When something useful lands and nothing must be done to upgrade (for example v0.1.1: the CLI on npm and `sdlc next`) |
 | The next minor `v0.2.0` | When the milestone UX is done, or as soon as a change needs an upgrade step |

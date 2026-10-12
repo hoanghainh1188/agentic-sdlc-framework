@@ -78,11 +78,13 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
    ```bash
    sdlc login --api-url http://127.0.0.1:8090
    sdlc whoami
+   sdlc doctor
    sdlc token create --name laptop
    ```
 
    - **Where:** today the API listens on the platform server only (`http://127.0.0.1:8090`), so run `sdlc` on that server. Access from other machines is not supported yet ([where to run it](deploy/README.md#where-to-run-it)). Comment commands and reviews on GitHub work from anywhere.
    - **Log in:** `sdlc login` asks for the API token at a hidden prompt.
+   - **Check:** `sdlc doctor` checks your login and the API (TLS, your API token and when it ends, your roles, the CLI's version against the API's) and says what to fix. It changes nothing and never prints your token.
    - **Your own token:** `sdlc token create --name laptop` prints a new token once. Log in again with it.
    - **Revoke the first token:** `sdlc token list`, then `sdlc token revoke --id <ID>`. Details: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command).
 3. **The project AI record** (the client's recorded consent to AI use) must allow the data class of your work (how sensitive its information is). Person A or the PM / BrSE writes it once per project with `sdlc ai-record set …` ([handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#ai-record)); check it with `sdlc ai-record show --project <slug>`. Without it, intents cannot enter G1.
@@ -210,6 +212,7 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 | Command | Use |
 |---|---|
 | `sdlc next <INT>` | What do I do now: the next command or comment for you, or who it waits for |
+| `sdlc doctor` | Is my login and the API all right, and what do I fix |
 | `sdlc intent list` / `sdlc intent show <INT>` | Where is my intent, what waits for whom |
 | `sdlc gate approve\|reject\|request-changes <G> <INT>` | Decide a gate (codes only; `--reason-code`) |
 | `sdlc spec link` / `sdlc plan submit` | Inputs of G2 and G3 |
@@ -229,6 +232,7 @@ The dashboard shows intents by gate, escalations, cost and gate waiting times; i
 
 | You see | What it means | What to do |
 |---|---|---|
+| **A command fails to reach the API**, or `sdlc` says you are not logged in | The login, the API address, a certificate or the API itself | `sdlc doctor` names the problem and the fix; a problem on the server goes to the operator (`pnpm doctor`) |
 | **Cannot enter G1** (`ai_record_missing`, `data_class_not_allowed`) | The project's AI record is missing or does not allow the data class | Person A or PM / BrSE fixes the record; the intent enters G1 by itself |
 | Your command gets a **reply** instead of a status comment | It was refused (wrong gate, no role, you are a producer, bad syntax) | Read the reason, write a new comment |
 | **Plan resubmit needed** | The plan file on `main` is not the one you submitted | `sdlc plan submit <INT>` again (Person B approves G3 again if it was at G4) |
@@ -276,6 +280,7 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 | 0.5 | 2026-10-09 | Docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists |
 | 0.6 | 2026-10-09 | Docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate |
 | 0.7 | 2026-10-09 | Docs review E2: §1 and §7 link to the handbook sections |
+| 0.13 | 2026-10-12 | Task V07: `sdlc doctor`, check your login and the API (§2, §4, §5) |
 | 0.12 | 2026-10-10 | Task V06: `sdlc next <INT>`, what to do now (§3, §4, §5) |
 | 0.11 | 2026-10-10 | Task V05: §2, install the `sdlc` command from npm (`agentic-sdlc-cli`); the checkout ways stay for developers |
 | 0.10 | 2026-10-09 | Task C13: step 5, saving an L1 proposal and ending the intent with a G4 rejection |

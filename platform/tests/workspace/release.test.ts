@@ -82,11 +82,11 @@ interface Fixture {
 }
 function fixture(version: string, f: Fixture = {}): string {
   const dir = tempDir();
-  fs.mkdirSync(path.join(dir, 'platform/apps/cli/src'), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'platform/packages/api-schemas/src'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'platform/deploy'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ version: f.pkg ?? version }));
   fs.writeFileSync(
-    path.join(dir, 'platform/apps/cli/src/version.ts'),
+    path.join(dir, 'platform/packages/api-schemas/src/version.ts'),
     `export const PLATFORM_VERSION = '${f.platform ?? version}';\n`,
   );
   fs.writeFileSync(path.join(dir, 'CHANGELOG.md'), f.changelog ?? changelog(version));
