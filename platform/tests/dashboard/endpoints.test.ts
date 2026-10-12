@@ -1,5 +1,6 @@
 // U01 AC1, AC6 (design/ADR-M54 §2.1): the dashboard needs no new endpoint. Every path it reads is
-// an existing GET route of the API, found in the controllers' decorators.
+// an existing GET route of the API, found in the controllers' decorators. U06: every path it
+// writes (src/api/writes.ts) is an existing route of the API with the same method.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -18,17 +19,19 @@ function controllers(dir: string): string[] {
   });
 }
 
-/** `GET` routes as patterns, `:param` → one segment. */
-function getRoutes(): RegExp[] {
+/** Routes of one method as patterns, `:param` → one segment. */
+function routesOf(method: 'Get' | 'Post' | 'Delete'): RegExp[] {
   return controllers(apiSrc).flatMap((file) => {
     const text = fs.readFileSync(file, 'utf8');
     const base = /@Controller\('([^']*)'\)/.exec(text)?.[1] ?? '';
-    return [...text.matchAll(/@Get\((?:'([^']*)')?\)/g)].map((m) => {
+    return [...text.matchAll(new RegExp(`@${method}\\((?:'([^']*)')?\\)`, 'g'))].map((m) => {
       const full = `/${[base, m[1] ?? ''].filter((p) => p !== '').join('/')}`;
       return new RegExp(`^${full.replace(/:[a-z_]+/g, '[^/]+')}$`);
     });
   });
 }
+
+const getRoutes = (): RegExp[] => routesOf('Get');
 
 /** The paths the dashboard reads (`apiPath('…')` in src/api/reads.ts), with `${…}` as one segment. */
 function dashboardPaths(): string[] {
@@ -56,6 +59,9 @@ describe('the dashboard reads existing GET endpoints only', () => {
         // U05: public reads of the sign-in.
         '/v1/auth/config',
         '/v1/auth/github/start',
+        // U06: the session's CSRF token, the person's passkeys.
+        '/v1/auth/session',
+        '/v1/me/passkeys',
       ]),
     );
   });
@@ -66,6 +72,26 @@ describe('the dashboard reads existing GET endpoints only', () => {
       expect(
         routes.some((r) => r.test(p)),
         p,
+      ).toBe(true);
+    }
+  });
+});
+
+describe('U06: the dashboard writes existing routes only, with their method', () => {
+  it('every write of src/api/writes.ts is a POST or DELETE route of the API', () => {
+    const writes = fs.readFileSync(
+      path.join(root, 'platform/apps/dashboard/src/api/writes.ts'),
+      'utf8',
+    );
+    const calls = [
+      ...writes.matchAll(/send\(\s*apiPath\([`']([^`']+)[`']\),\s*'(POST|DELETE)'/g),
+    ].map((m) => ({ path: m[1]!.replace(/\$\{[^}]+\}/g, 'X'), method: m[2]! }));
+    expect(calls.length).toBe(5);
+    for (const call of calls) {
+      const routes = routesOf(call.method === 'POST' ? 'Post' : 'Delete');
+      expect(
+        routes.some((r) => r.test(call.path)),
+        `${call.method} ${call.path}`,
       ).toBe(true);
     }
   });

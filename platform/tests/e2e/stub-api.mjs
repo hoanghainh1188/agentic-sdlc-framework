@@ -8,11 +8,17 @@
 // callback (GitHub "approves" at once); the tenant `demo` signs in, any other is refused. The
 // cookies have the API's attributes; a request with a token and a cookie answers 400; sign-out
 // needs the session cookie and the `localhost` origin. No real GitHub, no secret.
-import { createHmac, randomBytes } from 'node:crypto';
+//
+// U06 (ADR-M73 §2.3, §2.4): on `localhost` actions are on. Every write needs the session cookie,
+// the `localhost` origin, the session's CSRF token and a JSON body or none, like the API. The
+// passkey endpoints check the browser's answers with the api's own WebAuthn code (its build), so
+// the test proves the ceremony between a real browser and the real check.
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import http from 'node:http';
 import path from 'node:path';
 
 import { loadDashboardFiles, registerDashboard } from '../../apps/api/dist/dashboard/static.js';
+import { WebAuthnCeremonies } from '../../apps/api/dist/passkeys/webauthn.js';
 import { fixtures } from './fixtures.mjs';
 
 const root = path.resolve(import.meta.dirname, '../../..');
@@ -77,7 +83,7 @@ function redirect(res, location, cookies = []) {
 function signIn(req, res, url) {
   const github = (req.headers.host ?? '').startsWith('localhost:');
   if (url.pathname === '/v1/auth/config' && req.method === 'GET') {
-    json(res, 200, { github });
+    json(res, 200, { github, actions: github });
     return true;
   }
   if (!github) return false;
@@ -102,16 +108,13 @@ function signIn(req, res, url) {
     redirect(res, '/dashboard/', [clear, sessionCookie(secret, 28_800)]);
     return true;
   }
-  // U06 (ADR-M73 §2.3): the session's CSRF token, derived from the secret as the api does.
-  const csrfOf = (secret) =>
-    createHmac('sha256', secret).update('sdlc-csrf-1', 'utf8').digest('base64url');
   if (url.pathname === '/v1/auth/session' && req.method === 'GET') {
     const secret = cookieOf(req, '__Host-sdlc_session');
     if (!secret || !sessions.has(secret)) return (json(res, 401, error('session_ended')), true);
     json(res, 200, {
       csrf_token: csrfOf(secret),
       signed_in_at: new Date().toISOString(),
-      actions: false,
+      actions: true,
     });
     return true;
   }
@@ -119,9 +122,7 @@ function signIn(req, res, url) {
   if (writes[url.pathname] === req.method) {
     const secret = cookieOf(req, '__Host-sdlc_session');
     if (!secret || !sessions.has(secret)) return (json(res, 401, error('session_ended')), true);
-    if (req.headers.origin !== LOCAL_ORIGIN || req.headers['x-sdlc-csrf'] !== csrfOf(secret)) {
-      return (json(res, 403, error('csrf_refused')), true);
-    }
+    if (!writeAllowed(req, secret)) return (json(res, 403, error('csrf_refused')), true);
     const ended = url.pathname === '/v1/me/sessions' ? sessions.size : 1;
     if (url.pathname === '/v1/me/sessions') sessions.clear();
     else sessions.delete(secret);
@@ -131,6 +132,106 @@ function signIn(req, res, url) {
     });
     res.end(url.pathname === '/v1/me/sessions' ? JSON.stringify({ ended }) : undefined);
     return true;
+  }
+  return false;
+}
+
+const csrfOf = (secret) =>
+  createHmac('sha256', secret).update('sdlc-csrf-1', 'utf8').digest('base64url');
+
+/** The three CSRF layers of the API (ADR-M73 §2.3) and a JSON body or none. */
+function writeAllowed(req, secret) {
+  const type = req.headers['content-type'];
+  const body =
+    type === undefined
+      ? req.headers['content-length'] === undefined || req.headers['content-length'] === '0'
+      : /^application\/json/.test(type);
+  const site = req.headers['sec-fetch-site'];
+  return (
+    req.headers.origin === LOCAL_ORIGIN &&
+    (site === undefined || site === 'same-origin') &&
+    req.headers['x-sdlc-csrf'] === csrfOf(secret) &&
+    body
+  );
+}
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        resolve(
+          chunks.length === 0 ? undefined : JSON.parse(Buffer.concat(chunks).toString('utf8')),
+        );
+      } catch {
+        resolve(undefined);
+      }
+    });
+  });
+}
+
+const ceremonies = new WebAuthnCeremonies(LOCAL_ORIGIN);
+const sha256 = (value) => createHash('sha256').update(value, 'utf8').digest('hex');
+/** Registration challenges: ID → SHA-256 of the challenge. Passkeys of the one demo person. */
+const challenges = new Map();
+const passkeys = [];
+const presentPasskey = ({ id, aaguid, created_at, last_used_at, revoked_at }) => ({
+  id,
+  aaguid,
+  created_at,
+  last_used_at,
+  revoked_at,
+});
+
+/** The passkey endpoints of U06 (a GitHub session on `localhost`); true when one answered. */
+async function passkeyRoutes(req, res, url) {
+  if (!url.pathname.startsWith('/v1/me/passkeys')) return false;
+  const secret = cookieOf(req, '__Host-sdlc_session');
+  if (!secret || !sessions.has(secret)) return (json(res, 401, error('session_ended')), true);
+  if (req.method === 'GET' && url.pathname === '/v1/me/passkeys') {
+    return (json(res, 200, { items: passkeys.map(presentPasskey) }), true);
+  }
+  if (req.method === 'GET') return false;
+  if (!writeAllowed(req, secret)) return (json(res, 403, error('csrf_refused')), true);
+  const body = await readBody(req);
+  if (req.method === 'POST' && url.pathname === '/v1/me/passkeys/registration-options') {
+    const challenge = randomBytes(32).toString('base64url');
+    const id = randomUUID();
+    challenges.set(id, sha256(challenge));
+    const options = await ceremonies.registrationOptions({
+      challenge,
+      user: { id: 'demo-user', email: 'demo@example.com', displayName: 'Demo' },
+      exclude: passkeys.filter((p) => p.revoked_at === null).map((p) => p.credentialId),
+    });
+    return (json(res, 200, { challenge_id: id, options, expires_in_seconds: 120 }), true);
+  }
+  if (req.method === 'POST' && url.pathname === '/v1/me/passkeys') {
+    const hash = challenges.get(body?.challenge_id);
+    challenges.delete(body?.challenge_id);
+    if (!hash) return (json(res, 409, error('challenge_refused')), true);
+    try {
+      const verified = await ceremonies.verifyRegistration(body.response, hash);
+      const row = {
+        id: randomUUID(),
+        credentialId: verified.credentialId,
+        aaguid: verified.aaguid,
+        created_at: new Date().toISOString(),
+        last_used_at: null,
+        revoked_at: null,
+      };
+      passkeys.push(row);
+      return (json(res, 201, presentPasskey(row)), true);
+    } catch {
+      return (json(res, 400, error('passkey_refused')), true);
+    }
+  }
+  const match = /^\/v1\/me\/passkeys\/([0-9a-f-]{36})$/.exec(url.pathname);
+  if (req.method === 'DELETE' && match) {
+    const row = passkeys.find((p) => p.id === match[1] && p.revoked_at === null);
+    if (!row) return (json(res, 404, error('passkey_not_found')), true);
+    row.revoked_at = new Date().toISOString();
+    return (json(res, 200, presentPasskey(row)), true);
   }
   return false;
 }
@@ -155,7 +256,7 @@ function authenticate(req, res) {
 }
 
 http
-  .createServer((req, res) => {
+  .createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${port}`);
     if (url.pathname === '/dashboard' || url.pathname.startsWith('/dashboard/')) {
       const route =
@@ -168,6 +269,9 @@ http
     }
     if (!url.pathname.startsWith('/v1/')) return json(res, 404, error('not_found'));
     if (signIn(req, res, url)) return;
+    if ((req.headers.host ?? '').startsWith('localhost:') && (await passkeyRoutes(req, res, url))) {
+      return;
+    }
     // The dashboard is read only: the stub refuses every other method (the test counts them).
     if (req.method !== 'GET') return json(res, 405, error('method_not_allowed'));
     if (!authenticate(req, res)) return;

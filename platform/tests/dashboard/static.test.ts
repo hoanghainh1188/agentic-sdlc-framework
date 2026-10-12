@@ -32,23 +32,52 @@ const sources = files(srcDir, /\.tsx?$/).map((file) => ({
   text: code(fs.readFileSync(file, 'utf8')),
 }));
 
-describe('the dashboard is read only (AC1); U05: its only writes end its own GitHub session', () => {
-  it('only src/api/client.ts calls fetch: GET, plus the two fixed sign-out calls (ADR-M73 §2.2)', () => {
+describe('the dashboard writes only its own session and passkeys (AC1; U05, U06)', () => {
+  it('only src/api/client.ts calls fetch; writes only through send, from src/api/writes.ts', () => {
     const callers = sources.filter((s) => /\bfetch\s*\(/.test(s.text)).map((s) => s.file);
     expect(callers).toEqual(['src/api/client.ts']);
     const client = sources.find((s) => s.file === 'src/api/client.ts')!.text;
-    // Every method named in the client, each time it is named.
     const methods = [...client.matchAll(/'(GET|POST|PUT|PATCH|DELETE)'/g)].map((m) => m[1]);
     expect(methods.filter((m) => m === 'PUT' || m === 'PATCH')).toEqual([]);
-    // POST and DELETE: once in the request's type, once in a fixed sign-out call.
-    expect(methods.filter((m) => m === 'POST')).toHaveLength(2);
-    expect(methods.filter((m) => m === 'DELETE')).toHaveLength(2);
-    expect(client).toContain("request('/v1/auth/sign-out', 'POST', { cookie: true }, csrf)");
-    expect(client).toContain("request('/v1/me/sessions', 'DELETE', { cookie: true }, csrf)");
-    // U06 (ADR-M73 §2.3): the CSRF token is read from the session just before, never kept.
-    expect(client).toContain("getJson('/v1/auth/session', webSessionSchema");
     // GETs go through getJson / getPublicJson only.
     expect([...client.matchAll(/request\(path, 'GET'/g)]).toHaveLength(2);
+    // Writes: one `request` call, in `send`, with the cookie and the CSRF token (ADR-M73 §2.3).
+    expect([...client.matchAll(/request\(path, method,/g)]).toHaveLength(1);
+    expect(client).toContain(
+      'const answer = await request(path, method, { cookie: true }, { csrf, body });',
+    );
+    expect(client).toContain("if (write) headers['x-sdlc-csrf'] = write.csrf;");
+    expect(client).toContain(
+      "if (write?.body !== undefined) headers['content-type'] = 'application/json';",
+    );
+    for (const { file, text } of sources) {
+      if (file === 'src/api/writes.ts' || file === 'src/api/client.ts') continue;
+      expect(text, file).not.toMatch(/\bsend\(/);
+    }
+  });
+
+  it('the writes are exactly sign-out and the own passkeys: no business path', () => {
+    const writes = sources.find((s) => s.file === 'src/api/writes.ts')!.text;
+    const calls = [
+      ...writes.matchAll(/send\(\s*apiPath\([`']([^`']+)[`']\),\s*'(POST|DELETE)'/g),
+    ].map((m) => `${m[2]} ${m[1]!.replace(/\$\{[^}]+\}/g, 'X')}`);
+    expect(calls.sort()).toEqual(
+      [
+        'POST /v1/auth/sign-out',
+        'DELETE /v1/me/sessions',
+        'POST /v1/me/passkeys/registration-options',
+        'POST /v1/me/passkeys',
+        'DELETE /v1/me/passkeys/X',
+      ].sort(),
+    );
+    expect([...writes.matchAll(/\bsend\(/g)]).toHaveLength(calls.length);
+  });
+
+  it('U06: the CSRF token stays in memory; the passkey ceremony runs in the browser', () => {
+    const session = sources.find((s) => s.file === 'src/session.ts')!.text;
+    expect(session).toMatch(/let csrf: string \| null = null;/);
+    const view = sources.find((s) => s.file === 'src/views/Passkeys.tsx')!.text;
+    expect(view).toContain("import { startRegistration } from '@simplewebauthn/browser';");
   });
 
   it('never sends a request any other way', () => {
@@ -56,7 +85,7 @@ describe('the dashboard is read only (AC1); U05: its only writes end its own Git
       expect(text, file).not.toMatch(
         /XMLHttpRequest|navigator\.sendBeacon|new WebSocket|EventSource|<form[^>]*action=/,
       );
-      if (file === 'src/api/client.ts') continue;
+      if (file === 'src/api/client.ts' || file === 'src/api/writes.ts') continue;
       expect(text, file).not.toMatch(/'(POST|PUT|PATCH|DELETE)'/);
     }
   });

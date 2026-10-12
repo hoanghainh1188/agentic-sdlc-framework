@@ -301,6 +301,8 @@ describe('routes and API paths', () => {
     expect(parseRoute('#/numbers?project=pilot&by=model').query.get('by')).toBe('model');
     expect(parseRoute('#/intents/<script>').name).toBe('intents');
     expect(parseRoute('').name).toBe('intents');
+    // U06: the person's passkeys.
+    expect(parseRoute('#/passkeys').name).toBe('passkeys');
     expect(href('intents', { project: 'pilot', show: undefined })).toBe('#/intents?project=pilot');
   });
 
