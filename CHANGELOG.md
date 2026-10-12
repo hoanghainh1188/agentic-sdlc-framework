@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- The npm page of `agentic-sdlc-cli` (its README) and USER-GUIDE §2: `sdlc` is a client that needs a running platform (links to the trial and the fresh deployment), which address to use where the platform runs (`http://127.0.0.1:8090` on the same machine, `https://<server name>:8443` through team access, `NODE_EXTRA_CA_CERTS` for a company CA), where the token comes from, and `sdlc doctor` and `sdlc next` as the first commands. The npm page changes with the next published version. Documentation only.
 - GETTING-STARTED "Publishing the CLI on npm" and RELEASING.md §3: what the first workflow publish (v0.2.0) taught: `ENEEDAUTH` means the npm trusted publisher is wrong or expired (delete it and add it again, publish only), npm shows a new version as "validating" for some minutes, and how to check the provenance. Documentation only.
 
 ### Fixed
