@@ -22,6 +22,8 @@ export const TROUBLESHOOTING: Readonly<Record<string, Coverage>> = {
   'LiteLLM lists no model': { checks: ['models.litellm'] },
   'A service stays unhealthy': { checks: ['services.health'] },
   'Valkey writes fail': { checks: ['valkey.memory'] },
+  // The trial stack (V08).
+  'The trial stack does not start after a reboot': { checks: ['openbao.state', 'env.file'] },
   // Team access (V09, design/ADR-M67).
   '`up.sh` says the profile access is not ready': {
     checks: [

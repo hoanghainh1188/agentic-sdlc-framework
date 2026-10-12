@@ -3,8 +3,9 @@
 // `fresh-deploy.test.ts`; the static test `trial-up-static.test.ts` keeps both in step with the
 // README. What differs from the README, and why:
 // - the key shares and the root token are kept in this process's memory (`SecretBag`) and dropped
-//   once the credentials commands ran; the root token is revoked (QUESTIONS #345: the trial stack
-//   cannot be unsealed again after a reboot, it is wiped and set up again);
+//   once the credentials commands ran; the root token is revoked. The two shares that unseal are
+//   also written, encrypted with the person's passphrase, to the key file next to the env file, so
+//   `pnpm trial:start` can unseal the stack after a reboot (V08, QUESTIONS #356, design/ADR-M76);
 // - Person A is the tenant admin (QUESTIONS #346): `ops bootstrap` makes them the first user, and
 //   `ops role grant` gives them `person_a` (nobody grants a role to themselves through the API);
 // - Person B's token comes from `ops token issue` (90 days): a token a tenant admin issues for
@@ -25,6 +26,7 @@ import {
   trialEnv,
   type ProjectOverride,
 } from './env-file.js';
+import { encryptKeys, KEY_THRESHOLD, KeyFileError, writeKeyFile } from './keys.js';
 import { parseInitOutput, SecretBag } from './secrets.js';
 import { MODEL_NAMES, type TrialPerson, type TrialSettings } from './settings.js';
 import { TRIAL_AGENT_KEY, TRIAL_AGENT_VERSION, trialProjectConfig } from './trial-config.js';
@@ -97,6 +99,10 @@ export interface UpDeps {
    */
   readonly sandboxImage?: string;
   readonly dockerDesktop: boolean;
+  /** The passphrase of the key file (V08), already checked; kept in memory only. */
+  readonly passphrase: string;
+  /** Where the key file goes (`keyFileFor(envFile)`). */
+  readonly keyFile: string;
 }
 
 export interface UpResult {
@@ -119,6 +125,7 @@ export class TrialStepError extends Error {
 
 export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<UpResult> {
   const bag = new SecretBag();
+  bag.keep(deps.passphrase);
   const deployDir = path.join(deps.repoRoot, 'platform/deploy');
   const step = (n: keyof typeof STEP_MESSAGES) => deps.progress(STEP_MESSAGES[n]);
 
@@ -190,8 +197,22 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
   const { shares, rootToken } = parseInitOutput(init.stdout);
   try {
     ok(await bootstrap(['unseal'], `${shares[0]}\n${shares[1]}\n`), 'openbao:unseal');
+    // V08: the two shares that unseal, encrypted in memory with the passphrase; only the
+    // ciphertext reaches the disk. Written now, so a later failure still leaves a usable file.
+    try {
+      const record = {
+        project: composeProject,
+        createdAt: new Date().toISOString(),
+        shares: shares.slice(0, KEY_THRESHOLD),
+      };
+      writeKeyFile(deps.keyFile, await encryptKeys(record, deps.passphrase));
+    } catch (error) {
+      if (error instanceof KeyFileError) throw new TrialStepError('key-file', error.code);
+      throw error;
+    }
+    deps.progress('trial.keys.saved', { path: deps.keyFile });
   } finally {
-    // Never needed again: the trial stack is never unsealed a second time (QUESTIONS #345).
+    // Gone from memory: from now on only the key file holds them, encrypted (V08).
     for (const share of shares) bag.drop(share);
     shares.length = 0;
   }

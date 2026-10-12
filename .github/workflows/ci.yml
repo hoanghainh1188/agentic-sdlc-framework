@@ -472,7 +472,8 @@ jobs:
   trial-up:
     # V02 (D-08 V02 AC5): `pnpm trial:up`, the same README steps for the community trial, on a
     # throw-away Compose project to the first intent at G1, then `pnpm trial:down --wipe`. Same
-    # trigger as fresh-deploy (weekly and on demand). Throw-away keys only, never printed.
+    # trigger as fresh-deploy (weekly and on demand). Throw-away keys only, never printed. V08: also
+    # trial:down and trial:start (the key file, a wrong and the right passphrase) on the same stack.
     name: trial set-up (pnpm trial:up)
     needs: [scan, checks]
     if: needs.scan.outputs.run_fresh_deploy == 'true'
