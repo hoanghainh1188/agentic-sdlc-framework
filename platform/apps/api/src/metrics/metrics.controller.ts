@@ -5,7 +5,7 @@ import { CurrentPrincipal, type Principal } from '../auth/principal.js';
 import { METRICS } from '../tokens.js';
 import { parseRequest } from '../validation.js';
 import type { MetricsService } from './metrics.service.js';
-import { gateMetricsQuerySchema } from './schemas.js';
+import { agentMetricsQuerySchema, gateMetricsQuerySchema } from './schemas.js';
 
 @Controller('v1/metrics')
 export class MetricsController {
@@ -17,5 +17,13 @@ export class MetricsController {
     @Query() query: unknown,
   ): Promise<Record<string, unknown>> {
     return this.metrics.gates(p, parseRequest(gateMetricsQuerySchema, query, 'query'));
+  }
+
+  @Get('agents')
+  agents(
+    @CurrentPrincipal() p: Principal,
+    @Query() query: unknown,
+  ): Promise<Record<string, unknown>> {
+    return this.metrics.agents(p, parseRequest(agentMetricsQuerySchema, query, 'query'));
   }
 }

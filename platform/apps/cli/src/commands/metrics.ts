@@ -1,11 +1,17 @@
-// `sdlc metrics gates` over the API (task E06, D-08 E06 AC1, D-02 FR-12, ADR-M47, handbook Ch.19
+// `sdlc metrics agents` (task V13, ADR-M79) is further down. `sdlc metrics gates` over the API (task E06, D-08 E06 AC1, D-02 FR-12, ADR-M47, handbook Ch.19
 // §19.8c). Per project and gate: the waits that people ended (first round, and after a request for
 // changes), the platform's HOTL and AUDIT passes, and the intents at the gate now. Wall-clock time
 // from the gate's entry, never working hours, never per person. The whole tenant needs a tenant
 // admin; `--project` needs a role in project config `access.metrics_read_roles` (never `viewer`).
 import { t, type MessageKey } from '@sdlc/messages';
 
-import { gateMetricsSchema, type GateMetricsView, type WaitStatsView } from '../api/schemas.js';
+import {
+  agentMetricsSchema,
+  gateMetricsSchema,
+  type AgentMetricsView,
+  type GateMetricsView,
+  type WaitStatsView,
+} from '../api/schemas.js';
 import { parseCommand, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
 import { clean, say, show, toJson } from '../output.js';
@@ -17,6 +23,7 @@ const RISKS = new Set(['low', 'medium', 'high', 'critical']);
 export async function runMetrics(args: readonly string[], ctx: CliContext): Promise<number> {
   const [command, ...rest] = args;
   if (command === 'gates') return gates(rest, ctx);
+  if (command === 'agents') return agents(rest, ctx);
   return usage(ctx);
 }
 
@@ -51,6 +58,136 @@ async function gates(args: readonly string[], ctx: CliContext): Promise<number> 
     else printMetrics(ctx, body.metrics);
     return EXIT.ok;
   });
+}
+
+async function agents(args: readonly string[], ctx: CliContext): Promise<number> {
+  const parsed = parseCommand(args, {
+    project: { type: 'string' },
+    agent: { type: 'string' },
+    model: { type: 'string' },
+    from: { type: 'string' },
+    to: { type: 'string' },
+  });
+  if (!parsed) return usage(ctx);
+  const { project, agent, model, from, to } = parsed.values as Record<string, string | undefined>;
+  const json = parsed.values.json === true;
+  return withApi(ctx, json, async (client) => {
+    const body = await client.get('/v1/metrics/agents', agentMetricsSchema, {
+      project,
+      agent,
+      model,
+      from,
+      to,
+    });
+    if (json) ctx.stdout(toJson(body));
+    else printAgentMetrics(ctx, body.metrics);
+    return EXIT.ok;
+  });
+}
+
+/** `3` of `4` → `75%`; `-` without a base (exported for tests). */
+export function formatShare(part: number, whole: number): string {
+  return whole === 0 ? '-' : `${String(Math.round((part * 100) / whole))}%`;
+}
+
+const OK_STATUSES = ['succeeded', 'succeeded_proposal_only'];
+
+/** One line per (project, agent version, model): the run measures (exported for tests). */
+export function agentRunTable(metrics: AgentMetricsView): string[] {
+  const body = metrics.rows.map((row) => {
+    const ended = row.runs.total - row.runs.in_progress;
+    const ok = OK_STATUSES.reduce((sum, status) => sum + (row.runs.by_status[status] ?? 0), 0);
+    return [
+      clean(row.project),
+      clean(`${row.agent} ${row.agent_version}`),
+      clean(row.model),
+      String(row.runs.total),
+      formatShare(ok, ended),
+      String(row.runs.retries),
+      formatShare(row.ci.first_try_passed, row.ci.first_try_total),
+      String(row.merged.intents),
+      formatShare(row.merged.without_changes_requested, row.merged.intents),
+      String(row.scope_breaches),
+      formatDuration(row.merged.lead_time.avg_seconds),
+    ];
+  });
+  if (body.length === 0) return [];
+  const header = [
+    'cli.metrics.column.project',
+    'cli.metrics.column.agent',
+    'cli.metrics.column.model',
+    'cli.metrics.column.runs',
+    'cli.metrics.column.run_ok',
+    'cli.metrics.column.retries',
+    'cli.metrics.column.ci_first',
+    'cli.metrics.column.merged',
+    'cli.metrics.column.merged_clean',
+    'cli.metrics.column.breaches',
+    'cli.metrics.column.lead_avg',
+  ] as const satisfies readonly MessageKey[];
+  return table(
+    header.map((key) => t(key)),
+    body,
+    3,
+  );
+}
+
+/** One line per (project, agent version, model): tokens and cost (exported for tests). */
+export function agentCostTable(metrics: AgentMetricsView): string[] {
+  const body = metrics.rows.map((row) => [
+    clean(row.project),
+    clean(`${row.agent} ${row.agent_version}`),
+    clean(row.model),
+    row.tokens.input,
+    row.tokens.output,
+    row.tokens.cache_share_percent === null ? '-' : `${String(row.tokens.cache_share_percent)}%`,
+    row.cost.total_usd,
+    row.cost.wasted_usd,
+    row.cost.per_run_usd ?? '-',
+    row.cost.per_merged_intent_usd ?? '-',
+  ]);
+  if (body.length === 0) return [];
+  const header = [
+    'cli.metrics.column.project',
+    'cli.metrics.column.agent',
+    'cli.metrics.column.model',
+    'cli.metrics.column.input',
+    'cli.metrics.column.output',
+    'cli.metrics.column.cache',
+    'cli.metrics.column.cost',
+    'cli.metrics.column.wasted',
+    'cli.metrics.column.cost_run',
+    'cli.metrics.column.cost_merged',
+  ] as const satisfies readonly MessageKey[];
+  return table(
+    header.map((key) => t(key)),
+    body,
+    3,
+  );
+}
+
+function printAgentMetrics(ctx: CliContext, metrics: AgentMetricsView): void {
+  const scope =
+    metrics.scope.kind === 'tenant'
+      ? t('cli.metrics.scope.tenant')
+      : t('cli.metrics.scope.project', { project: clean(show(metrics.scope.project)) });
+  say(ctx, 'cli.metrics.agents_header', { scope, from: metrics.from, to: metrics.to });
+  const filters = [
+    metrics.filters.agent === null ? null : `agent ${metrics.filters.agent}`,
+    metrics.filters.model === null ? null : `model ${metrics.filters.model}`,
+  ].filter((value): value is string => value !== null);
+  if (filters.length > 0) say(ctx, 'cli.metrics.filters', { filters: clean(filters.join(', ')) });
+  const runs = agentRunTable(metrics);
+  if (runs.length === 0) {
+    say(ctx, 'cli.metrics.no_runs');
+  } else {
+    for (const line of runs) ctx.stdout(line);
+    ctx.stdout('');
+    for (const line of agentCostTable(metrics)) ctx.stdout(line);
+  }
+  say(ctx, 'cli.metrics.unattributed', { cost: metrics.unattributed_cost_usd });
+  if (metrics.truncated) say(ctx, 'cli.metrics.truncated', { max: metrics.rows.length });
+  say(ctx, 'cli.metrics.agents_note');
 }
 
 const UNITS = [

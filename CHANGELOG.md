@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- V13: the agent efficiency report (ADR-M79, QUESTIONS #430–#434; no migration). `GET /v1/metrics/agents` and `sdlc metrics agents [--project] [--agent] [--model] [--from] [--to] [--json]`: per project, agent version and model, from runs, run events, gate decisions, `intent.closed` and cost records. Run outcomes and stop reasons, retries, CI on the first try, merged with and without a request for changes, G5 scope breaches, lead time, tokens, cache share, total and wasted cost, cost per run and cost per merged intent. Needs a role in both `access.cost_read_roles` and `access.metrics_read_roles` (tenant admins always). Handbook Ch.19 §19.8c.
 - `platform/DEVELOPMENT.md` (QUESTIONS #424, #425): the test suites and where they run, the live tests the owner runs, the test helpers and rules, and the test map by area, which `CLAUDE.md` held until now. A static test (`workspace/development-doc.test.ts`) checks that every `pnpm test:*` script has an entry there. `design/README.md` "Number blocks" keeps the full history of QUESTIONS and ADR numbers. A second pull request slims `CLAUDE.md`.
 
 ### Changed

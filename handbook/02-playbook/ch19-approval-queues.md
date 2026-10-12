@@ -233,6 +233,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
 | `sdlc cost report [--project <slug> \| --intent <INT-…>] [--from <time>] [--to <time>] [--by project\|intent\|model\|status]` | Shows tokens and cost (below) |
 | `sdlc metrics gates [--project <slug>] [--gate G1..G8] [--mode HITL\|HOTL\|AUDIT\|POLICY] [--risk low\|medium\|high\|critical] [--from <time>] [--to <time>]` | Shows how long gates waited for people (below) |
+| `sdlc metrics agents [--project <slug>] [--agent <key>] [--model <name>] [--from <time>] [--to <time>]` | Shows whether agents and models are worth it, from real runs (below) |
 | `sdlc trial report [--project <slug>] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--max-intents <n>] [--json]` | The community trial's report (`TRIAL.md` §6): gate waits, runs, decisions, escalations, tokens and cost of the intents created in the range, **anonymous** (projects become `project-1`…, intents `intent-1`…; never a code, title, person, repository or link). Default range: the last 90 days. Built from the reads above with the same access rules; nothing is printed when the report fails its safety check (`design/ADR-M65-trial-report.md`) |
 | `sdlc evidence build <INT-…>` | Builds a new version of the intent's Evidence Pack, or returns the latest one when nothing changed: Chapter 15 §15.10.2 |
 | `sdlc evidence list <INT-…>` / `sdlc evidence show <INT-…> [--version <n>]` | Lists the pack's versions / shows one (default: the latest), with its release SHA-256 (what a G8 approval is bound to) |
@@ -326,6 +327,15 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - Decisions the platform makes by itself (G4 policy checks, G5 and G6) never count. A block of a passed gate never counts. Each approval of a dual approval counts.
 - The report never shows who decided: it is about the gates, not about people.
 - `--gate`, `--mode` (the oversight mode of the decision) and `--risk` (the intent's risk tier) narrow the rows. At most 500 rows are shown.
+
+<a id="agent-metrics"></a>**Reading the agent report.** `sdlc metrics agents` shows how agents and models did in real work, per project, agent version and model (task V13, `design/ADR-M79-agent-metrics.md`, D-02 FR-53, D-07 §5). It reads runs, gate decisions and cost records the platform already holds. It answers "is this agent worth its cost?". For a controlled comparison of agents and models on fixed tasks, see the evaluation harness (task L02, not built yet).
+
+- Who: a tenant admin for the whole tenant (no `--project`). For one project: a tenant admin, or a role that is in **both** `access.cost_read_roles` and `access.metrics_read_roles` (by default Person A, Person B, PM / BrSE, governance and admin; not the second approver, not the viewer). A role in only one list gets 403; no role on the project gets 404.
+- When: the same time formats and limits as the gate times. The report counts the runs created in the range (`--from` included, `--to` excluded); without them, the last 30 days. At most 366 days.
+- Run measures: runs by how they ended and by stop reason, retries (an attempt after the first), and runs still in progress. The "ended well" share leaves out runs in progress. A run's model is the one with the most cost in its cost records; a run without cost records shows the model `unknown`.
+- Quality measures: CI on the first try (the first CI result of an intent, counted under the run that made it), scope breaches at G5, and the intents merged with and without a request for changes at G7. These count under the run that was merged. Lead time is the wall-clock time from the creation of the intent to its close.
+- Cost measures: input and output tokens, the cached share of input tokens, total cost, wasted cost (runs that failed, were cancelled or stopped), cost per run and **cost per merged intent** (the whole cost of the intent, divided by the intents merged). Calls that belong to no run are shown apart and are not in any row. Money is a decimal string; a measure without data is empty, never 0.
+- It never shows a person. With `--json`, the amounts stay strings and the counts are numbers.
 
 <a id="exit-codes"></a>**When a command fails.** The message says why. The exit code tells scripts what happened (this is the one list; other documents link here):
 
@@ -510,6 +520,7 @@ Never publish the API's port 8090 to other machines. People on other machines us
 | 0.34 | 2026-10-12 | Claude (task V09, PR 2) | §19.8c, §19.8e: the team address through the TLS proxy, `NODE_EXTRA_CA_CERTS` with the operator's `ca.pem`, the dashboard and the GitHub sign-in on the team address, Safari there |
 | 0.36 | 2026-10-12 | Claude (docs review for v0.2.0) | §19.8d: `sdlc admin user sign-out` and `sdlc admin passkey list\|revoke` in the admin table; §19.8e: never publish port 8090, other machines use team access |
 | 0.35 | 2026-10-12 | Claude (task U06, PR 2) | §19.8e: passkeys in the dashboard (add within 5 minutes of a GitHub sign-in, remove, `sdlc admin passkey`), the session's security token on each change; decisions still to come (ADR-M73 §2.3, §2.4) |
+| 0.37 | 2026-10-12 | Claude (task V13) | §19.8c: `sdlc metrics agents`: who (a role in both the cost and the metrics lists), the range, the run, quality and cost measures, the model of a run (ADR-M79) |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

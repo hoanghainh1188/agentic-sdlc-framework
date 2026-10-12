@@ -272,6 +272,61 @@ export const gateMetricsSchema = z.object({
 });
 export type GateMetricsView = z.infer<typeof gateMetricsSchema>['metrics'];
 
+const count = z.number().int().min(0);
+
+/** `GET /v1/metrics/agents` (V13, ADR-M79). Counts, seconds and amounts only. */
+export const agentMetricsSchema = z.object({
+  metrics: z.object({
+    scope: z.object({ kind: z.enum(['tenant', 'project']), project: code.optional() }),
+    from: time,
+    to: time,
+    filters: z.object({ agent: code.nullable(), model: code.nullable() }),
+    rows: z
+      .array(
+        z.object({
+          project: code,
+          agent: code,
+          agent_version: code,
+          model: code,
+          runs: z.object({
+            total: count,
+            in_progress: count,
+            by_status: z.record(code, count),
+            by_stop_reason: z.record(code, count),
+            retries: count,
+          }),
+          ci: z.object({ first_try_total: count, first_try_passed: count }),
+          merged: z.object({
+            intents: count,
+            without_changes_requested: count,
+            lead_time: z.object({
+              count,
+              avg_seconds: seconds.nullable(),
+              max_seconds: seconds.nullable(),
+            }),
+          }),
+          scope_breaches: count,
+          tokens: z.object({
+            input: tokenSum,
+            output: tokenSum,
+            cached_input: tokenSum,
+            cache_share_percent: z.number().min(0).max(100).nullable(),
+          }),
+          cost: z.object({
+            total_usd: usd6,
+            wasted_usd: usd6,
+            per_run_usd: usd6.nullable(),
+            per_merged_intent_usd: usd6.nullable(),
+          }),
+        }),
+      )
+      .max(500),
+    unattributed_cost_usd: usd6,
+    truncated: z.boolean(),
+  }),
+});
+export type AgentMetricsView = z.infer<typeof agentMetricsSchema>['metrics'];
+
 /** `GET /v1/intents/:intent/specs` (B08). */
 export const specListSchema = z.object({
   intent: code,

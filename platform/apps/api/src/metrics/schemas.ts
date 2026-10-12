@@ -29,3 +29,19 @@ export const gateMetricsQuerySchema = z.strictObject({
   to: time.optional(),
 });
 export type GateMetricsQuery = z.infer<typeof gateMetricsQuerySchema>;
+
+/** Request schema of the agent efficiency report (task V13, ADR-M79); same range rules as above. */
+export const agentMetricsQuerySchema = z.strictObject({
+  project: z.string().regex(PROJECT_SLUG_PATTERN).optional(),
+  agent: z
+    .string()
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/)
+    .optional(),
+  model: z
+    .string()
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$/)
+    .optional(),
+  from: time.optional(),
+  to: time.optional(),
+});
+export type AgentMetricsQuery = z.infer<typeof agentMetricsQuerySchema>;
