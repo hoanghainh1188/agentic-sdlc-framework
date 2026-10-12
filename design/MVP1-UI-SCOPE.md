@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.3 |
+| Version | 1.4 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-10-10). Decided in ADR-M73; built by U05–U07 (milestone UX) and U08–U09 (Later). Revised once `design/M-E-REPORT.md` exists (section 9) |
 | Readers | Harry, the trial teams, Claude Code |
@@ -118,7 +118,7 @@ These follow the platform's rules. The trial data does not change them.
 
 Three layers, every one required on every action with a session cookie:
 1. `SameSite=Strict` on the session cookie.
-2. A **CSRF token** bound to the session, sent in the header `X-SDLC-CSRF`. The page gets it from `GET /v1/web/session` and keeps it in memory only.
+2. A **CSRF token** bound to the session, sent in the header `X-SDLC-CSRF`. The page gets it from `GET /v1/auth/session` and keeps it in memory only.
 3. An **origin check**: `Origin` must equal the configured public origin (`SDLC_API_PUBLIC_ORIGIN`), and `Sec-Fetch-Site` must be `same-origin` when the browser sends it.
 
 Also: request bodies must be `application/json` (no form posts), and actions answer no-store. Bearer requests skip these checks: no browser sends a bearer header by itself.
@@ -244,3 +244,4 @@ U05–U07 are in the milestone UX (toward v0.2.0), U08–U09 in Later (QUESTIONS
 | 1.1 | 2026-10-10 | Claude (task V11), after Harry's review of PR #280 | Still proposed. §5.1 login CSRF: the pre-login cookie `__Host-sdlc_oauth` (`SameSite=Lax`, about 10 minutes) with the hash of `state` and the PKCE verifier, both needed at the callback; why Lax. §5.2 a new session ID at sign-in (no fixation), "sign out everywhere". §5.4 the passkey challenge is random, stored with its action, short-lived and used once (not derived). §5.10 known limits: Safari and `Secure` cookies on `localhost` (tested in U05), the L1 proposal download stays in the CLI (W9) |
 | 1.2 | 2026-10-10 | Claude (task V11), approved by Harry | Approved (QUESTIONS #380): status, §7 the changes made (ADR-M73, D-02 1.10, D-03 1.40, D-05 1.40, ADR-M54 0.5, D-08 1.35), §8 the tasks U05–U09 in D-08 with their milestones, §10 #380 |
 | 1.3 | 2026-10-12 | Claude (task V09, PR 1) | Wording only: §6 links ADR-M67 (no longer "not done yet") and names the proxy origin with its port; meaning unchanged |
+| 1.4 | 2026-10-12 | Claude (task U06, PR 1) | Wording only: §5.3 names the endpoint as built, `GET /v1/auth/session` (was `/v1/web/session`; ADR-M73 §2.3b, QUESTIONS #410); meaning unchanged |

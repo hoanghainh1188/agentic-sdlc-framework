@@ -7,6 +7,8 @@ erDiagram
     users ||--o{ api_tokens : "owns"
     users ||--o{ web_sessions : "signs in"
     user_identities ||--o{ web_sessions : "opened with"
+    users ||--o{ webauthn_credentials : "holds passkeys"
+    web_sessions ||--o{ passkey_challenges : "asks"
     projects ||--o{ role_bindings : "within"
     projects ||--|| project_configs : "configured by"
     projects ||--|| git_event_cursors : "reads events"

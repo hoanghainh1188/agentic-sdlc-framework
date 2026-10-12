@@ -150,6 +150,9 @@ describe('sdlc-api service', () => {
 
   it('U05: the GitHub sign-in is off by default; its client secret is at kv/api/github-oauth, read by the api only', () => {
     expect(api.environment.SDLC_API_WEB_SIGNIN).toBe('${SDLC_API_WEB_SIGNIN:-off}');
+    // U06: actions in the dashboard are off unless the operator turns them on.
+    expect(api.environment.SDLC_API_DASHBOARD_ACTIONS).toBe('${SDLC_API_DASHBOARD_ACTIONS:-off}');
+    expect(envExample.get('SDLC_API_DASHBOARD_ACTIONS')).toBe('off');
     expect(api.environment.SDLC_API_PUBLIC_ORIGIN).toBe('${SDLC_API_PUBLIC_ORIGIN:-}');
     expect(envExample.get('SDLC_API_WEB_SIGNIN')).toBe('off');
     const bootstrap = readDeployFile('openbao/bootstrap.sh');

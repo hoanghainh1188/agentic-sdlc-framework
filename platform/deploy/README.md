@@ -200,6 +200,8 @@ Optional, dashboard sign-in with GitHub (U05, [ADR-M73](../../design/ADR-M73-das
 pnpm openbao:bootstrap api-github-oauth-credentials < <key file>.client-secret  # T11 §5n
 ```
 
+Optional, actions in the dashboard (U06, ADR-M73 §2.3): with the sign-in on, set `SDLC_API_DASHBOARD_ACTIONS=on` and start `sdlc-api` again. The api refuses to start with actions on and the sign-in off. Every write from the page needs the session's CSRF token and the public origin; each person adds a passkey in the dashboard within 5 minutes of a GitHub sign-in, and confirms each decision with it (decisions in the dashboard come with U07). A tenant admin lists and removes a person's passkeys with `sdlc admin passkey list|revoke --user <id or email>`.
+
 ### 8. The tenant and its first admin
 
 ```bash

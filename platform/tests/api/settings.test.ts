@@ -152,6 +152,7 @@ describe('api settings', () => {
       oauthSecretPath: 'api/github-oauth',
       idleMs: 30 * 60_000,
       maxAgeMs: 8 * 3_600_000,
+      actions: false,
     });
     expect(
       loadSettings({
@@ -178,6 +179,38 @@ describe('api settings', () => {
         origin,
       ).toThrowError(expect.objectContaining({ key: 'api.settings.public_origin_insecure' }));
     }
+  });
+
+  it('U06: dashboard actions are off by default; on, they need the GitHub sign-in and its origin', () => {
+    expect(loadSettings({}).webSignIn).toBeNull();
+    const on = {
+      SDLC_API_WEB_SIGNIN: 'github',
+      SDLC_API_PUBLIC_ORIGIN: 'https://sdlc.example.com',
+      SDLC_API_DASHBOARD_ACTIONS: 'on',
+    };
+    expect(loadSettings(on).webSignIn?.actions).toBe(true);
+    expect(loadSettings({ ...on, SDLC_API_DASHBOARD_ACTIONS: 'off' }).webSignIn?.actions).toBe(
+      false,
+    );
+    expect(() => loadSettings({ SDLC_API_DASHBOARD_ACTIONS: 'on' })).toThrowError(
+      expect.objectContaining({ key: 'api.settings.actions_need_signin' }),
+    );
+    expect(() =>
+      loadSettings({ SDLC_API_WEB_SIGNIN: 'off', SDLC_API_DASHBOARD_ACTIONS: 'on' }),
+    ).toThrowError(expect.objectContaining({ key: 'api.settings.actions_need_signin' }));
+    // Plain http:// on a host other than localhost, or no origin: refused with actions on too.
+    for (const origin of ['http://sdlc.example.com', 'http://127.0.0.1:8090']) {
+      expect(() => loadSettings({ ...on, SDLC_API_PUBLIC_ORIGIN: origin }), origin).toThrowError(
+        expect.objectContaining({ key: 'api.settings.public_origin_insecure' }),
+      );
+    }
+    expect(() => loadSettings({ ...on, SDLC_API_PUBLIC_ORIGIN: '' })).toThrowError(
+      expect.objectContaining({ key: 'api.settings.public_origin_missing' }),
+    );
+    expect(
+      loadSettings({ ...on, SDLC_API_PUBLIC_ORIGIN: 'http://localhost:8090' }).webSignIn?.actions,
+    ).toBe(true);
+    expect(() => loadSettings({ SDLC_API_DASHBOARD_ACTIONS: 'yes' })).toThrow(SettingsError);
   });
 
   it.each([

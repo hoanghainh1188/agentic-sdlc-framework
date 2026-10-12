@@ -6,7 +6,12 @@ import type { TenantId, TenantScope } from '@sdlc/core';
 /** How the caller authenticated: a personal API token, or a dashboard session (U05). */
 export type Credential =
   | { readonly kind: 'token'; readonly id: string }
-  | { readonly kind: 'session'; readonly id: string };
+  | {
+      readonly kind: 'session';
+      readonly id: string;
+      /** When the person signed in with GitHub (U06: passkeys are registered within 5 minutes). */
+      readonly signedInAt: Date;
+    };
 
 export interface Principal {
   readonly tenantId: TenantId;

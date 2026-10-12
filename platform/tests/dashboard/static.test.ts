@@ -43,8 +43,10 @@ describe('the dashboard is read only (AC1); U05: its only writes end its own Git
     // POST and DELETE: once in the request's type, once in a fixed sign-out call.
     expect(methods.filter((m) => m === 'POST')).toHaveLength(2);
     expect(methods.filter((m) => m === 'DELETE')).toHaveLength(2);
-    expect(client).toContain("request('/v1/auth/sign-out', 'POST', { cookie: true })");
-    expect(client).toContain("request('/v1/me/sessions', 'DELETE', { cookie: true })");
+    expect(client).toContain("request('/v1/auth/sign-out', 'POST', { cookie: true }, csrf)");
+    expect(client).toContain("request('/v1/me/sessions', 'DELETE', { cookie: true }, csrf)");
+    // U06 (ADR-M73 §2.3): the CSRF token is read from the session just before, never kept.
+    expect(client).toContain("getJson('/v1/auth/session', webSessionSchema");
     // GETs go through getJson / getPublicJson only.
     expect([...client.matchAll(/request\(path, 'GET'/g)]).toHaveLength(2);
   });
