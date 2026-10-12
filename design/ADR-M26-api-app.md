@@ -116,6 +116,7 @@ B03 covers only what is needed to use and test the API. Everything else in #58 i
   - failed authentications per client address per minute (429 once over).
   - A shared limiter (Valkey) comes when there is more than one instance.
   - Fastify runs with `trustProxy: false`: the client address is the TCP peer. If a reverse proxy is ever put in front of the api, this setting and the per-address limit must be revisited together, or every client shares the proxy's limit.
+    - Decided in ADR-M67 §2.5 (task V09, QUESTIONS #408): the proxy overwrites `X-Forwarded-For`, and the api trusts it only from the proxy's fixed address (`SDLC_API_TRUSTED_PROXY`, one IPv4 address, empty by default = `trustProxy: false`). `X-Forwarded-Proto` and `X-Forwarded-Host` are never used.
 - Error envelope: `{ error: { code, message, reason?, reason_message?, details? } }`.
   - Every code has a catalog key `api.error.<code>`.
   - Every refusal reason of the registry and the policy engine has a key `gate.reason.<code>` (`api.reason.<code>` until B06, which shares these texts with the comment replies; ADR-M27 §2.4).
@@ -162,3 +163,4 @@ B03 covers only what is needed to use and test the API. Everything else in #58 i
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task B03) | First version |
 | 0.2 | 2026-09-27 | Claude (task B06) | §2.7: refusal reason keys renamed `gate.reason.*`, same texts (ADR-M27) |
+| 0.3 | 2026-10-12 | Claude (task V09, PR 1) | §2.7: a note, the reverse proxy and `trustProxy` are decided in ADR-M67 §2.5 (QUESTIONS #408) |

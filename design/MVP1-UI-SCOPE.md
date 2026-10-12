@@ -2,8 +2,8 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.2 |
-| Date | 2026-10-10 |
+| Version | 1.3 |
+| Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-10-10). Decided in ADR-M73; built by U05–U07 (milestone UX) and U08–U09 (Later). Revised once `design/M-E-REPORT.md` exists (section 9) |
 | Readers | Harry, the trial teams, Claude Code |
 | Related documents | D-02 §3, §4.2, FR-11, FR-16, FR-17; D-03 §5.1, §9, §12 (ADR-M03); D-05 §6.3; ADR-M54 (the read-only dashboard); ADR-M41 (G7); ADR-M42 (kill switch); ADR-M28 (escalations); D-08 V03, V09, V11; QUESTIONS #255, #355, #358, #375–#379; handbook codes table §5 (2+N) |
@@ -173,14 +173,14 @@ Also: request bodies must be `application/json` (no form posts), and actions ans
 
 ## 6. What changes with V09 (team access)
 
-V09 (ADR-M67, not done yet) publishes the API and the dashboard on one LAN port through a TLS reverse proxy. For actions:
+V09 ([ADR-M67](ADR-M67-team-access.md)) publishes the API and the dashboard on one LAN port through a TLS reverse proxy. For actions:
 
 | Topic | On loopback | Behind V09 |
 |---|---|---|
-| Public origin | `http://localhost:8090` | `https://<proxy host>` |
+| Public origin | `http://localhost:8090` | `https://<proxy host>[:port]` (the proxy's host name, ADR-M67 §2.7) |
 | Cookie | `__Host-…; Secure` (localhost counts as secure in Chrome and Firefox; Safari: §5.10) | same, over TLS; the proxy adds HSTS |
 | Origin check | `localhost` | the proxy's origin only |
-| GitHub callback URL | `http://localhost:8090/…` | `https://<proxy host>/…` (one App can list both) |
+| GitHub callback URL | `http://localhost:8090/…` | `https://<proxy host>[:port]/…` (one App can list both) |
 | Passkey site name | `localhost` | the proxy's host name; passkeys registered on localhost do not work there |
 | Rate limits | api only | the proxy's per-client limits too |
 | Client address | direct | the proxy's forwarded address, trusted from the proxy only |
@@ -243,3 +243,4 @@ U05–U07 are in the milestone UX (toward v0.2.0), U08–U09 in Later (QUESTIONS
 | 1.0 | 2026-10-10 | Claude (task V11) | The plan of the dashboard's actions: three waves through the existing endpoints, what never goes in, the security design for writes (GitHub sign-in, sessions, CSRF, passkey step-up, the two-person rule, audit source `web`, `expected_input_sha256`, CSP unchanged), V09, the design changes and tasks after approval, how the trial data changes it (QUESTIONS #375–#379). Proposed: nothing changes before Harry approves it |
 | 1.1 | 2026-10-10 | Claude (task V11), after Harry's review of PR #280 | Still proposed. §5.1 login CSRF: the pre-login cookie `__Host-sdlc_oauth` (`SameSite=Lax`, about 10 minutes) with the hash of `state` and the PKCE verifier, both needed at the callback; why Lax. §5.2 a new session ID at sign-in (no fixation), "sign out everywhere". §5.4 the passkey challenge is random, stored with its action, short-lived and used once (not derived). §5.10 known limits: Safari and `Secure` cookies on `localhost` (tested in U05), the L1 proposal download stays in the CLI (W9) |
 | 1.2 | 2026-10-10 | Claude (task V11), approved by Harry | Approved (QUESTIONS #380): status, §7 the changes made (ADR-M73, D-02 1.10, D-03 1.40, D-05 1.40, ADR-M54 0.5, D-08 1.35), §8 the tasks U05–U09 in D-08 with their milestones, §10 #380 |
+| 1.3 | 2026-10-12 | Claude (task V09, PR 1) | Wording only: §6 links ADR-M67 (no longer "not done yet") and names the proxy origin with its port; meaning unchanged |

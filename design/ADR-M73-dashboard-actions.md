@@ -2,10 +2,10 @@
 
 | Item | Value |
 |---|---|
-| Status | **Accepted** (Harry, 2026-10-10). Built by tasks U05–U07 (UX) and U08–U09 (Later). Version 1.1: U05's details (§2.2b, QUESTIONS #385–#389) |
+| Status | **Accepted** (Harry, 2026-10-10). Built by tasks U05–U07 (UX) and U08–U09 (Later). Version 1.1: U05's details (§2.2b, QUESTIONS #385–#389); 1.2: wording |
 | Date | 2026-10-10 |
 | Decided by | Harry (V11: `design/MVP1-UI-SCOPE.md` 1.0 approved 2026-10-10; QUESTIONS #375–#380) |
-| Related | `design/MVP1-UI-SCOPE.md` 1.2 (the plan); ADR-M54 (the read-only dashboard); ADR-M03 (approvals through comments and the CLI); ADR-M26 (the API); ADR-M37 (admin); ADR-M41 (G7); ADR-M42 (kill switch); ADR-M28 (escalations); ADR-M67 (V09, team access, not written yet); D-02 §4.2 (1.10); D-03 §5.1, §9, §12 (1.40); D-05 (1.40); D-08 U05–U09, V03 |
+| Related | `design/MVP1-UI-SCOPE.md` 1.2 (the plan); ADR-M54 (the read-only dashboard); ADR-M03 (approvals through comments and the CLI); ADR-M26 (the API); ADR-M37 (admin); ADR-M41 (G7); ADR-M42 (kill switch); ADR-M28 (escalations); [ADR-M67](ADR-M67-team-access.md) (V09, team access); D-02 §4.2 (1.10); D-03 §5.1, §9, §12 (1.40); D-05 (1.40); D-08 U05–U09, V03 |
 
 ## 1. Context
 
@@ -103,5 +103,6 @@ Writes from a browser need what the read-only dashboard avoids: a sign-in that i
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 1.2 | 2026-10-12 | Claude (task V09, PR 1) | Wording only: the "Related" row links ADR-M67 (no longer "not written yet"); meaning unchanged |
 | 1.1 | 2026-10-10 | Claude (task U05), approved by Harry | §2.2b: U05 as built: settings, endpoints, pending sign-ins in memory, the user token revoked, reads only before U06, no DELETE on `web_sessions`, the client secret's path (QUESTIONS #385–#389) |
 | 1.0 | 2026-10-10 | Claude (task V11, design PR), accepted by Harry | First version, from `design/MVP1-UI-SCOPE.md` 1.0 and Harry's review in 1.1 (QUESTIONS #375–#380): login CSRF with a pre-login cookie, a new session ID at sign-in, sign out everywhere, a random stored single-use passkey challenge, the proposal download in the CLI only, the Safari limit |
