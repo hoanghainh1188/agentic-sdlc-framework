@@ -3,3 +3,4 @@
 export * from './schemas.js';
 export { cleanText } from './text.js';
 export { isHold, WAITING_CAUSE_KEYS, WAITING_REASON_KEYS } from './waiting.js';
+export { PLATFORM_VERSION } from './version.js';

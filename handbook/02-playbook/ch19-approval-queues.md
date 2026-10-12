@@ -201,6 +201,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
    - The address must use `https://`. `http://` works only for a platform on your own machine (`http://127.0.0.1:8090`).
    - If your company uses its own certificate authority, add it with the standard Node setting `NODE_EXTRA_CA_CERTS=<file>`. The command never runs with certificate checks turned off.
 3. `sdlc whoami` shows who you are and your roles per project.
+4. `sdlc doctor` checks your login and the API, and says what to fix (task V07): certificate checks on, the saved login file private, the API reachable over TLS and ready, your API token accepted and not near its end (a warning at 14 days or less), your roles per project, and the CLI's version against the API's. It reads only (`GET /health/live`, `/health/ready`, `/v1/me`, `/v1/me/tokens`), changes nothing and never prints your API token. One line per check (ok, warning, failed, skipped) and, for each problem, the fix; `--json` gives the same. Exit 1 when a check failed. When the API is down or you are not logged in, it says so. A problem on the server: the operator runs `pnpm doctor` there.
 
 - The API token is saved in `~/.config/sdlc/credentials.json` (or under `$XDG_CONFIG_HOME`), readable only by you. It is stored as plain text, so protect your account and your disk. If the file can be read by others, the command stops until you fix it (`chmod 600`) and log in again.
 - **Never put the API token on the command line**, in a script, in a chat or in a ticket. There is no `--token` option. To pipe an API token in (for example from a password manager), use `--token-stdin`.
@@ -216,6 +217,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 | `sdlc intent list [--project <slug>] [--status <status>] [--limit <n>] [--cursor <c>]` | Lists the intents you can read, newest first |
 | `sdlc intent show <INT-…>` | Shows an intent with its spec, plan and gate decisions, and **what holds it** when the platform holds it ("Held: …", the cause, until when) |
 | `sdlc next <INT>` | What you do next for this intent (task V06): the gate, who it waits for, why it is held (the reason the workflow recorded), and one advice for you: the command or comment to type, or the roles it waits for. It reads only the intent and your roles (`GET /v1/intents/:intent`, `GET /v1/me`) and changes nothing. A producer of the change (the intent's creator at G7 and G8, the person who approved G4 at G5, G7 and G8) is never told to approve; at G3 it reminds you that the person who submitted the plan cannot approve it. For an escalation it points to `sdlc escalation list --intent <INT>`. For actions outside a gate (link a spec, submit a plan, the AI record) it uses the default access roles and says so |
+| `sdlc doctor` | Checks your login and the API, and what to fix (task V07; step 4 above). Read only |
 | `sdlc gate approve <gate> <INT-…>` | Approves the gate the intent waits at |
 | `sdlc gate reject <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Rejects the gate |
 | `sdlc gate request-changes <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Requests changes |
@@ -476,6 +478,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.29 | 2026-10-09 | Claude (task V01, PR 2) | §19.8c: `sdlc trial report`, the anonymous report of the community trial (ADR-M65) |
 | 0.27 | 2026-10-09 | Claude (task U03) | §19.8c: `sdlc intent create --spec` creates the intent and links its spec in one command |
 | 0.31 | 2026-10-10 | Claude (task V06) | §19.8c: `sdlc next <INT>` |
+| 0.32 | 2026-10-12 | Claude (task V07, PR 1) | §19.8c: `sdlc doctor`, the check of your login and the API |
 | 0.30 | 2026-10-10 | Claude (task V05) | §19.8c: install the `sdlc` command from npm (`agentic-sdlc-cli`), `sdlc --version` |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |

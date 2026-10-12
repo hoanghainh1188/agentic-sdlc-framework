@@ -3,6 +3,8 @@
 // schemas fails these tests.
 import { createHash } from 'node:crypto';
 
+import { PLATFORM_VERSION } from '@sdlc/api-schemas';
+
 import type {
   Agent,
   AgentApproval,
@@ -316,6 +318,7 @@ export function meBody(): Record<string, unknown> {
     tenant_id: TENANT,
     token_id: '77777777-7777-4777-8777-777777777777',
     tenant_admin: false,
+    platform_version: PLATFORM_VERSION,
     roles: [{ project: PROJECT, role: 'person_a' }],
   };
 }
