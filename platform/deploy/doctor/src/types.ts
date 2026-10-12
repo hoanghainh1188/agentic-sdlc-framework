@@ -151,6 +151,11 @@ export interface OperatorFacts {
     readonly exists: boolean;
     readonly mode: number | null;
     readonly facts?: EnvFacts;
+    /**
+     * A trial stack's key file (V08, `pnpm trial:start`), next to the env file; only for a trial
+     * project. `mode` null: there is none. Its content is never read.
+     */
+    readonly trialKeyFile?: { readonly path: string; readonly mode: number | null };
   };
   /** null: no Docker, or the daemon does not answer. */
   readonly docker: {

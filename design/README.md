@@ -62,6 +62,7 @@
 | ADR-M66 | [The platform's images on GHCR for each release](ADR-M66-ghcr-images.md) (task V04) | Proposed | |
 | ADR-M72 | [The CLI on npm: one bundled file, published from a tag with provenance](ADR-M72-cli-npm-package.md) (task V05) | Proposed | |
 | ADR-M73 | [Actions in the web dashboard: GitHub sign-in, sessions, CSRF, passkey step-up](ADR-M73-dashboard-actions.md) (task V11; built by U05–U09) | Accepted | |
+| ADR-M76 | [The trial stack's key file: age with a passphrase, through the library `age-encryption`](ADR-M76-trial-key-file.md) (task V08) | Accepted | |
 
 **Version 1.0 (approved 2026-09-24, tag `design-v1.0`)**: D-02, D-03, D-05, D-08, D-09 aligned with the handbook (2+N roles, L0–L4, oversight matrix, forced HITL at G3, dual approval at G7, approval binding, escalation with SLA, project AI record, agent register, kill switch, retention). D-01 and D-07 unchanged.
 

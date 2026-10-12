@@ -1,10 +1,11 @@
 // `pnpm trial:down [--wipe]` (D-08 V02 AC4): stops the trial stack; `--wipe` also removes the
-// volumes of the trial's own Compose project, its env file and its TLS folder, after a
-// confirmation. It never touches another Compose project (the dev stack's `sdlc_*` volumes).
+// volumes of the trial's own Compose project, its env file, its TLS folder and its key file (V08),
+// after a confirmation. Without `--wipe` the key file is kept: `pnpm trial:start` needs it. It never touches another Compose project (the dev stack's `sdlc_*` volumes).
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { envValue } from './env-file.js';
+import { keyFileFor } from './keys.js';
 import type { Exec } from './up.js';
 
 /** Every profile, so no service of the project is left running. */
@@ -72,8 +73,10 @@ export async function trialDown(o: DownOptions): Promise<DownResult> {
   ];
   const r = await o.exec('docker', args);
   if (r.status !== 0 || !o.wipe) return { status: r.status, stderr: r.stderr, keptLogins: [] };
-  // The TLS folder next to the env file (`openbao/tls.sh dev`), the env file, the credentials.
+  // The TLS folder next to the env file (`openbao/tls.sh dev`), the key file (V08: useless
+  // without the volumes), the env file, the credentials.
   fs.rmSync(path.join(path.dirname(o.envFile), 'openbao-tls'), { recursive: true, force: true });
+  fs.rmSync(keyFileFor(o.envFile), { force: true });
   fs.rmSync(o.envFile, { force: true });
   const keptLogins: string[] = [];
   for (const file of o.credentialsFiles) {

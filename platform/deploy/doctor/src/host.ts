@@ -228,6 +228,14 @@ function jsonArray(text: string): unknown[] | null {
 const running = (services: readonly ServiceState[] | null | undefined, name: string) =>
   services?.some((s) => s.service === name && s.state === 'running') === true;
 
+/** The trial stack's key file (`platform/deploy/trial/src/keys.ts` `KEY_FILE_NAME`, static test). */
+export const TRIAL_KEY_FILE = 'trial-openbao-keys.age';
+
+/** A trial stack's Compose project (`pnpm trial:up`, and its live test). Pure. */
+export function isTrialProject(project: string | undefined): boolean {
+  return project !== undefined && /^(sdlc-trial|sdlctrialit)[a-z0-9-]*$/.test(project);
+}
+
 export async function gatherFacts(
   paths: HostPaths,
   exec: Exec,
@@ -240,11 +248,15 @@ export async function gatherFacts(
   const envFacts = exists
     ? parseEnvFacts(fs.readFileSync(paths.envFile, 'utf8'), required)
     : undefined;
+  const keyFile = path.join(path.dirname(paths.envFile), TRIAL_KEY_FILE);
   const envFile = {
     path: paths.envFile,
     exists,
     mode: statMode(paths.envFile),
     ...(envFacts ? { facts: envFacts } : {}),
+    ...(isTrialProject(envFacts?.values.COMPOSE_PROJECT_NAME)
+      ? { trialKeyFile: { path: keyFile, mode: statMode(keyFile) } }
+      : {}),
   };
 
   const disk = [

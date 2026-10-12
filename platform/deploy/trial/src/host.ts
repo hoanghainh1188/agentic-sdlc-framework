@@ -3,9 +3,11 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 
 import { processApiIo, processContext, runCli, type CliContext } from '@sdlc/cli';
 
+import { keyFileFor } from './keys.js';
 import { OLLAMA_TAG, type FileFact, type HostFacts } from './preflight.js';
 import { credentialsFile, secretFiles, type TrialSettings } from './settings.js';
 import type { Exec, ExecResult, Sdlc } from './up.js';
@@ -106,6 +108,18 @@ async function ollamaTags(url: string): Promise<string[] | null> {
   }
 }
 
+/**
+ * Whether Git ignores a file: `true` or `false` inside a repository, `null` outside one (V08: the
+ * key file must never be committed).
+ */
+async function gitIgnored(file: string): Promise<boolean | null> {
+  const dir = path.dirname(file);
+  const inside = await exec('git', ['-C', dir, 'rev-parse', '--is-inside-work-tree']);
+  if (inside.status !== 0 || inside.stdout.trim() !== 'true') return null;
+  const r = await exec('git', ['-C', dir, 'check-ignore', '-q', path.basename(file)]);
+  return r.status === 0;
+}
+
 export async function gatherFacts(
   settings: TrialSettings,
   envFile: string,
@@ -130,6 +144,13 @@ export async function gatherFacts(
     existingCredentials: [settings.personA, settings.personB]
       .map(credentialsFile)
       .filter((f) => fs.existsSync(f)),
+    keyFile: {
+      path: keyFileFor(envFile),
+      exists: fs.existsSync(keyFileFor(envFile)),
+      gitIgnored: fs.existsSync(path.dirname(keyFileFor(envFile)))
+        ? await gitIgnored(keyFileFor(envFile))
+        : null,
+    },
   };
 }
 
