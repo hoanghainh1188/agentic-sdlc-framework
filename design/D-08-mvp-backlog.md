@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.42 |
+| Version | 1.43 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -44,11 +44,11 @@
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
-| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420) | 14 | S×3 · M×9 · L×2 |
-| EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420) | 8 | S×4 · M×2 · L×2 |
-| Models | Self-hosted models (QUESTIONS #362) | 2 | S×1 · M×1 |
+| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) | 13 | S×3 · M×8 · L×2 |
+| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424) | 8 | S×4 · M×2 · L×2 |
+| Models | Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424) | 2 | S×1 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 4 | M×4 |
-| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 11 | S×3 · M×2 · L×6 |
+| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 12 | S×3 · M×3 · L×6 |
 | **Total** | | **94** | |
 
 ### Order and dependencies between milestones
@@ -61,9 +61,9 @@ flowchart LR
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
-    ME --> UX["UX V04–V13, U05–U07, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
-    UX --> EXT["EXT X01–X04, X07, X09, X11, X12 (v0.4.0)"]
-    EXT --> MO["Models L01, L03"]
+    ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
+    UX --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.4.0)"]
+    EXT --> MO["Models L01 (early in v0.4.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
     MD --> MU["U01–U03 read-only dashboard, done (Later)"]
@@ -875,7 +875,7 @@ flowchart LR
 > Note: QUESTIONS #342 (Harry, 2026-10-09): before v0.1.0. GitHub's manifest flow: https://docs.github.com/apps/sharing-github-apps/registering-a-github-app-from-a-manifest
 
 
-### UX — Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420)
+### UX — Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)
 
 #### V04. Publish the platform's images to GHCR for each release
 
@@ -1032,22 +1032,6 @@ flowchart LR
 
 > Note: ADR-M73, MVP1-UI-SCOPE 1.2 §5.3–§5.4, §5.8–§5.9 (QUESTIONS #376, #377)
 
-#### U07. Dashboard wave 1: kill a run, gate decisions, escalations
-
-| Size | Depends on | Requirements | Code area |
-|---|---|---|---|
-| M | U06 | FR-10, FR-11, FR-16, FR-17, FR-18, FR-34 | platform/apps/dashboard, platform/apps/api (intents, runs, escalations), platform/packages/core (commands, gate input hash), migrations (source `web`), platform/packages/messages, platform/tests/*, handbook Ch.19, USER-GUIDE |
-
-**Acceptance criteria**
-
-- [ ] AC1: The dashboard calls only the existing endpoints: `POST /v1/runs/:run/kill`, `POST /v1/intents/:intent/gates/:gate/decisions`, `POST /v1/escalations/:code/ack|decisions`; no new business endpoint; the same core handlers decide
-- [ ] AC2: A confirmation step shows what the decision is bound to and the current gate input hash (a new read-only field of the intent's `GET` answer, resolved by the workflow's own function); the decision sends `expected_input_sha256` and the API answers 409 when the input changed (optional for the CLI)
-- [ ] AC3: Source code `web` in `gate_decisions.source` and the kill source (D-05 migration); the actor is the person's user ID; no session or passkey ID in an append-only table
-- [ ] AC4: G7 is a link to the pull request only (no approve, no request changes); refusals are shown with their catalog code (producer, missing role, same person twice, frozen); the page has no rule set of its own
-- [ ] AC5: Playwright: the producer, a wrong role and the same person twice are refused through the page (N5); screenshots at 375, 768, 1440 px, light and dark; `pnpm test:db` for the 409 and the source
-
-> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378). U06 built the mechanism (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414): mark the decision, kill and acknowledgement routes `@SessionAction('actions')` (they refuse sessions until then); in the gate and escalation decisions call `PasskeysService.verifyStepUp` on the body's `step_up`, then core `consumeStepUp` inside the decision's transaction with the binding (`stepUpRequestSha256` of the body without `step_up`); the page asks `POST /v1/auth/step-up` with the same body
-
 #### V12. Release process: SemVer, a tag-driven release workflow, upgrade notes
 
 | Size | Depends on | Requirements | Code area |
@@ -1101,7 +1085,21 @@ flowchart LR
 > Note: QUESTIONS #422 (Harry, 2026-10-12): measure whether agents and models are worth it in real work, next to the evaluation harness (L02). The `sdlc trial report` (V01) may include its numbers later
 
 
-### EXT — Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420)
+### EXT — Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)
+
+#### X09. Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | B05 | NFR-05 | platform/spikes/git-hosts/* (thrown away), design/ADR-M70 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Check each host's API against the 19 methods of `GitHostAdapter`: a short-lived token for one repository, polling of comments, reviews, merges and CI results, opening a pull request, reviews bound to a commit, who merged, CI checks, security findings, branch protection
+- [ ] AC2: For each host: what works, what is missing for G6 and G7, and a workaround or a refusal
+- [ ] AC3: ADR-M70: a ranking and the effort of each adapter
+
+> Note: QUESTIONS #361 (Harry, 2026-10-10): clients use GitLab, Backlog Git and Bitbucket besides GitHub; adapters wait for a real project (X10)
 
 #### X01. Spike: a second, open-source coding agent (Aider or OpenCode)
 
@@ -1179,20 +1177,6 @@ flowchart LR
 
 > Note: QUESTIONS #361 (Harry, 2026-10-10): D-02 §4.2 "full context snapshots"
 
-#### X09. Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
-
-| Size | Depends on | Requirements | Code area |
-|---|---|---|---|
-| S | B05 | NFR-05 | platform/spikes/git-hosts/* (thrown away), design/ADR-M70 |
-
-**Acceptance criteria**
-
-- [ ] AC1: Check each host's API against the 19 methods of `GitHostAdapter`: a short-lived token for one repository, polling of comments, reviews, merges and CI results, opening a pull request, reviews bound to a commit, who merged, CI checks, security findings, branch protection
-- [ ] AC2: For each host: what works, what is missing for G6 and G7, and a workaround or a refusal
-- [ ] AC3: ADR-M70: a ranking and the effort of each adapter
-
-> Note: QUESTIONS #361 (Harry, 2026-10-10): clients use GitLab, Backlog Git and Bitbucket besides GitHub; adapters wait for a real project (X10)
-
 #### X11. Context condensing for agent runs
 
 | Size | Depends on | Requirements | Code area |
@@ -1225,7 +1209,7 @@ flowchart LR
 > Note: QUESTIONS #395 (Harry, 2026-10-12). Relates to X08 (lessons at G8)
 
 
-### Models — Self-hosted models (QUESTIONS #362)
+### Models — Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424)
 
 #### L01. A self-hosted model service (vLLM) on an optional GPU host
 
@@ -1380,6 +1364,22 @@ flowchart LR
 - [ ] AC5: D-03 §9 and §10 updated (sandbox egress); tests: the egress probe from a sandbox, a stub-model run that searches, another project's workspace refused
 
 > Note: QUESTIONS #285 (Harry, 2026-10-08): only if ADR-M59 (K01) says go. **Deferred** (QUESTIONS #300, Harry 2026-10-08): K01 found WeKnora no better than a plain bge-m3 + cosine search on the pilot, slow LLM summaries, and a document reader image with 202 critical vulnerabilities and an AGPL-3.0 library; revisit at M-F when a project has Office or PDF documents outside its repository, with the limits of ADR-M59 §5. QUESTIONS #305–#309, ADR-M60. Code index and full context snapshots stay Later. **Superseded by X04** (QUESTIONS #361): document search without WeKnora; WeKnora is looked at again only for documents outside the repository (X05)
+
+#### U07. Dashboard wave 1: kill a run, gate decisions, escalations
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | U06 | FR-10, FR-11, FR-16, FR-17, FR-18, FR-34 | platform/apps/dashboard, platform/apps/api (intents, runs, escalations), platform/packages/core (commands, gate input hash), migrations (source `web`), platform/packages/messages, platform/tests/*, handbook Ch.19, USER-GUIDE |
+
+**Acceptance criteria**
+
+- [ ] AC1: The dashboard calls only the existing endpoints: `POST /v1/runs/:run/kill`, `POST /v1/intents/:intent/gates/:gate/decisions`, `POST /v1/escalations/:code/ack|decisions`; no new business endpoint; the same core handlers decide
+- [ ] AC2: A confirmation step shows what the decision is bound to and the current gate input hash (a new read-only field of the intent's `GET` answer, resolved by the workflow's own function); the decision sends `expected_input_sha256` and the API answers 409 when the input changed (optional for the CLI)
+- [ ] AC3: Source code `web` in `gate_decisions.source` and the kill source (D-05 migration); the actor is the person's user ID; no session or passkey ID in an append-only table
+- [ ] AC4: G7 is a link to the pull request only (no approve, no request changes); refusals are shown with their catalog code (producer, missing role, same person twice, frozen); the page has no rule set of its own
+- [ ] AC5: Playwright: the producer, a wrong role and the same person twice are refused through the page (N5); screenshots at 375, 768, 1440 px, light and dark; `pnpm test:db` for the 409 and the source
+
+> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378). U06 built the mechanism (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414): mark the decision, kill and acknowledgement routes `@SessionAction('actions')` (they refuse sessions until then); in the gate and escalation decisions call `PasskeysService.verifyStepUp` on the body's `step_up`, then core `consumeStepUp` inside the decision's transaction with the binding (`stepUpRequestSha256` of the body without `step_up`); the page asks `POST /v1/auth/step-up` with the same body. QUESTIONS #424 (Harry, 2026-10-12): deferred from v0.3.0 until people in the trial or a team ask for decisions in the dashboard; the comments and the CLI already decide every gate
 
 #### U08. Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs
 
@@ -1562,6 +1562,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.40 | 2026-10-12 | Claude (docs review for v0.2.0), approved by Harry | The header shows the latest version; the second 1.38 row renumbered 1.39; ROADMAP.md marks each released task with its release (v0.1.0, v0.1.1, v0.2.0). No task changed |
 | 1.41 | 2026-10-12 | Claude, approved by Harry | L02 becomes an evaluation harness for agents, models and prompts (hidden tests, N runs, pass^k, confidence intervals, ADR-M78), size L; new task V13, the agent efficiency report from real runs (QUESTIONS #422) |
 | 1.42 | 2026-10-12 | Claude, approved by Harry | L02: a blind pairwise ranking by a reviewer, a growing task set reported per version, and a spike that reuses an existing evaluation framework where it fits (QUESTIONS #423) |
+| 1.43 | 2026-10-12 | Claude, approved by Harry | Plan review after v0.2.1 (QUESTIONS #424): U07 moves to Later until trial users ask for it; v0.3.0 = V13, L02, V10; X09 first in EXT and L01 early in v0.4.0 |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |

@@ -5,9 +5,9 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 | Milestone | Goal |
 |---|---|
 | M-E | The trial, run by the community (QUESTIONS #340) |
-| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420) |
-| EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420) |
-| Models | Self-hosted models (QUESTIONS #362) |
+| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) |
+| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424) |
+| Models | Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424) |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) |
 | M-F | Adjust gates, budgets and rules from the trial data, then a trial on a real internal tool (D-02 §13.3) |
@@ -18,7 +18,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V02** `pnpm trial:up`: the whole trial set-up on a developer machine in one command (done, v0.1.0)
 - **V03** Create the GitHub App from a manifest (done, v0.1.0)
 
-## UX: Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420)
+## UX: Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)
 
 - **V04** Publish the platform's images to GHCR for each release (done, v0.1.1)
 - **V05** Install the `sdlc` command with one command (npm package `agentic-sdlc-cli`) (done, v0.1.1)
@@ -30,23 +30,22 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V11** Plan the dashboard's actions (design only) (done, v0.1.1)
 - **U05** Dashboard sign-in with GitHub and server-side sessions (done, v0.2.0)
 - **U06** Dashboard writes: CSRF, origin check, passkey step-up (done, v0.2.0)
-- **U07** Dashboard wave 1: kill a run, gate decisions, escalations
 - **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes (done, v0.2.0)
 - **L02** Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision)
 - **V13** Agent efficiency report from real runs: `sdlc metrics agents`
 
-## EXT: Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420)
+## EXT: Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)
 
+- **X09** Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
 - **X01** Spike: a second, open-source coding agent (Aider or OpenCode)
 - **X02** Design: a tool register and MCP tools for agents
 - **X03** A second agent adapter and the agent register's adapter column
 - **X04** The tool register and the first tool: search the project's documents
 - **X07** A context snapshot for every run
-- **X09** Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
 - **X11** Context condensing for agent runs
 - **X12** Design: agent memory across runs
 
-## Models: Self-hosted models (QUESTIONS #362)
+## Models: Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424)
 
 - **L01** A self-hosted model service (vLLM) on an optional GPU host
 - **L03** GPU sizing note for leadership
@@ -60,6 +59,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 
 ## Later: Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done)
 
+- **U07** Dashboard wave 1: kill a run, gate decisions, escalations
 - **U08** Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs
 - **U09** Dashboard wave 3: administration
 - **X05** Documents outside the repository (Office, PDF, Confluence, Drive, Backlog)
