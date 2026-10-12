@@ -735,7 +735,7 @@ Needs `core` running and OpenBao unsealed.
 
 - Sessions are stored as hashes in `web_sessions`; they end after 30 idle minutes or 8 hours (`SDLC_API_SESSION_IDLE_MINUTES`, `SDLC_API_SESSION_MAX_HOURS`), at sign-out, when a user is disabled or an identity unlinked.
 - The api revokes each person's GitHub token right after it read the account ID; the platform never acts on GitHub as the person.
-- Safari may refuse the `Secure` cookies on `http://localhost`; use Chrome or Firefox there (ADR-M73 §4).
+- WebKit (Safari) keeps no `Secure` cookie on `http://localhost`, so Safari cannot sign in with GitHub there; use Chrome or Firefox (ADR-M73 §4, tested 2026-10-12).
 
 ## 6. Daily backup
 

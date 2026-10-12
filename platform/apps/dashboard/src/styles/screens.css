@@ -658,6 +658,32 @@ select {
   margin-top: var(--space-2);
 }
 
+.signin-github {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* The personal token, below GitHub: a second, quieter way in (U05). */
+.signin-alt {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--rule);
+}
+
+.signin-alt h2 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-small);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+.signin-alt .button-primary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--rule-strong);
+}
+
 .signin-facts {
   margin: var(--space-6) 0 0;
   padding: var(--space-4) 0 0 var(--space-4);

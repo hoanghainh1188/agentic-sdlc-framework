@@ -1,5 +1,6 @@
 // The API reads of the dashboard: GET endpoints that already exist for the CLI (ADR-M54 §2.1).
 import {
+  authConfigSchema,
   chainSchema,
   costReportSchema,
   escalationListSchema,
@@ -14,7 +15,7 @@ import {
   type IntentView,
 } from '@sdlc/api-schemas';
 
-import { apiPath, getJson, segment } from './client.js';
+import { apiPath, getJson, getPublicJson, segment } from './client.js';
 
 type Signal = { readonly signal?: AbortSignal };
 
@@ -23,6 +24,24 @@ export const MAX_BOARD_INTENTS = 1000;
 
 export const readMe = (token?: string, o: Signal = {}) =>
   getJson(apiPath('/v1/me'), meSchema, { ...o, ...(token ? { token } : {}) });
+
+/** U05: is this browser signed in with GitHub? (`GET /v1/me` with the session cookie only.) */
+export const readMeWithCookie = (o: Signal = {}) =>
+  getJson(apiPath('/v1/me'), meSchema, { ...o, cookie: true });
+
+/** U05: is GitHub sign-in on? A public read, no credential. */
+export const readAuthConfig = (o: Signal = {}) =>
+  getPublicJson(apiPath('/v1/auth/config'), authConfigSchema, o);
+
+/** The tenant slug format (`TENANT_SLUG_PATTERN` of the platform). */
+export const TENANT_SLUG = /^[a-z][a-z0-9-]{1,62}$/;
+
+/**
+ * U05: where the browser goes to sign in with GitHub. A top-level navigation (a `GET` the API
+ * answers with a redirect to GitHub), never a `fetch`.
+ */
+export const gitHubSignInUrl = (tenant: string): string =>
+  apiPath('/v1/auth/github/start', { tenant });
 
 /** Every intent the person can read, page by page; `truncated` past the cap. */
 export async function readIntents(

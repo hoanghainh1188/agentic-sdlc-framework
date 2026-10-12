@@ -148,6 +148,8 @@ test('the CSP blocks inline script (AC3)', async ({ page }) => {
 
 test('keyboard: sign in, skip link, navigation (AC5)', async ({ page }) => {
   await page.goto('/dashboard/');
+  // U05: the page first asks the API whether GitHub sign-in is on; wait for the form.
+  await expect(page.getByLabel('Personal API token')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Personal API token')).toBeFocused();
   await page.keyboard.type(TOKEN);

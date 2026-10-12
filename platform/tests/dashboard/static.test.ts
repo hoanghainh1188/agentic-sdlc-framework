@@ -32,12 +32,21 @@ const sources = files(srcDir, /\.tsx?$/).map((file) => ({
   text: code(fs.readFileSync(file, 'utf8')),
 }));
 
-describe('the dashboard is read only (AC1)', () => {
-  it('only src/api/client.ts calls fetch, and only with GET', () => {
+describe('the dashboard is read only (AC1); U05: its only writes end its own GitHub session', () => {
+  it('only src/api/client.ts calls fetch: GET, plus the two fixed sign-out calls (ADR-M73 §2.2)', () => {
     const callers = sources.filter((s) => /\bfetch\s*\(/.test(s.text)).map((s) => s.file);
     expect(callers).toEqual(['src/api/client.ts']);
     const client = sources.find((s) => s.file === 'src/api/client.ts')!.text;
-    expect([...client.matchAll(/method:\s*'([A-Z]+)'/g)].map((m) => m[1])).toEqual(['GET']);
+    // Every method named in the client, each time it is named.
+    const methods = [...client.matchAll(/'(GET|POST|PUT|PATCH|DELETE)'/g)].map((m) => m[1]);
+    expect(methods.filter((m) => m === 'PUT' || m === 'PATCH')).toEqual([]);
+    // POST and DELETE: once in the request's type, once in a fixed sign-out call.
+    expect(methods.filter((m) => m === 'POST')).toHaveLength(2);
+    expect(methods.filter((m) => m === 'DELETE')).toHaveLength(2);
+    expect(client).toContain("request('/v1/auth/sign-out', 'POST', { cookie: true })");
+    expect(client).toContain("request('/v1/me/sessions', 'DELETE', { cookie: true })");
+    // GETs go through getJson / getPublicJson only.
+    expect([...client.matchAll(/request\(path, 'GET'/g)]).toHaveLength(2);
   });
 
   it('never sends a request any other way', () => {
@@ -45,8 +54,24 @@ describe('the dashboard is read only (AC1)', () => {
       expect(text, file).not.toMatch(
         /XMLHttpRequest|navigator\.sendBeacon|new WebSocket|EventSource|<form[^>]*action=/,
       );
-      expect(text, file).not.toMatch(/method:\s*'(POST|PUT|PATCH|DELETE)'/);
+      if (file === 'src/api/client.ts') continue;
+      expect(text, file).not.toMatch(/'(POST|PUT|PATCH|DELETE)'/);
     }
+  });
+
+  it('U05: the GitHub sign-in is a top-level navigation to the API, never a fetch', () => {
+    const signIn = sources.find((s) => s.file === 'src/views/SignIn.tsx')!.text;
+    expect(signIn).toContain('window.location.assign(gitHubSignInUrl(tenant))');
+    const reads = sources.find((s) => s.file === 'src/api/reads.ts')!.text;
+    expect(reads).toContain("apiPath('/v1/auth/github/start', { tenant })");
+    // The session cookie is HttpOnly: the code never reads or writes cookies.
+    for (const { file, text } of sources) expect(text, file).not.toMatch(/document\.cookie/);
+    // A token or the cookie, never both: the Authorization header only with a token.
+    const client = sources.find((s) => s.file === 'src/api/client.ts')!.text;
+    expect(client).toContain("if ('token' in credential) headers.authorization");
+    expect(client).toContain("credentials: 'cookie' in credential ? 'same-origin' : 'omit'");
+    // A write keeps its Origin header (no `no-referrer` on POST or DELETE: review of PR 2).
+    expect(client).toContain("referrerPolicy: method === 'GET' ? 'no-referrer' : 'same-origin'");
   });
 
   it('builds API paths only under /v1/ and only through apiPath', () => {
