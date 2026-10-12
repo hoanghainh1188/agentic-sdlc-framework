@@ -44,8 +44,8 @@
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
-| UX | Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364) | 13 | S×3 · M×9 · L×1 |
-| EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361) | 8 | S×4 · M×2 · L×2 |
+| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420) | 13 | S×3 · M×9 · L×1 |
+| EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420) | 8 | S×4 · M×2 · L×2 |
 | Models | Self-hosted models (QUESTIONS #362) | 2 | S×1 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 4 | M×4 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 11 | S×3 · M×2 · L×6 |
@@ -61,8 +61,8 @@ flowchart LR
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
-    ME --> UX["UX V04–V12, L02: friendlier (v0.1.x → v0.2.0)"]
-    UX --> EXT["EXT X01–X04, X07, X09, X11, X12 (v0.3.0)"]
+    ME --> UX["UX V04–V12, U05–U07, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
+    UX --> EXT["EXT X01–X04, X07, X09, X11, X12 (v0.4.0)"]
     EXT --> MO["Models L01, L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
@@ -875,7 +875,7 @@ flowchart LR
 > Note: QUESTIONS #342 (Harry, 2026-10-09): before v0.1.0. GitHub's manifest flow: https://docs.github.com/apps/sharing-github-apps/registering-a-github-app-from-a-manifest
 
 
-### UX — Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364)
+### UX — Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420)
 
 #### V04. Publish the platform's images to GHCR for each release
 
@@ -1079,7 +1079,7 @@ flowchart LR
 > Note: QUESTIONS #362 (Harry, 2026-10-10): many clients are `client_restricted`, so a self-hosted model is a condition to sell; the company has no GPU yet. Runs early, in parallel with the milestone UX, on a developer machine
 
 
-### EXT — Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361)
+### EXT — Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420)
 
 #### X01. Spike: a second, open-source coding agent (Aider or OpenCode)
 
@@ -1535,6 +1535,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.35 | 2026-10-10 | Claude (task V11), approved by Harry | V11 done (`design/MVP1-UI-SCOPE.md` 1.2, ADR-M73): new tasks U05–U07 in UX (GitHub sign-in and sessions, CSRF and passkey step-up, wave 1: kill, gate decisions, escalations) and U08–U09 in Later (waves 2 and 3); U05 includes the V03 change (the App keeps its client secret); no dependency on V09 (QUESTIONS #375–#380) |
 | 1.36 | 2026-10-10 | Claude (task V12), approved by Harry | V12 note: AC2 as built (the tag verifies the images built before it; npm stays its own workflow with the same gate; `pnpm release:lock`), AC3 from 0.1.1 on (QUESTIONS #390) |
 | 1.37 | 2026-10-12 | Claude, approved by Harry | New tasks X11 (context condensing for agent runs) and X12 (design: agent memory across runs) in EXT, X13 (agent memory) in Later (QUESTIONS #395) |
+| 1.38 | 2026-10-12 | Claude, approved by Harry | Release v0.2.0 after V08, without waiting for U06 and U07; the rest of the milestone UX (U07, V10, L02) goes into v0.3.0 and EXT moves to v0.4.0 (QUESTIONS #420) |
 | 1.38 | 2026-10-12 | Claude (task U06, PR 1), approved by Harry | U07 note: how to wire the step-up and the session routes that U06 built (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

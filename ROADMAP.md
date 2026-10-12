@@ -5,8 +5,8 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 | Milestone | Goal |
 |---|---|
 | M-E | The trial, run by the community (QUESTIONS #340) |
-| UX | Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364) |
-| EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361) |
+| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420) |
+| EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420) |
 | Models | Self-hosted models (QUESTIONS #362) |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) |
@@ -18,7 +18,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V02** `pnpm trial:up`: the whole trial set-up on a developer machine in one command (done, v0.1.0)
 - **V03** Create the GitHub App from a manifest (done, v0.1.0)
 
-## UX: Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364)
+## UX: Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420)
 
 - **V04** Publish the platform's images to GHCR for each release
 - **V05** Install the `sdlc` command with one command (npm package `agentic-sdlc-cli`)
@@ -34,7 +34,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes
 - **L02** Model benchmark on the pilot tasks (data for the GPU decision)
 
-## EXT: Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361)
+## EXT: Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420)
 
 - **X01** Spike: a second, open-source coding agent (Aider or OpenCode)
 - **X02** Design: a tool register and MCP tools for agents
