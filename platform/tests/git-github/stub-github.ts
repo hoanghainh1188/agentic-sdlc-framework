@@ -140,6 +140,12 @@ export class StubGitHub {
       const custom = this.#routes.get(`GET ${req.path}`);
       return custom ? custom(req) : { body: { id: INSTALLATION_ID } };
     }
+    // V07: the App itself (`inspectInstallation`), with the App JWT.
+    if (req.method === 'GET' && req.path === '/app') {
+      if (!this.#validJwt(auth)) return { status: 401, body: { message: 'Bad credentials' } };
+      const custom = this.#routes.get('GET /app');
+      return custom ? custom(req) : { body: { id: 1, permissions: { metadata: 'read' } } };
+    }
     if (
       req.method === 'POST' &&
       req.path === `/app/installations/${INSTALLATION_ID}/access_tokens`

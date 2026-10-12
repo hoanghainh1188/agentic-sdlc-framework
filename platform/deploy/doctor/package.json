@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "pnpm doctor (D-08 V07): read-only checks of a deployment. Not a workspace package: built by tsc -b from the root tsconfig."
+}

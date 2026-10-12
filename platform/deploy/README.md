@@ -565,7 +565,30 @@ docker buildx imagetools inspect "$(pnpm --silent images get API)" --format '{{ 
 
 A tag (`0.1.1`, `sha-<commit>`) never moves, but use the digest anyway: the platform always does.
 
+## Doctor (`pnpm doctor`)
+
+`pnpm doctor [--env <file>] [--json]` checks the deployment on the machine of the stack and prints one line per check (ok, warning, failed, skipped) with, under each problem, the command or the section of this guide or runbook T11 that fixes it (task V07, `design/QUESTIONS.md` #400–#404). The env file is `platform/deploy/.env` unless `--env` names another one (for example the trial stack's). The option is `--env`, not `--env-file`: Node.js reads `--env-file` itself and would load the secrets.
+
+| Check | What it reads |
+|---|---|
+| `host.docker`, `host.memory`, `host.disk` | Docker and Compose versions (Compose 2.24 or later), Docker's memory (8 GiB), free disk next to the env file and in `SDLC_BACKUP_DIR` (a warning below 20 GiB, failed below 5 GiB) |
+| `env.file`, `env.secrets` | The env file exists with mode 600; every secret `.env.example` marks `CHANGEME` is set (names only, never a value) |
+| `services.health` | `docker compose ps`: unhealthy or restarting services, a failed one-shot job, a `core` service not running. A stopped stack is a warning and the checks that need it are skipped |
+| `openbao.state`, `openbao.tls_files`, `openbao.tls_expiry` | `pnpm openbao:bootstrap status`; the CA and server certificate in `SDLC_OPENBAO_TLS_DIR` and their end dates (a warning within 30 days). Never the key file |
+| `db.migrations` | The applied migrations (`psql` in the postgres container as `platform`, a read-only session) against the migration files of this checkout |
+| `credentials.approle` | Each process's AppRole files exist, and the secret ID's age (a warning at 80 days, failed at 90): `test -s` and `stat` inside the service, never the content |
+| `credentials.logs` | Event codes of the last 24 hours of the `sdlc-api`, `sdlc-worker` and `sdlc-runner` logs: `…_missing`, `worker.runs_off`, `worker.cost_sync_off`, `worker.cost_sync_gap`, a failed AppRole login, a sealed OpenBao. Only the event field is read; no line is printed |
+| `models.litellm` | The platform runs with the profile `models` (the LiteLLM sidecar) |
+| `valkey.memory` | Valkey's used memory against its limit (a warning at 90 %) |
+| `sandbox.image` | Each active project's effective `sandbox.image` is pinned by digest and present on this machine |
+| `github.app` | The GitHub App's permissions and each project repository's installation against `platform/deploy/github-app/manifest.json`. The worker runs the check with its own AppRole (`docker compose exec -T sdlc-worker node /app/dist/doctor-github.js`, read only, codes only), so the App key never leaves OpenBao and the worker; skipped while OpenBao is sealed or the worker is stopped |
+| `images.mode` | `pnpm images mode` (`local` or `published`) |
+
+**Read only.** It runs only the commands of its allowlist (`platform/deploy/doctor/src/commands.ts`): no `up`, `down`, `rm`, `prune`, no OpenBao command other than `status`, no SQL that writes. It prints no secret (never a token, key share, password or key) and works on a stopped or sealed stack: it says so instead of failing. It may run anywhere a person runs commands for the stack, including through Claude Code. Exit 0 when no check failed (warnings included), 1 when one did, 2 for a usage error. A person checks their own login with `sdlc doctor` (handbook Ch.19 §19.8c).
+
 ## Troubleshooting
+
+Run `pnpm doctor` first ([Doctor](#doctor-pnpm-doctor)): it checks the rows of this table and prints the fix. A person's own login and the API: `sdlc doctor`.
 
 | You see | Cause | Do |
 |---|---|---|

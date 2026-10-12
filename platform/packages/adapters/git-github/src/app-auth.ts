@@ -176,6 +176,14 @@ export class AppAuth {
     return { token, expiresAt, permissions: result };
   }
 
+  /**
+   * Authorization header value with the App JWT, for the read-only App endpoints of
+   * `inspectInstallation` (V07, QUESTIONS #400). Never logged; the caller never keeps it.
+   */
+  async appAuthorization(): Promise<string> {
+    return `Bearer ${await this.#jwt()}`;
+  }
+
   async #installationId(ref: RepoRef): Promise<string> {
     const key = repoKey(ref);
     const known = this.#installations.get(key);

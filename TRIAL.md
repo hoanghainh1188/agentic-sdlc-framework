@@ -118,6 +118,6 @@ Thank you. When enough reports have arrived (for example from three teams), we p
 
 ## 7. Help
 
-- Something does not work: [platform/deploy/README.md, Troubleshooting](platform/deploy/README.md#troubleshooting) and [USER-GUIDE §5](platform/USER-GUIDE.md#5-when-something-goes-wrong).
+- Something does not work: first `pnpm doctor --env <the trial env file>` (the stack) and `sdlc doctor` (your login): both say what to fix and change nothing ([Doctor](platform/deploy/README.md#doctor-pnpm-doctor)). Then [platform/deploy/README.md, Troubleshooting](platform/deploy/README.md#troubleshooting) and [USER-GUIDE §5](platform/USER-GUIDE.md#5-when-something-goes-wrong).
 - A bug: open an issue with the bug template; say that you were in the trial.
 - A word or a code you do not know: the [glossary](handbook/00-introduction/02-glossary.md) and the [codes table](handbook/00-introduction/05-codes.md).

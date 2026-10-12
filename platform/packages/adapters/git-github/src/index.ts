@@ -8,3 +8,10 @@ export {
   GitHubSignIn,
   type GitHubSignInOptions,
 } from './sign-in.js';
+// V07 (QUESTIONS #400): the App check of `pnpm doctor`, GitHub only, not a `GitHostAdapter` method.
+export {
+  inspectInstallation,
+  type AppPermissions,
+  type InstallationReport,
+  type RepoInstallation,
+} from './inspect.js';
