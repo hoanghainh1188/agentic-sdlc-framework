@@ -295,7 +295,7 @@ describe('V12 AC2: release.yml', () => {
     expect(runs(verify)).toContain(
       'platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt"',
     );
-    expect(verify.steps.some((st) => st.uses?.startsWith('sigstore/cosign-installer@'))).toBe(true);
+    expect(runs(verify)).toContain('platform/tools/release/install-cosign.sh "$COSIGN_VERSION"');
   });
 
   it('the release comes after both checks, from the CHANGELOG section, and never changes an existing one', () => {
@@ -477,5 +477,50 @@ describe('V12: pnpm release:lock', () => {
       expect(r.err).toContain('usage');
       expect(r.calls).toBe('');
     }
+  });
+});
+
+// After v0.2.0 (npm-publish failed three times on HTTP 504 while installing cosign): cosign is
+// installed by one script with long retries and a pinned SHA-256, never by sigstore/cosign-installer.
+describe('install-cosign.sh: cosign for the release workflows', () => {
+  const SCRIPT = 'platform/tools/release/install-cosign.sh';
+  const script = read(SCRIPT);
+  const FILES = [
+    '.github/workflows/release-images.yml',
+    '.github/workflows/release.yml',
+    '.github/workflows/npm-publish.yml',
+  ];
+
+  it('every release workflow installs cosign with the script, at a version the script pins', () => {
+    for (const file of FILES) {
+      const text = read(file);
+      const wf = parse(text) as Workflow;
+      expect(text, file).not.toContain('sigstore/cosign-installer');
+      expect(text, file).toContain(`${SCRIPT} "$COSIGN_VERSION"`);
+      const version = wf.env?.COSIGN_VERSION ?? '';
+      expect(version, file).toMatch(/^v\d+\.\d+\.\d+$/);
+      for (const arch of ['amd64', 'arm64']) {
+        expect(script, `${file} ${arch}`).toMatch(
+          new RegExp(
+            `^  ${version.replaceAll('.', '\\.')}/${arch}\\) sha256=[0-9a-f]{64} ;;$`,
+            'm',
+          ),
+        );
+      }
+    }
+  });
+
+  it('retries every network error for minutes and checks the SHA-256 before running cosign', () => {
+    expect(script).toContain('--retry 10 --retry-all-errors --retry-delay 15');
+    expect(script).toContain('sha256sum --check --status');
+    expect(script.indexOf('sha256sum --check')).toBeLessThan(script.indexOf('cosign" version'));
+    expect(script).toContain('https://github.com/sigstore/cosign/releases/download/');
+    expect(fs.statSync(path.join(root, SCRIPT)).mode & 0o111).not.toBe(0);
+  });
+
+  it('refuses a version or an architecture without a pin', () => {
+    const r = spawnSync('bash', [path.join(root, SCRIPT), 'v0.0.1'], { encoding: 'utf8' });
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/no pinned checksum|unsupported architecture/);
   });
 });

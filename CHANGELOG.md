@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- The release workflows (`release-images.yml`, `release.yml`, `npm-publish.yml`) install cosign with `platform/tools/release/install-cosign.sh` instead of `sigstore/cosign-installer`: the official binary, checked against a SHA-256 pinned in the script (amd64 and arm64), downloaded with retries for about three minutes. The action gave up after about 7 seconds of network errors, so v0.2.0's `npm-publish` failed three times on HTTP 504 while GitHub was degraded. Nothing to do on upgrade.
+
 ## [0.2.0] - 2026-10-12
 
 The second release of the milestone UX: easier to deploy, to check and to share. **`pnpm doctor` and `sdlc doctor`** say what is wrong with a deployment or a login and how to fix it; **the trial stack survives a reboot** (`pnpm trial:start`, the key shares encrypted with your passphrase); **team access from other machines** through a TLS proxy (profile `access`); **sign-in to the dashboard with GitHub**, sessions with CSRF protection and passkeys (the dashboard still decides nothing: its actions come with U07); and **the release process** (`RELEASING.md`). Everything new is off until you turn it on. A minor release because it has upgrade steps: two migrations and rebuilt images.
