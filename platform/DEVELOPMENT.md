@@ -1,0 +1,234 @@
+# Developing the platform: tests and live checks
+
+This document is for developers and Claude Code sessions that change the platform. It says:
+
+- which test suite proves what, what each suite needs, and where it runs (CI job, weekly, or never in CI);
+- which live tests only the owner runs, in a terminal;
+- the shared test helpers and the rules for writing tests;
+- for each area of the platform, its design record and its test files.
+
+Rules that a change must never break stay in [`CLAUDE.md`](../CLAUDE.md). The design of each area is in its ADR in [`design/`](../design/README.md). Deployment steps are in [`deploy/README.md`](deploy/README.md), the set-up of a development machine in [`GETTING-STARTED.md`](GETTING-STARTED.md), and the OpenBao and credentials steps in runbook [T11](../handbook/03-templates/T11-openbao-runbook.md).
+
+A test file named below without a folder is under `platform/tests/` (unit tests) or `platform/tests/integration/` (live and database tests). `pnpm test <file>` runs one unit test file.
+
+---
+
+## 1. Before a pull request
+
+```bash
+pnpm build && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test
+```
+
+Then run the suites of section 2 that cover the code you changed (section 5 lists them per area).
+
+---
+
+## 2. Test suites
+
+| Command | What it runs | Needs | Where it runs |
+|---|---|---|---|
+| `pnpm test` | Vitest: every `platform/**/*.test.ts` except integration tests. Unit tests, static checks of Compose files, workflows and documents | Nothing; run `pnpm build` first for the dashboard build checks | CI job `checks`, every pull request |
+| `pnpm test:integration` | Vitest for `platform/tests/integration/**` against a running `core` profile | `pnpm compose:core` running | CI job `compose` |
+| `pnpm test:compose` | Live Compose test on a throw-away project (ports +20000, cleaned up); includes the SeaweedFS access test | Docker | Developer machine |
+| `pnpm test:db` | Database integration tests on a throw-away PostgreSQL container, or `SDLC_TEST_DATABASE_URL` (a superuser URL). `SDLC_TEST_DB_DIR=<folder or file>` limits it | Docker | CI job `db`, every pull request except documentation-only ones |
+| `pnpm test:workflow` | The intent workflow on the Temporal time-skipping test server plus a throw-away PostgreSQL | Docker | CI job `db` |
+| `pnpm test:workflow-compose` | Smoke test on the real Compose Temporal (sticky queues, workers stopped and started), own throw-away project (ports +25000) and a throw-away platform PostgreSQL | Docker | CI job `compose` |
+| `pnpm test:openbao` | OpenBao bootstrap (A03), the OpenBao client (A04), TLS (A10), the SeaweedFS identities `api-evidence`, `worker-evidence`, `worker-purge`, `worker-anchor` on real SeaweedFS and OpenBao | Docker | CI job `compose` |
+| `pnpm test:seaweedfs` | SeaweedFS internal access refused from another container (A12) | Docker | CI job `compose` |
+| `pnpm test:backup` | The whole backup and restore drill on throw-away keys (A10) | Docker, `age` | CI job `compose` |
+| `pnpm test:litellm` | LiteLLM with keys from OpenBao (profile `models`) and the Cost Controller, stub model | Docker | CI job `compose` |
+| `pnpm test:api` | The `sdlc-api` container with OpenBao | Docker | CI job `compose` |
+| `pnpm test:access` | Team access through the TLS proxy (V09), ports +36000; the api-port check runs on Linux only | Docker | CI job `compose` |
+| `pnpm test:runner` | Runner on the local Docker Engine and a throw-away PostgreSQL: egress and hardening probed inside fixture sandboxes, provisioning, clean-up, clean-up after a restart, the kill measurement | Docker | CI job `compose` |
+| `pnpm test:runner-compose` | The `sdlc-runner` container in the profile `sandbox` (throw-away OpenBao keys) | Docker | CI job `compose` |
+| `pnpm test:observability` | One model call → a Langfuse trace with the seven labels; a platform span through the collector; no host port; the Langfuse purge (E08 AC4). Ports +27000, stub model | Docker | Developer machine |
+| `pnpm test:sandbox-image` | The `node24` sandbox image, hardened, with the real Verdaccio | Docker, internet | CI job `sandbox-image` |
+| `pnpm test:agent` | The real OpenHands Agent Server in a `node24` sandbox with a scripted stub model as LiteLLM, and a throw-away PostgreSQL. `SDLC_SANDBOX_IMAGE` uses a built image | Docker | CI job `sandbox-image` |
+| `pnpm test:pilot` | G1–G8 on the sample repository's shape with the real runner (section 4.3) | Docker | CI job `sandbox-image`, weekly and on demand only |
+| `pnpm test:dashboard` | Playwright against the stub API (section 4.4) | Chromium (`pnpm exec playwright install chromium`, once) | CI job `sandbox-image` when the dashboard, `api-schemas`, the api's static route or `platform/tests/e2e/` change; weekly; on demand |
+| `pnpm test:fresh-deploy` | Follows `deploy/README.md` "Fresh deployment (operator)" on a throw-away project (ports +31000) to the first intent at G1 | Docker | CI job `fresh-deploy`, weekly and on demand only |
+| `pnpm test:trial-up` | `pnpm trial:up` on a throw-away project, stop and `trial:start` again, a wrong passphrase, the intent found. Test-only overrides `SDLC_TRIAL_*` | Docker | CI job `trial-up`, weekly and on demand only |
+| `pnpm test:proposal-pilot` | The public pilot repository copied into the stub Git host, `pnpm install` in a `node24` sandbox, the L1 proposal, the runner's peak memory (`SDLC_PROPOSAL_REPORT=<file>`) | Docker, internet | Developer machine only, never in CI |
+| `pnpm test:sandbox-live` | Owner only (section 3) | | Never in CI |
+| `pnpm test:pilot-live` | Owner only (section 3) | | Never in CI |
+| `pnpm test:agent-real` | Owner's developer machine only (section 3) | | Never in CI |
+| `pnpm test:agent-api` | Owner only (section 3) | | Never in CI |
+
+CI layout (`.github/workflows/ci.yml`): pull requests, a daily run on `main` (the `scan` job only), a weekly run with every job, and manual dispatch. The heavy jobs (`compose`, `sandbox-image`) run only when their paths change, after `checks` passed, never on a draft pull request. After a pull request that changes the gate steps, the worker or the pilot suite, run the weekly jobs on the branch: `gh workflow run ci --ref <branch>`.
+
+---
+
+## 3. Live tests run by the owner
+
+These tests use a real GitHub App, a real model or the public pilot repository. **They never run in CI.** The owner runs them in the macOS Terminal app, never through a chat tool or the desktop app's terminal pane (Claude can read those). Files with keys stay outside the repository.
+
+| Test | Command | Prerequisites |
+|---|---|---|
+| GitHub adapter and poller with the test App | `SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file outside the repo> pnpm exec vitest run --config vitest.integration.config.ts platform/tests/integration/github`; the poller: `SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file> SDLC_TEST_DB_DIR=platform/tests/integration/github pnpm test:db` | The test App (GETTING-STARTED Step 11) |
+| The push and N6 on the pilot (C08 AC3) | `SDLC_GITHUB_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file> pnpm exec vitest run --config vitest.integration.config.ts platform/tests/integration/github/publish-live.test.ts` | The test App |
+| The whole sandbox flow | `SDLC_SANDBOX_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file> pnpm test:sandbox-live` — against `harryforge/pilot-order-inventory` with a real token from the test App and the `node24` image; no model key | The test App, Docker |
+| The pilot to G7 | `SDLC_PILOT_LIVE_TEST=1 SDLC_GITHUB_TEST_APP_FILE=<file> pnpm test:pilot-live` — the `test:pilot` stack against the real pilot repository: T01 to G7 with the real `ci-ok`, N6 on the real branch protection, then the pull request closed and the branch deleted. No issue, so no comment on the public repository; the PR text is codes only | GETTING-STARTED Step 11, Step 14 items 1 and 7 (the plan file `.sdlc/plans/INT-<UTC year>-0001.yaml` merged once by a person, QUESTIONS #230; the test stops with a message when it is missing), Docker. Not the dev stack |
+| The pilot to G8 | `SDLC_PILOT_LIVE_TEST=1 SDLC_PILOT_LIVE_G8=1 SDLC_GITHUB_TEST_APP_FILE=<file> pnpm test:pilot-live` — waits (`SDLC_PILOT_LIVE_MERGE_TIMEOUT_MINUTES`, 60) until Person B (`person_b_github_id`, `person_b_login` in the settings file) approves and merges on GitHub, then G8 → `done` | As above; GETTING-STARTED Step 14 items 7–8. The live plan (`pilot/fixtures/live-plan.yaml`, `[stub:live]`) allows `docs/live-test/**` only: never let a live run change the pilot's application code |
+| The real-model run on a local model (ADR-M10 §3, QUESTIONS #78) | `pnpm test:agent-real` — Ollama with the local tag `gpt-oss:20b` (`ollama pull gpt-oss:20b`; never a `:cloud` model), a throw-away LiteLLM with the Ollama entry of `config.ctmpl` (`reasoning_effort: low`, `num_ctx` 32768), the Cost Controller's virtual key, a `node24` sandbox. No secret. `SDLC_AGENT_REAL_REPORT=<file>` writes time, calls, tokens, cost, peak memory | Ollama on the developer machine. On a developer stack the Ollama entry of `config.ctmpl` appears only when `kv/litellm/providers/ollama` (field `api_base`) exists (runbook T11 §5d) |
+| One real task with an API model (D-08 E07 AC4, QUESTIONS #81) | `pnpm test:agent-api` — `claude-haiku-4-5-20251001` through the dev stack's LiteLLM, at most USD 1.00. Reads the LiteLLM master key from the rendered configuration in memory only (`integration/agent/litellm-master-key.ts`: never log the configuration; errors with fixed texts and no cause). `SDLC_AGENT_API_REPORT=<file>` gets the numbers for `design/MVP-DONE.md` §3 | `pnpm compose:models`, the provider key in OpenBao (runbook T11 §5d) |
+
+The test App is `harryforge-sdlc-dev` (Client ID `Iv23liQtMQBwNyVYZuJt`), installed only on `harryforge/pilot-order-inventory`. Its private key stays on the owner's machine.
+
+---
+
+## 4. Shared helpers and rules for tests
+
+### 4.1. Rules
+
+- Build fake tokens at run time, never as a literal. The Gitleaks rule `sdlc-api-token` blocks leaked tokens; its fake fixture is allow-listed in `platform/tests/gitleaks/fixtures/` only.
+- Never print a key share, root token, password or API token in test output. Throw-away OpenBao keys stay in the test process.
+- Never add a fixed sleep; wait for a condition (`waitLong` in the pilot suite).
+- A test that creates runs registers an agent first: `integration/agent-seed.ts`. A test that steps intents needs a project AI record: `integration/ai-record-seed.ts` (the workflow fixture seeds one).
+- A live test on Compose uses its own throw-away project, its own port offset and its own `access` subnet (`accessNetworkFor` in `platform/deploy/trial/src/env-file.ts`, used by `isolateEnv` and `trialEnv`); otherwise two projects collide. Every `docker compose` call passes `-p`.
+- Tests that search for leaked text (feedback, plan text) search every table, the Temporal history and the process output.
+
+### 4.2. Helpers
+
+| Helper | Use |
+|---|---|
+| `integration/throwaway-compose.ts` | Throw-away Compose projects; `baoClientArgs` and `openbaoCaMount` reach OpenBao over TLS; from the host network use `--add-host openbao:<ip>` |
+| `platform/deploy/scripts/test-db.sh` | The throw-away PostgreSQL behind `test:db`, `test:runner`, `test:agent` |
+| `platform/deploy/scripts/temporal-test-server.sh` | The Temporal test server: the sdk-java release pinned by version and SHA-256, the cached archive checked again on every run; never the SDK's own download |
+| `integration/g4-harness.ts` | Shared set-up for G4 and the run after it |
+| `integration/g7-world.ts` | Shared world for the G7 request-for-changes tests |
+| `integration/fake-spec-git-host.ts` | Fake Git host for spec linking |
+| `integration/memory-evidence-store.ts` | In-memory evidence store for G8 |
+| `integration/workflow/g1-g3/stack.ts` | B10's stack: CLI → API, the poller, the intent workflow on the Temporal test server |
+| `passkeys/soft-authenticator.ts` | A software passkey for the WebAuthn ceremonies |
+| `platform/tests/plans/fixtures/`, `platform/tests/specs/fixtures/` | Spec Kit and BMAD outputs at the pinned versions. A pin upgrade: compare the template files in ADR-M61 §2.2 and update these fixtures |
+
+### 4.3. The pilot suite (`pnpm test:pilot`, C09, E07)
+
+- `platform/tests/integration/pilot/`. `PilotStack` (`pilot/stack.ts`) = B10's stack on the **wall clock** with the worker's G4–G8 activities, the real `CostController` over `StubGateway` (run keys registered at the stub model, `/key/info`), StubOpenBao, and the **real runner** on the task queue `sdlc-runner` (`node24` sandbox, Agent Server, stub model as LiteLLM, the HTTP relay `pilot/relay-http.mjs` as `SDLC_RUNNER_SELF_CONTAINER`).
+- The repository is a bare Git repository on `StubGitHost` (`main` protected) with snapshots of the pilot's `AGENTS.md` and specs (`pilot/fixtures/`, commit `PILOT_COMMIT`). The GitHub stub serves refs, contents, trees, pull requests, a `ci-ok` check run (`setCi`) and code scanning (no alert).
+- The plan's task `summary` carries the stub model's script marker: `[stub:append]`, `[stub:edit]`, `[stub:count]`, `[stub:slow]`, `[stub:repeat]`, `[stub:silent]` (in `test:agent` only), `[stub:live]` (live tests).
+- Pilot configuration: HOTL block window 1 minute, `run.g6_ci_retries: 1`, `verification.required_checks: [ci-ok]`.
+- Files: `t01-n6` (C09 AC1, N6; and E07: T01 from G1 to G8 and `done`, Person B reviews and merges on the stub Git host with `PilotStack.review`, `mergeAsPerson`, `BareRepo.merge`; the test checks that no merge endpoint is called; then the pack, `sdlc audit verify` and one cost record per model call), `n1-n2-n3` (C09 AC2), `autonomy` (T09 to `rejected`, T10, C09 AC5), `kill-loop` (C09 AC4; prints `c09:kill_to_clean_up_ms:`). Run the files one at a time. A real G4–G6 run takes about two minutes.
+
+### 4.4. The dashboard suite (`pnpm test:dashboard`)
+
+- Playwright 1.63.0 against `platform/tests/e2e/stub-api.mjs`, which serves the build through the api's own `registerDashboard` with fictional data (`fixtures.mjs`; the token is made at run time). Run `pnpm build` first.
+- Screenshots at 375, 768 and 1440 px, light and dark, in `platform/tests/e2e/screenshots/` (Git-ignored).
+- `e2e/sign-in.e2e.ts`: the stub API plays GitHub on `localhost`. `SDLC_DASHBOARD_E2E_ALL_BROWSERS=1` adds Firefox and WebKit once `pnpm exec playwright install firefox webkit` ran.
+- `e2e/passkeys.e2e.ts`: Chromium's virtual authenticator on `localhost`; the stub checks with the api's built WebAuthn code.
+- Unit tests in `platform/tests/dashboard/`: data mapping, static checks of source and build, the no-new-endpoint check, colour contrast.
+
+---
+
+## 5. Test map by area
+
+Each row: the backlog task, its design record, and the tests that prove it. "unit" = `pnpm test`, "db" = `pnpm test:db`, "wf" = `pnpm test:workflow`.
+
+### 5.1. Foundation and infrastructure
+
+| Area | Task, design | Tests |
+|---|---|---|
+| Workspace, module boundaries, CI | A01, A09; ADR-M16 | unit: `workspace/boundaries.test.ts`, `workspace/structure.test.ts`, `workspace/ci-workflow.test.ts`, `workspace/ignores.test.ts`, `workspace/diagrams.test.ts`, `workspace/development-doc.test.ts` (this document) |
+| Docker Compose | A02; ADR-M17 | unit: the static Compose checks; `pnpm test:compose`; `pnpm test:integration` |
+| OpenBao bootstrap and client | A03, A04, A11; ADR-M19, ADR-M21 | `pnpm test:openbao` |
+| OpenBao TLS | A10 PR 1; ADR-M63 | unit: `deploy/openbao-tls-static.test.ts`; `pnpm test:openbao` (`openbao/tls.test.ts`: wrong CA, an IP, plain HTTP refused; renewal without a restart; a missing file stops OpenBao) |
+| Backups | A10 PR 2; ADR-M63 §5 | unit: `deploy/backup-static.test.ts`; `pnpm test:backup` |
+| Database, migrations | A06; ADR-M09 | db: `migrations.test.ts` and the tenant guard tests |
+| Audit log | A07; ADR-M09 §2.8 | unit: `audit/actions.test.ts`; db |
+| Logs and traces | A08; ADR-M35 | unit: logger, tracing with real HTTP, load order, static Compose; db: `telemetry-pg.test.ts` (no SQL parameter values in spans); `pnpm test:observability` |
+| SeaweedFS access | A12; ADR-M52 | unit: `deploy/seaweedfs-static.test.ts` (the exact command, `start.sh`); `pnpm test:seaweedfs` (`seaweedfs-access.test.ts`: every internal path refused from another container, 18333 `Unauthenticated`, the locked version unchanged, `start.sh` fails closed) |
+
+### 5.2. Intents, gates G1–G3, people
+
+| Area | Task, design | Tests |
+|---|---|---|
+| Policy engine | B01 | unit: the policy rules and matrix edge cases |
+| Registry | B02; ADR-M20 | db |
+| API | B03; ADR-M26 | unit: `api/settings.test.ts`; `pnpm test:api` |
+| User CLI | B04, U03; ADR-M36 | unit: `platform/tests/cli/` (mocked API and a real local HTTP server), `cli/api-schemas.test.ts` |
+| `sdlc next` | V06 | unit: `cli/next.test.ts` |
+| `sdlc doctor` | V07 PR 1 | unit: `cli/doctor.test.ts`; db: `api.test.ts` (`platform_version`) |
+| GitHub adapter | B05; ADR-M23 | unit; live with the test App (section 3) |
+| Poller and comment commands | B06; ADR-M27 | unit: grammar, replies, loop, settings, static Compose, `commands/comment-command.test.ts`; db: `git-poller.test.ts` (GitHub stub) |
+| Intent workflow | B07; ADR-M30 | db: `intent-workflow-2.test.ts`; wf: `intent-workflow-2.test.ts`; `pnpm test:workflow-compose` |
+| Spec linking | B08; ADR-M39 | unit: `platform/tests/specs/`, `cli/spec.test.ts`; db: `spec-linking.test.ts`; wf: `spec-n4.test.ts` |
+| G2 needs acceptance criteria | S01; ADR-M61 | unit: `specs/spec-structure.test.ts`, `evidence/pack.test.ts`, `cli/spec.test.ts`; db: `spec-linking.test.ts` (S01), `metrics-gates.test.ts`, `migrations.test.ts` |
+| Plan submission | B09; ADR-M40 | unit: `platform/tests/plans/`, `plans/plan-rules.test.ts`, `cli/plan.test.ts`; db: `plan-submission.test.ts`, `gate-g4.test.ts`; wf: `plan-resubmit.test.ts` |
+| Plan drafts | S02; ADR-M62 | unit: `plans/plan-draft.test.ts`, `cli/plan-draft.test.ts` |
+| The plan in the agent's prompt | B09 PR 2; ADR-M40 §2.7 | unit: `plans/plan-texts.test.ts`, `agent/plan-prompt.test.ts`, `runner/plan-file.test.ts`; db: `plan-in-prompt.test.ts`; wf: `plan-prompt-handoff.test.ts` |
+| G1–G3 end to end | B10 | `integration/workflow/g1-g3/` |
+| Escalations | B11; ADR-M28 | unit: clock, routing, notices, packet, freeze, loop, `/ack` and `/decide` grammar; db: `escalations.test.ts`, `escalation-commands.test.ts` |
+| Project AI record | B12; ADR-M32 | unit: rules, hash, policy, CLI; db: `ai-records.test.ts`; wf: `workflow/ai-record.test.ts` |
+| Admin onboarding, tokens | B13; ADR-M37 | unit: `admin/onboarding.test.ts`, `cli/admin-api.test.ts`, `admin-agents.test.ts`, `token-audit.test.ts`; db: `admin-onboarding.test.ts`, `admin-tokens.test.ts`, `admin-agents.test.ts`, `config-reconcile.test.ts` |
+
+### 5.3. Runs and gates G4–G6
+
+| Area | Task, design | Tests |
+|---|---|---|
+| Run Contracts | C02; ADR-M22 | unit: `run-contract/run-events.test.ts` and the contract tests; db |
+| LiteLLM and the Cost Controller | C03; ADR-M24 | unit: `cost/litellm-gateway.test.ts`; `pnpm test:litellm` (also: revoke by run; the key ID is not a key) |
+| Scheduled spend sync | C12; ADR-M24 §2.5 | unit: `worker/cost-sync-loop.test.ts`, `worker/settings.test.ts`; db: `cost-sync.test.ts` |
+| Runner and sandboxes | C04; ADR-M25 | unit: `deploy/sandbox-profile.test.ts` (the socket proxy allowlist equals `ALLOWED_ENDPOINTS`); `pnpm test:runner`, `pnpm test:runner-compose`, `pnpm test:sandbox-image` |
+| OpenHands adapter | C05; ADR-M29 | unit; `pnpm test:agent`; `pnpm test:agent-real` (section 3) |
+| Agent register | C10; ADR-M31 | unit: rules, SQL, CLI; db: `agents.test.ts` |
+| Gate G4 | C06; ADR-M33 | unit: `workflow/gate-g4.test.ts`, `config/agent-key-config.test.ts`, notices, `contracts/agent-instructions.test.ts`; db: `gate-g4.test.ts` (every check, POLICY, HITL, block, `prepareRun`) |
+| The run after G4, L1 proposals | C06 session 2; ADR-M33 §2.6–§2.9 | unit: runner activity, settings, config; db: `run-lifecycle.test.ts`; wf: `run-handoff.test.ts` (G4 → runner → G5, one slot, expiry, lost heartbeat, replay, no secret in the history); `pnpm test:proposal-pilot` |
+| Taking an L1 proposal forward | C13; ADR-M64 | unit: `cli/evidence-proposal.test.ts`, `cli/api-schemas.test.ts`; db: `l1-proposal.test.ts`; `pnpm test:pilot` (`autonomy.test.ts`, T09 to `rejected`) |
+| Gate G5 | C07; ADR-M34 | unit; db: the G5 and run tests; `pnpm test:runner` |
+| Gate G6, the push and the pull request | C08 PR 1; ADR-M38 | unit: `git-github/pull-request.test.ts`; db: `gate-g6-publish.test.ts`, `publish-run.test.ts` (the real push to a local Git host that protects `main`); wf: `publish-handoff.test.ts`; live: `publish-live.test.ts` (section 3) |
+| Gate G6 reads CI | C08 PR 2; ADR-M38 §2.7 | unit: `workflow/g6-checks.test.ts`, `git-github/pull-request.test.ts`, policy, request; db: `gate-g6-ci.test.ts` (every outcome, N2, timeout, findings, escalations, the poller wake) |
+| Kill switch | C11 PR 1; ADR-M42 | unit: rules M25, M26, `/kill` grammar, revoke, CLI, reconcile; db: `kill-switch.test.ts`, `agent-drive.test.ts`; wf: `kill-handoff.test.ts`; `pnpm test:runner` (`provision.test.ts`: the 5-minute measurement on real Docker, about 1 s) |
+| Loop detection | C11 PR 2; ADR-M42 §2.7 | unit: `agent/loop.test.ts`, `runner/loop-watch.test.ts`, `config/loop-detection-config.test.ts`; db: `agent-drive.test.ts`; wf: `run-handoff.test.ts`; `pnpm test:agent` (`[stub:repeat]`, `[stub:silent]`: real time, proves the Agent Server sends no periodic events) |
+| G4–G6 on the sample repository | C09 | `pnpm test:pilot` (section 4.3); `pnpm test:pilot-live` (section 3) |
+
+### 5.4. Gates G7–G8, evidence, cost, metrics
+
+| Area | Task, design | Tests |
+|---|---|---|
+| Gate G7, review and merge | E01 PR 1; ADR-M41 | unit: adapter `getReviews`, `getCommitAuthors`, the closed pull request event, run events; db: `gate-g7.test.ts` |
+| A request for changes at G7 | E01 PR 2; ADR-M41 §2.7 | unit: `git-github/review-feedback.test.ts`, `agent/feedback-prompt.test.ts`, `runner/feedback-cap.test.ts`, `commands/request-changes-reason.test.ts`; db: `g7-request-changes.test.ts` (searches every table for the text); wf: `request-changes-handoff.test.ts` (the text never in the history, tables or process output) |
+| Evidence Packs | E02; ADR-M48 | unit: `evidence/pack.test.ts`, `s3-store.test.ts`, `cli/evidence.test.ts`, `api/settings.test.ts`; db: `evidence-pack.test.ts`, `config-reconcile.test.ts`; `pnpm test:openbao` (`api-evidence.test.ts`) |
+| Gate G8, the release | E03; ADR-M49 | unit: `evidence/pack.test.ts` (release hash), `audit/actions.test.ts`, `commands/comment-command.test.ts`, `workflow/intent-notices.test.ts`, `worker/settings.test.ts`, static deploy; db: `gate-g8.test.ts`; wf: `publish-handoff.test.ts` (G7 merge → G8 → done, replay); `pnpm test:openbao` (`api-evidence.test.ts`: both identities) |
+| Cost report | E04; ADR-M45 | unit: `cost/report.test.ts`, `cli/cost.test.ts`; db: `cost-report.test.ts`, `config-reconcile.test.ts` |
+| Evidence retention, holds, archive | E05 PR 1; ADR-M51 | unit: `retention/rules.test.ts` (fake clock 179/181 days, archive 6/8 days), `worker/retention-loop.test.ts`, `cli/evidence-hold.test.ts`, static deploy; db: `retention.test.ts`; `pnpm test:openbao` (`retention-purge.test.ts`); operator check `pnpm sdlc ops retention report --tenant <slug>` |
+| The daily audit anchor | E05 PR 2; ADR-M51 §2.9 | unit: `audit/anchor.test.ts`, `worker/retention-loop.test.ts`; db: `audit-anchor.test.ts`; `pnpm test:openbao` (`audit-anchor.test.ts`) |
+| Gate waiting-time metrics | E06; ADR-M47 | unit: `metrics/gates.test.ts`, `cli/metrics.test.ts`; db: `metrics-gates.test.ts`, `config-reconcile.test.ts` |
+| v0.1 definition of done | E07; `design/MVP-DONE.md` | `pnpm test:pilot` (`t01-n6.test.ts`); `pnpm test:agent-api` (section 3) |
+| The Langfuse purge | E08; ADR-M53 | unit: `llm-traces/langfuse-store.test.ts`, `retention/langfuse-rules.test.ts`, `worker/langfuse-store.test.ts`, settings, static deploy; db: `langfuse-purge.test.ts`; `pnpm test:observability` |
+
+### 5.5. Trial, deployment, release
+
+| Area | Task, design | Tests |
+|---|---|---|
+| `sdlc trial report` | V01; ADR-M65 | unit: `cli/trial-report.test.ts` (markers in every free field, no slug, code, UUID, e-mail, repository or link; limits; retries) |
+| `pnpm trial:up`, `trial:down` | V02 | unit: `trial/trial-up.test.ts`, `deploy/trial-up-static.test.ts` (the script follows the README "Fresh deployment" steps); `pnpm test:trial-up` |
+| `pnpm trial:start` and the key file | V08; ADR-M76 | unit: `trial/trial-keys.test.ts`, `trial/trial-start.test.ts`, `trial/trial-down.test.ts`, `deploy/trial-up-static.test.ts`, `doctor/checks.test.ts`; `pnpm test:trial-up` |
+| GitHub App from a manifest | V03 | unit: `deploy/github-app.test.ts` (a fake GitHub only; the manifest equals the README's permissions table) |
+| Fresh deployment | E07 | unit: `deploy/fresh-deploy-readme.test.ts` (fails on a README command, option or credentials command that drifts); `pnpm test:fresh-deploy` |
+| Published images | V04; ADR-M66 | unit: `deploy/release-images.test.ts` |
+| The CLI on npm | V05; ADR-M72 | `pnpm cli:pack-check` (CI job `checks`) |
+| `pnpm doctor` | V07 PR 2 | unit: `doctor/checks.test.ts`, `no-secrets.test.ts`, `host-readonly.test.ts`, `github-permissions.test.ts`, `deploy/doctor-troubleshooting.test.ts` (every README "Troubleshooting" row has an entry; services, jobs and AppRole folders follow the compose file), `worker/doctor-github.test.ts` |
+| Team access | V09; ADR-M67 | unit: `deploy/access-static.test.ts`, `doctor/access.test.ts`, `api/settings.test.ts`, `cli/doctor.test.ts`, `trial/trial-up.test.ts`; `pnpm test:access` |
+| Releases | V12; `RELEASING.md` | unit: `workspace/release.test.ts` (the release gate on fixtures, "Upgrade notes" from 0.1.1 on, the tag workflows) |
+
+### 5.6. Dashboard and sign-in
+
+| Area | Task, design | Tests |
+|---|---|---|
+| Read-only dashboard | U01; ADR-M54 | unit: `api/dashboard-static.test.ts`, `workflow/gate-oversight.test.ts`, `platform/tests/dashboard/`; db: `api.test.ts`, `escalation-commands.test.ts`, the gate tests; `pnpm test:dashboard` |
+| What holds an intent | U02; ADR-M54 §2.4b | unit: `workflow/waiting-reason.test.ts`; db: `gate-g4.test.ts` (U02 block) and assertions in the gate tests, `plan-submission.test.ts`; `pnpm test:dashboard` |
+| Sign-in with GitHub, sessions | U05; ADR-M73 §2.2b | unit: `api/sign-in-pieces.test.ts`, `git-github/sign-in.test.ts`, `api/settings.test.ts`, `deploy/github-app.test.ts`, `deploy/api-static.test.ts`; db: `web-sessions.test.ts`; `pnpm test:dashboard` (`e2e/sign-in.e2e.ts`) |
+| Dashboard writes, CSRF, passkeys | U06; ADR-M73 §2.3b, §2.4b | unit: `passkeys/ceremonies.test.ts`, `api/settings.test.ts`, `deploy/api-static.test.ts`; db: `dashboard-writes.test.ts`; `pnpm test:dashboard` (`e2e/passkeys.e2e.ts`) |
+
+---
+
+## 6. Keeping this document current
+
+- A new `pnpm test:*` script gets a row in section 2; `workspace/development-doc.test.ts` fails otherwise, and also when this document names a script that no longer exists.
+- A new task adds its row in section 5 in the same pull request. The detail of the design goes in its ADR; a rule a change must never break goes in `CLAUDE.md`.
+
+## Version history
+
+| Version | Date | Author | Notes |
+|---|---|---|---|
+| 1.0 | 2026-10-12 | Claude (slim CLAUDE.md, PR 1), approved by Harry | First version: the test map and live-test notes that `CLAUDE.md` held (QUESTIONS #424, #425) |
