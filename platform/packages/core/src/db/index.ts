@@ -39,6 +39,15 @@ export type {
   LangfusePurgeRow,
 } from './repositories/langfuse-purges.js';
 export type {
+  AgentMetricsQuery,
+  AgentRowKey,
+  CiFirstTryRow,
+  MergedRow,
+  RunCostRow,
+  RunCountRow,
+  ScopeBreachRow,
+} from './repositories/agent-metrics.js';
+export type {
   AutoPassRow,
   GateMetricsFilter,
   GateWaitQuery,

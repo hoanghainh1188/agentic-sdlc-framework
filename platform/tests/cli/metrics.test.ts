@@ -6,14 +6,22 @@
 import { t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
 
-import { gateMetricsSchema } from '../../apps/cli/src/api/schemas.js';
-import { formatDuration, nowTable, waitTable } from '../../apps/cli/src/commands/metrics.js';
+import { agentMetricsSchema, gateMetricsSchema } from '../../apps/cli/src/api/schemas.js';
+import {
+  agentCostTable,
+  agentRunTable,
+  formatDuration,
+  formatShare,
+  nowTable,
+  waitTable,
+} from '../../apps/cli/src/commands/metrics.js';
 import { EXIT } from '../../apps/cli/src/index.js';
-import { gateMetricsBody } from './fixtures.js';
+import { agentMetricsBody, gateMetricsBody } from './fixtures.js';
 import { apiError, TOKEN, useHarness } from './harness.js';
 
 const harness = useHarness();
 const GATES = 'GET /v1/metrics/gates';
+const AGENTS = 'GET /v1/metrics/agents';
 
 describe('formatDuration', () => {
   it.each([
@@ -195,5 +203,108 @@ describe('tables', () => {
     for (const lines of [waitTable(metrics), nowTable(metrics)]) {
       expect(new Set(lines.map((line) => line.length)).size).toBe(1);
     }
+  });
+});
+
+describe('formatShare', () => {
+  it.each([
+    [0, 0, '-'],
+    [0, 4, '0%'],
+    [1, 3, '33%'],
+    [2, 3, '67%'],
+    [4, 4, '100%'],
+  ])('%j of %j → %j', (part, whole, text) => {
+    expect(formatShare(part, whole)).toBe(text);
+  });
+});
+
+describe('sdlc metrics agents (V13, ADR-M79)', () => {
+  it('sends the scope, filters and range as query parameters', async () => {
+    const h = await harness({ routes: { [AGENTS]: { status: 200, body: agentMetricsBody() } } });
+    const args = ['metrics', 'agents', '--project', 'pilot', '--agent', 'coder-openhands'];
+    expect(await h.run([...args, '--model', 'model-big', '--from', '2026-09-01'])).toBe(EXIT.ok);
+    expect(h.requests[0]!.url.pathname).toBe('/v1/metrics/agents');
+    expect(Object.fromEntries(h.requests[0]!.url.searchParams)).toEqual({
+      project: 'pilot',
+      agent: 'coder-openhands',
+      model: 'model-big',
+      from: '2026-09-01',
+    });
+  });
+
+  it('sends no parameter for the default (the whole tenant, the last 30 days)', async () => {
+    const h = await harness({
+      routes: { [AGENTS]: { status: 200, body: agentMetricsBody({ tenant: true }) } },
+    });
+    expect(await h.run(['metrics', 'agents'])).toBe(EXIT.ok);
+    expect([...h.requests[0]!.url.searchParams]).toEqual([]);
+    expect(h.out[0]).toContain(t('cli.metrics.scope.tenant'));
+  });
+
+  it('prints the run table, the cost table, the unattributed cost and the note', async () => {
+    const h = await harness({ routes: { [AGENTS]: { status: 200, body: agentMetricsBody() } } });
+    expect(await h.run(['metrics', 'agents', '--project', 'pilot'])).toBe(EXIT.ok);
+    const text = h.out.join('\n');
+    expect(h.out[0]).toBe(
+      t('cli.metrics.agents_header', {
+        scope: t('cli.metrics.scope.project', { project: 'pilot' }),
+        from: '2026-09-04T00:00:00.000Z',
+        to: '2026-10-04T00:00:00.000Z',
+      }),
+    );
+    // runs, ended well (2 of 3 ended), retries, CI first try, merged, no changes asked, breaches, lead
+    expect(text).toMatch(
+      /pilot\s+coder-openhands 1\.4\.0\s+model-big\s+4\s+67%\s+1\s+50%\s+2\s+50%\s+1\s+1h 30m/,
+    );
+    // The row without a merge: no share, no lead time.
+    expect(text).toMatch(/model-big|unknown\s+4\s+67%\s+1\s+50%\s+0\s+-\s+1\s+-/);
+    expect(text).toMatch(/1450\s+310\s+6\.9%\s+0\.900000\s+0\.500000\s+0\.225000\s+0\.900000/);
+    expect(h.out).toContain(t('cli.metrics.unattributed', { cost: '1.000000' }));
+    expect(h.out.at(-1)).toBe(t('cli.metrics.agents_note'));
+  });
+
+  it('says when no run was created, and still prints the note', async () => {
+    const h = await harness({
+      routes: { [AGENTS]: { status: 200, body: agentMetricsBody({ empty: true }) } },
+    });
+    expect(await h.run(['metrics', 'agents', '--project', 'pilot'])).toBe(EXIT.ok);
+    expect(h.out).toContain(t('cli.metrics.no_runs'));
+    expect(
+      agentRunTable(agentMetricsSchema.parse(agentMetricsBody({ empty: true })).metrics),
+    ).toEqual([]);
+    expect(h.out.at(-1)).toBe(t('cli.metrics.agents_note'));
+  });
+
+  it('says when the rows were cut at the limit', async () => {
+    const h = await harness({
+      routes: { [AGENTS]: { status: 200, body: agentMetricsBody({ truncated: true }) } },
+    });
+    expect(await h.run(['metrics', 'agents'])).toBe(EXIT.ok);
+    expect(h.out).toContain(t('cli.metrics.truncated', { max: 2 }));
+  });
+
+  it('--json prints the validated body: amounts as strings, null when nothing', async () => {
+    const h = await harness({ routes: { [AGENTS]: { status: 200, body: agentMetricsBody() } } });
+    expect(await h.run(['metrics', 'agents', '--project', 'pilot', '--json'])).toBe(EXIT.ok);
+    const body = JSON.parse(h.out.join('\n')) as {
+      metrics: { rows: { cost: Record<string, unknown> }[] };
+    };
+    expect(body.metrics.rows[0]!.cost.total_usd).toBe('0.900000');
+    expect(body.metrics.rows[1]!.cost.per_merged_intent_usd).toBeNull();
+    expect(agentCostTable(agentMetricsSchema.parse(agentMetricsBody()).metrics)).toHaveLength(4);
+  });
+
+  it('shows a refusal with its code (exit 1)', async () => {
+    const h = await harness({
+      routes: { [AGENTS]: apiError(403, 'forbidden') },
+    });
+    expect(await h.run(['metrics', 'agents', '--project', 'pilot'])).toBe(EXIT.failed);
+    expect(h.err.join('\n')).toContain('forbidden');
+  });
+
+  it('refuses an unknown option (usage, exit 2)', async () => {
+    const h = await harness({});
+    expect(await h.run(['metrics', 'agents', '--person', 'x'])).toBe(EXIT.usage);
+    expect(h.requests).toHaveLength(0);
   });
 });

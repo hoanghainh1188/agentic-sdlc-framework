@@ -193,6 +193,7 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 | Evidence retention, holds, archive | E05 PR 1; ADR-M51 | unit: `retention/rules.test.ts` (fake clock 179/181 days, archive 6/8 days), `worker/retention-loop.test.ts`, `cli/evidence-hold.test.ts`, static deploy; db: `retention.test.ts`; `pnpm test:openbao` (`retention-purge.test.ts`); operator check `pnpm sdlc ops retention report --tenant <slug>` |
 | The daily audit anchor | E05 PR 2; ADR-M51 §2.9 | unit: `audit/anchor.test.ts`, `worker/retention-loop.test.ts`; db: `audit-anchor.test.ts`; `pnpm test:openbao` (`audit-anchor.test.ts`) |
 | Gate waiting-time metrics | E06; ADR-M47 | unit: `metrics/gates.test.ts`, `cli/metrics.test.ts`; db: `metrics-gates.test.ts`, `config-reconcile.test.ts` |
+| Agent efficiency report | V13; ADR-M79 | unit: `metrics/agents.test.ts`, `cli/metrics.test.ts`, `cli/api-schemas.test.ts`; db: `metrics-agents.test.ts` (every measure, roles, range, tenants) |
 | v0.1 definition of done | E07; `design/MVP-DONE.md` | `pnpm test:pilot` (`t01-n6.test.ts`); `pnpm test:agent-api` (section 3) |
 | The Langfuse purge | E08; ADR-M53 | unit: `llm-traces/langfuse-store.test.ts`, `retention/langfuse-rules.test.ts`, `worker/langfuse-store.test.ts`, settings, static deploy; db: `langfuse-purge.test.ts`; `pnpm test:observability` |
 

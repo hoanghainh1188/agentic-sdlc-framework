@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task V13, for review) |
+| Status | **Proposed** (task V13, for review); §2.3 model attribution is QUESTIONS #434, proposed |
 | Date | 2026-10-12 |
 | Decided by | Harry (plan approved 2026-10-12, with answers to QUESTIONS #430–#433) |
 | Related | D-08 task V13; D-02 FR-12, FR-53; D-05 §6.3–§6.5; D-07 §5; ADR-M45 (cost report); ADR-M47 (gate metrics); ADR-M42 (kill switch, stop reasons); ADR-M26 §2.5; QUESTIONS #422, #430–#433 |
@@ -25,20 +25,20 @@ A role in **both** `access.cost_read_roles` and `access.metrics_read_roles`; ten
 
 ### 2.3. What a row belongs to (QUESTIONS #432, #433)
 
-- **Run measures** count under the run's agent key and version (`runs.agent_id`, `agent_version`) and the model in the run's contract (`run_contracts.contract_json`). Cost is split by `cost_records.model`; a cost record that cannot be tied to a run is left out and counted in `unattributed`.
+- **Run measures** count under the run's agent key and version (`runs.agent_id`, `agent_version`) and the run's model. The run's contract holds only `allowed_models`, the set the policy allows, so the model used is read from the cost records: **the model with the most cost among the run's records** (ties by name; QUESTIONS #434, proposed). A run without cost records has the model `unknown`. A run's whole cost counts under that one model; the report does not split a run across models. A cost record that belongs to no run is left out of the rows and shown apart as `unattributed_cost_usd`.
 - **Intent measures** (merged without a request for changes, lead time, cost per merged intent) count under the agent version and model of the run that was merged (the `pr_merged` run event). An intent that was not merged appears only in the run measures.
 
 ### 2.4. Measures
 
 | Measure | Source |
 |---|---|
-| Runs by status; each stop reason | `runs.status`, `runs.stop_reason` |
+| Runs by status; each stop reason | `runs.status`, `runs.stop_reason`; the runs created in the range |
 | Retries | `runs.attempt` above 1 |
-| CI on the first try at G6 | the first `ci_checked` run event of the intent's G6 visit |
-| Merged without a request for changes at G7 | `pr_merged` with no G7 `request_changes` earlier in the visit (audit `seq`, as ADR-M47) |
-| G5 scope breaches | G5 `fail` with reason `out_of_scope` |
+| CI on the first try at G6 | the first `ci_checked` run event of the intent, `state` `passed` or not, counted under the run that made it |
+| Merged without a request for changes at G7 | the intent's last `pr_merged` event, with no G7 `request_changes` decision recorded before it |
+| G5 scope breaches | G5 `fail` with reason `out_of_scope`, counted under the intent's latest run created before the decision |
 | Lead time | `intent.closed` |
-| Tokens and cost per run; cost per merged intent | `cost_records` |
+| Tokens and cost per run; cost per merged intent | `cost_records` (per merged intent: the whole cost of the intent, divided by the intents merged) |
 | Wasted cost | runs that ended in `WASTED_RUN_STATUSES` (ADR-M45) |
 | Cache share of input tokens | `cost_records.cached_input_tokens` / `input_tokens` |
 
@@ -60,6 +60,7 @@ A measure with no data is null, never 0. Runs still in progress are counted apar
 |---|---|
 | A new config key `access.agent_metrics_read_roles` | Changes every stored configuration hash; the report only combines two existing audiences |
 | The agent register's `model_ref` as the model | Holds only the current version's model (QUESTIONS #432) |
+| The run contract's `allowed_models` as the model | A set of allowed models, not the one used (QUESTIONS #434) |
 | Credit an intent to the first or the latest run | The merged run is the one whose result was accepted (QUESTIONS #433) |
 | A per-person breakdown | Ranks people; not needed (as ADR-M47) |
 

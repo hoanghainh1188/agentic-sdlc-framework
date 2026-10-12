@@ -229,6 +229,7 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 | `sdlc run list <INT>` / `sdlc run kill <INT>` | Runs, kill switch |
 | `sdlc cost report --project <slug>` | Tokens and cost |
 | `sdlc metrics gates --project <slug>` | How long gates wait for people |
+| `sdlc metrics agents --project <slug>` | How agents and models did: ended well, CI first try, cost per merged intent |
 | `sdlc evidence build\|list\|show\|export <INT>` | The Evidence Pack |
 
 Every command takes `--json`. Exit code 0 means done; 4 means log in again with a new API token. The other codes: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#exit-codes).

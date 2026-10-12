@@ -39,7 +39,7 @@ import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
 import { presentPlanList, presentSubmittedPlan } from '../../apps/api/src/plans/present.js';
 import { presentCostReport } from '../../apps/api/src/cost/present.js';
 import { presentPack, presentProposal } from '../../apps/api/src/evidence/present.js';
-import { presentGateMetrics } from '../../apps/api/src/metrics/present.js';
+import { presentAgentMetrics, presentGateMetrics } from '../../apps/api/src/metrics/present.js';
 import { presentKill, presentRunList } from '../../apps/api/src/runs/present.js';
 import { presentLinkedSpec, presentSpecList } from '../../apps/api/src/specs/present.js';
 import { presentEscalation } from '../../apps/api/src/escalations/present.js';
@@ -612,6 +612,52 @@ export function gateMetricsBody(
             open: { count: 2, oldestSeconds: 45 },
           },
         ],
+    truncated: options.truncated ?? false,
+  });
+}
+
+/** V13: `GET /v1/metrics/agents` (ADR-M79), from the API's presenter. */
+export function agentMetricsBody(
+  options: { empty?: boolean; truncated?: boolean; tenant?: boolean } = {},
+): Record<string, unknown> {
+  const row = (model: string, merged: number) => ({
+    project: 'pilot',
+    agent: 'coder-openhands',
+    agentVersion: '1.4.0',
+    model,
+    runs: {
+      total: 4,
+      inProgress: 1,
+      byStatus: { succeeded: 2, failed: 1, running: 1 },
+      byStopReason: { agent_error: 1 },
+      retries: 1,
+    },
+    ci: { firstTryTotal: 2, firstTryPassed: 1 },
+    merged: {
+      intents: merged,
+      withoutChangesRequested: merged === 0 ? 0 : 1,
+      leadTime: {
+        count: merged,
+        avgSeconds: merged === 0 ? null : 5400,
+        maxSeconds: merged === 0 ? null : 7200,
+      },
+    },
+    scopeBreaches: 1,
+    tokens: { input: '1450', output: '310', cachedInput: '100', cacheSharePercent: 6.9 },
+    cost: {
+      totalUsd: '0.900000',
+      wastedUsd: '0.500000',
+      perRunUsd: '0.225000',
+      perMergedIntentUsd: merged === 0 ? null : '0.900000',
+    },
+  });
+  return presentAgentMetrics({
+    scope: options.tenant ? { kind: 'tenant' } : { kind: 'project', project: 'pilot' },
+    from: new Date('2026-09-04T00:00:00.000Z'),
+    to: new Date('2026-10-04T00:00:00.000Z'),
+    filters: { agent: null, model: null },
+    rows: options.empty ? [] : [row('model-big', 2), row('unknown', 0)],
+    unattributedCostUsd: '1.000000',
     truncated: options.truncated ?? false,
   });
 }

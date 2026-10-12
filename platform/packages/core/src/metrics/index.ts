@@ -13,3 +13,18 @@ export {
   type GateMetricsScope,
   type WaitStats,
 } from './gates.js';
+
+// Agent efficiency report (task V13, design/ADR-M79).
+export {
+  AGENT_METRICS_MAX_ROWS,
+  buildAgentMetrics,
+  cacheShare,
+  checkAgentMetricsRange,
+  mergeAgentMetrics,
+  resolveAgentMetricsRange,
+  type AgentMetrics,
+  type AgentMetricsInput,
+  type AgentMetricsRange,
+  type AgentMetricsRow,
+  type AgentMetricsScope,
+} from './agents.js';
