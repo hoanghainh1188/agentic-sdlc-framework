@@ -19,14 +19,17 @@ Open for everyone (Harry, 2026-10-08): the code is MIT and the documentation CC 
 Handbook and platform must stay consistent: same codes, same names for gates, autonomy levels and roles.
 
 ## Read these first
-- Scope and requirements, v0.1 baseline (FR/NFR, acceptance criteria): @design/D-02-mvp-scope.md
-- Architecture, interfaces, Run Contract, code layout: @design/D-03-mvp-architecture.md
-- Data model, enums, append-only tables, audit hash chain: @design/D-05-data-model.md
-- backlog (tasks, dependencies, acceptance criteria): @design/D-08-mvp-backlog.md
-- Build vs buy decisions (what we reuse, what we build): @design/D-01-build-vs-buy.md
-- Model gateway and token/cost control: @design/D-07-model-and-token-management.md
-- Canonical codes (phases, autonomy L0–L4, oversight modes, gates G1–G8 × risk, 2+N roles): @handbook/00-introduction/05-codes.md
+Read the documents a task needs before planning it (they are not loaded automatically, to save tokens; QUESTIONS #426):
+- Scope and requirements, v0.1 baseline (FR/NFR, acceptance criteria): `design/D-02-mvp-scope.md`
+- Architecture, interfaces, Run Contract, code layout: `design/D-03-mvp-architecture.md`
+- Data model, enums, append-only tables, audit hash chain: `design/D-05-data-model.md`
+- Backlog (tasks, dependencies, acceptance criteria): `design/D-08-mvp-backlog.md` (read only the task's section)
+- Build vs buy decisions (what we reuse, what we build): `design/D-01-build-vs-buy.md`
+- Model gateway and token/cost control: `design/D-07-model-and-token-management.md`
+- Sample pilot repository: `design/D-09-sample-pilot-repo.md`
 - Tests, CI jobs, live tests and the test map by area: `platform/DEVELOPMENT.md`. The design of each area: its ADR (index `design/README.md`).
+Always loaded:
+- Canonical codes (phases, autonomy L0–L4, oversight modes, gates G1–G8 × risk, 2+N roles): @handbook/00-introduction/05-codes.md
 
 ## Language
 - Everything in this repo is English: docs, code, identifiers, commit messages, code comments.
@@ -179,4 +182,4 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - Q1 first agent: OpenHands · Q2 first Git host: GitHub (GitLab later, same interface) · Q3 language: TypeScript (Node.js) · Q5 repo language: English
 - Secret manager: OpenBao (MPL-2.0, Vault-compatible API) · Host: internal server, modest spec
 - G7 self-approval rule: intent creator cannot approve G7 · GitHub events: polling in v0.1 (ADR-M11) · SeaweedFS + Valkey (ADR-M12) · Evidence retention 180 days
-- Q4 pilot repo: A → C → B. Step A = sample repo `pilot-order-inventory` (Vue + NestJS + PostgreSQL), spec: @design/D-09-sample-pilot-repo.md
+- Q4 pilot repo: A → C → B. Step A = sample repo `pilot-order-inventory` (Vue + NestJS + PostgreSQL), spec: `design/D-09-sample-pilot-repo.md`
