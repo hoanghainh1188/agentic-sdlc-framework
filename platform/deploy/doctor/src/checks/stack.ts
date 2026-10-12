@@ -18,6 +18,7 @@ export const CORE_SERVICES = [
 ] as const;
 /** One-shot jobs (`restart: "no"`), the same list as `up.sh` `JOBS` (static test). */
 export const JOBS = [
+  'access-tls-init',
   'backup-agent',
   'openbao-tls-init',
   'seaweedfs-init',

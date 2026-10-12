@@ -199,7 +199,8 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 2. Run `sdlc login --api-url https://<platform address>` and paste the API token at the prompt. The prompt does not show what you type.
    - The platform checks the API token first. Only a valid API token is saved.
    - The address must use `https://`. `http://` works only for a platform on your own machine (`http://127.0.0.1:8090`).
-   - If your company uses its own certificate authority, add it with the standard Node setting `NODE_EXTRA_CA_CERTS=<file>`. The command never runs with certificate checks turned off.
+   - From another machine, use the team address of the platform's TLS proxy, for example `https://sdlc.example.internal:8443` (team access, task V09: `platform/deploy/README.md` "Team access (operator)"). Use the host name, not an IP address, unless the operator lists the address in the certificate.
+   - If your company uses its own certificate authority, add it with the standard Node setting `NODE_EXTRA_CA_CERTS=<file>` (the `ca.pem` the operator gives you). The command never runs with certificate checks turned off. When `sdlc doctor` says the machine does not know the CA, this is the fix.
 3. `sdlc whoami` shows who you are and your roles per project.
 4. `sdlc doctor` checks your login and the API, and says what to fix (task V07): certificate checks on, the saved login file private, the API reachable over TLS and ready, your API token accepted and not near its end (a warning at 14 days or less), your roles per project, and the CLI's version against the API's. It reads only (`GET /health/live`, `/health/ready`, `/v1/me`, `/v1/me/tokens`), changes nothing and never prints your API token. One line per check (ok, warning, failed, skipped) and, for each problem, the fix; `--json` gives the same. Exit 1 when a check failed. When the API is down or you are not logged in, it says so. A problem on the server: the operator runs `pnpm doctor` there.
 
@@ -397,7 +398,7 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 
 The dashboard shows in one page what the CLI shows one command at a time. **It only reads.** You still decide gates with comments, reviews and the CLI (§19.8b, §19.8c).
 
-**Open it.** Open `http://127.0.0.1:8090/dashboard/` on the machine that runs the platform (the API's own address; no other port). With GitHub sign-in on, open `http://localhost:8090/dashboard/` instead: the sign-in works on `localhost`, not on `127.0.0.1`. Then sign in one of two ways.
+**Open it.** With team access (task V09), open the team address the operator gives you, for example `https://sdlc.example.internal:8443/dashboard/`, from your own machine; your browser must trust the company's certificate authority. Without it, open `http://127.0.0.1:8090/dashboard/` on the machine that runs the platform (the API's own address; no other port); with GitHub sign-in on there, open `http://localhost:8090/dashboard/` instead: the sign-in works on `localhost`, not on `127.0.0.1`. With team access, the GitHub sign-in works on the team address only. Then sign in one of two ways.
 
 **Sign in with GitHub** (when the operator turned it on: runbook T11 §5n; task U05).
 
@@ -406,7 +407,7 @@ The dashboard shows in one page what the CLI shows one command at a time. **It o
 3. Only an active user whose GitHub account is linked by a tenant admin gets in (`sdlc admin identity link`). Every other case shows the same message: **Sign-in with GitHub was refused**. Check the tenant's name, then ask a tenant admin.
 4. The platform reads only your GitHub account number and gives up GitHub's access at once: it never acts on GitHub as you.
 5. The session ends after **30 minutes without use**, and after **8 hours** at most. A reload keeps it. **Sign out** ends it in this browser; **Sign out everywhere** ends every session you have, in every browser. A tenant admin can sign a person out everywhere: `sdlc admin user sign-out --user <id or email>`. Disabling a user or unlinking their GitHub account ends their sessions too.
-6. On `http://localhost`, **Safari cannot sign in with GitHub**: WebKit, Safari's engine, keeps no `Secure` cookie there, so the sign-in is refused (tested 2026-10-12). Use Chrome or Firefox on the platform machine; Safari works once the dashboard has an HTTPS address (team access, later). The personal token works in Safari too.
+6. On `http://localhost`, **Safari cannot sign in with GitHub**: WebKit, Safari's engine, keeps no `Secure` cookie there, so the sign-in is refused (tested 2026-10-12). Use Chrome or Firefox on the platform machine; Safari works on the HTTPS team address (team access, task V09). The personal token works in Safari too.
 
 **Sign in with your API token** (always possible).
 
@@ -493,6 +494,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.32 | 2026-10-12 | Claude (task V07, PR 1) | §19.8c: `sdlc doctor`, the check of your login and the API |
 | 0.33 | 2026-10-12 | Claude (task U05) | §19.8e: sign in to the dashboard with GitHub, the session, sign out, sign out everywhere, `sdlc admin user sign-out` (ADR-M73 §2.2) |
 | 0.30 | 2026-10-10 | Claude (task V05) | §19.8c: install the `sdlc` command from npm (`agentic-sdlc-cli`), `sdlc --version` |
+| 0.34 | 2026-10-12 | Claude (task V09, PR 2) | §19.8c, §19.8e: the team address through the TLS proxy, `NODE_EXTRA_CA_CERTS` with the operator's `ca.pem`, the dashboard and the GitHub sign-in on the team address, Safari there |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

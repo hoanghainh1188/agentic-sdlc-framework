@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task V09, PR 1, for review); version 0.2 after Harry's review of PR #301 |
+| Status | **Accepted** (Harry, 2026-10-12; PR #301 merged). Built by task V09 PR 2; version 1.0 records the names as built (§2.2b) |
 | Date | 2026-10-12 |
 | Decided by | Harry (V09 plan approved 2026-10-12 with the answers to QUESTIONS #405–#409, plus two changes: the proxy allows `/health/ready`, and the upgrade step for the fixed proxy address is written down) |
 | Related | D-08 task V09 (AC1–AC4); D-03 §9, §10, §10.1, §12 (version 1.41); ADR-M26 §2.7 (the api's per-address limits and `trustProxy`); ADR-M36 (the CLI's TLS rules); ADR-M54 (the dashboard, 127.0.0.1 only); ADR-M63 (OpenBao TLS, the internal CA); ADR-M73 (the dashboard's actions, `SDLC_API_PUBLIC_ORIGIN`, `__Host-` cookies); ADR-M66 (published images); D-08 V07 (`doctor`), U05–U07, O01, O03; QUESTIONS #405–#409 |
@@ -32,6 +32,15 @@ D-08 V09 asks for a Compose profile `access` with a pinned reverse proxy that pu
 - **Plain HTTP is refused, never redirected** (QUESTIONS #407): there is no listener on port 80; plain HTTP sent to the TLS port (nginx status 497) answers `400` with a fixed text. A redirect would come after the token was already sent in clear. The CLI refuses an `http://` address that is not on its own machine anyway (ADR-M36).
 - TLS 1.2 and 1.3 only, the Mozilla "intermediate" cipher list, session tickets off, `server_tokens off`.
 - A request whose `Host` is not `SDLC_ACCESS_HOSTNAME` (with or without the port) or one of `SDLC_ACCESS_IPS` answers `421` (this also blocks DNS rebinding).
+
+### 2.2b. As built (task V09, PR 2)
+
+- The port setting is `SDLC_ACCESS_HOST_PORT` (default 8443), like every other `*_HOST_PORT`, so the live tests' port offsets move it too.
+- The bind address has no default in `.env.example`; up.sh refuses the profile without it, and the compose file falls back to `127.0.0.1`, so a direct `docker compose --profile access up` never publishes on the LAN by mistake.
+- The rate settings: `SDLC_ACCESS_RATE_PER_SECOND` (10), `SDLC_ACCESS_RATE_BURST` (40), `SDLC_ACCESS_SIGNIN_RATE_PER_MINUTE` (30), `SDLC_ACCESS_SIGNIN_BURST` (10), `SDLC_ACCESS_CONN_PER_ADDR` (20).
+- The image: `nginxinc/nginx-unprivileged:1.30.4-alpine`, pinned by digest (Trivy: no CRITICAL finding; three HIGH findings in Alpine packages with fixes upstream, recorded in the PR).
+- The settings are checked by `platform/deploy/access/check-settings.sh`, which `up.sh` runs before it starts the profile.
+- The api always joins `access` (§2.5), so every throw-away Compose project of the live tests and of `trial:up`'s live test gets its own `access` subnet (a /29 in `172.28.0.0/16`, derived from its `sdlc` subnet), or two projects would share one.
 
 ### 2.3. Routes
 
@@ -125,5 +134,6 @@ An allow-list; everything else answers `404`:
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
+| 1.0 | 2026-10-12 | Claude (task V09, PR 2) | Accepted (PR #301 merged, Harry 2026-10-12). §2.2b: the names as built (`SDLC_ACCESS_HOST_PORT` instead of `SDLC_ACCESS_PORT`, the rate settings, nginx-unprivileged 1.30.4, the throw-away projects' own network `access`); meaning unchanged |
 | 0.2 | 2026-10-12 | Claude (task V09, PR 1), after Harry's review of PR #301 | §2.5: a small network `access` for the proxy and the api only (its own subnet, the proxy's fixed address there, the api always on it), the proxy not on `sdlc`; §2.6: existing stacks need no network step, `up.sh` checks; §3: the `ip_range` option rejected; §4 |
 | 0.1 | 2026-10-12 | Claude (task V09, PR 1) | First version: nginx, one LAN port, routes (with `/health/ready`), headers and limits, the trusted forwarded address and the network's allocation range with its upgrade step (replaced in 0.2), certificates, ADR-M73, the CLI and doctor, tests (QUESTIONS #405–#409) |

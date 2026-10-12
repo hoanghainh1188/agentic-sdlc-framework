@@ -29,9 +29,29 @@ export function readDeployFile(relative: string): string {
   return fs.readFileSync(path.join(deployDir, relative), 'utf8');
 }
 
-/** The compose file as written (merge keys resolved, variables NOT interpolated). */
+interface LongVolume {
+  type?: string;
+  source?: string;
+  target?: string;
+  read_only?: boolean;
+}
+
+/** A long-syntax volume (`type: bind` …) as its short form `source:target[:ro]`, for the tests. */
+function shortVolume(v: string | LongVolume): string {
+  if (typeof v === 'string') return v;
+  return `${v.source ?? ''}:${v.target ?? ''}${v.read_only ? ':ro' : ''}`;
+}
+
+/**
+ * The compose file as written (merge keys resolved, variables NOT interpolated). Long-syntax
+ * volumes come back in their short form (V09: access-tls-init's bind mount).
+ */
 export function loadCompose(): ComposeFile {
-  return parse(readDeployFile('docker-compose.yml'), { merge: true }) as ComposeFile;
+  const file = parse(readDeployFile('docker-compose.yml'), { merge: true }) as ComposeFile;
+  for (const s of Object.values(file.services)) {
+    if (s.volumes) s.volumes = (s.volumes as (string | LongVolume)[]).map(shortVolume);
+  }
+  return file;
 }
 
 /** Parses a dotenv file into key/value pairs (surrounding double quotes removed). */

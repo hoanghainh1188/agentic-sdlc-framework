@@ -8,6 +8,16 @@ export const ENV_ALLOWLIST = [
   'COMPOSE_PROJECT_NAME',
   'SDLC_OPENBAO_TLS_DIR',
   'SDLC_BACKUP_DIR',
+  // Team access (V09, design/ADR-M67): addresses, names, a folder and an origin; none is secret.
+  'SDLC_ACCESS_BIND_ADDR',
+  'SDLC_ACCESS_HOST_PORT',
+  'SDLC_ACCESS_HOSTNAME',
+  'SDLC_ACCESS_IPS',
+  'SDLC_ACCESS_TLS_DIR',
+  'SDLC_ACCESS_PROXY_IP',
+  'SDLC_API_TRUSTED_PROXY',
+  'SDLC_API_PUBLIC_ORIGIN',
+  'SDLC_API_WEB_SIGNIN',
 ] as const;
 
 export const PLACEHOLDER = 'CHANGEME';

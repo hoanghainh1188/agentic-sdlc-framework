@@ -131,7 +131,19 @@ function failureText(failure: ProbeFailure, status?: number, tlsCode?: string): 
   };
 }
 
-function failureFix(failure: ProbeFailure): Text {
+/** TLS codes that mean "this machine does not know the CA" (V09: a company or throw-away CA). */
+const UNKNOWN_CA = new Set([
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+]);
+
+function failureFix(failure: ProbeFailure, tlsCode?: string): Text {
+  // V09 (ADR-M67 §2.8): behind the team access proxy, an unknown CA needs NODE_EXTRA_CA_CERTS.
+  if (failure === 'tls' && tlsCode !== undefined && UNKNOWN_CA.has(tlsCode))
+    return { key: 'cli.doctor.fix.tls_ca' };
   if (failure === 'tls') return { key: 'cli.doctor.fix.tls' };
   if (failure === 'http' || failure === 'malformed') return { key: 'cli.doctor.fix.operator' };
   return { key: 'cli.doctor.fix.unreachable' };
@@ -239,7 +251,7 @@ function reachable(apiUrl: string, live: Probe | undefined): CheckResult {
       'cli.api_reachable',
       'failed',
       failureText(live.failure, live.status, live.tlsCode),
-      failureFix(live.failure),
+      failureFix(live.failure, live.tlsCode),
     );
   }
   // `http://` is accepted on this machine only (loopback); AC2 asks for TLS.
@@ -273,7 +285,7 @@ function ready(probe: Probe | undefined): CheckResult {
     'cli.api_ready',
     'warning',
     failureText(probe.failure, probe.status, probe.tlsCode),
-    failureFix(probe.failure),
+    failureFix(probe.failure, probe.tlsCode),
   );
 }
 

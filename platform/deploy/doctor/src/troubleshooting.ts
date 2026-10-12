@@ -22,4 +22,18 @@ export const TROUBLESHOOTING: Readonly<Record<string, Coverage>> = {
   'LiteLLM lists no model': { checks: ['models.litellm'] },
   'A service stays unhealthy': { checks: ['services.health'] },
   'Valkey writes fail': { checks: ['valkey.memory'] },
+  // Team access (V09, design/ADR-M67).
+  '`up.sh` says the profile access is not ready': {
+    checks: [
+      'access.tls_files',
+      'access.tls_names',
+      'access.public_origin',
+      'access.trusted_proxy',
+    ],
+  },
+  '`sdlc-access` does not start': { checks: ['access.proxy', 'access.tls_files'] },
+  'People on other machines get a certificate error': {
+    checks: ['access.tls_names', 'access.tls_expiry'],
+  },
+  'Every person gets `429` at the same time': { reason: 'doctor.no_check.shared_address' },
 };

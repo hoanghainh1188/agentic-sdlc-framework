@@ -38,6 +38,13 @@ export const CHECK_IDS = [
   'sandbox.image',
   'github.app',
   'images.mode',
+  'access.proxy',
+  'access.tls_files',
+  'access.tls_expiry',
+  'access.tls_names',
+  'access.ports',
+  'access.public_origin',
+  'access.trusted_proxy',
 ] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 
@@ -57,6 +64,35 @@ export interface ServiceState {
   /** `healthy`, `unhealthy`, `starting`, or empty without a health check. */
   readonly health: string;
   readonly exitCode: number;
+  /** Published ports (V09): the host address and port of each; empty when none. */
+  readonly published?: readonly PublishedPort[];
+}
+
+export interface PublishedPort {
+  /** The host address the port is bound to, as Docker reports it (`127.0.0.1`, `0.0.0.0`, `::`). */
+  readonly address: string;
+  readonly port: number;
+}
+
+/** Team access (V09, design/ADR-M67): its settings and certificate, from the env file and files. */
+export interface AccessFact {
+  /** SDLC_ACCESS_HOSTNAME or SDLC_ACCESS_BIND_ADDR is set. */
+  readonly configured: boolean;
+  readonly bindAddr: string | null;
+  readonly hostPort: string;
+  readonly hostname: string | null;
+  readonly ips: readonly string[];
+  readonly proxyIp: string;
+  readonly trustedProxy: string | null;
+  readonly publicOrigin: string | null;
+  readonly webSignIn: string;
+  readonly tls: {
+    readonly dir: string | null;
+    readonly missing: readonly string[];
+    readonly certs: readonly CertFact[];
+    /** The names the server certificate does not hold (host name, IPs); null: not readable. */
+    readonly unnamed: readonly string[] | null;
+  };
 }
 
 export type OpenBaoState = 'uninitialised' | 'sealed' | 'unsealed' | 'unreachable';
@@ -147,4 +183,5 @@ export interface OperatorFacts {
   /** null: could not be read. */
   readonly projects?: readonly ProjectImageFact[] | null;
   readonly imagesMode?: 'local' | 'published' | 'failed';
+  readonly access?: AccessFact;
 }

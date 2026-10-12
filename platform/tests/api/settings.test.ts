@@ -21,6 +21,7 @@ describe('api settings', () => {
       githubApiUrl: 'https://api.github.com',
       dashboardDir: null,
       webSignIn: null,
+      trustedProxy: null,
       evidence: {
         url: 'http://seaweedfs:8333',
         bucket: 'evidence',
@@ -28,6 +29,25 @@ describe('api settings', () => {
         maxItemBytes: 256 * 1024 * 1024,
       },
     });
+  });
+
+  it('V09: SDLC_API_TRUSTED_PROXY is one IPv4 address or empty (ADR-M67 §2.5)', () => {
+    expect(loadSettings({ SDLC_API_TRUSTED_PROXY: '172.30.1.6' }).trustedProxy).toBe('172.30.1.6');
+    expect(loadSettings({ SDLC_API_TRUSTED_PROXY: '' }).trustedProxy).toBeNull();
+    for (const value of [
+      '172.30.1.0/29',
+      '0.0.0.0/0',
+      '172.30.1.6,172.30.1.5',
+      'sdlc-access',
+      '256.1.1.1',
+      '01.2.3.4',
+      '::1',
+      'true',
+    ]) {
+      expect(() => loadSettings({ SDLC_API_TRUSTED_PROXY: value }), value).toThrowError(
+        SettingsError,
+      );
+    }
   });
 
   it('E02: the evidence store is an origin, a bucket and a path under api/; off turns it off', () => {

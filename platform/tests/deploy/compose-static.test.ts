@@ -48,6 +48,7 @@ const CORE = [
 ];
 const OBSERVABILITY_ONLY = ['clickhouse', 'langfuse-web', 'langfuse-worker', 'otel-collector'];
 const JOBS = [
+  'access-tls-init',
   'backup-agent',
   'openbao-tls-init',
   'seaweedfs-init',
@@ -179,8 +180,11 @@ describe('AC3: healthchecks and pinned images', () => {
       expect(tag, `${name}: ${full}`).toMatch(exact);
       // ADR-M17 pins by tag until Dependabot keeps digests current. The runner's services are
       // pinned by tag AND digest (ADR-M25 §2.5, §2.9, §2.10; QUESTIONS #54).
-      const sandbox = (s.profiles ?? []).includes('sandbox') && !built.includes(name);
-      if (sandbox) expect(digest, `${name} digest`).toMatch(/^sha256:[0-9a-f]{64}$/);
+      // The team access proxy (V09, ADR-M67 §2.1) too.
+      const byDigest =
+        ((s.profiles ?? []).includes('sandbox') || (s.profiles ?? []).includes('access')) &&
+        !built.includes(name);
+      if (byDigest) expect(digest, `${name} digest`).toMatch(/^sha256:[0-9a-f]{64}$/);
       else expect(digest, `${name} digest`).toBeUndefined();
     }
   });
@@ -261,6 +265,11 @@ describe('AC4: no secrets in the repo', () => {
       for (const port of s.ports ?? []) {
         // The sandbox image registry has no authentication: always 127.0.0.1 (runbook T11).
         if (name === 'registry') expect(port, name).toMatch(/^127\.0\.0\.1:/);
+        // Team access (V09, ADR-M67 §2.2): the only port beyond this machine, and only when set.
+        else if (name === 'sdlc-access')
+          expect(port, name).toBe(
+            '${SDLC_ACCESS_BIND_ADDR:-127.0.0.1}:${SDLC_ACCESS_HOST_PORT:-8443}:8443',
+          );
         else expect(port, name).toMatch(/^\$\{SDLC_BIND_ADDR:-127\.0\.0\.1\}:/);
       }
     }

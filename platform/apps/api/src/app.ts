@@ -78,7 +78,8 @@ const BODY_LIMIT_BYTES = 64 * 1024;
 
 export interface ApiDeps {
   readonly db: PlatformDatabase;
-  readonly settings: Pick<ApiSettings, 'rateLimitPerMinute' | 'authFailuresPerMinute'>;
+  readonly settings: Pick<ApiSettings, 'rateLimitPerMinute' | 'authFailuresPerMinute'> &
+    Partial<Pick<ApiSettings, 'trustedProxy'>>;
   /** Default: the system clock. */
   readonly now?: () => Date;
   /** Unexpected errors. Default: Nest's logger. Tests pass their own to check that no token is logged. */
@@ -246,7 +247,12 @@ class ApiModule {
 export async function createApp(deps: ApiDeps): Promise<NestFastifyApplication> {
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule.create(deps),
-    new FastifyAdapter({ bodyLimit: BODY_LIMIT_BYTES, trustProxy: false }),
+    // ADR-M26 §2.7, ADR-M67 §2.5: the client address is the TCP peer, except on requests from the
+    // team access proxy, whose X-Forwarded-For (written by the proxy, never by the client) counts.
+    new FastifyAdapter({
+      bodyLimit: BODY_LIMIT_BYTES,
+      trustProxy: deps.settings.trustedProxy ?? false,
+    }),
     { logger: deps.nestLogger ?? ['error', 'warn'] },
   );
   app.enableShutdownHooks();

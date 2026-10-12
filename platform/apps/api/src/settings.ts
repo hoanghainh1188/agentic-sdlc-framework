@@ -29,6 +29,7 @@ export const API_ENV = {
   githubOauthSecretPath: 'SDLC_API_GITHUB_OAUTH_SECRET_PATH',
   sessionIdleMinutes: 'SDLC_API_SESSION_IDLE_MINUTES',
   sessionMaxHours: 'SDLC_API_SESSION_MAX_HOURS',
+  trustedProxy: 'SDLC_API_TRUSTED_PROXY',
 } as const;
 
 /** Fields of the KV entry written by `openbao:bootstrap api-evidence-credentials` (E02). */
@@ -110,8 +111,20 @@ const schema = z.object({
     .default('api/github-oauth'),
   [API_ENV.sessionIdleMinutes]: z.coerce.number().int().min(5).max(120).default(30),
   [API_ENV.sessionMaxHours]: z.coerce.number().int().min(1).max(24).default(8),
+  // Team access (V09, ADR-M67 §2.5): the one address whose X-Forwarded-For the api trusts, the
+  // proxy's fixed address on the network `access`. Empty: trust no forwarded header.
+  [API_ENV.trustedProxy]: z
+    .string()
+    .refine((v) => v === '' || isIpv4(v))
+    .default(''),
   NODE_ENV: z.string().optional(),
 });
+
+/** A dotted IPv4 address (four numbers 0-255, no leading zeros). */
+export function isIpv4(value: string): boolean {
+  const parts = value.split('.');
+  return parts.length === 4 && parts.every((p) => /^(0|[1-9]\d{0,2})$/.test(p) && Number(p) <= 255);
+}
 
 function isOrigin(value: string): boolean {
   try {
@@ -162,6 +175,11 @@ export interface ApiSettings {
   readonly dashboardDir: string | null;
   /** Dashboard sign-in with GitHub (U05, ADR-M73 §2.2); null: `SDLC_API_WEB_SIGNIN=off`. */
   readonly webSignIn: WebSignInSettings | null;
+  /**
+   * The team access proxy's address (V09, ADR-M67 §2.5): Fastify's `trustProxy`, so the client
+   * address comes from `X-Forwarded-For` only on requests from this peer; null: never.
+   */
+  readonly trustedProxy: string | null;
 }
 
 export interface WebSignInSettings {
@@ -259,6 +277,7 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
   return {
     host: v[API_ENV.host],
     webSignIn,
+    trustedProxy: v[API_ENV.trustedProxy] === '' ? null : v[API_ENV.trustedProxy],
     port: v[API_ENV.port],
     database,
     rateLimitPerMinute: v[API_ENV.rateLimitPerMinute],
