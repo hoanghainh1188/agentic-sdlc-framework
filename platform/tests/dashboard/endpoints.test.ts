@@ -53,6 +53,9 @@ describe('the dashboard reads existing GET endpoints only', () => {
         '/v1/cost/report',
         '/v1/metrics/gates',
         '/v1/admin/audit/verify',
+        // U05: public reads of the sign-in.
+        '/v1/auth/config',
+        '/v1/auth/github/start',
       ]),
     );
   });

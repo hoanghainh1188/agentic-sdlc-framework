@@ -22,7 +22,21 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${port}`,
     trace: 'off',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // U05: the GitHub sign-in in Firefox and WebKit too, when their browsers are installed
+    // (`pnpm exec playwright install firefox webkit`); CI installs Chromium only.
+    ...(process.env.SDLC_DASHBOARD_E2E_ALL_BROWSERS === '1'
+      ? [
+          {
+            name: 'firefox',
+            testMatch: /sign-in\.e2e\.ts$/,
+            use: { ...devices['Desktop Firefox'] },
+          },
+          { name: 'webkit', testMatch: /sign-in\.e2e\.ts$/, use: { ...devices['Desktop Safari'] } },
+        ]
+      : []),
+  ],
   webServer: {
     command: `node ${path.join(__dirname, 'stub-api.mjs')}`,
     url: `http://127.0.0.1:${port}/dashboard/`,

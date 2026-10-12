@@ -395,11 +395,23 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 
 The dashboard shows in one page what the CLI shows one command at a time. **It only reads.** You still decide gates with comments, reviews and the CLI (§19.8b, §19.8c).
 
-**Open it.**
+**Open it.** Open `http://127.0.0.1:8090/dashboard/` on the machine that runs the platform (the API's own address; no other port). With GitHub sign-in on, open `http://localhost:8090/dashboard/` instead: the sign-in works on `localhost`, not on `127.0.0.1`. Then sign in one of two ways.
 
-1. Open `http://127.0.0.1:8090/dashboard/` on the machine that runs the platform (the API's own address; no other port).
-2. Paste your API token (`sdlc_pat_…`, the one you use for the CLI; create one with `sdlc token create`) and choose **Sign in**.
-3. The API token stays in the memory of that browser tab only. A reload, closing the tab or **Sign out** forgets it. The dashboard never puts it in the address, in browser storage or in a cookie. **Sign out** does not revoke the API token: `sdlc token revoke` does.
+**Sign in with GitHub** (when the operator turned it on: runbook T11 §5n; task U05).
+
+1. Type your tenant's name (for example `acme`) and choose **Sign in with GitHub**.
+2. GitHub asks you to confirm the platform's App the first time. Then you are back on the dashboard, signed in.
+3. Only an active user whose GitHub account is linked by a tenant admin gets in (`sdlc admin identity link`). Every other case shows the same message: **Sign-in with GitHub was refused**. Check the tenant's name, then ask a tenant admin.
+4. The platform reads only your GitHub account number and gives up GitHub's access at once: it never acts on GitHub as you.
+5. The session ends after **30 minutes without use**, and after **8 hours** at most. A reload keeps it. **Sign out** ends it in this browser; **Sign out everywhere** ends every session you have, in every browser. A tenant admin can sign a person out everywhere: `sdlc admin user sign-out --user <id or email>`. Disabling a user or unlinking their GitHub account ends their sessions too.
+6. Safari may refuse the sign-in on `http://localhost`: use Chrome or Firefox there.
+
+**Sign in with your API token** (always possible).
+
+1. Paste your API token (`sdlc_pat_…`, the one you use for the CLI; create one with `sdlc token create`) and choose **Sign in**.
+2. The API token stays in the memory of that browser tab only. A reload, closing the tab or **Sign out** forgets it. The dashboard never puts it in the address, in browser storage or in a cookie. **Sign out** does not revoke the API token: `sdlc token revoke` does.
+
+Either way the dashboard only reads: signing in with GitHub adds no action. Decisions in the dashboard come later (ADR-M73).
 
 The dashboard is for the platform machine itself. Do not open the API's port to other machines for it: that needs TLS and a review first.
 
@@ -476,6 +488,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.29 | 2026-10-09 | Claude (task V01, PR 2) | §19.8c: `sdlc trial report`, the anonymous report of the community trial (ADR-M65) |
 | 0.27 | 2026-10-09 | Claude (task U03) | §19.8c: `sdlc intent create --spec` creates the intent and links its spec in one command |
 | 0.31 | 2026-10-10 | Claude (task V06) | §19.8c: `sdlc next <INT>` |
+| 0.32 | 2026-10-12 | Claude (task U05) | §19.8e: sign in to the dashboard with GitHub, the session, sign out, sign out everywhere, `sdlc admin user sign-out` (ADR-M73 §2.2) |
 | 0.30 | 2026-10-10 | Claude (task V05) | §19.8c: install the `sdlc` command from npm (`agentic-sdlc-cli`), `sdlc --version` |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |

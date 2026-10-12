@@ -1,7 +1,11 @@
 // The dashboard (task U01, design/ADR-M54): sign-in, then the screens of the route. Read only.
+// U05 (ADR-M73 §2.2): at start it asks whether GitHub sign-in is on and whether this browser is
+// signed in with GitHub already (its session cookie), and shows what the API's callback said.
 import type { Me } from '@sdlc/api-schemas';
 import { useEffect, useState } from 'preact/hooks';
 
+import { ApiError, endSession } from './api/client.js';
+import { readAuthConfig, readMeWithCookie } from './api/reads.js';
 import { Txt } from './components/common.js';
 import { t } from './i18n.js';
 import { href, useRoute, type Route } from './router.js';
@@ -11,19 +15,92 @@ import { Escalations } from './views/Escalations.js';
 import { IntentDetail } from './views/IntentDetail.js';
 import { IntentsBoard } from './views/IntentsBoard.js';
 import { Numbers } from './views/Numbers.js';
-import { SignIn } from './views/SignIn.js';
+import { SignIn, type SignInNotice } from './views/SignIn.js';
+
+/**
+ * The `?signin=` parameter the API's callback adds on a refusal, read once and removed from the
+ * address bar so a reload does not show it again.
+ */
+function takeSignInNotice(): SignInNotice | null {
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get('signin');
+  if (value === null) return null;
+  params.delete('signin');
+  const search = params.toString();
+  window.history.replaceState(
+    null,
+    '',
+    `${window.location.pathname}${search === '' ? '' : `?${search}`}${window.location.hash}`,
+  );
+  return value === 'refused' || value === 'unavailable' ? value : null;
+}
 
 export function App() {
   const [me, setMe] = useState<Me | null>(null);
+  const [starting, setStarting] = useState(true);
+  const [github, setGithub] = useState(false);
+  const [notice] = useState(takeSignInNotice);
+  const [signOutFailed, setSignOutFailed] = useState(false);
   const route = useRoute();
 
   // The API ended the session (401), or the person signed out: back to sign-in.
-  useEffect(() => session.subscribe(() => session.token() === null && setMe(null)), []);
+  useEffect(
+    () =>
+      session.subscribe(() => {
+        if (session.signedIn()) return;
+        setMe(null);
+        setSignOutFailed(false);
+      }),
+    [],
+  );
   useEffect(() => {
     document.title = me ? t('dashboard.title.signed_in') : t('dashboard.title.signed_out');
   }, [me]);
+  useEffect(() => {
+    const abort = new AbortController();
+    void (async () => {
+      try {
+        const config = await readAuthConfig({ signal: abort.signal });
+        setGithub(config.github);
+        if (config.github) {
+          const found = await readMeWithCookie({ signal: abort.signal });
+          session.signInWithCookie();
+          setMe(found);
+        }
+      } catch {
+        // No GitHub session (401) or no answer: the sign-in page.
+      } finally {
+        if (!abort.signal.aborted) setStarting(false);
+      }
+    })();
+    return () => abort.abort();
+  }, []);
 
-  if (me === null || session.token() === null) return <SignIn onSignedIn={setMe} />;
+  const signOut = async (scope: 'this' | 'everywhere') => {
+    setSignOutFailed(false);
+    if (session.cookie()) {
+      try {
+        await endSession(scope);
+      } catch (error) {
+        // 401: the session had ended already (the client signed this tab out). Otherwise the
+        // session stays at the API: say so, and keep the person signed in here.
+        if (!(error instanceof ApiError && error.status === 401)) setSignOutFailed(true);
+        return;
+      }
+    }
+    session.signOut();
+  };
+
+  if (starting) {
+    return (
+      <main id="main" class="signin" aria-busy="true">
+        <p class="hint">{t('dashboard.signin.starting')}</p>
+      </main>
+    );
+  }
+  if (me === null || !session.signedIn()) {
+    return <SignIn onSignedIn={setMe} github={github} notice={notice} />;
+  }
   return (
     <>
       <a class="skip" href="#main">
@@ -50,13 +127,27 @@ export function App() {
               <Txt value={me.user.display_name} />
             </span>
             <span class="read-only-tag">{t('dashboard.read_only')}</span>
-            <button type="button" class="button button-quiet" onClick={() => session.signOut()}>
+            <button type="button" class="button button-quiet" onClick={() => void signOut('this')}>
               {t('dashboard.signout')}
             </button>
+            {session.cookie() && (
+              <button
+                type="button"
+                class="button button-quiet"
+                onClick={() => void signOut('everywhere')}
+              >
+                {t('dashboard.signout_everywhere')}
+              </button>
+            )}
           </div>
         </div>
       </header>
       <main id="main" tabIndex={-1}>
+        {signOutFailed && (
+          <p class="notice notice-error" role="alert">
+            {t('dashboard.signout_failed')}
+          </p>
+        )}
         <Screen route={route} me={me} />
       </main>
     </>
