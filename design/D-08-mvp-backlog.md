@@ -45,11 +45,11 @@
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
 | UX | Friendlier for users and deployers: v0.1.x releases toward v0.2.0 (QUESTIONS #355, #364) | 13 | S×3 · M×9 · L×1 |
-| EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361) | 6 | S×3 · M×1 · L×2 |
+| EXT | Other agents, tools for agents, document knowledge, other Git hosts: toward v0.3.0 (QUESTIONS #361) | 8 | S×4 · M×2 · L×2 |
 | Models | Self-hosted models (QUESTIONS #362) | 2 | S×1 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 4 | M×4 |
-| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 10 | S×3 · M×2 · L×5 |
-| **Total** | | **90** | |
+| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 11 | S×3 · M×2 · L×6 |
+| **Total** | | **93** | |
 
 ### Order and dependencies between milestones
 
@@ -62,7 +62,7 @@ flowchart LR
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V12, L02: friendlier (v0.1.x → v0.2.0)"]
-    UX --> EXT["EXT X01–X04, X07, X09 (v0.3.0)"]
+    UX --> EXT["EXT X01–X04, X07, X09, X11, X12 (v0.3.0)"]
     EXT --> MO["Models L01, L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
@@ -1171,6 +1171,37 @@ flowchart LR
 
 > Note: QUESTIONS #361 (Harry, 2026-10-10): clients use GitLab, Backlog Git and Bitbucket besides GitHub; adapters wait for a real project (X10)
 
+#### X11. Context condensing for agent runs
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | C05 | FR-31, FR-32, FR-35, D-07 §7 | platform/packages/adapters/agent-openhands, platform/packages/config, platform/apps/runner, platform/tests/*, design/ADR-M29, handbook Ch.13 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Check the condenser options of the pinned OpenHands Agent Server (1.48.0): which condensers exist, how they are set per conversation, what events they add to the log; record the result in ADR-M29
+- [ ] AC2: Project config `run.context_condensing` (off or summarize; maximum events, events kept at the start), validated by @sdlc/config with a mandatory rule (never on when the model's context size is unknown); the default is decided from the AC4 numbers
+- [ ] AC3: Summarizer calls go through LiteLLM with the run's virtual key and the seven labels, count against the run budget, and use a model in `allowed_models`; summaries are client data: never in run events, logs, Temporal or any table (counts only: condensations, events dropped)
+- [ ] AC4: Loop detection, the caps, the kill switch and the budget stop behave the same with condensing on (`identicalCalls` and `events` still counted correctly); `pnpm test:agent` with a stub model that runs past its context; numbers (tokens, time, result) from `pnpm test:agent-real` with and without condensing
+
+> Note: QUESTIONS #395 (Harry, 2026-10-12): the platform sets no condenser today; small local models (`num_ctx` 32768) need it first (L02)
+
+#### X12. Design: agent memory across runs
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | X07 | FR-11, FR-33, FR-40, FR-44 | design/ADR-M74, design/D-03, design/D-05, design/QUESTIONS.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: ADR-M74 designs memory as Markdown files in the project's repository (for example `.sdlc/memory/*.md`), proposed by an agent and merged by a person (QUESTIONS #395, option A), and records why a platform store was not chosen (retention and purge, FR-44; tenants; data classes; prompt injection that persists across runs)
+- [ ] AC2: A memory change goes in its own pull request, never with the code change, and never blocks a release; who approves it (never its producer, FR-11) and how an entry is removed
+- [ ] AC3: How a run gets memory: read at the run's `base_sha`, capped, in its own nonce block, framed as data
+- [ ] AC4: How memory fits the instruction-file rules: it is not `AGENTS.md` (an agent version change, QUESTIONS #94) and never triggers `instructions_unpinned` by mistake; what G5 does when a run changes a memory file
+- [ ] AC5: What is recorded: run events with counts and hashes only (X07), never memory text; no code in this task; D-03 and D-05 changes proposed for Harry's approval
+
+> Note: QUESTIONS #395 (Harry, 2026-10-12). Relates to X08 (lessons at G8)
+
 
 ### Models — Self-hosted models (QUESTIONS #362)
 
@@ -1408,6 +1439,19 @@ flowchart LR
 
 > Note: QUESTIONS #361
 
+#### X13. Agent memory
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| L | X12 | FR-11, FR-33, FR-44 | as ADR-M74 decides; platform/apps/runner, platform/packages/adapters/agent-openhands, platform/tests/*, handbook Ch.13, Ch.20 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Built as ADR-M74 decides; handbook Ch.13 and Ch.20 usage
+- [ ] AC2: Tests for every rule of X12: approval by a person who is not the producer, removal, caps, the data framing against injection, retention, another project's memory refused
+
+> Note: QUESTIONS #395 (Harry, 2026-10-12)
+
 ---
 
 ## 5. Handing tasks to Claude Code
@@ -1490,6 +1534,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.34 | 2026-10-10 | Claude, approved by Harry | "MVP" retired: the platform backlog, v0.1.0 is the baseline (QUESTIONS #360); milestone UX gains V12 (release process) and L02 (model benchmark, early); new milestones EXT (X01–X04, X07, X09; QUESTIONS #361), Models (L01, L03; #362), Server (A10 moved there, O01–O03; #363), Later (was MVP+1: U01–U03 done, K02 superseded by X04, X05, X06, X08, X10); a public ROADMAP.md generated with D-08 |
 | 1.35 | 2026-10-10 | Claude (task V11), approved by Harry | V11 done (`design/MVP1-UI-SCOPE.md` 1.2, ADR-M73): new tasks U05–U07 in UX (GitHub sign-in and sessions, CSRF and passkey step-up, wave 1: kill, gate decisions, escalations) and U08–U09 in Later (waves 2 and 3); U05 includes the V03 change (the App keeps its client secret); no dependency on V09 (QUESTIONS #375–#380) |
 | 1.36 | 2026-10-10 | Claude (task V12), approved by Harry | V12 note: AC2 as built (the tag verifies the images built before it; npm stays its own workflow with the same gate; `pnpm release:lock`), AC3 from 0.1.1 on (QUESTIONS #390) |
+| 1.37 | 2026-10-12 | Claude, approved by Harry | New tasks X11 (context condensing for agent runs) and X12 (design: agent memory across runs) in EXT, X13 (agent memory) in Later (QUESTIONS #395) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
