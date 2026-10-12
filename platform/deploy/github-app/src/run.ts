@@ -1,7 +1,10 @@
-// `pnpm github-app:create --out <file> [--org <org>] [--name <name>] [--force]` (D-08 V03): creates
-// the platform's GitHub App from `manifest.json` with GitHub's manifest flow, and saves its private
-// key to a file outside the repository (mode 600). Run by a person in their own terminal: the key is
-// never printed, and the client secret and webhook secret GitHub returns are dropped (QUESTIONS #351).
+// `pnpm github-app:create --out <file> [--org <org>] [--name <name>] [--callback-url <url>]…
+// [--force]` (D-08 V03, U05): creates the platform's GitHub App from `manifest.json` with GitHub's
+// manifest flow, and saves its private key to `--out` and its client secret to
+// `<--out>.client-secret`, both outside the repository (mode 600). Run by a person in their own
+// terminal: neither is printed, and the webhook secret GitHub returns is dropped (QUESTIONS #351).
+// The client secret is for the dashboard's GitHub sign-in (ADR-M73 §2.2): the operator stores it in
+// OpenBao with `pnpm openbao:bootstrap api-github-oauth-credentials`.
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
@@ -17,7 +20,10 @@ import {
 import { KeyFileError, keyFileRefusal, writeKeyFile, type KeyFileRefusal } from './key-file.js';
 import {
   buildManifest,
+  DEFAULT_CALLBACK_URL,
   isAppName,
+  isCallbackUrl,
+  MAX_CALLBACK_URLS,
   isOrgLogin,
   loadManifest,
   newAppUrl,
@@ -26,6 +32,9 @@ import {
 import { codeFromPaste, formPage, startCallbackServer } from './server.js';
 
 export const EXIT = { ok: 0, failed: 1, usage: 2 } as const;
+
+/** The client secret's file: next to the key file, same rules (U05). */
+export const CLIENT_SECRET_SUFFIX = '.client-secret';
 
 /** The callback must come within this time (GitHub's code itself lives one hour). */
 export const CALLBACK_TIMEOUT_MS = 15 * 60 * 1000;
@@ -67,7 +76,13 @@ export async function runCreate(argv: readonly string[], deps: RunDeps): Promise
   const say = (key: MessageKey, params?: MessageParams): void => deps.out(t(key, params));
   const fail = (key: MessageKey, params?: MessageParams): void => deps.err(t(key, params));
 
-  let values: { out?: string; org?: string; name?: string; force?: boolean };
+  let values: {
+    out?: string;
+    org?: string;
+    name?: string;
+    'callback-url'?: string[];
+    force?: boolean;
+  };
   try {
     ({ values } = parseArgs({
       args: [...argv],
@@ -75,6 +90,7 @@ export async function runCreate(argv: readonly string[], deps: RunDeps): Promise
         out: { type: 'string' },
         org: { type: 'string' },
         name: { type: 'string' },
+        'callback-url': { type: 'string', multiple: true },
         force: { type: 'boolean', default: false },
       },
       strict: true,
@@ -97,12 +113,20 @@ export async function runCreate(argv: readonly string[], deps: RunDeps): Promise
     fail('github_app.refused.name');
     return EXIT.usage;
   }
+  const callbackUrls = [...new Set(values['callback-url'] ?? [DEFAULT_CALLBACK_URL])];
+  if (callbackUrls.length > MAX_CALLBACK_URLS || !callbackUrls.every(isCallbackUrl)) {
+    fail('github_app.refused.callback_url');
+    return EXIT.usage;
+  }
   const force = values.force === true;
   const keyFile = path.resolve(values.out);
-  const refusal = keyFileRefusal(keyFile, deps.repoRoot, force);
-  if (refusal) {
-    fail(KEY_REFUSAL[refusal], { path: keyFile });
-    return EXIT.failed;
+  const secretFile = `${keyFile}${CLIENT_SECRET_SUFFIX}`;
+  for (const file of [keyFile, secretFile]) {
+    const refusal = keyFileRefusal(file, deps.repoRoot, force);
+    if (refusal) {
+      fail(KEY_REFUSAL[refusal], { path: file });
+      return EXIT.failed;
+    }
   }
 
   let base: BaseManifest;
@@ -117,7 +141,7 @@ export async function runCreate(argv: readonly string[], deps: RunDeps): Promise
   const server = await startCallbackServer({
     state,
     formPage: (redirectUrl) =>
-      formPage(action, JSON.stringify(buildManifest(base, name, redirectUrl))),
+      formPage(action, JSON.stringify(buildManifest(base, name, redirectUrl, callbackUrls))),
   });
   deps.onListening?.(server.url);
   say('github_app.open', { url: server.url, name });
@@ -164,10 +188,20 @@ export async function runCreate(argv: readonly string[], deps: RunDeps): Promise
     fail('github_app.write_failed', { id: app.id, slug: app.slug });
     return EXIT.failed;
   }
+  try {
+    writeKeyFile(secretFile, `${app.clientSecret}\n`, deps.repoRoot, force);
+  } catch (error) {
+    // The key is saved; the client secret is not. Never print it: a new one is made on GitHub.
+    if (error instanceof KeyFileError) fail(KEY_REFUSAL[error.refusal], { path: secretFile });
+    fail('github_app.secret_write_failed', { id: app.id, slug: app.slug, path: keyFile });
+    return EXIT.failed;
+  }
   say('github_app.created', {
     id: app.id,
     client_id: app.clientId,
     path: keyFile,
+    secret_path: secretFile,
+    callbacks: callbackUrls.join(', '),
     install_url: `${deps.githubUrl}/apps/${app.slug}/installations/new`,
   });
   return EXIT.ok;

@@ -147,4 +147,28 @@ describe('sdlc-api service', () => {
     const policy = readDeployFile('openbao/bootstrap/policies/api.hcl');
     expect(policy).toContain('path "kv/data/api/*"');
   });
+
+  it('U05: the GitHub sign-in is off by default; its client secret is at kv/api/github-oauth, read by the api only', () => {
+    expect(api.environment.SDLC_API_WEB_SIGNIN).toBe('${SDLC_API_WEB_SIGNIN:-off}');
+    expect(api.environment.SDLC_API_PUBLIC_ORIGIN).toBe('${SDLC_API_PUBLIC_ORIGIN:-}');
+    expect(envExample.get('SDLC_API_WEB_SIGNIN')).toBe('off');
+    const bootstrap = readDeployFile('openbao/bootstrap.sh');
+    const fn = /^cmd_api_github_oauth_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
+    expect(fn).toContain('bao kv put -mount=kv api/github-oauth - >/dev/null');
+    // The secret goes on the container's stdin, never as an argument; nothing is printed.
+    expect(fn).not.toMatch(/client_secret=\$/);
+    expect(fn).toContain("read_tty_secret 'Admin or root token (hidden)'");
+    expect(policyPaths('api')).toContain('kv/data/api/*');
+    for (const role of ['worker', 'runner', 'cost-controller', 'litellm', 'backup']) {
+      for (const path of policyPaths(role)) {
+        expect(path.startsWith('kv/data/api'), `${role}: ${path}`).toBe(false);
+        expect(path, role).not.toBe('kv/data/*');
+      }
+    }
+  });
 });
+
+function policyPaths(role: string): string[] {
+  const policy = readDeployFile(`openbao/bootstrap/policies/${role}.hcl`);
+  return [...policy.matchAll(/^path "([^"]+)"/gm)].map((m) => m[1]!);
+}

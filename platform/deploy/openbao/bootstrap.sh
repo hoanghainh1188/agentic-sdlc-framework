@@ -62,6 +62,13 @@ Commands:
                        Read:evidence/diffs/* (the hash re-check), Read:evidence/packs/* and
                        Write:evidence/packs/* (E02, ADR-M48). The old key stops working.
                        Prints no secret. Run it again to rotate, then restart sdlc-api.
+  api-github-oauth-credentials
+                       Ask for an admin token (hidden, from the terminal), then read the GitHub
+                       App's client secret (a hidden prompt, or standard input: < <file>) and
+                       store it at kv/api/github-oauth, field client_secret, for the dashboard's
+                       GitHub sign-in (U05, ADR-M73 §2.2). Only the api AppRole reads it. Prints
+                       no secret. Run it again to rotate (the api reads it again within 10
+                       minutes).
   worker-evidence-credentials
                        The same for the worker's release packs at G8: kv/worker/evidence, the
                        identity "worker-evidence" with the same four rights (E03, ADR-M49). The
@@ -140,7 +147,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | backup-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | backup-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials | api-github-oauth-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -444,6 +451,37 @@ cmd_worker_credentials() {
 }
 cmd_runner_credentials() { platform_credentials runner sdlc-runner sandbox; }
 
+# The GitHub App's client secret for the dashboard's sign-in (U05, ADR-M73 §2.2, runbook T11 §5n).
+# The admin token comes from the terminal (hidden); the client secret from a hidden prompt, or from
+# standard input when it is a file (`< <client secret file>` made by `pnpm github-app:create`). The
+# secret goes to OpenBao on the container's stdin: never a host file, a command line or a log.
+# Without a terminal at all (the live tests), the token is the first line of standard input.
+read_tty_secret() {
+  if [ -t 0 ]; then
+    read_secret "$1"
+  elif (: </dev/tty) 2>/dev/null; then
+    read_secret "$1" </dev/tty
+  else
+    read_secret "$1"
+  fi
+}
+cmd_api_github_oauth_credentials() {
+  require_unsealed
+  token="$(read_tty_secret 'Admin or root token (hidden)')"
+  [ -n "$token" ] || fail "no token given"
+  client_secret="$(read_secret "The GitHub App's client secret (hidden)")"
+  printf '%s' "$client_secret" | grep -Eq '^[A-Za-z0-9_.-]{20,255}$' ||
+    fail "that is not a GitHub App client secret (20 to 255 letters, digits, '_', '.', '-')"
+  printf '%s\n%s\n' "$token" "$client_secret" |
+    bao_exec sh -c 'set -e
+      IFS= read -r BAO_TOKEN && export BAO_TOKEN
+      IFS= read -r cs
+      printf "{\"client_secret\":\"%s\"}" "$cs" | bao kv put -mount=kv api/github-oauth - >/dev/null' ||
+    fail "storing kv/api/github-oauth failed"
+  unset token client_secret
+  echo "stored: kv/api/github-oauth (client_secret). Set SDLC_API_WEB_SIGNIN=github and SDLC_API_PUBLIC_ORIGIN, then restart sdlc-api (runbook T11 §5n)."
+}
+
 # The runner's write-only SeaweedFS identity for L1 proposals (C06 session 2b, ADR-M33 §2.9) and
 # run diffs (C07, ADR-M34 §2.2).
 # The openbao container makes the key pair, stores it at kv/runner/evidence (JSON on stdin) and
@@ -667,4 +705,5 @@ case "$command" in
   worker-purge-credentials) cmd_worker_purge_credentials ;;
   worker-anchor-credentials) cmd_worker_anchor_credentials ;;
   worker-langfuse-credentials) cmd_worker_langfuse_credentials ;;
+  api-github-oauth-credentials) cmd_api_github_oauth_credentials ;;
 esac

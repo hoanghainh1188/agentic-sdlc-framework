@@ -163,6 +163,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
   agent_approvals: [],
   // E08 (migration 0024, QUESTIONS #253): a request again until confirmed once (trigger SDA17).
   langfuse_purges: ['traces', 'attempts', 'last_requested_at', 'confirmed_at'],
+  // U05 (migration 0027): seen time only grows; the end is set once (trigger SDA18). No DELETE.
+  web_sessions: ['last_seen_at', 'revoked_at', 'end_reason'],
 };
 
 describeDb('AC2: migrations on PostgreSQL', () => {
@@ -296,7 +298,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // E02: evidence_packs → intents, users (built_by).
     // E05: evidence_holds → intents, users ×2 (held_by, released_by).
     // E08: langfuse_purges → intents.
-    expect(fks).toHaveLength(58);
+    // U05: web_sessions → users, user_identities.
+    expect(fks).toHaveLength(60);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {
@@ -352,6 +355,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
       'public.evidence_packs (tenant_id, intent_id) WHERE (sealed_at IS NOT NULL)',
       // E05: one active hold per intent.
       'public.evidence_holds (tenant_id, intent_id) WHERE (released_at IS NULL)',
+      // U05: the cookie names no tenant: the secret's hash is unique across tenants.
+      'public.web_sessions (secret_sha256)',
     ]) {
       expect(defs, expected).toContain(expected);
     }

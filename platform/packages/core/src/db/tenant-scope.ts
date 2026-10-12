@@ -33,6 +33,7 @@ import { SpecRefRepository } from './repositories/spec-refs.js';
 import { TenantRoleBindingRepository } from './repositories/tenant-role-bindings.js';
 import { UserIdentityRepository } from './repositories/user-identities.js';
 import { UserRepository } from './repositories/users.js';
+import { WebSessionRepository } from './repositories/web-sessions.js';
 
 /**
  * Repositories bound to one tenant. Every query they send passes the tenant guard, which
@@ -70,6 +71,7 @@ export class TenantScope {
   readonly escalationNotices: EscalationNoticeRepository;
   readonly agents: AgentRepository;
   readonly agentApprovals: AgentApprovalRepository;
+  readonly webSessions: WebSessionRepository;
 
   private readonly db: Kysely<Database>;
   #savepoints = 0;
@@ -109,6 +111,7 @@ export class TenantScope {
     this.escalationNotices = new EscalationNoticeRepository(this.db, this.tenantId);
     this.agents = new AgentRepository(this.db, this.tenantId);
     this.agentApprovals = new AgentApprovalRepository(this.db, this.tenantId);
+    this.webSessions = new WebSessionRepository(this.db, this.tenantId);
   }
 
   /**

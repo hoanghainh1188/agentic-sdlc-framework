@@ -203,14 +203,22 @@ afterEach(async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-/** Every file under `dir` except the key file holds none of the three secrets. */
+/**
+ * The output holds none of the three secrets; the key file holds only the key, the client secret
+ * file (U05) only the client secret; the webhook secret is nowhere.
+ */
 function expectNoSecretOutside(h: Harness): void {
   const text = [...h.out, ...h.err].join('\n');
   for (const value of [secrets.pem.split('\n')[1]!, secrets.clientSecret, secrets.webhookSecret])
     expect(text).not.toContain(value);
   for (const name of fs.readdirSync(dir)) {
     const content = fs.readFileSync(path.join(dir, name), 'utf8');
+    expect(content).not.toContain(secrets.webhookSecret);
     if (name === 'app.pem') continue;
+    if (name === 'app.pem.client-secret') {
+      expect(content).toBe(`${secrets.clientSecret}\n`);
+      continue;
+    }
     expect(content).not.toContain(secrets.clientSecret);
   }
   if (fs.existsSync(keyFile)) {
@@ -236,15 +244,22 @@ describe('V03: pnpm github-app:create against a fake GitHub', () => {
       redirect_url: new URL('/callback', pageUrl).href,
       public: false,
       hook_attributes: { active: false },
+      // U05: the dashboard's sign-in callback on a developer machine.
+      callback_urls: ['http://localhost:8090/v1/auth/github/callback'],
     });
 
     const done = await callback(pageUrl, `code=abc123&state=${state}`);
     expect(done.status).toBe(200);
     expect(await h.run).toBe(EXIT.ok);
     expect(github.codes).toEqual(['abc123']);
+    const text0 = (): string => h.out.join('\n');
     expect(fs.statSync(keyFile).mode & 0o777).toBe(0o600);
     expect(fs.readFileSync(keyFile, 'utf8')).toBe(secrets.pem);
-    expect(fs.readdirSync(dir)).toEqual(['app.pem']);
+    expect(fs.readdirSync(dir).sort()).toEqual(['app.pem', 'app.pem.client-secret']);
+    // U05 (ADR-M73 §2.2): the client secret is kept for the dashboard's sign-in, mode 600.
+    expect(fs.statSync(`${keyFile}.client-secret`).mode & 0o777).toBe(0o600);
+    expect(fs.readFileSync(`${keyFile}.client-secret`, 'utf8')).toBe(`${secrets.clientSecret}\n`);
+    expect(text0()).toContain(`${keyFile}.client-secret`);
     const text = h.out.join('\n');
     expect(text).toContain('424242');
     expect(text).toContain('Iv23liFAKEFAKE');
@@ -400,6 +415,41 @@ describe('V03: pnpm github-app:create against a fake GitHub', () => {
     expectNoSecretOutside(h);
   });
 
+  it('U05: lists the --callback-url values, refuses a bad one and an existing secret file', async () => {
+    const h = start([
+      '--out',
+      keyFile,
+      '--callback-url',
+      'http://localhost:9000/v1/auth/github/callback',
+      '--callback-url',
+      'https://sdlc.example.com/v1/auth/github/callback',
+    ]);
+    const { manifest, state } = await openForm(await h.pageUrl);
+    expect(manifest.callback_urls).toEqual([
+      'http://localhost:9000/v1/auth/github/callback',
+      'https://sdlc.example.com/v1/auth/github/callback',
+    ]);
+    await callback(await h.pageUrl, `code=c9&state=${state}`);
+    expect(await h.run).toBe(EXIT.ok);
+
+    for (const bad of [
+      'http://127.0.0.1:8090/v1/auth/github/callback',
+      'http://sdlc.example.com/v1/auth/github/callback',
+      'https://sdlc.example.com/other',
+      'https://sdlc.example.com/v1/auth/github/callback?x=1',
+      'https://user:pw@sdlc.example.com/v1/auth/github/callback',
+    ]) {
+      const refused = start(['--out', path.join(dir, 'other.pem'), '--callback-url', bad]);
+      expect(await refused.run, bad).toBe(EXIT.usage);
+      expect(refused.err.join('\n')).toContain('--callback-url');
+    }
+
+    fs.rmSync(keyFile);
+    const exists = start(['--out', keyFile]);
+    expect(await exists.run).toBe(EXIT.failed);
+    expect(exists.err.join('\n')).toContain(`${keyFile}.client-secret`);
+  });
+
   it('shows the usage without --out, and refuses a bad --org or --name', async () => {
     expect(await start([]).run).toBe(EXIT.usage);
     expect(await start(['--out', keyFile, '--org', 'bad org']).run).toBe(EXIT.usage);
@@ -433,8 +483,22 @@ describe('V03: the pieces', () => {
       client_secret: secrets.clientSecret,
       webhook_secret: secrets.webhookSecret,
     });
-    expect(Object.keys(kept).sort()).toEqual(['clientId', 'id', 'pem', 'slug']);
-    expect(JSON.stringify(kept)).not.toContain(secrets.clientSecret);
+    // U05: the client secret is kept for the dashboard's sign-in; the webhook secret never.
+    expect(Object.keys(kept).sort()).toEqual(['clientId', 'clientSecret', 'id', 'pem', 'slug']);
+    expect(JSON.stringify(kept)).not.toContain(secrets.webhookSecret);
+    expect(kept.clientSecret).toBe(secrets.clientSecret);
     expect(() => keepCredentials({ id: 1, client_id: 'Iv1', slug: 's', pem: 'x' })).toThrow();
+    expect(() =>
+      keepCredentials({ id: 1, client_id: 'Iv1', slug: 's', pem: secrets.pem }),
+    ).toThrow();
+    expect(() =>
+      keepCredentials({
+        id: 1,
+        client_id: 'Iv1',
+        slug: 's',
+        pem: secrets.pem,
+        client_secret: 'short',
+      }),
+    ).toThrow();
   });
 });

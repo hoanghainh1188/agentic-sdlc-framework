@@ -11,6 +11,7 @@ import {
   adminTenantRoleSchema,
   adminUserListSchema,
   adminUserSchema,
+  endedSessionsSchema,
   type AdminIdentityView,
   type AdminTenantRoleView,
   type AdminUserView,
@@ -125,6 +126,21 @@ export const USER_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
           say(call.ctx, 'cli.admin.identity.line', identityParams(item));
         }
       });
+    },
+  },
+  // U05 (ADR-M73 §2.2): ends every dashboard session of the person (sign out everywhere).
+  'user sign-out': {
+    options: user,
+    required: ['user'],
+    run: async (call) => {
+      const userId = await resolveUser(call, str(call.values, 'user'));
+      const result = await call.client.delete(
+        `/v1/admin/users/${segment(userId)}/sessions`,
+        endedSessionsSchema,
+      );
+      return output(call, result, () =>
+        say(call.ctx, 'cli.admin.user.signed_out', { id: userId, count: result.ended }),
+      );
     },
   },
   'identity unlink': {

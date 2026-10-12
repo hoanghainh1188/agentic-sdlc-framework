@@ -23,6 +23,12 @@ export const API_ENV = {
   evidenceSecretPath: 'SDLC_API_EVIDENCE_SECRET_PATH',
   evidenceMaxItemMb: 'SDLC_API_EVIDENCE_MAX_ITEM_MB',
   dashboardDir: 'SDLC_API_DASHBOARD_DIR',
+  webSignIn: 'SDLC_API_WEB_SIGNIN',
+  publicOrigin: 'SDLC_API_PUBLIC_ORIGIN',
+  githubWebUrl: 'SDLC_API_GITHUB_WEB_URL',
+  githubOauthSecretPath: 'SDLC_API_GITHUB_OAUTH_SECRET_PATH',
+  sessionIdleMinutes: 'SDLC_API_SESSION_IDLE_MINUTES',
+  sessionMaxHours: 'SDLC_API_SESSION_MAX_HOURS',
 } as const;
 
 /** Fields of the KV entry written by `openbao:bootstrap api-evidence-credentials` (E02). */
@@ -87,6 +93,23 @@ const schema = z.object({
     .string()
     .refine((v) => v === 'off' || v.startsWith('/'))
     .default('off'),
+  // Dashboard sign-in with GitHub (U05, ADR-M73 §2.2); `off` by default.
+  [API_ENV.webSignIn]: z.enum(['off', 'github']).default('off'),
+  // The origin people open the dashboard at; the GitHub callback URL is built from it.
+  [API_ENV.publicOrigin]: z
+    .string()
+    .refine((v) => v === '' || isOrigin(v))
+    .default(''),
+  [API_ENV.githubWebUrl]: z
+    .string()
+    .refine((v) => isOrigin(v) && v.startsWith('https://'))
+    .default('https://github.com'),
+  [API_ENV.githubOauthSecretPath]: z
+    .string()
+    .regex(/^api\/[A-Za-z0-9_.-]+$/)
+    .default('api/github-oauth'),
+  [API_ENV.sessionIdleMinutes]: z.coerce.number().int().min(5).max(120).default(30),
+  [API_ENV.sessionMaxHours]: z.coerce.number().int().min(1).max(24).default(8),
   NODE_ENV: z.string().optional(),
 });
 
@@ -137,6 +160,34 @@ export interface ApiSettings {
   } | null;
   /** The dashboard's built files (U01, ADR-M54): an absolute folder; null: `off`. */
   readonly dashboardDir: string | null;
+  /** Dashboard sign-in with GitHub (U05, ADR-M73 §2.2); null: `SDLC_API_WEB_SIGNIN=off`. */
+  readonly webSignIn: WebSignInSettings | null;
+}
+
+export interface WebSignInSettings {
+  /** The origin people open the dashboard at, for example `http://localhost:8090`. */
+  readonly publicOrigin: string;
+  /** `<publicOrigin>/v1/auth/github/callback`: listed in the GitHub App's settings. */
+  readonly callbackUrl: string;
+  readonly githubWebUrl: string;
+  readonly githubApiUrl: string;
+  readonly oauthSecretPath: string;
+  readonly idleMs: number;
+  readonly maxAgeMs: number;
+}
+
+/** The callback path of the sign-in (the GitHub App lists `<origin>` + this). */
+export const GITHUB_CALLBACK_PATH = '/v1/auth/github/callback';
+
+/**
+ * A public origin is allowed when it is `https://`, or plain `http://` on `localhost` only
+ * (ADR-M73 §2.3): cookies are `Secure`, and browsers treat only `localhost` as a secure context
+ * without TLS. `127.0.0.1` is refused too: WebAuthn (U06) refuses an IP address as a site name.
+ */
+export function isAllowedPublicOrigin(value: string): boolean {
+  if (!isOrigin(value)) return false;
+  const url = new URL(value);
+  return url.protocol === 'https:' || url.hostname === 'localhost';
 }
 
 /** A setting is missing or wrong. `key` is a message catalog key; `name` the variable. */
@@ -148,7 +199,9 @@ export class SettingsError extends Error {
       | 'api.settings.invalid'
       | 'api.settings.dev_mode_in_production'
       | 'api.settings.dev_url_missing'
-      | 'api.settings.temporal_off_in_production',
+      | 'api.settings.temporal_off_in_production'
+      | 'api.settings.public_origin_missing'
+      | 'api.settings.public_origin_insecure',
     readonly setting: string,
   ) {
     super(`${key}: ${setting}`);
@@ -183,8 +236,29 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
       secretPath: v[API_ENV.dbSecretPath],
     };
   }
+  let webSignIn: WebSignInSettings | null = null;
+  if (v[API_ENV.webSignIn] === 'github') {
+    const origin = v[API_ENV.publicOrigin];
+    if (origin === '') {
+      throw new SettingsError('api.settings.public_origin_missing', API_ENV.publicOrigin);
+    }
+    if (!isAllowedPublicOrigin(origin)) {
+      throw new SettingsError('api.settings.public_origin_insecure', API_ENV.publicOrigin);
+    }
+    const publicOrigin = new URL(origin).origin;
+    webSignIn = {
+      publicOrigin,
+      callbackUrl: `${publicOrigin}${GITHUB_CALLBACK_PATH}`,
+      githubWebUrl: new URL(v[API_ENV.githubWebUrl]).origin,
+      githubApiUrl: v[API_ENV.githubApiUrl],
+      oauthSecretPath: v[API_ENV.githubOauthSecretPath],
+      idleMs: v[API_ENV.sessionIdleMinutes] * 60_000,
+      maxAgeMs: v[API_ENV.sessionMaxHours] * 3_600_000,
+    };
+  }
   return {
     host: v[API_ENV.host],
+    webSignIn,
     port: v[API_ENV.port],
     database,
     rateLimitPerMinute: v[API_ENV.rateLimitPerMinute],

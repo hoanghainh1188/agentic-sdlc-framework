@@ -32,6 +32,9 @@ import { t, type MessageKey } from '@sdlc/messages';
 /** Codes of the error envelope. Each has the catalog key `api.error.<code>` (tested). */
 export const API_ERROR_CODES = [
   'unauthorized',
+  'session_ended',
+  'credentials_ambiguous',
+  'session_write_not_allowed',
   'rate_limited',
   'invalid_request',
   'not_found',
@@ -103,6 +106,9 @@ export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
 const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   unauthorized: 'api.error.unauthorized',
+  session_ended: 'api.error.session_ended',
+  credentials_ambiguous: 'api.error.credentials_ambiguous',
+  session_write_not_allowed: 'api.error.session_write_not_allowed',
   rate_limited: 'api.error.rate_limited',
   invalid_request: 'api.error.invalid_request',
   not_found: 'api.error.not_found',

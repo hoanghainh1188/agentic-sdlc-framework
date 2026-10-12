@@ -26,6 +26,7 @@ import { migration0023Retention } from './0023-retention.js';
 import { migration0024LangfusePurges } from './0024-langfuse-purges.js';
 import { migration0025IntentsWaitingReason } from './0025-intents-waiting-reason.js';
 import { migration0026SpecStructure } from './0026-spec-structure.js';
+import { migration0027WebSessions } from './0027-web-sessions.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -55,4 +56,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0024-langfuse-purges': migration0024LangfusePurges,
   '0025-intents-waiting-reason': migration0025IntentsWaitingReason,
   '0026-spec-structure': migration0026SpecStructure,
+  '0027-web-sessions': migration0027WebSessions,
 };

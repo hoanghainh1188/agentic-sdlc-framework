@@ -4,6 +4,7 @@ import { sql, type Kysely } from 'kysely';
 
 import { translatePgError } from './errors.js';
 import { assertTokenHash } from './repositories/api-tokens.js';
+import type { WebSessionEndReason } from './schema.js';
 import type { Database, Tenant } from './schema.js';
 import { isUuid, parseTenantId, type TenantId } from './tenant-id.js';
 import { TenantScope } from './tenant-scope.js';
@@ -18,6 +19,14 @@ export interface ResolvedApiToken {
   readonly tenantId: TenantId;
   readonly userId: string;
   readonly tokenId: string;
+}
+
+/** A dashboard session found by its secret's hash (U05, ADR-M73 §2.2): IDs and times only. */
+export interface ResolvedWebSession {
+  readonly tenantId: TenantId;
+  readonly userId: string;
+  readonly sessionId: string;
+  readonly lastSeenAt: Date;
 }
 
 /** An escalation whose clock is due (task B11): IDs only. */
@@ -356,6 +365,75 @@ export class SystemScope {
     return row
       ? { tenantId: parseTenantId(row.tenant_id), userId: row.user_id, tokenId: row.token_id }
       : undefined;
+  }
+
+  /**
+   * The API's guard (U05, ADR-M73 §2.2): a session cookie names no tenant, so the lookup crosses
+   * tenants, as for API tokens. Takes the SHA-256 of the session secret, never the secret.
+   * Returns undefined unless the session is not ended, not past its absolute end, seen after
+   * `idleSince`, its user and tenant are active and the identity it was opened with is still
+   * linked.
+   */
+  async resolveWebSession(
+    secretHash: string,
+    now: Date,
+    idleSince: Date,
+  ): Promise<ResolvedWebSession | undefined> {
+    assertTokenHash(secretHash);
+    const row = await run(
+      this.db
+        .selectFrom('web_sessions as s')
+        .innerJoin('users as u', (join) =>
+          join.onRef('u.tenant_id', '=', 's.tenant_id').onRef('u.id', '=', 's.user_id'),
+        )
+        .innerJoin('user_identities as i', (join) =>
+          join
+            .onRef('i.tenant_id', '=', 's.tenant_id')
+            .onRef('i.id', '=', 's.identity_id')
+            .onRef('i.user_id', '=', 's.user_id'),
+        )
+        .innerJoin('tenants as tn', 'tn.id', 's.tenant_id')
+        .select(['s.id as session_id', 's.tenant_id', 's.user_id', 's.last_seen_at'])
+        .where('s.secret_sha256', '=', secretHash)
+        .where('s.revoked_at', 'is', null)
+        .where('s.expires_at', '>', now)
+        .where('s.last_seen_at', '>', idleSince)
+        .where('i.unlinked_at', 'is', null)
+        .where('u.status', '=', 'active')
+        .where('tn.status', '=', 'active')
+        .executeTakeFirst(),
+    );
+    return row
+      ? {
+          tenantId: parseTenantId(row.tenant_id),
+          userId: row.user_id,
+          sessionId: row.session_id,
+          lastSeenAt: row.last_seen_at,
+        }
+      : undefined;
+  }
+
+  /**
+   * Ends the session of a secret's hash, whatever its state (sign-in replaces any session cookie
+   * the browser sent, ADR-M73 §2.2: no session fixation). Crosses tenants for the same reason as
+   * `resolveWebSession`. Returns the tenant and user when this call ended an open session.
+   */
+  async endWebSessionBySecret(
+    secretHash: string,
+    reason: WebSessionEndReason,
+    at: Date,
+  ): Promise<{ tenantId: TenantId; userId: string } | undefined> {
+    assertTokenHash(secretHash);
+    const row = await run(
+      this.db
+        .updateTable('web_sessions')
+        .set({ revoked_at: at, end_reason: reason })
+        .where('secret_sha256', '=', secretHash)
+        .where('revoked_at', 'is', null)
+        .returning(['tenant_id', 'user_id'])
+        .executeTakeFirst(),
+    );
+    return row ? { tenantId: parseTenantId(row.tenant_id), userId: row.user_id } : undefined;
   }
 }
 

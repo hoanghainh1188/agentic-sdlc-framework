@@ -17,6 +17,7 @@ import {
   listTokensOf,
   revokeTokenOf,
   createUser,
+  endUserWebSessions,
   isTenantAdmin,
   linkIdentity,
   listIdentities,
@@ -96,6 +97,7 @@ export class AdminUsersController {
       actorOf(p),
       parseRequest(idSchema, id, 'path'),
       false,
+      this.now(),
     );
     return this.present(p, user);
   }
@@ -192,6 +194,18 @@ export class AdminUsersController {
       this.now(),
     );
     return presentToken(revoked);
+  }
+
+  /** U05 (ADR-M73 §2.2): a tenant admin signs a person out of the dashboard everywhere. */
+  @Delete(':user/sessions')
+  async endSessions(@CurrentPrincipal() p: Principal, @Param('user') id: string): Promise<Body> {
+    const ended = await endUserWebSessions(
+      p.scope,
+      actorOf(p),
+      parseRequest(idSchema, id, 'path'),
+      this.now(),
+    );
+    return { ended };
   }
 
   private async present(p: Principal, user: User): Promise<Body> {

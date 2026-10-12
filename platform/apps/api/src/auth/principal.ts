@@ -3,10 +3,15 @@
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
 import type { TenantId, TenantScope } from '@sdlc/core';
 
+/** How the caller authenticated: a personal API token, or a dashboard session (U05). */
+export type Credential =
+  | { readonly kind: 'token'; readonly id: string }
+  | { readonly kind: 'session'; readonly id: string };
+
 export interface Principal {
   readonly tenantId: TenantId;
   readonly userId: string;
-  readonly tokenId: string;
+  readonly credential: Credential;
   /** Repositories bound to the caller's tenant. The only way handlers reach data. */
   readonly scope: TenantScope;
 }

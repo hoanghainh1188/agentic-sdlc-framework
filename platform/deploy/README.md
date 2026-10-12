@@ -49,9 +49,9 @@ The platform reaches each project's repository through one **GitHub App** per in
 pnpm github-app:create --out ~/secrets/sdlc-app.private-key.pem
 ```
 
-- Add `--org <organization>` to create the App in an organization you administer, `--name <name>` to choose its name (default `sdlc-<random>`, at most 34 characters), `--force` to replace an existing key file.
+- Add `--org <organization>` to create the App in an organization you administer, `--name <name>` to choose its name (default `sdlc-<random>`, at most 34 characters), `--callback-url <url>` (repeat it, at most 10) for the dashboard's sign-in callbacks (default `http://localhost:8090/v1/auth/github/callback`; `https://…/v1/auth/github/callback` for another origin), `--force` to replace existing files.
 - It prints a local page (`http://127.0.0.1:<port>/`). Open it in the browser where you are signed in to GitHub and press the button; GitHub shows the App with its permissions; confirm with **Create GitHub App**. GitHub sends the browser back to `127.0.0.1`, and the command finishes the App (`POST /app-manifests/{code}/conversions`).
-- It saves the private key to `--out` with mode 600 (never inside the repository, never over an existing file without `--force`) and prints only the App ID, the **Client ID** (`Iv…`, not a secret) and the install link. The key is never printed. GitHub also returns a client secret and a webhook secret: the platform uses neither, so they are dropped at once (`design/QUESTIONS.md` #351).
+- It saves the private key to `--out` and the App's **client secret** to `<--out>.client-secret`, both with mode 600 (never inside the repository, never over an existing file without `--force`), and prints only the App ID, the **Client ID** (`Iv…`, not a secret), the file names and the install link. Neither secret is printed. The client secret is only for the dashboard's GitHub sign-in (U05, `design/ADR-M73-dashboard-actions.md` §2.2): store it in OpenBao ([Fresh deployment, step 7](#7-start-the-platform)), then delete the file. GitHub also returns a webhook secret: the platform uses no webhook, so it is dropped at once (`design/QUESTIONS.md` #351).
 - If the browser cannot open `127.0.0.1` after GitHub (a remote desktop, a browser on another machine), copy the whole address from the browser's address bar and paste it at the command's hidden prompt (QUESTIONS #350). The code from GitHub works once, within one hour; the command waits at most 15 minutes.
 - Then **install** the App with the printed link: "Only select repositories", the project's application repository (step 6 below).
 
@@ -64,12 +64,12 @@ pnpm github-app:create --out ~/secrets/sdlc-app.private-key.pem
    |---|---|
    | GitHub App name | A name of your own, for example `<company>-sdlc` |
    | Homepage URL | Any URL (for example this repository) |
-   | Callback URL | Empty |
+   | Callback URL | `http://localhost:8090/v1/auth/github/callback` for the dashboard's GitHub sign-in (U05); add `https://<host>/v1/auth/github/callback` for another origin. Keep **Expire user authorization tokens** on and **Request user authorization (OAuth) during installation** off |
    | Webhook → Active | **Off** (the platform polls GitHub) |
    | Where can this App be installed | Only on this account |
 
 3. Set the repository permissions exactly as listed in [The GitHub App's settings](#github-app-permissions); everything else "No access".
-4. Note the **Client ID** (`Iv…`). It is not a secret.
+4. Note the **Client ID** (`Iv…`). It is not a secret. For the dashboard's GitHub sign-in, also **generate a client secret** and store it at once with `pnpm openbao:bootstrap api-github-oauth-credentials` (hidden prompt; [Fresh deployment, step 7](#7-start-the-platform)); never paste it anywhere else.
 5. Generate a **private key** and move the file out of Downloads, outside every repository, readable only by you (`chmod 600`). It goes into OpenBao in [Fresh deployment, step 4](#4-shared-secrets) and nowhere else.
 6. **Install** the App on the account: "Only select repositories", the project's application repository. Add a repository later in the same place when a second project joins ([ROLLOUT-GUIDE step 2](../ROLLOUT-GUIDE.md#step-2-set-up-the-platform-for-the-project-operator-tenant-admin-pm--brse-about-1-day)).
 7. After a later permission change, accept it on the installation, or tokens keep the old permissions.
@@ -193,6 +193,12 @@ pnpm openbao:bootstrap worker-langfuse-credentials  # T11 §5m (needs the profil
 ```
 
 The worker's retention loop starts in `report` mode: it deletes nothing (runbook T11 §5j).
+
+Optional, dashboard sign-in with GitHub (U05, [ADR-M73](../../design/ADR-M73-dashboard-actions.md)): the GitHub App needs a client secret and lists the callback URL `<public origin>/v1/auth/github/callback` (section [Create the GitHub App](#create-the-github-app-operator)). Store the client secret (`pnpm github-app:create` wrote it to `<key file>.client-secret`; delete the file afterwards), set `SDLC_API_WEB_SIGNIN=github` and `SDLC_API_PUBLIC_ORIGIN` (for example `http://localhost:8090`; plain `http://` only on `localhost`) in `platform/deploy/.env`, and start `sdlc-api` again:
+
+```bash
+pnpm openbao:bootstrap api-github-oauth-credentials < <key file>.client-secret  # T11 §5n
+```
 
 ### 8. The tenant and its first admin
 
