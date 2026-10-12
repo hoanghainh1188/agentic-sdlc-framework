@@ -2,7 +2,7 @@
 
 For **Person A, Person B, the second approver and PM / BrSE** who use the platform for the first time. It walks one intent (one change to make) from G1 to G8 and points to the handbook for details; the [glossary](../handbook/00-introduction/02-glossary.md) explains the words. Operators who install the platform read [deploy/README.md](deploy/README.md) instead; developers read [GETTING-STARTED.md](GETTING-STARTED.md). To set up a whole team first (people, roles, repository, agent), see [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md). New to the platform? Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and follow the [tutorial](TUTORIAL-FIRST-FEATURE.md) first.
 
-Version 0.14, 2026-10-12. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
+Version 0.15, 2026-10-12. Written by Claude Code; kept in line with the platform and the handbook usage sections (Ch.13–15, Ch.18–20). Changes: the version history at the end.
 
 ---
 
@@ -42,8 +42,8 @@ npm install -g agentic-sdlc-cli
 sdlc --version
 ```
 
-- **Use the platform's version.** `sdlc --version` prints the release; install the one your platform runs (ask your operator), for example `npm install -g agentic-sdlc-cli@0.1.1`. To update: the same command with the new version.
-- **Trust.** Every version is published by this repository's GitHub Actions from a release tag, with npm provenance (npm shows the commit and the workflow that built it). The package has no dependencies: everything it needs is in one file, and `THIRD-PARTY-NOTICES` lists the bundled open-source packages.
+- **Use the platform's version.** `sdlc --version` prints the release; install the one your platform runs (ask your operator): `npm install -g agentic-sdlc-cli@<version>`, for example `@0.2.0`. To update: the same command with the new version.
+- **Trust.** From v0.2.0 on, every version is published by this repository's GitHub Actions from a release tag, with npm provenance (npm shows the commit and the workflow that built it). Version 0.1.1 was published by hand, without provenance. The package has no dependencies: everything it needs is in one file, and `THIRD-PARTY-NOTICES` lists the bundled open-source packages.
 - **Operator commands.** `sdlc ops …` is in the package too, but works only on the platform server, with `SDLC_DB_URL` ([deploy/README.md](deploy/README.md)).
 - To remove it: `npm uninstall -g agentic-sdlc-cli`.
 
@@ -83,7 +83,7 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
    | On the server itself | `http://127.0.0.1:8090` | The operator, if they changed the port |
    | On a team server, from your computer (team access, [deploy/README.md](deploy/README.md#team-access-operator)) | `https://<server name>:8443` | The operator; with a company or test certificate authority also its `ca.pem`: `export NODE_EXTRA_CA_CERTS=<path to ca.pem>` |
 
-   Plain `http://` works only for this machine; every other address is `https://`, and the certificate is always checked.
+   Plain `http://` works only for this machine; every other address is `https://`, and the certificate is always checked: never turn certificate checks off. Without team access, run `sdlc` on the server. Comment commands and reviews on GitHub work from anywhere.
 
    ```bash
    sdlc login --api-url http://127.0.0.1:8090
@@ -92,10 +92,9 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
    sdlc token create --name laptop
    ```
 
-   - **Where:** on the platform server the API is `http://127.0.0.1:8090`. From your own machine, use the team address the operator gives you, for example `sdlc login --api-url https://sdlc.example.internal:8443` (team access, [deploy README](deploy/README.md#team-access-operator)). If your machine does not trust the company's certificate authority, set `NODE_EXTRA_CA_CERTS` to the `ca.pem` file the operator gives you; never turn certificate checks off. Without team access, run `sdlc` on the server. Comment commands and reviews on GitHub work from anywhere.
    - **Log in:** `sdlc login` asks for the API token at a hidden prompt.
    - **Check:** `sdlc doctor` checks your login and the API (TLS, your API token and when it ends, your roles, the CLI's version against the API's) and says what to fix. It changes nothing and never prints your token.
-   - **Your own token:** `sdlc token create --name laptop` prints a new token once. Log in again with it.
+   - **Your own token:** the first token a tenant admin issues for you lives at most 7 days. `sdlc token create --name laptop` prints a new token of your own once. Log in again with it.
    - **Revoke the first token:** `sdlc token list`, then `sdlc token revoke --id <ID>`. Details: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command).
 3. **The project AI record** (the client's recorded consent to AI use) must allow the data class of your work (how sensitive its information is). Person A or the PM / BrSE writes it once per project with `sdlc ai-record set …` ([handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#ai-record)); check it with `sdlc ai-record show --project <slug>`. Without it, intents cannot enter G1.
 
@@ -236,7 +235,7 @@ Every command takes `--json`. Exit code 0 means done; 4 means log in again with 
 
 ### The dashboard (read only)
 
-The dashboard shows intents by gate, escalations, cost and gate waiting times; it decides nothing yet. With a GitHub sign-in and actions on, add a **passkey** there within 5 minutes of signing in: the dashboard will ask for it before each decision made there (coming with task U07). Where to open it, how to sign in, passkeys and what each screen shows: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only).
+The dashboard shows intents by gate, escalations, cost and gate waiting times; it decides nothing yet. Its address: on the platform machine `http://localhost:8090/dashboard/` (write `localhost`, not `127.0.0.1`: the GitHub sign-in needs it); from another machine, through team access, `https://<server name>:8443/dashboard/`. With a GitHub sign-in and actions on, add a **passkey** there within 5 minutes of signing in: the dashboard will ask for it before each decision made there (coming with task U07). Where to open it, how to sign in, passkeys and what each screen shows: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only).
 
 ## 5. When something goes wrong
 
@@ -290,6 +289,7 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 | 0.5 | 2026-10-09 | Docs review PR C2: steps 3–8 and §4–§6 link to the handbook sections for the spec, the plan, budgets, the kill switch, G5, G6, G7, the Evidence Pack, G8 and escalations; change flags: G3 and G7 have two lists |
 | 0.6 | 2026-10-09 | Docs review fixes: the login example, the AI record command, G2 approvers, the plan file format, what reject and request-changes do at each gate |
 | 0.7 | 2026-10-09 | Docs review E2: §1 and §7 link to the handbook sections |
+| 0.15 | 2026-10-12 | Docs review for v0.2.0: §2 the npm version is the platform's, provenance from v0.2.0 on, the first token lives at most 7 days, one place for the address; §4 the dashboard's address |
 | 0.14 | 2026-10-12 | Task U06: §4, passkeys in the dashboard |
 | 0.13 | 2026-10-12 | Task V07: `sdlc doctor`, check your login and the API (§2, §4, §5) |
 | 0.12 | 2026-10-10 | Task V06: `sdlc next <INT>`, what to do now (§3, §4, §5) |

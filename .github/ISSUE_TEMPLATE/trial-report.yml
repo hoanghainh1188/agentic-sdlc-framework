@@ -13,7 +13,7 @@ body:
     id: version
     attributes:
       label: Platform version
-      description: The release or commit you deployed, for example v0.1.0.
+      description: The release or commit you deployed, for example v0.2.0.
     validations:
       required: true
   - type: dropdown

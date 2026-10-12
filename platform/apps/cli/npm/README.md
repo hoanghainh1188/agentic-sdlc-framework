@@ -40,6 +40,8 @@ sdlc login --api-url <address from step 2>
 
 `sdlc login` asks for the token and does not show it while you type. It checks the token with the platform before it saves the login (in `~/.config/sdlc/`, readable by you only). Never put the token on the command line.
 
+The first token a tenant admin issues for you lives at most 7 days. Once logged in, create your own (`sdlc token create --name laptop`), log in again with it, then revoke the first one (`sdlc token list`, `sdlc token revoke --id <ID>`).
+
 ## 4. Check, then start
 
 ```bash
@@ -61,7 +63,8 @@ sdlc next INT-2026-0001
 ## Good to know
 
 - The operator commands (`sdlc ops …`) work only on the platform server, with `SDLC_DB_URL`.
-- Every release is published from a tag of the repository by GitHub Actions, with npm provenance (npm shows the commit and the workflow that built it).
+- From v0.2.0 on, every release is published from a tag of the repository by GitHub Actions, with npm provenance (npm shows the commit and the workflow that built it). Version 0.1.1 was published by hand, without provenance.
+- The platform's web dashboard is at `<address from step 2>/dashboard/`; on the platform machine itself use `http://localhost:8090/dashboard/` (`localhost`, not `127.0.0.1`, for the GitHub sign-in).
 - To update: `npm install -g agentic-sdlc-cli@<new version>`. To remove: `npm uninstall -g agentic-sdlc-cli`.
 
 MIT licence. The bundled third-party packages and their licences are listed in `THIRD-PARTY-NOTICES`.

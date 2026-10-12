@@ -374,7 +374,7 @@ People on other machines of the company LAN use the CLI and the dashboard throug
 4. **Start** with the profiles you use and `access` in the same call, for example `platform/deploy/scripts/up.sh core models platform sandbox access` (development: `pnpm compose:access`). `up.sh` checks the settings first (the bind address, the host name, the network `access`, `SDLC_API_TRUSTED_PROXY`, the public origin, the certificate) and starts nothing when one is wrong; a certificate ending within 30 days only warns.
 5. **Check**: `pnpm doctor` (the `access.*` lines), then from another machine `curl --cacert ca.pem https://sdlc.example.internal:8443/health/ready`.
 
-**People** set `SDLC_API_URL=https://sdlc.example.internal:8443` for `sdlc login`, and, when the company CA is not in their system, `NODE_EXTRA_CA_CERTS=<path to ca.pem>` (never `NODE_TLS_REJECT_UNAUTHORIZED=0`); the dashboard is at `https://sdlc.example.internal:8443/dashboard/` ([USER-GUIDE §2](../USER-GUIDE.md#account-and-login), handbook Ch.19 §19.8c). `sdlc doctor` names `NODE_EXTRA_CA_CERTS` when it cannot verify the certificate.
+**People** sign in with `sdlc login --api-url https://sdlc.example.internal:8443`, and, when the company CA is not in their system, set `NODE_EXTRA_CA_CERTS=<path to ca.pem>` (never `NODE_TLS_REJECT_UNAUTHORIZED=0`); the dashboard is at `https://sdlc.example.internal:8443/dashboard/` ([USER-GUIDE §2](../USER-GUIDE.md#account-and-login), handbook Ch.19 §19.8c). `sdlc doctor` names `NODE_EXTRA_CA_CERTS` when it cannot verify the certificate.
 
 **Turn it off:** stop the proxy (`docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile access stop sdlc-access`), empty `SDLC_ACCESS_BIND_ADDR`, `SDLC_ACCESS_HOSTNAME` and `SDLC_API_TRUSTED_PROXY`, and set `SDLC_API_PUBLIC_ORIGIN` back if the sign-in is on.
 
@@ -603,7 +603,7 @@ A tag (`0.1.1`, `sha-<commit>`) never moves, but use the digest anyway: the plat
 
 ## Doctor (`pnpm doctor`)
 
-`pnpm doctor [--env <file>] [--json]` checks the deployment on the machine of the stack and prints one line per check (ok, warning, failed, skipped) with, under each problem, the command or the section of this guide or runbook T11 that fixes it (task V07, `design/QUESTIONS.md` #400–#404). The env file is `platform/deploy/.env` unless `--env` names another one (for example the trial stack's). The option is `--env`, not `--env-file`: Node.js reads `--env-file` itself and would load the secrets.
+`pnpm doctor [--env <file>] [--json]` checks the deployment on the machine of the stack and prints one line per check (ok, warning, failed, skipped) with, under each problem, the command or the section of this guide or runbook T11 that fixes it (task V07, `design/QUESTIONS.md` #400–#404). The env file is `platform/deploy/.env` (the trial stack uses it too) unless `--env` names another one. The option is `--env`, not `--env-file`: Node.js reads `--env-file` itself and would load the secrets.
 
 | Check | What it reads |
 |---|---|
