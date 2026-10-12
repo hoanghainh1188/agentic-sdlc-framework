@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- The npm page of `agentic-sdlc-cli` (its README) and USER-GUIDE §2: `sdlc` is a client that needs a running platform (links to the trial and the fresh deployment), which address to use where the platform runs (`http://127.0.0.1:8090` on the same machine, `https://<server name>:8443` through team access, `NODE_EXTRA_CA_CERTS` for a company CA), where the token comes from, and `sdlc doctor` and `sdlc next` as the first commands. The npm page changes with the next published version. Documentation only.
+
 ### Fixed
 - The release workflows (`release-images.yml`, `release.yml`, `npm-publish.yml`) install cosign with `platform/tools/release/install-cosign.sh` instead of `sigstore/cosign-installer`: the official binary, checked against a SHA-256 pinned in the script (amd64 and arm64), downloaded with retries for about three minutes. The action gave up after about 7 seconds of network errors, so v0.2.0's `npm-publish` failed three times on HTTP 504 while GitHub was degraded. Nothing to do on upgrade.
 

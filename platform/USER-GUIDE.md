@@ -75,6 +75,16 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
 1. **Account.** A tenant admin (who manages users, projects and roles for your company on the platform) creates your platform user, links your GitHub account (by its numeric ID) and gives you your roles on the project. Ask them; you cannot give roles to yourself.
 2. **API token and login.** You get a first API token (`sdlc_pat_…`) from the tenant admin. Keep it in your password manager, never in chat or a ticket.
 
+   The address (`--api-url`) depends on where the platform runs:
+
+   | Where the platform runs | Address | Who tells you |
+   |---|---|---|
+   | On your own machine (`pnpm trial:up`, a development stack) | `http://127.0.0.1:8090` | Nobody: the default. After `pnpm trial:up` you are already logged in |
+   | On the server itself | `http://127.0.0.1:8090` | The operator, if they changed the port |
+   | On a team server, from your computer (team access, [deploy/README.md](deploy/README.md#team-access-operator)) | `https://<server name>:8443` | The operator; with a company or test certificate authority also its `ca.pem`: `export NODE_EXTRA_CA_CERTS=<path to ca.pem>` |
+
+   Plain `http://` works only for this machine; every other address is `https://`, and the certificate is always checked.
+
    ```bash
    sdlc login --api-url http://127.0.0.1:8090
    sdlc whoami
