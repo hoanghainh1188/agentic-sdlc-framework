@@ -27,6 +27,10 @@ export interface ResolvedWebSession {
   readonly userId: string;
   readonly sessionId: string;
   readonly lastSeenAt: Date;
+  /** When the person signed in with GitHub (U06: a passkey is registered within 5 minutes). */
+  readonly createdAt: Date;
+  /** SHA-256 of the session's CSRF token (U06); null for a session made before U06. */
+  readonly csrfSha256: string | null;
 }
 
 /** An escalation whose clock is due (task B11): IDs only. */
@@ -393,7 +397,14 @@ export class SystemScope {
             .onRef('i.user_id', '=', 's.user_id'),
         )
         .innerJoin('tenants as tn', 'tn.id', 's.tenant_id')
-        .select(['s.id as session_id', 's.tenant_id', 's.user_id', 's.last_seen_at'])
+        .select([
+          's.id as session_id',
+          's.tenant_id',
+          's.user_id',
+          's.last_seen_at',
+          's.created_at',
+          's.csrf_sha256',
+        ])
         .where('s.secret_sha256', '=', secretHash)
         .where('s.revoked_at', 'is', null)
         .where('s.expires_at', '>', now)
@@ -409,6 +420,8 @@ export class SystemScope {
           userId: row.user_id,
           sessionId: row.session_id,
           lastSeenAt: row.last_seen_at,
+          createdAt: row.created_at,
+          csrfSha256: row.csrf_sha256,
         }
       : undefined;
   }

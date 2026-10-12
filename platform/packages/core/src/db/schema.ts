@@ -553,6 +553,11 @@ export interface WebSessionsTable {
   identity_id: Immutable<string>;
   /** SHA-256 of the session secret, lowercase hex. The secret itself is never stored. */
   secret_sha256: Immutable<string>;
+  /**
+   * SHA-256 of the session's CSRF token (U06, migration 0028, QUESTIONS #410); null for sessions
+   * made before U06, which can only read. Fixed (trigger SDA18).
+   */
+  csrf_sha256: ColumnType<string | null, string | null | undefined, never>;
   /** Only grows (trigger SDA18); the idle timeout counts from it. */
   last_seen_at: ColumnType<Date, Date, Date>;
   /** The absolute end of the session. */
@@ -561,6 +566,58 @@ export interface WebSessionsTable {
   end_reason: ColumnType<WebSessionEndReason | null, never, WebSessionEndReason>;
   created_at: CreatedAt;
 }
+
+/** A person's passkey (U06, migration 0028, ADR-M73 §2.4). Keys, codes and times only. */
+export interface WebauthnCredentialsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  user_id: Immutable<string>;
+  /** The WebAuthn credential ID, base64url. Never in the audit log. */
+  credential_id: Immutable<string>;
+  /** The COSE public key. */
+  public_key: Immutable<Buffer>;
+  /** COSE algorithm: -7 (ES256), -8 (EdDSA), -257 (RS256). */
+  algorithm: Immutable<number>;
+  /**
+   * The authenticator's signature counter (0 to 2^32 − 1); only grows (trigger SDA20). bigint:
+   * `pg` returns int8 as a string.
+   */
+  sign_count: ColumnType<string, number | undefined, number>;
+  /** The authenticator model (a UUID, never free text); null when unknown. */
+  aaguid: ColumnType<string | null, string | null | undefined, never>;
+  last_used_at: ColumnType<Date | null, never, Date>;
+  revoked_at: ColumnType<Date | null, never, Date>;
+  revoked_by: ColumnType<string | null, never, string>;
+  created_at: CreatedAt;
+}
+
+/** What a passkey challenge is for (U06). */
+export type PasskeyChallengePurpose = 'register' | 'step_up';
+
+/**
+ * One passkey challenge (U06, migration 0028, ADR-M73 §2.4, QUESTIONS #411): only its hash, the
+ * session, and for a step-up the action it is bound to. Only `used_at` changes, once (SDA19).
+ */
+export interface PasskeyChallengesTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  user_id: Immutable<string>;
+  session_id: Immutable<string>;
+  purpose: Immutable<PasskeyChallengePurpose>;
+  action: NullableImmutable<string>;
+  intent_id: NullableImmutable<string>;
+  escalation_id: NullableImmutable<string>;
+  gate: NullableImmutable<GateCode>;
+  decision: NullableImmutable<string>;
+  expected_input_sha256: NullableImmutable<string>;
+  request_sha256: NullableImmutable<string>;
+  challenge_sha256: Immutable<string>;
+  expires_at: Immutable<Date>;
+  used_at: ColumnType<Date | null, never, Date>;
+  created_at: Immutable<Date>;
+}
+
+type NullableImmutable<T> = ColumnType<T | null, T | null | undefined, never>;
 
 /** Why a session ended (`web_session.ended`). */
 export type WebSessionEndReason =
@@ -703,6 +760,8 @@ export interface Database {
   tenant_role_bindings: TenantRoleBindingsTable;
   agent_approvals: AgentApprovalsTable;
   web_sessions: WebSessionsTable;
+  webauthn_credentials: WebauthnCredentialsTable;
+  passkey_challenges: PasskeyChallengesTable;
 }
 
 export type TableName = keyof Database;
@@ -1156,6 +1215,39 @@ export const TABLE_COLUMNS = {
     'revoked_at',
     'end_reason',
     'created_at',
+    'csrf_sha256',
+  ]),
+  webauthn_credentials: columns<WebauthnCredentialsTable>()([
+    'id',
+    'tenant_id',
+    'user_id',
+    'credential_id',
+    'public_key',
+    'algorithm',
+    'sign_count',
+    'aaguid',
+    'last_used_at',
+    'revoked_at',
+    'revoked_by',
+    'created_at',
+  ]),
+  passkey_challenges: columns<PasskeyChallengesTable>()([
+    'id',
+    'tenant_id',
+    'user_id',
+    'session_id',
+    'purpose',
+    'action',
+    'intent_id',
+    'escalation_id',
+    'gate',
+    'decision',
+    'expected_input_sha256',
+    'request_sha256',
+    'challenge_sha256',
+    'expires_at',
+    'used_at',
+    'created_at',
   ]),
 } as const satisfies { [T in TableName]: ColumnList<Database[T]> };
 
@@ -1195,6 +1287,8 @@ export const TENANT_COLUMN = {
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
   web_sessions: 'tenant_id',
+  webauthn_credentials: 'tenant_id',
+  passkey_challenges: 'tenant_id',
 } as const satisfies { [T in TableName]: keyof Database[T] & string };
 
 export type Tenant = Selectable<TenantsTable>;
@@ -1206,6 +1300,8 @@ export type UserIdentity = Selectable<UserIdentitiesTable>;
 export type RoleBinding = Selectable<RoleBindingsTable>;
 export type ApiToken = Selectable<ApiTokensTable>;
 export type WebSession = Selectable<WebSessionsTable>;
+export type WebauthnCredential = Selectable<WebauthnCredentialsTable>;
+export type PasskeyChallenge = Selectable<PasskeyChallengesTable>;
 export type GitEventCursor = Selectable<GitEventCursorsTable>;
 export type AuditLogRow = Selectable<AuditLogTable>;
 export type Intent = Selectable<IntentsTable>;

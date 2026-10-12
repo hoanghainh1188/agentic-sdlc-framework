@@ -48,8 +48,14 @@ export type Me = z.infer<typeof meSchema>;
 export const endedSessionsSchema = z.object({ ended: z.number().int().min(0).max(1_000_000) });
 export type EndedSessions = z.infer<typeof endedSessionsSchema>;
 
-/** `GET /v1/auth/config` (U05): is dashboard sign-in with GitHub on? */
-export const authConfigSchema = z.object({ github: z.boolean() });
+/**
+ * `GET /v1/auth/config` (U05): is dashboard sign-in with GitHub on? U06: are actions on
+ * (`SDLC_API_DASHBOARD_ACTIONS`)? Absent from an older API: off.
+ */
+export const authConfigSchema = z.object({
+  github: z.boolean(),
+  actions: z.boolean().optional().default(false),
+});
 export type AuthConfig = z.infer<typeof authConfigSchema>;
 
 export const intentSchema = z.object({
@@ -569,3 +575,29 @@ export const evidenceHoldListSchema = z.object({
   active: evidenceHoldSchema.nullable(),
   history: z.array(evidenceHoldSchema).max(10_000),
 });
+
+/**
+ * `GET /v1/auth/session` (U06, ADR-M73 §2.3): the session's CSRF token, kept in memory and sent in
+ * `X-SDLC-CSRF` with every write; when the person signed in; are actions on.
+ */
+export const webSessionSchema = z.object({
+  csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  signed_in_at: z.string().max(40),
+  actions: z.boolean(),
+});
+export type WebSessionView = z.infer<typeof webSessionSchema>;
+
+const UUID_TEXT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** One passkey (U06): IDs, the authenticator model and times; never the key. */
+export const passkeySchema = z.object({
+  id: z.string().regex(UUID_TEXT),
+  aaguid: z.string().regex(UUID_TEXT).nullable(),
+  created_at: z.string().max(40),
+  last_used_at: z.string().max(40).nullable(),
+  revoked_at: z.string().max(40).nullable(),
+});
+export type PasskeyView = z.infer<typeof passkeySchema>;
+
+/** `GET /v1/me/passkeys`, `GET /v1/admin/users/:user/passkeys` (U06). */
+export const passkeyListSchema = z.object({ items: z.array(passkeySchema).max(1000) });

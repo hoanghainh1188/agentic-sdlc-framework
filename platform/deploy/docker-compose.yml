@@ -651,6 +651,8 @@ services:
       # client secret is in OpenBao (kv/api/github-oauth, runbook T11 §5n).
       SDLC_API_WEB_SIGNIN: ${SDLC_API_WEB_SIGNIN:-off}
       SDLC_API_PUBLIC_ORIGIN: ${SDLC_API_PUBLIC_ORIGIN:-}
+      # Actions in the dashboard (U06, ADR-M73 §2.3): off by default; on needs the sign-in.
+      SDLC_API_DASHBOARD_ACTIONS: ${SDLC_API_DASHBOARD_ACTIONS:-off}
       # Team access (V09, ADR-M67 §2.5): the proxy's fixed address on `access`; only its
       # X-Forwarded-For counts. Empty (the default): no forwarded header is trusted.
       SDLC_API_TRUSTED_PROXY: ${SDLC_API_TRUSTED_PROXY:-}

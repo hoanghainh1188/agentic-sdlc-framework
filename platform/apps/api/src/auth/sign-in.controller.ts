@@ -4,6 +4,7 @@
 // - `GET  /v1/auth/config`                  public: is GitHub sign-in on?
 // - `GET  /v1/auth/github/start?tenant=…`   public: pre-login cookie, redirect to GitHub
 // - `GET  /v1/auth/github/callback`         public: session cookie, redirect to the dashboard
+// - `GET  /v1/auth/session`                 the session's CSRF token, for the page (U06)
 // - `POST /v1/auth/sign-out`                the session of this request ends
 // - `DELETE /v1/me/sessions`                sign out everywhere (every session of the caller)
 //
@@ -21,11 +22,11 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { endAllOwnWebSessions, endOwnWebSession } from '@sdlc/core';
+import { deriveCsrfToken, endAllOwnWebSessions, endOwnWebSession } from '@sdlc/core';
 
 import { ApiError } from '../errors/api-error.js';
 import { CLOCK, SIGN_IN } from '../tokens.js';
-import { Public, SessionWrite } from './auth.guard.js';
+import { Public, SessionAction } from './auth.guard.js';
 import {
   clearCookie,
   OAUTH_COOKIE,
@@ -62,6 +63,8 @@ export interface SignInEndpoints {
   readonly starts: RateLimiter;
   /** Callback requests per client address and minute. */
   readonly callbacks: RateLimiter;
+  /** `SDLC_API_DASHBOARD_ACTIONS=on` (U06, ADR-M73 §2.3). */
+  readonly actions: boolean;
 }
 
 const DASHBOARD = '/dashboard/';
@@ -80,7 +83,26 @@ export class SignInController {
   @Get('auth/config')
   @Header('Cache-Control', 'no-store')
   config(): Record<string, unknown> {
-    return { github: this.signIn !== undefined };
+    return { github: this.signIn !== undefined, actions: this.signIn?.actions === true };
+  }
+
+  /**
+   * U06 (ADR-M73 §2.3, QUESTIONS #410): the session's CSRF token, derived from the session cookie
+   * the guard just accepted; the page keeps it in memory and sends it in `X-SDLC-CSRF`. Only for
+   * a session: a token caller gets 404.
+   */
+  @Get('auth/session')
+  @Header('Cache-Control', 'no-store')
+  session(@CurrentPrincipal() p: Principal, @Req() request: Request): Record<string, unknown> {
+    const secret = readCookie(request.headers.cookie, SESSION_COOKIE);
+    if (p.credential.kind !== 'session' || secret === undefined || !this.signIn) {
+      throw new ApiError(404, 'not_found');
+    }
+    return {
+      csrf_token: deriveCsrfToken(secret),
+      signed_in_at: p.credential.signedInAt.toISOString(),
+      actions: this.signIn.actions,
+    };
   }
 
   @Public()
@@ -137,7 +159,7 @@ export class SignInController {
   }
 
   @Post('auth/sign-out')
-  @SessionWrite()
+  @SessionAction('always')
   @HttpCode(204)
   async signOut(
     @CurrentPrincipal() p: Principal,
@@ -149,7 +171,7 @@ export class SignInController {
   }
 
   @Delete('me/sessions')
-  @SessionWrite()
+  @SessionAction('always')
   async signOutEverywhere(
     @CurrentPrincipal() p: Principal,
     @Res({ passthrough: true }) reply: Reply,

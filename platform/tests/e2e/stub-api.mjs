@@ -8,7 +8,7 @@
 // callback (GitHub "approves" at once); the tenant `demo` signs in, any other is refused. The
 // cookies have the API's attributes; a request with a token and a cookie answers 400; sign-out
 // needs the session cookie and the `localhost` origin. No real GitHub, no secret.
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import http from 'node:http';
 import path from 'node:path';
 
@@ -102,12 +102,25 @@ function signIn(req, res, url) {
     redirect(res, '/dashboard/', [clear, sessionCookie(secret, 28_800)]);
     return true;
   }
+  // U06 (ADR-M73 §2.3): the session's CSRF token, derived from the secret as the api does.
+  const csrfOf = (secret) =>
+    createHmac('sha256', secret).update('sdlc-csrf-1', 'utf8').digest('base64url');
+  if (url.pathname === '/v1/auth/session' && req.method === 'GET') {
+    const secret = cookieOf(req, '__Host-sdlc_session');
+    if (!secret || !sessions.has(secret)) return (json(res, 401, error('session_ended')), true);
+    json(res, 200, {
+      csrf_token: csrfOf(secret),
+      signed_in_at: new Date().toISOString(),
+      actions: false,
+    });
+    return true;
+  }
   const writes = { '/v1/auth/sign-out': 'POST', '/v1/me/sessions': 'DELETE' };
   if (writes[url.pathname] === req.method) {
     const secret = cookieOf(req, '__Host-sdlc_session');
     if (!secret || !sessions.has(secret)) return (json(res, 401, error('session_ended')), true);
-    if (req.headers.origin !== LOCAL_ORIGIN) {
-      return (json(res, 403, error('session_write_not_allowed')), true);
+    if (req.headers.origin !== LOCAL_ORIGIN || req.headers['x-sdlc-csrf'] !== csrfOf(secret)) {
+      return (json(res, 403, error('csrf_refused')), true);
     }
     const ended = url.pathname === '/v1/me/sessions' ? sessions.size : 1;
     if (url.pathname === '/v1/me/sessions') sessions.clear();

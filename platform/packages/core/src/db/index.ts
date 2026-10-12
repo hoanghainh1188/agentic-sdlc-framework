@@ -115,5 +115,8 @@ export type {
   UserIdentity,
   WebSession,
   WebSessionEndReason,
+  WebauthnCredential,
+  PasskeyChallenge,
+  PasskeyChallengePurpose,
 } from './schema.js';
 export * from './vocabulary.js';

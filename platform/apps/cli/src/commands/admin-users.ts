@@ -12,6 +12,9 @@ import {
   adminUserListSchema,
   adminUserSchema,
   endedSessionsSchema,
+  passkeyListSchema,
+  passkeySchema,
+  type PasskeyView,
   type AdminIdentityView,
   type AdminTenantRoleView,
   type AdminUserView,
@@ -143,6 +146,34 @@ export const USER_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
       );
     },
   },
+  // U06 (ADR-M73 §2.4, QUESTIONS #414): a person's dashboard passkeys; a tenant admin may remove
+  // one (for example a lost device). People add passkeys in the dashboard only.
+  'passkey list': {
+    options: { ...user, ...all },
+    required: ['user'],
+    run: async (call) => {
+      const list = await call.client.get(`${await userPath(call)}/passkeys`, passkeyListSchema);
+      const items =
+        call.values.all === true ? list.items : list.items.filter((i) => i.revoked_at === null);
+      return output(call, { items }, () => {
+        if (items.length === 0) say(call.ctx, 'cli.admin.api.none');
+        for (const item of items) say(call.ctx, 'cli.admin.passkey.line', passkeyParams(item));
+      });
+    },
+  },
+  'passkey revoke': {
+    options: { ...user, id: { type: 'string' } },
+    required: ['user', 'id'],
+    run: async (call) => {
+      const revoked = await call.client.delete(
+        `${await userPath(call)}/passkeys/${segment(str(call.values, 'id'))}`,
+        passkeySchema,
+      );
+      return output(call, revoked, () =>
+        say(call.ctx, 'cli.admin.passkey.revoked', passkeyParams(revoked)),
+      );
+    },
+  },
   'identity unlink': {
     options: { ...user, id: { type: 'string' } },
     required: ['user', 'id'],
@@ -271,5 +302,14 @@ function tenantRoleParams(item: AdminTenantRoleView): Record<string, string> {
     role: item.role,
     user_id: item.user_id,
     revoked: show(item.revoked_at),
+  };
+}
+
+function passkeyParams(item: PasskeyView): Record<string, string> {
+  return {
+    id: item.id,
+    created: item.created_at,
+    used: item.last_used_at ?? '-',
+    status: item.revoked_at === null ? 'active' : `revoked ${item.revoked_at}`,
   };
 }

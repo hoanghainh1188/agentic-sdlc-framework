@@ -1,7 +1,7 @@
 // D-08 U05 on a live PostgreSQL, through the Nest app and Fastify `inject()` (no port), with a fake
 // GitHub sign-in provider: the OAuth start and callback (state, PKCE, the pre-login cookie, one
 // refusal for every cause), the session cookie and its row (hashes only), the guard (token or
-// cookie, never both; reads only before U06), the timeouts, sign out, sign out everywhere, the
+// cookie, never both; since U06 writes only to marked routes, with the CSRF token), the timeouts, sign out, sign out everywhere, the
 // tenant admin's sign-out, the ends at disable and unlink, tenant isolation, the trigger, and no
 // secret in logs, audit or tables (design/ADR-M73 §2.2, QUESTIONS #385–#389).
 import { createHash } from 'node:crypto';
@@ -20,6 +20,7 @@ import { bootstrapTenant } from '../../../packages/core/src/admin/bootstrap.js';
 import { setUserActive, unlinkIdentity } from '../../../packages/core/src/admin/users.js';
 import { issueApiToken } from '../../../packages/core/src/admin/tokens.js';
 import { parseTenantId } from '../../../packages/core/src/db/tenant-id.js';
+import { deriveCsrfToken } from '../../../packages/core/src/web-sessions/index.js';
 import type { TenantScope } from '../../../packages/core/src/db/tenant-scope.js';
 import { createJsonLogger } from '../../../packages/core/src/observability/index.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
@@ -445,7 +446,7 @@ describeDb('U05: dashboard sign-in with GitHub and sessions', () => {
       expect(reply.json().error?.code).toBe('credentials_ambiguous');
     });
 
-    it('before U06 a session only reads: every other write is refused, even from the origin', async () => {
+    it('a session writes only to marked routes: every other write is refused, even from the origin (U06)', async () => {
       for (const [method, url] of [
         ['POST', '/v1/intents'],
         ['POST', '/v1/me/tokens'],
@@ -456,7 +457,11 @@ describeDb('U05: dashboard sign-in with GitHub and sessions', () => {
           app,
           method,
           url,
-          asSession(secret, { origin: ORIGIN, 'sec-fetch-site': 'same-origin' }),
+          asSession(secret, {
+            origin: ORIGIN,
+            'sec-fetch-site': 'same-origin',
+            'x-sdlc-csrf': deriveCsrfToken(secret),
+          }),
           {},
         );
         expect(reply.statusCode, url).toBe(403);
@@ -464,12 +469,13 @@ describeDb('U05: dashboard sign-in with GitHub and sessions', () => {
       }
     });
 
-    it('sign-out needs the public origin, then ends the session and clears the cookie', async () => {
+    it('sign-out needs the public origin and the CSRF token (U06), then ends the session and clears the cookie', async () => {
       const own = (await signIn('acme', people.alice!.github)).secret!;
       for (const headers of [
         {} as Record<string, string>,
         { origin: 'http://evil.example' },
-        { origin: ORIGIN, 'sec-fetch-site': 'cross-site' },
+        { origin: ORIGIN, 'sec-fetch-site': 'cross-site', 'x-sdlc-csrf': deriveCsrfToken(own) },
+        { origin: ORIGIN },
       ]) {
         const reply = await inject(app, 'POST', '/v1/auth/sign-out', asSession(own, headers));
         expect(reply.statusCode).toBe(403);
@@ -478,7 +484,7 @@ describeDb('U05: dashboard sign-in with GitHub and sessions', () => {
         app,
         'POST',
         '/v1/auth/sign-out',
-        asSession(own, { origin: ORIGIN }),
+        asSession(own, { origin: ORIGIN, 'x-sdlc-csrf': deriveCsrfToken(own) }),
       );
       expect(reply.statusCode).toBe(204);
       expect(cookiesOf(reply)).toContain(
@@ -576,8 +582,14 @@ describeDb('U05: dashboard sign-in with GitHub and sessions', () => {
       expect(reply.statusCode).toBe(401);
       expect(reply.json().error?.code).toBe('unauthorized');
       expect((await inject(off, 'GET', '/v1/auth/github/start?tenant=acme')).statusCode).toBe(404);
-      expect((await inject(off, 'GET', '/v1/auth/config')).json()).toEqual({ github: false });
-      expect((await inject(app, 'GET', '/v1/auth/config')).json()).toEqual({ github: true });
+      expect((await inject(off, 'GET', '/v1/auth/config')).json()).toEqual({
+        github: false,
+        actions: false,
+      });
+      expect((await inject(app, 'GET', '/v1/auth/config')).json()).toEqual({
+        github: true,
+        actions: false,
+      });
     });
   });
 
@@ -590,7 +602,7 @@ describeDb('U05: dashboard sign-in with GitHub and sessions', () => {
         app,
         'DELETE',
         '/v1/me/sessions',
-        asSession(one, { origin: ORIGIN }),
+        asSession(one, { origin: ORIGIN, 'x-sdlc-csrf': deriveCsrfToken(one) }),
       );
       expect(reply.statusCode).toBe(200);
       expect(reply.json()).toEqual({ ended: 2 });
