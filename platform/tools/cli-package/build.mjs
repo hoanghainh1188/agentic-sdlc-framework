@@ -28,7 +28,10 @@ const EXTERNAL = ['pg-native', 'pg-cloudflare'];
 /** The root package.json version and `PLATFORM_VERSION` must be equal (one release, one number). */
 async function releaseVersion() {
   const root = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'));
-  const source = await readFile(path.join(CLI, 'src', 'version.ts'), 'utf8');
+  const source = await readFile(
+    path.join(ROOT, 'platform', 'packages', 'api-schemas', 'src', 'version.ts'),
+    'utf8',
+  );
   const match = /PLATFORM_VERSION = '([^']+)'/.exec(source);
   if (match?.[1] !== root.version) {
     throw new Error(

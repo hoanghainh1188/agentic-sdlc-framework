@@ -1,3 +1,3 @@
-// The platform's release version, as the root `package.json` names it. `sdlc trial report` puts it
-// in the report (task V01, ADR-M65). A test keeps the two equal; change both for a release.
-export const PLATFORM_VERSION = '0.1.1';
+// The platform's release version (task V01, ADR-M65; V05 `sdlc --version`). One source since V07
+// (QUESTIONS #401): `@sdlc/api-schemas`, shared with the API's `GET /v1/me`.
+export { PLATFORM_VERSION } from '@sdlc/api-schemas';

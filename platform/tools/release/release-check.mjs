@@ -55,7 +55,7 @@ function checkVersions(root, version, errors) {
     if (found !== version)
       errors.push(`package_version: package.json has ${found}, the tag ${version}`);
   }
-  const src = readFile(root, 'platform/apps/cli/src/version.ts', errors);
+  const src = readFile(root, 'platform/packages/api-schemas/src/version.ts', errors);
   if (src !== null) {
     const found = /PLATFORM_VERSION = '([^']*)'/.exec(src)?.[1];
     if (found !== version) {
