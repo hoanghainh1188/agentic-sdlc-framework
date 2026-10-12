@@ -202,11 +202,11 @@ describe('sdlc doctor: the checks (pure)', () => {
 
   it('compares the versions; an unknown or odd version is never put into a command', () => {
     const differs = byId(
-      evaluate(facts({ me: { ok: true, value: me({ platform_version: '0.2.0' }) } })),
+      evaluate(facts({ me: { ok: true, value: me({ platform_version: '9.9.9' }) } })),
     );
     expect(differs['cli.version']).toMatchObject({
       status: 'warning',
-      fix: { key: 'cli.doctor.fix.version', params: { api: '0.2.0' } },
+      fix: { key: 'cli.doctor.fix.version', params: { api: '9.9.9' } },
     });
     for (const odd of [undefined, '1.0.0; rm -rf ~', '$(id)']) {
       const value = me(odd === undefined ? {} : { platform_version: odd });
