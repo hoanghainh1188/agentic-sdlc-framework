@@ -1,0 +1,405 @@
+// `pnpm doctor`, the checks (D-08 V07 AC1, AC3, AC4): pure functions on facts, no host. A stopped
+// stack, a sealed OpenBao and a missing env file give `skipped` lines with the reason; every
+// warning and failure names its fix; every text exists in the catalog with its parameters.
+import { catalogFor, placeholdersOf } from '@sdlc/messages';
+import { describe, expect, it } from 'vitest';
+
+import { evaluate } from '../../deploy/doctor/src/checks/index.js';
+import {
+  parseAppRole,
+  parseOpenBaoStatus,
+  parsePs,
+  parseValkeyMemory,
+  parseWorkerGitHub,
+} from '../../deploy/doctor/src/host.js';
+import { renderText } from '../../deploy/doctor/src/render.js';
+import { CHECK_IDS, type CheckResult, type OperatorFacts } from '../../deploy/doctor/src/types.js';
+import { GIB, healthyFacts, inDays, MANIFEST, NOW, RUNNING, service } from './fixtures.js';
+
+const of = (results: readonly CheckResult[], id: string, subject?: string) =>
+  results.filter((r) => r.id === id && (subject === undefined || r.subject === subject));
+const one = (results: readonly CheckResult[], id: string, subject?: string) => {
+  const found = of(results, id, subject);
+  expect(found).toHaveLength(1);
+  return found[0] as CheckResult;
+};
+
+describe('pnpm doctor: the checks', () => {
+  it('a healthy deployment: every check ok, in the order of CHECK_IDS', () => {
+    const results = evaluate(healthyFacts());
+    expect(results.filter((r) => r.status !== 'ok')).toEqual([]);
+    const order = [...new Set(results.map((r) => r.id))];
+    expect(order).toEqual([...CHECK_IDS]);
+  });
+
+  it('every text and fix exists in the catalog with the parameters it uses', () => {
+    const catalog = catalogFor('en') as Readonly<Record<string, string>>;
+    const variants: OperatorFacts[] = [
+      healthyFacts(),
+      healthyFacts({ docker: null }),
+      healthyFacts({ services: [] }),
+      healthyFacts({ services: null }),
+      healthyFacts({ openbao: 'sealed', github: undefined }),
+      healthyFacts({ envFile: { path: '/x/.env', exists: false, mode: null } }),
+      healthyFacts({
+        approles: [{ service: 'sdlc-api', credentials: 'api-credentials', state: 'missing' }],
+        logs: {
+          events: ['worker.evidence_missing', 'worker.cost_sync_gap', 'openbao.sealed'],
+          started: [],
+        },
+        github: { ok: false, error: 'not_built' },
+        migrations: { expected: ['0001-a', '0002-b'], applied: null },
+        projects: null,
+        valkey: null,
+        imagesMode: 'failed',
+      }),
+    ];
+    for (const facts of variants) {
+      for (const r of evaluate(facts)) {
+        for (const item of [r.text, r.fix].filter((x) => x !== undefined)) {
+          expect(Object.hasOwn(catalog, item.key), item.key).toBe(true);
+          for (const name of placeholdersOf(catalog[item.key] ?? '')) {
+            expect(Object.keys(item.params ?? {}), `${item.key}: ${name}`).toContain(name);
+          }
+        }
+        if (r.status === 'warning' || r.status === 'failed') expect(r.fix, r.id).toBeDefined();
+      }
+    }
+  });
+
+  it('no Docker: fails host.docker and skips the stack checks (never crashes)', () => {
+    const results = evaluate(healthyFacts({ docker: null, services: undefined }));
+    expect(one(results, 'host.docker').status).toBe('failed');
+    for (const id of ['services.health', 'openbao.state', 'db.migrations', 'github.app']) {
+      expect(
+        of(results, id).every((r) => r.status === 'skipped'),
+        id,
+      ).toBe(true);
+    }
+  });
+
+  it('an old docker compose fails', () => {
+    const facts = healthyFacts({
+      docker: { serverVersion: '27', composeVersion: '2.20.0', memoryBytes: 16 * GIB },
+    });
+    expect(one(evaluate(facts), 'host.docker').status).toBe('failed');
+  });
+
+  it('little memory and disk: warning; very little disk: failed', () => {
+    const facts = healthyFacts({
+      docker: { serverVersion: '29', composeVersion: '2.30.0', memoryBytes: 4 * GIB },
+      disk: [
+        { path: '/a', freeBytes: 10 * GIB },
+        { path: '/b', freeBytes: 1 * GIB },
+      ],
+    });
+    const results = evaluate(facts);
+    expect(one(results, 'host.memory').status).toBe('warning');
+    expect(one(results, 'host.disk', '/a').status).toBe('warning');
+    expect(one(results, 'host.disk', '/b').status).toBe('failed');
+  });
+
+  it('the env file: missing, readable by others, unset secrets (names only)', () => {
+    const missing = evaluate(
+      healthyFacts({
+        envFile: { path: '/x/.env', exists: false, mode: null },
+        services: undefined,
+      }),
+    );
+    expect(one(missing, 'env.file')).toMatchObject({
+      status: 'failed',
+      fix: { key: 'doctor.fix.compose_env' },
+    });
+    expect(one(missing, 'openbao.tls_files').status).toBe('skipped');
+    const open = evaluate(
+      healthyFacts({
+        envFile: {
+          path: '/x/.env',
+          exists: true,
+          mode: 0o100644,
+          facts: { values: {}, secrets: { A_PASSWORD: 'placeholder', B_KEY: 'empty', C: 'set' } },
+        },
+      }),
+    );
+    expect(one(open, 'env.file')).toMatchObject({
+      status: 'failed',
+      fix: { key: 'doctor.fix.chmod' },
+    });
+    expect(one(open, 'env.secrets')).toMatchObject({
+      status: 'failed',
+      text: { params: { names: 'A_PASSWORD, B_KEY' } },
+    });
+  });
+
+  it('a stopped stack: a warning, and the checks that need it are skipped (AC3)', () => {
+    const results = evaluate(healthyFacts({ services: [] }));
+    expect(one(results, 'services.health').status).toBe('warning');
+    for (const id of [
+      'openbao.state',
+      'db.migrations',
+      'credentials.approle',
+      'valkey.memory',
+      'sandbox.image',
+    ]) {
+      expect(one(results, id)).toMatchObject({
+        status: 'skipped',
+        text: { key: 'doctor.skipped.stopped' },
+      });
+    }
+    // The TLS files are on the host: checked also when the stack is stopped.
+    expect(one(results, 'openbao.tls_files').status).toBe('ok');
+  });
+
+  it('services: unhealthy, restarting, a failed job, a core service not running', () => {
+    const services = [
+      ...RUNNING.filter((s) => s.service !== 'temporal' && s.service !== 'litellm'),
+      service('litellm', { health: 'unhealthy' }),
+      service('temporal-schema', { state: 'exited', health: '', exitCode: 1 }),
+    ];
+    const results = evaluate(healthyFacts({ services }));
+    expect(one(results, 'services.health', 'litellm').status).toBe('failed');
+    expect(one(results, 'services.health', 'temporal-schema').status).toBe('failed');
+    const absent = of(results, 'services.health').find(
+      (r) => r.text.key === 'doctor.services.core_absent',
+    );
+    expect(absent).toMatchObject({ status: 'warning', text: { params: { names: 'temporal' } } });
+  });
+
+  it('OpenBao sealed: failed with the unseal fix; the GitHub check is skipped', () => {
+    const results = evaluate(healthyFacts({ openbao: 'sealed', github: undefined }));
+    expect(one(results, 'openbao.state')).toMatchObject({
+      status: 'failed',
+      fix: { key: 'doctor.fix.unseal' },
+    });
+    expect(one(results, 'github.app')).toMatchObject({
+      status: 'skipped',
+      text: { key: 'doctor.skipped.openbao_sealed' },
+    });
+  });
+
+  it('TLS: a missing file fails; a certificate within 30 days warns; an ended one fails', () => {
+    const results = evaluate(
+      healthyFacts({
+        tls: {
+          dir: '/t',
+          missing: ['server-key.pem'],
+          certs: [
+            { name: 'ca', notAfter: inDays(10) },
+            { name: 'server', notAfter: inDays(-1) },
+          ],
+        },
+      }),
+    );
+    expect(one(results, 'openbao.tls_files').status).toBe('failed');
+    expect(one(results, 'openbao.tls_expiry', 'ca')).toMatchObject({
+      status: 'warning',
+      text: { params: { days: 10 } },
+    });
+    expect(one(results, 'openbao.tls_expiry', 'server').status).toBe('failed');
+  });
+
+  it('migrations: pending fails with the count and the first; unreadable warns', () => {
+    const pending = evaluate(
+      healthyFacts({
+        migrations: { expected: ['0001-a', '0002-b', '0003-c'], applied: ['0001-a'] },
+      }),
+    );
+    expect(one(pending, 'db.migrations')).toMatchObject({
+      status: 'failed',
+      text: { params: { count: 2, first: '0002-b' } },
+      fix: { key: 'doctor.fix.migrate' },
+    });
+    expect(
+      one(
+        evaluate(healthyFacts({ migrations: { expected: ['0001-a'], applied: null } })),
+        'db.migrations',
+      ).status,
+    ).toBe('warning');
+  });
+
+  it('AppRole credentials: missing fails, 80 days warns, 90 days fails, each with its command', () => {
+    const results = evaluate(
+      healthyFacts({
+        approles: [
+          { service: 'sdlc-api', credentials: 'api-credentials', state: 'missing' },
+          { service: 'sdlc-worker', credentials: 'worker-credentials', state: 'ok', ageDays: 85 },
+          { service: 'sdlc-runner', credentials: 'runner-credentials', state: 'ok', ageDays: 90 },
+          { service: 'litellm-agent', credentials: 'litellm-credentials', state: 'not_running' },
+        ],
+      }),
+    );
+    expect(one(results, 'credentials.approle', 'sdlc-api')).toMatchObject({
+      status: 'failed',
+      fix: { params: { command: 'api-credentials' } },
+    });
+    expect(one(results, 'credentials.approle', 'sdlc-worker').status).toBe('warning');
+    expect(one(results, 'credentials.approle', 'sdlc-runner').status).toBe('failed');
+    expect(of(results, 'credentials.approle', 'litellm-agent')).toEqual([]);
+  });
+
+  it('log events: one warning each with its credentials command; no start event: skipped', () => {
+    const results = evaluate(
+      healthyFacts({
+        logs: { events: ['api.evidence_missing', 'worker.runs_off'], started: ['sdlc-api'] },
+      }),
+    );
+    expect(one(results, 'credentials.logs', 'api.evidence_missing')).toMatchObject({
+      status: 'warning',
+      fix: { params: { command: 'api-evidence-credentials' } },
+    });
+    expect(one(results, 'credentials.logs', 'worker.runs_off').fix?.params).toMatchObject({
+      command: 'worker-credentials',
+    });
+    const quiet = evaluate(healthyFacts({ logs: { events: [], started: [] } }));
+    expect(one(quiet, 'credentials.logs')).toMatchObject({
+      status: 'skipped',
+      text: { key: 'doctor.skipped.no_start_events' },
+    });
+  });
+
+  it('the platform without the profile models: a warning', () => {
+    const results = evaluate(
+      healthyFacts({ services: RUNNING.filter((s) => s.service !== 'litellm-agent') }),
+    );
+    expect(one(results, 'models.litellm')).toMatchObject({
+      status: 'warning',
+      fix: { key: 'doctor.fix.models' },
+    });
+  });
+
+  it('Valkey at 90 % of its memory: a warning', () => {
+    const results = evaluate(
+      healthyFacts({ valkey: { usedBytes: 240 * 1024 ** 2, maxBytes: 256 * 1024 ** 2 } }),
+    );
+    expect(one(results, 'valkey.memory').status).toBe('warning');
+  });
+
+  it('GitHub: a missing permission fails, an uninstalled repository fails, "all repositories" warns', () => {
+    const noContents = Object.fromEntries(
+      Object.entries(MANIFEST).filter(([k]) => k !== 'contents'),
+    );
+    const results = evaluate(
+      healthyFacts({
+        github: {
+          ok: true,
+          app: { permissions: { ...MANIFEST, administration: 'write' } },
+          repos: [
+            { repo: 'acme/shop', installed: true, selection: 'selected', permissions: noContents },
+            { repo: 'acme/other', installed: false },
+            { repo: 'acme/all', installed: true, selection: 'all', permissions: { ...MANIFEST } },
+          ],
+        },
+      }),
+    );
+    expect(one(results, 'github.app', 'app')).toMatchObject({
+      status: 'warning',
+      text: { params: { permissions: 'administration:write' } },
+    });
+    expect(one(results, 'github.app', 'acme/shop')).toMatchObject({
+      status: 'failed',
+      text: { params: { permissions: 'contents:write' } },
+      fix: { key: 'doctor.fix.accept_permissions' },
+    });
+    expect(one(results, 'github.app', 'acme/other').status).toBe('failed');
+    expect(one(results, 'github.app', 'acme/all').status).toBe('warning');
+  });
+
+  it('GitHub: a worker image without the check says to rebuild; a stopped worker skips', () => {
+    expect(
+      one(evaluate(healthyFacts({ github: { ok: false, error: 'not_built' } })), 'github.app').fix
+        ?.key,
+    ).toBe('doctor.fix.rebuild_worker');
+    const stopped = evaluate(
+      healthyFacts({
+        github: undefined,
+        services: RUNNING.filter((s) => s.service !== 'sdlc-worker'),
+      }),
+    );
+    expect(one(stopped, 'github.app')).toMatchObject({
+      status: 'skipped',
+      text: { key: 'doctor.skipped.worker_stopped' },
+    });
+  });
+
+  it('sandbox images: absent warns; an invalid configuration warns', () => {
+    const results = evaluate(
+      healthyFacts({
+        projects: [
+          { project: 'a/x', image: `r/i@sha256:${'b'.repeat(64)}`, present: false },
+          { project: 'a/y', image: null, present: null },
+        ],
+      }),
+    );
+    expect(one(results, 'sandbox.image', 'a/x')).toMatchObject({
+      status: 'warning',
+      fix: { key: 'doctor.fix.sandbox_image' },
+    });
+    expect(one(results, 'sandbox.image', 'a/y').status).toBe('warning');
+  });
+
+  it('renders one line per check, a fix line under each problem, and a summary', () => {
+    const results = evaluate(healthyFacts({ openbao: 'sealed', github: undefined }));
+    const lines = renderText(results, '/srv/sdlc/.env');
+    expect(lines).toHaveLength(1 + results.length + results.filter((r) => r.fix).length + 1);
+    expect(lines.at(-1)).toMatch(/1 failed/);
+  });
+});
+
+describe('pnpm doctor: parsing command output', () => {
+  it('docker compose ps: an array or one object per line', () => {
+    const row = { Service: 'postgres', State: 'running', Health: 'healthy', ExitCode: 0 };
+    expect(parsePs(JSON.stringify([row]))).toEqual([
+      { service: 'postgres', state: 'running', health: 'healthy', exitCode: 0 },
+    ]);
+    expect(
+      parsePs(`${JSON.stringify(row)}\n${JSON.stringify({ ...row, Service: 'valkey' })}`),
+    ).toHaveLength(2);
+    expect(parsePs('')).toEqual([]);
+    expect(parsePs('not json')).toBeNull();
+  });
+
+  it('OpenBao status, Valkey memory, AppRole age', () => {
+    expect(parseOpenBaoStatus(0, 'bootstrap: OpenBao is sealed\n')).toBe('sealed');
+    expect(parseOpenBaoStatus(1, '')).toBe('unreachable');
+    expect(parseValkeyMemory('# Memory\r\nused_memory:1048576\r\nmaxmemory:268435456\r\n')).toEqual(
+      {
+        usedBytes: 1048576,
+        maxBytes: 268435456,
+      },
+    );
+    const tenDaysAgo = Math.floor((NOW.getTime() - 10 * 86_400_000) / 1000);
+    expect(parseAppRole(0, `${String(tenDaysAgo)}\n`, NOW)).toEqual({ state: 'ok', ageDays: 10 });
+    expect(parseAppRole(0, 'missing\n', NOW)).toEqual({ state: 'missing' });
+    expect(parseAppRole(0, 'garbage', NOW)).toEqual({ state: 'unreadable' });
+  });
+
+  it("the worker's answer: fields checked, odd values dropped", () => {
+    const answer = {
+      ok: true,
+      app: { permissions: { contents: 'write', 'Bad Name': 'write', issues: 'everything' } },
+      repos: [
+        { repo: 'acme/shop', installed: true, selection: 'all', permissions: { contents: 'read' } },
+        { repo: '../etc', installed: false },
+      ],
+    };
+    expect(parseWorkerGitHub(0, JSON.stringify(answer))).toEqual({
+      ok: true,
+      app: { permissions: { contents: 'write' } },
+      repos: [
+        { repo: 'acme/shop', installed: true, selection: 'all', permissions: { contents: 'read' } },
+      ],
+    });
+    expect(parseWorkerGitHub(0, '{"ok":false,"error":"openbao_sealed"}')).toEqual({
+      ok: false,
+      error: 'openbao_sealed',
+    });
+    expect(parseWorkerGitHub(0, '{"ok":false,"error":"Some Text With Spaces"}')).toEqual({
+      ok: false,
+      error: 'invalid_answer',
+    });
+    expect(parseWorkerGitHub(1, "Error: Cannot find module '/app/dist/doctor-github.js'")).toEqual({
+      ok: false,
+      error: 'not_built',
+    });
+  });
+});

@@ -214,6 +214,7 @@ Use this after a reboot, after Docker Desktop restarted, or when `sdlc-api` and 
 | 5 | When `main` has new code since the last start, rebuild the platform images and add new `.env` variables first (Step 11b part 1, items 2–3). Then start the rest: `platform/deploy/scripts/up.sh core models platform sandbox` (add `observability` for Langfuse) | The script ends without an error; Step 11b part 7 shows no missing credential |
 | 6 | `curl -s http://127.0.0.1:8090/health/ready` | Ready |
 | 7 | `pnpm sdlc whoami` (if the login was removed: `pnpm sdlc login --api-url http://127.0.0.1:8090`) | Shows your user |
+| 8 | 🤖 `pnpm doctor` (read only, prints no secret: Claude Code may run it), and `pnpm sdlc doctor` for your login | No `failed` line; each warning names its fix ([deploy/README, Doctor](deploy/README.md#doctor-pnpm-doctor)) |
 
 Start `core` alone first: `sdlc-api`, `sdlc-worker`, `sdlc-runner` and `litellm-agent` cannot become healthy while OpenBao is sealed, so `up.sh` with those profiles would wait until it times out.
 

@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.36. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.37. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -123,7 +123,7 @@ OpenBao's listener 8200 speaks TLS on every machine (task A10, `design/ADR-M63-o
 
 **Renewal (every year; the reminder 30 days before the end).**
 
-- `pnpm openbao:tls check` fails within 30 days of the end; `up.sh` prints a warning at every start. Put the end date in the team calendar with a reminder 30 days before.
+- `pnpm openbao:tls check` fails within 30 days of the end; `up.sh` prints a warning at every start; `pnpm doctor` shows both end dates (`openbao.tls_expiry`). Put the end date in the team calendar with a reminder 30 days before.
 - To renew: take the CA folder out of the safe, run `pnpm openbao:tls server <ca-folder>`, then `pnpm openbao:tls reload`. OpenBao reads the new certificate and **stays unsealed**; the clients keep working (same CA). Put the CA folder back; record it in the operations log.
 - A new CA (every 5 years, or after a leak): `pnpm openbao:tls ca` in a new folder, `server`, `reload`, then restart every client (`sdlc-api`, `sdlc-worker`, `sdlc-runner`, `litellm-agent`): they read `ca.pem` when they start.
 
@@ -132,7 +132,7 @@ OpenBao's listener 8200 speaks TLS on every machine (task A10, `design/ADR-M63-o
 1. The operator announces the restart in the internal channel.
 2. After the restart, `pnpm openbao:bootstrap status` says `sealed`. The platform processes cannot read secrets until OpenBao is unsealed.
 3. Two key holders run `pnpm openbao:bootstrap unseal` in turn, or one after the other in the same session. Each types their share at the hidden prompt. Remote access is allowed only over a secure connection (company VPN + SSH), never by sending the share to someone else.
-4. `status` says `unsealed`. Check that the platform processes reconnect.
+4. `status` says `unsealed`. Check that the platform processes reconnect: `pnpm doctor` (read only, prints no secret) shows the services, the credentials and the logs' missing credentials in one list ([deploy README, Doctor](../../platform/deploy/README.md#doctor-pnpm-doctor)).
 5. Record it in the operations log.
 
 A wrong share is refused and OpenBao stays sealed. To reset a half-finished unseal, restart the `openbao` container.
@@ -920,6 +920,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.37 | 2026-10-12 | Claude Code (task V07, PR 2) | Sections 3c and 4: `pnpm doctor` shows the certificates' end dates and checks the platform after an unseal |
 | 0.36 | 2026-10-10 | Claude Code (task U05) | New section 5n: the GitHub App's client secret for the dashboard's GitHub sign-in (`kv/api/github-oauth`, `pnpm openbao:bootstrap api-github-oauth-credentials`), turning sign-in on, rotation, signing everyone out (ADR-M73 §2.2, QUESTIONS #385–#389) |
 | 0.35 | 2026-10-09 | Claude Code (task A10, PR 2) | Sections 6 and 7 rewritten: `pnpm backup` (every database, OpenBao's snapshot through the AppRole `backup`, the volumes, the env file and the TLS folder, each encrypted with age to `SDLC_BACKUP_DIR`; QUESTIONS #326–#329), the systemd timer, `pnpm restore` into an empty stack and the drill. Tested with throw-away keys (`pnpm test:backup`) |
 | 0.34 | 2026-10-09 | Claude Code (task A10, PR 1) | New section 3c: TLS on 8200 everywhere (QUESTIONS #20, #325), the throw-away CA on development machines, the company CA on the server (`pnpm openbao:tls ca`, `server`), renewal without unsealing (`reload`), the 30-day reminder; section 5c and the troubleshooting rows. Tested with throw-away certificates (`pnpm test:openbao`, `tls.test.ts`) |
