@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task V09, PR 1, for review) |
+| Status | **Proposed** (task V09, PR 1, for review); version 0.2 after Harry's review of PR #301 |
 | Date | 2026-10-12 |
 | Decided by | Harry (V09 plan approved 2026-10-12 with the answers to QUESTIONS #405–#409, plus two changes: the proxy allows `/health/ready`, and the upgrade step for the fixed proxy address is written down) |
 | Related | D-08 task V09 (AC1–AC4); D-03 §9, §10, §10.1, §12 (version 1.41); ADR-M26 §2.7 (the api's per-address limits and `trustProxy`); ADR-M36 (the CLI's TLS rules); ADR-M54 (the dashboard, 127.0.0.1 only); ADR-M63 (OpenBao TLS, the internal CA); ADR-M73 (the dashboard's actions, `SDLC_API_PUBLIC_ORIGIN`, `__Host-` cookies); ADR-M66 (published images); D-08 V07 (`doctor`), U05–U07, O01, O03; QUESTIONS #405–#409 |
@@ -58,21 +58,20 @@ An allow-list; everything else answers `404`:
 ### 2.5. Forwarded addresses (QUESTIONS #408)
 
 - The proxy **overwrites** `X-Forwarded-For` with the TCP peer's address (`$remote_addr`) and clears `Forwarded`, so a client cannot choose the address the api sees.
-- The proxy has a **fixed address on the `sdlc` network**: `SDLC_ACCESS_PROXY_IP` (default `172.30.0.250`). The api trusts `X-Forwarded-For` **only from that address**: a new setting `SDLC_API_TRUSTED_PROXY` (one IPv4 address, empty by default) becomes Fastify's `trustProxy`. Without it, `trustProxy` stays `false` (ADR-M26 §2.7). The api's per-address limits then count each real client, not the proxy.
+- **A small network of its own** (Harry, PR #301 review): a new Compose network `access` (name `<project>-access`), with its own subnet `SDLC_ACCESS_NETWORK_SUBNET` (default `172.30.1.0/29`, which does not overlap the default `sdlc` subnet `172.30.0.0/24`) and an allocation range `SDLC_ACCESS_NETWORK_IP_RANGE` (default `172.30.1.0/30`: the gateway and the api only). **Only `sdlc-api` and `sdlc-access` join it.** The proxy is **not** on the `sdlc` network: it talks to the api only (`proxy_pass http://sdlc-api:8080` on `access`), so it cannot reach PostgreSQL, OpenBao, SeaweedFS or any other service.
+- The network is a normal bridge, not `internal`: Docker publishes a container's port only through a network that is not internal, and the proxy's port is its only reason to exist.
+- The proxy has a **fixed address in that network**, outside the allocation range: `SDLC_ACCESS_PROXY_IP` (default `172.30.1.6`). Docker gives the api an address from the range, so it never takes the proxy's.
+- The api trusts `X-Forwarded-For` **only from that address**: a new setting `SDLC_API_TRUSTED_PROXY` (one IPv4 address, empty by default) becomes Fastify's `trustProxy`. The proxy is the only other container on `access`. Without the setting, `trustProxy` stays `false` (ADR-M26 §2.7). The api's per-address limits then count each real client, not the proxy. Requests from the `sdlc` network and from the host (`127.0.0.1:8090`) are never trusted.
+- **`sdlc-api` joins `access` always**, not only with the profile. A Compose service cannot change its networks by profile without a second compose file, and the network is harmless: Compose creates it only when a service that uses it starts, it holds only the api until the proxy starts, and it changes nothing on the `sdlc` network. So the api's networks are the same with and without the profile; turning access on or off changes only two api settings (`SDLC_API_TRUSTED_PROXY`, `SDLC_API_PUBLIC_ORIGIN`).
 - `X-Forwarded-Proto` and `X-Forwarded-Host` are never used: the public origin is the configured `SDLC_API_PUBLIC_ORIGIN` (ADR-M73), never derived from a request.
-- Docker allocates container addresses from the low end of the subnet; so that it never takes the proxy's address, the network gets an allocation range: `ip_range: ${SDLC_NETWORK_IP_RANGE:-172.30.0.0/25}`. The proxy's address must be inside the subnet and outside that range; `up.sh` checks it. The subnet and the gateway do not change, so the AppRole secret IDs bound to the subnet (ADR-M19 §2.5) stay valid.
 - **Limit:** the proxy sees the real client address only when Docker keeps it. Docker on Linux with its default iptables port publishing keeps it; Docker Desktop and some rootless port drivers (O01) show one shared address, so every client would share one limit. The README names this; `pnpm doctor` cannot detect it.
 
-### 2.6. Upgrade of an existing stack: the network
+### 2.6. Existing stacks
 
-The allocation range (§2.5) changes the `sdlc` network's configuration. Docker cannot change a network that exists, so on a stack that was set up before V09 PR 2, Compose may refuse to start until the network is created again. This applies to every stack after the update, with or without the profile `access`. The operator, after the `git pull` of the release (README "Upgrade"):
-
-1. Stops everything: `pnpm compose:down`. This removes the containers and the Compose network `<project>-net` (`sdlc-net` by default). **The volumes are kept**: databases, buckets, OpenBao storage and the AppRole files stay. Never add `-v` and never run `docker volume prune` or `docker system prune --volumes`.
-2. Starts again as after a reboot (README "Restart after a reboot"): start `openbao`, `postgres`, `seaweedfs`; unseal OpenBao (two key holders); then `up.sh` with the usual profiles. Compose creates the network again with the same subnet and gateway and the new range.
-3. No credentials command is needed: the subnet is unchanged.
-4. An operator who set their own `SDLC_NETWORK_SUBNET` also sets `SDLC_NETWORK_IP_RANGE` and `SDLC_ACCESS_PROXY_IP` inside it before step 2; `up.sh` refuses an address outside the subnet or inside the range.
-
-PR 2's CHANGELOG "Upgrade notes" repeat these steps; `pnpm compose:down` also stops the profile `access` from PR 2 on.
+- **No network step.** The `sdlc` network does not change (subnet, gateway, no allocation range), so an existing stack needs no `down`, no new network and no unseal for V09. After updating to the release, the operator follows README "Upgrade" as usual; Compose creates the new network `<project>-access` when `sdlc-api` starts again with its new configuration.
+- The AppRole secret IDs bound to the `sdlc` subnet (ADR-M19 §2.5) stay valid: the api reaches OpenBao over `sdlc`, as before.
+- `up.sh` refuses to start when `SDLC_ACCESS_PROXY_IP` is outside `SDLC_ACCESS_NETWORK_SUBNET`, inside its allocation range or equal to its gateway, or when the access subnet overlaps `SDLC_NETWORK_SUBNET`. An operator who set their own `sdlc` subnet checks that `172.30.1.0/29` is free, or sets the access settings.
+- PR 2's CHANGELOG "Upgrade notes" say this: new settings, no network step; volumes are never touched.
 
 ### 2.7. Certificates (QUESTIONS #406)
 
@@ -96,8 +95,8 @@ PR 2's CHANGELOG "Upgrade notes" repeat these steps; `pnpm compose:down` also st
 
 ### 2.9. Tests
 
-- `pnpm test`: a static test of the compose file and the configuration template (one published service in the profile, its bind address, the pin, the hardening, the volume, TLS versions, no port 80, the headers, no CSP, `X-Forwarded-For` set to the peer, the zones, the body limit equal to the api's, the route allow-list including `/health/ready`); the api settings; the doctor checks with fake facts; the CLI probe's CA hint.
-- `pnpm test:access` (live, throw-away Compose project, throw-away OpenBao keys and CA), in the existing CI job `compose`: from a container on another Docker network, only the proxy answers; TLS verified with the CA and refused without it; plain HTTP refused; the routes (including `/health/ready`) and a `404` for others; the headers and the api's CSP unchanged; `413`, `429`, `421`; a spoofed `X-Forwarded-For` does not escape the api's limit; `sdlc whoami` through the proxy; a certificate renewal without a restart; a missing certificate stops the proxy.
+- `pnpm test`: a static test of the compose file and the configuration template (one published service in the profile, its bind address, the pin, the hardening, the volume, TLS versions, no port 80, the headers, no CSP, `X-Forwarded-For` set to the peer, the zones, the body limit equal to the api's, the route allow-list including `/health/ready`; the network `access`: its own subnet, only `sdlc-api` and `sdlc-access` on it, the proxy not on `sdlc`, its fixed address outside the allocation range); the api settings; the doctor checks with fake facts; the CLI probe's CA hint.
+- `pnpm test:access` (live, throw-away Compose project, throw-away OpenBao keys and CA), in the existing CI job `compose`: from a container on another Docker network, only the proxy answers; TLS verified with the CA and refused without it; plain HTTP refused; the routes (including `/health/ready`) and a `404` for others; the headers and the api's CSP unchanged; `413`, `429`, `421`; a spoofed `X-Forwarded-For` does not escape the api's limit; `sdlc whoami` through the proxy; a certificate renewal without a restart; a missing certificate stops the proxy; from the proxy container, PostgreSQL, OpenBao and SeaweedFS are unreachable.
 
 ## 3. Alternatives considered
 
@@ -110,13 +109,14 @@ PR 2's CHANGELOG "Upgrade notes" repeat these steps; `pnpm compose:down` also st
 | A redirect from HTTP to HTTPS | The request, and its token, already went in clear (§2.2) |
 | An IP address only, no host name | Passkeys refuse it (ADR-M73 §2.4) |
 | Trust `X-Forwarded-For` from any peer, or the whole subnet | Any container or host process could choose the address the api limits by |
+| The proxy on the `sdlc` network with a fixed address, kept free by an allocation range (`ip_range`) on `sdlc` (the first version of PR #301) | Changing `sdlc`'s configuration forces every existing stack to recreate its network (`down`, start again, unseal), for a feature most stacks do not use; the proxy would also reach every service on `sdlc` |
 | A list of public origins (localhost and the proxy) | The origin check of ADR-M73 §2.3 stays one exact comparison; operators on the server use the proxy's host name too |
 
 ## 4. Consequences and gaps
 
 - A new way in from the LAN: the firewall and the bind address are the operator's job, and the README says the server must never be reachable from the internet.
 - The real client address depends on Docker's port publishing (§2.5); on Docker Desktop or some rootless set-ups every client shares one limit.
-- Every existing stack recreates its network once after the update (§2.6); volumes are kept.
+- One more small Docker network, with a fixed address in it; existing stacks need no network step (§2.6).
 - Passkeys registered on `localhost` do not work behind the proxy (ADR-M73 §4).
 - Diagram D11 (D-03 §4) does not show the proxy; it stays as it is.
 - Exposure to the internet, company single sign-on and more than one api process stay out of scope.
@@ -125,4 +125,5 @@ PR 2's CHANGELOG "Upgrade notes" repeat these steps; `pnpm compose:down` also st
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
-| 0.1 | 2026-10-12 | Claude (task V09, PR 1) | First version: nginx, one LAN port, routes (with `/health/ready`), headers and limits, the trusted forwarded address and the network's allocation range with its upgrade step, certificates, ADR-M73, the CLI and doctor, tests (QUESTIONS #405–#409) |
+| 0.2 | 2026-10-12 | Claude (task V09, PR 1), after Harry's review of PR #301 | §2.5: a small network `access` for the proxy and the api only (its own subnet, the proxy's fixed address there, the api always on it), the proxy not on `sdlc`; §2.6: existing stacks need no network step, `up.sh` checks; §3: the `ip_range` option rejected; §4 |
+| 0.1 | 2026-10-12 | Claude (task V09, PR 1) | First version: nginx, one LAN port, routes (with `/health/ready`), headers and limits, the trusted forwarded address and the network's allocation range with its upgrade step (replaced in 0.2), certificates, ADR-M73, the CLI and doctor, tests (QUESTIONS #405–#409) |
