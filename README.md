@@ -11,11 +11,11 @@ The handbook says **what must happen and why**. The platform **makes sure it hap
 
 Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
-**Status (2026-10-09): built and tested, not yet used on a real project.** The platform is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on a fictional sample project has not started (anyone can run it: see below); the first real internal project comes after it. Before real client data, the server still needs the company's own certificate and named key holders for the secret manager (encrypted connections to it are built), a first restore drill on the server (backup and restore are built and tested), and measured resources (the open task A10).
+**Status (2026-10-12): v0.2.0 is released ([CHANGELOG](CHANGELOG.md)); built and tested, not yet used on a real project.** The platform is built, with automated tests for each requirement ([what proves each criterion](design/MVP-DONE.md)). The trial on a fictional sample project has not started (anyone can run it: see below); the first real internal project comes after it. Before real client data, the server still needs the company's own certificate and named key holders for the secret manager (encrypted connections to it are built), a first restore drill on the server (backup and restore are built and tested), and measured resources (the open task A10).
 
 **Try it: we are looking for teams to run the first trial.** Deploy the platform on your own machine, take a few tasks of a fictional sample project through the 8 gates with an AI agent, and tell us what you found: [TRIAL.md](TRIAL.md).
 
-**Supported today:** GitHub, projects built with Node.js and TypeScript (one sandbox image, `node24`), the OpenHands agent, and one server with Docker Compose. People reach the API and the dashboard on the server itself; access from other machines comes later ([where to run it](platform/deploy/README.md#where-to-run-it)).
+**Supported today:** GitHub, projects built with Node.js and TypeScript (one sandbox image, `node24`), the OpenHands agent, and one server with Docker Compose. People reach the API and the dashboard on the server itself, or from their own machines through team access, a TLS proxy on one LAN port ([Team access](platform/deploy/README.md#team-access-operator)). The `sdlc` command installs from npm (`npm install -g agentic-sdlc-cli`); `pnpm doctor` (the operator) and `sdlc doctor` (a person) say what is wrong and how to fix it; a trial stack starts again after a reboot with `pnpm trial:start`.
 
 ---
 
@@ -37,6 +37,7 @@ Red: always approved by a person (HITL, human in the loop). Orange: oversight de
 | **Preparing your application's repository** (Person A, the intent owner, or the repository owner) | [ROLLOUT-GUIDE step 1](platform/ROLLOUT-GUIDE.md#step-1-prepare-the-repository-person-a-the-repository-owner-12-days): the two repositories, what yours needs, the one file of agent instructions, Spec Kit and BMAD |
 | **New to the platform** | [The platform in five minutes](platform/PLATFORM-IN-5-MINUTES.md), then the [tutorial: your first feature](platform/TUTORIAL-FIRST-FEATURE.md), one real feature from idea to release. Every platform guide in one list: [platform/README.md](platform/README.md) |
 | **A team member** (Person A, who asks for changes; Person B, who reviews and approves; PM / BrSE) | [platform/USER-GUIDE.md](platform/USER-GUIDE.md): one intent from G1 to G8, by role, with the commands and what to do when something goes wrong |
+| **Releasing the platform** (maintainer) | [RELEASING.md](RELEASING.md): versions, the release steps, the Upgrade notes, what to do when a step fails |
 | **Installing and operating the platform** (operator) | [platform/deploy/README.md](platform/deploy/README.md): where to run it, the GitHub App, "Fresh deployment" from an empty checkout to the first intent, restart, upgrade, troubleshooting, uninstall; runbook [T11](handbook/03-templates/T11-openbao-runbook.md) (OpenBao) |
 | **Working on the platform's code** (not needed to use it) | [CONTRIBUTING.md](CONTRIBUTING.md) and [platform/GETTING-STARTED.md](platform/GETTING-STARTED.md) (the developers' set-up: dev stack, test GitHub App) |
 | **Working on the handbook** | [CONTRIBUTING.md](CONTRIBUTING.md), the [contents](handbook/00-introduction/01-contents.md) and the [writing style](handbook/00-introduction/06-writing-style.md) |
@@ -96,7 +97,7 @@ What it does keep: each run's diff, as evidence, for at least 180 days. If the o
 | **Escalations** | Time limits per severity, a backup owner for each escalation, then governance; the work stays frozen while nobody answers |
 | **Cost** | Every model call through one gateway (LiteLLM) with labels for tenant, project, intent and run; cost reports, including wasted cost |
 | **Retention** | Evidence kept 180 days by default, longer when configured; holds for disputes; the audit log kept at least two years |
-| **Dashboard** | A read-only web page: intents by gate, who each waits for and why, escalations, cost, gate waiting times, evidence |
+| **Dashboard** | A read-only web page: intents by gate, who each waits for and why, escalations, cost, gate waiting times, evidence. Sign in with GitHub or with an API token; decisions in the dashboard come with v0.3.0 |
 | **Multi-tenant** | Every record belongs to a tenant; every query filters by it |
 
 Interfaces keep the platform open to change: the Git host (GitHub today), the agent (OpenHands today), the policy engine and the model provider can each be replaced without changing the core.
@@ -148,6 +149,7 @@ Interfaces keep the platform open to change: the Git host (GitHub today), the ag
 | Contributing, the repository's rules and CI | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Reporting a security problem | [SECURITY.md](SECURITY.md) |
 | Changes | [CHANGELOG.md](CHANGELOG.md) |
+| How a release is made | [RELEASING.md](RELEASING.md) |
 
 ## 8. Help
 

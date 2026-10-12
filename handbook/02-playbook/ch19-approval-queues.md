@@ -376,6 +376,8 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 | `sdlc admin project list`, `show`, `update`, `archive` | An archived project takes no new roles or configuration. An archive is refused while the project has open intents (`project_has_open_intents`): finish or cancel them first. About 7 days after the archive the platform deletes the project's evidence files, except held ones (below). There is no un-archive command |
 | `sdlc admin evidence hold <INT-…> [--ref <https link>]`, `release <INT-…>`, `show <INT-…>` | Puts an intent's evidence on hold: the platform keeps its evidence files until the hold is released, also past the retention and after an archive. For a dispute, an incident or a client request. Tenant admins, or the roles in `access.evidence_hold_roles` (by default governance and admin; never viewer). Write the reason where it can be edited and give its link with `--ref`: the platform keeps no text |
 | `sdlc admin user list`, `show`, `update`, `disable`, `enable --user <id or email>` | A disabled person's tokens stop working at once |
+| `sdlc admin user sign-out --user <id or email>` | Ends every dashboard session of the person, in every browser (§19.8e) |
+| `sdlc admin passkey list --user <id or email> [--all]`, `revoke --user <id or email> --id <passkey-id>` | A person's dashboard passkeys; remove one, for example after a device was lost (§19.8e). `--all` also shows removed ones. People add passkeys in the dashboard only |
 | `sdlc admin identity list --user <id or email> [--all]`, `unlink --user <id or email> --id <identity ID>` | `--all` also shows unlinked accounts |
 | `sdlc admin role list --project <slug> [--all]`, `revoke --project <slug> --id <role ID>` | `--all` also shows revoked roles |
 | `sdlc admin tenant-admin grant --user <id or email>`, `list [--all]`, `revoke --id <ID>` | Tenant admins only |
@@ -426,7 +428,7 @@ Either way the dashboard decides nothing yet: decisions in the dashboard come wi
 6. Each change the page sends carries a security token of your session and comes from the dashboard's own address; the platform refuses anything else. If a change fails with "did not come from the dashboard page", reload the page.
 7. Without a passkey you can still read in the dashboard and decide with the CLI or a comment on GitHub.
 
-The dashboard is for the platform machine itself. Do not open the API's port to other machines for it: that needs TLS and a review first.
+Never publish the API's port 8090 to other machines. People on other machines use team access, the operator's TLS proxy on one LAN port (`platform/deploy/README.md`, "Team access").
 
 **What you see.** The same access rules as the CLI apply: you see the projects you have a role on, and a section your role cannot read says so.
 
@@ -506,6 +508,7 @@ The dashboard is for the platform machine itself. Do not open the API's port to 
 | 0.33 | 2026-10-12 | Claude (task U05) | §19.8e: sign in to the dashboard with GitHub, the session, sign out, sign out everywhere, `sdlc admin user sign-out` (ADR-M73 §2.2) |
 | 0.30 | 2026-10-10 | Claude (task V05) | §19.8c: install the `sdlc` command from npm (`agentic-sdlc-cli`), `sdlc --version` |
 | 0.34 | 2026-10-12 | Claude (task V09, PR 2) | §19.8c, §19.8e: the team address through the TLS proxy, `NODE_EXTRA_CA_CERTS` with the operator's `ca.pem`, the dashboard and the GitHub sign-in on the team address, Safari there |
+| 0.36 | 2026-10-12 | Claude (docs review for v0.2.0) | §19.8d: `sdlc admin user sign-out` and `sdlc admin passkey list\|revoke` in the admin table; §19.8e: never publish port 8090, other machines use team access |
 | 0.35 | 2026-10-12 | Claude (task U06, PR 2) | §19.8e: passkeys in the dashboard (add within 5 minutes of a GitHub sign-in, remove, `sdlc admin passkey`), the session's security token on each change; decisions still to come (ADR-M73 §2.3, §2.4) |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |

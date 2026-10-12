@@ -8,8 +8,8 @@ How the platform is versioned and released (D-08 task V12, QUESTIONS #364, #370,
 |---|---|
 | [Semantic Versioning](https://semver.org/) `X.Y.Z` | One version for the whole repository: the root `package.json`, `PLATFORM_VERSION` (`platform/packages/api-schemas/src/version.ts`, shared by the API, the CLI and the dashboard), the images on GHCR and the npm package `agentic-sdlc-cli` |
 | Before v1.0 | A **minor** release (`0.2.0`) may break things: a migration, a changed setting, a credentials command to run again. Its "Upgrade notes" say exactly what to do. A **patch** release (`0.1.2`) never needs an upgrade step |
-| A patch release `v0.1.x` | When something useful lands and nothing must be done to upgrade (for example v0.1.1: the CLI on npm and `sdlc next`) |
-| The next minor `v0.2.0` | When the milestone UX is done, or as soon as a change needs an upgrade step |
+| A patch release `v0.x.y` | When something useful lands and nothing must be done to upgrade (for example v0.1.1: the CLI on npm and `sdlc next`) |
+| The next minor `v0.x.0` | As soon as a change needs an upgrade step (for example v0.2.0: two migrations and rebuilt images). The roadmap names what goes into which release; the owner decides when to release (QUESTIONS #420) |
 | v1.0 | When the platform runs on a team server (milestone Server). From then on only a major release breaks things |
 | Support | **The latest release only.** A fix, also a security fix, comes in a new release; older releases get no patches |
 | Security advisories | Reported privately ([SECURITY.md](SECURITY.md)); published as a GitHub Security Advisory together with the release that fixes it |
@@ -75,3 +75,5 @@ Try the gate before you tag: `node platform/tools/release/release-check.mjs tag 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 1.0 | 2026-10-10 | Claude (task V12), approved by Harry | First version: the versioning policy, the release steps, `release.yml`, the release gate, `pnpm release:lock` |
+| 1.1 | 2026-10-12 | Claude, approved by Harry | §3: what the v0.2.0 release taught: cosign installed by `install-cosign.sh` with retries, `ENEEDAUTH` (an expired npm trusted publisher), npm's "validating" state (#308, #309) |
+| 1.2 | 2026-10-12 | Claude (docs review for v0.2.0), approved by Harry | §1: the versioning rules in general terms (a patch when nothing must be done, the next minor when an upgrade step is needed); the line "v0.2.0 when the milestone UX is done" removed |

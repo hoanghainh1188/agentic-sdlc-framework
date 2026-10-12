@@ -2,7 +2,7 @@
 
 For **whoever leads the rollout** (usually the tech lead, with leadership and the platform operator), and for **everyone on the team** who wants to know where to start. It puts the existing guides in order: what to read, who does what, in which order, and how to check each step. It does not replace them.
 
-Version 0.8, 2026-10-09. Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment); this guide only links to it. Changes: the version history at the end.
+Version 0.9, 2026-10-12. Written by Claude Code from the set-up and the trial plan of the sample repository. The policy side (when a team may start, readiness, pilots) is the handbook's: Chapter 9 (adoption roadmap), templates T5 (project RACI) and T17 (readiness assessment); this guide only links to it. Changes: the version history at the end.
 
 ---
 
@@ -21,7 +21,7 @@ Version 0.8, 2026-10-09. Written by Claude Code from the set-up and the trial pl
 
 Every document by reader, outside the rollout too: [README §2](../README.md#2-where-to-start).
 
-The dashboard (read only, on the platform machine only for now: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) shows everyone what waits for whom; decisions are made in GitHub comments, GitHub reviews and the `sdlc` command (USER-GUIDE).
+The dashboard (read only; on the platform machine, or from other machines through team access: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) shows everyone what waits for whom; decisions are made in GitHub comments, GitHub reviews and the `sdlc` command (USER-GUIDE).
 
 ## 2. The rules to know before you start
 
@@ -181,6 +181,7 @@ From a spec to a submitted plan:
 | 2.6 | Operator, tenant admin | Build the sandbox image for the project's toolchain and pin it by digest ([deploy/README step 10](deploy/README.md#10-the-sandbox-image); other toolchains need a new image) | The reference ends in `@sha256:…` |
 | 2.7 | Tenant admin, agent owner, Person B | Register the agent, then the agent owner and Person B approve it ([handbook Ch.20 §20.5b](../handbook/02-playbook/ch20-agent-and-model-lifecycle.md#205b-the-agent-register-on-the-platform)) | `sdlc admin agent show --key <key>` says `active` |
 | 2.8 | Tenant admin | Upload the project configuration: at least `run.agent_key`, `sandbox.image`, `verification.required_checks` (the aggregate check of 1.2); the budgets of 0.4 ([deploy/README step 12](deploy/README.md#12-the-project-configuration)) | `sdlc admin config show --project <slug>` shows the new version |
+| 2.9 | Operator (optional) | **Team access and dashboard sign-in.** So that people use the API and the dashboard from their own machines, turn on team access: one LAN port over TLS ([deploy/README, Team access](deploy/README.md#team-access-operator)). To let them sign in to the dashboard with GitHub, store the App's client secret and turn the sign-in on ([runbook T11 §5n](../handbook/03-templates/T11-openbao-runbook.md#5n-the-dashboards-github-sign-in-the-apps-client-secret)). Tell the team the address, `https://<server name>:8443`, and give them the CA's `ca.pem` when it is not a company CA their machines trust | From another machine, `sdlc doctor` after `sdlc login --api-url https://<server name>:8443` is ok |
 
 **A second project or tenant.** One installation serves many projects: the operator skips 2.1, and 2.2 is needed only for a new tenant (a client or unit with its own data and budget: `pnpm sdlc ops bootstrap`, deploy/README step 8). For each new project: install the GitHub App on its repository too (selected repositories), then 2.3–2.8. A project with another toolchain than Node.js needs a new sandbox image (2.6), which does not exist yet.
 
@@ -189,8 +190,8 @@ From a spec to a submitted plan:
 | # | Do | Check |
 |---|---|---|
 | 3.1 | Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and the [tutorial](TUTORIAL-FIRST-FEATURE.md) (about 20 minutes), then `platform/USER-GUIDE.md` and the handbook chapters of your role (section 1) | — |
-| 3.2 | Install the `sdlc` command ([USER-GUIDE §2, "Install the sdlc command"](USER-GUIDE.md#install-the-sdlc-command)). Get a first API token from the tenant admin, log in, create your own API token and revoke the first one (USER-GUIDE §2) | `sdlc whoami` shows your roles |
-| 3.3 | On the platform server, open `http://127.0.0.1:8090/dashboard/` and sign in with your API token ([handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) | You see the project's (empty) board |
+| 3.2 | Install the `sdlc` command ([USER-GUIDE §2, "Install the sdlc command"](USER-GUIDE.md#install-the-sdlc-command)). Get a first API token from the tenant admin, log in (`sdlc login --api-url` with the team address of 2.9 when it is set, else on the platform server), create your own API token and revoke the first one (USER-GUIDE §2) | `sdlc whoami` shows your roles |
+| 3.3 | Open the dashboard: through team access `https://<server name>:8443/dashboard/`, or on the platform server `http://localhost:8090/dashboard/`; sign in with GitHub (when 2.9 turned it on) or with your API token ([handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) | You see the project's (empty) board |
 | 3.4 | A 30-minute walk-through together: the eight gates, who decides each, how comment commands work (first line of a new comment), what an escalation is | Everyone can say who approves G3 and G7 on this project |
 
 ### Step 4. Pilot (the whole team; 2–4 weeks)
@@ -262,3 +263,4 @@ Run real intents, one at a time at first. The trial plan of the sample repositor
 | 0.6 | 2026-10-09 | Docs review fixes: the health check runs on the platform server |
 | 0.7 | 2026-10-09 | Docs review E2: links in §1 and §6; the operator installs the GitHub App |
 | 0.8 | 2026-10-09 | Docs review E3 (readability): the rule numbers explained once; §2b "more than one approval" in plain words; "tenant" explained at first use; the dashboard address in 3.3; the version history moved here |
+| 0.9 | 2026-10-12 | Docs review for v0.2.0: the dashboard is no longer for the platform machine only; new optional step 2.9 (team access and the dashboard's GitHub sign-in); 3.2 and 3.3 use the team address when it is set |
