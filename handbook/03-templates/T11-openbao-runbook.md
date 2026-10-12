@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.39. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.40. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -114,7 +114,7 @@ What `configure` sets up (details: `design/ADR-M19-openbao-bootstrap.md`):
 
 Settings (key shares, threshold, token and secret ID lifetimes) are in `platform/deploy/openbao/bootstrap/bootstrap.conf`. Access rules are in `platform/deploy/openbao/bootstrap/policies/*.hcl`. Changes to either go through a reviewed pull request, then `configure` again.
 
-## 3c. TLS on port 8200: the CA, the certificate, renewal
+### 3c. TLS on port 8200: the CA, the certificate, renewal
 
 OpenBao's listener 8200 speaks TLS on every machine (task A10, `design/ADR-M63-openbao-tls-and-backups.md`, QUESTIONS #20, #325). Every platform process verifies the certificate with the CA; there is no plain listener on the Compose network. The listener 8210 inside the container stays plain.
 
@@ -136,7 +136,7 @@ OpenBao's listener 8200 speaks TLS on every machine (task A10, `design/ADR-M63-o
 - To renew: take the CA folder out of the safe, run `pnpm openbao:tls server <ca-folder>`, then `pnpm openbao:tls reload`. OpenBao reads the new certificate and **stays unsealed**; the clients keep working (same CA). Put the CA folder back; record it in the operations log.
 - A new CA (every 5 years, or after a leak): `pnpm openbao:tls ca` in a new folder, `server`, `reload`, then restart every client (`sdlc-api`, `sdlc-worker`, `sdlc-runner`, `litellm-agent`): they read `ca.pem` when they start.
 
-## 3d. TLS for team access: the proxy's certificate
+### 3d. TLS for team access: the proxy's certificate
 
 The team access proxy (`sdlc-access`, profile `access`, task V09, `design/ADR-M67-team-access.md`) speaks TLS on one LAN port with its own certificate. It names the host name people open (`SDLC_ACCESS_HOSTNAME`, never only an IP address: passkeys refuse it) and, optionally, the IPv4 addresses of `SDLC_ACCESS_IPS`. The commands are `pnpm access:tls …` (`platform/deploy/access/tls.sh`), built like section 3c.
 
@@ -946,6 +946,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.40 | 2026-10-12 | Claude Code (docs review for v0.2.0) | Sections 3c and 3d are subsections of section 3, like 3.1 and 3.2 (heading level only; the links stay the same) |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |
 | 0.37 | 2026-10-12 | Claude Code (task V07, PR 2) | Sections 3c and 4: `pnpm doctor` shows the certificates' end dates and checks the platform after an unseal |

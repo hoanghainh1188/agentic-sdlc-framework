@@ -60,6 +60,7 @@
 | ADR-M64 | [Taking an L1 proposal forward: the download and the end of the intent](ADR-M64-l1-proposal-hand-over.md) (task C13) | Proposed | |
 | ADR-M65 | [The trial report: an anonymous summary built from the existing reads](ADR-M65-trial-report.md) (task V01) | Proposed | |
 | ADR-M66 | [The platform's images on GHCR for each release](ADR-M66-ghcr-images.md) (task V04) | Proposed | |
+| ADR-M67 | [Team access from other machines: a TLS reverse proxy](ADR-M67-team-access.md) (task V09) | Accepted | 2026-10-12 |
 | ADR-M72 | [The CLI on npm: one bundled file, published from a tag with provenance](ADR-M72-cli-npm-package.md) (task V05) | Proposed | |
 | ADR-M73 | [Actions in the web dashboard: GitHub sign-in, sessions, CSRF, passkey step-up](ADR-M73-dashboard-actions.md) (task V11; built by U05–U09) | Accepted | |
 | ADR-M76 | [The trial stack's key file: age with a passphrase, through the library `age-encryption`](ADR-M76-trial-key-file.md) (task V08) | Accepted | |
