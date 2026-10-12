@@ -7,6 +7,7 @@
 
 ### Changed
 - `CLAUDE.md` slimmed from 137 KB to 29 KB (QUESTIONS #424, #425): the hard rules stay, the module rules stay as one line each with a link to their ADR, and the long per-task paragraphs of "Commands" become one line per command family with a link to where it is explained (ADRs, `platform/deploy/README.md`, runbook T11, `platform/DEVELOPMENT.md`). "Current constraints" keeps the current state and the next free QUESTIONS and ADR numbers; the history is in `CHANGELOG.md`, `ROADMAP.md` and `design/README.md`. A new line in "Documentation rules" keeps it short.
+- `CLAUDE.md` "Read these first" names the design documents as paths instead of importing them, so a session no longer loads about 390 KB of design documents up front; the codes table and the writing style stay imported (QUESTIONS #426).
 
 ## [0.2.1] - 2026-10-12
 
