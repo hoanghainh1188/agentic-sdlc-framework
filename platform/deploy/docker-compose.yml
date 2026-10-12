@@ -13,6 +13,9 @@
 #                  the Docker socket proxy, the npm package proxy (Verdaccio) and the local
 #                  registry for sandbox images. Needs core, OpenBao configured and the runner
 #                  credentials delivered first: pnpm compose:sandbox
+#   access         Team access (V09, design/ADR-M67): an nginx TLS reverse proxy that publishes
+#                  the API and the dashboard on one LAN port. Needs the profile platform and the
+#                  SDLC_ACCESS_* settings: pnpm compose:access
 #
 # Usage (from the repo root; see platform/deploy/README.md):
 #   platform/deploy/scripts/init-env.sh           # once: creates platform/deploy/.env (mode 600)
@@ -47,6 +50,16 @@ networks:
       config:
         - subnet: ${SDLC_NETWORK_SUBNET:-172.30.0.0/24}
           gateway: ${SDLC_NETWORK_GATEWAY:-172.30.0.1}
+  # Team access (V09, design/ADR-M67 §2.5): a small network for the proxy and the api only. The
+  # proxy is never on `sdlc`; its fixed address is outside the allocation range, so Docker never
+  # gives it to the api. The api always joins it (the network holds only the api until the proxy
+  # starts); existing stacks need no network step (ADR-M67 §2.6).
+  access:
+    name: ${COMPOSE_PROJECT_NAME:-sdlc}-access
+    ipam:
+      config:
+        - subnet: ${SDLC_ACCESS_NETWORK_SUBNET:-172.30.1.0/29}
+          ip_range: ${SDLC_ACCESS_NETWORK_IP_RANGE:-172.30.1.0/30}
 
 volumes:
   postgres-data:
@@ -102,6 +115,9 @@ volumes:
   npm-proxy-storage:
   # Sandbox images of the local registry.
   registry-data:
+  # The team access proxy's certificate, key (owner 101, mode 600) and CA certificate; written by
+  # the job access-tls-init from SDLC_ACCESS_TLS_DIR (V09, design/ADR-M67 §2.7).
+  access-tls:
 
 services:
   # ---------------------------------------------------------------- core ----
@@ -608,7 +624,8 @@ services:
       dockerfile: platform/apps/api/Dockerfile
     profiles: [platform]
     restart: unless-stopped
-    networks: [sdlc]
+    # `access` (V09, ADR-M67 §2.5): the small network shared with the team access proxy only.
+    networks: [sdlc, access]
     depends_on:
       postgres:
         condition: service_healthy
@@ -634,6 +651,9 @@ services:
       # client secret is in OpenBao (kv/api/github-oauth, runbook T11 §5n).
       SDLC_API_WEB_SIGNIN: ${SDLC_API_WEB_SIGNIN:-off}
       SDLC_API_PUBLIC_ORIGIN: ${SDLC_API_PUBLIC_ORIGIN:-}
+      # Team access (V09, ADR-M67 §2.5): the proxy's fixed address on `access`; only its
+      # X-Forwarded-For counts. Empty (the default): no forwarded header is trusted.
+      SDLC_API_TRUSTED_PROXY: ${SDLC_API_TRUSTED_PROXY:-}
       # E02 (ADR-M48): Evidence Packs in SeaweedFS with the api's identity from OpenBao
       # (kv/api/evidence, `openbao:bootstrap api-evidence-credentials`): reads proposals and diffs
       # to re-check their hashes, reads and writes packs/ only.
@@ -883,3 +903,84 @@ services:
     healthcheck:
       <<: *healthcheck-defaults
       test: [CMD, node, /app/dist/healthcheck.js]
+
+  # ------------------------------------------------------------ access ----
+  # Team access (V09, design/ADR-M67, runbook T11 section 3d). Copies the proxy's certificate
+  # files from SDLC_ACCESS_TLS_DIR (outside the repository, made by access/tls.sh) into the
+  # volume access-tls (owner 101, the nginx user; key mode 600). Runs at every start, like
+  # openbao-tls-init; `access/tls.sh reload` runs it again and makes nginx read the new files.
+  access-tls-init:
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine@sha256:adf5042a17f4ecdd200c595fa9ffd1be37efb18f89a830bd1a00e4ab4d59d42c
+    profiles: [access]
+    restart: 'no'
+    network_mode: none
+    user: root
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        for f in ca.pem server.pem server-key.pem; do
+          test -s "/src/$$f" || { echo "access-tls-init: $$f missing in SDLC_ACCESS_TLS_DIR (access/tls.sh dev, import or server; runbook T11 section 3d)" >&2; exit 1; }
+        done
+        cp /src/server.pem /tls/server.pem.new
+        cp /src/server-key.pem /tls/server-key.pem.new
+        cp /src/ca.pem /tls/ca.pem.new
+        chown 101:101 /tls/server.pem.new /tls/server-key.pem.new /tls/ca.pem.new
+        chmod 0644 /tls/server.pem.new /tls/ca.pem.new
+        chmod 0600 /tls/server-key.pem.new
+        chmod 0755 /tls
+        mv /tls/server.pem.new /tls/server.pem
+        mv /tls/server-key.pem.new /tls/server-key.pem
+        mv /tls/ca.pem.new /tls/ca.pem
+        echo 'access-tls-init: certificates in place'
+    volumes:
+      # Long syntax with create_host_path: false, so an unset folder is an error, never an empty
+      # folder Docker creates on the host. up.sh checks the folder before it starts the profile.
+      - type: bind
+        source: ${SDLC_ACCESS_TLS_DIR:-./access/tls-dir-not-set}
+        target: /src
+        read_only: true
+        bind:
+          create_host_path: false
+      - access-tls:/tls
+
+  # The proxy (ADR-M67 §2.1-§2.4). The only service published on an address that is not
+  # 127.0.0.1, and only with SDLC_ACCESS_BIND_ADDR set (up.sh refuses the profile without it; the
+  # fallback 127.0.0.1 never exposes it). Only on the network `access`: it reaches the api and
+  # nothing else. Configuration: access/nginx.conf.template, filled from SDLC_ACCESS_* only.
+  sdlc-access:
+    image: nginxinc/nginx-unprivileged:1.30.4-alpine@sha256:adf5042a17f4ecdd200c595fa9ffd1be37efb18f89a830bd1a00e4ab4d59d42c
+    profiles: [access]
+    restart: unless-stopped
+    networks:
+      access:
+        ipv4_address: ${SDLC_ACCESS_PROXY_IP:-172.30.1.6}
+    depends_on:
+      access-tls-init:
+        condition: service_completed_successfully
+      sdlc-api:
+        condition: service_healthy
+    environment:
+      NGINX_ENVSUBST_FILTER: ^SDLC_ACCESS_
+      SDLC_ACCESS_SERVER_NAMES: ${SDLC_ACCESS_HOSTNAME:-} ${SDLC_ACCESS_IPS:-}
+      SDLC_ACCESS_RATE_PER_SECOND: ${SDLC_ACCESS_RATE_PER_SECOND:-10}
+      SDLC_ACCESS_RATE_BURST: ${SDLC_ACCESS_RATE_BURST:-40}
+      SDLC_ACCESS_SIGNIN_RATE_PER_MINUTE: ${SDLC_ACCESS_SIGNIN_RATE_PER_MINUTE:-30}
+      SDLC_ACCESS_SIGNIN_BURST: ${SDLC_ACCESS_SIGNIN_BURST:-10}
+      SDLC_ACCESS_CONN_PER_ADDR: ${SDLC_ACCESS_CONN_PER_ADDR:-20}
+    volumes:
+      - ./access/nginx.conf.template:/etc/nginx/templates/sdlc-access.conf.template:ro
+      - access-tls:/etc/nginx/tls:ro
+    read_only: true
+    # The entrypoint writes the filled-in configuration to conf.d; nginx keeps its pid file and
+    # temporary files in /tmp. Both in memory, owned by the nginx user.
+    tmpfs:
+      - /etc/nginx/conf.d:uid=101,gid=101,mode=0755
+      - /tmp:uid=101,gid=101,mode=0755
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - ${SDLC_ACCESS_BIND_ADDR:-127.0.0.1}:${SDLC_ACCESS_HOST_PORT:-8443}:8443
+    healthcheck:
+      <<: *healthcheck-defaults
+      # nginx's own status page on 127.0.0.1:8081 inside the container; never published.
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8081/healthz']

@@ -6,7 +6,12 @@ import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 
 import { downRefusal } from '../../deploy/trial/src/down.js';
-import { envValue, trialEnv, TRIAL_PROJECT } from '../../deploy/trial/src/env-file.js';
+import {
+  accessNetworkFor,
+  envValue,
+  trialEnv,
+  TRIAL_PROJECT,
+} from '../../deploy/trial/src/env-file.js';
 import { preflight, type HostFacts } from '../../deploy/trial/src/preflight.js';
 import { parseInitOutput, SecretBag } from '../../deploy/trial/src/secrets.js';
 import {
@@ -269,7 +274,7 @@ describe('V02 AC3: secrets never reach the terminal', () => {
 
 describe('V02: the env file and the configuration of the trial stack', () => {
   const example =
-    'COMPOSE_PROJECT_NAME=sdlc\nSDLC_NETWORK_SUBNET=172.30.0.0/24\nSDLC_NETWORK_GATEWAY=172.30.0.1\nSDLC_API_HOST_PORT=8090\nLITELLM_MASTER_KEY=sk-abc\nLITELLM_SALT_KEY=def\n';
+    'COMPOSE_PROJECT_NAME=sdlc\nSDLC_NETWORK_SUBNET=172.30.0.0/24\nSDLC_NETWORK_GATEWAY=172.30.0.1\nSDLC_ACCESS_NETWORK_SUBNET=172.30.1.0/29\nSDLC_ACCESS_NETWORK_IP_RANGE=172.30.1.0/30\nSDLC_ACCESS_PROXY_IP=172.30.1.6\nSDLC_API_HOST_PORT=8090\nLITELLM_MASTER_KEY=sk-abc\nLITELLM_SALT_KEY=def\n';
 
   it('uses its own Compose project and takes the gateway keys from OpenBao', () => {
     const out = trialEnv(example);
@@ -289,6 +294,26 @@ describe('V02: the env file and the configuration of the trial stack', () => {
     });
     expect(envValue(out, 'SDLC_API_HOST_PORT')).toBe('41090');
     expect(envValue(out, 'SDLC_NETWORK_SUBNET')).toBe('172.29.1.0/24');
+    // V09: its own network `access` too (the api always joins it, ADR-M67 §2.5).
+    expect(envValue(out, 'SDLC_ACCESS_NETWORK_SUBNET')).toBe('172.28.0.8/29');
+    expect(envValue(out, 'SDLC_ACCESS_PROXY_IP')).toBe('172.28.0.14');
+  });
+
+  it('V09: each throw-away subnet gets its own /29 network `access`, never overlapping', () => {
+    expect(accessNetworkFor('172.30.0.0/24')).toEqual({
+      subnet: '172.28.8.0/29',
+      ipRange: '172.28.8.0/30',
+      proxyIp: '172.28.8.6',
+    });
+    expect(accessNetworkFor('172.31.255.0/24').subnet).toBe('172.28.23.248/29');
+    const seen = new Set<string>();
+    for (const b of [29, 30, 31]) {
+      for (let c = 0; c < 256; c += 1) seen.add(accessNetworkFor(`172.${b}.${c}.0/24`).subnet);
+    }
+    expect(seen.size).toBe(768);
+    for (const bad of ['10.0.0.0/24', '172.30.1.0/29', '172.30.256.0/24', '172.32.0.0/24']) {
+      expect(() => accessNetworkFor(bad), bad).toThrow();
+    }
   });
 
   it('the trial configuration of M-E-TRIAL-PLAN §6', () => {

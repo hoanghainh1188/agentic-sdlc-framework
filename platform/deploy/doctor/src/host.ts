@@ -21,12 +21,14 @@ import type { Exec } from './exec.js';
 import { manifestPermissions } from './github-permissions.js';
 import { findLogEvents } from './logs.js';
 import type {
+  AccessFact,
   AppRoleFact,
   CertFact,
   GitHubFact,
   OpenBaoState,
   OperatorFacts,
   ProjectImageFact,
+  PublishedPort,
   RepoFact,
   ServiceState,
 } from './types.js';
@@ -90,7 +92,20 @@ export function parsePs(text: string): ServiceState[] | null {
       state: typeof r.State === 'string' ? r.State : '',
       health: typeof r.Health === 'string' ? r.Health : '',
       exitCode: typeof r.ExitCode === 'number' ? r.ExitCode : 0,
+      published: publishers(r.Publishers),
     });
+  }
+  return out;
+}
+
+/** The published ports of one `docker compose ps` row (V09): address and port, nothing else. */
+function publishers(value: unknown): PublishedPort[] {
+  if (!Array.isArray(value)) return [];
+  const out: PublishedPort[] = [];
+  for (const p of value as Record<string, unknown>[]) {
+    const port = typeof p?.PublishedPort === 'number' ? p.PublishedPort : 0;
+    const address = typeof p?.URL === 'string' ? p.URL : '';
+    if (port > 0 && /^[0-9a-fA-F.:]{1,45}$/.test(address)) out.push({ address, port });
   }
   return out;
 }
@@ -257,7 +272,8 @@ export async function gatherFacts(
     mode.status === 0 && /^(local|published)$/.test(mode.stdout.trim())
       ? (mode.stdout.trim() as 'local' | 'published')
       : 'failed';
-  const base: OperatorFacts = { now, envFile, docker, disk, manifest, imagesMode };
+  const access = accessFact(envFacts?.values ?? {});
+  const base: OperatorFacts = { now, envFile, docker, disk, manifest, imagesMode, access };
   const tlsDir = envFacts?.values.SDLC_OPENBAO_TLS_DIR ?? null;
   const tls = {
     dir: tlsDir,
@@ -343,6 +359,51 @@ export async function gatherFacts(
     ...(logs !== undefined ? { logs } : {}),
     ...(valkey !== undefined ? { valkey } : {}),
     ...(github ? { github } : {}),
+  };
+}
+
+/**
+ * Team access (V09, design/ADR-M67): the settings of the env file and the proxy's certificate.
+ * Reads the two certificates (never the key file: only whether it exists).
+ */
+export function accessFact(values: Readonly<Record<string, string>>): AccessFact {
+  const hostname = values.SDLC_ACCESS_HOSTNAME ?? null;
+  const bindAddr = values.SDLC_ACCESS_BIND_ADDR ?? null;
+  const ips = (values.SDLC_ACCESS_IPS ?? '').split(/\s+/).filter((ip) => ip !== '');
+  const dir = values.SDLC_ACCESS_TLS_DIR ?? null;
+  let unnamed: string[] | null = null;
+  if (dir) {
+    try {
+      const cert = new X509Certificate(fs.readFileSync(path.join(dir, 'server.pem')));
+      unnamed = [
+        ...(hostname && cert.checkHost(hostname) === undefined ? [hostname] : []),
+        ...ips.filter((ip) => cert.checkIP(ip) === undefined),
+      ];
+    } catch {
+      unnamed = null;
+    }
+  }
+  return {
+    configured: hostname !== null || bindAddr !== null,
+    bindAddr,
+    hostPort: values.SDLC_ACCESS_HOST_PORT ?? '8443',
+    hostname,
+    ips,
+    proxyIp: values.SDLC_ACCESS_PROXY_IP ?? '172.30.1.6',
+    trustedProxy: values.SDLC_API_TRUSTED_PROXY ?? null,
+    publicOrigin: values.SDLC_API_PUBLIC_ORIGIN ?? null,
+    webSignIn: values.SDLC_API_WEB_SIGNIN ?? 'off',
+    tls: {
+      dir,
+      missing: dir ? TLS_FILES.filter((f) => !fs.existsSync(path.join(dir, f))) : [...TLS_FILES],
+      certs: dir
+        ? [
+            certFact('ca', path.join(dir, 'ca.pem')),
+            certFact('server', path.join(dir, 'server.pem')),
+          ]
+        : [],
+      unnamed,
+    },
   };
 }
 

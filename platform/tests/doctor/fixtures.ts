@@ -25,6 +25,8 @@ export function service(name: string, extra: Partial<ServiceState> = {}): Servic
 export const RUNNING: ServiceState[] = [
   ...CORE_SERVICES.map((s) => service(s)),
   ...['sdlc-api', 'sdlc-worker', 'sdlc-runner', 'litellm-agent'].map((s) => service(s)),
+  // V09: team access on, the proxy on the LAN address, the api on 127.0.0.1.
+  service('sdlc-access', { published: [{ address: '192.168.10.5', port: 8443 }] }),
   ...JOBS.filter((j) => j !== 'backup-agent').map((j) =>
     service(j, { state: 'exited', health: '', exitCode: 0 }),
   ),
@@ -77,6 +79,26 @@ export function healthyFacts(overrides: Partial<OperatorFacts> = {}): OperatorFa
       },
     ],
     imagesMode: 'local',
+    access: {
+      configured: true,
+      bindAddr: '192.168.10.5',
+      hostPort: '8443',
+      hostname: 'sdlc.example.internal',
+      ips: ['192.168.10.5'],
+      proxyIp: '172.30.1.6',
+      trustedProxy: '172.30.1.6',
+      publicOrigin: 'https://sdlc.example.internal:8443',
+      webSignIn: 'github',
+      tls: {
+        dir: '/srv/sdlc/access-tls',
+        missing: [],
+        certs: [
+          { name: 'ca', notAfter: inDays(1500) },
+          { name: 'server', notAfter: inDays(300) },
+        ],
+        unnamed: [],
+      },
+    },
     ...overrides,
   };
 }

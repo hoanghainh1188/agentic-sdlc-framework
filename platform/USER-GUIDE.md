@@ -82,7 +82,7 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
    sdlc token create --name laptop
    ```
 
-   - **Where:** today the API listens on the platform server only (`http://127.0.0.1:8090`), so run `sdlc` on that server. Access from other machines is not supported yet ([where to run it](deploy/README.md#where-to-run-it)). Comment commands and reviews on GitHub work from anywhere.
+   - **Where:** on the platform server the API is `http://127.0.0.1:8090`. From your own machine, use the team address the operator gives you, for example `sdlc login --api-url https://sdlc.example.internal:8443` (team access, [deploy README](deploy/README.md#team-access-operator)). If your machine does not trust the company's certificate authority, set `NODE_EXTRA_CA_CERTS` to the `ca.pem` file the operator gives you; never turn certificate checks off. Without team access, run `sdlc` on the server. Comment commands and reviews on GitHub work from anywhere.
    - **Log in:** `sdlc login` asks for the API token at a hidden prompt.
    - **Check:** `sdlc doctor` checks your login and the API (TLS, your API token and when it ends, your roles, the CLI's version against the API's) and says what to fix. It changes nothing and never prints your token.
    - **Your own token:** `sdlc token create --name laptop` prints a new token once. Log in again with it.

@@ -4,6 +4,7 @@
 # Usage: platform/deploy/scripts/up.sh <profile>...
 #   e.g. up.sh core
 #        up.sh core observability
+#        up.sh core models platform access   (team access, V09: README "Team access")
 #
 # Environment:
 #   SDLC_ENV_FILE      env file (default: platform/deploy/.env, created by init-env.sh)
@@ -16,7 +17,7 @@
 set -eu
 
 # One-shot jobs (restart: "no"). A static test keeps this list in sync with docker-compose.yml.
-JOBS="backup-agent openbao-tls-init temporal-schema temporal-namespace seaweedfs-init"
+JOBS="backup-agent openbao-tls-init temporal-schema temporal-namespace seaweedfs-init access-tls-init"
 
 [ "$#" -gt 0 ] || { echo "usage: $0 <profile>..." >&2; exit 2; }
 
@@ -61,6 +62,16 @@ if ! SDLC_ENV_FILE="$env_file" "$deploy_dir/openbao/tls.sh" check >/dev/null 2>&
   SDLC_ENV_FILE="$env_file" "$deploy_dir/openbao/tls.sh" check >&2 || true
   echo "up: warning: OpenBao's TLS certificate is missing or ends soon (runbook T11 section 3c)" >&2
 fi
+
+# Team access (V09, design/ADR-M67): the profile access starts only with its settings checked
+# (bind address, host name, the network `access`, the trusted proxy, the public origin, the
+# certificate); a certificate ending within 30 days only warns.
+case " $* " in
+  *" access "*)
+    "$deploy_dir/access/check-settings.sh" "$env_file" "$@" ||
+      { echo "up: the profile access is not ready; nothing started (README \"Team access\")" >&2; exit 1; }
+    ;;
+esac
 
 # Published images (V04, design/ADR-M66 §2.5): on a release checkout, the images of
 # images.lock pinned by digest (overlay docker-compose.images.yml); everywhere else they are

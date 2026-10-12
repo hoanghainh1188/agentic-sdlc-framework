@@ -349,8 +349,22 @@ describe('pnpm doctor: parsing command output', () => {
   it('docker compose ps: an array or one object per line', () => {
     const row = { Service: 'postgres', State: 'running', Health: 'healthy', ExitCode: 0 };
     expect(parsePs(JSON.stringify([row]))).toEqual([
-      { service: 'postgres', state: 'running', health: 'healthy', exitCode: 0 },
+      { service: 'postgres', state: 'running', health: 'healthy', exitCode: 0, published: [] },
     ]);
+    // V09: the published ports (address and port only).
+    const published = parsePs(
+      JSON.stringify([
+        {
+          ...row,
+          Service: 'sdlc-access',
+          Publishers: [
+            { URL: '192.168.10.5', TargetPort: 8443, PublishedPort: 8443, Protocol: 'tcp' },
+            { URL: '', TargetPort: 8081, PublishedPort: 0, Protocol: 'tcp' },
+          ],
+        },
+      ]),
+    );
+    expect(published?.[0]?.published).toEqual([{ address: '192.168.10.5', port: 8443 }]);
     expect(
       parsePs(`${JSON.stringify(row)}\n${JSON.stringify({ ...row, Service: 'valkey' })}`),
     ).toHaveLength(2);

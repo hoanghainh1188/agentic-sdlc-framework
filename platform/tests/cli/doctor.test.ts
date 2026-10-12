@@ -136,6 +136,11 @@ describe('sdlc doctor: the checks (pure)', () => {
       'cli.login': 'skipped',
       'cli.version': 'skipped',
     });
+    // V09: an unknown CA (a company or throw-away CA behind the proxy) names NODE_EXTRA_CA_CERTS.
+    const unknownCa = evaluate(
+      facts({ live: { ok: false, failure: 'tls', tlsCode: 'SELF_SIGNED_CERT_IN_CHAIN' } }),
+    );
+    expect(byId(unknownCa)['cli.api_reachable']?.fix?.key).toBe('cli.doctor.fix.tls_ca');
     const refused = byId(evaluate(facts({ live: { ok: false, failure: 'refused' } })));
     expect(refused['cli.api_reachable']?.fix?.key).toBe('cli.doctor.fix.unreachable');
   });

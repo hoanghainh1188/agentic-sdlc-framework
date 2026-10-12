@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.37. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.38. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -126,6 +126,23 @@ OpenBao's listener 8200 speaks TLS on every machine (task A10, `design/ADR-M63-o
 - `pnpm openbao:tls check` fails within 30 days of the end; `up.sh` prints a warning at every start; `pnpm doctor` shows both end dates (`openbao.tls_expiry`). Put the end date in the team calendar with a reminder 30 days before.
 - To renew: take the CA folder out of the safe, run `pnpm openbao:tls server <ca-folder>`, then `pnpm openbao:tls reload`. OpenBao reads the new certificate and **stays unsealed**; the clients keep working (same CA). Put the CA folder back; record it in the operations log.
 - A new CA (every 5 years, or after a leak): `pnpm openbao:tls ca` in a new folder, `server`, `reload`, then restart every client (`sdlc-api`, `sdlc-worker`, `sdlc-runner`, `litellm-agent`): they read `ca.pem` when they start.
+
+## 3d. TLS for team access: the proxy's certificate
+
+The team access proxy (`sdlc-access`, profile `access`, task V09, `design/ADR-M67-team-access.md`) speaks TLS on one LAN port with its own certificate. It names the host name people open (`SDLC_ACCESS_HOSTNAME`, never only an IP address: passkeys refuse it) and, optionally, the IPv4 addresses of `SDLC_ACCESS_IPS`. The commands are `pnpm access:tls …` (`platform/deploy/access/tls.sh`), built like section 3c.
+
+**Where the files are.** `SDLC_ACCESS_TLS_DIR` (an absolute path; **outside the repository on a server**) holds `ca.pem`, `server.pem` and `server-key.pem` (mode 600). The job `access-tls-init` copies them into the volume `access-tls` at every start; the proxy reads that volume only. **Never put a CA's private key in this folder** (`import` refuses a folder that holds `ca-key.pem`).
+
+**On the server.** Done by the infrastructure operator:
+
+1. Set the team access settings in `platform/deploy/.env` (`platform/deploy/README.md`, "Team access (operator)").
+2. Either take the certificate from the **company CA** (the usual case: company machines already trust it): put `ca.pem`, `server.pem` and `server-key.pem` in a folder and run `pnpm access:tls import <folder>`; it checks the chain, that the key belongs to the certificate and that the certificate names the host name and the IPs, then copies the files. Or issue it with the **internal CA of section 3c**: take the CA folder out of the safe, `pnpm access:tls server <ca-folder>` (1 year), put the folder back.
+3. `pnpm access:tls check` shows both end dates and the names; `pnpm doctor` shows them too (`access.tls_*`).
+4. Give people `ca.pem` when their machines do not trust the CA (the CLI: `NODE_EXTRA_CA_CERTS`). Record it in the operations log.
+
+**On a test or development machine (throw-away CA).** `pnpm access:tls dev` makes a throw-away CA and the certificate in `platform/deploy/access-tls/` next to the env file (Git-ignored), deletes the CA key at once, and sets `SDLC_ACCESS_TLS_DIR`. Never for a server.
+
+**Renewal (every year; the reminder 30 days before the end).** `pnpm access:tls check` fails within 30 days of the end; `up.sh` warns at every start of the profile; `pnpm doctor` shows the dates. Renew with `import` (a new certificate from the company CA) or `server <ca-folder>`, then `pnpm access:tls reload`: the job copies the files again and nginx reads them (SIGHUP) **without a restart**. People need a new `ca.pem` only when the CA changed.
 
 ## 4. Unseal after a server restart
 
@@ -920,6 +937,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.27 | 2026-10-07 | Claude Code (coordinator) | Sections 5b and 5d: the commands that store a secret name each hidden value and end with `stored` or `FAILED`; the master and salt keys made at random inside the container (found while setting up a development machine from scratch, GETTING-STARTED Step 11b) |
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
+| 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |
 | 0.37 | 2026-10-12 | Claude Code (task V07, PR 2) | Sections 3c and 4: `pnpm doctor` shows the certificates' end dates and checks the platform after an unseal |
 | 0.36 | 2026-10-10 | Claude Code (task U05) | New section 5n: the GitHub App's client secret for the dashboard's GitHub sign-in (`kv/api/github-oauth`, `pnpm openbao:bootstrap api-github-oauth-credentials`), turning sign-in on, rotation, signing everyone out (ADR-M73 §2.2, QUESTIONS #385–#389) |
 | 0.35 | 2026-10-09 | Claude Code (task A10, PR 2) | Sections 6 and 7 rewritten: `pnpm backup` (every database, OpenBao's snapshot through the AppRole `backup`, the volumes, the env file and the TLS folder, each encrypted with age to `SDLC_BACKUP_DIR`; QUESTIONS #326–#329), the systemd timer, `pnpm restore` into an empty stack and the drill. Tested with throw-away keys (`pnpm test:backup`) |

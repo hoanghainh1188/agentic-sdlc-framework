@@ -49,7 +49,8 @@ describe.skipIf(!enabled)(
     const envFile = path.join(tmp, 'it.env');
     const project = `sdlcapiev${process.pid}`;
     // Subnets of the live test files stay apart: this file uses 1–49.
-    const subnet = `172.30.${1 + (process.pid % 49)}.0/24`;
+    // Not 172.30.1.x: the default network `access` (172.30.1.0/29, V09) of a running stack.
+    const subnet = `172.30.${2 + (process.pid % 48)}.0/24`;
     const gateway = subnet.replace(/0\/24$/, '1');
     const bootstrap = path.join(deployDir, 'openbao/bootstrap.sh');
 

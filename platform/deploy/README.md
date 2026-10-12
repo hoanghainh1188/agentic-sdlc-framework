@@ -35,7 +35,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 | OpenBao | TLS on port 8200 runs everywhere (A10); on the server the certificate comes from the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Three named key holders before any real secret or client data (runbook T11 §3.2): not yet done (A10) |
 | Backups | Off the server, encrypted ([Backup and restore](#backup-and-restore)) |
 
-**Access from other machines: not supported yet.** The API and the dashboard listen on `127.0.0.1:8090` of the server only. TLS and a reverse proxy for team access come later (A10, M-F). Until then, people use the CLI and the dashboard on the server itself; an SSH tunnel to `127.0.0.1:8090` works for one person, but it is not a supported set-up. Comment commands and reviews on GitHub work from anywhere.
+**Access from other machines** (team access, V09): the API and the dashboard listen on `127.0.0.1:8090` of the server. People on other machines reach them only through the TLS proxy of the profile `access`, on one LAN port: see [Team access (operator)](#team-access-operator). Comment commands and reviews on GitHub work from anywhere.
 
 ## Create the GitHub App (operator)
 
@@ -345,6 +345,37 @@ curl -s http://127.0.0.1:8090/health/ready
 - Record the restart and who unsealed in the operations log (T11 §4).
 - On a development machine, [GETTING-STARTED Step 13](../GETTING-STARTED.md#step-13-restart-the-dev-stack-after-a-break-dev) is the same procedure with `up.sh core` (the LiteLLM keys are in `.env` there).
 
+## Team access (operator)
+
+People on other machines of the company LAN use the CLI and the dashboard through a TLS reverse proxy (task V09, [ADR-M67](../../design/ADR-M67-team-access.md)): nginx in the Compose profile `access`, on **one LAN port**. Nothing else is published beyond `127.0.0.1`; the api keeps listening on `127.0.0.1:8090` for the operator on the server. The server still accepts no connection from the internet: keep the port for the company LAN in the firewall.
+
+**What the proxy does:** TLS 1.2 and 1.3 only; plain HTTP on its port answers `400` (no redirect, no port 80); a request for another host name answers `421`; only `/`, `/dashboard/`, `/v1/`, `/health/live` and `/health/ready` reach the api, everything else answers `404`; it adds HSTS (one year) and the other security headers and leaves the dashboard's Content-Security-Policy as the api sends it; bodies above 64 KiB answer `413`; per client address, 10 requests a second (burst 40), 30 sign-in requests a minute (burst 10) and 20 connections at the same time, then `429`. It logs the time, the client address, the method, the path without its query string, the status and the duration: never a header. The token travels only in the `Authorization` header.
+
+**Networks.** The proxy is on a small network of its own, `access` (`<project>-access`, default `172.30.1.0/29`), with the api only: it cannot reach PostgreSQL, OpenBao, SeaweedFS or any other service. It overwrites `X-Forwarded-For` with the client's address, and the api trusts that header only from the proxy's fixed address (`SDLC_ACCESS_PROXY_IP`, default `172.30.1.6`) through `SDLC_API_TRUSTED_PROXY`, so the api's per-address limits count each person. The network `sdlc` does not change: an existing stack needs no network step. The real client address reaches the proxy only when Docker keeps it: Docker on Linux with its default port publishing does; Docker Desktop and some rootless set-ups show one shared address, and then every client shares one limit.
+
+### Set it up
+
+1. **A host name.** Choose the DNS name people open, for example `sdlc.example.internal`, and make it point to the server's LAN address in the company DNS. An IP address alone is not enough: passkeys refuse it.
+2. **Settings** in `platform/deploy/.env`:
+
+   ```bash
+   SDLC_ACCESS_BIND_ADDR=192.0.2.10          # the server's LAN address (0.0.0.0 works, with a warning)
+   SDLC_ACCESS_HOST_PORT=8443
+   SDLC_ACCESS_HOSTNAME=sdlc.example.internal
+   SDLC_ACCESS_IPS=                          # optional: IPv4 addresses for the CLI, space-separated
+   SDLC_ACCESS_TLS_DIR=/etc/sdlc/access-tls  # outside the repository on a server
+   SDLC_API_TRUSTED_PROXY=172.30.1.6         # = SDLC_ACCESS_PROXY_IP
+   ```
+
+   With the dashboard's GitHub sign-in on (`SDLC_API_WEB_SIGNIN=github`), set `SDLC_API_PUBLIC_ORIGIN=https://sdlc.example.internal:8443` (one public origin: the sign-in on `http://localhost:8090` stops), and add `https://sdlc.example.internal:8443/v1/auth/github/callback` to the GitHub App's callback URLs (a new App: `pnpm github-app:create --callback-url …`; an existing one: the App's settings on GitHub). Passkeys registered on `localhost` do not work on the new name; people register them again there.
+3. **The certificate** ([T11 §3d](../../handbook/03-templates/T11-openbao-runbook.md#3d-tls-for-team-access-the-proxys-certificate)): from the company CA, `pnpm access:tls import <folder with ca.pem, server.pem, server-key.pem>`; or from the A10 internal CA, `pnpm access:tls server <ca-folder>`. On a test machine, `pnpm access:tls dev` makes a throw-away CA. `pnpm access:tls check` shows the end dates and the names.
+4. **Start** with the profiles you use and `access` in the same call, for example `platform/deploy/scripts/up.sh core models platform sandbox access` (development: `pnpm compose:access`). `up.sh` checks the settings first (the bind address, the host name, the network `access`, `SDLC_API_TRUSTED_PROXY`, the public origin, the certificate) and starts nothing when one is wrong; a certificate ending within 30 days only warns.
+5. **Check**: `pnpm doctor` (the `access.*` lines), then from another machine `curl --cacert ca.pem https://sdlc.example.internal:8443/health/ready`.
+
+**People** set `SDLC_API_URL=https://sdlc.example.internal:8443` for `sdlc login`, and, when the company CA is not in their system, `NODE_EXTRA_CA_CERTS=<path to ca.pem>` (never `NODE_TLS_REJECT_UNAUTHORIZED=0`); the dashboard is at `https://sdlc.example.internal:8443/dashboard/` ([USER-GUIDE §2](../USER-GUIDE.md#account-and-login), handbook Ch.19 §19.8c). `sdlc doctor` names `NODE_EXTRA_CA_CERTS` when it cannot verify the certificate.
+
+**Turn it off:** stop the proxy (`docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile access stop sdlc-access`), empty `SDLC_ACCESS_BIND_ADDR`, `SDLC_ACCESS_HOSTNAME` and `SDLC_API_TRUSTED_PROXY`, and set `SDLC_API_PUBLIC_ORIGIN` back if the sign-in is on.
+
 ## Secrets and `.env`
 
 - `.env` holds every password and key. It is ignored by Git and has mode 600. **Never commit it and never paste it into chat, issues or email.**
@@ -355,7 +386,7 @@ curl -s http://127.0.0.1:8090/health/ready
 
 ## Ports
 
-All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The server accepts no inbound internet connections (D-03 section 9). Change a host port in `.env` when it is already in use.
+All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`), except the team access proxy, which binds to `SDLC_ACCESS_BIND_ADDR`. The server accepts no inbound internet connections (D-03 section 9). Change a host port in `.env` when it is already in use.
 
 | Service | Default host port | Notes |
 |---|---|---|
@@ -365,7 +396,8 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`). The serve
 | LiteLLM | 4000 | Models only with the profile `models` (keys from OpenBao). Without it: no models, development keys from `.env` |
 | SeaweedFS S3 | 8333 | Anonymous access denied. The only SeaweedFS port reachable from outside its container (A12) |
 | Langfuse | 3000 | `observability` profile only |
-| API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI. Also serves the read-only dashboard at `/dashboard/` (U01, `SDLC_API_DASHBOARD_DIR`, built into the image; `off` turns it off). Keep it on `127.0.0.1`: the dashboard is not for other machines (ADR-M54 §2.2; how people use it: [handbook Ch.19 §19.8e](../../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) |
+| API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI. Also serves the read-only dashboard at `/dashboard/` (U01, `SDLC_API_DASHBOARD_DIR`, built into the image; `off` turns it off). Keep it on `127.0.0.1`: other machines use the proxy of the profile `access` (ADR-M54 §2.2, ADR-M67; how people use it: [handbook Ch.19 §19.8e](../../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) |
+| Team access proxy (`sdlc-access`) | 8443 | `access` profile only. **The only port on another address**: `SDLC_ACCESS_BIND_ADDR`, the server's LAN address ([Team access](#team-access-operator)); without it the profile does not start |
 | Sandbox image registry | 5050 | `sandbox` profile only. **Always 127.0.0.1** (not `SDLC_BIND_ADDR`): it has no authentication. Not 5000: macOS uses it |
 
 Valkey, ClickHouse, the Langfuse worker, the OpenTelemetry Collector, **OpenBao**, the runner, the socket proxy and the npm proxy publish no port.
@@ -391,6 +423,8 @@ What leaves the server, and what stays on it. The data classes and which models 
 | Model prompts and answers | Langfuse (profile `observability` only) | Until the retention purge of the same loop (`purge` mode only) |
 | Audit log, gate decisions, escalations | PostgreSQL | At least 2 years |
 | Secrets and keys | OpenBao | Until rotated |
+
+Comes in: with the profile `access` only, HTTPS from the company LAN to the proxy's port (the API and the dashboard; [Team access](#team-access-operator)). Nothing else accepts a connection from another machine.
 
 Sandboxes reach only LiteLLM and the package proxy; never GitHub, OpenBao or the internet. The platform keeps no working copy of the code: clones are removed when a run ends.
 
@@ -583,6 +617,7 @@ A tag (`0.1.1`, `sha-<commit>`) never moves, but use the digest anyway: the plat
 | `sandbox.image` | Each active project's effective `sandbox.image` is pinned by digest and present on this machine |
 | `github.app` | The GitHub App's permissions and each project repository's installation against `platform/deploy/github-app/manifest.json`. The worker runs the check with its own AppRole (`docker compose exec -T sdlc-worker node /app/dist/doctor-github.js`, read only, codes only), so the App key never leaves OpenBao and the worker; skipped while OpenBao is sealed or the worker is stopped |
 | `images.mode` | `pnpm images mode` (`local` or `published`) |
+| `access.proxy`, `access.tls_files`, `access.tls_expiry`, `access.tls_names`, `access.ports`, `access.public_origin`, `access.trusted_proxy` | Team access (V09): `sdlc-access` runs and is healthy; its CA and certificate in `SDLC_ACCESS_TLS_DIR`, their end dates (a warning within 30 days) and whether the certificate names `SDLC_ACCESS_HOSTNAME` and `SDLC_ACCESS_IPS` (never the key file); every published port of the project on `127.0.0.1` except the proxy's on `SDLC_ACCESS_BIND_ADDR` (a warning on `0.0.0.0`); `SDLC_API_PUBLIC_ORIGIN` is the proxy's origin; `SDLC_API_TRUSTED_PROXY` is the proxy's address. Without team access: one line says it is off, and the ports are still checked |
 
 **Read only.** It runs only the commands of its allowlist (`platform/deploy/doctor/src/commands.ts`): no `up`, `down`, `rm`, `prune`, no OpenBao command other than `status`, no SQL that writes. It prints no secret (never a token, key share, password or key) and works on a stopped or sealed stack: it says so instead of failing. It may run anywhere a person runs commands for the stack, including through Claude Code. Exit 0 when no check failed (warnings included), 1 when one did, 2 for a usage error. A person checks their own login with `sdlc doctor` (handbook Ch.19 §19.8c).
 
@@ -604,6 +639,10 @@ Run `pnpm doctor` first ([Doctor](#doctor-pnpm-doctor)): it checks the rows of t
 | LiteLLM lists no model | Profile `models` not started, or the provider entry is not in OpenBao | `pnpm compose:models`; runbook T11 §5d |
 | A service stays unhealthy | See its log | `docker compose -f platform/deploy/docker-compose.yml logs <service>`; [what "healthy" means](#health-what-healthy-means) |
 | Valkey writes fail in Langfuse and LiteLLM | Valkey is full | [Shared Valkey](#shared-valkey-memory-limit) |
+| `up.sh` says the profile access is not ready | A team access setting is missing or wrong (the line before names it) | Fix that setting ([Team access](#team-access-operator)), then start again |
+| `sdlc-access` does not start; `access-tls-init` says a file is missing in `SDLC_ACCESS_TLS_DIR` | No certificate for the proxy | `pnpm access:tls import`, `server` or (test machine) `dev`: [T11 §3d](../../handbook/03-templates/T11-openbao-runbook.md#3d-tls-for-team-access-the-proxys-certificate) |
+| People on other machines get a certificate error | Their machine does not know the CA, or the address is not a name in the certificate | `NODE_EXTRA_CA_CERTS=<ca.pem>` for the CLI, the CA in the browser; open the name of `SDLC_ACCESS_HOSTNAME`; `pnpm access:tls check` |
+| Every person gets `429` at the same time | The proxy sees one shared client address (Docker Desktop, some rootless set-ups) | Run the stack on Docker for Linux with the default port publishing ([Team access](#team-access-operator)) |
 
 Problems with a gate or an intent (refused commands, held intents, escalations): [USER-GUIDE §5](../USER-GUIDE.md#5-when-something-goes-wrong). Still stuck: open an issue with the bug report template, and never paste a log line with a secret or client data. Security problems: [SECURITY.md](../../SECURITY.md).
 
@@ -611,7 +650,7 @@ Problems with a gate or an intent (refused commands, held intents, escalations):
 
 This deletes every intent, the evidence, the audit log and the secrets. Keep a backup first if the records must be kept (the audit log at least 2 years, handbook Ch.3).
 
-1. Stop and remove the containers and their volumes: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox down -v`.
+1. Stop and remove the containers and their volumes: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox --profile access down -v`.
 2. Remove the per-run objects the runner may have left after a crash: containers, networks and volumes whose name starts with `sdlc-sandbox-`, `sdlc-run-` or `sdlc-ws-` (`docker ps -a`, `docker network ls`, `docker volume ls`).
 3. Remove the images if you want the disk back (`docker image ls`).
 4. On GitHub: uninstall the GitHub App from the repositories, then delete the App and its private key.
@@ -631,4 +670,5 @@ This deletes every intent, the evidence, the audit log and the secrets. Keep a b
 | `pnpm test:sandbox-image` | Builds the sandbox image `node24` and runs it hardened with the real Verdaccio: Node 24, pnpm through corepack and the proxy, no other way out. Needs internet | Yes |
 | `pnpm test:observability` | A08 AC3: `core + models + observability` on a throw-away Compose project (ports +27000) with a stub model and throw-away OpenBao keys. One model call through LiteLLM must give a Langfuse trace with all seven labels; a span of a platform process must reach Langfuse through the collector; the collector has no host port. About 2 minutes | Yes |
 | `pnpm test:fresh-deploy` | E07 AC3: follows the section [Fresh deployment](#fresh-deployment-operator) on a throw-away Compose project (ports +31000, throw-away keys): `compose:env`, OpenBao init, unseal and configure, the shared secrets, every credentials command, the migrations, `up.sh core models platform sandbox`, `ops bootstrap`, the team, the sandbox image, the agent, the configuration, the AI record and the first intent at G1, then `sdlc audit verify`. CI: weekly and manual runs only. Prints `e07:fresh_deploy_seconds` | Yes |
+| `pnpm test:access` | V09: the profile `access` on a throw-away Compose project (ports +36000, throw-away OpenBao keys and CA): from a container on another network only the proxy answers, TLS verified with the CA and refused without it, the routes (`/health/ready` included), plain HTTP `400`, another host `421`, a large body `413`, the headers and the dashboard's CSP unchanged, the proxy's rate limit, a forged `X-Forwarded-For` does not escape the api's limit, the proxy cannot reach PostgreSQL, OpenBao or SeaweedFS, `sdlc whoami` through it, a renewal without a restart. A few minutes | Yes |
 | `pnpm test:compose` | Starts `core`, then `core + observability`, with a throw-away env file, its own project name and ports shifted by 20000. Checks health, databases, namespace, buckets, Valkey policy, OpenBao state, Langfuse sign-up and trace upload. Removes everything afterwards. Takes about 2–5 minutes | Yes |

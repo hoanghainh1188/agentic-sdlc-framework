@@ -5,6 +5,7 @@
 // the project's volume openbao-ca and verifies the certificate, like the platform processes.
 import { spawnSync } from 'node:child_process';
 
+import { accessNetworkFor } from '../../deploy/trial/src/env-file.js';
 import { loadCompose } from '../deploy/compose';
 
 export interface ThrowawayProject {
@@ -28,6 +29,11 @@ export function isolateEnv(text: string, p: ThrowawayProject): string {
   let out = set(text, 'COMPOSE_PROJECT_NAME', p.project);
   out = set(out, 'SDLC_NETWORK_SUBNET', p.subnet);
   out = set(out, 'SDLC_NETWORK_GATEWAY', p.gateway);
+  // V09 (ADR-M67 §2.5): the api always joins the network `access`, so each project needs its own.
+  const access = accessNetworkFor(p.subnet);
+  out = set(out, 'SDLC_ACCESS_NETWORK_SUBNET', access.subnet);
+  out = set(out, 'SDLC_ACCESS_NETWORK_IP_RANGE', access.ipRange);
+  out = set(out, 'SDLC_ACCESS_PROXY_IP', access.proxyIp);
   return out.replace(
     /^(\w+_HOST_PORT)=(\d+)$/gm,
     (_, key: string, port: string) => `${key}=${Number(port) + p.portOffset}`,
