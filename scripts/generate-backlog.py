@@ -453,14 +453,14 @@ t("U06","UX","Dashboard writes: CSRF, origin check, passkey step-up","M",["U05"]
   "Step-up per decision: a random challenge made by the api and stored with its bound action (session, action, subject, gate, decision, `expected_input_sha256`), about 2 minutes, used once in the decision's transaction; a request that differs from the stored action is refused; never for a kill or an acknowledgement",
   "Tests: a request from another origin, without the CSRF token, with a reused or foreign assertion, or with a session of another tenant is refused; the CSP of ADR-M54 unchanged (static test)"],
  "ADR-M73, MVP1-UI-SCOPE 1.2 §5.3–§5.4, §5.8–§5.9 (QUESTIONS #376, #377)")
-t("U07","UX","Dashboard wave 1: kill a run, gate decisions, escalations","M",["U06"],"FR-10, FR-11, FR-16, FR-17, FR-18, FR-34",
+t("U07","Later","Dashboard wave 1: kill a run, gate decisions, escalations","M",["U06"],"FR-10, FR-11, FR-16, FR-17, FR-18, FR-34",
  "platform/apps/dashboard, platform/apps/api (intents, runs, escalations), platform/packages/core (commands, gate input hash), migrations (source `web`), platform/packages/messages, platform/tests/*, handbook Ch.19, USER-GUIDE",
  ["The dashboard calls only the existing endpoints: `POST /v1/runs/:run/kill`, `POST /v1/intents/:intent/gates/:gate/decisions`, `POST /v1/escalations/:code/ack|decisions`; no new business endpoint; the same core handlers decide",
   "A confirmation step shows what the decision is bound to and the current gate input hash (a new read-only field of the intent's `GET` answer, resolved by the workflow's own function); the decision sends `expected_input_sha256` and the API answers 409 when the input changed (optional for the CLI)",
   "Source code `web` in `gate_decisions.source` and the kill source (D-05 migration); the actor is the person's user ID; no session or passkey ID in an append-only table",
   "G7 is a link to the pull request only (no approve, no request changes); refusals are shown with their catalog code (producer, missing role, same person twice, frozen); the page has no rule set of its own",
   "Playwright: the producer, a wrong role and the same person twice are refused through the page (N5); screenshots at 375, 768, 1440 px, light and dark; `pnpm test:db` for the 409 and the source"],
- "ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378). U06 built the mechanism (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414): mark the decision, kill and acknowledgement routes `@SessionAction('actions')` (they refuse sessions until then); in the gate and escalation decisions call `PasskeysService.verifyStepUp` on the body's `step_up`, then core `consumeStepUp` inside the decision's transaction with the binding (`stepUpRequestSha256` of the body without `step_up`); the page asks `POST /v1/auth/step-up` with the same body")
+ "ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378). U06 built the mechanism (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414): mark the decision, kill and acknowledgement routes `@SessionAction('actions')` (they refuse sessions until then); in the gate and escalation decisions call `PasskeysService.verifyStepUp` on the body's `step_up`, then core `consumeStepUp` inside the decision's transaction with the binding (`stepUpRequestSha256` of the body without `step_up`); the page asks `POST /v1/auth/step-up` with the same body. QUESTIONS #424 (Harry, 2026-10-12): deferred from v0.3.0 until people in the trial or a team ask for decisions in the dashboard; the comments and the CLI already decide every gate")
 t("U08","Later","Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs","M",["U07"],"FR-01, FR-02, FR-20, FR-40",
  "platform/apps/dashboard, platform/packages/messages, platform/tests/*, handbook Ch.19",
  ["Create an intent and link its spec with the two calls of U03; a refused link keeps the intent and says so",
@@ -501,6 +501,12 @@ t("V13","UX","Agent efficiency report from real runs: `sdlc metrics agents`","M"
   "Optional baseline: a person may record an estimate of the human effort for an intent (hours, a number) so that the report can show the time compared with it; empty by default",
   "Tests: `pnpm test` (the CLI, the rules), `pnpm test:db` (each measure on seeded runs, tenants, roles); handbook Ch.19 usage; the dashboard may show it later"],
  "QUESTIONS #422 (Harry, 2026-10-12): measure whether agents and models are worth it in real work, next to the evaluation harness (L02). The `sdlc trial report` (V01) may include its numbers later")
+t("X09","EXT","Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)","S",["B05"],"NFR-05",
+ "platform/spikes/git-hosts/* (thrown away), design/ADR-M70",
+ ["Check each host's API against the 19 methods of `GitHostAdapter`: a short-lived token for one repository, polling of comments, reviews, merges and CI results, opening a pull request, reviews bound to a commit, who merged, CI checks, security findings, branch protection",
+  "For each host: what works, what is missing for G6 and G7, and a workaround or a refusal",
+  "ADR-M70: a ranking and the effort of each adapter"],
+ "QUESTIONS #361 (Harry, 2026-10-10): clients use GitLab, Backlog Git and Bitbucket besides GitHub; adapters wait for a real project (X10)")
 t("X01","EXT","Spike: a second, open-source coding agent (Aider or OpenCode)","S",["C05"],"NFR-04, NFR-05, D-02 §4.2",
  "platform/spikes/agent2/* (thrown away), design/ADR-M68",
  ["Run Aider and OpenCode (pinned) in the node24 sandbox: the model only through LiteLLM with the run's virtual key, no other egress, no Git push; iteration and time caps, a stop on request, and counts for loop detection (`events`, `identicalCalls`)",
@@ -537,12 +543,6 @@ t("X07","EXT","A context snapshot for every run","M",["X04"],"FR-40, FR-41",
   "Never text, prompts or code in run events, logs or tables",
   "Tests: a stub-model run reads files and searches documents; the snapshot appears in the pack"],
  "QUESTIONS #361 (Harry, 2026-10-10): D-02 §4.2 \"full context snapshots\"")
-t("X09","EXT","Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)","S",["B05"],"NFR-05",
- "platform/spikes/git-hosts/* (thrown away), design/ADR-M70",
- ["Check each host's API against the 19 methods of `GitHostAdapter`: a short-lived token for one repository, polling of comments, reviews, merges and CI results, opening a pull request, reviews bound to a commit, who merged, CI checks, security findings, branch protection",
-  "For each host: what works, what is missing for G6 and G7, and a workaround or a refusal",
-  "ADR-M70: a ranking and the effort of each adapter"],
- "QUESTIONS #361 (Harry, 2026-10-10): clients use GitLab, Backlog Git and Bitbucket besides GitHub; adapters wait for a real project (X10)")
 t("X11","EXT","Context condensing for agent runs","M",["C05"],"FR-31, FR-32, FR-35, D-07 §7",
  "platform/packages/adapters/agent-openhands, platform/packages/config, platform/apps/runner, platform/tests/*, design/ADR-M29, handbook Ch.13",
  ["Check the condenser options of the pinned OpenHands Agent Server (1.48.0): which condensers exist, how they are set per conversation, what events they add to the log; record the result in ADR-M29",
@@ -620,13 +620,13 @@ def lp(k):
         if c[0]>b[0]: b=c
     return (b[0]+W[IDX[k]['size']],b[1]+[k])
 CP=" → ".join(max((lp(k) for k in IDX),key=lambda x:x[0])[1])
-MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the dashboard's actions (QUESTIONS #355, #364, #420)"),("EXT","Other agents, tools for agents, document knowledge, other Git hosts: toward v0.4.0 (QUESTIONS #361, #420)"),("Models","Self-hosted models (QUESTIONS #362)"),("Server","A team on a server: toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done)")]
+MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)"),("EXT","Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)"),("Models","Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424)"),("Server","A team on a server: toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done)")]
 o=[];w=o.append
 w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.42 |
+| Version | 1.43 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -675,9 +675,9 @@ flowchart LR
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
-    ME --> UX["UX V04–V13, U05–U07, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
-    UX --> EXT["EXT X01–X04, X07, X09, X11, X12 (v0.4.0)"]
-    EXT --> MO["Models L01, L03"]
+    ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
+    UX --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.4.0)"]
+    EXT --> MO["Models L01 (early in v0.4.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
     MD --> MU["U01–U03 read-only dashboard, done (Later)"]
@@ -794,6 +794,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.40 | 2026-10-12 | Claude (docs review for v0.2.0), approved by Harry | The header shows the latest version; the second 1.38 row renumbered 1.39; ROADMAP.md marks each released task with its release (v0.1.0, v0.1.1, v0.2.0). No task changed |
 | 1.41 | 2026-10-12 | Claude, approved by Harry | L02 becomes an evaluation harness for agents, models and prompts (hidden tests, N runs, pass^k, confidence intervals, ADR-M78), size L; new task V13, the agent efficiency report from real runs (QUESTIONS #422) |
 | 1.42 | 2026-10-12 | Claude, approved by Harry | L02: a blind pairwise ranking by a reviewer, a growing task set reported per version, and a spike that reuses an existing evaluation framework where it fits (QUESTIONS #423) |
+| 1.43 | 2026-10-12 | Claude, approved by Harry | Plan review after v0.2.1 (QUESTIONS #424): U07 moves to Later until trial users ask for it; v0.3.0 = V13, L02, V10; X09 first in EXT and L01 early in v0.4.0 |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
