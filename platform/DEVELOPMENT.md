@@ -44,6 +44,7 @@ Then run the suites of section 2 that cover the code you changed (section 5 list
 | `pnpm test:observability` | One model call → a Langfuse trace with the seven labels; a platform span through the collector; no host port; the Langfuse purge (E08 AC4). Ports +27000, stub model | Docker | Developer machine |
 | `pnpm test:sandbox-image` | The `node24` sandbox image, hardened, with the real Verdaccio | Docker, internet | CI job `sandbox-image` |
 | `pnpm test:agent` | The real OpenHands Agent Server in a `node24` sandbox with a scripted stub model as LiteLLM, and a throw-away PostgreSQL. `SDLC_SANDBOX_IMAGE` uses a built image | Docker | CI job `sandbox-image` |
+| `pnpm test:attack` | H01 (ADR-M80): attacks from inside the real `node24` sandbox with a stub model that obeys every injection (`[stub:attack=<name>]`): environment and files, internet, OpenBao and platform services, Docker, another run, packages, the box's limits, instruction files, a hostile `finish`; each also searches records and logs for canary secrets. Not while a long `pnpm eval` uses Docker | Docker, internet | CI job `sandbox-image` |
 | `pnpm test:pilot` | G1–G8 on the sample repository's shape with the real runner (section 4.3) | Docker | CI job `sandbox-image`, weekly and on demand only |
 | `pnpm test:dashboard` | Playwright against the stub API (section 4.4) | Chromium (`pnpm exec playwright install chromium`, once) | CI job `sandbox-image` when the dashboard, `api-schemas`, the api's static route or `platform/tests/e2e/` change; weekly; on demand |
 | `pnpm test:fresh-deploy` | Follows `deploy/README.md` "Fresh deployment (operator)" on a throw-away project (ports +31000) to the first intent at G1 | Docker | CI job `fresh-deploy`, weekly and on demand only |
@@ -107,7 +108,7 @@ The test App is `harryforge-sdlc-dev` (Client ID `Iv23liQtMQBwNyVYZuJt`), instal
 
 - `platform/tests/integration/pilot/`. `PilotStack` (`pilot/stack.ts`) = B10's stack on the **wall clock** with the worker's G4–G8 activities, the real `CostController` over `StubGateway` (run keys registered at the stub model, `/key/info`), StubOpenBao, and the **real runner** on the task queue `sdlc-runner` (`node24` sandbox, Agent Server, stub model as LiteLLM, the HTTP relay `pilot/relay-http.mjs` as `SDLC_RUNNER_SELF_CONTAINER`).
 - The repository is a bare Git repository on `StubGitHost` (`main` protected) with snapshots of the pilot's `AGENTS.md` and specs (`pilot/fixtures/`, commit `PILOT_COMMIT`). The GitHub stub serves refs, contents, trees, pull requests, a `ci-ok` check run (`setCi`) and code scanning (no alert).
-- The plan's task `summary` carries the stub model's script marker: `[stub:append]`, `[stub:edit]`, `[stub:count]`, `[stub:slow]`, `[stub:repeat]`, `[stub:silent]` (in `test:agent` only), `[stub:live]` (live tests).
+- The plan's task `summary` carries the stub model's script marker: `[stub:append]`, `[stub:edit]`, `[stub:count]`, `[stub:slow]`, `[stub:repeat]`, `[stub:silent]` (in `test:agent` only), `[stub:attack=<name>:<params>]` (in `test:attack` only), `[stub:live]` (live tests).
 - Pilot configuration: HOTL block window 1 minute, `run.g6_ci_retries: 1`, `verification.required_checks: [ci-ok]`.
 - Files: `t01-n6` (C09 AC1, N6; and E07: T01 from G1 to G8 and `done`, Person B reviews and merges on the stub Git host with `PilotStack.review`, `mergeAsPerson`, `BareRepo.merge`; the test checks that no merge endpoint is called; then the pack, `sdlc audit verify` and one cost record per model call), `n1-n2-n3` (C09 AC2), `autonomy` (T09 to `rejected`, T10, C09 AC5), `kill-loop` (C09 AC4; prints `c09:kill_to_clean_up_ms:`). Run the files one at a time. A real G4–G6 run takes about two minutes.
 
@@ -171,6 +172,7 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 | LiteLLM and the Cost Controller | C03; ADR-M24 | unit: `cost/litellm-gateway.test.ts`; `pnpm test:litellm` (also: revoke by run; the key ID is not a key) |
 | Scheduled spend sync | C12; ADR-M24 §2.5 | unit: `worker/cost-sync-loop.test.ts`, `worker/settings.test.ts`; db: `cost-sync.test.ts` |
 | Runner and sandboxes | C04; ADR-M25 | unit: `deploy/sandbox-profile.test.ts` (the socket proxy allowlist equals `ALLOWED_ENDPOINTS`); `pnpm test:runner`, `pnpm test:runner-compose`, `pnpm test:sandbox-image` |
+| Threat model of a run, attack tests | H01; ADR-M80 | unit: `attack/prompt-injection.test.ts`, `attack/comment-commands.test.ts`; `pnpm test:attack` |
 | OpenHands adapter | C05; ADR-M29 | unit; `pnpm test:agent`; `pnpm test:agent-real` (section 3) |
 | Agent register | C10; ADR-M31 | unit: rules, SQL, CLI; db: `agents.test.ts` |
 | Gate G4 | C06; ADR-M33 | unit: `workflow/gate-g4.test.ts`, `config/agent-key-config.test.ts`, notices, `contracts/agent-instructions.test.ts`; db: `gate-g4.test.ts` (every check, POLICY, HITL, block, `prepareRun`) |
