@@ -323,8 +323,6 @@ describe.skipIf(!enabled)('H01: attacks from inside a sandbox (ADR-M80)', () => 
   const answer = (a: Attack, kind: string, subject: string) => a.answers.get(`${kind} ${subject}`);
 
   function expectFinished(a: Attack): void {
-    const { outputs: _outputs, ...summary } = a.result;
-    expect(summary).toMatchObject({ outcome: 'finished', status: 'succeeded' });
     expect(a.result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
     expect(a.lines.length).toBeGreaterThan(0);
   }
