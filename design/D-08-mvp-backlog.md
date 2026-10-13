@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.46 |
+| Version | 1.47 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -45,11 +45,12 @@
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) | 14 | S×3 · M×9 · L×2 |
+| EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 5 | S×1 · M×3 · L×1 |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424) | 8 | S×4 · M×2 · L×2 |
 | Models | Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424) | 2 | S×1 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 8 | S×1 · M×7 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 15 | S×4 · M×5 · L×6 |
-| **Total** | | **102** | |
+| **Total** | | **107** | |
 
 ### Order and dependencies between milestones
 
@@ -62,7 +63,8 @@ flowchart LR
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
-    UX --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.4.0)"]
+    UX --> EV["EVAL L04–L08: evaluations, reports, recommendations for managers"]
+    EV --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.4.0)"]
     EXT --> MO["Models L01 (early in v0.4.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
@@ -1099,6 +1101,84 @@ flowchart LR
 > Note: Found in the plan review after V13 (Harry, 2026-10-13, QUESTIONS #440): the repository is public and the community trial runs on people's own repositories. Before the first trial report from a real repository
 
 
+### EVAL — Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)
+
+#### L04. Evaluations on the server, one engine for the server and developer machines
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| L | L02, V13, C06 | D-07 §3–§5, FR-31, FR-50, NFR-01, NFR-02 | platform/eval/*, platform/apps/worker (evaluation loop), platform/apps/runner (queue), platform/packages/core (evaluations), migrations, design/D-05, design/ADR (next free number), platform/tests/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: One evaluation engine (tasks, scoring container, statistics, report: ADR-M78) used in two places: `pnpm eval` on a developer machine (also on a trial stack) and evaluations on the server; the same task set and configuration give comparable numbers, and every report says where it ran and on what hardware
+- [ ] AC2: On the server, runs go through the deployed runner and LiteLLM (API and self-hosted models, the seven labels, a capped virtual key per run), on their own queue: they never take a slot of a real run (`SDLC_RUNNER_MAX_SANDBOXES` counts real runs first) and stop when their own budget is used up
+- [ ] AC3: Results in the database per tenant, codes and numbers only (as the run results of ADR-M78), append-only; the scoring container keeps its limits (no network, no capability, non-root)
+- [ ] AC4: Data classes (D-07 §4): a `client_restricted` project evaluates with self-hosted models only; `prohibited` never
+- [ ] AC5: Tests: `pnpm test`, `pnpm test:db` (results, tenants, budget stop, the queue never blocks a real run), a live run on the stub model
+
+> Note: QUESTIONS #450 (Harry, 2026-10-13): managers plan evaluations themselves and get reports and recommendations; the evaluation also stays possible on a developer machine
+
+#### L05. Evaluation plans that managers make themselves
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | L04 | FR-20, NFR-08 | platform/apps/api (evaluations), platform/apps/cli (sdlc eval …), platform/apps/dashboard, platform/packages/config (access.eval_roles), platform/packages/core, platform/tests/*, handbook Ch.19 |
+
+**Acceptance criteria**
+
+- [ ] AC1: A person with a role in project config `access.eval_roles` (default Person A, Person B, governance, admin; never `viewer`, a mandatory rule) makes an evaluation plan: the configurations (agent versions and models from the agent register and the gateway, and **prompt variants**: another instructions file to try before it changes `AGENTS.md`), the task set, the number of runs, a budget
+- [ ] AC2: When it runs: once, on a schedule (for example weekly), or when a new model or agent version appears
+- [ ] AC3: Through the API, `sdlc eval plan|run|list|show` and the dashboard; every plan and run audited (IDs, codes, hashes only)
+- [ ] AC4: Tests: roles, budgets, schedules, tenants, refusals
+
+> Note: QUESTIONS #450
+
+#### L06. Evaluation reports and recommendations for managers
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | L05 | FR-53, NFR-08 | platform/packages/core (recommendations), platform/apps/api, platform/apps/cli, platform/apps/dashboard, platform/packages/messages, platform/tests/*, handbook Ch.19 |
+
+**Acceptance criteria**
+
+- [ ] AC1: The report of an evaluation (ADR-M78 §2.5) in the dashboard and the CLI, with the real-run numbers of V13 for the same agents and models next to it; a notice when an evaluation ends
+- [ ] AC2: **Recommendations by rules**, each with the numbers and intervals it rests on, never a claim the data does not show: for example a cheaper model that resolves as well (no difference by the report's test), a low CI-on-the-first-try rate (add the checks to the instructions), unstable results (pass@k far above pass^k), runs stopped at a cap, scope breaches
+- [ ] AC3: A recommendation is a proposal only: a change of model or prompt still goes through the agent register (a new version, approvals, 2+N)
+- [ ] AC4: Recommendations written by a model come later, and only after they were checked against people's judgement (as the LLM judge, QUESTIONS #438)
+- [ ] AC5: Tests: each rule on synthetic results (fires, does not fire, the numbers quoted), texts from the catalog
+
+> Note: QUESTIONS #450
+
+#### L07. A project's own task set from its merged intents
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | L02, E01 | FR-40, D-07 §4 | platform/eval/*, platform/packages/core, platform/apps/cli, platform/tests/*, design/ADR (next free number) |
+
+**Acceptance criteria**
+
+- [ ] AC1: Make evaluation tasks from a project's merged intents, as SWE-bench does: the spec, the base commit, and the tests the pull request added as hidden tests; a person reviews each task before it enters the set
+- [ ] AC2: The task set is private to the project and tenant and follows its data class and retention (FR-44); never copied to another tenant
+- [ ] AC3: The task check of ADR-M78 (`--check`) runs on every new task
+- [ ] AC4: Tests: a task made from a fixture intent, refused when the pull request added no test
+
+> Note: QUESTIONS #450: evaluations on a project's own code, not only the sample repository
+
+#### L08. Design: evaluations in the agent register's approvals
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | L06, C10 | FR-11, FR-36 | design/ADR (next free number), design/ADR-M31, handbook Ch.20, design/QUESTIONS.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: A design for a new agent version (model, instructions) to reach a threshold on the project's task set before Person B and the owner approve it, and for the 3-month recertification (FR-36) to use evaluation numbers
+- [ ] AC2: No code in this task; implementation tasks follow Harry's approval
+
+> Note: QUESTIONS #450
+
+
 ### EXT — Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)
 
 #### X09. Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
@@ -1678,6 +1758,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.44 | 2026-10-12 | Claude (task V13), approved by Harry | V13: access rule and model attribution (QUESTIONS #430–#433); its human-effort baseline (AC4) split out as V14 in Later |
 | 1.45 | 2026-10-13 | Claude, approved by Harry | Plan review after V13 (QUESTIONS #440): new tasks H01 (threat model and attack tests, UX), H02 (dependencies an agent adds), H03 (design: client data deletion), O04 (data that only grows), O05 (key rotation) in Server; O06 (real repositories), O07 (load test) in Later; more items in "Also later"; prefix `H` |
 | 1.46 | 2026-10-13 | Claude (task L02, PR 3), approved by Harry | L02 note: kept diffs for blind pairs (QUESTIONS #445); Langfuse scores later (QUESTIONS #446) |
+| 1.47 | 2026-10-13 | Claude, approved by Harry | New milestone EVAL after v0.3.0, before EXT (QUESTIONS #450): L04 (evaluations on the server, one engine with developer machines), L05 (evaluation plans by managers), L06 (reports and recommendations), L07 (a project's task set from its merged intents), L08 (design: evaluations in the agent register's approvals) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |

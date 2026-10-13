@@ -607,6 +607,41 @@ t("X13","Later","Agent memory","L",["X12"],"FR-11, FR-33, FR-44",
  ["Built as ADR-M74 decides; handbook Ch.13 and Ch.20 usage",
   "Tests for every rule of X12: approval by a person who is not the producer, removal, caps, the data framing against injection, retention, another project's memory refused"],
  "QUESTIONS #395 (Harry, 2026-10-12)")
+t("L04","EVAL","Evaluations on the server, one engine for the server and developer machines","L",["L02","V13","C06"],"D-07 §3–§5, FR-31, FR-50, NFR-01, NFR-02",
+ "platform/eval/*, platform/apps/worker (evaluation loop), platform/apps/runner (queue), platform/packages/core (evaluations), migrations, design/D-05, design/ADR (next free number), platform/tests/*",
+ ["One evaluation engine (tasks, scoring container, statistics, report: ADR-M78) used in two places: `pnpm eval` on a developer machine (also on a trial stack) and evaluations on the server; the same task set and configuration give comparable numbers, and every report says where it ran and on what hardware",
+  "On the server, runs go through the deployed runner and LiteLLM (API and self-hosted models, the seven labels, a capped virtual key per run), on their own queue: they never take a slot of a real run (`SDLC_RUNNER_MAX_SANDBOXES` counts real runs first) and stop when their own budget is used up",
+  "Results in the database per tenant, codes and numbers only (as the run results of ADR-M78), append-only; the scoring container keeps its limits (no network, no capability, non-root)",
+  "Data classes (D-07 §4): a `client_restricted` project evaluates with self-hosted models only; `prohibited` never",
+  "Tests: `pnpm test`, `pnpm test:db` (results, tenants, budget stop, the queue never blocks a real run), a live run on the stub model"],
+ "QUESTIONS #450 (Harry, 2026-10-13): managers plan evaluations themselves and get reports and recommendations; the evaluation also stays possible on a developer machine")
+t("L05","EVAL","Evaluation plans that managers make themselves","M",["L04"],"FR-20, NFR-08",
+ "platform/apps/api (evaluations), platform/apps/cli (sdlc eval …), platform/apps/dashboard, platform/packages/config (access.eval_roles), platform/packages/core, platform/tests/*, handbook Ch.19",
+ ["A person with a role in project config `access.eval_roles` (default Person A, Person B, governance, admin; never `viewer`, a mandatory rule) makes an evaluation plan: the configurations (agent versions and models from the agent register and the gateway, and **prompt variants**: another instructions file to try before it changes `AGENTS.md`), the task set, the number of runs, a budget",
+  "When it runs: once, on a schedule (for example weekly), or when a new model or agent version appears",
+  "Through the API, `sdlc eval plan|run|list|show` and the dashboard; every plan and run audited (IDs, codes, hashes only)",
+  "Tests: roles, budgets, schedules, tenants, refusals"],
+ "QUESTIONS #450")
+t("L06","EVAL","Evaluation reports and recommendations for managers","M",["L05"],"FR-53, NFR-08",
+ "platform/packages/core (recommendations), platform/apps/api, platform/apps/cli, platform/apps/dashboard, platform/packages/messages, platform/tests/*, handbook Ch.19",
+ ["The report of an evaluation (ADR-M78 §2.5) in the dashboard and the CLI, with the real-run numbers of V13 for the same agents and models next to it; a notice when an evaluation ends",
+  "**Recommendations by rules**, each with the numbers and intervals it rests on, never a claim the data does not show: for example a cheaper model that resolves as well (no difference by the report's test), a low CI-on-the-first-try rate (add the checks to the instructions), unstable results (pass@k far above pass^k), runs stopped at a cap, scope breaches",
+  "A recommendation is a proposal only: a change of model or prompt still goes through the agent register (a new version, approvals, 2+N)",
+  "Recommendations written by a model come later, and only after they were checked against people's judgement (as the LLM judge, QUESTIONS #438)",
+  "Tests: each rule on synthetic results (fires, does not fire, the numbers quoted), texts from the catalog"],
+ "QUESTIONS #450")
+t("L07","EVAL","A project's own task set from its merged intents","M",["L02","E01"],"FR-40, D-07 §4",
+ "platform/eval/*, platform/packages/core, platform/apps/cli, platform/tests/*, design/ADR (next free number)",
+ ["Make evaluation tasks from a project's merged intents, as SWE-bench does: the spec, the base commit, and the tests the pull request added as hidden tests; a person reviews each task before it enters the set",
+  "The task set is private to the project and tenant and follows its data class and retention (FR-44); never copied to another tenant",
+  "The task check of ADR-M78 (`--check`) runs on every new task",
+  "Tests: a task made from a fixture intent, refused when the pull request added no test"],
+ "QUESTIONS #450: evaluations on a project's own code, not only the sample repository")
+t("L08","EVAL","Design: evaluations in the agent register's approvals","S",["L06","C10"],"FR-11, FR-36",
+ "design/ADR (next free number), design/ADR-M31, handbook Ch.20, design/QUESTIONS.md",
+ ["A design for a new agent version (model, instructions) to reach a threshold on the project's task set before Person B and the owner approve it, and for the 3-month recertification (FR-36) to use evaluation numbers",
+  "No code in this task; implementation tasks follow Harry's approval"],
+ "QUESTIONS #450")
 t("L01","Models","A self-hosted model service (vLLM) on an optional GPU host","M",["L02"],"D-07 §3, §4, NFR-01",
  "platform/deploy (profile models-local), platform/deploy/litellm/config.ctmpl, design/D-03 §10.1, design/D-07, design/ADR-M71, handbook T11",
  ["A Compose profile `models-local` with vLLM pinned (Apache-2.0), a health check and a limit of concurrent requests, on the server or a separate GPU host",
@@ -668,13 +703,13 @@ def lp(k):
         if c[0]>b[0]: b=c
     return (b[0]+W[IDX[k]['size']],b[1]+[k])
 CP=" → ".join(max((lp(k) for k in IDX),key=lambda x:x[0])[1])
-MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)"),("EXT","Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)"),("Models","Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424)"),("Server","A team on a server: toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done)")]
+MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)"),("EVAL","Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)"),("EXT","Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)"),("Models","Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424)"),("Server","A team on a server: toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done)")]
 o=[];w=o.append
 w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.46 |
+| Version | 1.47 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -724,7 +759,8 @@ flowchart LR
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
-    UX --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.4.0)"]
+    UX --> EV["EVAL L04–L08: evaluations, reports, recommendations for managers"]
+    EV --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.4.0)"]
     EXT --> MO["Models L01 (early in v0.4.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
@@ -846,6 +882,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.44 | 2026-10-12 | Claude (task V13), approved by Harry | V13: access rule and model attribution (QUESTIONS #430–#433); its human-effort baseline (AC4) split out as V14 in Later |
 | 1.45 | 2026-10-13 | Claude, approved by Harry | Plan review after V13 (QUESTIONS #440): new tasks H01 (threat model and attack tests, UX), H02 (dependencies an agent adds), H03 (design: client data deletion), O04 (data that only grows), O05 (key rotation) in Server; O06 (real repositories), O07 (load test) in Later; more items in "Also later"; prefix `H` |
 | 1.46 | 2026-10-13 | Claude (task L02, PR 3), approved by Harry | L02 note: kept diffs for blind pairs (QUESTIONS #445); Langfuse scores later (QUESTIONS #446) |
+| 1.47 | 2026-10-13 | Claude, approved by Harry | New milestone EVAL after v0.3.0, before EXT (QUESTIONS #450): L04 (evaluations on the server, one engine with developer machines), L05 (evaluation plans by managers), L06 (reports and recommendations), L07 (a project's task set from its merged intents), L08 (design: evaluations in the agent register's approvals) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
@@ -857,7 +894,7 @@ with open('design/D-08-backlog.csv','w',newline='',encoding='utf-8') as f:
     for x in T: c.writerow([x['id'],x['ms'],x['title'],x['size'],";".join(x['deps']),x['fr'],x['area']," | ".join(x['ac']),x['note']])
 
 # ---------- ROADMAP.md (public, generated) ----------
-RM_MS=["M-E","UX","EXT","Models","Server","Later"]
+RM_MS=["M-E","UX","EVAL","EXT","Models","Server","Later"]
 SKIP_LATER={"U01","U02","U03","K02"}
 # Released tasks shown in ROADMAP.md: task -> the release that shipped it.
 DONE={**{t:"v0.1.0" for t in ("V01","V02","V03")},
