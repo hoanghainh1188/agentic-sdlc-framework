@@ -37,6 +37,7 @@ MILESTONES = {
     "EXT": "Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)",
     "Models": "Self-hosted models (QUESTIONS #362)",
     "Server": "A team on a server: toward v1.0 (QUESTIONS #363)",
+    "EVAL": "Evaluation for managers: plans, reports and recommendations, on the server and on developer machines (QUESTIONS #450)",
     "Later": "Not scheduled yet (was MVP+1)",
 }
 LABELS = {
