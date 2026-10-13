@@ -2,8 +2,8 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.48 |
-| Date | 2026-10-12 |
+| Version | 1.49 |
+| Date | 2026-10-13 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-05 (data), D-07 (tokens), D-09 (sample repo) |
@@ -48,9 +48,9 @@
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 5 | S×1 · M×3 · L×1 |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424) | 8 | S×4 · M×2 · L×2 |
 | Models | Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424) | 2 | S×1 · M×1 |
-| Server | A team on a server: toward v1.0 (QUESTIONS #363) | 8 | S×1 · M×7 |
-| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 15 | S×4 · M×5 · L×6 |
-| **Total** | | **107** | |
+| Server | A team on a server: toward v1.0 (QUESTIONS #363) | 11 | S×3 · M×8 |
+| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 16 | S×4 · M×6 · L×6 |
+| **Total** | | **111** | |
 
 ### Order and dependencies between milestones
 
@@ -1098,7 +1098,7 @@ flowchart LR
 - [ ] AC3: Each test asserts the platform's answer (refused, stopped, escalated) and that no secret, token or key appears in a run event, a log or the evidence
 - [ ] AC4: Every gap found becomes a fix in this task or a new backlog task with a severity; QUESTIONS for the ones that need a decision
 
-> Note: Found in the plan review after V13 (Harry, 2026-10-13, QUESTIONS #440): the repository is public and the community trial runs on people's own repositories. Before the first trial report from a real repository
+> Note: Found in the plan review after V13 (Harry, 2026-10-13, QUESTIONS #440): the repository is public and the community trial runs on people's own repositories. Before the first trial report from a real repository Done: ADR-M80 (PRs 1–3); the gaps it found are H02 (G-1, G-5), H04 (G-10), H05 (G-9), H06 (G-6) and H07 (G-7), QUESTIONS #455 and #456
 
 
 ### EVAL — Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)
@@ -1362,9 +1362,10 @@ flowchart LR
 - [ ] AC1: Detect a run's new or changed dependencies from the stored diff (npm lock and manifest files first), outside the sandbox
 - [ ] AC2: Check each one: an allowed licence (project config), known vulnerabilities, a name close to a popular package (typosquatting), a package published very recently; counts and codes in a run event, never package text
 - [ ] AC3: A finding makes G6 HITL (or a `security` escalation for a critical one), also when the project's own CI has no scan
-- [ ] AC4: Tests on fixtures of lock files; handbook Ch.14 usage
+- [ ] AC4: The package proxy (Verdaccio) no longer shares its cache between tenants, or has none, decided with these checks (ADR-M80 gap G-5, Low); install scripts of new packages are shown as a finding (G-1, Medium)
+- [ ] AC5: Tests on fixtures of lock files; handbook Ch.14 usage
 
-> Note: QUESTIONS #440: G6 relies on the project's CI today; a project without a dependency scan lets anything through
+> Note: QUESTIONS #440: G6 relies on the project's CI today; a project without a dependency scan lets anything through. ADR-M80 (H01): gap G-1, Medium (the proxy allows every npmjs package and runs install scripts in the sandbox, contained), and G-5, Low
 
 #### H03. Design: deleting a client's data on request
 
@@ -1379,6 +1380,49 @@ flowchart LR
 - [ ] AC3: No code in this task; the implementation tasks follow Harry's approval
 
 > Note: QUESTIONS #440: D-05 §10 says this needs its own design; there was no task
+
+#### H04. A secret scan of a run's diff before G5
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | C07 | FR-33, NFR-03 | platform/apps/runner (changes step), platform/packages/core (workflow G5), platform/packages/config, platform/tests/*, handbook Ch.14 |
+
+**Acceptance criteria**
+
+- [ ] AC1: The runner scans the stored diff (added lines only) for secret patterns (keys, tokens, private keys) outside the sandbox, with the rules of the repository's Gitleaks configuration or a built-in set; the run event holds a count and rule codes, never a match or a path
+- [ ] AC2: A finding holds the run at G5 with a `security` escalation (like `instructions_unpinned`); a person decides; the pull request is never opened with the secret in it
+- [ ] AC3: Tests with fake secrets in a fixture diff (none in a harmless diff); the canary search of `pnpm test:attack` still passes
+
+> Note: ADR-M80 gap G-10, **Medium**: the agent may carry a secret it found in the repository into the diff; today G6 relies on the project's own CI scan
+
+#### H05. A size bound for a change a person must review
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | C07, E01 | FR-12, NFR-03 | platform/packages/config, platform/packages/core (workflow G5/G7), platform/apps/runner, handbook Ch.15, platform/tests/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: Config `run.review_limits` (changed files, changed lines; values and behaviour as Harry decides in QUESTIONS #456); the runner counts them from the diff it computes outside the sandbox
+- [ ] AC2: A change over the limit holds the run at G5 with a visible reason code and a person decides (split the plan, or allow with a reason); counts only in run events
+- [ ] AC3: Tests: a diff at the limit and over it; a generated-file allowance if decided
+
+> Note: ADR-M80 gap G-9, **Medium**: a very large or generated diff defeats review at G7. Blocked on QUESTIONS #456
+
+#### H07. A Docker authorization plugin that checks the body of container requests
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | A10, C04 | NFR-03 | platform/deploy (the plugin and its policy), platform/apps/runner (docker/guard.ts rules shared as data), design/ADR-M25 §2.5, handbook T11, platform/tests/integration/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: A Docker authorization plugin (for example OPA) on the runner's Engine applies the same rules as `docker/guard.ts` to the body of `containers/create` and `networks/create`: no privileged container, host namespace, device, capability, bind mount or extra network
+- [ ] AC2: One source for the rules (a data file read by the guard and by the policy), and a test that sends the same requests through both and fails when they differ
+- [ ] AC3: A test that a request the guard would refuse is refused by the plugin when the guard is bypassed (a direct call to the socket proxy)
+- [ ] AC4: Runbook T11: install, update and what to do when the plugin refuses a legitimate run
+
+> Note: ADR-M80 gap G-7, **High** for the company server, Medium for a trial: the socket proxy limits endpoints, not the body (ADR-M25 §2.5). Mitigations 1 and 2 (a separate VM, rootless Docker) are A10 PR 3; see QUESTIONS #455
 
 #### O01. The runner in its own VM or with rootless Docker
 
@@ -1574,6 +1618,20 @@ flowchart LR
 
 > Note: QUESTIONS #431 (Harry, 2026-10-12): split out of V13 AC4 so that V13 stays read-only with no migration
 
+#### H06. An optional stronger sandbox runtime (gVisor or Kata)
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | C04, A10 | NFR-03 | platform/apps/runner (docker/guard.ts, settings), platform/deploy, design/ADR-M25, platform/tests/integration/runner/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: Config `sandbox.runtime` (default the Engine's own); with `runsc` or `kata` the runner passes the runtime through the guard allowlist and refuses it when the Engine does not list it
+- [ ] AC2: `pnpm test:runner` and `pnpm test:attack` pass on the stronger runtime; the cost in start time and memory is measured and written down
+- [ ] AC3: Handbook and deploy README: when to use it (shared host, untrusted repositories)
+
+> Note: ADR-M80 gap G-6, **Medium**: the sandbox shares the host's kernel; a kernel bug is an escape. Until then the runner runs in its own VM (A10)
+
 #### X05. Documents outside the repository (Office, PDF, Confluence, Drive, Backlog)
 
 | Size | Depends on | Requirements | Code area |
@@ -1759,6 +1817,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.45 | 2026-10-13 | Claude, approved by Harry | Plan review after V13 (QUESTIONS #440): new tasks H01 (threat model and attack tests, UX), H02 (dependencies an agent adds), H03 (design: client data deletion), O04 (data that only grows), O05 (key rotation) in Server; O06 (real repositories), O07 (load test) in Later; more items in "Also later"; prefix `H` |
 | 1.46 | 2026-10-13 | Claude (task L02, PR 3), approved by Harry | L02 note: kept diffs for blind pairs (QUESTIONS #445); Langfuse scores later (QUESTIONS #446) |
 | 1.47 | 2026-10-13 | Claude, approved by Harry | New milestone EVAL after v0.3.0, before EXT (QUESTIONS #450): L04 (evaluations on the server, one engine with developer machines), L05 (evaluation plans by managers), L06 (reports and recommendations), L07 (a project's task set from its merged intents), L08 (design: evaluations in the agent register's approvals) |
+| 1.49 | 2026-10-13 | Claude (task H01, PR 3), approved by Harry | H01 done: its gaps become H04 (secret scan of the diff, Medium), H05 (diff size bound, Medium), H06 (stronger sandbox runtime, Later), H07 (Docker authorization plugin, High) and two criteria of H02; QUESTIONS #455, #456 |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

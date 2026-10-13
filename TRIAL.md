@@ -24,6 +24,8 @@ The full plan behind this page, with every measure and rule: [`design/M-E-TRIAL-
 | GitHub | **Two accounts** (Person A and Person B) | See section 2 |
 | A model | Ollama with `gpt-oss:20b`, **or** an Anthropic API key with a spend limit | Section 4 |
 
+**What the sandbox protects, and what it does not.** The agent runs in a sandbox with no internet, no secrets and no route to the platform; everything it changes is checked outside the sandbox and a person merges it. Two things stay your job: the platform's runner controls the Docker on your machine, so use a machine whose Docker you accept as exposed (not one with other people's data or a shared Docker); and read the whole change before you approve it, because the agent may have added a package or a file you did not ask for ([threat model](design/ADR-M80-threat-model.md)).
+
 ## 2. Who does what (two people)
 
 The platform's main rule is that the person who makes a change never approves it (separation of duties). The trial measures exactly that, so it needs two roles:
