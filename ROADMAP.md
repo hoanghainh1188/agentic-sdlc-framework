@@ -6,6 +6,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 |---|---|
 | M-E | The trial, run by the community (QUESTIONS #340) |
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) |
+| EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424) |
 | Models | Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424) |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) |
@@ -34,6 +35,14 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **L02** Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision)
 - **V13** Agent efficiency report from real runs: `sdlc metrics agents`
 - **H01** Threat model for agent runs and attack tests
+
+## EVAL: Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)
+
+- **L04** Evaluations on the server, one engine for the server and developer machines
+- **L05** Evaluation plans that managers make themselves
+- **L06** Evaluation reports and recommendations for managers
+- **L07** A project's own task set from its merged intents
+- **L08** Design: evaluations in the agent register's approvals
 
 ## EXT: Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)
 
