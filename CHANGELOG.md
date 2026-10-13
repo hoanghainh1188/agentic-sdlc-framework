@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-13
+
+The third release of the milestone UX: **are agents worth it, and are they safe?** `sdlc metrics agents` shows, from real runs, how each agent version and model does: outcomes, stop reasons, retries, CI on the first try, review rounds, time and cost per merged intent (V13). `pnpm eval` runs agents, models and prompts on a fixed task set with hidden tests and a statistical report, so a choice of model rests on numbers (L02; the first measurement of local models is in D-07 §9). `sdlc help` and next-step hints after a command make the CLI easier to learn (V10). And the **threat model of an agent run** (ADR-M80, H01): attacks from inside the sandbox are now tests (`pnpm test:attack`), and every gap it found has a task or an acceptance. A minor release for the new commands and one new run event; nothing to migrate.
+
+### Upgrade notes
+- **On a running stack:** (1) `pnpm install`; (2) no migration; (3) on a checkout of the tag `v0.3.0` the published images are pulled; on any other checkout rebuild `sdlc-api` and `sdlc-worker` (`docker compose … build`; the api serves `GET /v1/metrics/agents`, and the worker records the new run event `model_selected`); (4) start the platform again as usual (`platform/deploy/scripts/up.sh …`): volumes are kept, no unseal beyond the usual one; (5) the `sdlc` command: `npm install -g agentic-sdlc-cli@0.3.0` (`sdlc metrics agents`, `sdlc help`).
+- No changed setting and no credentials command to run again. The report `sdlc metrics agents` is readable by a role that may read both the cost report and the gate metrics (no new configuration key). Runs that started before the update have no `model_selected` event; the report falls back to the model with the most cost for them.
+- `pnpm eval` and `pnpm test:attack` are for developer machines and CI; they change nothing on a running stack.
+- **Before the first real agent run on a company server:** the runner must run in its own VM or on rootless Docker (QUESTIONS #455, ADR-M80 gap G-7). A trial on your own machine exposes that machine's Docker: see `TRIAL.md`.
+
 ### Added
 - H01 PR 3 (ADR-M80 0.3): every gap of the threat model has a task or an acceptance. New backlog tasks H04 (secret scan of a run's diff, Medium), H05 (size bound for review, Medium), H06 (optional gVisor or Kata runtime), H07 (Docker authorization plugin, High for the company server); H02 gets two criteria. QUESTIONS #455 (runner VM as a condition for the company server) and #456 (review size limits) wait for Harry. `TRIAL.md` says what the sandbox protects and that a trial exposes the machine's Docker. No code change.
 - H01 PR 2: attack tests (ADR-M80). Unit tests for attack text in the plan and review blocks and in GitHub comments (`pnpm test`); `pnpm test:attack` runs a stub model that obeys every injection in the real sandbox (environment, network, OpenBao, Docker, other runs, packages, instruction files) and searches all records for canary secrets; `pnpm test:litellm` proves a run key cannot write to LiteLLM's management API. Findings: the agent can read its model key from memory (Low), no secret scan or size limit for the diff (Medium).

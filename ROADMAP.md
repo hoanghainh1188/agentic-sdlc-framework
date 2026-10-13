@@ -27,14 +27,14 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V07** `doctor`: check a deployment and a login, and say what to fix (done, v0.2.0)
 - **V08** The trial stack survives a reboot (done, v0.2.0)
 - **V09** Team access from other machines (TLS reverse proxy) (done, v0.2.0)
-- **V10** A friendlier CLI: `sdlc help`, hints, clearer errors
+- **V10** A friendlier CLI: `sdlc help`, hints, clearer errors (done, v0.3.0)
 - **V11** Plan the dashboard's actions (design only) (done, v0.1.1)
 - **U05** Dashboard sign-in with GitHub and server-side sessions (done, v0.2.0)
 - **U06** Dashboard writes: CSRF, origin check, passkey step-up (done, v0.2.0)
 - **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes (done, v0.2.0)
-- **L02** Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision)
-- **V13** Agent efficiency report from real runs: `sdlc metrics agents`
-- **H01** Threat model for agent runs and attack tests
+- **L02** Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision) (done, v0.3.0)
+- **V13** Agent efficiency report from real runs: `sdlc metrics agents` (done, v0.3.0)
+- **H01** Threat model for agent runs and attack tests (done, v0.3.0)
 
 ## EVAL: Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)
 

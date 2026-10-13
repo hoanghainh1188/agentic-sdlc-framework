@@ -3,4 +3,4 @@
 // (`platform_version`), `sdlc --version` prints it, `sdlc doctor` compares the two. The release
 // gate (`platform/tools/release/release-check.mjs`) and a test keep it equal to `package.json`;
 // change both for a release (RELEASING.md).
-export const PLATFORM_VERSION = '0.2.1';
+export const PLATFORM_VERSION = '0.3.0';
