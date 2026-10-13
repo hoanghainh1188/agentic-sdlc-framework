@@ -505,6 +505,26 @@ t("V14","Later","Human-effort baseline for the agent report","S",["V13"],"FR-53"
  ["A person with a write role may record an estimate of the human effort for an intent (hours, a number; codes and numbers only, no text); empty by default",
   "`sdlc metrics agents` shows the time compared with the estimate when one exists; D-05 and a migration in the same task"],
  "QUESTIONS #431 (Harry, 2026-10-12): split out of V13 AC4 so that V13 stays read-only with no migration")
+t("H01","UX","Threat model for agent runs and attack tests","M",["C05","C11"],"FR-33, FR-50, NFR-03",
+ "design/ADR (next free number), platform/tests/integration/* (attack fixtures), platform/apps/runner, platform/packages/adapters/agent-openhands, handbook T11 (if a procedure changes)",
+ ["A threat model of an agent run against the OWASP Top 10 for Agentic Applications (D-03 §9): what an attacker controls (spec, plan, review comment, repository content, package registry, model output) and which control stops each step; gaps listed with a severity",
+  "Attack tests on the stub model and the real sandbox: prompt injection in the spec, the plan text and the review feedback (the nonce blocks hold); a repository whose files try to read the sandbox's environment, reach the internet, OpenBao, the Docker socket or another run's network; a package that is not on the proxy; an agent that edits its own instruction files or `.sdlc/`",
+  "Each test asserts the platform's answer (refused, stopped, escalated) and that no secret, token or key appears in a run event, a log or the evidence",
+  "Every gap found becomes a fix in this task or a new backlog task with a severity; QUESTIONS for the ones that need a decision"],
+ "Found in the plan review after V13 (Harry, 2026-10-13, QUESTIONS #440): the repository is public and the community trial runs on people's own repositories. Before the first trial report from a real repository")
+t("H02","Server","Dependencies an agent adds: licence, known vulnerabilities, name checks","M",["C07","C08"],"FR-33, NFR-04",
+ "platform/packages/core (workflow G5/G6), platform/apps/runner (diff), platform/deploy/verdaccio, design/ADR (next free number), platform/tests/*",
+ ["Detect a run's new or changed dependencies from the stored diff (npm lock and manifest files first), outside the sandbox",
+  "Check each one: an allowed licence (project config), known vulnerabilities, a name close to a popular package (typosquatting), a package published very recently; counts and codes in a run event, never package text",
+  "A finding makes G6 HITL (or a `security` escalation for a critical one), also when the project's own CI has no scan",
+  "Tests on fixtures of lock files; handbook Ch.14 usage"],
+ "QUESTIONS #440: G6 relies on the project's CI today; a project without a dependency scan lets anything through")
+t("H03","Server","Design: deleting a client's data on request","S",["E05","E08"],"FR-44",
+ "design/ (a new ADR), design/D-05 §10, design/QUESTIONS.md",
+ ["A design for a client's request to delete its data (for example under Japan's APPI or a contract): what is deleted (evidence files, Langfuse traces, personal data in `users`), what stays (hashes, codes and IDs in append-only tables, kept at least 2 years) and how the audit log records the deletion",
+  "How it fits the append-only rule and the hash chain: no row of an append-only table is changed or deleted",
+  "No code in this task; the implementation tasks follow Harry's approval"],
+ "QUESTIONS #440: D-05 §10 says this needs its own design; there was no task")
 t("X09","EXT","Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)","S",["B05"],"NFR-05",
  "platform/spikes/git-hosts/* (thrown away), design/ADR-M70",
  ["Check each host's API against the 19 methods of `GitHostAdapter`: a short-lived token for one repository, polling of comments, reviews, merges and CI results, opening a pull request, reviews bound to a commit, who merged, CI checks, security findings, branch protection",
@@ -614,6 +634,30 @@ t("O03","Server","Operational alerts","M",["V07"],"NFR-06",
  ["Alerts when a service stops being healthy, OpenBao is sealed, the disk or the backup target fills up, a backup did not run, or a TLS certificate nears its end; delivered to the operator (for example e-mail or a chat webhook, configured), never with a secret",
   "Built on `doctor` (V07) and the existing health checks; works with the profile `observability` off"],
  "QUESTIONS #363")
+t("O04","Server","Data that only grows: run events, sessions, challenges, partitions","M",["E05","U06"],"FR-44, NFR-01",
+ "platform/packages/core (retention), platform/apps/worker (retention loop), migrations, design/D-05 §10, platform/tests/*",
+ ["`run_events` older than the retention in D-05 §10 (1 year) are summarised into counts per run, then removed, with a grant of their own and an audit event; or D-05 is changed to keep them, with a reason",
+  "Ended `web_sessions` and used or expired `passkey_challenges` are removed after a fixed time by the retention loop (D-05 §6.1 says a later task does it)",
+  "A measured decision on monthly partitions for the append-only tables (D-05 §12): when the tables reach a size, and how the hash chain and the triggers stay intact",
+  "Tests: `pnpm test:db` for each removal, the audit event, tenants"],
+ "QUESTIONS #440")
+t("O05","Server","Key rotation: the Run Contract signing key and the processes' secret IDs","M",["C02","A10"],"NFR-03",
+ "platform/deploy/openbao/*, platform/packages/secrets, platform/apps/worker, handbook T11, design/ADR-M22, platform/tests/*",
+ ["Rotate the Transit key `run-contract` on a schedule; contracts signed before keep verifying until they expire (ADR-M22 §2.4); a test with a rotation between issue and start",
+  "Renew the AppRole secret IDs before their 90 days end without a manual step on the server, or warn in `doctor` and the alerts (O03) well before",
+  "Runbook T11: rotation, revocation of a leaked key, and how to check that nothing still uses the old one"],
+ "QUESTIONS #440: D-03 §8 says rotation and revocation come later; there was no task")
+t("O06","Later","Real repositories: very large trees, monorepos, repositories without CI or AGENTS.md","M",["C08"],"NFR-05",
+ "platform/packages/adapters/git-github, platform/packages/core (G4, G6), handbook Ch.13, Ch.14",
+ ["G4 refuses a tree the Git host lists only in part (`tree_truncated`): a way to run on very large repositories (a recursive listing in pages, or a check of only the instruction paths)",
+  "Monorepos: one project per package, or several projects on one repository, with their own plans and checks",
+  "Clear refusals and onboarding steps for a repository without CI or without `AGENTS.md`"],
+ "QUESTIONS #440: the trial on a real internal tool (M-F) may meet these first")
+t("O07","Later","Load test: many intents and tenants at once","M",["O03"],"NFR-01",
+ "platform/tests/load/*, platform/deploy/README.md",
+ ["A repeatable load test with stub models: many intents and tenants at once through the poller, the workflow, the runner queue and the database; GitHub API rate limits measured",
+  "The numbers and the limits written in the deploy README (how many intents, runs and tenants one server takes)"],
+ "QUESTIONS #440")
 # ---------- rendering ----------
 IDX={x['id']:x for x in T}; W={'S':1,'M':2,'L':3}
 @functools.lru_cache(None)
@@ -630,7 +674,7 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.44 |
+| Version | 1.45 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -651,7 +695,7 @@ w(f"""# D-08. Platform backlog
 
 | Field | Meaning |
 |---|---|
-| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early), `S` = spec tools and `K` = document knowledge (before the trial M-E), `V` = the trial M-E (validation by the community) and its usability round UX, `X` = extensions (agents, tools, knowledge, Git hosts), `L` = models, `O` = operations on a server |
+| ID | `A` = M-A, `B` = M-B, `R` = M-0 (sample repo), `C` = M-C, `E` = M-D (`E` avoids confusion with document codes `D-xx`), `U` = user interface (MVP+1, started early), `S` = spec tools and `K` = document knowledge (before the trial M-E), `V` = the trial M-E (validation by the community) and its usability round UX, `X` = extensions (agents, tools, knowledge, Git hosts), `L` = models, `O` = operations on a server, `H` = hardening (security and data) |
 | Size | **S** ≈ 1 session · **M** ≈ 1–2 sessions · **L** ≈ split into 2–3 sessions. [Proposal] Relative estimate, not person-hours |
 | Depends on | Tasks that must be finished first |
 | Acceptance criteria | Conditions for the PR to be approved. Claude Code writes tests for them |
@@ -800,6 +844,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.42 | 2026-10-12 | Claude, approved by Harry | L02: a blind pairwise ranking by a reviewer, a growing task set reported per version, and a spike that reuses an existing evaluation framework where it fits (QUESTIONS #423) |
 | 1.43 | 2026-10-12 | Claude, approved by Harry | Plan review after v0.2.1 (QUESTIONS #424): U07 moves to Later until trial users ask for it; v0.3.0 = V13, L02, V10; X09 first in EXT and L01 early in v0.4.0 |
 | 1.44 | 2026-10-12 | Claude (task V13), approved by Harry | V13: access rule and model attribution (QUESTIONS #430–#433); its human-effort baseline (AC4) split out as V14 in Later |
+| 1.45 | 2026-10-13 | Claude, approved by Harry | Plan review after V13 (QUESTIONS #440): new tasks H01 (threat model and attack tests, UX), H02 (dependencies an agent adds), H03 (design: client data deletion), O04 (data that only grows), O05 (key rotation) in Server; O06 (real repositories), O07 (load test) in Later; more items in "Also later"; prefix `H` |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |
@@ -834,7 +879,7 @@ for m,d in MS:
     a(f"\n## {m}: {d}\n")
     for x in ts: a(f"- **{x['id']}** {x['title']}" + (f" (done, {DONE[x['id']]})" if x['id'] in DONE else ""))
 a("""
-Also later, not yet planned as tasks: webhooks instead of polling, a full policy engine (OPA or Cedar), an incident module, break-glass access, automatic rollback, the recertification workflow, client reports, SSO and Kubernetes, several agents in one intent (D-02 §4.2).
+Also later, not yet planned as tasks: webhooks instead of polling, a full policy engine (OPA or Cedar), an incident module, break-glass access, automatic rollback, the recertification workflow, client reports, SSO and Kubernetes, several agents in one intent, the deferred approval queue, PQC metrics (D-02 §4.2); PostgreSQL row-level security (D-03 §9, D-05 §8); a support policy for older CLI versions against a newer server (QUESTIONS #440).
 """)
 open('ROADMAP.md','w').write("\n".join(r))
 print(CP)

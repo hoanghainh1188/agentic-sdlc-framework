@@ -33,6 +33,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes (done, v0.2.0)
 - **L02** Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision)
 - **V13** Agent efficiency report from real runs: `sdlc metrics agents`
+- **H01** Threat model for agent runs and attack tests
 
 ## EXT: Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)
 
@@ -53,9 +54,13 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 ## Server: A team on a server: toward v1.0 (QUESTIONS #363)
 
 - **A10** Resource measurement + backup / restore drill + internal CA / TLS
+- **H02** Dependencies an agent adds: licence, known vulnerabilities, name checks
+- **H03** Design: deleting a client's data on request
 - **O01** The runner in its own VM or with rootless Docker
 - **O02** A tested upgrade between two releases
 - **O03** Operational alerts
+- **O04** Data that only grows: run events, sessions, challenges, partitions
+- **O05** Key rotation: the Run Contract signing key and the processes' secret IDs
 
 ## Later: Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done)
 
@@ -68,5 +73,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **X08** Knowledge for people and the G8 learning loop (design first)
 - **X10** An adapter for a second Git host
 - **X13** Agent memory
+- **O06** Real repositories: very large trees, monorepos, repositories without CI or AGENTS.md
+- **O07** Load test: many intents and tenants at once
 
-Also later, not yet planned as tasks: webhooks instead of polling, a full policy engine (OPA or Cedar), an incident module, break-glass access, automatic rollback, the recertification workflow, client reports, SSO and Kubernetes, several agents in one intent (D-02 §4.2).
+Also later, not yet planned as tasks: webhooks instead of polling, a full policy engine (OPA or Cedar), an incident module, break-glass access, automatic rollback, the recertification workflow, client reports, SSO and Kubernetes, several agents in one intent, the deferred approval queue, PQC metrics (D-02 §4.2); PostgreSQL row-level security (D-03 §9, D-05 §8); a support policy for older CLI versions against a newer server (QUESTIONS #440).
