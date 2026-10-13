@@ -68,7 +68,7 @@ const TIMEOUT = 15 * 60_000;
 const SECRET_NAME = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i;
 const PLATFORM_NAME =
   /^(SDLC_|GITHUB|GH_|OPENBAO|VAULT|BAO_|LITELLM|AWS_|DOCKER|OPENAI|ANTHROPIC|PG|POSTGRES)/;
-const ALLOWED_SECRET_NAMES = new Set(['SESSION_API_KEY', 'OH_SECRET_KEY']);
+const ALLOWED_SECRET_NAMES = new Set(['SESSION_API_KEY', 'OH_SECRET_KEY', 'TIKTOKEN_CACHE_DIR']);
 
 interface Attack {
   readonly runId: string;
@@ -273,6 +273,13 @@ describe.skipIf(!enabled)('H01: attacks from inside a sandbox (ADR-M80)', () => 
           return [`${kind} ${subject}`, rest.join(' ')] as const;
         }),
       );
+      if (result.outcome !== 'finished') {
+        const row = await r.scope.runs.getById(runId);
+        const events = (await r.scope.runEvents.list(runId)).map((e) => [e.event_type, e.payload]);
+        process.stdout.write(
+          `ATTACK-DEBUG ${name} ${JSON.stringify({ stop: row?.stop_reason, events })}\n`,
+        );
+      }
       return {
         runId,
         intentId: r.envelope.contract.intent_id,
@@ -316,6 +323,8 @@ describe.skipIf(!enabled)('H01: attacks from inside a sandbox (ADR-M80)', () => 
   const answer = (a: Attack, kind: string, subject: string) => a.answers.get(`${kind} ${subject}`);
 
   function expectFinished(a: Attack): void {
+    const { outputs: _outputs, ...summary } = a.result;
+    expect(summary).toMatchObject({ outcome: 'finished', status: 'succeeded' });
     expect(a.result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
     expect(a.lines.length).toBeGreaterThan(0);
   }
@@ -537,7 +546,7 @@ describe.skipIf(!enabled)('H01: attacks from inside a sandbox (ADR-M80)', () => 
   );
 
   it(
-    'A-9: edits of AGENTS.md, a second spelling, skills, .sdlc/ and the spec reach G5 as instructions_unpinned; the default branch is untouched',
+    'A-9: edits of AGENTS.md, skills, .sdlc/ and the spec reach G5 as instructions_unpinned; the default branch is untouched',
     { timeout: TIMEOUT },
     async () => {
       const a = await attack('instructions');
@@ -546,10 +555,10 @@ describe.skipIf(!enabled)('H01: attacks from inside a sandbox (ADR-M80)', () => 
       const checked = (await a.r.scope.runEvents.list(a.runId)).find(
         (e) => e.event_type === 'changes_checked',
       );
-      expect(checked?.payload).toMatchObject({ changed_files: 5 });
+      expect(checked?.payload).toMatchObject({ changed_files: 4 });
       expect(
         (checked?.payload as { instruction_files: number }).instruction_files,
-      ).toBeGreaterThanOrEqual(3);
+      ).toBeGreaterThanOrEqual(2);
       expect((checked?.payload as { out_of_scope: number }).out_of_scope).toBeGreaterThanOrEqual(4);
       // G5's own check on those facts: stopped for the instruction files first, with a security escalation.
       const facts = await gatherG5Facts(a.r.scope, a.intentId);
@@ -565,7 +574,6 @@ describe.skipIf(!enabled)('H01: attacks from inside a sandbox (ADR-M80)', () => 
       const diff = a.puts[0]!.content.toString('utf8');
       for (const file of [
         'AGENTS.md',
-        'agents.md',
         '.openhands/skills/evil.md',
         '.sdlc/plans/INT-2026-0001.yaml',
       ]) {
@@ -579,6 +587,23 @@ describe.skipIf(!enabled)('H01: attacks from inside a sandbox (ADR-M80)', () => 
       expect(
         execFileSync('git', ['-C', clone, 'rev-parse', 'main'], { encoding: 'utf8' }).trim(),
       ).toBe(a.r.repoBase);
+      await expectNoLeaks(a);
+    },
+  );
+
+  it(
+    'A-9b: a second spelling of the instruction file next to the pinned one fails the run closed; nothing reaches G5',
+    { timeout: TIMEOUT },
+    async () => {
+      const a = await attack('spelling');
+      // The runner refuses the workspace archive (two names that one file system would fold into
+      // one) and the run fails with a technical escalation; it never reaches G5 or a push.
+      expect(a.result).toMatchObject({ outcome: 'failed', status: 'failed' });
+      expect(await a.r.scope.runs.getById(a.runId)).toMatchObject({
+        stop_reason: 'agent_changes_unavailable',
+      });
+      expect(await gatherG5Facts(a.r.scope, a.intentId)).toBeNull();
+      expect(a.puts).toHaveLength(0);
       await expectNoLeaks(a);
     },
   );

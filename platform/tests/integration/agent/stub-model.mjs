@@ -227,8 +227,8 @@ for (let i = 0; i < 3000; i += 1) {
 setTimeout(() => {
   say('pids', 'spawned', String(kids.filter((k) => k.pid).length), 'stop', stop);
   for (const k of kids) { try { k.kill('SIGKILL'); } catch {} }
-  setTimeout(() => process.exit(0), 500);
-}, 1500);
+  setTimeout(() => process.exit(0), 2000);
+}, 300);
 process.on('uncaughtException', () => { stop = 'EAGAIN'; });`,
   },
   // A-7: packages. The install scripts of a local package run (that is what npm does); a git URL,
@@ -264,9 +264,14 @@ for (const [what, spec] of [['git', 'git+https://github.com/octocat/Hello-World.
   instructions: {
     kind: 'sh',
     body:
-      "cd /workspace && echo '# changed by the agent' >> AGENTS.md && printf 'x' > agents.md && " +
+      "cd /workspace && echo '# changed by the agent' >> AGENTS.md && " +
       "mkdir -p .openhands/skills .sdlc/plans && printf 'x' > .openhands/skills/evil.md && " +
       "printf 'x' > .sdlc/plans/INT-2026-0001.yaml && echo x >> docs/specs/T01-labels.md && echo PROBE changed ok",
+  },
+  // A-9: a second spelling of the instruction file next to the pinned one.
+  spelling: {
+    kind: 'sh',
+    body: "cd /workspace && printf 'x' > agents.md && echo PROBE changed ok",
   },
   // A-11: a hostile path name; the message of `finish` is below.
   presentation: {
@@ -288,7 +293,7 @@ function attackStep(request, first, step) {
     };
   const tools = request.messages.filter((m) => m.role === 'tool');
   const last = textOf(tools.at(-1)?.content);
-  const done = last.includes('PROBE done') || (probe.kind === 'sh' && step > 0);
+  const done = /^PROBE done$/m.test(last) || (probe.kind === 'sh' && step > 0);
   if (done || step > 60) {
     const message = marker[1] === 'presentation' ? FINISH_MESSAGE : 'attack done';
     return { delayMs: 0, toolCalls: [call(request, step, 'finish', { message })] };
@@ -307,7 +312,11 @@ function attackStep(request, first, step) {
   }
   return {
     delayMs: 0,
-    toolCalls: [call(request, step, 'terminal', { command: 'sleep 3; cat /tmp/probe.out' })],
+    toolCalls: [
+      call(request, step, 'terminal', {
+        command: `echo poll-${step}; sleep 3; cat /tmp/probe.out`,
+      }),
+    ],
   };
 }
 
