@@ -23,6 +23,7 @@ const BASE = new Date(NOW.getTime() - 5 * 24 * HOUR);
 const at = (hours: number) => new Date(BASE.getTime() + hours * HOUR);
 const BIG = 'model-big';
 const SMALL = 'model-small';
+const PICK = 'model-pick';
 
 type Who = 'admin' | 'a' | 'pm' | 'second' | 'viewer' | 'outsider';
 
@@ -353,6 +354,9 @@ describeDb('V13: agent efficiency report on PostgreSQL', () => {
     });
     // A cost record with no run: counted apart, never in a row.
     await record(a.scope, { projectId: shop, model: BIG, input: 1, output: 1, cost: '1' });
+    // QUESTIONS #434: the model G4 chose (run event) wins; runs without it fall back to cost.
+    await event(id, r3, 'model_selected', { model: PICK }, at(2));
+    await event(id, opsRun, 'model_selected', { model: SMALL }, at(1)); // its cost is all BIG
     await ci(id, r1, 'failed', at(0.4)); // the first CI of the intent: not passed
     await ci(id, r2, 'passed', at(1.1));
     await decision(id, intent, 'G7', 'request_changes', at(1.05), a.seeded.personA); // before the merge
@@ -393,8 +397,9 @@ describeDb('V13: agent efficiency report on PostgreSQL', () => {
       const m = await metrics('/v1/metrics/agents', tenantA.tokens.admin);
       expect(m.scope).toEqual({ kind: 'tenant' });
       expect(m.rows.map((r) => [r.project, r.model])).toEqual([
-        ['ops', BIG],
+        ['ops', SMALL],
         ['shop', BIG],
+        ['shop', PICK],
         ['shop', 'unknown'],
       ]);
       expect(new Set(m.rows.map((r) => r.agent_version))).toEqual(new Set(['1.4.0']));
@@ -411,12 +416,19 @@ describeDb('V13: agent efficiency report on PostgreSQL', () => {
         by_stop_reason: { agent_error: 1 },
         retries: 1,
       });
-      expect(find(m, 'shop', 'unknown').runs).toEqual({
-        total: 2,
-        in_progress: 1,
-        by_status: { stopped_killed: 1, running: 1 },
+      expect(find(m, 'shop', PICK).runs).toEqual({
+        total: 1,
+        in_progress: 0,
+        by_status: { stopped_killed: 1 },
         by_stop_reason: { killed: 1 },
-        retries: 2,
+        retries: 1,
+      });
+      expect(find(m, 'shop', 'unknown').runs).toEqual({
+        total: 1,
+        in_progress: 1,
+        by_status: { running: 1 },
+        by_stop_reason: {},
+        retries: 1,
       });
     });
 
@@ -432,7 +444,7 @@ describeDb('V13: agent efficiency report on PostgreSQL', () => {
         lead_time: { count: 1, avg_seconds: 7200, max_seconds: 7200 },
       });
       expect(shop.scope_breaches).toBe(1);
-      const ops = find(m, 'ops', BIG);
+      const ops = find(m, 'ops', SMALL);
       expect(ops.ci).toEqual({ first_try_total: 1, first_try_passed: 1 });
       expect(ops.merged).toEqual({
         intents: 1,
@@ -467,6 +479,17 @@ describeDb('V13: agent efficiency report on PostgreSQL', () => {
         per_run_usd: '0.000000',
         per_merged_intent_usd: null,
       });
+    });
+
+    it('takes the model from model_selected first, then from the cost records (QUESTIONS #434)', async () => {
+      const m = await metrics('/v1/metrics/agents', tenantA.tokens.admin);
+      // The ops run's only cost is on BIG, but G4 chose SMALL: the event wins, the cost follows.
+      expect(m.rows.some((r) => r.project === 'ops' && r.model === BIG)).toBe(false);
+      expect(find(m, 'ops', SMALL).cost.total_usd).toBe('0.200000');
+      // r3 has no cost record: the event still names its model.
+      expect(find(m, 'shop', PICK).runs.total).toBe(1);
+      // r1 and r2 have no event (older runs): the most costly model of their records.
+      expect(find(m, 'shop', BIG).runs.total).toBe(2);
     });
 
     it('filters by agent and model, and by project', async () => {
@@ -515,7 +538,7 @@ describeDb('V13: agent efficiency report on PostgreSQL', () => {
     it('lets a role in both lists read one project, and a tenant admin the whole tenant', async () => {
       const a = await metrics('/v1/metrics/agents?project=shop', tenantA.tokens.a);
       expect(a.scope).toEqual({ kind: 'project', project: 'shop' });
-      expect(a.rows.map((r) => r.project)).toEqual(['shop', 'shop']);
+      expect(a.rows.map((r) => r.project)).toEqual(['shop', 'shop', 'shop']);
       await metrics('/v1/metrics/agents?project=shop', tenantA.tokens.pm);
       await metrics('/v1/metrics/agents?project=ops', tenantA.tokens.admin);
     });
