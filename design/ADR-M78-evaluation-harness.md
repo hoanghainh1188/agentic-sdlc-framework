@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L02; 0.3 after PR 3, for review) |
+| Status | **Proposed** (task L02; 0.4 after PR 4, for review) |
 | Date | 2026-10-13 |
 | Decided by | Harry (plan approved 2026-10-13, with answers to QUESTIONS #435–#439) |
 | Related | D-08 task L02 (AC1–AC10); D-07 §3–§5; D-09 §7; ADR-M10, ADR-M29 (the agent path), ADR-M24 (cost), ADR-M35 (Langfuse), ADR-M79 (the report from real runs); QUESTIONS #362, #422, #423, #435–#439 |
@@ -76,7 +76,7 @@ Inspect AI and promptfoo stay options for prompt-only comparisons later; neither
 | 1 | This ADR, QUESTIONS #435–#439 (docs only) |
 | 2 | The harness, task set v1, configurations, per-run measures; unit tests, a live run on the stub model |
 | 3 | Statistics, the report and chart (`pnpm eval:report`), blind pairs and Bradley-Terry (`pnpm eval:pairs`), kept diffs (QUESTIONS #445); Langfuse scores later (QUESTIONS #446) |
-| 4 | The result table in D-07 from a full evaluation (Harry approves) |
+| 4 | The result table in D-07 §9 from the evaluation that was run (53 of 80 runs, stopped by Harry's decision, QUESTIONS #447; Harry approves) |
 
 ## 3. Consequences
 
@@ -101,3 +101,4 @@ Inspect AI and promptfoo stay options for prompt-only comparisons later; neither
 | 0.1 | 2026-10-13 | Claude (task L02, PR 1) | First version |
 | 0.2 | 2026-10-13 | Claude (task L02, PR 2) | §2.2–§2.4 as built: the live test runs the evaluation, the package proxy for the agent, the scoring container's limits, `--check`, task set v1, the models and the 24 GB limit; API models later |
 | 0.3 | 2026-10-13 | Claude (task L02, PR 3) | §2.1 Langfuse later (QUESTIONS #446); §2.4 kept diffs for blind pairs (QUESTIONS #445); §2.6, §2.7 as built |
+| 0.4 | 2026-10-13 | Claude (task L02, PR 4) | §2.7: PR 4 as built: the first measurement of local models is in D-07 §9 with its limits; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
