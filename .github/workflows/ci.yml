@@ -138,12 +138,12 @@ jobs:
           # tests need Docker.
           decide_heavy run_compose "Compose integration job" \
             "platform/deploy/, the OpenBao client, the LiteLLM adapter, the Cost Controller, the runner, the intent workflow or a live test" \
-            platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts platform/tests/integration/deploy/seaweedfs-access.test.ts platform/tests/integration/deploy/access.test.ts platform/tests/integration/backup/
+            platform/deploy/ platform/packages/secrets/ platform/tests/integration/openbao/ platform/packages/adapters/model-litellm/ platform/packages/core/src/cost/ platform/tests/integration/litellm/ platform/apps/runner/ platform/tests/integration/runner/ platform/tests/integration/attack/ platform/apps/worker/src/workflows/ platform/apps/worker/src/temporal.ts platform/packages/workflow-client/ platform/tests/integration/workflow/compose-smoke.test.ts platform/tests/integration/deploy/seaweedfs-access.test.ts platform/tests/integration/deploy/access.test.ts platform/tests/integration/backup/
 
           # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
           decide_heavy run_sandbox_image "Sandbox image job" \
             "a sandbox image, the runner, the agent adapter, the package proxy or a live test" \
-            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/
+            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/ platform/tests/integration/attack/
 
           # U01 (design/ADR-M54 §2.6): the dashboard's browser smoke test (Playwright, Chromium)
           # runs in the sandbox image job, without the sandbox steps when only these paths changed.
@@ -416,6 +416,11 @@ jobs:
       # with a scripted stub model (no provider, no key) and a throw-away PostgreSQL.
       - if: needs.scan.outputs.run_sandbox_image == 'true'
         run: pnpm test:agent
+      # H01 (design/ADR-M80): attacks from inside the sandbox with a stub model that obeys every
+      # injection: the sandbox's environment, network, Docker, other runs, packages and instruction
+      # files; every test also searches the records and logs for canary secrets.
+      - if: needs.scan.outputs.run_sandbox_image == 'true'
+        run: pnpm test:attack
       # C09 (D-08 C09 AC1–AC5): G1–G6 on the sample repository's shape with the real runner, the
       # node24 sandbox and the Agent Server (stub model), the intent workflow on the Temporal test
       # server, a local Git host that protects main, and a throw-away PostgreSQL. One file at a time.

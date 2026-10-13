@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task H01, PR 1 of 3: the model; the tests are PR 2, the fixes PR 3) |
+| Status | **Proposed** (task H01; PR 1 the model, PR 2 the tests with their findings in §5 and §6, PR 3 the fixes) |
 | Date | 2026-10-13 |
 | Decided by | Harry (H01 plan approved 2026-10-13: severity scale, Critical and High fixed inside H01, one optional local-model trial) |
 | Related | D-08 task H01; D-02 FR-33, FR-50, NFR-03; D-03 §9; ADR-M25 (sandbox), ADR-M29 (agent adapter), ADR-M34 (G5), ADR-M40 §2.7 (plan in the prompt), ADR-M41 §2.7 (review feedback), ADR-M42 (kill switch); handbook Ch.7 (standards); task H02 (dependencies an agent adds) |
@@ -182,28 +182,41 @@ Severity scale (H01 plan): Critical, High, Medium, Low, as the escalation severi
 | # | Gap | ASI | Severity | State | Plan |
 |---|---|---|---|---|---|
 | G-1 | The package proxy allows every package of npmjs, including install scripts (`platform/deploy/verdaccio/config.yaml`: `'**'` proxies to `npmjs`). A malicious or typo-squatted package runs in the sandbox (contained) and lands in the diff, where only G5 scope and a person at G7 look at it | ASI04 | Medium (contained in the sandbox; the risk is code merged by a tired reviewer) | Known | Task H02 (dependency checks: new packages and install scripts in the diff shown as a finding, allow- and deny-lists, `--ignore-scripts` where the project allows) |
-| G-2 | The run's virtual key is passed to the Agent Server in an API body, so it sits in the memory of a process of the same user as the agent's terminal; the agent can read it. Whether the key can call LiteLLM's management API (create keys, list keys, change models, read other keys' spend) is not tested | ASI02, ASI03 | High if it can mint or read other keys, otherwise Low | To confirm (A-6) | If confirmed: restrict the key's `allowed_routes` or the LiteLLM route list reachable from the sandbox; fix in PR 3 |
+| G-2 | The run's virtual key is passed to the Agent Server in an API body, so it sits in the memory of a process of the same user as the agent's terminal. **Confirmed (PR 2, `pnpm test:attack` G-2 test): the agent can read it.** Whether a run key can write to LiteLLM's management API is **refuted (PR 2, `pnpm test:litellm` A-6): every write route is refused and nothing changes.** What is left is a key that works for the allowed models up to its cap, until the run ends | ASI02, ASI03 | Low (was High if it could mint or read other keys) | Confirmed; the control holds | Accepted: the key's rights are the limit (models, cap, expiry, revoked at the end, kill switch). A-6 stays as a regression test. No task |
 | G-3 | Before the cap, a taken-over agent can spend the key's budget on any allowed model, at once and uselessly (D-07: the cap is per run; the intent and tenant budgets sit above it) | ASI02, ASI08 | Low | Accepted by design, recorded | Document; the cap is the control; no task |
 | G-4 | The spec is an instruction source by design: whoever can merge a spec to the default branch steers the agent | ASI01 | Low | Accepted (G2 approval, branch protection) | Document in handbook Ch.12 if not already there |
 | G-5 | The package proxy cache is shared by all runs and tenants: a bad version cached for one run is served to the next; the proxy log names packages per client address | ASI04 | Low | To confirm | A task in H02: a cache per tenant, or none, decided with the dependency checks |
 | G-6 | The sandbox shares the host's kernel (no gVisor or microVM). A kernel bug is a sandbox escape | ASI05 | Medium | Known (ADR-M10, ADR-M25 §2.5) | Backlog task: optional stronger runtime (gVisor or Kata) behind `sandbox.runtime`; until then run the runner on a separate VM (A10) |
 | G-7 | The runner's Docker access is limited by endpoints, not by body: a compromised runner can create a privileged container (ADR-M25 §2.5 "honest limit") | ASI05, ASI10 | High for the server deployment, Medium for a trial | Known; mitigations 1 and 2 (separate VM, rootless Docker) belong to A10 PR 3, mitigation 3 (authorization plugin) is later | Not fixable in H01; record the trial advice (separate VM) in `TRIAL.md` if missing; backlog task for the authorization plugin with the severity |
 | G-8 | Instruction files under paths hidden by the base commit's ignore rules are not seen by the diff checks (ADR-M34 §2.3) | ASI06 | Low (cannot reach Git, so cannot persist) | Known | Accepted; revisit when the agent version changes |
-| G-9 | No limit on the size of a diff that a person must read at G7; a very large or generated diff defeats review | ASI09 | Medium | To confirm | Backlog task: a configurable "files changed / lines changed" bound that holds G7 with a visible reason, and a G5 check; decision for Harry (QUESTIONS) |
-| G-10 | The agent's `finish` message, terminal output and file content may carry secrets it found in the repository into the diff or the pull request | ASI09, ASI01 | Medium | To confirm (is there a secret scan of the diff at G6?) | If there is none: a G6 secret scan of the diff (the repository already uses Gitleaks in CI) |
+| G-9 | No limit on the size of a diff that a person must read at G7; a very large or generated diff defeats review | ASI09 | Medium | Confirmed (no size check in the runner, G5 or G7 code) | Backlog task: a configurable "files changed / lines changed" bound that holds G7 with a visible reason, and a G5 check; decision for Harry (QUESTIONS) |
+| G-10 | The agent may carry a secret it found in the repository into the diff or the pull request. The platform has no secret scan of the diff; G6 uses only what the project's CI reports | ASI09, ASI01 | Medium | Confirmed (no scan in the runner, G5 or G6 code) | Backlog task: scan the stored diff for secret patterns before G5 and hold the run with a security escalation |
 
-New gaps found by PR 2 are added here with a severity before PR 3.
+Findings of PR 2 that are controls working, not gaps:
+
+- **Case-colliding names fail closed (A-9b).** A second spelling of the instruction file (`agents.md` next to `AGENTS.md`) makes the runner refuse the workspace archive; the run ends `failed` with `agent_changes_unavailable`, never reaches G5, and nothing is pushed.
+- **Install scripts run, and get nothing (A-7).** The postinstall script of a local package runs in the sandbox (G-1), finds no canary in its environment and cannot connect to the internet; a git URL, a tarball URL and an unknown package all fail.
+- **A process flood is an availability risk only (A-10).** The PID limit (512) stops it; it can starve the Agent Server for the moment it lasts, and a run that ends in that state fails closed (`agent_git_failed`, `agent_stuck`), never succeeds.
 
 ## 6. Tests added (summary)
 
 | ID | Where | What | AC |
 |---|---|---|---|
-| U-1 | `platform/tests/attack/plan-injection.test.ts`, `pnpm test` | Plan text through `planTaskBlock` and the cleaner: guessed nonce, forged closing marker, bidi and zero-width characters, `system:` lines, over-long text | AC2, AC3 |
-| U-2 | `platform/tests/attack/feedback-injection.test.ts`, `pnpm test` | The same for review feedback (`feedbackBlock`) | AC2, AC3 |
-| U-3 | `platform/tests/attack/comment-commands.test.ts`, `pnpm test` | `/approve G7`, an edited comment, bots, unlinked accounts, a user without the role, the creator | AC3 |
-| A-1 … A-12 | `platform/tests/integration/attack/*.test.ts`, `pnpm test:attack` (Docker; added to `platform/DEVELOPMENT.md` and the CI `compose` job path filters) | Stub model mode `[stub:attack]` runs the commands of §4 in the real sandbox; assertions as in §4.1 | AC2, AC3 |
+| U-1, U-2 | `platform/tests/attack/prompt-injection.test.ts`, `pnpm test` | Plan task text and review feedback as the runner sends them (cleaned, capped, framed): guessed and known nonce, forged closing markers, bidi, zero-width and tag characters, `system:` lines, chat-template tokens, a new `Rules:` section, carriage returns, over-long text. The text after the block is byte for byte the same as for a harmless text | AC2, AC3 |
+| U-3 | `platform/tests/attack/comment-commands.test.ts`, `pnpm test` | The comment handler on fakes that fail on any unexpected call: a bot with Person B's ID, an unlinked account, a disabled user, no role, `/approve G7` (also spelled `g7`, `G07`), look-alike commands (quote, fence, full-width slash, zero-width characters, bidi), an edited comment | AC3 |
+| A-1 | `platform/tests/integration/attack/attack.test.ts`, `pnpm test:attack` | Environment names, `/proc/*/environ`, `/proc/*/cmdline` and files hold no canary and no secret-like name except the per-run keys | AC2, AC3 |
+| A-2 to A-5 | same | Internet (addresses, names, cloud metadata, IPv6), OpenBao and platform services (name, alias, address), Docker (socket paths and TCP), another run's sandbox and Agent Server: all unreachable, with positive controls (the model gateway and the sandbox's own server answer). A-3 also covers the platform services the plan called A-12 | AC2, AC3 |
+| A-6 | `platform/tests/integration/litellm/litellm-live.test.ts`, `pnpm test:litellm` | A run key cannot write to any LiteLLM management route; the cap, another key and the tenant's team are unchanged | AC2 |
+| A-7 | `attack.test.ts` | Install scripts, a git URL, a tarball URL and an unknown package, through the real Verdaccio | AC2, AC3 |
+| A-8 | same | Writes to the system, `mount`, exec from tmpfs, `setuid`, `sudo`, `chown`: refused; no capability, `no-new-privileges`, memory, PID and swap limits as set | AC2 |
+| A-9, A-9b | same | Edits of `AGENTS.md`, skills, `.sdlc/` and the spec: `changes_checked` counts them, G5's own check answers `instructions_unpinned` with a security escalation, nothing on the default branch. A second spelling of the instruction file: the run fails closed | AC2, AC3 |
+| A-10 | same | A process flood stops at the PID limit; the run ends and the sandbox and network are removed | AC2 |
+| A-11 | same | A hostile `finish` message and file names (bidi, Markdown, a link) are in no run event, audit event, run table or log | AC3 |
+| G-2 | same | Records whether the agent can read its model key from process memory (yes); the key is in no record | AC3 |
 
-`pnpm test:attack` needs Docker and the stub stack of `agent-api.test.ts`; it is not run while a long evaluation (`pnpm eval`) is using Docker on the same machine.
+Every `attack.test.ts` test ends with the canary search of §4.1 over `run_events`, `audit_log`, `runs`, `cost_records`, `evidence_items`, the process output, the stored diff and the model's log. The budget and time caps (planned as A-10) are proved by the existing tests `agent-live.test.ts` (iteration cap, time cap, loops) and the pilot's N3.
+
+`pnpm test:attack` needs Docker and the network; do not run it while a long `pnpm eval` uses Docker on the same machine.
 
 ## 7. Single trial with a real local model
 
@@ -223,3 +236,4 @@ Optional, once, outside CI: one run with `gpt-oss:20b` (Ollama on the owner's ma
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-13 | Claude (task H01, PR 1) | First version: assets, attackers, ASI01–ASI10, gaps with severity, test plan |
+| 0.2 | 2026-10-13 | Claude (task H01, PR 2) | Test results: G-2 half confirmed, half refuted (Low); G-9 and G-10 confirmed; §6 lists the tests as built |

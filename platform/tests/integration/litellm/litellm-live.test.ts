@@ -591,6 +591,57 @@ describe.skipIf(!enabled)(
         });
       });
 
+      // H01 (ADR-M80 A-6, gap G-2): a sandbox's agent can read its own run key out of the Agent
+      // Server's memory, so the key's rights are the real limit. With the run key alone, no
+      // management route may change a key, a team, a user or a model.
+      it('H01 A-6: a run key cannot call a management route that writes (keys, teams, users, models, config)', async () => {
+        const own = await seed();
+        const other = await seed();
+        const ownKey = await issue(own);
+        const otherKey = await issue(other);
+        const key = ownKey.key.key.reveal();
+        const writes: ReadonlyArray<readonly [string, string, Record<string, unknown>]> = [
+          ['key_generate', '/key/generate', { models: [MODEL], max_budget: 1000 }],
+          ['key_update_own_budget', '/key/update', { key, max_budget: 100000 }],
+          [
+            'key_update_other',
+            '/key/update',
+            { key: otherKey.key.key.reveal(), max_budget: 100000 },
+          ],
+          ['key_delete_other', '/key/delete', { keys: [otherKey.key.keyId] }],
+          ['key_regenerate', '/key/regenerate', { key }],
+          [
+            'team_update_budget',
+            '/team/update',
+            { team_id: `sdlc-tenant-${own.slug}`, max_budget: 100000 },
+          ],
+          ['team_new', '/team/new', { team_alias: 'attack-team' }],
+          ['user_new', '/user/new', { user_role: 'proxy_admin' }],
+          [
+            'model_new',
+            '/model/new',
+            { model_name: 'attack', litellm_params: { model: 'openai/x' } },
+          ],
+          ['config_update', '/config/update', { general_settings: { master_key: 'attack' } }],
+        ];
+        const accepted: string[] = [];
+        for (const [name, route, body] of writes) {
+          const response = await fetch(`${litellmUrl}${route}`, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          await response.text();
+          if (response.status >= 200 && response.status < 300)
+            accepted.push(`${name}:${String(response.status)}`);
+        }
+        expect(accepted, 'management routes a run key may write').toEqual([]);
+        // And nothing changed: the run's cap, the other key and the tenant's budget are as issued.
+        const reader = new LiteLLMKeySpendReader({ baseUrl: litellmUrl });
+        expect((await reader.readOwnSpend(ownKey.key.key)).maxBudgetUsd).toBe('2');
+        expect(await chat(otherKey.key.key.reveal())).toBe(200);
+      });
+
       it('a key over its cap still reads its own spend, within the re-read wait (the runner sees the budget stop)', async () => {
         const s = await seed({ runBudget: '0.002' });
         const issued = await issue(s);
