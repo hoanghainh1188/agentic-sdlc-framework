@@ -3,8 +3,9 @@
 // `tenant_id = <tenant>` on every table occurrence (D-05 D2, the tenant guard).
 //
 // - The runs in scope are the runs created in the half-open range [from, to) (UTC).
-// - A run's model is the model with the most cost in its cost records (QUESTIONS #434); a run
-//   without cost records has the model `unknown`.
+// - A run's model is the model in its `model_selected` run event (QUESTIONS #434, option C). A run
+//   without the event (older runs, or a name the event cannot hold) falls back to the model with
+//   the most cost in its cost records; without cost records either, the model is `unknown`.
 // - Intent measures (CI on the first try, merged, cost per merged intent, lead time) count under
 //   the run that made the event (the first `ci_checked`, the last `pr_merged`; QUESTIONS #433).
 // - Sums are made in SQL; money and token sums come back as strings (D-05 D6).
@@ -399,6 +400,14 @@ export class AgentMetricsRepository extends TenantRepository {
             'r.agent_version as agent_version',
             eb.fn
               .coalesce(
+                eb
+                  .selectFrom('run_events as me')
+                  .select(sql<string>`me.payload->>'model'`.as('model'))
+                  .where('me.tenant_id', '=', tenantId)
+                  .whereRef('me.run_id', '=', 'r.id')
+                  .where('me.event_type', '=', 'model_selected')
+                  .orderBy('me.id')
+                  .limit(1),
                 eb
                   .selectFrom('cost_records as m')
                   .select('m.model')
