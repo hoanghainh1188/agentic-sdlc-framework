@@ -184,6 +184,7 @@ describe('sdlc ai-record', () => {
         code: 'ai_record_not_found',
         message: t('api.error.ai_record_not_found'),
       }),
+      t('cli.fix.not_found'),
     ]);
   });
 

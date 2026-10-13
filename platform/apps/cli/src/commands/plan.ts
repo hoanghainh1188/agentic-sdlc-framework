@@ -13,6 +13,7 @@ import { EXIT, type CliContext } from '../context.js';
 import { say, toJson } from '../output.js';
 import { intentRef } from './intent.js';
 import { draft } from './plan-draft.js';
+import { sayNextHint } from './next/hint.js';
 
 const COMMIT = /^[0-9a-f]{40}$/;
 
@@ -56,6 +57,7 @@ async function submit(args: readonly string[], ctx: CliContext): Promise<number>
         flags: flags(plan),
       });
     }
+    await sayNextHint(ctx, client, plan.intent, json);
     return EXIT.ok;
   });
 }

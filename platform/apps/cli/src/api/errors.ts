@@ -61,7 +61,29 @@ export function reportApiFailure(ctx: CliContext, error: ApiCallError, json: boo
     }
   }
   if (exit === EXIT.auth) sayError(ctx, 'cli.api.login_again');
+  const fix = fixKey(error);
+  if (fix !== undefined) sayError(ctx, fix);
   return exit;
+}
+
+/**
+ * V10 AC2: the line that names what to do next for a failure, or undefined (an expired login has
+ * its own line, `cli.api.login_again`). Never printed with `--json`.
+ */
+export function fixKey(error: ApiCallError): MessageKey | undefined {
+  if (error.kind === 'malformed') return 'cli.fix.version';
+  if (error.kind !== 'http') return 'cli.fix.connection';
+  const status = error.status ?? 0;
+  if (status === 403) return 'cli.fix.forbidden';
+  if (status === 404) return 'cli.fix.not_found';
+  if (status === 400) return 'cli.fix.invalid';
+  // A rule refused it: the reason line already explains it when there is one.
+  if (status === 422)
+    return error.envelope?.error.reason === undefined ? 'cli.fix.refused' : undefined;
+  if (status === 409) return 'cli.fix.conflict';
+  if (status === 429) return 'cli.fix.rate_limited';
+  if (status >= 500) return 'cli.fix.unavailable';
+  return undefined;
 }
 
 function messageOfKind(error: ApiCallError): string {

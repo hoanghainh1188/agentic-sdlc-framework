@@ -10,6 +10,7 @@ import { parseCommand, segment, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
 import { say, toJson } from '../output.js';
 import { intentRef } from './intent.js';
+import { sayNextHint } from './next/hint.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -82,6 +83,7 @@ async function kill(args: readonly string[], ctx: CliContext): Promise<number> {
         escalation: result.escalation ?? '-',
       });
     }
+    await sayNextHint(ctx, client, result.intent, json);
     return EXIT.ok;
   });
 }

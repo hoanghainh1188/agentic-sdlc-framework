@@ -148,6 +148,7 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 | API | B03; ADR-M26 | unit: `api/settings.test.ts`; `pnpm test:api` |
 | User CLI | B04, U03; ADR-M36 | unit: `platform/tests/cli/` (mocked API and a real local HTTP server), `cli/api-schemas.test.ts` |
 | `sdlc next` | V06 | unit: `cli/next.test.ts` |
+| `sdlc help`, hints, what to do after a failure | V10 | unit: `cli/help.test.ts` (every command has help and an example; the next-step line; the fix lines; no colour) |
 | `sdlc doctor` | V07 PR 1 | unit: `cli/doctor.test.ts`; db: `api.test.ts` (`platform_version`) |
 | GitHub adapter | B05; ADR-M23 | unit; live with the test App (section 3) |
 | Poller and comment commands | B06; ADR-M27 | unit: grammar, replies, loop, settings, static Compose, `commands/comment-command.test.ts`; db: `git-poller.test.ts` (GitHub stub) |
@@ -237,3 +238,4 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 | 1.0 | 2026-10-12 | Claude (slim CLAUDE.md, PR 1), approved by Harry | First version: the test map and live-test notes that `CLAUDE.md` held (QUESTIONS #424, #425) |
 | 1.1 | 2026-10-13 | Claude (task L02, PR 2) | Section 3 and §5.4: the evaluation harness (`pnpm eval`, ADR-M78) |
 | 1.2 | 2026-10-13 | Claude (task L02, PR 3) | Section 3 and §5.4: `pnpm eval:report`, `pnpm eval:pairs`, the kept diffs |
+| 1.3 | 2026-10-13 | Claude (task V10) | §5.2: `cli/help.test.ts` |

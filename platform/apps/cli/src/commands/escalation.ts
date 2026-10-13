@@ -12,6 +12,7 @@ import { EXIT, type CliContext } from '../context.js';
 import { say, show, toJson } from '../output.js';
 import { HTTPS_REF } from './gate.js';
 import { intentRef } from './intent.js';
+import { sayNextHint } from './next/hint.js';
 
 const MAX_PAGE = 100;
 const DECIMAL = /^\d{1,12}(\.\d{1,6})?$/;
@@ -112,7 +113,9 @@ async function decide(args: readonly string[], ctx: CliContext): Promise<number>
       escalationSchema,
       { decision, ...body },
     );
-    return print(ctx, json, escalation, 'cli.escalation.decided');
+    const exit = print(ctx, json, escalation, 'cli.escalation.decided');
+    await sayNextHint(ctx, client, escalation.intent.code, json);
+    return exit;
   });
 }
 

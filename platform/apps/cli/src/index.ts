@@ -13,6 +13,7 @@ import { runDoctor } from './commands/doctor.js';
 import { runEscalation } from './commands/escalation.js';
 import { runEvidence } from './commands/evidence.js';
 import { runGate } from './commands/gate.js';
+import { commandHelp, isHelpFlag, runHelp } from './commands/help.js';
 import { runIntent } from './commands/intent.js';
 import { runMetrics } from './commands/metrics.js';
 import { runNext } from './commands/next.js';
@@ -65,8 +66,22 @@ export async function runCli(argv: readonly string[], ctx: CliContext): Promise<
     ctx.stdout(PLATFORM_VERSION);
     return EXIT.ok;
   }
-  const user =
-    group !== undefined && Object.hasOwn(USER_COMMANDS, group) ? USER_COMMANDS[group] : undefined;
+  // V10: `sdlc help …`, `sdlc --help`, and `sdlc <group> … --help` print help and do nothing else.
+  if (group === undefined || group === 'help' || isHelpFlag(group)) {
+    if (group === undefined) {
+      ctx.stderr(t('cli.usage'));
+      return EXIT.usage;
+    }
+    return runHelp(group === 'help' ? argv.slice(1) : [], ctx);
+  }
+  if (argv.slice(1).some(isHelpFlag)) {
+    const help = commandHelp(group);
+    if (help !== undefined) {
+      ctx.stdout(help);
+      return EXIT.ok;
+    }
+  }
+  const user = Object.hasOwn(USER_COMMANDS, group) ? USER_COMMANDS[group] : undefined;
   if (user) {
     try {
       return await user(argv.slice(1), ctx);

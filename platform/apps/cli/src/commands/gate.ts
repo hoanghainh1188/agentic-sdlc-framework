@@ -10,6 +10,7 @@ import { parseCommand, segment, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
 import { say, toJson } from '../output.js';
 import { decisionParams, intentRef } from './intent.js';
+import { sayNextHint } from './next/hint.js';
 
 const VERBS: Readonly<Record<string, string>> = {
   approve: 'approve',
@@ -57,6 +58,7 @@ export async function runGate(args: readonly string[], ctx: CliContext): Promise
     );
     if (json) ctx.stdout(toJson(row));
     else say(ctx, 'cli.gate.recorded', { ...decisionParams(row), intent: ref });
+    await sayNextHint(ctx, client, ref, json);
     return EXIT.ok;
   });
 }

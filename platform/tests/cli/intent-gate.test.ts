@@ -92,6 +92,7 @@ describe('sdlc intent create', () => {
     expect(await h.run(CREATE)).toBe(EXIT.failed);
     expect(h.err).toEqual([
       t('cli.api.refused', { code: 'forbidden', message: t('api.error.forbidden') }),
+      t('cli.fix.forbidden'),
     ]);
   });
 
@@ -117,6 +118,7 @@ describe('sdlc intent create', () => {
     expect(await h.run(CREATE)).toBe(EXIT.failed);
     expect(h.err).toEqual([
       t('cli.api.refused', { code: 'brand_new_code', message: 'server text for brand_new_code' }),
+      t('cli.fix.conflict'),
     ]);
   });
 
@@ -256,7 +258,7 @@ describe('sdlc intent list and show', () => {
       routes: { 'GET /v1/intents/INT-2026-0007': { status: 200, body: { code: 'x' } } },
     });
     expect(await h.run(['intent', 'show', 'INT-2026-0007'])).toBe(EXIT.error);
-    expect(h.err).toEqual([t('cli.api.malformed')]);
+    expect(h.err).toEqual([t('cli.api.malformed'), t('cli.fix.version')]);
   });
 });
 
