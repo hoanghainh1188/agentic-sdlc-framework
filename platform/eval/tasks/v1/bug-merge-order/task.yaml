@@ -1,0 +1,15 @@
+schema: 1
+id: bug-merge-order
+title: Stock rows are not locked in product order
+kind: bug
+shape: F4
+planned_files:
+  - apps/api/src/inventory/stock-rules.ts
+  - apps/api/src/inventory/stock-rules.spec.ts
+fail_to_pass:
+  - pnpm --filter @pilot/api test -- merge-order.hidden
+pass_to_pass:
+  - pnpm --filter @pilot/api test
+ci:
+  - pnpm --filter @pilot/api typecheck
+  - pnpm lint

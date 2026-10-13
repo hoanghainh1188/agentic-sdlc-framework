@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L02, PR 1, for review) |
+| Status | **Proposed** (task L02; 0.2 after PR 2, for review) |
 | Date | 2026-10-13 |
 | Decided by | Harry (plan approved 2026-10-13, with answers to QUESTIONS #435–#439) |
 | Related | D-08 task L02 (AC1–AC10); D-07 §3–§5; D-09 §7; ADR-M10, ADR-M29 (the agent path), ADR-M24 (cost), ADR-M35 (Langfuse), ADR-M79 (the report from real runs); QUESTIONS #362, #422, #423, #435–#439 |
@@ -36,14 +36,17 @@ Inspect AI and promptfoo stay options for prompt-only comparisons later; neither
 
 ### 2.2. Where it lives and how it runs
 
-- `pnpm eval [--config <file>] [--tasks <ids>] [--n <runs>] [--out <folder>]`; code in `platform/eval/`, a TypeScript project in the root `tsconfig.json` (like `platform/deploy/doctor`), not a workspace package.
+- `pnpm eval --out <folder> [--config <file>] [--configurations <ids>] [--tasks <ids>] [--n <runs>]` and `pnpm eval --check`. The pure parts (tasks, configurations, run results, the scoring script, the base) are `platform/eval/src/`, a TypeScript project in the root `tsconfig.json` (like `platform/deploy/doctor`), not a workspace package. The runs are a live test, `platform/tests/integration/eval/eval-run.test.ts`, started through `test-db.sh` like `test:agent-real`, so they reuse the live tests' set-up (a throw-away PostgreSQL, the sandbox image, the relay, the agent helpers).
+- **The agent works as on a real run**: the sandbox reaches LiteLLM and the package proxy only (Verdaccio, its storage in the volume `sdlc-eval-npm-cache`), so it can run `pnpm install` and the tests, as `AGENTS.md` tells it.
+- **The scoring container** (`sdlc-eval-base:<commit>`, built once with the packages installed) runs code the agent wrote: `--network none`, `--cap-drop ALL`, `no-new-privileges`, the user `node`, memory, CPU, process and time limits. It applies the base and the agent's diff, runs the repository's checks, `pass_to_pass`, then copies the hidden files in and runs `fail_to_pass` and ESLint on the changed files, and writes exit codes and a count only.
 - **Developer machines only, never in CI.** It needs Docker, internet (the sample repository at a pinned commit, as `test:proposal-pilot`) and the models. No secret for local models; a run with an API model is started by the owner in a terminal (the key comes from OpenBao as in `test:agent-api`).
 - **Runner and agent only, not G1–G8** (QUESTIONS #436): gates are not what is measured. The harness computes the file scope (`checkScope` against the task's plan) and runs the repository's CI commands itself.
 - Results are written per run to `--out` (outside the repository), so a stopped evaluation continues where it stopped (QUESTIONS #437).
+- `--check` checks the task set itself: each task's `solution.patch` (a reference fix, never given to the agent) resolves it, and the base without a change fails its hidden tests. A new or changed task must pass it.
 
 ### 2.3. The task set (AC1, AC8)
 
-- Task set version 1: about 8–10 tasks on `pilot-order-inventory` at a pinned commit: the shapes of T01–T08 (D-09 §7) and 3–5 seeded bugs to fix.
+- Task set version 1: 8 tasks on `pilot-order-inventory` at commit `7d5341d`, all in `apps/api`: 4 seeded bugs (`findShortages`, `mergeRequests`, `likePattern`, `formatOrderNumber`) and 4 features in the shapes of T02, T05, T06, T08, each naming the function the hidden tests call. Screens, migrations and database tests are not in v1: their tests need a browser or PostgreSQL in the scoring container (a later version).
 - Each task: the spec and the plan the agent gets, the base commit (or a seed patch for a bug), and **hidden tests**: `fail_to_pass` (the new behaviour) and `pass_to_pass` (what must not break). The agent never sees them: they are copied into a fresh container with the agent's diff after the run.
 - Tasks live in `platform/eval/tasks/v1/` (QUESTIONS #435). The repository is public, so a model may have seen them; `SDLC_EVAL_TASKS_DIR` points at a private task set outside the repository. Every report names the task set version; new tasks go into a new version.
 
@@ -53,7 +56,7 @@ Inspect AI and promptfoo stay options for prompt-only comparisons later; neither
 - Each task runs N times per configuration (default 5, QUESTIONS #437).
 - Per run, numbers and codes only: hidden tests passed (resolved), CI commands passed on the first try, scope breach, stop reason, new static-analysis findings (count), diff size (files, lines), wall-clock time, model calls, input, output and cached tokens, cost (the internal cost for self-hosted models, D-07 §3).
 - **The report never holds prompts, task text, code or diffs** (AC6).
-- Models (QUESTIONS #439): `gpt-oss:20b` (local tag, already used), one small (about 7–8B) and one about 30B local model, tags chosen in PR 2 and pulled by the owner; never an Ollama `:cloud` model. One API model (`claude-haiku-4-5-20251001`) when the owner runs it with a key.
+- Models (QUESTIONS #439): `gpt-oss:20b` and `qwen3:8b` (`platform/eval/configs/local.yaml`), pulled on the owner's machine. `qwen2.5-coder:7b` was tried first and dropped: it made no tool call through OpenHands, so every run ended after one reply with no change (2026-10-13, one run per task). A first `qwen3:8b` run called the tools 26 times and reached the 20-minute cap without a change; never an Ollama `:cloud` model (the configuration loader refuses one). **No 30B model on the owner's machine** (24 GB of memory, with Docker, LiteLLM and the sandbox): the report says so; a larger machine or L01 measures it. The provider `stub` checks the harness itself. API models (`claude-haiku-4-5-20251001`) come in a later PR: the run needs the key from OpenBao, started by the owner in a terminal.
 
 ### 2.5. Statistics and the report (AC3, AC4)
 
@@ -95,3 +98,4 @@ Inspect AI and promptfoo stay options for prompt-only comparisons later; neither
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-13 | Claude (task L02, PR 1) | First version |
+| 0.2 | 2026-10-13 | Claude (task L02, PR 2) | §2.2–§2.4 as built: the live test runs the evaluation, the package proxy for the agent, the scoring container's limits, `--check`, task set v1, the models and the 24 GB limit; API models later |

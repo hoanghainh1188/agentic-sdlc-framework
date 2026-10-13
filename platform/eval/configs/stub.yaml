@@ -1,0 +1,9 @@
+# The scripted stub model of the live tests: checks the harness itself, never a model's quality
+# (task L02, ADR-M78). The stub edits a file outside the plan, so its runs are never resolved.
+schema: 1
+configurations:
+  - id: stub
+    agent_version: 1.0.0
+    model: { provider: stub, name: stub-model }
+    max_iterations: 10
+    max_duration_min: 5

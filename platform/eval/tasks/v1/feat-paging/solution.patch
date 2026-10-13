@@ -1,0 +1,23 @@
+diff --git a/apps/api/src/common/paging.ts b/apps/api/src/common/paging.ts
+new file mode 100644
+index 0000000..a3bdac6
+--- /dev/null
++++ b/apps/api/src/common/paging.ts
+@@ -0,0 +1,17 @@
++export const DEFAULT_PAGE_SIZE = 20;
++export const MAX_PAGE_SIZE = 100;
++
++/** Checks the paging parameters (T08) and computes the offset. Throws RangeError on a bad value. */
++export function resolvePaging(input: { page?: number; pageSize?: number }): {
++  page: number;
++  pageSize: number;
++  offset: number;
++} {
++  const page = input.page ?? 1;
++  const pageSize = input.pageSize ?? DEFAULT_PAGE_SIZE;
++  if (!Number.isInteger(page) || page < 1) throw new RangeError('page must be an integer of 1 or more');
++  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
++    throw new RangeError('pageSize must be an integer from 1 to 100');
++  }
++  return { page, pageSize, offset: (page - 1) * pageSize };
++}

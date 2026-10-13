@@ -86,6 +86,17 @@ export interface StartAgentRun {
   readonly configYaml?: string;
   /** Runs after the claim, while the run is `provisioning` (the Cost Controller issues its key). */
   readonly afterClaim?: (scope: TenantScope, envelope: RunContractEnvelope) => Promise<void>;
+  /**
+   * L02 (ADR-M78): a prepared repository (HEAD on `main` is the base) instead of the fixture
+   * repository, with the path of its spec. `agentsMd` and `specText` are then not written.
+   */
+  readonly repoSource?: { readonly dir: string; readonly specPath: string };
+  /** The plan's path patterns (default `hello.txt`). */
+  readonly plannedFiles?: readonly string[];
+  /** L02: the package proxy as a second egress service (`npm-proxy`, port 4873). */
+  readonly npmProxyContainer?: string;
+  /** The SHA-256 of the instructions the agent reads (default a fixed value). */
+  readonly instructionsSha256?: string;
 }
 
 const git = (dir: string, ...args: string[]) =>
@@ -98,15 +109,28 @@ const git = (dir: string, ...args: string[]) =>
 export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixture> {
   const cloneDir = fs.mkdtempSync(path.join(input.tmp, 'run-'));
   const repo = path.join(cloneDir, 'repo');
-  fs.mkdirSync(repo);
   fs.mkdirSync(path.join(cloneDir, 'home'));
-  git(repo, 'init', '-q', '-b', 'main');
-  fs.mkdirSync(path.join(repo, 'docs/specs'), { recursive: true });
-  fs.writeFileSync(path.join(repo, 'README.md'), '# Fixture\n');
-  fs.writeFileSync(path.join(repo, 'AGENTS.md'), input.agentsMd);
-  fs.writeFileSync(path.join(repo, SPEC_PATH), input.specText);
-  git(repo, 'add', '-A');
-  git(repo, 'commit', '-q', '-m', 'fixture');
+  const specPath = input.repoSource?.specPath ?? SPEC_PATH;
+  if (input.repoSource) {
+    execFileSync('git', [
+      'clone',
+      '-q',
+      '--no-hardlinks',
+      '--branch',
+      'main',
+      input.repoSource.dir,
+      repo,
+    ]);
+  } else {
+    fs.mkdirSync(repo);
+    git(repo, 'init', '-q', '-b', 'main');
+    fs.mkdirSync(path.join(repo, 'docs/specs'), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'README.md'), '# Fixture\n');
+    fs.writeFileSync(path.join(repo, 'AGENTS.md'), input.agentsMd);
+    fs.writeFileSync(path.join(repo, SPEC_PATH), input.specText);
+    git(repo, 'add', '-A');
+    git(repo, 'commit', '-q', '-m', 'fixture');
+  }
   const baseSha = git(repo, 'rev-parse', 'HEAD');
 
   const tenant = await input.t.app.system.createTenant({ slug: input.slug, name: input.slug });
@@ -135,9 +159,9 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
     riskTier: 'low',
     dataClass: 'internal',
   });
-  const blob = fs.readFileSync(path.join(repo, SPEC_PATH));
+  const blob = fs.readFileSync(path.join(repo, specPath));
   await registry.linkSpec(scope, intent.id, {
-    path: SPEC_PATH,
+    path: specPath,
     commitSha: baseSha,
     contentSha256: crypto.createHash('sha256').update(blob).digest('hex'),
     structure: 'manual_heading',
@@ -146,7 +170,7 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
     actorId: person,
   });
   const plan = await registry.submitPlan(scope, intent.id, {
-    plannedFiles: ['hello.txt'],
+    plannedFiles: [...(input.plannedFiles ?? ['hello.txt'])],
     summary: input.planSummary,
     planSha256: 'b'.repeat(64),
     actorType: 'human',
@@ -162,7 +186,7 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
       agent: {
         id: agent.id,
         version: '1.0.0',
-        instructionsSha256: 'c'.repeat(64),
+        instructionsSha256: input.instructionsSha256 ?? 'c'.repeat(64),
         tools: ['file_editor', 'terminal'],
       },
       planTools: ['file_editor', 'terminal'],
@@ -170,7 +194,9 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
       maxBudgetUsd: '1',
       ...input.caps,
       allowedModels: [input.model],
-      egressAllowlist: ['litellm:4000'],
+      egressAllowlist: input.npmProxyContainer
+        ? ['litellm:4000', 'npm-proxy:4873']
+        : ['litellm:4000'],
       triggeredBy: null,
     },
     { signer },
@@ -205,7 +231,10 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
   const settings = runnerSettingsFromEnv({
     SDLC_RUNNER_DOCKER_SOCKET: dockerSocket(),
     SDLC_RUNNER_INSTANCE: `c05-${input.suffix}`,
-    SDLC_RUNNER_EGRESS_SERVICES: `litellm=${input.litellmContainer}:4000`,
+    SDLC_RUNNER_EGRESS_SERVICES: input.npmProxyContainer
+      ? `litellm=${input.litellmContainer}:4000,npm-proxy=${input.npmProxyContainer}:4873`
+      : `litellm=${input.litellmContainer}:4000`,
+    ...(input.npmProxyContainer ? { SDLC_RUNNER_NPM_REGISTRY: 'http://npm-proxy:4873/' } : {}),
     SDLC_RUNNER_SELF_CONTAINER: relay,
     SDLC_RUNNER_AGENT_POLL_MS: '250',
     SDLC_RUNNER_AGENT_STOP_GRACE_SECONDS: '300',

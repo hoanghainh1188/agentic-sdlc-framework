@@ -1,0 +1,15 @@
+schema: 1
+id: feat-paging
+title: Paging parameters (rule only)
+kind: feature
+shape: T08
+planned_files:
+  - apps/api/src/common/paging.ts
+  - apps/api/src/common/paging.spec.ts
+fail_to_pass:
+  - pnpm --filter @pilot/api test -- paging.hidden
+pass_to_pass:
+  - pnpm --filter @pilot/api test
+ci:
+  - pnpm --filter @pilot/api typecheck
+  - pnpm lint

@@ -1,0 +1,11 @@
+diff --git a/apps/api/src/inventory/stock-rules.ts b/apps/api/src/inventory/stock-rules.ts
+index 6f58018..0d18268 100644
+--- a/apps/api/src/inventory/stock-rules.ts
++++ b/apps/api/src/inventory/stock-rules.ts
+@@ -36,5 +36,5 @@ export function findShortages(
+       requested: quantity,
+       available: available.get(productId) ?? 0,
+     }))
+-    .filter((line) => line.requested > line.available);
++    .filter((line) => line.requested >= line.available);
+ }

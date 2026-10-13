@@ -1,0 +1,13 @@
+diff --git b/apps/api/src/orders/order-rules.ts a/apps/api/src/orders/order-rules.ts
+index f2f9b53..2462c8b 100644
+--- b/apps/api/src/orders/order-rules.ts
++++ a/apps/api/src/orders/order-rules.ts
+@@ -14,7 +14,7 @@ export interface PricedLine {
+ 
+ /** Order number shown to users: `SO-` plus the sequence value padded to six digits. */
+ export function formatOrderNumber(sequenceValue: number): string {
+-  return `SO-${String(sequenceValue).padStart(5, '0')}`;
++  return `SO-${String(sequenceValue).padStart(6, '0')}`;
+ }
+ 
+ /**

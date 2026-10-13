@@ -1,0 +1,15 @@
+schema: 1
+id: bug-like-escape
+title: The order search treats an underscore as a wildcard
+kind: bug
+shape: F5
+planned_files:
+  - apps/api/src/orders/order-rules.ts
+  - apps/api/src/orders/order-rules.spec.ts
+fail_to_pass:
+  - pnpm --filter @pilot/api test -- like-escape.hidden
+pass_to_pass:
+  - pnpm --filter @pilot/api test
+ci:
+  - pnpm --filter @pilot/api typecheck
+  - pnpm lint

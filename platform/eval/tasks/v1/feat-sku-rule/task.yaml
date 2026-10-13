@@ -1,0 +1,15 @@
+schema: 1
+id: feat-sku-rule
+title: Validate the SKU format (rule only)
+kind: feature
+shape: T02
+planned_files:
+  - apps/api/src/products/sku-rules.ts
+  - apps/api/src/products/sku-rules.spec.ts
+fail_to_pass:
+  - pnpm --filter @pilot/api test -- sku-rules.hidden
+pass_to_pass:
+  - pnpm --filter @pilot/api test
+ci:
+  - pnpm --filter @pilot/api typecheck
+  - pnpm lint

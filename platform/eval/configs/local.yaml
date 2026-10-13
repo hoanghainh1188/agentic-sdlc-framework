@@ -1,0 +1,26 @@
+# Local configurations for the first evaluation (task L02, QUESTIONS #439, ADR-M78 §2.4).
+# One factor changes between two configurations that are compared: here, the model.
+# Pull the tags on this machine first (`ollama pull <tag>`); never a `:cloud` model.
+schema: 1
+configurations:
+  - id: gpt-oss-20b
+    agent_version: 1.0.0
+    model:
+      {
+        provider: ollama,
+        name: gpt-oss-20b,
+        tag: 'gpt-oss:20b',
+        num_ctx: 32768,
+        reasoning_effort: low,
+      }
+    instructions: repo
+    max_iterations: 30
+    max_duration_min: 20
+  # qwen2.5-coder:7b was tried first: it made no tool call, so the agent ended after one reply
+  # (2026-10-13, ADR-M78 §2.4). qwen3:8b calls the tools.
+  - id: qwen3-8b
+    agent_version: 1.0.0
+    model: { provider: ollama, name: qwen3-8b, tag: 'qwen3:8b', num_ctx: 32768 }
+    instructions: repo
+    max_iterations: 30
+    max_duration_min: 20

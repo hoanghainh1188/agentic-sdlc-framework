@@ -1,0 +1,15 @@
+schema: 1
+id: bug-order-number
+title: Order numbers have five digits instead of six
+kind: bug
+shape: F4
+planned_files:
+  - apps/api/src/orders/order-rules.ts
+  - apps/api/src/orders/order-rules.spec.ts
+fail_to_pass:
+  - pnpm --filter @pilot/api test -- order-number.hidden
+pass_to_pass:
+  - pnpm --filter @pilot/api test
+ci:
+  - pnpm --filter @pilot/api typecheck
+  - pnpm lint
