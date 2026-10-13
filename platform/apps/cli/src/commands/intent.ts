@@ -23,6 +23,7 @@ import { EXIT, type CliContext } from '../context.js';
 import { say, sayError, show, toJson } from '../output.js';
 import { linkSpec, sayLinked, specLinkBody } from './spec-link.js';
 import type { ApiClient } from '../api/client.js';
+import { sayNextHint } from './next/hint.js';
 
 /** The API's limits (ADR-M26 §2.8, `createIntentSchema`). */
 const MAX_DESCRIPTION = 10_000;
@@ -89,6 +90,7 @@ async function create(args: readonly string[], ctx: CliContext): Promise<number>
     if (specBody === undefined) {
       if (json) ctx.stdout(toJson(intent));
       else say(ctx, 'cli.intent.created', summary(intent));
+      await sayNextHint(ctx, client, intent.code, json);
       return EXIT.ok;
     }
     if (!json) say(ctx, 'cli.intent.created', summary(intent));
@@ -124,6 +126,7 @@ async function linkAfterCreate(
     const spec = await linkSpec(client, intent.code, specBody);
     if (json) ctx.stdout(toJson({ intent, spec, spec_error: null }));
     else sayLinked(ctx, spec);
+    await sayNextHint(ctx, client, intent.code, json);
     return EXIT.ok;
   } catch (error) {
     if (!(error instanceof ApiCallError)) throw error;

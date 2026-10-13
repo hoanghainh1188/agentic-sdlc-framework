@@ -11,6 +11,7 @@ import { EXIT, type CliContext } from '../context.js';
 import { say, toJson } from '../output.js';
 import { intentRef } from './intent.js';
 import { linkSpec, sayLinked, specLinkBody, structureParams } from './spec-link.js';
+import { sayNextHint } from './next/hint.js';
 
 export async function runSpec(args: readonly string[], ctx: CliContext): Promise<number> {
   const [command, ...rest] = args;
@@ -36,6 +37,7 @@ async function link(args: readonly string[], ctx: CliContext): Promise<number> {
     const spec = await linkSpec(client, ref, body);
     if (json) ctx.stdout(toJson(spec));
     else sayLinked(ctx, spec);
+    await sayNextHint(ctx, client, spec.intent, json);
     return EXIT.ok;
   });
 }

@@ -48,9 +48,12 @@ describe('sdlc intent create --spec (U03)', () => {
     expect(await h.run([...WITH_SPEC, '--spec-commit', COMMIT, '--spec-tool', 'spec-kit'])).toBe(
       EXIT.ok,
     );
+    // V10: then the two reads of the next-step hint (no route here: the hint is left out).
     expect(h.requests.map((r) => `${r.method} ${r.url.pathname}`)).toEqual([
       'POST /v1/intents',
       SPECS,
+      'GET /v1/me',
+      'GET /v1/intents/INT-2026-0007',
     ]);
     // The create body is unchanged; the spec options go to the link only.
     expect(h.requests[0]?.body).not.toHaveProperty('spec');

@@ -102,7 +102,7 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
 
 The example is task T01 of the sample repo, Low risk. Where Medium or High risk differs, it says so.
 
-**Lost? Ask the platform.** At any step, `sdlc next <INT>` prints where the intent is, who it waits for, why it is held, and what **you** do now: the command or comment to type, or that it waits for someone else. It reads the intent and your roles only and changes nothing; it never tells a producer of a change to approve it.
+**Lost? Ask the platform.** `sdlc help` lists the guides and the commands; after a command that moves an intent, the CLI prints the likely next step, and after a failure, what to do. At any step, `sdlc next <INT>` prints where the intent is, who it waits for, why it is held, and what **you** do now: the command or comment to type, or that it waits for someone else. It reads the intent and your roles only and changes nothing; it never tells a producer of a change to approve it.
 
 ### Step 1. Create the intent (Person A)
 
@@ -222,6 +222,7 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 |---|---|
 | `sdlc next <INT>` | What do I do now: the next command or comment for you, or who it waits for |
 | `sdlc doctor` | Is my login and the API all right, and what do I fix |
+| `sdlc help [topic\|command]` | Short guides (getting started, roles, gates, comment commands, troubleshooting) and every command with an example; `sdlc <command> --help` too |
 | `sdlc intent list` / `sdlc intent show <INT>` | Where is my intent, what waits for whom |
 | `sdlc gate approve\|reject\|request-changes <G> <INT>` | Decide a gate (codes only; `--reason-code`) |
 | `sdlc spec link` / `sdlc plan submit` | Inputs of G2 and G3 |

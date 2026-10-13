@@ -17,7 +17,12 @@ describe('sdlc run', () => {
   it('kills a run by its ID', async () => {
     const h = await harness({ routes: { [`POST ${KILL}`]: { status: 202, body: killBody() } } });
     expect(await h.run(['run', 'kill', RUN_ID])).toBe(EXIT.ok);
-    expect(h.requests.map((r) => `${r.method} ${r.url.pathname}`)).toEqual([`POST ${KILL}`]);
+    // V10: then the two reads of the next-step hint (no route here: the hint is left out).
+    expect(h.requests.map((r) => `${r.method} ${r.url.pathname}`)).toEqual([
+      `POST ${KILL}`,
+      'GET /v1/me',
+      'GET /v1/intents/INT-2026-0007',
+    ]);
     expect(h.out).toEqual([
       t('cli.run.killed', {
         run: RUN_ID,
