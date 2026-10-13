@@ -16,9 +16,11 @@ configurations:
     instructions: repo
     max_iterations: 30
     max_duration_min: 20
-  - id: qwen2-5-coder-7b
+  # qwen2.5-coder:7b was tried first: it made no tool call, so the agent ended after one reply
+  # (2026-10-13, ADR-M78 §2.4). qwen3:8b calls the tools.
+  - id: qwen3-8b
     agent_version: 1.0.0
-    model: { provider: ollama, name: qwen2.5-coder-7b, tag: 'qwen2.5-coder:7b', num_ctx: 32768 }
+    model: { provider: ollama, name: qwen3-8b, tag: 'qwen3:8b', num_ctx: 32768 }
     instructions: repo
     max_iterations: 30
     max_duration_min: 20

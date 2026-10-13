@@ -209,7 +209,7 @@ describe('configurations (AC2, AC6)', () => {
     const local = loadConfigurations(path.join(CONFIGS, 'local.yaml'));
     expect(local.map((c) => [c.id, c.model.provider, c.model.tag])).toEqual([
       ['gpt-oss-20b', 'ollama', 'gpt-oss:20b'],
-      ['qwen2-5-coder-7b', 'ollama', 'qwen2.5-coder:7b'],
+      ['qwen3-8b', 'ollama', 'qwen3:8b'],
     ]);
     expect(loadConfigurations(path.join(CONFIGS, 'stub.yaml'))[0]!.model).toMatchObject({
       provider: 'stub',
@@ -241,9 +241,7 @@ describe('configurations (AC2, AC6)', () => {
     const twice = `${one('{ provider: stub, name: m }')}  - id: a\n    agent_version: 1.0.0\n    model: { provider: stub, name: m }\n`;
     expect(() => loadConfigurations(write(twice))).toThrow(/repeat/);
     const file = path.join(CONFIGS, 'local.yaml');
-    expect(loadConfigurations(file, ['qwen2-5-coder-7b']).map((c) => c.id)).toEqual([
-      'qwen2-5-coder-7b',
-    ]);
+    expect(loadConfigurations(file, ['qwen3-8b']).map((c) => c.id)).toEqual(['qwen3-8b']);
     expect(() => loadConfigurations(file, ['nope'])).toThrow(/unknown configuration/);
   });
 
