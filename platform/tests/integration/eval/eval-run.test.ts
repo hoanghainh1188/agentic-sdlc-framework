@@ -38,6 +38,7 @@ import {
   type EvalConfiguration,
   type EvalTask,
   type TaskSet,
+  writeDiff,
 } from '../../../eval/src/index.js';
 import {
   DockerClient,
@@ -426,6 +427,13 @@ describe.skipIf(!enabled || MODE !== 'evaluate')(
           cached_input_tokens: sum((r) => r.cached_input_tokens),
           cost_usd: formatUsd6(fromMicros(costMicros)),
         });
+        // QUESTIONS #445: the diff stays on this machine for blind review (`pnpm eval:pairs`),
+        // never in a result or the report; `pnpm eval:pairs purge-diffs` deletes it.
+        writeDiff(
+          s!.out,
+          { taskSet: set.version, configuration: config.id, task: task.id, run },
+          agentPatch,
+        );
         process.stderr.write(
           `L02 RUN ${config.id} ${task.id} ${String(run)} → ${path.basename(file)}\n`,
         );

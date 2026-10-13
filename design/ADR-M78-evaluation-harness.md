@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L02; 0.2 after PR 2, for review) |
+| Status | **Proposed** (task L02; 0.3 after PR 3, for review) |
 | Date | 2026-10-13 |
 | Decided by | Harry (plan approved 2026-10-13, with answers to QUESTIONS #435–#439) |
 | Related | D-08 task L02 (AC1–AC10); D-07 §3–§5; D-09 §7; ADR-M10, ADR-M29 (the agent path), ADR-M24 (cost), ADR-M35 (Langfuse), ADR-M79 (the report from real runs); QUESTIONS #362, #422, #423, #435–#439 |
@@ -29,7 +29,7 @@ The four candidates of D-08 L02, checked on 2026-10-13 (GitHub API: licence, las
 **Decision.** A thin harness of our own in TypeScript that runs each task through the platform's own agent path (`driveAgent`, the sandbox, LiteLLM, the Cost Controller), so the numbers describe what the platform runs. Reused, not rebuilt:
 
 - the SWE-bench scoring model (hidden `fail_to_pass` and `pass_to_pass` tests on the agent's diff, in a fresh container);
-- Langfuse datasets and scores for storing and viewing results when the profile `observability` is on (PR 3; checked first against the pinned Langfuse v4 in `events_only` mode; without it the JSON report is the only output);
+- Langfuse datasets and scores for storing and viewing results: **later** (QUESTIONS #446), after a check of that API on the pinned Langfuse v4 in `events_only` mode. Until then the report (JSON, Markdown, an SVG chart) is the only output;
 - the statistics are standard formulas (§2.5), implemented and unit-tested, not a new method.
 
 Inspect AI and promptfoo stay options for prompt-only comparisons later; neither is added now.
@@ -55,7 +55,7 @@ Inspect AI and promptfoo stay options for prompt-only comparisons later; neither
 - A configuration = agent × model × instructions version, in a YAML file; one factor changes at a time between two configurations that are compared.
 - Each task runs N times per configuration (default 5, QUESTIONS #437).
 - Per run, numbers and codes only: hidden tests passed (resolved), CI commands passed on the first try, scope breach, stop reason, new static-analysis findings (count), diff size (files, lines), wall-clock time, model calls, input, output and cached tokens, cost (the internal cost for self-hosted models, D-07 §3).
-- **The report never holds prompts, task text, code or diffs** (AC6).
+- **The report never holds prompts, task text, code or diffs** (AC6). One exception, for blind pairs only (QUESTIONS #445): each run's diff is kept on the developer's machine in `<out>/diffs/` (outside the repository, folders 700, files 600), never in a result, the report, Langfuse or a commit; `pnpm eval:pairs purge-diffs` deletes them. The sample repository is fictional, so they hold no client data.
 - Models (QUESTIONS #439): `gpt-oss:20b` and `qwen3:8b` (`platform/eval/configs/local.yaml`), pulled on the owner's machine. `qwen2.5-coder:7b` was tried first and dropped: it made no tool call through OpenHands, so every run ended after one reply with no change (2026-10-13, one run per task). A first `qwen3:8b` run called the tools 26 times and reached the 20-minute cap without a change; never an Ollama `:cloud` model (the configuration loader refuses one). **No 30B model on the owner's machine** (24 GB of memory, with Docker, LiteLLM and the sandbox): the report says so; a larger machine or L01 measures it. The provider `stub` checks the harness itself. API models (`claude-haiku-4-5-20251001`) come in a later PR: the run needs the key from OpenBao, started by the owner in a terminal.
 
 ### 2.5. Statistics and the report (AC3, AC4)
@@ -66,7 +66,7 @@ Inspect AI and promptfoo stay options for prompt-only comparisons later; neither
 
 ### 2.6. Pairwise ranking and the judge (AC5, AC7)
 
-- **Blind pairs** (AC7): a command shows a reviewer the diffs of two configurations for the same task, as A and B in a random order, on the reviewer's machine only; the reviewer picks one or a tie. The choices give a Bradley-Terry ranking next to the automatic scores. Diffs are never stored; only the choice, the task ID and the configuration IDs.
+- **Blind pairs** (AC7): `pnpm eval:pairs --out <folder> --a <id> --b <id>` shows a reviewer the kept diffs of two configurations for the same task and run, as A and B in a random order per pair, on the reviewer's machine only; the reviewer picks A, B or a tie (or skips). The choices file `<out>/pairs/v<set>.jsonl` holds codes only (task, run, the two configurations, the winner). They give a Bradley-Terry ranking (MM algorithm; ties half a win; one virtual tie per compared pair so the ranking stays defined) next to the automatic scores.
 - **LLM judge** (AC5): deferred (QUESTIONS #438). Tests and blind pairs are enough for the GPU decision; a judge is added later, measured against human scores first.
 
 ### 2.7. Pull requests
@@ -75,7 +75,8 @@ Inspect AI and promptfoo stay options for prompt-only comparisons later; neither
 |---|---|
 | 1 | This ADR, QUESTIONS #435–#439 (docs only) |
 | 2 | The harness, task set v1, configurations, per-run measures; unit tests, a live run on the stub model |
-| 3 | Statistics, the report and chart, Langfuse scores, blind pairs and Bradley-Terry; the result table in D-07 (Harry approves) |
+| 3 | Statistics, the report and chart (`pnpm eval:report`), blind pairs and Bradley-Terry (`pnpm eval:pairs`), kept diffs (QUESTIONS #445); Langfuse scores later (QUESTIONS #446) |
+| 4 | The result table in D-07 from a full evaluation (Harry approves) |
 
 ## 3. Consequences
 
@@ -99,3 +100,4 @@ Inspect AI and promptfoo stay options for prompt-only comparisons later; neither
 |---|---|---|---|
 | 0.1 | 2026-10-13 | Claude (task L02, PR 1) | First version |
 | 0.2 | 2026-10-13 | Claude (task L02, PR 2) | §2.2–§2.4 as built: the live test runs the evaluation, the package proxy for the agent, the scoring container's limits, `--check`, task set v1, the models and the 24 GB limit; API models later |
+| 0.3 | 2026-10-13 | Claude (task L02, PR 3) | §2.1 Langfuse later (QUESTIONS #446); §2.4 kept diffs for blind pairs (QUESTIONS #445); §2.6, §2.7 as built |
