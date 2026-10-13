@@ -65,6 +65,9 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **A10** Resource measurement + backup / restore drill + internal CA / TLS
 - **H02** Dependencies an agent adds: licence, known vulnerabilities, name checks
 - **H03** Design: deleting a client's data on request
+- **H04** A secret scan of a run's diff before G5
+- **H05** A size bound for a change a person must review
+- **H07** A Docker authorization plugin that checks the body of container requests
 - **O01** The runner in its own VM or with rootless Docker
 - **O02** A tested upgrade between two releases
 - **O03** Operational alerts
@@ -77,6 +80,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **U08** Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs
 - **U09** Dashboard wave 3: administration
 - **V14** Human-effort baseline for the agent report
+- **H06** An optional stronger sandbox runtime (gVisor or Kata)
 - **X05** Documents outside the repository (Office, PDF, Confluence, Drive, Backlog)
 - **X06** A code index for agents (Tree-sitter or SCIP and pgvector)
 - **X08** Knowledge for people and the G8 learning loop (design first)
