@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.6 |
-| Date | 2026-10-08 |
-| Status | **Approved** (Harry, 2026-09-24); 0.4 approved by Harry on 2026-09-27 in the C05 session 2 plan (Ollama on developer machines; QUESTIONS #78); 0.5 approved by Harry on 2026-10-06 (the trial M-E on the local model; QUESTIONS #81); 0.6 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged) |
+| Version | 0.7 |
+| Date | 2026-10-13 |
+| Status | **Approved** (Harry, 2026-09-24); 0.4 approved by Harry on 2026-09-27 in the C05 session 2 plan (Ollama on developer machines; QUESTIONS #78); 0.5 approved by Harry on 2026-10-06 (the trial M-E on the local model; QUESTIONS #81); 0.6 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); **0.7 proposed** in L02 PR 4 (§9: the first measurement of local models), for Harry's approval |
 | Readers | Leadership (sections 1, 2, 7, 9), tech lead / architect (all) |
 | Related decisions | Fully self-hosted. Models: **both API and self-hosted** |
 
@@ -208,6 +208,27 @@ Ordered by expected impact (to be measured in the pilot):
 2. Try routing: one task via API, one via vLLM, same spec. Compare quality and cost.
 3. Measure the effect of prompt caching on a real agent.
 
+### First measurement of local models (task L02, 2026-10-13)
+
+The evaluation harness of ADR-M78 ran the task set version 1 (8 small tasks in `apps/api` of the sample repository: 4 seeded bugs, 4 features, each scored by hidden tests) through the platform's own agent path. Machine: one developer laptop with 24 GB of memory, Ollama, `num_ctx` 32768. Cost is the internal cost of D-07 §3 (USD 0.0000001 per input token, USD 0.0000004 per output token), not a bill.
+
+| | `gpt-oss:20b` (reasoning low) | `qwen3:8b` |
+|---|---|---|
+| Runs | 40 (8 tasks × 5) | **13 only** (3 tasks × 3–5): the evaluation was stopped (QUESTIONS #447) |
+| Resolved (hidden tests pass, nothing broke) | **68%** (95% interval 50%–85%) | 0% of 13 |
+| At least 1 of 5 runs resolves a task (pass@5) | 100% (every task) | not measured |
+| All 5 runs resolve it (pass^5) | 25% | not measured |
+| CI of the repository passes on the first try | 53% | 92% (but nothing was resolved) |
+| Median time per run | 56 s | 431 s |
+| Cost per resolved run | USD 0.0135 | none resolved |
+| How runs ended | 39 finished, 1 scope breach, 1 stopped | 9 stopped by OpenHands' own stuck detector, 1 no progress, 1 time cap, 2 finished without a fix |
+
+What it shows, and what it does not:
+- A 20B model on a laptop resolves about two of three small, well-specified tasks, but not reliably: only one task in four is resolved every time. The easiest tasks (`feat-paging`, `feat-tax`) resolved 5 of 5; the hardest (`bug-order-number`) 1 of 5.
+- An 8B model of the `qwen3` family could not finish these tasks through OpenHands: it called the tools but got stuck. An earlier 7B coder model (`qwen2.5-coder`) made no tool call at all and ended after one reply. On 13 paired runs the difference to the 20B model is clear (McNemar p = 0.016), but the data of the 8B model covers 3 tasks only.
+- **Not measured, so no conclusion yet:** any model of about 30B or more (it does not fit this laptop), any API model, any GPU server, bigger tasks (screens, migrations, database tests), the effect of the prompt (`AGENTS.md`), and blind human preference. Eight tasks and 5 runs per task are few: the intervals are wide.
+- **For the GPU decision (task L03):** the first number is that a 20B-class model is usable for small tasks. Whether a larger model resolves more, and how much GPU memory and speed that needs, must still be measured on a larger machine (task L01 and a rented GPU are the way). The harness is ready for it: `pnpm eval` with a configuration file.
+
 ### Questions for leadership
 
 - What is the monthly token budget for the pilot? (Not set by us.)
@@ -245,3 +266,4 @@ Note: prices and features change often. Check again before budgeting.
 | 0.4 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §3: Ollama on developer machines only, local tags, same gateway, routing and internal-cost rules; §4: never for client data (QUESTIONS #78) |
 | 0.5 | 2026-10-06 | Claude (coordinator), approved by Harry | §3, §4: the trial M-E runs with the local Ollama model on the fictional sample repo; the API-model run moves to before M-F (QUESTIONS #81) |
 | 0.6 | 2026-10-08 | Claude (coordinator), approved by Harry | Sources: citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged |
+| 0.7 | 2026-10-13 | Claude (task L02, PR 4), for Harry's approval | §9: the first measurement of local models (`gpt-oss:20b` 68% resolved on 40 runs; `qwen3:8b` 0% on 13 runs, evaluation stopped) from the harness of ADR-M78 (QUESTIONS #447) |
