@@ -492,7 +492,7 @@ t("L02","UX","Evaluation harness: agents, models and prompts measured on a fixed
   "The task set grows: new tasks are added on a schedule and results are reported per task-set version, so a model cannot do well only because it has seen the tasks before",
   "Before building the harness, a short spike compares existing open-source evaluation frameworks (for example Inspect, promptfoo, the SWE-bench harness, Langfuse experiments) for licence, maintenance and fit; reuse one if it fits, record the choice in ADR-M78",
   "ADR-M78 records the task set, the scoring, the statistics and how a new task or configuration is added; a short result table for leadership (which model size reaches which quality, the memory and speed), input for L01, L03 and X01"],
- "QUESTIONS #362 (Harry, 2026-10-10): many clients are `client_restricted`, so a self-hosted model is a condition to sell; the company has no GPU yet. QUESTIONS #422 (Harry, 2026-10-12): the benchmark becomes an evaluation harness for agents, models and prompts. Runs on a developer machine, in parallel with the milestone UX; split into PRs (spike and harness with the task set, then statistics, the pairwise ranking and the report). QUESTIONS #423 (Harry, 2026-10-12): follow established practice (SWE-bench-style hidden tests, pass^k, error bars, judged pairs, fresh tasks) and reuse a framework where it fits")
+ "QUESTIONS #362 (Harry, 2026-10-10): many clients are `client_restricted`, so a self-hosted model is a condition to sell; the company has no GPU yet. QUESTIONS #422 (Harry, 2026-10-12): the benchmark becomes an evaluation harness for agents, models and prompts. Runs on a developer machine, in parallel with the milestone UX; split into PRs (spike and harness with the task set, then statistics, the pairwise ranking and the report). QUESTIONS #423 (Harry, 2026-10-12): follow established practice (SWE-bench-style hidden tests, pass^k, error bars, judged pairs, fresh tasks) and reuse a framework where it fits. QUESTIONS #445 (Harry, 2026-10-13): AC7 keeps the runs' diffs on the developer's machine only (`<out>/diffs/`, purgeable), never in a result or report. QUESTIONS #446: AC4's Langfuse scores come later, after a check of the API in `events_only` mode; the report is JSON, Markdown and an SVG chart")
 t("V13","UX","Agent efficiency report from real runs: `sdlc metrics agents`","M",["E04","E06"],"FR-12, FR-53, D-07 §5",
  "platform/packages/core (metrics), platform/apps/api (metrics endpoint), platform/apps/cli (metrics agents), platform/packages/api-schemas, platform/tests/*, handbook Ch.19 §19.8c",
  ["`GET /v1/metrics/agents` and `sdlc metrics agents [--project] [--agent] [--model] [--from] [--to] [--json]`: per agent version and the model of the run's contract (QUESTIONS #432), from data the platform already records (runs, run events, gate decisions, `intent.closed`, cost records); no new table",
@@ -674,7 +674,7 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.45 |
+| Version | 1.46 |
 | Date | 2026-10-12 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -845,6 +845,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.43 | 2026-10-12 | Claude, approved by Harry | Plan review after v0.2.1 (QUESTIONS #424): U07 moves to Later until trial users ask for it; v0.3.0 = V13, L02, V10; X09 first in EXT and L01 early in v0.4.0 |
 | 1.44 | 2026-10-12 | Claude (task V13), approved by Harry | V13: access rule and model attribution (QUESTIONS #430–#433); its human-effort baseline (AC4) split out as V14 in Later |
 | 1.45 | 2026-10-13 | Claude, approved by Harry | Plan review after V13 (QUESTIONS #440): new tasks H01 (threat model and attack tests, UX), H02 (dependencies an agent adds), H03 (design: client data deletion), O04 (data that only grows), O05 (key rotation) in Server; O06 (real repositories), O07 (load test) in Later; more items in "Also later"; prefix `H` |
+| 1.46 | 2026-10-13 | Claude (task L02, PR 3), approved by Harry | L02 note: kept diffs for blind pairs (QUESTIONS #445); Langfuse scores later (QUESTIONS #446) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
 | 1.26 | 2026-10-08 | Claude, approved by Harry | K02 deferred to MVP+1, revisited at M-F (QUESTIONS #300, ADR-M59); S01, S02, K01 done |

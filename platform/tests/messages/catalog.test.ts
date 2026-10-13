@@ -65,6 +65,7 @@ describe('message catalog', () => {
       'platform/deploy/trial/src',
       'platform/deploy/doctor/src',
       'platform/deploy/github-app/src',
+      'platform/eval/src',
     ]
       .flatMap((dir) => sourceFiles(path.join(root, dir)))
       .filter(
