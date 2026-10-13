@@ -3,7 +3,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { DbError } from '../../packages/core/src/db/errors.js';
-import { checkRunEvent, RUN_EVENT_TYPES } from '../../packages/core/src/run-events/index.js';
+import {
+  checkRunEvent,
+  isRecordableModel,
+  RUN_EVENT_TYPES,
+} from '../../packages/core/src/run-events/index.js';
 
 const SHA = 'a'.repeat(64);
 const refused = (type: string, payload: Record<string, unknown>) => () =>
@@ -13,6 +17,7 @@ describe('run event payloads', () => {
   it('declares the C02, C04, C05, C06, C07, C08, E01 and C11 event types (E01 PR 2: feedback; C11 PR 2: loop_detected; B09 PR 2: plan)', () => {
     expect(Object.keys(RUN_EVENT_TYPES)).toEqual([
       'contract_issued',
+      'model_selected',
       'contract_accepted',
       'contract_rejected',
       'workspace_prepared',
@@ -47,6 +52,19 @@ describe('run event payloads', () => {
       'plan_read',
       'plan_unavailable',
     ]);
+  });
+
+  it('V13: model_selected holds a gateway model name, never a space or an @', () => {
+    for (const model of ['gpt-oss-20b', 'claude-haiku-4-5-20251001', 'ollama/gpt-oss:20b']) {
+      expect(checkRunEvent('model_selected', { model })).toEqual({ model });
+      expect(isRecordableModel(model)).toBe(true);
+    }
+    expect(isRecordableModel('m'.repeat(128))).toBe(true);
+    for (const model of ['m'.repeat(129), 'a b', 'org@model', 'model+1', '-model', '', 7]) {
+      expect(isRecordableModel(model)).toBe(false);
+      expect(refused('model_selected', { model })).toThrow(DbError);
+    }
+    expect(refused('model_selected', { model: 'gpt-oss-20b', run: 'x' })).toThrow(/undeclared/);
   });
 
   it('E01: g7_checked and pr_merged hold codes, counts and a hash, never a login', () => {

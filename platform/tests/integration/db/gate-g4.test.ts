@@ -8,7 +8,8 @@
 //   default branch voids the approval (FR-17); a rejection ends the intent.
 // - `prepareRun`: contract, capped key, wrapped secrets; the recertification warning (FR-36).
 // - C07 (QUESTIONS #126): an unpinned agent instruction file at the base commit, or a commit the
-//   Git host lists only in part, fails G4 (`instructions_unpinned`); the run event `key_issued`.
+//   Git host lists only in part, fails G4 (`instructions_unpinned`); the run events `key_issued`
+//   and (V13) `model_selected`.
 import { sql } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -579,6 +580,20 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       const issued = events.filter((e) => e.event_type === 'key_issued');
       expect(issued.map((e) => e.payload)).toEqual([{ max_budget_usd: '2', limited_by: 'run' }]);
       expect(JSON.stringify(events)).not.toMatch(/sk-virtual|key-/);
+    });
+
+    it('V13: records model_selected with the model G4 bound into the proposal, before key_issued', async () => {
+      const intent = await atG4(t, 'medium');
+      await t.settle(intent);
+      const result = await prepareRun(t.f.scope, deps(), intent.id);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const events = await t.f.scope.runEvents.list(result.run.runId);
+      const types = events.map((e) => e.event_type);
+      expect(types.indexOf('model_selected')).toBeGreaterThan(-1);
+      expect(types.indexOf('model_selected')).toBeLessThan(types.indexOf('key_issued'));
+      const selected = events.filter((e) => e.event_type === 'model_selected');
+      expect(selected.map((e) => e.payload)).toEqual([{ model: result.run.modelRef }]);
     });
 
     it('refuses when the proposal changed since G4 passed, or when a check fails', async () => {
