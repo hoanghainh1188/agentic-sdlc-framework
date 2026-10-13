@@ -1,0 +1,11 @@
+diff --git a/apps/api/src/orders/order-rules.ts b/apps/api/src/orders/order-rules.ts
+index 2462c8b..74122d7 100644
+--- a/apps/api/src/orders/order-rules.ts
++++ b/apps/api/src/orders/order-rules.ts
+@@ -37,5 +37,5 @@ export function priceLines(
+ 
+ /** Escapes `%`, `_` and `\` so user text matches literally inside an ILIKE pattern. */
+ export function likePattern(text: string): string {
+-  return `%${text.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
++  return `%${text.replace(/[\\%]/g, (char) => `\\${char}`)}%`;
+ }

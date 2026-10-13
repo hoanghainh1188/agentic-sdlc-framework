@@ -1,0 +1,25 @@
+diff --git a/apps/api/src/orders/tax-rules.ts b/apps/api/src/orders/tax-rules.ts
+new file mode 100644
+index 0000000..64db14d
+--- /dev/null
++++ b/apps/api/src/orders/tax-rules.ts
+@@ -0,0 +1,19 @@
++export type TaxCategory = 'standard' | 'reduced';
++
++const RATES: Record<TaxCategory, number> = { standard: 10, reduced: 8 };
++
++/** Sums the amounts per rate, then rounds each rate's tax down to whole yen (T06, an assumption). */
++export function calculateTax(lines: readonly { amount: number; category: TaxCategory }[]): {
++  beforeTax: number;
++  tax: number;
++  includingTax: number;
++} {
++  const totals: Record<TaxCategory, number> = { standard: 0, reduced: 0 };
++  for (const line of lines) totals[line.category] += line.amount;
++  const tax = (Object.keys(totals) as TaxCategory[]).reduce(
++    (sum, category) => sum + Math.floor((totals[category] * RATES[category]) / 100),
++    0,
++  );
++  const beforeTax = totals.standard + totals.reduced;
++  return { beforeTax, tax, includingTax: beforeTax + tax };
++}

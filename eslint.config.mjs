@@ -22,6 +22,9 @@ export default tseslint.config(
       '**/coverage/',
       // The npm package build of the CLI (V05): a generated bundle.
       'platform/apps/cli/npm-dist/',
+      // The evaluation tasks (L02): code of the sample repository (its Jest tests, its patches), not
+      // platform code; kept exactly as the task check ran it.
+      'platform/eval/tasks/',
     ],
   },
 

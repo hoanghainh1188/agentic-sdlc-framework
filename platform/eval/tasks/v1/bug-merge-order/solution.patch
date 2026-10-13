@@ -1,0 +1,14 @@
+diff --git b/apps/api/src/inventory/stock-rules.ts a/apps/api/src/inventory/stock-rules.ts
+index 59b6519..6f58018 100644
+--- b/apps/api/src/inventory/stock-rules.ts
++++ a/apps/api/src/inventory/stock-rules.ts
+@@ -21,7 +21,8 @@ export function mergeRequests(requests: readonly StockRequest[]): StockRequest[]
+     totals.set(productId, (totals.get(productId) ?? 0) + quantity);
+   }
+   return [...totals.entries()]
+-    .map(([productId, quantity]) => ({ productId, quantity }));
++    .map(([productId, quantity]) => ({ productId, quantity }))
++    .sort((a, b) => a.productId - b.productId);
+ }
+ 
+ /** Lists every request that the available stock cannot cover. Empty when all fit. */

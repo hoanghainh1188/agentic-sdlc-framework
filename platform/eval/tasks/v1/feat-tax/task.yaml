@@ -1,0 +1,15 @@
+schema: 1
+id: feat-tax
+title: Consumption tax calculation (rule only)
+kind: feature
+shape: T06
+planned_files:
+  - apps/api/src/orders/tax-rules.ts
+  - apps/api/src/orders/tax-rules.spec.ts
+fail_to_pass:
+  - pnpm --filter @pilot/api test -- tax-rules.hidden
+pass_to_pass:
+  - pnpm --filter @pilot/api test
+ci:
+  - pnpm --filter @pilot/api typecheck
+  - pnpm lint

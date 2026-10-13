@@ -1,0 +1,13 @@
+diff --git a/apps/api/src/products/sku-rules.ts b/apps/api/src/products/sku-rules.ts
+new file mode 100644
+index 0000000..3dc59a2
+--- /dev/null
++++ b/apps/api/src/products/sku-rules.ts
+@@ -0,0 +1,7 @@
++/** SKU format: three capital letters, a hyphen and three digits (T02). */
++const SKU_FORMAT = /^[A-Z]{3}-[0-9]{3}$/;
++
++/** True when the SKU, without spaces at both ends, has the format `AAA-999`. */
++export function isValidSku(sku: string): boolean {
++  return SKU_FORMAT.test(sku.trim());
++}

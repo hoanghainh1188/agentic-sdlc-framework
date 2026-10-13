@@ -1,0 +1,13 @@
+diff --git a/apps/api/src/inventory/stock-rules.ts b/apps/api/src/inventory/stock-rules.ts
+index 6f58018..808d0dd 100644
+--- a/apps/api/src/inventory/stock-rules.ts
++++ b/apps/api/src/inventory/stock-rules.ts
+@@ -38,3 +38,8 @@ export function findShortages(
+     }))
+     .filter((line) => line.requested > line.available);
+ }
++
++/** True when the stock is at or below the product's threshold (T05). */
++export function isLowStock(quantity: number, threshold: number): boolean {
++  return quantity <= threshold;
++}

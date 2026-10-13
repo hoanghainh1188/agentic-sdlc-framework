@@ -8,6 +8,9 @@ diagrams/
 # Scripts outside the platform. .github/ workflows are formatted (A09); its Markdown is covered by *.md.
 scripts/
 
+# The evaluation tasks (L02): code of the sample repository, kept exactly as the task check ran it.
+platform/eval/tasks/
+
 # Generated output
 node_modules/
 dist/

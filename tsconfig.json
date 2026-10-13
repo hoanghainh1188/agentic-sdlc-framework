@@ -23,6 +23,7 @@
     { "path": "platform/apps/dashboard" },
     { "path": "platform/deploy/trial" },
     { "path": "platform/deploy/doctor" },
+    { "path": "platform/eval" },
     { "path": "platform/deploy/github-app" }
   ]
 }

@@ -1,0 +1,6 @@
+# Evaluation task set version 1 (task L02, design/ADR-M78 §2.3). Every report names this version.
+# A change of a task, or a new task, makes a new version; never edit a version that was reported.
+schema: 1
+version: 1
+repository: https://github.com/harryforge/pilot-order-inventory.git
+commit: 7d5341d87953db8a343d265ac294b56bfc075eb0
