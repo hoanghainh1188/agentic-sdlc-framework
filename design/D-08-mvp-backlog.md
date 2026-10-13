@@ -1349,7 +1349,7 @@ flowchart LR
 - [ ] AC4: Record RAM/CPU/disk usage for the core and observability profiles
 - [ ] AC5: Runbook T11 written in full
 
-> Note: Three PRs (ADR-M63, QUESTIONS #325–#327): PR 1 = TLS on 8200 everywhere (AC1; a throw-away CA on development machines and in CI, `pnpm openbao:tls`, renewal without unsealing); PR 2 = backup and restore scripts, encrypted with age to a target folder, and a live restore drill with throw-away keys (AC2, AC3); PR 3 = with the infrastructure operator and the three key holders on the internal server (the company CA, AC4, AC5). Done together with the infrastructure operator. Also before the real server: the runner in its own VM or rootless Docker (ADR-M25 §2.5); done: ClickHouse's `langfuse` user has no access management, a loopback-only `sdlc_admin` makes `sdlc_purge` (ADR-M63 §6, QUESTIONS #330)
+> Note: Three PRs (ADR-M63, QUESTIONS #325–#327): PR 1 = TLS on 8200 everywhere (AC1; a throw-away CA on development machines and in CI, `pnpm openbao:tls`, renewal without unsealing); PR 2 = backup and restore scripts, encrypted with age to a target folder, and a live restore drill with throw-away keys (AC2, AC3); PR 3 = with the infrastructure operator and the three key holders on the internal server (the company CA, AC4, AC5). Done together with the infrastructure operator. Also before the real server: the runner in its own VM or rootless Docker (ADR-M25 §2.5); done: ClickHouse's `langfuse` user has no access management, a loopback-only `sdlc_admin` makes `sdlc_purge` (ADR-M63 §6, QUESTIONS #330) Condition for the company server (Harry, 2026-10-13, QUESTIONS #455): the first real agent run needs the runner in its own VM or on rootless Docker until H07 exists; PR 3's checklist says so
 
 #### H02. Dependencies an agent adds: licence, known vulnerabilities, name checks
 
@@ -1407,7 +1407,7 @@ flowchart LR
 - [ ] AC2: A change over the limit holds the run at G5 with a visible reason code and a person decides (split the plan, or allow with a reason); counts only in run events
 - [ ] AC3: Tests: a diff at the limit and over it; a generated-file allowance if decided
 
-> Note: ADR-M80 gap G-9, **Medium**: a very large or generated diff defeats review at G7. Blocked on QUESTIONS #456
+> Note: ADR-M80 gap G-9, **Medium**: a very large or generated diff defeats review at G7. Limits decided in QUESTIONS #456 (40 files, 1500 lines, per-project, held at G5 not blocked)
 
 #### H07. A Docker authorization plugin that checks the body of container requests
 
@@ -1817,7 +1817,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.45 | 2026-10-13 | Claude, approved by Harry | Plan review after V13 (QUESTIONS #440): new tasks H01 (threat model and attack tests, UX), H02 (dependencies an agent adds), H03 (design: client data deletion), O04 (data that only grows), O05 (key rotation) in Server; O06 (real repositories), O07 (load test) in Later; more items in "Also later"; prefix `H` |
 | 1.46 | 2026-10-13 | Claude (task L02, PR 3), approved by Harry | L02 note: kept diffs for blind pairs (QUESTIONS #445); Langfuse scores later (QUESTIONS #446) |
 | 1.47 | 2026-10-13 | Claude, approved by Harry | New milestone EVAL after v0.3.0, before EXT (QUESTIONS #450): L04 (evaluations on the server, one engine with developer machines), L05 (evaluation plans by managers), L06 (reports and recommendations), L07 (a project's task set from its merged intents), L08 (design: evaluations in the agent register's approvals) |
-| 1.49 | 2026-10-13 | Claude (task H01, PR 3), approved by Harry | H01 done: its gaps become H04 (secret scan of the diff, Medium), H05 (diff size bound, Medium), H06 (stronger sandbox runtime, Later), H07 (Docker authorization plugin, High) and two criteria of H02; QUESTIONS #455, #456 |
+| 1.49 | 2026-10-13 | Claude (task H01, PR 3), approved by Harry (QUESTIONS #455, #456 answered) | H01 done: its gaps become H04 (secret scan of the diff, Medium), H05 (diff size bound, Medium), H06 (stronger sandbox runtime, Later), H07 (Docker authorization plugin, High) and two criteria of H02; QUESTIONS #455, #456 |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
