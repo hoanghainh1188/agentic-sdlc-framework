@@ -176,9 +176,9 @@ export function agentCommitAuthor(contract: RunContract): { name: string; email:
   return { name: 'sdlc-agent', email: `agent-${contract.agent_id}@agents.sdlc.invalid` };
 }
 
-type EndOutcome = Exclude<AgentOutcome, 'failed' | 'killed'>;
+export type EndOutcome = Exclude<AgentOutcome, 'failed' | 'killed'>;
 
-const STATUS_OF: Readonly<Record<EndOutcome, RunStatus>> = {
+export const STATUS_OF: Readonly<Record<EndOutcome, RunStatus>> = {
   finished: 'succeeded',
   // An iteration cap is a budget of agent steps (D-07 §6: "token cap and a maximum number of
   // iterations"); the stop reason tells which cap (ADR-M29).
@@ -193,7 +193,7 @@ const STATUS_OF: Readonly<Record<EndOutcome, RunStatus>> = {
   agent_error: 'failed',
 };
 
-const STOP_REASON_OF: Readonly<Record<EndOutcome, string | undefined>> = {
+export const STOP_REASON_OF: Readonly<Record<EndOutcome, string | undefined>> = {
   finished: undefined,
   max_iterations: 'max_iterations',
   max_duration: 'max_duration',
@@ -204,11 +204,11 @@ const STOP_REASON_OF: Readonly<Record<EndOutcome, string | undefined>> = {
   agent_error: 'agent_error',
 };
 
-function clockOf(deps: AgentDriveDeps): () => number {
+export function clockOf(deps: Pick<AgentDriveDeps, 'clock'>): () => number {
   return deps.clock ?? Date.now;
 }
 
-function sleepOf(deps: AgentDriveDeps): (ms: number) => Promise<void> {
+export function sleepOf(deps: Pick<AgentDriveDeps, 'sleep'>): (ms: number) => Promise<void> {
   return deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
 }
 
@@ -236,7 +236,10 @@ export function outcomeOf(
   return 'agent_error';
 }
 
-interface Polled {
+/** What the poll loop and the stop step need: shared with the evaluation driver (task L04). */
+export type PollDeps = Pick<AgentDriveDeps, 'adapter' | 'settings' | 'clock' | 'sleep'>;
+
+export interface Polled {
   readonly state: AgentRunState;
   readonly iterations: number;
   readonly timedOut: boolean;
@@ -249,8 +252,8 @@ interface Polled {
   readonly loop?: LoopStop;
 }
 
-async function pollUntilDone(
-  deps: AgentDriveDeps,
+export async function pollUntilDone(
+  deps: PollDeps,
   handle: AgentRunHandle,
   deadline: number,
   signal?: AbortSignal,
@@ -291,8 +294,8 @@ async function pollUntilDone(
 }
 
 /** Interrupt, then wait up to the grace period. `kill`: the agent did not stop in time. */
-async function stopAtTimeCap(
-  deps: AgentDriveDeps,
+export async function stopAtTimeCap(
+  deps: PollDeps,
   handle: AgentRunHandle,
 ): Promise<{ method: 'interrupt' | 'kill'; iterations: number | undefined }> {
   const clock = clockOf(deps);
@@ -690,7 +693,7 @@ function spendWatchFor(
   });
 }
 
-function failureCode(error: unknown): string {
+export function failureCode(error: unknown): string {
   if (error instanceof AgentRunError) return error.reason;
   if (error instanceof AgentError) return error.code;
   return 'runner_error';

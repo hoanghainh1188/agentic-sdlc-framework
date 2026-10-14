@@ -109,7 +109,7 @@ export interface StoredProposal {
  */
 export async function computeRunPatch(
   deps: Pick<ProposalDeps, 'docker' | 'settings'>,
-  contract: RunContract,
+  contract: Pick<RunContract, 'run_id' | 'base_sha'>,
   cloneDir: string,
 ): Promise<Proposal> {
   const repoDir = path.join(cloneDir, 'repo');

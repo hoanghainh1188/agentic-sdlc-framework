@@ -189,3 +189,22 @@ export {
   type RunnerSettings,
   type SandboxLimits,
 } from './settings.js';
+export { EVALUATION_AGENT_BRANCH, agentContractOf } from './evaluation/agent-contract.js';
+export {
+  driveEvaluationAgent,
+  type EvaluationDriveDeps,
+  type EvaluationDriveRequest,
+  type EvaluationDriveResult,
+} from './evaluation/drive.js';
+export {
+  executeEvaluation,
+  type ExecuteEvaluationContext,
+  type ExecuteEvaluationDeps,
+} from './evaluation/execute.js';
+export {
+  createEvaluationActivities,
+  EVALUATION_HEARTBEAT_MS,
+  type EvaluationActivityContextLike,
+  type EvaluationActivityDeps,
+} from './evaluation/activities.js';
+export { ServerExecutor, type ServerExecutorOptions } from './evaluation/server-executor.js';
