@@ -595,9 +595,12 @@ export const AUDIT_ACTIONS = {
       code: 'code',
       data_class: 'code',
       task_set_version: 'version',
-      config_name: 'code',
+      config_name: 'code?',
       runs_total: 'version',
       budget_usd: 'decimal',
+      // L05: the plan and its version, when the evaluation was started from a plan.
+      plan_id: 'uuid?',
+      plan_version: 'version?',
     },
   },
   /**
@@ -615,6 +618,55 @@ export const AUDIT_ACTIONS = {
       cost_usd: 'decimal',
     },
   },
+  /**
+   * An evaluation plan was created (task L05, ADR-M82 §2.8). The entity is the plan. Amounts are
+   * decimals; `trigger` is `once`, `schedule` or `on_change`. Never a prompt text or a path.
+   */
+  'evaluation_plan.created': {
+    entityType: 'evaluation_plan',
+    fields: {
+      project_id: 'uuid',
+      code: 'code',
+      version: 'version',
+      trigger: 'code',
+      budget_per_run_usd: 'decimal',
+      monthly_cap_usd: 'decimal',
+      configurations: 'count',
+    },
+  },
+  /**
+   * A plan got a new version (L05): `fields` names the changed fields (codes); the amounts before
+   * and after.
+   */
+  'evaluation_plan.changed': {
+    entityType: 'evaluation_plan',
+    fields: {
+      version: 'version',
+      fields: 'codes',
+      trigger: 'code',
+      old_budget_per_run_usd: 'decimal',
+      budget_per_run_usd: 'decimal',
+      old_monthly_cap_usd: 'decimal',
+      monthly_cap_usd: 'decimal',
+    },
+  },
+  /** A plan was archived (L05): final. */
+  'evaluation_plan.archived': { entityType: 'evaluation_plan', fields: { version: 'version' } },
+  /**
+   * A run of a plan started (L05): the evaluation; `reason` is `manual`, `schedule` or
+   * `on_change`; `budget_usd` the evaluation's budget.
+   */
+  'evaluation_plan.run_started': {
+    entityType: 'evaluation_plan',
+    fields: {
+      evaluation_id: 'uuid',
+      version: 'version',
+      reason: 'code',
+      budget_usd: 'decimal',
+    },
+  },
+  /** A plan's schedule paused (L05): `reason` a code (`monthly_cap_used`). */
+  'evaluation_plan.paused': { entityType: 'evaluation_plan', fields: { reason: 'code' } },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

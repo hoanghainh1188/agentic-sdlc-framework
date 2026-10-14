@@ -628,6 +628,11 @@ const m32: Rule = (c) =>
     ? [issue('config.rule.viewer_never_holds_evidence', 'access.evidence_hold_roles')]
     : [];
 
+const m33: Rule = (c) =>
+  c.access.eval_roles.includes('viewer')
+    ? [issue('config.rule.viewer_never_runs_evaluations', 'access.eval_roles')]
+    : [];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -663,6 +668,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M30: m30,
   M31: m31,
   M32: m32,
+  M33: m33,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

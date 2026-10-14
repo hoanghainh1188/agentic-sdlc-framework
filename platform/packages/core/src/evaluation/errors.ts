@@ -18,6 +18,38 @@ export const EVALUATION_ERROR_CODES = [
   'self_hosted_only',
   /** An input has a format the evaluation does not accept. */
   'invalid_input',
+  // L05 (ADR-M82): evaluation plans.
+  /** The person has no role in `access.eval_roles` of the project (rule M33). */
+  'forbidden',
+  'plan_not_found',
+  /** Another plan of the project has this code. */
+  'plan_code_taken',
+  /** The plan is archived: it never changes or runs again. */
+  'plan_archived',
+  /** The plan is paused (its monthly cap is used up). */
+  'plan_paused',
+  /** The plan got another version since the caller read it. */
+  'plan_changed',
+  /** The plan has an evaluation that is not final yet. */
+  'evaluation_open',
+  /** The plan's monthly cap is used up. */
+  'monthly_cap_used',
+  /** A monthly cap below what the plan already spent this month. */
+  'cap_below_spent',
+  /** The server does not have this task set version. */
+  'task_set_not_found',
+  /** A task ID is not in the task set. */
+  'task_not_found',
+  /** No agent with this key in the register. */
+  'agent_not_found',
+  /** The agent is not `active`. */
+  'agent_not_active',
+  /** The agent has no model in the register. */
+  'agent_no_model',
+  /** A prompt variant's file is not on the project's default branch. */
+  'prompt_not_found',
+  /** The Git host could not be read: try again later. */
+  'git_host_unavailable',
 ] as const;
 export type EvaluationErrorCode = (typeof EVALUATION_ERROR_CODES)[number];
 

@@ -43,3 +43,25 @@ export {
   type FinishEvaluationDeps,
   type FinishEvaluationInput,
 } from './finish.js';
+export {
+  MONTHLY_CAP_USED,
+  archiveEvaluationPlan,
+  assertEvalRole,
+  changeEvaluationPlan,
+  changedPlanFields,
+  createEvaluationPlan,
+  mayReadPlans,
+  nextScheduledRun,
+  planChangeNeedsStepUp,
+  planFleetSha256,
+  readEvaluationPlan,
+  resolveConfigurations,
+  startEvaluationPlan,
+  startOfNextUtcMonth,
+  type EvaluationPlanDeps,
+  type KnownTaskSet,
+  type PlanActor,
+  type PlanConfigurationInput,
+  type PlanContentInput,
+} from './plans.js';
+export { checkEvaluationScope } from './start.js';

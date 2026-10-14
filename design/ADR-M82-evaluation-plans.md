@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L05, PR 1; for review) |
+| Status | **Proposed** (task L05, PR 2 done; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L05 plan approved 2026-10-14, with answers to QUESTIONS #470–#474) |
 | Related | D-08 task L05 (AC1–AC4), then L06 (reports, recommendations) and L07 (a project's own task set); ADR-M81 (evaluations on the server), ADR-M73 (the dashboard's actions, CSRF, passkey step-up), ADR-M78 (the harness), ADR-M31 (the agent register), ADR-M39 and ADR-M40 (files read from the default branch, hashes only), ADR-M28 (budgets only go up by a decision); D-05 §6.8; QUESTIONS #450, #465, #470–#474 |
@@ -24,6 +24,8 @@ A plan belongs to a project and holds codes, IDs, numbers and hashes only:
 - when it runs (§2.4).
 
 A plan is versioned: every change writes a new row of `evaluation_plan_versions` (append-only); the plan row points at its current version. A plan is archived, never deleted. Each evaluation started from a plan records the plan and the version (`evaluations.plan_id`, `evaluations.plan_version`).
+
+As built (PR 2, QUESTIONS #475): a configuration names an agent of the register by its key, or a model by name (with its provider type) run by the project's default agent (`run.agent_key`). When a run starts, each configuration is resolved: the agent must be `active` and have a model, the model must be on the gateway's list and allowed for the data class; the result (agent, version, model, provider type, caps, the instructions file's path, commit and SHA-256) is stored in `evaluation_configurations` (append-only), and the runner reads it there instead of a configuration file (PR 4). An evaluation has either a `config_name` (the operator command of L04) or a plan, never both (a CHECK). Migration `0031-evaluation-plans`; trigger SDA23 fixes a plan's identity, keeps an archived plan final and the version going up; a unique index keeps one open evaluation per plan. The default of `access.eval_roles` is `person_a`, `person_b`, `governance`, `admin` (the project role codes); mandatory rule M33.
 
 ### 2.2. Who (AC1, AC4)
 
@@ -107,3 +109,4 @@ New audit actions, IDs, codes, hashes and amounts only: `evaluation_plan.created
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-14 | Claude (task L05, PR 1) | First version |
+| 0.2 | 2026-10-14 | Claude (task L05, PR 2) | §2.1 as built: configurations from the agent register or a model with the default agent, resolved into `evaluation_configurations` at start (QUESTIONS #475); migration 0031, SDA23, M33 |

@@ -71,6 +71,7 @@ const PG_ERROR_CODES: Record<string, DbErrorCode> = {
   SDA18: 'immutable', // a web session's fixed columns, or an ended session changed (0027)
   SDA21: 'immutable', // an evaluation's fixed columns, a final status, or a budget going down (0029)
   SDA22: 'immutable', // an evaluation run's fixed columns, a final status, or a move not allowed (0029)
+  SDA23: 'immutable', // an evaluation plan's fixed columns, an archived plan, or a version going down (0031)
 };
 
 /** Maps a PostgreSQL error to a DbError; anything else is rethrown unchanged. */

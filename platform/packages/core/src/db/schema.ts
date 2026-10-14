@@ -34,6 +34,8 @@ import type {
   DisclosureFormat,
   EvaluationRunStatus,
   EvaluationStatus,
+  EvaluationPlanStatus,
+  EvaluationPlanTrigger,
   GateDecisionSource,
   GitProvider,
   ProdLogsAllowed,
@@ -560,8 +562,8 @@ export interface EvaluationsTable {
   code: Immutable<string>;
   data_class: Immutable<DataClass>;
   task_set_version: Immutable<number>;
-  /** The configuration file the runner reads (a code, no path). */
-  config_name: Immutable<string>;
+  /** The configuration file the runner reads (a code, no path); null for a plan's evaluation. */
+  config_name: Immutable<string | null>;
   task_ids: Immutable<string[]>;
   configuration_ids: Immutable<string[]>;
   runs_per_task: Immutable<number>;
@@ -576,6 +578,68 @@ export interface EvaluationsTable {
   created_at: CreatedAt;
   /** The task set's commit the runs start from (migration 0030); null before it. */
   base_sha: Immutable<string | null>;
+  /** L05 (migration 0031): the plan and its version, or null for an operator evaluation. */
+  plan_id: ColumnType<string | null, string | null | undefined, never>;
+  plan_version: ColumnType<number | null, number | null | undefined, never>;
+}
+
+/** An evaluation plan of a project (L05, migration 0031, ADR-M82). */
+export interface EvaluationPlansTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  project_id: Immutable<string>;
+  code: Immutable<string>;
+  current_version: ColumnType<number, number | undefined, number>;
+  status: ColumnType<EvaluationPlanStatus, EvaluationPlanStatus | undefined, EvaluationPlanStatus>;
+  pause_reason: ColumnType<string | null, string | null | undefined, string | null>;
+  paused_until: ColumnType<Date | null, Date | null | undefined, Date | null>;
+  next_run_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
+  seen_sha256: ColumnType<string | null, string | null | undefined, string | null>;
+  created_by: Immutable<string | null>;
+  updated_at: ColumnType<Date, Date | undefined, Date>;
+  created_at: CreatedAt;
+}
+
+/** One version of a plan (L05, migration 0031). Append-only: codes, IDs, numbers, hashes. */
+export interface EvaluationPlanVersionsTable {
+  /** bigint identity; `pg` returns int8 as a string. */
+  id: ColumnType<string, never, never>;
+  tenant_id: Immutable<string>;
+  plan_id: Immutable<string>;
+  version: Immutable<number>;
+  data_class: Immutable<DataClass>;
+  task_set_version: Immutable<number>;
+  task_ids: Immutable<string[] | null>;
+  runs_per_task: Immutable<number>;
+  budget_per_run_usd: Immutable<string>;
+  monthly_cap_usd: Immutable<string>;
+  trigger: Immutable<EvaluationPlanTrigger>;
+  schedule_every: Immutable<'daily' | 'weekly' | null>;
+  schedule_hour: Immutable<number | null>;
+  schedule_weekday: Immutable<number | null>;
+  /** JSON array of `PlanConfiguration` (written as a string). */
+  configurations: ColumnType<unknown[], string, never>;
+  changed_by: Immutable<string | null>;
+  created_at: CreatedAt;
+}
+
+/** A configuration an evaluation of a plan runs, resolved at its start (L05, migration 0031). */
+export interface EvaluationConfigurationsTable {
+  /** bigint identity; `pg` returns int8 as a string. */
+  id: ColumnType<string, never, never>;
+  tenant_id: Immutable<string>;
+  evaluation_id: Immutable<string>;
+  configuration_id: Immutable<string>;
+  agent_id: Immutable<string | null>;
+  model: Immutable<string>;
+  provider_type: Immutable<ProviderType>;
+  agent_version: Immutable<string>;
+  max_iterations: Immutable<number>;
+  max_duration_min: Immutable<number>;
+  instructions_path: Immutable<string | null>;
+  instructions_commit: Immutable<string | null>;
+  instructions_sha256: Immutable<string | null>;
+  created_at: CreatedAt;
 }
 
 /** One run of one task for one configuration (L04, migration 0029). */
@@ -873,6 +937,9 @@ export interface Database {
   evaluation_runs: EvaluationRunsTable;
   evaluation_run_results: EvaluationRunResultsTable;
   evaluation_run_contracts: EvaluationRunContractsTable;
+  evaluation_plans: EvaluationPlansTable;
+  evaluation_plan_versions: EvaluationPlanVersionsTable;
+  evaluation_configurations: EvaluationConfigurationsTable;
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
@@ -1327,6 +1394,8 @@ export const TABLE_COLUMNS = {
     'updated_at',
     'created_at',
     'base_sha',
+    'plan_id',
+    'plan_version',
   ]),
   evaluation_runs: columns<EvaluationRunsTable>()([
     'id',
@@ -1395,6 +1464,56 @@ export const TABLE_COLUMNS = {
     'issued_at',
     'expires_at',
     'revoked_at',
+    'created_at',
+  ]),
+  evaluation_plans: columns<EvaluationPlansTable>()([
+    'id',
+    'tenant_id',
+    'project_id',
+    'code',
+    'current_version',
+    'status',
+    'pause_reason',
+    'paused_until',
+    'next_run_at',
+    'seen_sha256',
+    'created_by',
+    'updated_at',
+    'created_at',
+  ]),
+  evaluation_plan_versions: columns<EvaluationPlanVersionsTable>()([
+    'id',
+    'tenant_id',
+    'plan_id',
+    'version',
+    'data_class',
+    'task_set_version',
+    'task_ids',
+    'runs_per_task',
+    'budget_per_run_usd',
+    'monthly_cap_usd',
+    'trigger',
+    'schedule_every',
+    'schedule_hour',
+    'schedule_weekday',
+    'configurations',
+    'changed_by',
+    'created_at',
+  ]),
+  evaluation_configurations: columns<EvaluationConfigurationsTable>()([
+    'id',
+    'tenant_id',
+    'evaluation_id',
+    'configuration_id',
+    'agent_id',
+    'model',
+    'provider_type',
+    'agent_version',
+    'max_iterations',
+    'max_duration_min',
+    'instructions_path',
+    'instructions_commit',
+    'instructions_sha256',
     'created_at',
   ]),
   tenant_role_bindings: columns<TenantRoleBindingsTable>()([
@@ -1500,6 +1619,9 @@ export const TENANT_COLUMN = {
   evaluation_runs: 'tenant_id',
   evaluation_run_results: 'tenant_id',
   evaluation_run_contracts: 'tenant_id',
+  evaluation_plans: 'tenant_id',
+  evaluation_plan_versions: 'tenant_id',
+  evaluation_configurations: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
   web_sessions: 'tenant_id',
@@ -1532,6 +1654,9 @@ export type Evaluation = Selectable<EvaluationsTable>;
 export type EvaluationRun = Selectable<EvaluationRunsTable>;
 export type EvaluationRunResultRow = Selectable<EvaluationRunResultsTable>;
 export type EvaluationRunContractRow = Selectable<EvaluationRunContractsTable>;
+export type EvaluationPlan = Selectable<EvaluationPlansTable>;
+export type EvaluationPlanVersion = Selectable<EvaluationPlanVersionsTable>;
+export type EvaluationConfigurationRow = Selectable<EvaluationConfigurationsTable>;
 export type GitEventReceipt = Selectable<GitEventReceiptsTable>;
 export type Escalation = Selectable<EscalationsTable>;
 export type EscalationNotice = Selectable<EscalationNoticesTable>;

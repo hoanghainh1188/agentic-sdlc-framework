@@ -785,13 +785,16 @@ The same-run CHECK ties `contract_json` to its row (kind `evaluation`, run, tena
 
 ---
 
-### 6.9. Evaluation plans (task L05, ADR-M82, QUESTIONS #470–#474; draft, migration with L05 PR 2)
+### 6.9. Evaluation plans (task L05, ADR-M82, QUESTIONS #470–#475; migration `0031-evaluation-plans`)
 
 | Table | Columns (all with `tenant_id`) | Notes |
 |---|---|---|
 | `evaluation_plans` | `id`, `project_id`, `code` (unique per project), `current_version`, `status` (`active`, `paused`, `archived`), `pause_reason` (code), `next_run_at`, `seen_sha256` (`on_change`), `created_by`, `created_at`, `updated_at` | Never deleted; archived is final |
 | `evaluation_plan_versions` (AO) | `plan_id`, `version`, `data_class`, `task_set_version`, `task_ids` (codes), `runs_per_task`, `budget_per_run_usd`, `monthly_cap_usd` (decimals), `trigger` (`once`, `schedule`, `on_change`), `schedule` (`daily`/`weekly`, hour UTC, weekday), `configurations` (JSON: configuration ID, agent version ID or model, provider type, prompt variant path, commit, SHA-256), `changed_by`, `created_at` | Codes, IDs, numbers and hashes only; never a prompt text |
-| `evaluations` | + `plan_id` (nullable), `plan_version` (nullable) | An operator evaluation of L04 has none |
+| `evaluations` | + `plan_id` (nullable), `plan_version` (nullable); `config_name` now nullable | Exactly one of `config_name` (operator, L04) and `plan_id` (a CHECK); one open evaluation per plan (unique index) |
+| `evaluation_configurations` (AO) | `evaluation_id`, `configuration_id`, `agent_id`, `model`, `provider_type`, `agent_version`, `max_iterations`, `max_duration_min`, `instructions_path`, `instructions_commit`, `instructions_sha256` | The configurations an evaluation of a plan runs, resolved at its start (QUESTIONS #475) |
+
+As built: `evaluation_plans` adds `paused_until` (the start of the next UTC month for a used-up cap); the configurations JSON holds `id`, `agent_key` or `model` with `provider_type`, `max_iterations`, `max_duration_min` and `prompt` (`path`, `commit`, `sha256`); trigger `SDA23` keeps the plan's identity, keeps an archived plan final and the version going up.
 
 ## 7. Audit log: hash chain
 
@@ -986,3 +989,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.45 | 2026-10-14 | Claude (task L04, PR 3), approved by Harry | §6.8 as built (migration `0029-evaluations`): hardware as flat columns, `config_name`, status machines and triggers `SDA21` / `SDA22`; the evaluation contract is stored with PR 4; the cost report of intents leaves evaluation records out |
 | 1.46 | 2026-10-14 | Claude (task L04, PR 4a), approved by Harry | §6.8: migration `0030-evaluation-contracts`: `evaluation_run_contracts`, `evaluations.base_sha`, `evaluation_runs.max_iterations` / `max_duration_min`; cost records of evaluation runs are synced with the `gate` label `EVAL` (ADR-M81 §2.2, §2.4) |
 | 1.47 | 2026-10-14 | Claude (task L05, PR 1) | §6.9 draft: `evaluation_plans`, `evaluation_plan_versions` (AO), `evaluations.plan_id` / `plan_version` (ADR-M82) |
+| 1.48 | 2026-10-14 | Claude (task L05, PR 2) | §6.9 as built (migration `0031-evaluation-plans`): `evaluation_configurations` (AO), `paused_until`, the configurations JSON, `config_name` nullable, trigger `SDA23` (QUESTIONS #475) |
