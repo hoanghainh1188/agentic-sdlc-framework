@@ -53,6 +53,9 @@ importers:
       '@sdlc/contracts':
         specifier: workspace:*
         version: link:platform/packages/contracts
+      '@sdlc/eval':
+        specifier: workspace:*
+        version: link:platform/eval
       '@sdlc/messages':
         specifier: workspace:*
         version: link:platform/packages/messages
@@ -319,6 +322,15 @@ importers:
       zod:
         specifier: 4.6.5
         version: 4.6.5
+
+  platform/eval:
+    dependencies:
+      '@sdlc/config':
+        specifier: workspace:*
+        version: link:../packages/config
+      '@sdlc/messages':
+        specifier: workspace:*
+        version: link:../packages/messages
 
   platform/packages/adapters/agent-openhands:
     dependencies:
