@@ -7,6 +7,7 @@ import { t } from '@sdlc/messages';
 
 import { runAdminApi } from './commands/admin-api.js';
 import { runAiRecord } from './commands/ai-record.js';
+import { runEval } from './commands/eval.js';
 import { runAuditVerify } from './commands/audit-verify-api.js';
 import { runCost } from './commands/cost.js';
 import { runDoctor } from './commands/doctor.js';
@@ -44,6 +45,7 @@ const USER_COMMANDS: Readonly<
   gate: runGate,
   escalation: runEscalation,
   'ai-record': runAiRecord,
+  eval: runEval,
   spec: runSpec,
   plan: runPlan,
   run: runRun,

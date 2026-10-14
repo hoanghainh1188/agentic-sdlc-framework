@@ -595,6 +595,12 @@ export interface EvaluationPlansTable {
   paused_until: ColumnType<Date | null, Date | null | undefined, Date | null>;
   next_run_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
   seen_sha256: ColumnType<string | null, string | null | undefined, string | null>;
+  /** L05 (migration 0032, QUESTIONS #476): a person's Run now, until the worker takes it. */
+  run_requested_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
+  run_requested_by: ColumnType<string | null, string | null | undefined, string | null>;
+  /** The worker's last refusal to start the plan (a code), for the dashboard. */
+  last_refusal: ColumnType<string | null, string | null | undefined, string | null>;
+  last_refusal_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
   created_by: Immutable<string | null>;
   updated_at: ColumnType<Date, Date | undefined, Date>;
   created_at: CreatedAt;
@@ -1480,6 +1486,10 @@ export const TABLE_COLUMNS = {
     'created_by',
     'updated_at',
     'created_at',
+    'run_requested_at',
+    'run_requested_by',
+    'last_refusal',
+    'last_refusal_at',
   ]),
   evaluation_plan_versions: columns<EvaluationPlanVersionsTable>()([
     'id',

@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L05, PR 2 done; for review) |
+| Status | **Proposed** (task L05, PR 3 done; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L05 plan approved 2026-10-14, with answers to QUESTIONS #470–#474) |
 | Related | D-08 task L05 (AC1–AC4), then L06 (reports, recommendations) and L07 (a project's own task set); ADR-M81 (evaluations on the server), ADR-M73 (the dashboard's actions, CSRF, passkey step-up), ADR-M78 (the harness), ADR-M31 (the agent register), ADR-M39 and ADR-M40 (files read from the default branch, hashes only), ADR-M28 (budgets only go up by a decision); D-05 §6.8; QUESTIONS #450, #465, #470–#474 |
@@ -66,6 +66,8 @@ The three CSRF layers of ADR-M73 §2.3 apply to all four; with `SDLC_API_DASHBOA
 
 The API (`/v1/projects/:project/eval-plans`, `/v1/eval-plans/:plan…`, `/v1/evaluations…`) and the CLI (`sdlc eval plan create|change|show|list|archive`, `sdlc eval run`, `sdlc eval list|show`, all with `--json`) give the same actions with a token; a token takes no step-up (ADR-M36).
 
+As built (PR 3, QUESTIONS #476): the api has neither the gateway's model list nor the task sets, so it checks the role, the format, the register (the agent exists, is active and has a model), the prompt files and the project's AI record, and saves the plan. **Run now** (`POST /v1/eval-plans/:plan/runs`) answers 202 and records a request on the plan (`run_requested_at`, `run_requested_by`, migration `0032-evaluation-plan-requests`; audit `evaluation_plan.run_requested`; a second request while one waits records nothing). The worker's plan loop (PR 4) takes the request, checks the models and the task set and starts the evaluation; when it cannot, it keeps the refusal code on the plan (`last_refusal`, `last_refusal_at`) and writes `evaluation_plan.run_refused`. Refusals reach the caller as `evaluation_refused` (422), `evaluation_conflict` (409), `forbidden` (403) or `not_found` / `project_not_found` (404), with the code as `reason` and its catalog text (`evaluation.error.*`). The CLI reads the plan from a JSON file of at most 64 KB (`--file`), never from an argument holding text. The response schemas are in `@sdlc/api-schemas` for the dashboard (PR 5).
+
 ### 2.8. Audit (AC3)
 
 New audit actions, IDs, codes, hashes and amounts only: `evaluation_plan.created`, `evaluation_plan.changed` (the version, the changed field names, old and new amounts), `evaluation_plan.archived`, `evaluation_plan.run_started` (the evaluation, the reason code), `evaluation_plan.paused`. `evaluation.started` of L04 gains the plan and its version when it has one.
@@ -109,4 +111,5 @@ New audit actions, IDs, codes, hashes and amounts only: `evaluation_plan.created
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-14 | Claude (task L05, PR 1) | First version |
+| 0.3 | 2026-10-14 | Claude (task L05, PR 3) | §2.7 as built: the API and CLI; Run now as a request the worker starts (QUESTIONS #476, migration 0032) |
 | 0.2 | 2026-10-14 | Claude (task L05, PR 2) | §2.1 as built: configurations from the agent register or a model with the default agent, resolved into `evaluation_configurations` at start (QUESTIONS #475); migration 0031, SDA23, M33 |

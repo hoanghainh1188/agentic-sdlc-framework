@@ -58,10 +58,13 @@ export interface KnownTaskSet {
 
 export interface EvaluationPlanDeps {
   readonly policyFactory: EvaluationPolicyFactory;
-  /** The gateway's current model list. */
-  readonly models: () => Promise<readonly ModelRef[]>;
-  /** The task sets this server has (the runner image's v1, `SDLC_EVAL_TASKS_DIR`). */
-  readonly taskSet: (version: number) => Promise<KnownTaskSet | undefined>;
+  /**
+   * The gateway's current model list. The worker has it; the api does not (QUESTIONS #476): then
+   * the models are checked when the worker starts a run.
+   */
+  readonly models?: () => Promise<readonly ModelRef[]>;
+  /** The task sets this server has (the runner image's v1, `SDLC_EVAL_TASKS_DIR`); worker only. */
+  readonly taskSet?: (version: number) => Promise<KnownTaskSet | undefined>;
   /** Reads a prompt variant from the default branch; the text is hashed, never kept. */
   readonly gitHost: Pick<GitHostAdapter, 'getBranchHead' | 'getFileAtCommit'>;
   /** Default: `new Date()`. */
@@ -150,7 +153,7 @@ export function startOfNextUtcMonth(at: Date): Date {
  */
 export async function planFleetSha256(
   scope: TenantScope,
-  deps: Pick<EvaluationPlanDeps, 'models'>,
+  deps: { readonly models: () => Promise<readonly ModelRef[]> },
   projectId: string,
   configurations: readonly PlanConfiguration[],
 ): Promise<string> {
@@ -209,11 +212,13 @@ async function buildContent(
   project: Project,
   input: PlanContentInput,
 ): Promise<PlanContent> {
-  const set = await deps.taskSet(input.taskSetVersion);
-  if (!set) throw new EvaluationError('task_set_not_found', 'unknown task set version');
   const taskIds = input.taskIds && input.taskIds.length > 0 ? [...input.taskIds] : null;
-  if (taskIds?.some((id) => !set.taskIds.includes(id))) {
-    throw new EvaluationError('task_not_found', 'a task is not in the task set');
+  if (deps.taskSet) {
+    const set = await deps.taskSet(input.taskSetVersion);
+    if (!set) throw new EvaluationError('task_set_not_found', 'unknown task set version');
+    if (taskIds?.some((id) => !set.taskIds.includes(id))) {
+      throw new EvaluationError('task_not_found', 'a task is not in the task set');
+    }
   }
   const configurations: PlanConfiguration[] = [];
   for (const c of input.configurations) {
@@ -246,13 +251,51 @@ async function buildContent(
     if (error instanceof DbError) throw new EvaluationError('invalid_input', error.message);
     throw error;
   }
-  const resolved = await resolveConfigurations(scope, deps, project.id, configurations);
-  await checkEvaluationScope(scope, deps, {
-    projectId: project.id,
-    dataClass: content.dataClass,
-    configurations: resolved,
-  });
+  if (deps.models) {
+    const resolved = await resolveConfigurations(
+      scope,
+      { models: deps.models },
+      project.id,
+      configurations,
+    );
+    await checkEvaluationScope(scope, deps, {
+      projectId: project.id,
+      dataClass: content.dataClass,
+      configurations: resolved,
+    });
+  } else {
+    // Without the gateway (the api): the project, its AI record and the register now; the models
+    // when the worker starts a run.
+    await checkAgents(scope, project.id, configurations);
+    await checkEvaluationScope(scope, deps, {
+      projectId: project.id,
+      dataClass: content.dataClass,
+      configurations: [],
+    });
+  }
   return content;
+}
+
+/** Every configuration's agent is in the register, active and has a model. */
+async function checkAgents(
+  scope: TenantScope,
+  projectId: string,
+  configurations: readonly PlanConfiguration[],
+): Promise<void> {
+  const { config } = await loadEffectiveConfig(scope.projectConfigs, projectId);
+  for (const c of configurations) {
+    const key = c.agent_key ?? config.run.agent_key;
+    if (key === null)
+      throw new EvaluationError('agent_not_found', 'no agent for the configuration');
+    const agent = await scope.agents.getByKey(key);
+    if (!agent) throw new EvaluationError('agent_not_found', `agent ${key} not found`);
+    if (agent.status !== 'active') {
+      throw new EvaluationError('agent_not_active', `agent ${key} is not active`);
+    }
+    if (c.agent_key !== null && !agent.model_ref) {
+      throw new EvaluationError('agent_no_model', `agent ${key} has no model`);
+    }
+  }
 }
 
 /**
@@ -261,7 +304,7 @@ async function buildContent(
  */
 export async function resolveConfigurations(
   scope: TenantScope,
-  deps: Pick<EvaluationPlanDeps, 'models'>,
+  deps: { readonly models: () => Promise<readonly ModelRef[]> },
   projectId: string,
   configurations: readonly PlanConfiguration[],
 ): Promise<EvaluationConfigurationInput[]> {
@@ -336,9 +379,10 @@ export async function createEvaluationPlan(
   if (await scope.evaluationPlans.getByCode(project.id, input.code)) {
     throw new EvaluationError('plan_code_taken', `plan ${input.code} exists`);
   }
+  // Without the gateway (the api), the worker records what it sees first, without a run.
   const seen =
-    content.trigger === 'on_change'
-      ? await planFleetSha256(scope, deps, project.id, content.configurations)
+    content.trigger === 'on_change' && deps.models
+      ? await planFleetSha256(scope, { models: deps.models }, project.id, content.configurations)
       : null;
   try {
     return await scope.evaluationPlans.create({
@@ -414,7 +458,9 @@ export async function changeEvaluationPlan(
   if (!updated) throw new EvaluationError('plan_changed', 'the plan moved on');
   if (content.trigger === 'on_change' && before.trigger !== 'on_change') {
     await scope.evaluationPlans.setSchedule(plan.id, {
-      seenSha256: await planFleetSha256(scope, deps, project.id, content.configurations),
+      seenSha256: deps.models
+        ? await planFleetSha256(scope, { models: deps.models }, project.id, content.configurations)
+        : null,
     });
   }
   // A higher cap ends a pause for the cap at once.
@@ -472,6 +518,9 @@ export async function startEvaluationPlan(
   const perRun = toMicros(version.budgetPerRunUsd);
   const budgetUsd = fromMicros(left < perRun ? left : perRun);
 
+  if (!deps.models || !deps.taskSet) {
+    throw new Error('startEvaluationPlan needs the gateway and the task sets (the worker)');
+  }
   const set = await deps.taskSet(version.taskSetVersion);
   if (!set) throw new EvaluationError('task_set_not_found', 'unknown task set version');
   // Prompt variants are read again: the run uses the file as it is now, and records it.
@@ -486,7 +535,12 @@ export async function startEvaluationPlan(
           },
     );
   }
-  const resolved = await resolveConfigurations(scope, deps, project.id, configurations);
+  const resolved = await resolveConfigurations(
+    scope,
+    { models: deps.models },
+    project.id,
+    configurations,
+  );
   const fromPlan: EvaluationFromPlan = {
     id: plan.id,
     version: version.version,
@@ -529,6 +583,26 @@ export async function startEvaluationPlan(
     }
     throw error;
   }
+}
+
+/**
+ * A person's **Run now** (QUESTIONS #476): checks the role, the plan and that no evaluation of it
+ * is open, then records the request; the worker's loop starts the run and checks the models and
+ * the task set. A request that waits already is not an error.
+ */
+export async function requestEvaluationPlanRun(
+  scope: TenantScope,
+  input: { readonly planId: string; readonly userId: string },
+): Promise<EvaluationPlan> {
+  const plan = await planOf(scope, input.planId);
+  await assertEvalRole(scope, input.userId, plan.project_id);
+  if (plan.status === 'paused') throw new EvaluationError('plan_paused', 'paused');
+  if (await scope.evaluationPlans.openEvaluationId(plan.id)) {
+    throw new EvaluationError('evaluation_open', 'the plan has an open evaluation');
+  }
+  await projectOf(scope, plan.project_id);
+  await scope.evaluationPlans.requestRun(plan.id, input.userId);
+  return (await scope.evaluationPlans.getById(plan.id))!;
 }
 
 /** A plan with its current version, for reading. */

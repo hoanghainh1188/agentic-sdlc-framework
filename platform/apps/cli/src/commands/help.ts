@@ -30,6 +30,7 @@ export const COMMAND_HELP = {
   run: { usage: 'cli.run.usage', example: 'cli.help.example.run' },
   cost: { usage: 'cli.cost.usage', example: 'cli.help.example.cost' },
   metrics: { usage: 'cli.metrics.usage', example: 'cli.help.example.metrics' },
+  eval: { usage: 'cli.eval.usage', example: 'cli.help.example.eval' },
   trial: { usage: 'cli.trial.usage', example: 'cli.help.example.trial' },
   evidence: { usage: 'cli.evidence.usage', example: 'cli.help.example.evidence' },
   token: { usage: 'cli.token.usage', example: 'cli.help.example.token' },

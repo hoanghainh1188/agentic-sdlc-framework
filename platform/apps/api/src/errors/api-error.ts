@@ -7,6 +7,7 @@ import {
   AgentRegisterError,
   AiRecordError,
   CommandError,
+  EvaluationError,
   KillError,
   PasskeyError,
   PLAN_ERROR_MESSAGES,
@@ -26,6 +27,7 @@ import {
   type PasskeyErrorCode,
   type DbErrorCode,
   type EscalationErrorCode,
+  type EvaluationErrorCode,
   type EvidencePackErrorCode,
   type RegistryErrorCode,
 } from '@sdlc/core';
@@ -79,6 +81,8 @@ export const API_ERROR_CODES = [
   'plan_not_on_default_branch',
   'plan_submit_not_allowed',
   'git_host_unavailable',
+  'evaluation_refused',
+  'evaluation_conflict',
   'run_not_found',
   'run_not_active',
   'no_active_run',
@@ -162,6 +166,8 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   plan_not_on_default_branch: 'api.error.plan_not_on_default_branch',
   plan_submit_not_allowed: 'api.error.plan_submit_not_allowed',
   git_host_unavailable: 'api.error.git_host_unavailable',
+  evaluation_refused: 'api.error.evaluation_refused',
+  evaluation_conflict: 'api.error.evaluation_conflict',
   run_not_found: 'api.error.run_not_found',
   run_not_active: 'api.error.run_not_active',
   no_active_run: 'api.error.no_active_run',
@@ -423,6 +429,7 @@ export function toApiError(error: unknown): ApiError {
     return new ApiError(status, code, error.extra.reason, details, error.extra.issues);
   }
   if (error instanceof EscalationError) return new ApiError(...ESCALATION[error.code]);
+  if (error instanceof EvaluationError) return evaluationApiError(error);
   if (error instanceof AiRecordError) {
     if (error.code === 'version_conflict') return new ApiError(409, 'ai_record_version_conflict');
     if (error.code === 'not_a_writer') return new ApiError(403, 'forbidden');
@@ -442,4 +449,57 @@ export function toApiError(error: unknown): ApiError {
   }
   if (error instanceof TenantGuardError) return new ApiError(500, 'internal');
   return new ApiError(500, 'internal');
+}
+
+/**
+ * Evaluation plans (L05, ADR-M82): the refusal code is the `reason`, with its catalog text
+ * (`evaluation.error.<code>`). Not found → 404; another person's change or an open evaluation →
+ * 409; anything else the plan or its configurations do not allow → 422.
+ */
+const EVALUATION_STATUS: Readonly<Partial<Record<EvaluationErrorCode, [number, ApiErrorCode]>>> = {
+  project_not_found: [404, 'project_not_found'],
+  plan_not_found: [404, 'not_found'],
+  forbidden: [403, 'forbidden'],
+  git_host_unavailable: [503, 'git_host_unavailable'],
+  plan_code_taken: [409, 'evaluation_conflict'],
+  plan_changed: [409, 'evaluation_conflict'],
+  plan_archived: [409, 'evaluation_conflict'],
+  plan_paused: [409, 'evaluation_conflict'],
+  evaluation_open: [409, 'evaluation_conflict'],
+  monthly_cap_used: [409, 'evaluation_conflict'],
+};
+
+/** The catalog text of each evaluation refusal (`evaluation.error.<code>`). */
+const EVALUATION_MESSAGES: Readonly<Record<EvaluationErrorCode, MessageKey>> = {
+  project_not_found: 'evaluation.error.project_not_found',
+  project_not_active: 'evaluation.error.project_not_active',
+  data_class_prohibited: 'evaluation.error.data_class_prohibited',
+  ai_record_missing: 'evaluation.error.ai_record_missing',
+  data_class_not_allowed: 'evaluation.error.data_class_not_allowed',
+  model_not_allowed: 'evaluation.error.model_not_allowed',
+  self_hosted_only: 'evaluation.error.self_hosted_only',
+  invalid_input: 'evaluation.error.invalid_input',
+  forbidden: 'evaluation.error.forbidden',
+  plan_not_found: 'evaluation.error.plan_not_found',
+  plan_code_taken: 'evaluation.error.plan_code_taken',
+  plan_archived: 'evaluation.error.plan_archived',
+  plan_paused: 'evaluation.error.plan_paused',
+  plan_changed: 'evaluation.error.plan_changed',
+  evaluation_open: 'evaluation.error.evaluation_open',
+  monthly_cap_used: 'evaluation.error.monthly_cap_used',
+  cap_below_spent: 'evaluation.error.cap_below_spent',
+  task_set_not_found: 'evaluation.error.task_set_not_found',
+  task_not_found: 'evaluation.error.task_not_found',
+  agent_not_found: 'evaluation.error.agent_not_found',
+  agent_not_active: 'evaluation.error.agent_not_active',
+  agent_no_model: 'evaluation.error.agent_no_model',
+  prompt_not_found: 'evaluation.error.prompt_not_found',
+  git_host_unavailable: 'evaluation.error.git_host_unavailable',
+};
+
+function evaluationApiError(error: EvaluationError): ApiError {
+  const [status, code] = EVALUATION_STATUS[error.code] ?? [422, 'evaluation_refused'];
+  return new ApiError(status, code, error.code, undefined, undefined, (locale) =>
+    t(EVALUATION_MESSAGES[error.code], {}, locale),
+  );
 }

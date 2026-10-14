@@ -21,6 +21,9 @@ import type {
   TenantRoleBinding,
   User,
   UserIdentity,
+  Evaluation,
+  EvaluationPlan,
+  PlanVersionView,
 } from '../../packages/core/src/index.js';
 
 import { presentAgent, presentRound } from '../../apps/api/src/admin/agents.present.js';
@@ -36,6 +39,11 @@ import {
   presentUser,
 } from '../../apps/api/src/admin/present.js';
 import { presentAiRecord } from '../../apps/api/src/ai-records/present.js';
+import {
+  presentEvaluation,
+  presentPlan as presentEvalPlan,
+  presentVersion,
+} from '../../apps/api/src/evaluations/present.js';
 import { presentPlanList, presentSubmittedPlan } from '../../apps/api/src/plans/present.js';
 import { presentCostReport } from '../../apps/api/src/cost/present.js';
 import { presentPack, presentProposal } from '../../apps/api/src/evidence/present.js';
@@ -714,4 +722,93 @@ export function evidenceFileBody(content: string, sha256?: string): Record<strin
       content,
     },
   };
+}
+
+// L05: an evaluation plan with its current version, and an evaluation of it.
+const PLAN_ID = '88888888-8888-4888-8888-888888888888';
+
+export function evalPlanBody(): Record<string, unknown> {
+  const plan = {
+    id: PLAN_ID,
+    tenant_id: TENANT,
+    project_id: PROJECT.id,
+    code: 'weekly-models',
+    current_version: 2,
+    status: 'active',
+    pause_reason: null,
+    paused_until: null,
+    next_run_at: AT,
+    seen_sha256: null,
+    run_requested_at: AT,
+    run_requested_by: USER,
+    last_refusal: 'model_not_allowed',
+    last_refusal_at: AT,
+    created_by: USER,
+    updated_at: AT,
+    created_at: AT,
+  } as EvaluationPlan;
+  const version = {
+    version: 2,
+    dataClass: 'internal',
+    taskSetVersion: 1,
+    taskIds: ['feat-tax'],
+    runsPerTask: 2,
+    budgetPerRunUsd: '2.5',
+    monthlyCapUsd: '10',
+    trigger: 'schedule',
+    schedule: { every: 'weekly', hour: 6, weekday: 1 },
+    configurations: [
+      {
+        id: 'oss-short',
+        agent_key: null,
+        model: 'gpt-oss-20b',
+        provider_type: 'self_hosted',
+        max_iterations: 30,
+        max_duration_min: 20,
+        prompt: { path: 'eval/prompts/short.md', commit: 'c'.repeat(40), sha256: HASH },
+      },
+    ],
+    changedBy: USER,
+    createdAt: AT,
+  } as PlanVersionView;
+  return {
+    ...presentEvalPlan(plan, PROJECT),
+    current: presentVersion(version),
+    versions: [{ version: 2, changed_by: USER, created_at: AT.toISOString() }],
+    evaluations: [evaluationBody()],
+  };
+}
+
+export function evaluationBody(extra = false): Record<string, unknown> {
+  const evaluation = {
+    id: '99999999-9999-4999-8999-999999999999',
+    tenant_id: TENANT,
+    project_id: PROJECT.id,
+    code: 'EVAL-2026-0001',
+    data_class: 'internal',
+    task_set_version: 1,
+    config_name: null,
+    task_ids: ['feat-tax'],
+    configuration_ids: ['oss-short'],
+    runs_per_task: 2,
+    budget_usd: '2.500000',
+    status: 'running',
+    stop_reason: null,
+    started_by: USER,
+    finished_at: null,
+    updated_at: AT,
+    created_at: AT,
+    base_sha: 'a'.repeat(40),
+    plan_id: PLAN_ID,
+    plan_version: 2,
+  } as Evaluation;
+  return presentEvaluation(
+    evaluation,
+    extra
+      ? {
+          counts: { queued: 1, running: 1, preempted: 0, scored: 0, failed: 0, cancelled: 0 },
+          spentUsd: '0.42',
+        }
+      : undefined,
+  );
 }
