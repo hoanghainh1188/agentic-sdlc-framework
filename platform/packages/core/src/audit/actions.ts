@@ -582,6 +582,39 @@ export const AUDIT_ACTIONS = {
       output_tokens: 'code',
     },
   },
+  /**
+   * An evaluation was started on the server (task L04, ADR-M81 §2.7, QUESTIONS #464). The actor is
+   * the system for the operator command. The entity is the evaluation. `code` is `EVAL-YYYY-NNNN`;
+   * `config_name` the configuration file's code; `runs_total` the runs queued. Never a task text,
+   * a prompt or a model name.
+   */
+  'evaluation.started': {
+    entityType: 'evaluation',
+    fields: {
+      project_id: 'uuid',
+      code: 'code',
+      data_class: 'code',
+      task_set_version: 'version',
+      config_name: 'code',
+      runs_total: 'version',
+      budget_usd: 'decimal',
+    },
+  },
+  /**
+   * An evaluation ended (L04): `status` is `completed`, `stopped_budget`, `cancelled` or `failed`;
+   * `stop_reason` a code; the counts are runs by outcome.
+   */
+  'evaluation.finished': {
+    entityType: 'evaluation',
+    fields: {
+      status: 'code',
+      stop_reason: 'code?',
+      runs_scored: 'count',
+      runs_failed: 'count',
+      runs_cancelled: 'count',
+      cost_usd: 'decimal',
+    },
+  },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

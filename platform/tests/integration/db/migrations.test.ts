@@ -163,6 +163,19 @@ const UPDATABLE: Record<string, readonly string[]> = {
   agent_approvals: [],
   // E08 (migration 0024, QUESTIONS #253): a request again until confirmed once (trigger SDA17).
   langfuse_purges: ['traces', 'attempts', 'last_requested_at', 'confirmed_at'],
+  // L04 (migration 0029): the state of an evaluation and of its runs; the budget only goes up
+  // (SDA21); a run moves only along the machine (SDA22). Results are append-only.
+  evaluations: ['budget_usd', 'status', 'stop_reason', 'finished_at', 'updated_at'],
+  evaluation_runs: [
+    'attempt',
+    'status',
+    'stop_reason',
+    'runner_instance',
+    'started_at',
+    'finished_at',
+    'updated_at',
+  ],
+  evaluation_run_results: [],
   // U05 (migration 0027): seen time only grows; the end is set once (trigger SDA18). No DELETE.
   web_sessions: ['last_seen_at', 'revoked_at', 'end_reason'],
   // U06 (migration 0028): the counter and the last use only grow; revoked once (SDA20). No DELETE.
@@ -305,7 +318,9 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // U05: web_sessions → users, user_identities.
     // U06: webauthn_credentials → users ×2 (user_id, revoked_by); passkey_challenges → users,
     // web_sessions, intents, escalations.
-    expect(fks).toHaveLength(66);
+    // L04: evaluations → projects, users; evaluation_runs → evaluations; evaluation_run_results →
+    // evaluation_runs; cost_records → evaluation_runs.
+    expect(fks).toHaveLength(71);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

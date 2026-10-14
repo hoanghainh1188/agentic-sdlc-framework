@@ -28,6 +28,7 @@ import { migration0025IntentsWaitingReason } from './0025-intents-waiting-reason
 import { migration0026SpecStructure } from './0026-spec-structure.js';
 import { migration0027WebSessions } from './0027-web-sessions.js';
 import { migration0028DashboardWrites } from './0028-dashboard-writes.js';
+import { migration0029Evaluations } from './0029-evaluations.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -59,4 +60,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0026-spec-structure': migration0026SpecStructure,
   '0027-web-sessions': migration0027WebSessions,
   '0028-dashboard-writes': migration0028DashboardWrites,
+  '0029-evaluations': migration0029Evaluations,
 };

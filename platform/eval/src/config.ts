@@ -13,6 +13,12 @@ import { TaskError } from './task.js';
 export const PROVIDERS = ['ollama', 'stub'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
+/** Where a provider runs: every provider of this version is self-hosted (ADR-M81 §2.6). */
+export function providerTypeOf(provider: Provider): 'self_hosted' {
+  void provider;
+  return 'self_hosted';
+}
+
 export interface EvalModel {
   readonly provider: Provider;
   /** The gateway name the agent asks LiteLLM for (and the name in the report). */

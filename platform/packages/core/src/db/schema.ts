@@ -32,6 +32,8 @@ import type {
   AgentEnvironment,
   AiAllowed,
   DisclosureFormat,
+  EvaluationRunStatus,
+  EvaluationStatus,
   GateDecisionSource,
   GitProvider,
   ProdLogsAllowed,
@@ -451,6 +453,8 @@ export interface CostRecordsTable {
   source_ref: Immutable<string>;
   occurred_at: Immutable<Date>;
   created_at: CreatedAt;
+  /** The evaluation run this call belongs to, instead of an intent (L04, migration 0029). */
+  evaluation_run_id: ColumnType<string | null, string | null | undefined, never>;
 }
 
 /** Evidence files in the evidence store (D-05 section 6.6, C06 session 2b, ADR-M33 §2.9). */
@@ -541,6 +545,97 @@ export interface LangfusePurgesTable {
   requested_at: Immutable<Date>;
   last_requested_at: ColumnType<Date, Date, Date>;
   confirmed_at: ColumnType<Date | null, Date | null | undefined, Date>;
+  created_at: CreatedAt;
+}
+
+/**
+ * One evaluation on the server (L04, migration 0029, design/ADR-M81 §2.2; D-05 §6.8). Codes and
+ * numbers only: the task and configuration IDs, never a prompt, task text or code.
+ */
+export interface EvaluationsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  project_id: Immutable<string>;
+  /** `EVAL-YYYY-NNNN`; also the `intent_id` label of its model calls (QUESTIONS #462). */
+  code: Immutable<string>;
+  data_class: Immutable<DataClass>;
+  task_set_version: Immutable<number>;
+  /** The configuration file the runner reads (a code, no path). */
+  config_name: Immutable<string>;
+  task_ids: Immutable<string[]>;
+  configuration_ids: Immutable<string[]>;
+  runs_per_task: Immutable<number>;
+  /** numeric(18,6) as a decimal string; only goes up (trigger SDA21). */
+  budget_usd: ColumnType<string, string, string>;
+  status: ColumnType<EvaluationStatus, EvaluationStatus | undefined, EvaluationStatus>;
+  stop_reason: ColumnType<string | null, string | null | undefined, string | null>;
+  /** Null when an operator started it as the system. */
+  started_by: Immutable<string | null>;
+  finished_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
+  updated_at: ColumnType<Date, Date | undefined, Date>;
+  created_at: CreatedAt;
+}
+
+/** One run of one task for one configuration (L04, migration 0029). */
+export interface EvaluationRunsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  evaluation_id: Immutable<string>;
+  configuration_id: Immutable<string>;
+  task_id: Immutable<string>;
+  run_index: Immutable<number>;
+  model: Immutable<string>;
+  provider_type: Immutable<ProviderType>;
+  agent_version: Immutable<string>;
+  attempt: ColumnType<number, number | undefined, number>;
+  status: ColumnType<EvaluationRunStatus, EvaluationRunStatus | undefined, EvaluationRunStatus>;
+  stop_reason: ColumnType<string | null, string | null | undefined, string | null>;
+  runner_instance: ColumnType<string | null, string | null | undefined, string | null>;
+  started_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
+  finished_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
+  updated_at: ColumnType<Date, Date | undefined, Date>;
+  created_at: CreatedAt;
+}
+
+/**
+ * The scored result of an evaluation run (L04, migration 0029; the fields of the run result of
+ * ADR-M78 §2.4 and the hardware block of ADR-M81 §2.1). Append-only: numbers and codes only.
+ */
+export interface EvaluationRunResultsTable {
+  /** bigint identity; `pg` returns int8 as a string. */
+  id: ColumnType<string, never, never>;
+  tenant_id: Immutable<string>;
+  evaluation_run_id: Immutable<string>;
+  attempt: Immutable<number>;
+  instructions_sha256: Immutable<string>;
+  outcome: Immutable<string>;
+  status: Immutable<string>;
+  stop_reason: Immutable<string | null>;
+  applied: Immutable<boolean>;
+  resolved: Immutable<boolean>;
+  fail_to_pass_passed: Immutable<boolean>;
+  pass_to_pass_passed: Immutable<boolean>;
+  ci_passed: Immutable<boolean>;
+  scope_breach: Immutable<boolean>;
+  out_of_plan_files: Immutable<number>;
+  lint_findings: Immutable<number>;
+  diff_files: Immutable<number>;
+  diff_lines_added: Immutable<number>;
+  diff_lines_removed: Immutable<number>;
+  seconds: Immutable<number>;
+  iterations: Immutable<number>;
+  model_calls: Immutable<number>;
+  /** bigint: `pg` returns int8 as a string. */
+  input_tokens: ColumnType<string, number, never>;
+  output_tokens: ColumnType<string, number, never>;
+  cached_input_tokens: ColumnType<string, number, never>;
+  cost_usd: ColumnType<string, string, never>;
+  hw_cpu_model: Immutable<string>;
+  hw_cpu_cores: Immutable<number>;
+  hw_memory_gb: Immutable<number>;
+  hw_docker_version: Immutable<string>;
+  hw_gpu: Immutable<string | null>;
+  hw_runner_instance: Immutable<string | null>;
   created_at: CreatedAt;
 }
 
@@ -751,6 +846,9 @@ export interface Database {
   evidence_packs: EvidencePacksTable;
   evidence_holds: EvidenceHoldsTable;
   langfuse_purges: LangfusePurgesTable;
+  evaluations: EvaluationsTable;
+  evaluation_runs: EvaluationRunsTable;
+  evaluation_run_results: EvaluationRunResultsTable;
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
@@ -1015,6 +1113,7 @@ export const TABLE_COLUMNS = {
     'source_ref',
     'occurred_at',
     'created_at',
+    'evaluation_run_id',
   ]),
   git_event_receipts: columns<GitEventReceiptsTable>()([
     'id',
@@ -1185,6 +1284,79 @@ export const TABLE_COLUMNS = {
     'confirmed_at',
     'created_at',
   ]),
+  evaluations: columns<EvaluationsTable>()([
+    'id',
+    'tenant_id',
+    'project_id',
+    'code',
+    'data_class',
+    'task_set_version',
+    'config_name',
+    'task_ids',
+    'configuration_ids',
+    'runs_per_task',
+    'budget_usd',
+    'status',
+    'stop_reason',
+    'started_by',
+    'finished_at',
+    'updated_at',
+    'created_at',
+  ]),
+  evaluation_runs: columns<EvaluationRunsTable>()([
+    'id',
+    'tenant_id',
+    'evaluation_id',
+    'configuration_id',
+    'task_id',
+    'run_index',
+    'model',
+    'provider_type',
+    'agent_version',
+    'attempt',
+    'status',
+    'stop_reason',
+    'runner_instance',
+    'started_at',
+    'finished_at',
+    'updated_at',
+    'created_at',
+  ]),
+  evaluation_run_results: columns<EvaluationRunResultsTable>()([
+    'id',
+    'tenant_id',
+    'evaluation_run_id',
+    'attempt',
+    'instructions_sha256',
+    'outcome',
+    'status',
+    'stop_reason',
+    'applied',
+    'resolved',
+    'fail_to_pass_passed',
+    'pass_to_pass_passed',
+    'ci_passed',
+    'scope_breach',
+    'out_of_plan_files',
+    'lint_findings',
+    'diff_files',
+    'diff_lines_added',
+    'diff_lines_removed',
+    'seconds',
+    'iterations',
+    'model_calls',
+    'input_tokens',
+    'output_tokens',
+    'cached_input_tokens',
+    'cost_usd',
+    'hw_cpu_model',
+    'hw_cpu_cores',
+    'hw_memory_gb',
+    'hw_docker_version',
+    'hw_gpu',
+    'hw_runner_instance',
+    'created_at',
+  ]),
   tenant_role_bindings: columns<TenantRoleBindingsTable>()([
     'id',
     'tenant_id',
@@ -1284,6 +1456,9 @@ export const TENANT_COLUMN = {
   evidence_packs: 'tenant_id',
   evidence_holds: 'tenant_id',
   langfuse_purges: 'tenant_id',
+  evaluations: 'tenant_id',
+  evaluation_runs: 'tenant_id',
+  evaluation_run_results: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
   web_sessions: 'tenant_id',
@@ -1312,6 +1487,9 @@ export type Run = Selectable<RunsTable>;
 export type RunContractRow = Selectable<RunContractsTable>;
 export type RunEventRow = Selectable<RunEventsTable>;
 export type CostRecordRow = Selectable<CostRecordsTable>;
+export type Evaluation = Selectable<EvaluationsTable>;
+export type EvaluationRun = Selectable<EvaluationRunsTable>;
+export type EvaluationRunResultRow = Selectable<EvaluationRunResultsTable>;
 export type GitEventReceipt = Selectable<GitEventReceiptsTable>;
 export type Escalation = Selectable<EscalationsTable>;
 export type EscalationNotice = Selectable<EscalationNoticesTable>;

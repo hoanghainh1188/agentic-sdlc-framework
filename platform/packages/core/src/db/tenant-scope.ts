@@ -9,6 +9,8 @@ import { AgentRepository } from './repositories/agents.js';
 import { ApiTokenRepository } from './repositories/api-tokens.js';
 import { AuditLogRepository } from './repositories/audit-log.js';
 import { CostRecordRepository } from './repositories/cost-records.js';
+import { EvaluationRunRepository } from './repositories/evaluation-runs.js';
+import { EvaluationRepository } from './repositories/evaluations.js';
 import { EvidenceHoldRepository } from './repositories/evidence-holds.js';
 import { EvidenceItemRepository } from './repositories/evidence-items.js';
 import { EvidencePackRepository } from './repositories/evidence-packs.js';
@@ -71,6 +73,8 @@ export class TenantScope {
   readonly evidenceHolds: EvidenceHoldRepository;
   readonly retention: RetentionRepository;
   readonly langfusePurges: LangfusePurgeRepository;
+  readonly evaluations: EvaluationRepository;
+  readonly evaluationRuns: EvaluationRunRepository;
   readonly escalations: EscalationRepository;
   readonly escalationNotices: EscalationNoticeRepository;
   readonly agents: AgentRepository;
@@ -114,6 +118,8 @@ export class TenantScope {
     this.evidenceHolds = new EvidenceHoldRepository(this.db, this.tenantId);
     this.retention = new RetentionRepository(this.db, this.tenantId);
     this.langfusePurges = new LangfusePurgeRepository(this.db, this.tenantId);
+    this.evaluations = new EvaluationRepository(this.db, this.tenantId);
+    this.evaluationRuns = new EvaluationRunRepository(this.db, this.tenantId);
     this.escalations = new EscalationRepository(this.db, this.tenantId);
     this.escalationNotices = new EscalationNoticeRepository(this.db, this.tenantId);
     this.agents = new AgentRepository(this.db, this.tenantId);

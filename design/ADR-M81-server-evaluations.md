@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L04, PR 2 of 5 done; for review) |
+| Status | **Proposed** (task L04, PR 3 of 5 done; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L04 plan approved 2026-10-14, with answers to QUESTIONS #460–#464) |
 | Related | D-08 task L04 (AC1–AC5), then L05 (plans, API, CLI, schedules) and L06 (reports in the dashboard); ADR-M78 (the harness), ADR-M25 (sandbox, guard), ADR-M33 §2.6 (runner queue), ADR-M24 and ADR-M45 (cost), ADR-M29 (agent path), ADR-M80 §4.1 (canary search); D-07 §3–§5; D-05 §6.8 (the tables); QUESTIONS #450, #460–#464 |
@@ -34,7 +34,7 @@ Three tables, all with `tenant_id`, codes and numbers only (D-05 §6.8):
 | `evaluation_runs` | One run of one task for one configuration: status (`queued`, `running`, `scored`, `failed`, `preempted`, `cancelled`), attempt, runner instance |
 | `evaluation_run_results` (append-only) | The scored result of a run: hidden tests passed, CI first try, scope breach, stop reason code, finding count, diff size, wall-clock time, model calls, tokens, cost as a decimal string |
 
-Real `runs`, V13 metrics, gates, the kill switch and the cost report stay unmixed. The Run Contract gets a second kind, `evaluation`: same OpenBao Transit key, its own schema, no intent and no plan. A runner verifies the kind before it acts.
+Real `runs`, V13 metrics, gates, the kill switch and the cost report stay unmixed. As built (PR 3): migration `0029-evaluations`, D-05 §6.8. The evaluation keeps its configuration file as a code (`config_name`) and each run copies the model, provider type and agent version of its configuration, so the worker and the runner read no prompt from a table. The signed contract is stored in PR 4. The Run Contract gets a second kind, `evaluation`: same OpenBao Transit key, its own schema, no intent and no plan. A runner verifies the kind before it acts.
 
 No prompt, task text, code or diff is stored in any table, run event, audit event, log or Temporal history (ADR-M78 §2.4).
 
@@ -64,11 +64,11 @@ Developer machines use the same three steps (replacing `sdlc-eval-base`), so bot
 
 ### 2.6. Data classes and models (AC4)
 
-An evaluation belongs to a project and has a data class never below the project's default. Models come only through the policy's `allowedModels`. `client_restricted` → self-hosted models only. `prohibited` → refused at start. The platform never raises a data class (ADR-M32).
+An evaluation belongs to a project and has a data class never below the project's default. Models come only through the policy's `allowedModels`. `client_restricted` → self-hosted models only. `prohibited` → refused at start. The platform never raises a data class (ADR-M32). As built (PR 3, `startEvaluation`): the project has no "default data class" (the AI record lists the classes it allows; intents name their own), so the caller names the class (`--data-class`, default `internal`: the sample repository is fictional) and the same rule as G1 applies: the class must be allowed by the project's AI record (`aiRecordRefusal`). On top of it: `client_restricted` needs self-hosted configurations whatever the project configuration says, and every model must be in the policy's `allowedModels`.
 
 ### 2.7. How an evaluation starts in L04 (QUESTIONS #464)
 
-Only the operator command `pnpm sdlc ops eval start --tenant --project --config --tasks --n --budget` (actor `system`; the audit event holds IDs and codes). The API, CLI and schedules come in L05; reports in L06.
+Only the operator command `pnpm sdlc ops eval start --tenant --project --config --tasks --n --budget` (actor `system`; the audit event holds IDs and codes). As built (PR 3): `--tenant <slug> --project <slug> --config <file> --budget <USD>` and the optional `--configurations`, `--tasks`, `--n` (default 5), `--data-class`, `--tasks-dir`, `--json`; it writes `evaluation.started`; the evaluation ends with `evaluation.finished`. The API, CLI and schedules come in L05; reports in L06.
 
 - Task set v1 is packed into the runner image. A private set is mounted read-only through `SDLC_EVAL_TASKS_DIR`. Hidden tests and `solution.patch` never reach the agent.
 - The sample repository is cloned like a real run, with the GitHub App's short-lived single-repository token. The App must be installed on `pilot-order-inventory`; the deploy README says so.
@@ -119,3 +119,4 @@ Only the operator command `pnpm sdlc ops eval start --tenant --project --config 
 |---|---|---|---|
 | 0.1 | 2026-10-14 | Claude (task L04, PR 1) | First version |
 | 0.2 | 2026-10-14 | Claude (task L04, PR 2) | §2.1, §2.5 as built: `@sdlc/eval`, `EvalExecutor`, `LocalExecutor`, the hardware block, scoring in the sandbox image |
+| 0.3 | 2026-10-14 | Claude (task L04, PR 3) | §2.2, §2.6, §2.7 as built: the tables, the data-class rule without a project default, the operator command; budget service and queue primitives in core |

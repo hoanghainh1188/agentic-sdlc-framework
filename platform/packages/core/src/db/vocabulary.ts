@@ -32,6 +32,38 @@ import {
 export const TENANT_ROLES = ['tenant_admin'] as const;
 export type TenantRole = (typeof TENANT_ROLES)[number];
 
+/** Statuses of an evaluation and of its runs (task L04, migration 0029; stored as text + CHECK). */
+export const EVALUATION_STATUSES = [
+  'queued',
+  'running',
+  'completed',
+  'stopped_budget',
+  'cancelled',
+  'failed',
+] as const;
+export type EvaluationStatus = (typeof EVALUATION_STATUSES)[number];
+export const EVALUATION_FINAL_STATUSES: readonly EvaluationStatus[] = [
+  'completed',
+  'stopped_budget',
+  'cancelled',
+  'failed',
+];
+
+export const EVALUATION_RUN_STATUSES = [
+  'queued',
+  'running',
+  'preempted',
+  'scored',
+  'failed',
+  'cancelled',
+] as const;
+export type EvaluationRunStatus = (typeof EVALUATION_RUN_STATUSES)[number];
+export const EVALUATION_RUN_FINAL_STATUSES: readonly EvaluationRunStatus[] = [
+  'scored',
+  'failed',
+  'cancelled',
+];
+
 export const GIT_PROVIDERS = ['github', 'gitlab'] as const;
 export type GitProvider = (typeof GIT_PROVIDERS)[number];
 
