@@ -8,7 +8,7 @@
 !.npmrc
 !platform/apps/**
 !platform/packages/**
-!platform/eval/package.json
+!platform/eval/**
 **/node_modules
 **/dist
 **/*.tsbuildinfo

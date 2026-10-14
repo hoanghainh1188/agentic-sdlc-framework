@@ -532,9 +532,22 @@ describe.skipIf(!enabled)('H01: attacks from inside a sandbox (ADR-M80)', () => 
       const a = await attack('pids');
       const line = a.lines.find((l) => l.startsWith('PROBE pids spawned ')) ?? '';
       const spawned = Number(/spawned (\d+)/.exec(line)?.[1] ?? 'NaN');
+      if (Number.isNaN(spawned)) {
+        // The probe never reported: show what the model was asked and what the run did.
+        const calls = docker('logs', names.stub)
+          .split('\n')
+          .filter((l) => l.startsWith('stub:call:'));
+        process.stdout.write(`ATTACK-DEBUG pids no report; model calls: ${calls.join(' ')}\n`);
+      }
       expect(spawned).toBeGreaterThan(10);
       expect(spawned).toBeLessThan(600);
       expect(line).not.toMatch(/stop none/);
+      // The kernel itself counted refused forks (when the cgroup reports it), and every sleeper
+      // was reaped, so the flood was over before the run went on.
+      const denied = /denied (\d+|n\/a)/.exec(line)?.[1] ?? 'missing';
+      expect(denied).not.toBe('missing');
+      if (denied !== 'n/a') expect(Number(denied)).toBeGreaterThan(0);
+      expect(line).toContain('reaped true');
       // The run is over whatever the flood did, and nothing is left on the host.
       expect(['finished', 'failed']).toContain(a.result.outcome);
       expect(docker('ps', '-a', '-q', '--filter', `name=sdlc-sandbox-${a.runId}`)).toBe('');

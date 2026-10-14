@@ -215,21 +215,33 @@ const field = (n) => ((new RegExp('^' + n + ':\\\\s*(.*)$', 'm')).exec(status) |
 say('status', 'uid=' + field('Uid').split('\\t')[0], 'capeff=' + field('CapEff'), 'nonewprivs=' + field('NoNewPrivs'));
 say('cgroup', 'memory.max=' + (read('/sys/fs/cgroup/memory.max') || '?').trim(), 'pids.max=' + (read('/sys/fs/cgroup/pids.max') || '?').trim(), 'swap.max=' + (read('/sys/fs/cgroup/memory.swap.max') || '?').trim());`,
   },
-  // A-10: the process limit. Spawns sleepers until the kernel refuses, then stops them.
+  // A-10: the process limit. Spawns sleepers until the kernel refuses, kills them at once and waits
+  // until they are reaped (a killed child holds its slot until its parent reaps it), so the flood
+  // is over before the Agent Server needs a thread again. `denied` is the kernel's own count of
+  // refused forks (`pids.events`, `max`), the proof that the limit, not the probe, stopped it.
   pids: {
     kind: 'node',
     body: `
-const kids = []; let stop = 'none';
+process.on('uncaughtException', () => { stop = 'EAGAIN'; });
+const kids = []; let stop = 'none'; let exited = 0;
+const denied = () => (/^max (\\d+)$/m.exec(read('/sys/fs/cgroup/pids.events') || '') || [])[1] || 'n/a';
 for (let i = 0; i < 3000; i += 1) {
-  try { const k = cp.spawn('sleep', ['30'], { stdio: 'ignore' }); k.on('error', () => {}); if (!k.pid) { stop = 'nopid'; break; } kids.push(k); }
-  catch (e) { stop = e.code || 'error'; break; }
+  try {
+    const k = cp.spawn('sleep', ['30'], { stdio: 'ignore' });
+    k.on('error', () => {}); k.on('exit', () => { exited += 1; });
+    if (!k.pid) { stop = 'nopid'; break; }
+    kids.push(k);
+  } catch (e) { stop = e.code || 'error'; break; }
 }
-setTimeout(() => {
-  say('pids', 'spawned', String(kids.filter((k) => k.pid).length), 'stop', stop);
-  for (const k of kids) { try { k.kill('SIGKILL'); } catch {} }
-  setTimeout(() => process.exit(0), 2000);
-}, 300);
-process.on('uncaughtException', () => { stop = 'EAGAIN'; });`,
+const spawned = kids.length; const hit = denied();
+for (const k of kids) { try { k.kill('SIGKILL'); } catch {} }
+const t0 = Date.now();
+const wait = setInterval(() => {
+  if (exited < kids.length && Date.now() - t0 < 10000) return;
+  clearInterval(wait);
+  say('pids', 'spawned', String(spawned), 'stop', stop, 'denied', hit, 'reaped', String(exited >= kids.length));
+  process.exit(0);
+}, 100);`,
   },
   // A-7: packages. The install scripts of a local package run (that is what npm does); a git URL,
   // a tarball URL and a package that is not on the proxy must fail. The script's own reach is
@@ -310,8 +322,10 @@ function attackStep(request, first, step) {
       `(node /tmp/probe.js '${args.replaceAll("'", '')}' > /tmp/probe.out 2>&1; echo 'PROBE done' >> /tmp/probe.out) > /dev/null 2>&1 &`;
     return { delayMs: 0, toolCalls: [call(request, step, 'terminal', { command })] };
   }
+  // A-10: the first poll waits until the flood is over; a terminal command forks too, and the
+  // Agent Server needs threads, so a poll made inside the flood would test the race, not the limit.
   return {
-    delayMs: 0,
+    delayMs: marker[1] === 'pids' && step === 1 ? 6_000 : 0,
     toolCalls: [
       call(request, step, 'terminal', {
         command: `echo poll-${step}; sleep 3; cat /tmp/probe.out`,
