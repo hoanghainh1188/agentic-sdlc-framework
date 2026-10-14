@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L04, PR 4b done; for review) |
+| Status | **Proposed** (task L04, PR 4c done; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L04 plan approved 2026-10-14, with answers to QUESTIONS #460–#464) |
 | Related | D-08 task L04 (AC1–AC5), then L05 (plans, API, CLI, schedules) and L06 (reports in the dashboard); ADR-M78 (the harness), ADR-M25 (sandbox, guard), ADR-M33 §2.6 (runner queue), ADR-M24 and ADR-M45 (cost), ADR-M29 (agent path), ADR-M80 §4.1 (canary search); D-07 §3–§5; D-05 §6.8 (the tables); QUESTIONS #450, #460–#464 |
@@ -84,8 +84,18 @@ Only the operator command `pnpm sdlc ops eval start --tenant --project --config 
 
 1. `ops eval start` writes an `evaluations` row (`queued`) and one `evaluation_runs` row per task × run × configuration.
 2. A plain worker loop, `EvaluationLoop` (never a Temporal schedule), picks `queued` evaluations. Per run it issues the evaluation contract and a capped virtual key, then queues the run on `sdlc-runner-eval`. Temporal inputs hold IDs only; single-use OpenBao wrapping tokens as for real runs.
-3. The runner drives the agent with `driveAgent`, scores it as §2.5 and writes the result.
+3. The runner drives the agent, scores it as §2.5 and returns the measures (codes and numbers). The worker adds the model calls, tokens and cost from the cost records and writes the result.
 4. The Cost Controller syncs spend into `cost_records` with `evaluation_run_id`.
+
+As built (PR 4c, the runner side): `executeEvaluation` (`apps/runner/src/evaluation/execute.ts`), run by the activity `executeEvaluationRun` of a second Temporal worker on `sdlc-runner-eval` (its activity slots are `SDLC_RUNNER_MAX_EVAL_SANDBOXES`):
+
+1. wait for an evaluation slot (the run is still `queued`); verify the signed contract and claim the run;
+2. clone the sample repository at the contract's commit with a single-repository token (revoked as soon as the clone ended), read the task from the task set and the configuration from the config folder (both packed into the runner image: `/app/eval-tasks`, `/app/eval-configs`, or `SDLC_EVAL_TASKS_DIR` / `SDLC_EVAL_CONFIG_DIR`; the reference solutions are removed from the image), build the base with `prepareBase` of `@sdlc/eval`, start the sandbox from it;
+3. drive the agent with `driveEvaluationAgent`, which shares the poll loop, the stop step, the budget stop and the loop detection with `driveAgent` and writes no run event (an evaluation run has no row in `runs`);
+4. recompute the change outside the sandbox with hardened git (`computeRunPatch`), count the files outside the plan, remove the sandbox, score in the scoring containers (`ServerExecutor` is the server's `EvalExecutor`);
+5. return `scored` with the measures; the run stays `running` until the worker writes the result.
+
+A real run that needs the slot aborts the activity's signal: the agent is stopped (interrupt, then kill), the run is marked `preempted` and queued again for the next attempt, and the stopped attempt is not counted. A cancel of the activity ends the run `cancelled` (`evaluation_stopped`). A refused contract (expired, …) gives the run its next attempt. Any other failure marks the run `failed` with a code (`clone_clone_failed`, `agent_…`, `scoring_install_failed`, `task_unavailable`, …). The result is written by the worker, not the runner, because the cost is synced into `cost_records` by the worker (the runner holds no gateway key). The hardware block is the runner's: Docker version from the ping answer's `Server` header (no new endpoint), `SDLC_RUNNER_GPU`, the instance label.
 
 ## 3. Pull requests
 
@@ -96,7 +106,8 @@ Only the operator command `pnpm sdlc ops eval start --tenant --project --config 
 | 3 | Migration, repositories, core `evaluations` (budget, append-only, tenant), `ops eval start` |
 | 4a | The contract of kind `evaluation` (schema, signing, storage per attempt, the runner's check), the capped virtual key with the label `gate` = `EVAL`, the spend sync into `cost_records.evaluation_run_id`, the claim of a queued run (migration `0030`) |
 | 4b | The runner: the second task queue and the slot rule (free slots only, preemption of an evaluation run for a real run), the scoring container through `docker/guard.ts` with its test and an ADR-M25 note |
-| 4c | The runner's evaluation activity (clone, sandbox, agent, diff, score, result), `ServerExecutor`, `EvaluationLoop` in the worker, the stub-model live test and the canary search |
+| 4c | The runner side: `executeEvaluation`, the activity and the second Temporal worker, `driveEvaluationAgent`, `ServerExecutor`, task set and configurations in the runner image, the stub-model live test (`pnpm test:eval-server`) with the canary search of ADR-M80 §4.1 |
+| 4d | The worker side: the workflow that runs the activity, `EvaluationLoop` (contract, capped key, wrapping tokens, the result with the cost, the budget stop, the end of an evaluation) |
 | 5 | Handbook Ch.19 usage, deploy README, `platform/DEVELOPMENT.md` rows, troubleshooting, CHANGELOG |
 
 ## 4. Tests (AC5)
@@ -131,3 +142,4 @@ Only the operator command `pnpm sdlc ops eval start --tenant --project --config 
 | 0.3 | 2026-10-14 | Claude (task L04, PR 3) | §2.2, §2.6, §2.7 as built: the tables, the data-class rule without a project default, the operator command; budget service and queue primitives in core |
 | 0.4 | 2026-10-14 | Claude (task L04, PR 4a) | §2.2, §2.4 as built: the evaluation contract, the key and the sync; §3: PR 4 is split into 4a, 4b and 4c because the runner's provisioning and driver are tied to `runs` (4b and 4c reuse their polling and caps without a `runs` row) |
 | 0.5 | 2026-10-14 | Claude (task L04, PR 4b) | §2.3, §2.5 as built: the slot pool, the sweep of lost evaluation runs, scoring in two containers over one volume with the guard rule |
+| 0.6 | 2026-10-14 | Claude (task L04, PR 4c) | §2.8 as built on the runner side; §3: PR 4 is now 4a to 4d (4d is the worker side); the result is written by the worker because it adds the cost |

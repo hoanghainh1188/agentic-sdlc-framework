@@ -319,7 +319,10 @@ async function projectImage(scope: TenantScope, projectId: string): Promise<stri
 }
 
 /** Waits for the image's health check (image contract, ADR-M25 §2.3). */
-async function waitUntilHealthy(deps: RunnerDeps, containerId: string): Promise<void> {
+export async function waitUntilHealthy(
+  deps: Pick<RunnerDeps, 'docker' | 'settings'>,
+  containerId: string,
+): Promise<void> {
   const deadline = Date.now() + deps.settings.readyTimeoutMs;
   for (;;) {
     const info = await deps.docker.containerInspect(containerId);

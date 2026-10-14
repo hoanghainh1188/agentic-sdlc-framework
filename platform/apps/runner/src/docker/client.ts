@@ -68,6 +68,8 @@ export function isAllowedEndpoint(method: string, path: string): boolean {
 export interface DockerResponse {
   readonly status: number;
   readonly body: Buffer;
+  /** Response headers (lower-case names); empty for responses built by the client itself. */
+  readonly headers?: Readonly<Record<string, string | string[] | undefined>>;
 }
 
 export interface ContainerSummary {
@@ -150,6 +152,19 @@ export class DockerClient {
 
   async ping(): Promise<void> {
     await this.#expect('GET', '/_ping', [200]);
+  }
+
+  /**
+   * The Docker Engine's version from the `Server` header of the ping answer (`Docker/29.8.2 (linux)`),
+   * for the hardware block of an evaluation result (ADR-M81 §2.1). No new endpoint. `unknown` when the
+   * header is missing or has another shape.
+   */
+  async engineVersion(): Promise<string> {
+    const res = await this.request('GET', '/_ping');
+    this.#check(res, [200], 'GET');
+    const header = res.headers?.server;
+    const text = Array.isArray(header) ? header[0] : header;
+    return /^Docker\/([0-9A-Za-z][0-9A-Za-z._+-]{0,31})/.exec(text ?? '')?.[1] ?? 'unknown';
   }
 
   /** Image details, or undefined when the image is not on this host. */
@@ -425,7 +440,11 @@ export class DockerClient {
             chunks.push(chunk);
           });
           res.on('end', () =>
-            resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks) }),
+            resolve({
+              status: res.statusCode ?? 0,
+              body: Buffer.concat(chunks),
+              headers: res.headers,
+            }),
           );
           res.on('error', () => reject(unreachable('response')));
         },

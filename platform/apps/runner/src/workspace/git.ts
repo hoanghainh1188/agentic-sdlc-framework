@@ -54,7 +54,8 @@ export class CloneError extends RunnerError {
 
 const REPO = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}\/[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$/;
 const SHA = /^[0-9a-f]{40}$/;
-const BRANCH = /^agent\/INT-[0-9]{4}-[0-9]{4,9}$/;
+/** A run's branch, or `evaluation`: the local branch of an evaluation run's clone (task L04). */
+const BRANCH = /^(?:agent\/INT-[0-9]{4}-[0-9]{4,9}|evaluation)$/;
 
 /** Environment of every git process: nothing inherited but PATH. */
 function baseEnv(home: string): NodeJS.ProcessEnv {

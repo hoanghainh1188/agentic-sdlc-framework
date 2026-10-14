@@ -37,6 +37,9 @@ export const RUNNER_ENV = {
   agentSpendCheckSeconds: 'SDLC_RUNNER_AGENT_SPEND_CHECK_SECONDS',
   agentSpendRecheckSeconds: 'SDLC_RUNNER_AGENT_SPEND_RECHECK_SECONDS',
   killEvidenceSeconds: 'SDLC_RUNNER_KILL_EVIDENCE_SECONDS',
+  evalTasksDir: 'SDLC_EVAL_TASKS_DIR',
+  evalConfigDir: 'SDLC_EVAL_CONFIG_DIR',
+  gpu: 'SDLC_RUNNER_GPU',
 } as const;
 
 /**
@@ -91,6 +94,16 @@ export interface AgentSettings {
   readonly killEvidenceMs: number;
 }
 
+/** Where an evaluation run finds its task set and configurations (task L04, ADR-M81 §2.7). */
+export interface EvaluationSettings {
+  /** The task set (`task-set.yaml`, one folder per task): packed into the image, or a private set. */
+  readonly tasksDir: string;
+  /** The configuration files (`<config name>.yaml` and the instructions files next to them). */
+  readonly configDir: string;
+  /** The GPU name for the hardware block of a result; null when none. */
+  readonly gpu: string | null;
+}
+
 export interface RunnerSettings {
   /** Path of the Docker Engine socket (in Compose: the socket proxy, ADR-M25 §2.5). */
   readonly dockerSocket: string;
@@ -125,6 +138,7 @@ export interface RunnerSettings {
   /** How often the runner removes objects of runs it does not hold (ADR-M25 §2.8). */
   readonly sweepIntervalMs: number;
   readonly agent: AgentSettings;
+  readonly evaluation: EvaluationSettings;
 }
 
 export const DEFAULT_DOCKER_SOCKET = '/var/run/docker.sock';
@@ -132,6 +146,8 @@ export const DEFAULTS = {
   instance: 'sdlc',
   maxSandboxes: 1,
   maxEvalSandboxes: 1,
+  evalTasksDir: '/app/eval-tasks',
+  evalConfigDir: '/app/eval-configs',
   memoryMb: 2048,
   cpus: '1.5',
   pids: 512,
@@ -256,6 +272,32 @@ function gitSettings(env: NodeJS.ProcessEnv): GitSettings {
   };
 }
 
+function absoluteDir(raw: string | undefined, fallback: string, name: string): string {
+  const dir = raw || fallback;
+  if (!path.isAbsolute(dir)) throw invalid(name);
+  return dir;
+}
+
+function evaluationSettings(env: NodeJS.ProcessEnv): EvaluationSettings {
+  const gpu = env[RUNNER_ENV.gpu];
+  if (gpu !== undefined && gpu !== '' && !/^[A-Za-z0-9][A-Za-z0-9 ._:@()/+-]{0,127}$/.test(gpu)) {
+    throw invalid(RUNNER_ENV.gpu);
+  }
+  return {
+    tasksDir: absoluteDir(
+      env[RUNNER_ENV.evalTasksDir],
+      DEFAULTS.evalTasksDir,
+      RUNNER_ENV.evalTasksDir,
+    ),
+    configDir: absoluteDir(
+      env[RUNNER_ENV.evalConfigDir],
+      DEFAULTS.evalConfigDir,
+      RUNNER_ENV.evalConfigDir,
+    ),
+    gpu: gpu ? gpu : null,
+  };
+}
+
 function agentSettings(env: NodeJS.ProcessEnv): AgentSettings {
   const self = env[RUNNER_ENV.selfContainer];
   if (self !== undefined && self !== '' && !NAME.test(self))
@@ -351,5 +393,6 @@ export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Run
       intSetting(env, RUNNER_ENV.sweepIntervalSeconds, DEFAULTS.sweepIntervalSeconds, 30, 3600) *
       1000,
     agent: agentSettings(env),
+    evaluation: evaluationSettings(env),
   };
 }

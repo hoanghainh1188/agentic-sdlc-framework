@@ -16,6 +16,13 @@ COPY platform/eval platform/eval
 RUN pnpm install --frozen-lockfile --ignore-scripts \
   && pnpm exec tsc -b platform/apps/runner \
   && pnpm --filter @sdlc/runner deploy --legacy --prod /out
+# Evaluation runs (L04, ADR-M81 §2.7): task set v1 and the configurations travel with the image,
+# as /app/eval-tasks and /app/eval-configs. The reference solutions are for the task checks on a
+# developer machine; the runner never needs them.
+RUN mkdir -p /out/eval-tasks /out/eval-configs \
+  && cp -R platform/eval/tasks/v1/. /out/eval-tasks/ \
+  && cp -R platform/eval/configs/. /out/eval-configs/ \
+  && find /out/eval-tasks -name solution.patch -delete
 
 FROM node:24.13.0-bookworm-slim
 # git for the clone; ca-certificates for HTTPS to the Git host. Debian's security updates at build

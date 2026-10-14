@@ -17,10 +17,11 @@ import { t } from '@sdlc/messages';
 import { OpenBaoClient, SecretsError } from '@sdlc/secrets';
 import { activityTracingInterceptor } from '@sdlc/telemetry';
 
-import { RUNNER_TASK_QUEUE } from '@sdlc/contracts';
+import { EVALUATION_RUNNER_TASK_QUEUE, RUNNER_TASK_QUEUE } from '@sdlc/contracts';
 import { NativeConnection, Worker } from '@temporalio/worker';
 
 import { createRunnerActivities } from './activities.js';
+import { createEvaluationActivities } from './evaluation/activities.js';
 import { DockerClient } from './docker/client.js';
 import { RunnerError } from './errors.js';
 import {
@@ -177,9 +178,16 @@ async function main(): Promise<void> {
   );
   await runner.start();
 
-  // The task queue `sdlc-runner` (C06 session 2, ADR-M33 §2.6).
+  // The task queue `sdlc-runner` (C06 session 2, ADR-M33 §2.6), and `sdlc-runner-eval` for
+  // evaluation runs (L04, ADR-M81 §2.3).
   let temporal:
-    { connection: NativeConnection; worker: Worker; running: Promise<void> } | undefined;
+    | {
+        connection: NativeConnection;
+        worker: Worker;
+        running: Promise<void>;
+        evaluation?: { worker: Worker; running: Promise<void> };
+      }
+    | undefined;
   if (proc.temporal) {
     const connection = await NativeConnection.connect({ address: proc.temporal.address });
     const worker = await Worker.create({
@@ -211,7 +219,42 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       process.kill(process.pid, 'SIGTERM');
     });
-    temporal = { connection, worker, running };
+    // Evaluation runs: their own queue and slots, never a slot of a real run (QUESTIONS #461).
+    let evaluation: { worker: Worker; running: Promise<void> } | undefined;
+    if (settings.maxEvalSandboxes > 0) {
+      const evalWorker = await Worker.create({
+        connection,
+        namespace: proc.temporal.namespace,
+        taskQueue: EVALUATION_RUNNER_TASK_QUEUE,
+        activities: {
+          ...createEvaluationActivities({
+            logger,
+            execute: {
+              db,
+              docker,
+              settings,
+              verifier: openbao.transit(),
+              unwrapper: openbao.wrapping(),
+              pool: runner.pool,
+              held: runner.held,
+              adapter: new OpenHandsAdapter(),
+              spendReader,
+              ...(tokenRevoker ? { tokenRevoker } : {}),
+            },
+          }),
+        },
+        interceptors: { activity: [activityTracingInterceptor({ withLogContext })] },
+        maxConcurrentActivityTaskExecutions: settings.maxEvalSandboxes,
+      });
+      const evalRunning = evalWorker.run();
+      evalRunning.catch(() => {
+        log('error', 'runner.temporal_failed', t('runner.start.temporal_failed'));
+        process.exitCode = 1;
+        process.kill(process.pid, 'SIGTERM');
+      });
+      evaluation = { worker: evalWorker, running: evalRunning };
+    }
+    temporal = { connection, worker, running, ...(evaluation ? { evaluation } : {}) };
   } else {
     log('warn', 'runner.temporal_off', t('runner.start.temporal_off'));
   }
@@ -226,7 +269,12 @@ async function main(): Promise<void> {
 
   const shutdown = () => {
     if (temporal?.worker.getState() === 'RUNNING') temporal.worker.shutdown();
-    void (temporal?.running.catch(() => undefined) ?? Promise.resolve())
+    if (temporal?.evaluation?.worker.getState() === 'RUNNING')
+      temporal.evaluation.worker.shutdown();
+    void Promise.all([
+      temporal?.running.catch(() => undefined),
+      temporal?.evaluation?.running.catch(() => undefined),
+    ])
       .then(() => temporal?.connection.close())
       .then(() => runner.stop())
       .then(() => {

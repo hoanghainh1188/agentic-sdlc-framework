@@ -236,6 +236,26 @@ export class EvaluationRunRepository extends TenantRepository {
     );
   }
 
+  /**
+   * A `queued` run gets the next attempt (its contract was refused, for example expired, and the
+   * pair run and attempt holds only one contract). False when the run is not queued or the attempt
+   * moved already.
+   */
+  async nextAttempt(id: string, attempt: number): Promise<boolean> {
+    if (!isUuid(id) || !Number.isSafeInteger(attempt) || attempt < 1) return false;
+    const result = await this.run(
+      this.db
+        .updateTable('evaluation_runs')
+        .set({ attempt: attempt + 1, updated_at: sql<Date>`now()` })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .where('status', '=', 'queued')
+        .where('attempt', '=', attempt)
+        .executeTakeFirst(),
+    );
+    return Number(result.numUpdatedRows) === 1;
+  }
+
   /** `running` → `preempted`: a real run needs the slot (QUESTIONS #461). False if not running. */
   async markPreempted(id: string): Promise<boolean> {
     return this.move(id, 'running', {
@@ -264,6 +284,16 @@ export class EvaluationRunRepository extends TenantRepository {
         .executeTakeFirst(),
     );
     return Number(result.numUpdatedRows) === 1;
+  }
+
+  /** `running` → `cancelled` with a stop reason code: the evaluation stopped (no result is written). */
+  async markCancelled(id: string, stopReason: string): Promise<boolean> {
+    if (!CODE.test(stopReason)) invalid('stopReason');
+    return this.move(id, 'running', {
+      status: 'cancelled',
+      stop_reason: stopReason,
+      finished_at: sql<Date>`now()`,
+    });
   }
 
   /** `running` → `failed` with a stop reason code (no result is written). */

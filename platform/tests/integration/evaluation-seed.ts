@@ -1,6 +1,7 @@
 // Seeds a tenant with a project `shop`, an AI record and one evaluation of two runs, for the
 // evaluation tests on PostgreSQL (task L04).
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
+import { loadProjectConfig } from '@sdlc/config';
 
 import type { PlatformDatabase } from '../../packages/core/src/db/platform-database.js';
 import { parseTenantId } from '../../packages/core/src/db/tenant-id.js';
@@ -21,7 +22,25 @@ export interface SeededEvaluation {
 
 export async function seedEvaluation(
   db: PlatformDatabase,
-  options: { slug: string; budget?: string; monthly?: string | null; runsPerTask?: number },
+  options: {
+    slug: string;
+    budget?: string;
+    monthly?: string | null;
+    runsPerTask?: number;
+    baseSha?: string;
+    /** The configuration file's name and the configuration (default `local` / gpt-oss-20b). */
+    configName?: string;
+    configuration?: {
+      id: string;
+      model: string;
+      agentVersion: string;
+      maxIterations: number;
+      maxDurationMin: number;
+    };
+    taskIds?: readonly string[];
+    /** The project's configuration YAML (for example `sandbox.image`), stored before the start. */
+    configYaml?: string;
+  },
 ): Promise<SeededEvaluation> {
   const tenant = await db.system.createTenant({
     slug: options.slug,
@@ -35,6 +54,16 @@ export async function seedEvaluation(
     git_provider: 'github',
     repo_full_name: 'org/pilot-order-inventory',
   });
+  if (options.configYaml !== undefined) {
+    const loaded = loadProjectConfig(options.configYaml);
+    if (!loaded.ok) throw new Error('test configuration refused');
+    await scope.projectConfigs.save(project.id, {
+      configYaml: options.configYaml,
+      configHash: loaded.configHash,
+      updatedBy: null,
+      expectedVersion: 0,
+    });
+  }
   const user = await scope.users.create({
     display_name: 'pam',
     email: `pam@${options.slug}.test`,
@@ -57,17 +86,19 @@ export async function seedEvaluation(
       projectId: project.id,
       dataClass: 'internal',
       taskSetVersion: 1,
-      configName: 'local',
-      baseSha: EVAL_BASE_SHA,
-      taskIds: ['feat-tax'],
+      configName: options.configName ?? 'local',
+      baseSha: options.baseSha ?? EVAL_BASE_SHA,
+      taskIds: [...(options.taskIds ?? ['feat-tax'])],
       configurations: [
         {
-          id: 'gpt-oss-20b',
-          model: 'gpt-oss-20b',
+          ...(options.configuration ?? {
+            id: 'gpt-oss-20b',
+            model: 'gpt-oss-20b',
+            agentVersion: '1.0.0',
+            maxIterations: 30,
+            maxDurationMin: 20,
+          }),
           providerType: 'self_hosted',
-          agentVersion: '1.0.0',
-          maxIterations: 30,
-          maxDurationMin: 20,
         },
       ],
       runsPerTask: options.runsPerTask ?? 2,
