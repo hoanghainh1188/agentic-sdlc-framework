@@ -10,10 +10,29 @@ import {
 } from '@sdlc/contracts';
 import type { ExpressionBuilder } from 'kysely';
 
+import { fromMicros, toMicros } from '../../cost/money.js';
 import { DbError } from '../errors.js';
 import type { CostRecordRow, Database } from '../schema.js';
 import { isUuid } from '../tenant-id.js';
 import { TenantRepository } from './base.js';
+
+/** What the calls of one evaluation run cost (ADR-M81 §2.8). */
+export interface EvaluationRunCostTotals {
+  readonly modelCalls: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cachedInputTokens: number;
+  /** Decimal string, at most 6 decimals. */
+  readonly costUsd: string;
+}
+
+const EMPTY_RUN_TOTALS: EvaluationRunCostTotals = {
+  modelCalls: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  cachedInputTokens: 0,
+  costUsd: '0',
+};
 
 export interface NewCostRecord {
   readonly projectId: string;
@@ -203,6 +222,41 @@ export class CostRecordRepository extends TenantRepository {
         .executeTakeFirstOrThrow(),
     );
     return String(row.total);
+  }
+
+  /**
+   * What the calls of one evaluation run cost: their number, tokens and cost (ADR-M81 §2.8). The
+   * numbers come from the synced cost records, never from the runner. Token sums are numbers
+   * (a run stays far under 2^53); the cost is a decimal string.
+   */
+  async totalsForEvaluationRun(evaluationRunId: string): Promise<EvaluationRunCostTotals> {
+    if (!isUuid(evaluationRunId)) return EMPTY_RUN_TOTALS;
+    const row = await this.run(
+      this.db
+        .selectFrom('cost_records')
+        .select((eb) => [
+          eb.fn.countAll<string>().as('calls'),
+          eb.fn.coalesce(eb.fn.sum<string>('input_tokens'), eb.val('0')).as('input'),
+          eb.fn.coalesce(eb.fn.sum<string>('output_tokens'), eb.val('0')).as('output'),
+          eb.fn.coalesce(eb.fn.sum<string>('cached_input_tokens'), eb.val('0')).as('cached'),
+          eb.fn.coalesce(eb.fn.sum<string>('cost_usd'), eb.val('0')).as('cost'),
+        ])
+        .where('tenant_id', '=', this.tenantId)
+        .where('evaluation_run_id', '=', evaluationRunId)
+        .executeTakeFirstOrThrow(),
+    );
+    const tokens = (value: string): number => {
+      const n = Number(value);
+      if (!Number.isSafeInteger(n)) throw new RangeError('token sum out of range');
+      return n;
+    };
+    return {
+      modelCalls: tokens(String(row.calls)),
+      inputTokens: tokens(String(row.input)),
+      outputTokens: tokens(String(row.output)),
+      cachedInputTokens: tokens(String(row.cached)),
+      costUsd: fromMicros(toMicros(String(row.cost))),
+    };
   }
 
   /** Total cost of the tenant for calls at or after `since`, as a decimal string. */

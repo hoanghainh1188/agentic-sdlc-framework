@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L04, PR 4c done; for review) |
+| Status | **Proposed** (task L04, PR 4d done; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L04 plan approved 2026-10-14, with answers to QUESTIONS #460–#464) |
 | Related | D-08 task L04 (AC1–AC5), then L05 (plans, API, CLI, schedules) and L06 (reports in the dashboard); ADR-M78 (the harness), ADR-M25 (sandbox, guard), ADR-M33 §2.6 (runner queue), ADR-M24 and ADR-M45 (cost), ADR-M29 (agent path), ADR-M80 §4.1 (canary search); D-07 §3–§5; D-05 §6.8 (the tables); QUESTIONS #450, #460–#464 |
@@ -97,6 +97,14 @@ As built (PR 4c, the runner side): `executeEvaluation` (`apps/runner/src/evaluat
 
 A real run that needs the slot aborts the activity's signal: the agent is stopped (interrupt, then kill), the run is marked `preempted` and queued again for the next attempt, and the stopped attempt is not counted. A cancel of the activity ends the run `cancelled` (`evaluation_stopped`). A refused contract (expired, …) gives the run its next attempt. Any other failure marks the run `failed` with a code (`clone_clone_failed`, `agent_…`, `scoring_install_failed`, `task_unavailable`, …). The result is written by the worker, not the runner, because the cost is synced into `cost_records` by the worker (the runner holds no gateway key). The hardware block is the runner's: Docker version from the ping answer's `Server` header (no new endpoint), `SDLC_RUNNER_GPU`, the instance label.
 
+As built (PR 4d, the worker side): the loop `EvaluationLoop` (`apps/worker/src/evaluation-loop.ts`) runs every `SDLC_WORKER_EVAL_TICK_SECONDS` (default 15) when the worker has the Cost Controller and Temporal. Per pass it visits the tenants with an open evaluation, or a run still on a runner (`SystemScope.listTenantsWithOpenEvaluations`, IDs only), and for each tenant:
+
+1. cancels the workflow of every `running` run whose evaluation already ended (a budget stop, an operator stop);
+2. gives the next attempt to a run that was handed over (it has a contract for its current attempt) but has no live workflow, for example after a worker stop between the contract and the start;
+3. hands over queued runs while fewer than `SDLC_WORKER_EVAL_MAX_IN_FLIGHT` (default 2, over all tenants) are running or waiting for a runner slot, so a contract does not expire in a queue: `prepareEvaluationRun` (core) re-checks the model against the gateway's current list and the project's policy for the evaluation's data class (a model that is gone cancels the run: `model_not_allowed`), checks the budget (a used-up budget stops the evaluation), issues and signs the contract, issues the virtual key capped at what is left of the evaluation, the run and the tenant (`CostController.issueEvaluationRunKey`; a used-up tenant budget stops the evaluation: `tenant_budget_used`), issues the single-repository read token and wraps both secrets. A run is not prepared while the workflow of its previous attempt still lives, so the finish of that attempt never revokes the next attempt's key.
+
+The workflow `evaluationRunWorkflow` (ID `evaluation-run/<tenant>/<run>/<attempt>`, so a second start is refused by Temporal) calls the runner's activity once (12 hours, heartbeat timeout 2 minutes, no retry, `WAIT_CANCELLATION_COMPLETED`), then calls the worker activity `finishEvaluationRun` outside the cancel scope (up to 8 tries; idempotent). Its input holds IDs, one time and the two wrapping tokens; its history holds no secret. `finishEvaluationRun` (core) revokes the run's key and syncs the spend, then by the answer: `scored` → waits (bounded: three syncs, 5 seconds apart) until the cost records show the calls, and writes the result with the model calls, tokens and cost from the cost records; `failed` → the run fails with the runner's code; `lost` (the activity failed or the heartbeat was lost) → the run is queued again, and fails with `runner_lost` after `MAX_EVALUATION_ATTEMPTS` (three); `refused` → the next attempt; `cancelled` before a runner took the run → `cancelled` (`evaluation_stopped`); `preempted` and a runner-side `cancelled` need nothing. Then it stops the evaluation if its budget is used up (`stopped_budget`), or ends it when no run is left to do (`completed` when at least one run was scored, else `failed` with `no_run_scored`). The runner's evaluation worker sends heartbeats at least every 5 seconds, so a cancel reaches the agent quickly.
+
 ## 3. Pull requests
 
 | PR | Content |
@@ -107,7 +115,7 @@ A real run that needs the slot aborts the activity's signal: the agent is stoppe
 | 4a | The contract of kind `evaluation` (schema, signing, storage per attempt, the runner's check), the capped virtual key with the label `gate` = `EVAL`, the spend sync into `cost_records.evaluation_run_id`, the claim of a queued run (migration `0030`) |
 | 4b | The runner: the second task queue and the slot rule (free slots only, preemption of an evaluation run for a real run), the scoring container through `docker/guard.ts` with its test and an ADR-M25 note |
 | 4c | The runner side: `executeEvaluation`, the activity and the second Temporal worker, `driveEvaluationAgent`, `ServerExecutor`, task set and configurations in the runner image, the stub-model live test (`pnpm test:eval-server`) with the canary search of ADR-M80 §4.1 |
-| 4d | The worker side: the workflow that runs the activity, `EvaluationLoop` (contract, capped key, wrapping tokens, the result with the cost, the budget stop, the end of an evaluation) |
+| 4d | The worker side: the workflow that runs the activity, `EvaluationLoop` (contract, capped key, wrapping tokens, the result with the cost, the budget stop, the end of an evaluation); tests on PostgreSQL and on the Temporal test server |
 | 5 | Handbook Ch.19 usage, deploy README, `platform/DEVELOPMENT.md` rows, troubleshooting, CHANGELOG |
 
 ## 4. Tests (AC5)
@@ -143,3 +151,4 @@ A real run that needs the slot aborts the activity's signal: the agent is stoppe
 | 0.4 | 2026-10-14 | Claude (task L04, PR 4a) | §2.2, §2.4 as built: the evaluation contract, the key and the sync; §3: PR 4 is split into 4a, 4b and 4c because the runner's provisioning and driver are tied to `runs` (4b and 4c reuse their polling and caps without a `runs` row) |
 | 0.5 | 2026-10-14 | Claude (task L04, PR 4b) | §2.3, §2.5 as built: the slot pool, the sweep of lost evaluation runs, scoring in two containers over one volume with the guard rule |
 | 0.6 | 2026-10-14 | Claude (task L04, PR 4c) | §2.8 as built on the runner side; §3: PR 4 is now 4a to 4d (4d is the worker side); the result is written by the worker because it adds the cost |
+| 0.7 | 2026-10-14 | Claude (task L04, PR 4d) | §2.8 as built on the worker side: the loop, `prepareEvaluationRun`, the workflow, `finishEvaluationRun`, the settings `SDLC_WORKER_EVAL_TICK_SECONDS` and `SDLC_WORKER_EVAL_MAX_IN_FLIGHT` |

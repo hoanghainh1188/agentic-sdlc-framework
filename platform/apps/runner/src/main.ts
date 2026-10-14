@@ -245,6 +245,10 @@ async function main(): Promise<void> {
         },
         interceptors: { activity: [activityTracingInterceptor({ withLogContext })] },
         maxConcurrentActivityTaskExecutions: settings.maxEvalSandboxes,
+        // A cancel (the evaluation ended, its budget is used up) reaches the agent on the next
+        // heartbeat: send heartbeats at least every 5 seconds, not every minute (ADR-M81 §2.8).
+        maxHeartbeatThrottleInterval: '5s',
+        defaultHeartbeatThrottleInterval: '5s',
       });
       const evalRunning = evalWorker.run();
       evalRunning.catch(() => {

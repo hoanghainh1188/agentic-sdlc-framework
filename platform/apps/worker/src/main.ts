@@ -20,6 +20,7 @@ import {
   gitHostErrorMessage,
   loadEffectiveConfig,
   pollProject,
+  prepareEvaluationRun,
   Registry,
 } from '@sdlc/core';
 import { t } from '@sdlc/messages';
@@ -28,6 +29,7 @@ import { OTEL_ENDPOINT_ENV } from '@sdlc/telemetry';
 import {
   connectTemporal,
   NO_INTENT_SIGNALS,
+  TemporalEvaluationDispatcher,
   TemporalIntentSignals,
   type TemporalClient,
 } from '@sdlc/workflow-client';
@@ -37,6 +39,7 @@ import { createIntentActivities } from './activities/intent-activities.js';
 import { CostSyncLoop } from './cost-sync-loop.js';
 import { openWorkerEvidence } from './evidence-store.js';
 import { EscalationLoop } from './escalation-loop.js';
+import { EvaluationLoop } from './evaluation-loop.js';
 import { jsonLogger } from './logger.js';
 import { PollerLoop } from './poller-loop.js';
 import { ReconcileLoop } from './reconcile-loop.js';
@@ -113,6 +116,8 @@ async function main(): Promise<void> {
         // E01 (ADR-M41): G7 reads the pull request and its reviews; it needs no run capability.
         g7: { gitHost },
         ...(releases ? { releases, logger } : {}),
+        // L04: the end of an evaluation run needs the Cost Controller (ADR-M81 §2.8).
+        ...(workerRuns ? { evaluations: { costController: workerRuns.costController } } : {}),
         ...(workerRuns
           ? {
               g4: workerRuns.g4,
@@ -182,6 +187,33 @@ async function main(): Promise<void> {
     : undefined;
   if (costSync) costSync.start();
   else logger.log('warn', 'worker.cost_sync_off', { message: t('worker.start.cost_sync_off') });
+  // The evaluation loop (L04, ADR-M81 §2.8): hands queued evaluation runs to the runner. It needs
+  // the Cost Controller (keys, spend) and Temporal (one workflow per run attempt).
+  const evaluations =
+    workerRuns && temporal
+      ? new EvaluationLoop({
+          listTenants: (limit) => db.system.listTenantsWithOpenEvaluations(limit),
+          forTenant: (tenantId) => db.forTenant(tenantId),
+          prepare: (scope, evaluationRunId) =>
+            prepareEvaluationRun(
+              scope,
+              {
+                signer: workerRuns.runs.signer,
+                costController: workerRuns.costController,
+                gitHost,
+                wrapper: workerRuns.runs.wrapper,
+                models: workerRuns.models,
+                policyFactory: (config, models) => createSimplePolicyEngine({ config, models }),
+                egressAllowlist: workerRuns.runs.egressAllowlist,
+              },
+              evaluationRunId,
+            ),
+          dispatcher: new TemporalEvaluationDispatcher(temporal.client),
+          logger,
+          maxInFlight: settings.evaluation.maxInFlight,
+        })
+      : undefined;
+  evaluations?.start(settings.evaluation.tickMs);
   // Evidence retention (E05, ADR-M51): its own SeaweedFS identity `worker-purge`.
   const retentionStore = await openRetentionStore(settings.retention, secrets, logger);
   // Pack IDs found without a row, kept across passes: deleted only when seen twice.
@@ -274,6 +306,7 @@ async function main(): Promise<void> {
       escalations.stop(),
       reconcile?.stop(),
       costSync?.stop(),
+      evaluations?.stop(),
       retention?.stop(),
       intentWorker?.shutdown(),
     ])

@@ -27,3 +27,19 @@ export {
   type IssuedEvaluationContract,
   type VerifyEvaluationDeps,
 } from './contract.js';
+export {
+  MODEL_NOT_ALLOWED,
+  TENANT_BUDGET_USED,
+  prepareEvaluationRun,
+  type PrepareEvaluationDeps,
+  type PrepareEvaluationRefusal,
+  type PrepareEvaluationResult,
+  type PreparedEvaluationRun,
+} from './prepare.js';
+export {
+  MAX_EVALUATION_ATTEMPTS,
+  finishEvaluationRun,
+  type EvaluationRunEnd,
+  type FinishEvaluationDeps,
+  type FinishEvaluationInput,
+} from './finish.js';

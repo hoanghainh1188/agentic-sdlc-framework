@@ -74,3 +74,57 @@ export type ExecuteEvaluationRunResult =
 export interface EvaluationRunnerActivities {
   executeEvaluationRun(input: ExecuteEvaluationRunInput): Promise<ExecuteEvaluationRunResult>;
 }
+
+/** Workflow type of one evaluation run on the worker (the exported workflow function). */
+export const EVALUATION_RUN_WORKFLOW_TYPE = 'evaluationRunWorkflow';
+
+const WORKFLOW_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * Workflow ID of one attempt of an evaluation run: `evaluation-run/<tenant_id>/<run_id>/<attempt>`.
+ * The ID makes the start idempotent: a second start for the same attempt is refused by Temporal.
+ * Throws for IDs that are not lowercase UUIDs.
+ */
+export function evaluationRunWorkflowId(ref: {
+  readonly tenantId: string;
+  readonly evaluationRunId: string;
+  readonly attempt: number;
+}): string {
+  if (!WORKFLOW_UUID.test(ref.tenantId) || !WORKFLOW_UUID.test(ref.evaluationRunId)) {
+    throw new Error('evaluationRunWorkflowId: tenant and run IDs must be lowercase UUIDs');
+  }
+  if (!Number.isSafeInteger(ref.attempt) || ref.attempt < 1) {
+    throw new Error('evaluationRunWorkflowId: the attempt must be a positive integer');
+  }
+  return `evaluation-run/${ref.tenantId}/${ref.evaluationRunId}/${ref.attempt}`;
+}
+
+/**
+ * The input of the workflow: the runner's input plus when the run's key was issued (ISO time), so
+ * the worker's spend sync after the run starts there. IDs, a time and two single-use wrapping
+ * tokens only.
+ */
+export interface EvaluationRunWorkflowInput extends ExecuteEvaluationRunInput {
+  readonly keyIssuedAt: string;
+}
+
+/** How the workflow ends: the run's outcome code. */
+export type EvaluationRunWorkflowResult = ExecuteEvaluationRunResult['outcome'] | 'lost';
+
+/** Starts, checks and cancels evaluation run workflows (Temporal in the worker, a fake in tests). */
+export interface EvaluationRunDispatcher {
+  /** Starts the workflow of one attempt. A workflow that exists already is not an error. */
+  start(input: EvaluationRunWorkflowInput): Promise<void>;
+  /** True while the workflow of this attempt runs. */
+  isRunning(ref: {
+    readonly tenantId: string;
+    readonly evaluationRunId: string;
+    readonly attempt: number;
+  }): Promise<boolean>;
+  /** Asks the workflow to stop (the evaluation ended). A workflow that is not found is fine. */
+  cancel(ref: {
+    readonly tenantId: string;
+    readonly evaluationRunId: string;
+    readonly attempt: number;
+  }): Promise<void>;
+}

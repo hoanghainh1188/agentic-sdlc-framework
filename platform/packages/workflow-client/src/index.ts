@@ -8,11 +8,15 @@ import {
   WorkflowNotFoundError,
 } from '@temporalio/client';
 import {
+  EVALUATION_RUN_WORKFLOW_TYPE,
+  evaluationRunWorkflowId,
   INTENT_KILL_SIGNAL,
   INTENT_TASK_QUEUE,
   INTENT_WAKE_SIGNAL,
   INTENT_WORKFLOW_TYPE,
   intentWorkflowId,
+  type EvaluationRunDispatcher,
+  type EvaluationRunWorkflowInput,
   type IntentWorkflowRef,
   type IntentWorkflowSignals,
 } from '@sdlc/contracts';
@@ -88,3 +92,44 @@ export const NO_INTENT_SIGNALS: IntentWorkflowSignals = {
   wake: () => Promise.resolve(),
   kill: () => Promise.resolve(),
 };
+
+/**
+ * Starts, checks and cancels the workflow of an evaluation run attempt (task L04, ADR-M81 §2.8).
+ * The workflow ID names the run and the attempt, so a second start for the same attempt is
+ * refused by Temporal and treated as done.
+ */
+export class TemporalEvaluationDispatcher implements EvaluationRunDispatcher {
+  constructor(private readonly client: Client) {}
+
+  async start(input: EvaluationRunWorkflowInput): Promise<void> {
+    try {
+      await this.client.workflow.start(EVALUATION_RUN_WORKFLOW_TYPE, {
+        workflowId: evaluationRunWorkflowId(input),
+        taskQueue: INTENT_TASK_QUEUE,
+        args: [input],
+      });
+    } catch (error) {
+      if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error;
+    }
+  }
+
+  async isRunning(ref: Parameters<EvaluationRunDispatcher['isRunning']>[0]): Promise<boolean> {
+    try {
+      const described = await this.client.workflow
+        .getHandle(evaluationRunWorkflowId(ref))
+        .describe();
+      return described.status.name === 'RUNNING';
+    } catch (error) {
+      if (error instanceof WorkflowNotFoundError) return false;
+      throw error;
+    }
+  }
+
+  async cancel(ref: Parameters<EvaluationRunDispatcher['cancel']>[0]): Promise<void> {
+    try {
+      await this.client.workflow.getHandle(evaluationRunWorkflowId(ref)).cancel();
+    } catch (error) {
+      if (!(error instanceof WorkflowNotFoundError)) throw error;
+    }
+  }
+}

@@ -213,6 +213,39 @@ export class SystemScope {
   }
 
   /**
+   * The tenants that have an evaluation that is not final, or a run still working (task L04, ADR-M81 §2.8): what the
+   * worker's evaluation loop visits. IDs only, ordered, active tenants only.
+   */
+  async listTenantsWithOpenEvaluations(limit: number): Promise<TenantId[]> {
+    const rows = await run(
+      this.db
+        .selectFrom('evaluations as e')
+        .innerJoin('tenants as tn', 'tn.id', 'e.tenant_id')
+        .select('e.tenant_id')
+        .distinct()
+        .where((eb) =>
+          eb.or([
+            eb('e.status', 'in', ['queued', 'running']),
+            // An ended evaluation whose run is still on a runner: the loop stops that run.
+            eb.exists(
+              eb
+                .selectFrom('evaluation_runs as er')
+                .select('er.id')
+                .whereRef('er.tenant_id', '=', 'e.tenant_id')
+                .whereRef('er.evaluation_id', '=', 'e.id')
+                .where('er.status', '=', 'running'),
+            ),
+          ]),
+        )
+        .where('tn.status', '=', 'active')
+        .orderBy('e.tenant_id')
+        .limit(limit)
+        .execute(),
+    );
+    return rows.map((row) => parseTenantId(row.tenant_id));
+  }
+
+  /**
    * Kill signals to send again (task C11, ADR-M42 §2.2): `running` intents of active tenants whose
    * latest run of the current round (created since the intent became `running`) is being killed
    * or was killed. A kill recorded without a signal (the operator command, a lost signal) still

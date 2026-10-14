@@ -8,12 +8,15 @@ import {
   abandonRun,
   buildReleasePack,
   finishPublish,
+  finishEvaluationRun,
   finishRun,
   parseTenantId,
   preparePublish,
   revokeKilledRunKey,
   startRun,
   stepIntent,
+  type EvaluationRunEnd,
+  type FinishEvaluationDeps,
   type G4Deps,
   type G6Deps,
   type G7Deps,
@@ -73,6 +76,22 @@ export interface IntentActivities {
    * stored evidence file is read back and checked. Returns a code only.
    */
   buildReleasePack(ref: IntentWorkflowRef): Promise<ReleasePackOutcome>;
+  /**
+   * L04 (ADR-M81 §2.8): an evaluation run ended on the runner (or was lost). Revoke its key, write
+   * the result with the cost, check the budget, end the evaluation when no run is left (core
+   * `finishEvaluationRun`). Idempotent.
+   */
+  finishEvaluationRun(input: FinishEvaluationRunInput): Promise<void>;
+}
+
+/** What the workflow tells the finishing activity: IDs, a time and the runner's coded result. */
+export interface FinishEvaluationRunInput {
+  readonly tenantId: string;
+  readonly evaluationRunId: string;
+  readonly attempt: number;
+  /** ISO time the run's key was issued. */
+  readonly keyIssuedAt: string;
+  readonly end: EvaluationRunEnd;
 }
 
 /** E03: the worker's evidence store (its identity `worker-evidence`, ADR-M49 §2.2). */
@@ -104,6 +123,8 @@ export interface IntentActivityDeps {
   readonly releases?: ReleaseDeps;
   /** E03: why a release pack could not be built (codes only). */
   readonly logger?: PlatformLogger;
+  /** L04: the Cost Controller for the end of an evaluation run. Without it the activity throws. */
+  readonly evaluations?: FinishEvaluationDeps;
 }
 
 /** Thrown by a run activity when the worker was started without run support. */
@@ -167,6 +188,21 @@ export function createIntentActivities(deps: IntentActivityDeps): IntentActiviti
       return result.ok ? { ok: true } : { ok: false, reason: result.reason };
     },
     abandonPublish: (ref, runId, reason) => abandonPublish(scope(ref), ref.intentId, runId, reason),
+    async finishEvaluationRun(input) {
+      if (!deps.evaluations) {
+        throw new RunsNotConfiguredError('evaluations are not configured in this worker');
+      }
+      await finishEvaluationRun(
+        deps.db.forTenant(parseTenantId(input.tenantId)),
+        deps.evaluations,
+        {
+          evaluationRunId: input.evaluationRunId,
+          attempt: input.attempt,
+          keyIssuedAt: new Date(input.keyIssuedAt),
+          end: input.end,
+        },
+      );
+    },
     async buildReleasePack(ref) {
       if (!deps.releases) return 'unavailable';
       return buildReleasePack(

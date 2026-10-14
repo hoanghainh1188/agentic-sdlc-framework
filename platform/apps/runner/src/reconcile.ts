@@ -14,7 +14,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import type { RunStatus } from '@sdlc/contracts';
-import { parseTenantId, type PlatformDatabase, type TenantScope } from '@sdlc/core';
+import {
+  MAX_EVALUATION_ATTEMPTS,
+  parseTenantId,
+  type PlatformDatabase,
+  type TenantScope,
+} from '@sdlc/core';
 
 import type { DockerClient } from './docker/client.js';
 import type { HeldRuns } from './held.js';
@@ -39,11 +44,8 @@ export interface ReconcileResult {
   readonly errors: number;
 }
 
-/**
- * An evaluation run whose runner was lost is queued again, and fails after this many attempts
- * (task L04, ADR-M81 §2.3): a run that keeps killing its runner must not loop for ever.
- */
-export const MAX_EVALUATION_ATTEMPTS = 3;
+// The attempt limit is shared with the worker (core `MAX_EVALUATION_ATTEMPTS`, ADR-M81 §2.3).
+export { MAX_EVALUATION_ATTEMPTS };
 
 /** States of a run whose sandbox may exist. `queued` has at most a reserved workspace volume. */
 const ACTIVE: readonly RunStatus[] = ['provisioning', 'running', 'stopping'];

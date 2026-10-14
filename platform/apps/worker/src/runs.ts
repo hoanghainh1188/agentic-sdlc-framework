@@ -5,7 +5,7 @@
 // single-use wrapping token).
 import { LiteLLMGateway } from '@sdlc/adapter-model-litellm';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type { GitHostAdapter, RunContractSigner, SecretWrapper } from '@sdlc/contracts';
+import type { GitHostAdapter, ModelRef, RunContractSigner, SecretWrapper } from '@sdlc/contracts';
 import {
   CostController,
   parseTenantId,
@@ -32,6 +32,8 @@ export interface WorkerRuns {
   readonly g6: G6Deps;
   /** C12: the scheduled spend sync uses the same Cost Controller (ADR-M24 §2.5). */
   readonly costController: CostController;
+  /** L04: the gateway's current model list, for the model re-check of an evaluation run. */
+  readonly models: () => Promise<readonly ModelRef[]>;
   close(): Promise<void>;
 }
 
@@ -84,6 +86,7 @@ export async function createWorkerRuns(options: {
       publish: { registry: options.registry, gitHost: options.gitHost, wrapper: options.wrapper },
       g6: { gitHost: options.gitHost },
       costController,
+      models: () => gateway.listModels(),
       close: () => cost.close(),
     };
   } catch (error) {
