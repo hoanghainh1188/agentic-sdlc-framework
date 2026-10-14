@@ -284,179 +284,187 @@ describe('V09: the nginx template (ADR-M67 §2.2-§2.5)', () => {
   });
 });
 
-describe('V09: access/check-settings.sh and access/tls.sh', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-access-static-'));
-  afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
-  const tls = path.join(deployDir, 'access/tls.sh');
-  const check = path.join(deployDir, 'access/check-settings.sh');
-  const baseEnv = { PATH: process.env.PATH ?? '/usr/bin:/bin' };
+// One shell process per case: a GitHub runner is about three times slower than a
+// developer machine, so the 5 s default is too short for these tests.
+const SHELL_TEST_TIMEOUT_MS = 30_000;
 
-  const good: Record<string, string> = {
-    SDLC_ACCESS_BIND_ADDR: '192.168.10.5',
-    SDLC_ACCESS_HOST_PORT: '8443',
-    SDLC_ACCESS_HOSTNAME: 'sdlc.example.internal',
-    SDLC_ACCESS_IPS: '192.168.10.5',
-    SDLC_ACCESS_TLS_DIR: '',
-    SDLC_ACCESS_NETWORK_SUBNET: '172.30.1.0/29',
-    SDLC_ACCESS_NETWORK_IP_RANGE: '172.30.1.0/30',
-    SDLC_ACCESS_PROXY_IP: '172.30.1.6',
-    SDLC_API_TRUSTED_PROXY: '172.30.1.6',
-    SDLC_API_WEB_SIGNIN: 'github',
-    SDLC_API_PUBLIC_ORIGIN: 'https://sdlc.example.internal:8443',
-    SDLC_NETWORK_SUBNET: '172.30.0.0/24',
-  };
-  let n = 0;
-  const envFile = (values: Record<string, string>): string => {
-    n += 1;
-    const file = path.join(tmp, `e${n}.env`);
-    fs.writeFileSync(
-      file,
-      Object.entries(values)
-        .map(([k, v]) => `${k}=${v}`)
-        .join('\n') + '\n',
-      { mode: 0o600 },
-    );
-    return file;
-  };
-  const run = (cmd: string, args: string[], env: Record<string, string> = {}) =>
-    spawnSync(cmd, args, { encoding: 'utf8', env: { ...baseEnv, ...env } });
+describe(
+  'V09: access/check-settings.sh and access/tls.sh',
+  { timeout: SHELL_TEST_TIMEOUT_MS },
+  () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-access-static-'));
+    afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
+    const tls = path.join(deployDir, 'access/tls.sh');
+    const check = path.join(deployDir, 'access/check-settings.sh');
+    const baseEnv = { PATH: process.env.PATH ?? '/usr/bin:/bin' };
 
-  // A throw-away certificate for the checks (the CA key is deleted by tls.sh dev).
-  const devEnv = envFile(good);
-  const dev = run(tls, ['dev'], { SDLC_ENV_FILE: devEnv });
-  const certDir = path.join(tmp, 'access-tls');
-  const withCert = { ...good, SDLC_ACCESS_TLS_DIR: certDir };
+    const good: Record<string, string> = {
+      SDLC_ACCESS_BIND_ADDR: '192.168.10.5',
+      SDLC_ACCESS_HOST_PORT: '8443',
+      SDLC_ACCESS_HOSTNAME: 'sdlc.example.internal',
+      SDLC_ACCESS_IPS: '192.168.10.5',
+      SDLC_ACCESS_TLS_DIR: '',
+      SDLC_ACCESS_NETWORK_SUBNET: '172.30.1.0/29',
+      SDLC_ACCESS_NETWORK_IP_RANGE: '172.30.1.0/30',
+      SDLC_ACCESS_PROXY_IP: '172.30.1.6',
+      SDLC_API_TRUSTED_PROXY: '172.30.1.6',
+      SDLC_API_WEB_SIGNIN: 'github',
+      SDLC_API_PUBLIC_ORIGIN: 'https://sdlc.example.internal:8443',
+      SDLC_NETWORK_SUBNET: '172.30.0.0/24',
+    };
+    let n = 0;
+    const envFile = (values: Record<string, string>): string => {
+      n += 1;
+      const file = path.join(tmp, `e${n}.env`);
+      fs.writeFileSync(
+        file,
+        Object.entries(values)
+          .map(([k, v]) => `${k}=${v}`)
+          .join('\n') + '\n',
+        { mode: 0o600 },
+      );
+      return file;
+    };
+    const run = (cmd: string, args: string[], env: Record<string, string> = {}) =>
+      spawnSync(cmd, args, { encoding: 'utf8', env: { ...baseEnv, ...env } });
 
-  it('tls.sh dev: a throw-away CA, no CA key kept, the key mode 600, the folder recorded', () => {
-    expect(dev.status, dev.stderr).toBe(0);
-    expect(fs.readdirSync(certDir).sort()).toEqual(['ca.pem', 'server-key.pem', 'server.pem']);
-    expect(fs.statSync(path.join(certDir, 'server-key.pem')).mode & 0o777).toBe(0o600);
-    expect(fs.readFileSync(devEnv, 'utf8')).toContain(`SDLC_ACCESS_TLS_DIR=${certDir}`);
-    const checked = run(tls, ['check'], { SDLC_ENV_FILE: devEnv });
-    expect(checked.status, checked.stderr).toBe(0);
-  });
+    // A throw-away certificate for the checks (the CA key is deleted by tls.sh dev).
+    const devEnv = envFile(good);
+    const dev = run(tls, ['dev'], { SDLC_ENV_FILE: devEnv });
+    const certDir = path.join(tmp, 'access-tls');
+    const withCert = { ...good, SDLC_ACCESS_TLS_DIR: certDir };
 
-  it('tls.sh refuses an IP address as the host name, a missing name, and names it lacks', () => {
-    const ip = run(tls, ['dev'], {
-      SDLC_ENV_FILE: envFile({ ...good, SDLC_ACCESS_HOSTNAME: '192.168.10.5' }),
+    it('tls.sh dev: a throw-away CA, no CA key kept, the key mode 600, the folder recorded', () => {
+      expect(dev.status, dev.stderr).toBe(0);
+      expect(fs.readdirSync(certDir).sort()).toEqual(['ca.pem', 'server-key.pem', 'server.pem']);
+      expect(fs.statSync(path.join(certDir, 'server-key.pem')).mode & 0o777).toBe(0o600);
+      expect(fs.readFileSync(devEnv, 'utf8')).toContain(`SDLC_ACCESS_TLS_DIR=${certDir}`);
+      const checked = run(tls, ['check'], { SDLC_ENV_FILE: devEnv });
+      expect(checked.status, checked.stderr).toBe(0);
     });
-    expect(ip.status).toBe(1);
-    expect(ip.stderr).toMatch(/not an IP address/);
-    expect(
-      run(tls, ['dev'], { SDLC_ENV_FILE: envFile({ ...good, SDLC_ACCESS_HOSTNAME: '' }) }).status,
-    ).toBe(1);
-    const other = run(tls, ['check'], {
-      SDLC_ENV_FILE: envFile({ ...withCert, SDLC_ACCESS_HOSTNAME: 'other.example.internal' }),
-    });
-    expect(other.status).toBe(1);
-    expect(other.stderr).toMatch(/does not name other\.example\.internal/);
-  });
 
-  it('tls.sh import and server refuse a folder in the repository; import refuses a CA key', () => {
-    const inRepo = envFile({
-      ...good,
-      SDLC_ACCESS_TLS_DIR: path.join(root, 'platform/deploy/x-tls'),
+    it('tls.sh refuses an IP address as the host name, a missing name, and names it lacks', () => {
+      const ip = run(tls, ['dev'], {
+        SDLC_ENV_FILE: envFile({ ...good, SDLC_ACCESS_HOSTNAME: '192.168.10.5' }),
+      });
+      expect(ip.status).toBe(1);
+      expect(ip.stderr).toMatch(/not an IP address/);
+      expect(
+        run(tls, ['dev'], { SDLC_ENV_FILE: envFile({ ...good, SDLC_ACCESS_HOSTNAME: '' }) }).status,
+      ).toBe(1);
+      const other = run(tls, ['check'], {
+        SDLC_ENV_FILE: envFile({ ...withCert, SDLC_ACCESS_HOSTNAME: 'other.example.internal' }),
+      });
+      expect(other.status).toBe(1);
+      expect(other.stderr).toMatch(/does not name other\.example\.internal/);
     });
-    const imported = run(tls, ['import', certDir], { SDLC_ENV_FILE: inRepo });
-    expect(imported.status).toBe(1);
-    expect(imported.stderr).toMatch(/outside the repository/);
-    const withKey = path.join(tmp, 'with-key');
-    fs.mkdirSync(withKey);
-    for (const f of ['ca.pem', 'server.pem', 'server-key.pem'])
-      fs.copyFileSync(path.join(certDir, f), path.join(withKey, f));
-    fs.writeFileSync(path.join(withKey, 'ca-key.pem'), 'x');
-    const target = path.join(tmp, 'imported');
-    const refused = run(tls, ['import', withKey], {
-      SDLC_ENV_FILE: envFile({ ...good, SDLC_ACCESS_TLS_DIR: target }),
+
+    it('tls.sh import and server refuse a folder in the repository; import refuses a CA key', () => {
+      const inRepo = envFile({
+        ...good,
+        SDLC_ACCESS_TLS_DIR: path.join(root, 'platform/deploy/x-tls'),
+      });
+      const imported = run(tls, ['import', certDir], { SDLC_ENV_FILE: inRepo });
+      expect(imported.status).toBe(1);
+      expect(imported.stderr).toMatch(/outside the repository/);
+      const withKey = path.join(tmp, 'with-key');
+      fs.mkdirSync(withKey);
+      for (const f of ['ca.pem', 'server.pem', 'server-key.pem'])
+        fs.copyFileSync(path.join(certDir, f), path.join(withKey, f));
+      fs.writeFileSync(path.join(withKey, 'ca-key.pem'), 'x');
+      const target = path.join(tmp, 'imported');
+      const refused = run(tls, ['import', withKey], {
+        SDLC_ENV_FILE: envFile({ ...good, SDLC_ACCESS_TLS_DIR: target }),
+      });
+      expect(refused.status).toBe(1);
+      expect(fs.existsSync(target)).toBe(false);
+      fs.rmSync(path.join(withKey, 'ca-key.pem'));
+      const ok = run(tls, ['import', withKey], {
+        SDLC_ENV_FILE: envFile({ ...good, SDLC_ACCESS_TLS_DIR: target }),
+      });
+      expect(ok.status, ok.stderr).toBe(0);
+      expect(fs.statSync(path.join(target, 'server-key.pem')).mode & 0o777).toBe(0o600);
     });
-    expect(refused.status).toBe(1);
-    expect(fs.existsSync(target)).toBe(false);
-    fs.rmSync(path.join(withKey, 'ca-key.pem'));
-    const ok = run(tls, ['import', withKey], {
-      SDLC_ENV_FILE: envFile({ ...good, SDLC_ACCESS_TLS_DIR: target }),
+
+    const checkWith = (values: Record<string, string>, profiles = ['core', 'platform', 'access']) =>
+      run(check, [envFile(values), ...profiles]);
+
+    it('check-settings: good settings pass', () => {
+      const r = checkWith(withCert);
+      expect(r.stderr).toBe('');
+      expect(r.status).toBe(0);
     });
-    expect(ok.status, ok.stderr).toBe(0);
-    expect(fs.statSync(path.join(target, 'server-key.pem')).mode & 0o777).toBe(0o600);
-  });
 
-  const checkWith = (values: Record<string, string>, profiles = ['core', 'platform', 'access']) =>
-    run(check, [envFile(values), ...profiles]);
+    it('check-settings: refuses every setting that would expose or confuse the proxy', () => {
+      const cases: [Record<string, string>, RegExp][] = [
+        [{ SDLC_ACCESS_BIND_ADDR: '' }, /set SDLC_ACCESS_BIND_ADDR/],
+        [{ SDLC_ACCESS_BIND_ADDR: 'lan' }, /not an IPv4 address/],
+        [{ SDLC_ACCESS_HOSTNAME: '' }, /set SDLC_ACCESS_HOSTNAME/],
+        [{ SDLC_ACCESS_PROXY_IP: '172.30.1.2' }, /inside the allocation range/],
+        [{ SDLC_ACCESS_PROXY_IP: '172.30.1.1' }, /gateway/],
+        [{ SDLC_ACCESS_PROXY_IP: '172.30.2.6' }, /not a host address/],
+        [
+          {
+            SDLC_ACCESS_NETWORK_SUBNET: '172.30.0.0/29',
+            SDLC_ACCESS_NETWORK_IP_RANGE: '172.30.0.0/30',
+            SDLC_ACCESS_PROXY_IP: '172.30.0.6',
+            SDLC_API_TRUSTED_PROXY: '172.30.0.6',
+          },
+          /overlaps SDLC_NETWORK_SUBNET/,
+        ],
+        [{ SDLC_ACCESS_NETWORK_IP_RANGE: '172.30.9.0/30' }, /not inside/],
+        [{ SDLC_API_TRUSTED_PROXY: '' }, /SDLC_API_TRUSTED_PROXY=172\.30\.1\.6/],
+        [
+          { SDLC_API_PUBLIC_ORIGIN: 'http://localhost:8090' },
+          /must be https:\/\/sdlc\.example\.internal:8443/,
+        ],
+        [{ SDLC_API_PUBLIC_ORIGIN: '' }, /set SDLC_API_PUBLIC_ORIGIN/],
+        [{ SDLC_ACCESS_TLS_DIR: '' }, /set SDLC_ACCESS_TLS_DIR/],
+        [{ SDLC_ACCESS_TLS_DIR: path.join(tmp, 'none') }, /certificate cannot be used/],
+      ];
+      for (const [change, message] of cases) {
+        const r = checkWith({ ...withCert, ...change });
+        expect(r.status, JSON.stringify(change)).toBe(1);
+        expect(r.stderr, JSON.stringify(change)).toMatch(message);
+      }
+      const noPlatform = checkWith(withCert, ['core', 'access']);
+      expect(noPlatform.status).toBe(1);
+      expect(noPlatform.stderr).toMatch(/profile platform/);
+    });
 
-  it('check-settings: good settings pass', () => {
-    const r = checkWith(withCert);
-    expect(r.stderr).toBe('');
-    expect(r.status).toBe(0);
-  });
+    it('check-settings: 0.0.0.0 and port 443 are allowed; 0.0.0.0 warns', () => {
+      const all = checkWith({ ...withCert, SDLC_ACCESS_BIND_ADDR: '0.0.0.0' });
+      expect(all.status).toBe(0);
+      expect(all.stderr).toMatch(/warning: SDLC_ACCESS_BIND_ADDR=0\.0\.0\.0/);
+      const p443 = checkWith({
+        ...withCert,
+        SDLC_ACCESS_HOST_PORT: '443',
+        SDLC_API_PUBLIC_ORIGIN: 'https://sdlc.example.internal',
+      });
+      expect(p443.status, p443.stderr).toBe(0);
+    });
 
-  it('check-settings: refuses every setting that would expose or confuse the proxy', () => {
-    const cases: [Record<string, string>, RegExp][] = [
-      [{ SDLC_ACCESS_BIND_ADDR: '' }, /set SDLC_ACCESS_BIND_ADDR/],
-      [{ SDLC_ACCESS_BIND_ADDR: 'lan' }, /not an IPv4 address/],
-      [{ SDLC_ACCESS_HOSTNAME: '' }, /set SDLC_ACCESS_HOSTNAME/],
-      [{ SDLC_ACCESS_PROXY_IP: '172.30.1.2' }, /inside the allocation range/],
-      [{ SDLC_ACCESS_PROXY_IP: '172.30.1.1' }, /gateway/],
-      [{ SDLC_ACCESS_PROXY_IP: '172.30.2.6' }, /not a host address/],
-      [
+    it('up.sh stops before Docker when the profile access is not ready', () => {
+      const bin = path.join(tmp, 'bin');
+      fs.mkdirSync(bin, { recursive: true });
+      fs.writeFileSync(path.join(bin, 'docker'), '#!/bin/sh\necho docker-called >&2\nexit 3\n', {
+        mode: 0o755,
+      });
+      const r = spawnSync(
+        'sh',
+        [path.join(deployDir, 'scripts/up.sh'), 'core', 'platform', 'access'],
         {
-          SDLC_ACCESS_NETWORK_SUBNET: '172.30.0.0/29',
-          SDLC_ACCESS_NETWORK_IP_RANGE: '172.30.0.0/30',
-          SDLC_ACCESS_PROXY_IP: '172.30.0.6',
-          SDLC_API_TRUSTED_PROXY: '172.30.0.6',
+          encoding: 'utf8',
+          env: {
+            PATH: `${bin}:/usr/bin:/bin`,
+            SDLC_ENV_FILE: envFile({ ...withCert, SDLC_ACCESS_BIND_ADDR: '' }),
+            SDLC_IMAGES: 'local',
+          },
         },
-        /overlaps SDLC_NETWORK_SUBNET/,
-      ],
-      [{ SDLC_ACCESS_NETWORK_IP_RANGE: '172.30.9.0/30' }, /not inside/],
-      [{ SDLC_API_TRUSTED_PROXY: '' }, /SDLC_API_TRUSTED_PROXY=172\.30\.1\.6/],
-      [
-        { SDLC_API_PUBLIC_ORIGIN: 'http://localhost:8090' },
-        /must be https:\/\/sdlc\.example\.internal:8443/,
-      ],
-      [{ SDLC_API_PUBLIC_ORIGIN: '' }, /set SDLC_API_PUBLIC_ORIGIN/],
-      [{ SDLC_ACCESS_TLS_DIR: '' }, /set SDLC_ACCESS_TLS_DIR/],
-      [{ SDLC_ACCESS_TLS_DIR: path.join(tmp, 'none') }, /certificate cannot be used/],
-    ];
-    for (const [change, message] of cases) {
-      const r = checkWith({ ...withCert, ...change });
-      expect(r.status, JSON.stringify(change)).toBe(1);
-      expect(r.stderr, JSON.stringify(change)).toMatch(message);
-    }
-    const noPlatform = checkWith(withCert, ['core', 'access']);
-    expect(noPlatform.status).toBe(1);
-    expect(noPlatform.stderr).toMatch(/profile platform/);
-  });
-
-  it('check-settings: 0.0.0.0 and port 443 are allowed; 0.0.0.0 warns', () => {
-    const all = checkWith({ ...withCert, SDLC_ACCESS_BIND_ADDR: '0.0.0.0' });
-    expect(all.status).toBe(0);
-    expect(all.stderr).toMatch(/warning: SDLC_ACCESS_BIND_ADDR=0\.0\.0\.0/);
-    const p443 = checkWith({
-      ...withCert,
-      SDLC_ACCESS_HOST_PORT: '443',
-      SDLC_API_PUBLIC_ORIGIN: 'https://sdlc.example.internal',
+      );
+      expect(r.status).toBe(1);
+      expect(r.stderr).toMatch(/the profile access is not ready; nothing started/);
+      expect(r.stderr).not.toContain('docker-called');
     });
-    expect(p443.status, p443.stderr).toBe(0);
-  });
-
-  it('up.sh stops before Docker when the profile access is not ready', () => {
-    const bin = path.join(tmp, 'bin');
-    fs.mkdirSync(bin, { recursive: true });
-    fs.writeFileSync(path.join(bin, 'docker'), '#!/bin/sh\necho docker-called >&2\nexit 3\n', {
-      mode: 0o755,
-    });
-    const r = spawnSync(
-      'sh',
-      [path.join(deployDir, 'scripts/up.sh'), 'core', 'platform', 'access'],
-      {
-        encoding: 'utf8',
-        env: {
-          PATH: `${bin}:/usr/bin:/bin`,
-          SDLC_ENV_FILE: envFile({ ...withCert, SDLC_ACCESS_BIND_ADDR: '' }),
-          SDLC_IMAGES: 'local',
-        },
-      },
-    );
-    expect(r.status).toBe(1);
-    expect(r.stderr).toMatch(/the profile access is not ready; nothing started/);
-    expect(r.stderr).not.toContain('docker-called');
-  });
-});
+  },
+);
