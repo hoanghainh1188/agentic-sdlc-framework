@@ -785,6 +785,14 @@ The same-run CHECK ties `contract_json` to its row (kind `evaluation`, run, tena
 
 ---
 
+### 6.9. Evaluation plans (task L05, ADR-M82, QUESTIONS #470–#474; draft, migration with L05 PR 2)
+
+| Table | Columns (all with `tenant_id`) | Notes |
+|---|---|---|
+| `evaluation_plans` | `id`, `project_id`, `code` (unique per project), `current_version`, `status` (`active`, `paused`, `archived`), `pause_reason` (code), `next_run_at`, `seen_sha256` (`on_change`), `created_by`, `created_at`, `updated_at` | Never deleted; archived is final |
+| `evaluation_plan_versions` (AO) | `plan_id`, `version`, `data_class`, `task_set_version`, `task_ids` (codes), `runs_per_task`, `budget_per_run_usd`, `monthly_cap_usd` (decimals), `trigger` (`once`, `schedule`, `on_change`), `schedule` (`daily`/`weekly`, hour UTC, weekday), `configurations` (JSON: configuration ID, agent version ID or model, provider type, prompt variant path, commit, SHA-256), `changed_by`, `created_at` | Codes, IDs, numbers and hashes only; never a prompt text |
+| `evaluations` | + `plan_id` (nullable), `plan_version` (nullable) | An operator evaluation of L04 has none |
+
 ## 7. Audit log: hash chain
 
 [Doc] An earlier internal draft proposes an append-only table + hash chain, with an extra copy on locked object storage.
@@ -977,3 +985,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.44 | 2026-10-14 | Claude (task L04, PR 1), approved by Harry | §6.8 draft: `evaluations`, `evaluation_runs`, `evaluation_run_results` (AO) and the column `cost_records.evaluation_run_id` (ADR-M81, QUESTIONS #460–#464); migration and ERD with L04 PR 3 |
 | 1.45 | 2026-10-14 | Claude (task L04, PR 3), approved by Harry | §6.8 as built (migration `0029-evaluations`): hardware as flat columns, `config_name`, status machines and triggers `SDA21` / `SDA22`; the evaluation contract is stored with PR 4; the cost report of intents leaves evaluation records out |
 | 1.46 | 2026-10-14 | Claude (task L04, PR 4a), approved by Harry | §6.8: migration `0030-evaluation-contracts`: `evaluation_run_contracts`, `evaluations.base_sha`, `evaluation_runs.max_iterations` / `max_duration_min`; cost records of evaluation runs are synced with the `gate` label `EVAL` (ADR-M81 §2.2, §2.4) |
+| 1.47 | 2026-10-14 | Claude (task L05, PR 1) | §6.9 draft: `evaluation_plans`, `evaluation_plan_versions` (AO), `evaluations.plan_id` / `plan_version` (ADR-M82) |
