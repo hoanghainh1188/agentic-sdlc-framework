@@ -11,6 +11,8 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json .npmrc ./
 COPY platform/apps platform/apps
 COPY platform/packages platform/packages
+# The workspace lists platform/eval (task L04): pnpm needs its manifest to install.
+COPY platform/eval/package.json platform/eval/package.json
 RUN pnpm install --frozen-lockfile --ignore-scripts \
   && pnpm exec tsc -b platform/apps/api \
   && pnpm --filter @sdlc/dashboard build \
