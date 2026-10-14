@@ -18,6 +18,7 @@
     "@sdlc/config": "workspace:*",
     "@sdlc/contracts": "workspace:*",
     "@sdlc/core": "workspace:*",
+    "@sdlc/eval": "workspace:*",
     "@sdlc/messages": "workspace:*",
     "@sdlc/secrets": "workspace:*",
     "@sdlc/telemetry": "workspace:*",

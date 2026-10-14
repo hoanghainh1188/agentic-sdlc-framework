@@ -16,6 +16,11 @@ RUN pnpm install --frozen-lockfile --ignore-scripts \
   && pnpm exec tsc -b platform/apps/worker \
   && node platform/apps/worker/dist/bundle-workflows.js \
   && pnpm --filter @sdlc/worker deploy --legacy --prod /out
+# Evaluation plans (L05, ADR-M82 §2.6): the plan loop reads task set v1's versions, commit and
+# task IDs from /app/eval-tasks. The reference solutions are never needed here.
+RUN mkdir -p /out/eval-tasks \
+  && cp -R platform/eval/tasks/v1/. /out/eval-tasks/ \
+  && find /out/eval-tasks -name solution.patch -delete
 
 FROM node:24.13.0-bookworm-slim
 # Debian's security updates at build time, and no npm, npx or corepack at run time: the process

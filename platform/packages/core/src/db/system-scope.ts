@@ -246,6 +246,40 @@ export class SystemScope {
   }
 
   /**
+   * The tenants with an evaluation plan the worker's plan loop must look at (task L05, ADR-M82
+   * §2.4): a Run now request, a schedule that is due, an `on_change` plan, or a pause that ended.
+   * IDs only, active tenants, ordered.
+   */
+  async listTenantsWithPlanWork(now: Date, limit: number): Promise<TenantId[]> {
+    const rows = await run(
+      this.db
+        .selectFrom('evaluation_plans as p')
+        .innerJoin('tenants as tn', 'tn.id', 'p.tenant_id')
+        .innerJoin('evaluation_plan_versions as v', (join) =>
+          join
+            .onRef('v.tenant_id', '=', 'p.tenant_id')
+            .onRef('v.plan_id', '=', 'p.id')
+            .onRef('v.version', '=', 'p.current_version'),
+        )
+        .select('p.tenant_id')
+        .distinct()
+        .where('tn.status', '=', 'active')
+        .where((eb) =>
+          eb.or([
+            eb.and([eb('p.status', '=', 'active'), eb('p.run_requested_at', 'is not', null)]),
+            eb.and([eb('p.status', '=', 'active'), eb('p.next_run_at', '<=', now)]),
+            eb.and([eb('p.status', '=', 'active'), eb('v.trigger', '=', 'on_change')]),
+            eb.and([eb('p.status', '=', 'paused'), eb('p.paused_until', '<=', now)]),
+          ]),
+        )
+        .orderBy('p.tenant_id')
+        .limit(limit)
+        .execute(),
+    );
+    return rows.map((row) => parseTenantId(row.tenant_id));
+  }
+
+  /**
    * Kill signals to send again (task C11, ADR-M42 §2.2): `running` intents of active tenants whose
    * latest run of the current round (created since the intent became `running`) is being killed
    * or was killed. A kill recorded without a signal (the operator command, a lost signal) still

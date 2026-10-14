@@ -41,6 +41,9 @@
     },
     {
       "path": "../../packages/telemetry"
+    },
+    {
+      "path": "../../eval"
     }
   ]
 }
