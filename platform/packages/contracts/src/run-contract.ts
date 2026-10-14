@@ -8,6 +8,22 @@
 // (`allowed_tools`, `allowed_models`, `egress_allowlist`) must be sorted and unique, so the same
 // set always gives the same bytes.
 import type { AutonomyLevel } from './codes.js';
+import {
+  budget,
+  GIT_SHA,
+  HOST,
+  MODEL,
+  positiveInt,
+  REPO,
+  SHA256,
+  SIGNATURE,
+  sortedSet,
+  text,
+  timestamp,
+  UUID,
+  VERSION_LABEL,
+  type Check,
+} from './contract-checks.js';
 
 export const RUN_CONTRACT_SCHEMA_VERSION = 1;
 
@@ -83,32 +99,10 @@ export type RunContractValidation =
   | { readonly ok: true; readonly contract: RunContract }
   | { readonly ok: false; readonly field: string };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const SHA256 = /^[0-9a-f]{64}$/;
-const GIT_SHA = /^[0-9a-f]{40}$/;
-const REPO = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
 const BRANCH = /^agent\/INT-[0-9]{4}-[0-9]{4,9}$/;
-const VERSION_LABEL = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 const TOOL = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
-const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/;
-const HOST =
-  /^(?=.{1,253}(:|$))[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*(:[0-9]{1,5})?$/;
-const USD = /^(0|[1-9][0-9]{0,11})(\.[0-9]{1,6})?$/;
-const TIMESTAMP = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/;
-const SIGNATURE = /^vault:v([1-9][0-9]{0,8}):[A-Za-z0-9+/]+={0,2}$/;
 
 const MAX_PLANNED_FILES = 1000;
-const MAX_LIST = 100;
-
-type Check = (value: unknown) => boolean;
-
-const text =
-  (pattern: RegExp): Check =>
-  (value) =>
-    typeof value === 'string' && pattern.test(value);
-
-const positiveInt: Check = (value) =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
 
 const plannedFiles: Check = (value) =>
   Array.isArray(value) &&
@@ -117,28 +111,6 @@ const plannedFiles: Check = (value) =>
   value.every(
     (f) => typeof f === 'string' && f.length >= 1 && f.length <= 1024 && !f.includes('\0'),
   );
-
-/** A sorted list of unique strings that match `pattern`. */
-const sortedSet =
-  (pattern: RegExp, min: number): Check =>
-  (value) =>
-    Array.isArray(value) &&
-    value.length >= min &&
-    value.length <= MAX_LIST &&
-    value.every(
-      (item, i) =>
-        typeof item === 'string' &&
-        pattern.test(item) &&
-        (i === 0 || (value[i - 1] as string) < item),
-    );
-
-const timestamp: Check = (value) =>
-  typeof value === 'string' &&
-  TIMESTAMP.test(value) &&
-  !Number.isNaN(Date.parse(value)) &&
-  new Date(value).toISOString() === value;
-
-const budget: Check = (value) => typeof value === 'string' && USD.test(value) && Number(value) > 0;
 
 const FIELDS: Readonly<Record<keyof RunContract, Check>> = {
   schema_version: (value) => value === RUN_CONTRACT_SCHEMA_VERSION,

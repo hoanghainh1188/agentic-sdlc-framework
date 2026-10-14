@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L04, PR 3 of 5 done; for review) |
+| Status | **Proposed** (task L04, PR 4a done; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L04 plan approved 2026-10-14, with answers to QUESTIONS #460–#464) |
 | Related | D-08 task L04 (AC1–AC5), then L05 (plans, API, CLI, schedules) and L06 (reports in the dashboard); ADR-M78 (the harness), ADR-M25 (sandbox, guard), ADR-M33 §2.6 (runner queue), ADR-M24 and ADR-M45 (cost), ADR-M29 (agent path), ADR-M80 §4.1 (canary search); D-07 §3–§5; D-05 §6.8 (the tables); QUESTIONS #450, #460–#464 |
@@ -38,6 +38,8 @@ Real `runs`, V13 metrics, gates, the kill switch and the cost report stay unmixe
 
 No prompt, task text, code or diff is stored in any table, run event, audit event, log or Temporal history (ADR-M78 §2.4).
 
+As built (PR 4a): the contract (`@sdlc/contracts` `EvaluationRunContract`, kind `evaluation`) names the evaluation run, the evaluation code, the sample repository and its commit, the codes of the configuration and the task, the attempt, the one model (the only entry of `allowed_models`), the caps and the egress hosts; it has no intent, plan or branch, and a Run Contract fails its schema and the other way round. It is stored per attempt in `evaluation_run_contracts` (migration `0030`); `evaluations.base_sha` and the configuration's caps on `evaluation_runs` let the worker issue it without reading a configuration file. `issueEvaluationContract` caps `max_budget_usd` at what is left of the budget and refuses a used-up budget; `verifyEvaluationContract` (runner side) checks the signature, the stored contract, the time window and that the run is `queued` on that attempt; the runner then takes the run with `claim(id, attempt, instance)`, one conditional update. A preempted run gets a new contract for its next attempt; the old one is useless.
+
 ### 2.3. The queue never blocks a real run (QUESTIONS #461, AC2)
 
 - Evaluation runs go on their own Temporal task queue, `sdlc-runner-eval`.
@@ -49,6 +51,7 @@ No prompt, task text, code or diff is stored in any table, run event, audit even
 
 - New nullable column `cost_records.evaluation_run_id` (a migration; the table stays append-only). A cost record belongs to a real intent or to an evaluation run, never both.
 - The seven LiteLLM labels stay: `tenant`, `project`, `intent_id` = the evaluation code (`EVAL-…`), `run_id` = the evaluation run ID, `gate` = `EVAL`, `agent`, `data_class`.
+- As built (PR 4a): `CostController.issueEvaluationRunKey` issues the key (`run_id` = the evaluation run, `agent` = the configuration, `gate` = `EVAL`; the cap is the smallest of the contract, what is left of the evaluation's budget and of the tenant's month). The spend sync recognises the label `gate` = `EVAL`, checks that `intent_id` is the evaluation's code and `project` its project's slug, and records the call with `evaluation_run_id` (intent, run and gate null); a mismatch is skipped as `label_mismatch`. A key is revoked with `endRunKey` by the evaluation run's ID, and a preempted run's key is revoked before its next attempt is queued.
 - The cost report (ADR-M45) shows evaluations as their own line, never inside an intent and never in a per-person view.
 - Each evaluation has its own budget (a decimal string). Each run's virtual key is capped at what is left. When the budget is used up, the evaluation stops and its status says why (a code). A budget goes up only by a decision, as ADR-M28.
 
@@ -87,7 +90,9 @@ Only the operator command `pnpm sdlc ops eval start --tenant --project --config 
 | 1 | This ADR, QUESTIONS #460–#464, the D-05 draft (three tables, one column), the number block |
 | 2 | `@sdlc/eval`, `LocalExecutor`, scoring as §2.5 on developer machines, the hardware block in reports |
 | 3 | Migration, repositories, core `evaluations` (budget, append-only, tenant), `ops eval start` |
-| 4 | `EvaluationLoop`, the eval queue and slot priority in the runner, the scoring container through the guard, cost labels and column |
+| 4a | The contract of kind `evaluation` (schema, signing, storage per attempt, the runner's check), the capped virtual key with the label `gate` = `EVAL`, the spend sync into `cost_records.evaluation_run_id`, the claim of a queued run (migration `0030`) |
+| 4b | The runner: the second task queue and the slot rule (free slots only, preemption of an evaluation run for a real run), the scoring container through `docker/guard.ts` with its test and an ADR-M25 note |
+| 4c | The runner's evaluation activity (clone, sandbox, agent, diff, score, result), `ServerExecutor`, `EvaluationLoop` in the worker, the stub-model live test and the canary search |
 | 5 | Handbook Ch.19 usage, deploy README, `platform/DEVELOPMENT.md` rows, troubleshooting, CHANGELOG |
 
 ## 4. Tests (AC5)
@@ -120,3 +125,4 @@ Only the operator command `pnpm sdlc ops eval start --tenant --project --config 
 | 0.1 | 2026-10-14 | Claude (task L04, PR 1) | First version |
 | 0.2 | 2026-10-14 | Claude (task L04, PR 2) | §2.1, §2.5 as built: `@sdlc/eval`, `EvalExecutor`, `LocalExecutor`, the hardware block, scoring in the sandbox image |
 | 0.3 | 2026-10-14 | Claude (task L04, PR 3) | §2.2, §2.6, §2.7 as built: the tables, the data-class rule without a project default, the operator command; budget service and queue primitives in core |
+| 0.4 | 2026-10-14 | Claude (task L04, PR 4a) | §2.2, §2.4 as built: the evaluation contract, the key and the sync; §3: PR 4 is split into 4a, 4b and 4c because the runner's provisioning and driver are tied to `runs` (4b and 4c reuse their polling and caps without a `runs` row) |

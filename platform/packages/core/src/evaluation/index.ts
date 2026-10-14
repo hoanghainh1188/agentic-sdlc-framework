@@ -13,3 +13,17 @@ export {
   stopEvaluationIfBudgetUsed,
   type EvaluationBudget,
 } from './budget.js';
+export {
+  EVALUATION_CONTRACT_ERROR_CODES,
+  EvaluationContractError,
+  evaluationContractBytes,
+  evaluationContractSha256,
+  issueEvaluationContract,
+  verifyEvaluationContract,
+  type EvaluationContractErrorCode,
+  type EvaluationContractVerification,
+  type IssueEvaluationContract,
+  type IssueEvaluationDeps,
+  type IssuedEvaluationContract,
+  type VerifyEvaluationDeps,
+} from './contract.js';

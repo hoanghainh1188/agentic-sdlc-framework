@@ -199,6 +199,43 @@ export class EvaluationRunRepository extends TenantRepository {
     );
   }
 
+  /**
+   * The runner takes one queued run for the attempt its contract names: `queued` → `running`, with
+   * one conditional update (two runners never take the same run). False when the run is not queued
+   * any more, or is on another attempt. The first start of an evaluation moves it to `running`.
+   */
+  async claim(id: string, attempt: number, runnerInstance: string): Promise<boolean> {
+    if (!isUuid(id) || !Number.isSafeInteger(attempt) || attempt < 1) return false;
+    if (!CODE.test(runnerInstance)) invalid('runnerInstance');
+    return this.run(
+      this.transactional(async (db) => {
+        const claimed = await db
+          .updateTable('evaluation_runs')
+          .set({
+            status: 'running',
+            runner_instance: runnerInstance,
+            started_at: sql<Date>`now()`,
+            updated_at: sql<Date>`now()`,
+          })
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', id)
+          .where('status', '=', 'queued')
+          .where('attempt', '=', attempt)
+          .returning('evaluation_id')
+          .executeTakeFirst();
+        if (!claimed) return false;
+        await db
+          .updateTable('evaluations')
+          .set({ status: 'running', updated_at: sql<Date>`now()` })
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', claimed.evaluation_id)
+          .where('status', '=', 'queued')
+          .execute();
+        return true;
+      }),
+    );
+  }
+
   /** `running` → `preempted`: a real run needs the slot (QUESTIONS #461). False if not running. */
   async markPreempted(id: string): Promise<boolean> {
     return this.move(id, 'running', {

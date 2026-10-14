@@ -24,9 +24,17 @@ const evaluation = (over: Partial<NewEvaluation> = {}): NewEvaluation => ({
   dataClass: 'internal',
   taskSetVersion: 1,
   configName: 'local',
+  baseSha: '7'.repeat(40),
   taskIds: ['feat-tax', 'bug-merge-order'],
   configurations: [
-    { id: 'gpt-oss-20b', model: 'gpt-oss-20b', providerType: 'self_hosted', agentVersion: '1.0.0' },
+    {
+      id: 'gpt-oss-20b',
+      model: 'gpt-oss-20b',
+      providerType: 'self_hosted',
+      agentVersion: '1.0.0',
+      maxIterations: 30,
+      maxDurationMin: 20,
+    },
   ],
   runsPerTask: 5,
   budgetUsd: '2.5',
@@ -78,6 +86,7 @@ describe('a new evaluation is checked before the database sees it', () => {
     ['an unknown data class', { dataClass: 'secret' as never }],
     ['task set version 0', { taskSetVersion: 0 }],
     ['a config name with a path', { configName: '../local' }],
+    ['a base commit that is a branch name', { baseSha: 'main' }],
     ['no task', { taskIds: [] }],
     ['a task code with capitals', { taskIds: ['Feat'] }],
     ['a repeated task', { taskIds: ['a', 'a'] }],
@@ -89,7 +98,14 @@ describe('a new evaluation is checked before the database sees it', () => {
       'a model with a space',
       {
         configurations: [
-          { id: 'a', model: 'my model', providerType: 'api' as const, agentVersion: '1.0.0' },
+          {
+            id: 'a',
+            model: 'my model',
+            providerType: 'api' as const,
+            agentVersion: '1.0.0',
+            maxIterations: 30,
+            maxDurationMin: 20,
+          },
         ],
       },
     ],
@@ -97,7 +113,14 @@ describe('a new evaluation is checked before the database sees it', () => {
       'an agent version that is a sentence',
       {
         configurations: [
-          { id: 'a', model: 'm', providerType: 'api' as const, agentVersion: 'the new one' },
+          {
+            id: 'a',
+            model: 'm',
+            providerType: 'api' as const,
+            agentVersion: 'the new one',
+            maxIterations: 30,
+            maxDurationMin: 20,
+          },
         ],
       },
     ],
@@ -107,8 +130,22 @@ describe('a new evaluation is checked before the database sees it', () => {
         taskIds: Array.from({ length: 64 }, (_, i) => `t${String(i)}`),
         runsPerTask: 50,
         configurations: [
-          { id: 'a', model: 'm', providerType: 'self_hosted' as const, agentVersion: '1.0.0' },
-          { id: 'b', model: 'm', providerType: 'self_hosted' as const, agentVersion: '1.0.0' },
+          {
+            id: 'a',
+            model: 'm',
+            providerType: 'self_hosted' as const,
+            agentVersion: '1.0.0',
+            maxIterations: 30,
+            maxDurationMin: 20,
+          },
+          {
+            id: 'b',
+            model: 'm',
+            providerType: 'self_hosted' as const,
+            agentVersion: '1.0.0',
+            maxIterations: 30,
+            maxDurationMin: 20,
+          },
         ],
       },
     ],

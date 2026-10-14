@@ -71,12 +71,16 @@ const SELF_HOSTED = {
   model: 'gpt-oss-20b',
   providerType: 'self_hosted',
   agentVersion: '1.0.0',
+  maxIterations: 30,
+  maxDurationMin: 20,
 } as const;
 const API = {
   id: 'haiku',
   model: 'claude-haiku-4-5-20251001',
   providerType: 'api',
   agentVersion: '1.0.0',
+  maxIterations: 30,
+  maxDurationMin: 20,
 } as const;
 
 const policyFactory: EvaluationPolicyFactory = (config, models) =>
@@ -94,6 +98,7 @@ describeDb('L04 PR 3: evaluations on PostgreSQL', () => {
     dataClass: 'internal',
     taskSetVersion: 1,
     configName: 'local',
+    baseSha: '7'.repeat(40),
     taskIds: ['feat-tax', 'bug-merge-order'],
     configurations: [SELF_HOSTED],
     runsPerTask: 2,

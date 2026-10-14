@@ -34,6 +34,7 @@ erDiagram
     users ||--o{ evaluations : "starts"
     evaluations ||--o{ evaluation_runs : "queues"
     evaluation_runs ||--o| evaluation_run_results : "is scored as"
+    evaluation_runs ||--o{ evaluation_run_contracts : "is granted"
     evaluation_runs ||--o{ cost_records : "costs (evaluation)"
     intents ||--o{ evidence_items : "has evidence"
     intents ||--o{ evidence_packs : "packaged as (versions)"
