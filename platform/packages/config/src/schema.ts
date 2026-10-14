@@ -256,6 +256,8 @@ export const projectConfigSchema = z.strictObject({
     evidence_read_roles: uniqueList(role).min(1),
     // E05 (ADR-M51, QUESTIONS #235): who may put an intent's evidence on hold and release it.
     evidence_hold_roles: uniqueList(role).min(1),
+    // L05 (ADR-M82, QUESTIONS #470): who may create, change, archive and run evaluation plans.
+    eval_roles: uniqueList(role).min(1),
     conflicting_roles: z.array(uniqueList(role).length(2)),
   }),
   agents: z.strictObject({ recertification_months: positiveInt }),

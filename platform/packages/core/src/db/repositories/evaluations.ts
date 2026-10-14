@@ -12,7 +12,7 @@ import { sql, type Kysely } from 'kysely';
 
 import { fromMicros, isUsd, toMicros } from '../../cost/money.js';
 import { DbError } from '../errors.js';
-import type { Database, Evaluation } from '../schema.js';
+import type { Database, Evaluation, EvaluationConfigurationRow } from '../schema.js';
 import { isUuid } from '../tenant-id.js';
 import {
   EVALUATION_FINAL_STATUSES,
@@ -39,14 +39,32 @@ export interface EvaluationConfigurationInput {
   /** The configuration's caps, copied to its runs (migration 0030). */
   readonly maxIterations: number;
   readonly maxDurationMin: number;
+  /** L05: the register's agent the configuration came from, if any. */
+  readonly agentId?: string | null;
+  /** L05: a prompt variant (path, commit, SHA-256 read at start); null: the repository's own. */
+  readonly instructions?: {
+    readonly path: string;
+    readonly commit: string;
+    readonly sha256: string;
+  } | null;
+}
+
+/** L05: the plan an evaluation is started from, and why (ADR-M82 §2.4). */
+export interface EvaluationFromPlan {
+  readonly id: string;
+  readonly version: number;
+  /** `manual`, `schedule` or `on_change`. */
+  readonly reason: 'manual' | 'schedule' | 'on_change';
 }
 
 export interface NewEvaluation {
   readonly projectId: string;
   readonly dataClass: DataClass;
   readonly taskSetVersion: number;
-  /** The configuration file the runner reads, as a code. */
-  readonly configName: string;
+  /** The configuration file the runner reads, as a code; null for an evaluation of a plan. */
+  readonly configName: string | null;
+  /** L05: the plan; its evaluations store their resolved configurations instead of a file. */
+  readonly plan?: EvaluationFromPlan;
   /** The task set's commit the runs start from (40 hex characters). */
   readonly baseSha: string;
   readonly taskIds: readonly string[];
@@ -90,7 +108,14 @@ export function checkNewEvaluation(input: NewEvaluation): void {
   if (!Number.isSafeInteger(input.taskSetVersion) || input.taskSetVersion < 1) {
     invalid('taskSetVersion');
   }
-  if (!CODE.test(input.configName)) invalid('configName');
+  if (input.plan === undefined) {
+    if (input.configName === null || !CODE.test(input.configName)) invalid('configName');
+  } else {
+    if (input.configName !== null) invalid('configName');
+    if (!isUuid(input.plan.id)) invalid('plan');
+    if (!Number.isSafeInteger(input.plan.version) || input.plan.version < 1) invalid('plan');
+    if (!['manual', 'schedule', 'on_change'].includes(input.plan.reason)) invalid('plan');
+  }
   checkCodes('taskIds', input.taskIds, 64);
   checkCodes(
     'configurations',
@@ -106,6 +131,18 @@ export function checkNewEvaluation(input: NewEvaluation): void {
     }
     if (!Number.isSafeInteger(c.maxDurationMin) || c.maxDurationMin < 1 || c.maxDurationMin > 120) {
       invalid('maxDurationMin');
+    }
+    if (c.agentId != null && !isUuid(c.agentId)) invalid('agentId');
+    if (c.instructions != null) {
+      const { path, commit, sha256 } = c.instructions;
+      if (!/^[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+){0,15}$/.test(path)) invalid('instructions');
+      if (path.split('/').some((segment) => /^\.+$/.test(segment))) invalid('instructions');
+      if (!/^[0-9a-f]{40}$/.test(commit) || !/^[0-9a-f]{64}$/.test(sha256)) {
+        invalid('instructions');
+      }
+    }
+    if (input.plan === undefined && (c.agentId != null || c.instructions != null)) {
+      invalid('configurations');
     }
   }
   if (!/^[0-9a-f]{40}$/.test(input.baseSha)) invalid('baseSha');
@@ -151,6 +188,8 @@ export class EvaluationRepository extends TenantRepository {
             runs_per_task: input.runsPerTask,
             budget_usd: input.budgetUsd,
             started_by: input.startedBy,
+            plan_id: input.plan?.id ?? null,
+            plan_version: input.plan?.version ?? null,
           })
           .returningAll()
           .executeTakeFirstOrThrow();
@@ -176,7 +215,29 @@ export class EvaluationRepository extends TenantRepository {
             .values(runs.slice(from, from + 1000))
             .execute();
         }
-        await new AuditLogRepository(db, this.tenantId).append({
+        if (input.plan) {
+          await db
+            .insertInto('evaluation_configurations')
+            .values(
+              input.configurations.map((c) => ({
+                tenant_id: this.tenantId,
+                evaluation_id: evaluation.id,
+                configuration_id: c.id,
+                agent_id: c.agentId ?? null,
+                model: c.model,
+                provider_type: c.providerType,
+                agent_version: c.agentVersion,
+                max_iterations: c.maxIterations,
+                max_duration_min: c.maxDurationMin,
+                instructions_path: c.instructions?.path ?? null,
+                instructions_commit: c.instructions?.commit ?? null,
+                instructions_sha256: c.instructions?.sha256 ?? null,
+              })),
+            )
+            .execute();
+        }
+        const audit = new AuditLogRepository(db, this.tenantId);
+        await audit.append({
           action: 'evaluation.started',
           actorType: input.startedBy === null ? 'system' : 'human',
           actorId: input.startedBy,
@@ -186,13 +247,42 @@ export class EvaluationRepository extends TenantRepository {
             code,
             data_class: input.dataClass,
             task_set_version: input.taskSetVersion,
-            config_name: input.configName,
+            ...(input.configName === null ? {} : { config_name: input.configName }),
             runs_total: runs.length,
             budget_usd: fromMicros(toMicros(input.budgetUsd)),
+            ...(input.plan ? { plan_id: input.plan.id, plan_version: input.plan.version } : {}),
           },
         });
+        if (input.plan) {
+          await audit.append({
+            action: 'evaluation_plan.run_started',
+            actorType: input.startedBy === null ? 'system' : 'human',
+            actorId: input.startedBy,
+            entityId: input.plan.id,
+            payload: {
+              evaluation_id: evaluation.id,
+              version: input.plan.version,
+              reason: input.plan.reason,
+              budget_usd: fromMicros(toMicros(input.budgetUsd)),
+            },
+          });
+        }
         return evaluation;
       }),
+    );
+  }
+
+  /** L05: the configurations an evaluation of a plan runs (none for an operator evaluation). */
+  async configurations(evaluationId: string): Promise<EvaluationConfigurationRow[]> {
+    if (!isUuid(evaluationId)) return [];
+    return this.run(
+      this.db
+        .selectFrom('evaluation_configurations')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('evaluation_id', '=', evaluationId)
+        .orderBy('configuration_id')
+        .execute(),
     );
   }
 

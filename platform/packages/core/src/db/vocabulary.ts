@@ -144,3 +144,9 @@ export type GateDecisionSource = (typeof GATE_DECISION_SOURCES)[number];
 /** Environments an agent may be approved for (handbook template T6). Runs are `sandbox`. */
 export const AGENT_ENVIRONMENTS = ['sandbox', 'staging', 'production'] as const;
 export type AgentEnvironment = (typeof AGENT_ENVIRONMENTS)[number];
+
+/** Evaluation plans (L05, ADR-M82, migration 0031). */
+export const EVALUATION_PLAN_STATUSES = ['active', 'paused', 'archived'] as const;
+export type EvaluationPlanStatus = (typeof EVALUATION_PLAN_STATUSES)[number];
+export const EVALUATION_PLAN_TRIGGERS = ['once', 'schedule', 'on_change'] as const;
+export type EvaluationPlanTrigger = (typeof EVALUATION_PLAN_TRIGGERS)[number];

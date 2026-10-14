@@ -57,6 +57,7 @@ escalation:
 | `access.cost_read_roles` | Who may read the cost report of a project or intent (E04, ADR-M45). Default: `person_a`, `person_b`, `pm_brse`, `governance`, `admin`; tenant admins always may; never `viewer` (M28) |
 | `access.evidence_build_roles`, `access.evidence_read_roles` | Who may build, and who may list, show and export, an intent's Evidence Pack (E02, ADR-M48). Defaults: `person_a`, `person_b`, `pm_brse`, `governance`, `admin` (build); the same and `second_approver` (read); tenant admins always may; never `viewer` (M30) |
 | `access.evidence_hold_roles` | Who may put an intent's evidence on hold and release it (E05, ADR-M51); held evidence is never purged. Default `[governance, admin]`; never `viewer` (rule M32) |
+| `access.eval_roles` | Who may create, change, archive and run the project's evaluation plans (L05, ADR-M82). Default: `person_a`, `person_b`, `governance`, `admin`; tenant admins always may; never `viewer` (M33) |
 | `access.metrics_read_roles` | Who may read the gate waiting-time metrics of a project (E06, ADR-M47). Default: `person_a`, `person_b`, `second_approver`, `pm_brse`, `governance`, `admin`; tenant admins always may; never `viewer` (M29) |
 
 Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `working_hours`, `working_days` (working calendar; one working day = the working hours). Deadlines may also be `{ kind: end_of_working_day }` or `{ kind: next_planned_work }` (no clock).
@@ -97,6 +98,7 @@ A project may tighten anything. It may **not** loosen these (rules M1–M32; sou
 | M30 | `access.evidence_build_roles` and `access.evidence_read_roles` never hold `viewer` (E02, ADR-M48) |
 | M31 | `retention.evidence_retention_days` is between 180 and 3650 (E05, ADR-M51, QUESTIONS #236) |
 | M32 | `access.evidence_hold_roles` never holds `viewer` (E05, ADR-M51, QUESTIONS #235) |
+| M33 | `access.eval_roles` never holds `viewer` (L05, ADR-M82, QUESTIONS #470) |
 
 Other loosening is accepted with a warning: a looser matrix cell, fewer approvals, a higher G6 security threshold (`min_severity`), a working day swapped out of the calendar, shorter working hours (still ≥ 7), or more than 20 holidays in one calendar year. A Run Contract validity above 60 minutes, a run cap above the default and a no-progress window under 5 minutes (`run.loop_detection.no_progress_window_minutes`: a long silent command may stop a healthy run) also give a warning. Adding working days, a longer day or up to 20 holidays a year gives no warning.
 

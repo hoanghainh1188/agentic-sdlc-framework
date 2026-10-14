@@ -221,6 +221,9 @@ export async function executeEvaluation(
     const set = loadTaskSet(settings.evaluation.tasksDir, [contract.task_id]);
     const task: EvalTask = set.tasks[0]!;
     if (set.version !== contract.task_set_version) throw new TaskError('task set', 'version');
+    // An evaluation of a plan (L05) has its configurations in the database; the runner reads them
+    // with L05 PR 4. Until then such a run fails with a code instead of guessing a file.
+    if (evaluation.config_name === null) throw new TaskError('configuration', 'from a plan');
     const configuration: EvalConfiguration = loadConfigurations(
       configurationFile(settings.evaluation.configDir, evaluation.config_name),
       [contract.configuration_id],

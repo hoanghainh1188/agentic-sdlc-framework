@@ -281,6 +281,10 @@ access:
   # hold (`sdlc admin evidence hold|release`): held evidence is never purged (a dispute, an
   # incident, a client request). Tenant admins always may. Never the viewer (mandatory rule M32).
   evidence_hold_roles: [governance, admin]
+  # Task L05, ADR-M82, QUESTIONS #470. Who creates, changes, archives and runs the project's
+  # evaluation plans (the dashboard, `sdlc eval`). Tenant admins always may. Plans spend money,
+  # so the viewer role never does (mandatory rule M33); everybody who reads the project reads them.
+  eval_roles: [person_a, person_b, governance, admin]
   # Task B13, ADR-M37, QUESTIONS #154. Separation of duties (handbook Ch.5, codes table §5): one
   # person never holds both roles of a pair on the same project. Person A (owner) and Person B
   # (independent reviewer) always stay apart (mandatory rule M21): G1–G3 have no producers

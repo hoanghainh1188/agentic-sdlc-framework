@@ -247,6 +247,11 @@ export interface ProjectConfig {
      */
     readonly evidence_hold_roles: readonly ProjectRole[];
     /**
+     * Who may create, change, archive and run evaluation plans (task L05, ADR-M82, QUESTIONS
+     * #470). Tenant admins always may. The viewer never (mandatory rule M33).
+     */
+    readonly eval_roles: readonly ProjectRole[];
+    /**
      * Pairs of roles one person may not hold together on the project (task B13, ADR-M37,
      * QUESTIONS #154): a grant that would give someone both roles of a pair is refused. Person A
      * and Person B always stay apart (mandatory rule M21).

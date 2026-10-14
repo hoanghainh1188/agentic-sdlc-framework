@@ -178,6 +178,19 @@ const UPDATABLE: Record<string, readonly string[]> = {
   evaluation_run_results: [],
   // L04 PR 4a (migration 0030): a contract is written once for an attempt and never changed.
   evaluation_run_contracts: [],
+  // L05 (migration 0031): a plan's state; its identity is fixed, archived is final, the version
+  // only goes up (SDA23). Versions and resolved configurations are append-only.
+  evaluation_plans: [
+    'current_version',
+    'status',
+    'pause_reason',
+    'paused_until',
+    'next_run_at',
+    'seen_sha256',
+    'updated_at',
+  ],
+  evaluation_plan_versions: [],
+  evaluation_configurations: [],
   // U05 (migration 0027): seen time only grows; the end is set once (trigger SDA18). No DELETE.
   web_sessions: ['last_seen_at', 'revoked_at', 'end_reason'],
   // U06 (migration 0028): the counter and the last use only grow; revoked once (SDA20). No DELETE.
@@ -322,7 +335,9 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // web_sessions, intents, escalations.
     // L04: evaluations → projects, users; evaluation_runs → evaluations; evaluation_run_results →
     // evaluation_runs; cost_records → evaluation_runs; evaluation_run_contracts → evaluation_runs.
-    expect(fks).toHaveLength(72);
+    // L05: evaluation_plans → projects, users; evaluation_plan_versions → evaluation_plans, users;
+    // evaluations → evaluation_plans; evaluation_configurations → evaluations, agents.
+    expect(fks).toHaveLength(79);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

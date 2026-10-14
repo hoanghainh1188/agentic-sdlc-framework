@@ -490,6 +490,14 @@ const CASES: Case[] = [
     key: 'config.rule.viewer_never_reads_metrics',
     path: 'access.metrics_read_roles',
   },
+  // M33: the viewer never creates or runs evaluation plans (L05, ADR-M82, QUESTIONS #470).
+  {
+    name: 'viewer may run evaluation plans',
+    rule: 'M33',
+    yaml: 'access:\n  eval_roles: [person_a, viewer]\n',
+    key: 'config.rule.viewer_never_runs_evaluations',
+    path: 'access.eval_roles',
+  },
   // M30: the viewer never builds or reads an Evidence Pack (E02, ADR-M48, QUESTIONS #218).
   {
     name: 'viewer may build evidence packs',

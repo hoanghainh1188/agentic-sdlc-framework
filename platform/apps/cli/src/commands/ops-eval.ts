@@ -53,6 +53,22 @@ const ERROR_KEYS: Readonly<Record<EvaluationErrorCode, MessageKey>> = {
   model_not_allowed: 'cli.ops.eval.error.model_not_allowed',
   self_hosted_only: 'cli.ops.eval.error.self_hosted_only',
   invalid_input: 'cli.ops.eval.error.invalid_input',
+  forbidden: 'evaluation.error.forbidden',
+  plan_not_found: 'evaluation.error.plan_not_found',
+  plan_code_taken: 'evaluation.error.plan_code_taken',
+  plan_archived: 'evaluation.error.plan_archived',
+  plan_paused: 'evaluation.error.plan_paused',
+  plan_changed: 'evaluation.error.plan_changed',
+  evaluation_open: 'evaluation.error.evaluation_open',
+  monthly_cap_used: 'evaluation.error.monthly_cap_used',
+  cap_below_spent: 'evaluation.error.cap_below_spent',
+  task_set_not_found: 'evaluation.error.task_set_not_found',
+  task_not_found: 'evaluation.error.task_not_found',
+  agent_not_found: 'evaluation.error.agent_not_found',
+  agent_not_active: 'evaluation.error.agent_not_active',
+  agent_no_model: 'evaluation.error.agent_no_model',
+  prompt_not_found: 'evaluation.error.prompt_not_found',
+  git_host_unavailable: 'evaluation.error.git_host_unavailable',
 };
 
 const list = (value: string | boolean | undefined): string[] | undefined =>

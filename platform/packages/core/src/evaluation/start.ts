@@ -60,36 +60,7 @@ export async function startEvaluation(
     throw new EvaluationError('data_class_prohibited', 'prohibited data is never evaluated');
   }
   return scope.transaction(async (tx) => {
-    const project = await tx.projects.getById(input.projectId);
-    if (!project) {
-      throw new EvaluationError('project_not_found', `project ${input.projectId} not found`);
-    }
-    if (project.status !== 'active') {
-      throw new EvaluationError('project_not_active', `project ${input.projectId} is not active`);
-    }
-    const refusal = aiRecordRefusal(await loadAiRecordFacts(tx, input.projectId), input.dataClass);
-    if (refusal !== null) {
-      throw new EvaluationError(refusal, `the project does not allow ${input.dataClass}`);
-    }
-    if (input.dataClass === 'client_restricted') {
-      const outside = input.configurations.find((c) => c.providerType !== 'self_hosted');
-      if (outside) {
-        throw new EvaluationError(
-          'self_hosted_only',
-          `configuration ${outside.id} is not self-hosted`,
-        );
-      }
-    }
-    const { config } = await loadEffectiveConfig(tx.projectConfigs, input.projectId);
-    const policy = deps.policyFactory(
-      config,
-      input.configurations.map((c) => ({ model: c.model, providerType: c.providerType })),
-    );
-    const allowed = new Set(policy.allowedModels({ dataClass: input.dataClass }));
-    const refused = input.configurations.find((c) => !allowed.has(c.model));
-    if (refused) {
-      throw new EvaluationError('model_not_allowed', `the model of ${refused.id} is not allowed`);
-    }
+    await checkEvaluationScope(tx, deps, input);
     try {
       return await tx.evaluations.create(input);
     } catch (error) {
@@ -99,4 +70,57 @@ export async function startEvaluation(
       throw error;
     }
   });
+}
+
+/**
+ * The rules every evaluation start checks, by an operator or from a plan (ADR-M81 §2.6, ADR-M82
+ * §2.1): the project is active, its AI record allows the data class, `client_restricted` data
+ * goes to self-hosted models only, and every configuration's model is allowed by the project's
+ * policy. Throws `EvaluationError`.
+ */
+export async function checkEvaluationScope(
+  tx: TenantScope,
+  deps: StartEvaluationDeps,
+  input: {
+    readonly projectId: string;
+    readonly dataClass: DataClass;
+    readonly configurations: readonly Pick<
+      EvaluationConfigurationInput,
+      'id' | 'model' | 'providerType'
+    >[];
+  },
+): Promise<void> {
+  if (input.dataClass === 'prohibited') {
+    throw new EvaluationError('data_class_prohibited', 'prohibited data is never evaluated');
+  }
+  const project = await tx.projects.getById(input.projectId);
+  if (!project) {
+    throw new EvaluationError('project_not_found', `project ${input.projectId} not found`);
+  }
+  if (project.status !== 'active') {
+    throw new EvaluationError('project_not_active', `project ${input.projectId} is not active`);
+  }
+  const refusal = aiRecordRefusal(await loadAiRecordFacts(tx, input.projectId), input.dataClass);
+  if (refusal !== null) {
+    throw new EvaluationError(refusal, `the project does not allow ${input.dataClass}`);
+  }
+  if (input.dataClass === 'client_restricted') {
+    const outside = input.configurations.find((c) => c.providerType !== 'self_hosted');
+    if (outside) {
+      throw new EvaluationError(
+        'self_hosted_only',
+        `configuration ${outside.id} is not self-hosted`,
+      );
+    }
+  }
+  const { config } = await loadEffectiveConfig(tx.projectConfigs, input.projectId);
+  const policy = deps.policyFactory(
+    config,
+    input.configurations.map((c) => ({ model: c.model, providerType: c.providerType })),
+  );
+  const allowed = new Set(policy.allowedModels({ dataClass: input.dataClass }));
+  const refused = input.configurations.find((c) => !allowed.has(c.model));
+  if (refused) {
+    throw new EvaluationError('model_not_allowed', `the model of ${refused.id} is not allowed`);
+  }
 }

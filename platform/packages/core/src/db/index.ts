@@ -30,8 +30,19 @@ export {
   MAX_EVALUATION_RUNS,
   type EvaluationConfigurationInput,
   type EvaluationCounts,
+  type EvaluationFromPlan,
   type NewEvaluation,
 } from './repositories/evaluations.js';
+export {
+  checkPlanContent,
+  planVersionView,
+  type NewEvaluationPlan,
+  type PlanConfiguration,
+  type PlanContent,
+  type PlanPromptVariant,
+  type PlanSchedule,
+  type PlanVersionView,
+} from './repositories/evaluation-plans.js';
 export {
   checkEvaluationRunResult,
   type NewEvaluationRunResult,

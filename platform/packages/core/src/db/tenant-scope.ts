@@ -10,6 +10,7 @@ import { ApiTokenRepository } from './repositories/api-tokens.js';
 import { AuditLogRepository } from './repositories/audit-log.js';
 import { CostRecordRepository } from './repositories/cost-records.js';
 import { EvaluationContractRepository } from './repositories/evaluation-contracts.js';
+import { EvaluationPlanRepository } from './repositories/evaluation-plans.js';
 import { EvaluationRunRepository } from './repositories/evaluation-runs.js';
 import { EvaluationRepository } from './repositories/evaluations.js';
 import { EvidenceHoldRepository } from './repositories/evidence-holds.js';
@@ -77,6 +78,7 @@ export class TenantScope {
   readonly evaluations: EvaluationRepository;
   readonly evaluationRuns: EvaluationRunRepository;
   readonly evaluationContracts: EvaluationContractRepository;
+  readonly evaluationPlans: EvaluationPlanRepository;
   readonly escalations: EscalationRepository;
   readonly escalationNotices: EscalationNoticeRepository;
   readonly agents: AgentRepository;
@@ -123,6 +125,7 @@ export class TenantScope {
     this.evaluations = new EvaluationRepository(this.db, this.tenantId);
     this.evaluationRuns = new EvaluationRunRepository(this.db, this.tenantId);
     this.evaluationContracts = new EvaluationContractRepository(this.db, this.tenantId);
+    this.evaluationPlans = new EvaluationPlanRepository(this.db, this.tenantId);
     this.escalations = new EscalationRepository(this.db, this.tenantId);
     this.escalationNotices = new EscalationNoticeRepository(this.db, this.tenantId);
     this.agents = new AgentRepository(this.db, this.tenantId);
