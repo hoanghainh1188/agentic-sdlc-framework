@@ -214,6 +214,7 @@ describe('sdlc-runner service', () => {
     );
     expect(env.SDLC_RUNNER_NPM_REGISTRY).toBe('http://npm-proxy:4873/');
     expect(env.SDLC_RUNNER_MAX_SANDBOXES).toBe('${SDLC_RUNNER_MAX_SANDBOXES:-1}');
+    expect(env.SDLC_RUNNER_MAX_EVAL_SANDBOXES).toBe('${SDLC_RUNNER_MAX_EVAL_SANDBOXES:-1}');
     expect(env.SDLC_RUNNER_SWEEP_INTERVAL_SECONDS).toBe(
       '${SDLC_RUNNER_SWEEP_INTERVAL_SECONDS:-300}',
     );

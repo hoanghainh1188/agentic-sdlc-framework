@@ -1,9 +1,9 @@
 # T10 5年以上前の受注の削除 / Delete orders older than 5 years
 
-| 項目 / Item | 値 / Value |
-|---|---|
-| リスク区分 / Risk tier | Critical (D-09 §7) |
-| 関連機能 / Related features | F2, F4, F5 |
+| 項目 / Item                 | 値 / Value         |
+| --------------------------- | ------------------ |
+| リスク区分 / Risk tier      | Critical (D-09 §7) |
+| 関連機能 / Related features | F2, F4, F5         |
 
 > リスク区分と自律レベルはプラットフォームが決める。この表は人のための参考情報。
 > The platform decides the risk tier and the autonomy level. This table is for people.

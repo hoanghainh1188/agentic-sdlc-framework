@@ -30,6 +30,13 @@ export class StubDocker {
   readonly images = new Set<string>();
   /** Health status reported for started containers; undefined = the image has no health check. */
   health: 'healthy' | 'unhealthy' | 'starting' | undefined = 'healthy';
+  /**
+   * Exit codes `POST /containers/{id}/wait` answers, in order; 0 once the list is used up; -1 is a
+   * wait that fails (a step that does not end in time).
+   */
+  readonly exitCodes: number[] = [];
+  /** Standard output `GET /containers/{id}/logs` answers, for the container with this name. */
+  readonly stdout = new Map<string, string>();
   /** `METHOD /path` pattern → HTTP status to answer instead of the normal result. */
   readonly failures = new Map<RegExp, number>();
   #seq = 0;
@@ -225,6 +232,24 @@ export class StubDocker {
       if (!x) return [404, {}];
       x.running = true;
       return [204, ''];
+    }
+    // L04: scoring containers run to their end and print their result.
+    if (m === 'POST' && (match = /^\/containers\/([^/]+)\/wait$/.exec(p))) {
+      const x = container(match[1]!);
+      if (!x) return [404, {}];
+      x.running = false;
+      const code = this.exitCodes.shift() ?? 0;
+      // -1: the wait does not end in time (the client gives up on it).
+      return code === -1 ? [500, {}] : [200, { StatusCode: code }];
+    }
+    if (m === 'GET' && (match = /^\/containers\/([^/]+)\/logs$/.exec(p))) {
+      const x = container(match[1]!);
+      if (!x) return [404, {}];
+      const payload = Buffer.from(this.stdout.get(x.name) ?? '', 'utf8');
+      const header = Buffer.alloc(8);
+      header[0] = 1;
+      header.writeUInt32BE(payload.length, 4);
+      return [200, Buffer.concat([header, payload])];
     }
     // C11: kill a sandbox's processes; the container stays.
     if (m === 'POST' && (match = /^\/containers\/([^/]+)\/kill$/.exec(p))) {

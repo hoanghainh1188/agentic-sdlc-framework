@@ -19,6 +19,33 @@ export const SANDBOX_ENV_ALLOWLIST = [
   'COREPACK_NPM_REGISTRY', // same proxy, so a project's `packageManager` pin can be fetched
 ] as const;
 
+/**
+ * Environment variables of a scoring container (task L04, ADR-M81 §2.5, QUESTIONS #463). The
+ * install step reaches the package proxy; the step that runs the tests has no network at all.
+ * Values are never secrets.
+ */
+export const SCORING_ENV_ALLOWLIST = [
+  'HOME',
+  'CI',
+  'NPM_CONFIG_REGISTRY',
+  'COREPACK_NPM_REGISTRY',
+  'NPM_CONFIG_STORE_DIR',
+  'COREPACK_HOME', // on the volume, so the pnpm the install step fetched is there for the next step
+] as const;
+
+/**
+ * The two steps of the scoring container, each with its one fixed command (the scripts are written
+ * by the platform into the volume). `install`: a clean install from the base lockfile, on the run's
+ * internal network with the package proxy. `score`: the agent's diff and the hidden tests, with
+ * **no network** (`NetworkMode: none`).
+ */
+export const SCORING_COMMANDS = {
+  install: 'sh /workspace/in/install.sh',
+  score: 'sh /workspace/in/score.sh',
+} as const;
+export type ScoringPhase = keyof typeof SCORING_COMMANDS;
+export const SCORING_ENTRYPOINT = ['/bin/sh', '-c'] as const;
+
 export const WORKSPACE_PATH = '/workspace';
 export const SANDBOX_USER = '10001:10001';
 /** tmpfs mounts of a sandbox. `/tmp` needs `exec` (ADR-M10 §2.4). */
@@ -53,6 +80,12 @@ export interface ContainerSpec {
   };
 }
 
+/** A scoring container: a sandbox container with a fixed command (`Entrypoint`, `Cmd`). */
+export interface ScoringContainerSpec extends ContainerSpec {
+  readonly Entrypoint: readonly string[];
+  readonly Cmd: readonly string[];
+}
+
 const TOP_KEYS = new Set([
   'Image',
   'User',
@@ -62,6 +95,7 @@ const TOP_KEYS = new Set([
   'NetworkDisabled',
   'HostConfig',
 ]);
+const SCORING_TOP_KEYS = new Set([...TOP_KEYS, 'Entrypoint', 'Cmd']);
 const HOST_KEYS = new Set([
   'NetworkMode',
   'ReadonlyRootfs',
@@ -102,10 +136,38 @@ function positiveInt(value: unknown): boolean {
 
 /** Throws `runner.docker.spec_refused` unless the container is a hardened sandbox of one run. */
 export function assertSafeContainerSpec(name: string, spec: ContainerSpec): void {
+  checkHardening(name, spec, undefined);
+}
+
+/**
+ * Throws `runner.docker.spec_refused` unless the container is a hardened scoring container of one
+ * run (task L04, ADR-M81 §2.5, ADR-M25 §2.5): everything a sandbox must be (same name, labels,
+ * image by digest, user, no capability, read-only root, limits, one volume of the run), plus a
+ * fixed command for its `phase` and its own environment allowlist. The install step is on the run's
+ * internal network; the step that runs the agent's diff and the hidden tests has no network.
+ */
+export function assertSafeScoringSpec(
+  name: string,
+  spec: ScoringContainerSpec,
+  phase: ScoringPhase,
+): void {
+  checkHardening(name, spec, phase);
+}
+
+function checkHardening(
+  name: string,
+  spec: ContainerSpec,
+  scoring: ScoringPhase | undefined,
+): void {
   const raw = spec as unknown as Record<string, unknown>;
   const host = (raw.HostConfig ?? {}) as Record<string, unknown>;
   if (!SANDBOX_NAME.test(name)) refuse('name');
-  if (Object.keys(raw).some((key) => !TOP_KEYS.has(key))) refuse('unknown_option');
+  const topKeys = scoring === undefined ? TOP_KEYS : SCORING_TOP_KEYS;
+  if (Object.keys(raw).some((key) => !topKeys.has(key))) refuse('unknown_option');
+  if (scoring !== undefined) {
+    if (!sameList(raw.Entrypoint, SCORING_ENTRYPOINT)) refuse('scoring_entrypoint');
+    if (!sameList(raw.Cmd, [SCORING_COMMANDS[scoring]])) refuse('scoring_command');
+  }
   if (Object.keys(host).some((key) => !HOST_KEYS.has(key))) refuse('unknown_host_option');
   if (typeof spec.Image !== 'string' || !PINNED.test(spec.Image)) refuse('image_not_pinned');
   if (spec.User !== SANDBOX_USER) refuse('user');
@@ -114,9 +176,9 @@ export function assertSafeContainerSpec(name: string, spec: ContainerSpec): void
 
   const env = Array.isArray(spec.Env) ? spec.Env : refuse('env');
   const names = env.map((entry) => (typeof entry === 'string' ? entry.split('=')[0] : ''));
-  if (names.some((n) => !(SANDBOX_ENV_ALLOWLIST as readonly string[]).includes(n ?? ''))) {
-    refuse('env');
-  }
+  const allowed: readonly string[] =
+    scoring === undefined ? SANDBOX_ENV_ALLOWLIST : SCORING_ENV_ALLOWLIST;
+  if (names.some((n) => !allowed.includes(n ?? ''))) refuse('env');
   if (new Set(names).size !== names.length) refuse('env');
 
   const labels = spec.Labels as Record<string, unknown> | undefined;
@@ -124,7 +186,10 @@ export function assertSafeContainerSpec(name: string, spec: ContainerSpec): void
   if (`sdlc-sandbox-${String(labels[LABELS.runId])}` !== name) refuse('labels');
 
   const hc = spec.HostConfig;
-  if (
+  if (scoring === 'score') {
+    // The agent's code runs here: no network of any kind, not even the run's internal one.
+    if (hc.NetworkMode !== 'none') refuse('network');
+  } else if (
     !RUN_NETWORK.test(hc.NetworkMode) ||
     hc.NetworkMode !== `sdlc-run-${String(labels[LABELS.runId])}`
   ) {

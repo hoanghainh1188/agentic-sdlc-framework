@@ -6,15 +6,38 @@
   },
   "include": ["src"],
   "references": [
-    { "path": "../../packages/adapters/agent-openhands" },
-    { "path": "../../packages/adapters/evidence-s3" },
-    { "path": "../../packages/adapters/git-github" },
-    { "path": "../../packages/adapters/model-litellm" },
-    { "path": "../../packages/adapters/policy-simple" },
-    { "path": "../../packages/contracts" },
-    { "path": "../../packages/core" },
-    { "path": "../../packages/messages" },
-    { "path": "../../packages/secrets" },
-    { "path": "../../packages/telemetry" }
+    {
+      "path": "../../eval"
+    },
+    {
+      "path": "../../packages/adapters/agent-openhands"
+    },
+    {
+      "path": "../../packages/adapters/evidence-s3"
+    },
+    {
+      "path": "../../packages/adapters/git-github"
+    },
+    {
+      "path": "../../packages/adapters/model-litellm"
+    },
+    {
+      "path": "../../packages/adapters/policy-simple"
+    },
+    {
+      "path": "../../packages/contracts"
+    },
+    {
+      "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/messages"
+    },
+    {
+      "path": "../../packages/secrets"
+    },
+    {
+      "path": "../../packages/telemetry"
+    }
   ]
 }

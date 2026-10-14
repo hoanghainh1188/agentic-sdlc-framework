@@ -68,7 +68,9 @@ export function scoringScript(task: Pick<EvalTask, 'ci' | 'passToPass' | 'failTo
   return [
     'set -u',
     `cd ${SCORING_DIRS.work}`,
-    `result() { printf '{"applied":%s,"ci":%s,"pass_to_pass":%s,"fail_to_pass":%s,"lint":%s}\\n' "$1" "$2" "$3" "$4" "$5" > ${SCORING_DIRS.output}/score.json; }`,
+    // The result goes to the file (the developer machine reads it) and to standard output (the
+    // runner reads the container's log): the last line is always the script's own.
+    `result() { line=$(printf '{"applied":%s,"ci":%s,"pass_to_pass":%s,"fail_to_pass":%s,"lint":%s}' "$1" "$2" "$3" "$4" "$5"); printf '%s\\n' "$line" > ${SCORING_DIRS.output}/score.json; printf '%s\\n' "$line"; }`,
     `git apply --whitespace=nowarn ${SCORING_DIRS.input}/base.patch || { result false false false false 0; exit 0; }`,
     'git add -A && git -c user.name=eval -c user.email=eval@eval.invalid commit -qm base',
     `if [ -s ${SCORING_DIRS.input}/agent.patch ]; then git apply --whitespace=nowarn ${SCORING_DIRS.input}/agent.patch || { result false false false false 0; exit 0; }; fi`,
@@ -87,6 +89,18 @@ export function scoringScript(task: Pick<EvalTask, 'ci' | 'passToPass' | 'failTo
     'result true "$ci" "$p2p" "$f2p" "${lint:-0}"',
     '',
   ].join('\n');
+}
+
+/**
+ * Reads the result from a scoring container's standard output (the server): the last non-empty
+ * line, which is the script's own. The commands of the task write nothing there (their output goes
+ * to /dev/null). Throws when the line is not a result.
+ */
+export function parseScoreOutput(stdout: string): Score {
+  const lines = stdout.split('\n').filter((line) => line.trim() !== '');
+  const last = lines.at(-1);
+  if (last === undefined) throw new TypeError('score: no output');
+  return parseScore(last);
 }
 
 /** Parses the container's `score.json` (exported for tests). */

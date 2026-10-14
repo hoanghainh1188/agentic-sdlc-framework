@@ -30,7 +30,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 | Network | Outbound HTTPS only: to GitHub, the model providers, the npm registry and the image registries ([Network and data flows](#network-and-data-flows)). No inbound connection from the internet: the platform polls GitHub and needs no webhook |
 | Size | See [Resource estimate](#resource-estimate): about 3 GiB RAM and 2 vCPU for `core`, 6 GiB and 4 vCPU with `observability`, plus up to 2 GiB per running sandbox. Estimates only, not measured on a server yet (A10) |
 | GPU | Not needed with API models. Only for a self-hosted model on the same machine (D-07 §3) |
-| Sandboxes | 1 by default (`SDLC_RUNNER_MAX_SANDBOXES`); 2 on a larger server |
+| Sandboxes | 1 by default (`SDLC_RUNNER_MAX_SANDBOXES`); 2 on a larger server. Evaluation runs use free slots only, at most `SDLC_RUNNER_MAX_EVAL_SANDBOXES` (default 1, never above the line before; 0 turns them off) and give a slot back to a real run that waits |
 | The runner | In its own VM or with rootless Docker, because it controls Docker (ADR-M25 §2.5). Not yet done (A10) |
 | OpenBao | TLS on port 8200 runs everywhere (A10); on the server the certificate comes from the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Three named key holders before any real secret or client data (runbook T11 §3.2): not yet done (A10) |
 | Backups | Off the server, encrypted ([Backup and restore](#backup-and-restore)) |

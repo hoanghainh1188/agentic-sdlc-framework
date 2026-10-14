@@ -1,9 +1,9 @@
 # T09 複数倉庫対応 / Move to multiple warehouses
 
-| 項目 / Item | 値 / Value |
-|---|---|
-| リスク区分 / Risk tier | High (D-09 §7) |
-| 関連機能 / Related features | F2, F4, F6 |
+| 項目 / Item                 | 値 / Value     |
+| --------------------------- | -------------- |
+| リスク区分 / Risk tier      | High (D-09 §7) |
+| 関連機能 / Related features | F2, F4, F6     |
 
 > リスク区分と自律レベルはプラットフォームが決める。この表は人のための参考情報。
 > The platform decides the risk tier and the autonomy level. This table is for people.

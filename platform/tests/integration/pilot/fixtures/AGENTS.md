@@ -19,14 +19,14 @@ Instructions for AI coding agents that work in this repo. Read them before you c
 
 Run them in the repo root.
 
-| Command | Use |
-|---|---|
-| `pnpm install --frozen-lockfile` | Install packages. Always from the lockfile |
-| `pnpm lint` | ESLint on the whole repo |
-| `pnpm typecheck` | TypeScript check (`tsc`, `vue-tsc`) |
-| `pnpm test` | Unit tests of both apps. No database needed |
-| `pnpm build` | Production build of both apps |
-| `pnpm test:integration` | Api integration tests. Needs PostgreSQL (see below) |
+| Command                          | Use                                                 |
+| -------------------------------- | --------------------------------------------------- |
+| `pnpm install --frozen-lockfile` | Install packages. Always from the lockfile          |
+| `pnpm lint`                      | ESLint on the whole repo                            |
+| `pnpm typecheck`                 | TypeScript check (`tsc`, `vue-tsc`)                 |
+| `pnpm test`                      | Unit tests of both apps. No database needed         |
+| `pnpm build`                     | Production build of both apps                       |
+| `pnpm test:integration`          | Api integration tests. Needs PostgreSQL (see below) |
 
 - Packages come from the npm proxy that the sandbox sets in `NPM_CONFIG_REGISTRY`. The sandbox has no other internet access. Never change the registry.
 - Add or upgrade a package only when the plan names it. Then commit `pnpm-lock.yaml` with it.

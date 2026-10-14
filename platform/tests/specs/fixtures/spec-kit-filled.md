@@ -3,7 +3,7 @@
 **Feature Branch**: `003-order-status-filter`
 **Status**: Draft
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Filter the order list (Priority: P1)
 
@@ -36,13 +36,13 @@ Sales staff filter the order list by status.
 
 - What happens when no order has the chosen status?
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
 - **FR-001**: System MUST filter orders by status
 - **FR-002**: System MUST keep the filter in the URL
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 - **SC-001**: Staff find open orders in under 10 seconds
