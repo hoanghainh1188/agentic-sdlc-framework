@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import type { RunStatus } from '@sdlc/contracts';
-import { parseTenantId, type PlatformDatabase } from '@sdlc/core';
+import { parseTenantId, type PlatformDatabase, type TenantScope } from '@sdlc/core';
 
 import type { DockerClient } from './docker/client.js';
 import type { HeldRuns } from './held.js';
@@ -38,6 +38,12 @@ export interface ReconcileResult {
   /** Runs whose clean-up failed; the next sweep tries again. */
   readonly errors: number;
 }
+
+/**
+ * An evaluation run whose runner was lost is queued again, and fails after this many attempts
+ * (task L04, ADR-M81 §2.3): a run that keeps killing its runner must not loop for ever.
+ */
+export const MAX_EVALUATION_ATTEMPTS = 3;
 
 /** States of a run whose sandbox may exist. `queued` has at most a reserved workspace volume. */
 const ACTIVE: readonly RunStatus[] = ['provisioning', 'running', 'stopping'];
@@ -110,9 +116,11 @@ async function cleanUpRun(
   const result = await teardownSandbox(deps.docker, labelled.runId);
   const scope = deps.db.forTenant(parseTenantId(labelled.tenantId));
   const run = await scope.runs.getById(labelled.runId);
-  // No row (another database, a deleted test tenant) or still `queued` (a workspace reserved just
-  // before a crash; the claim never happened): the objects are gone, there is nothing to record.
-  if (!run || run.status === 'queued') return false;
+  // Not a real run: maybe an evaluation run (its own tables, QUESTIONS #460).
+  if (!run) return abandonEvaluationRun(scope, labelled.runId);
+  // Still `queued` (a workspace reserved just before a crash; the claim never happened): the
+  // objects are gone, there is nothing to record.
+  if (run.status === 'queued') return false;
 
   let failed = false;
   if (ACTIVE.includes(run.status)) {
@@ -135,6 +143,22 @@ async function cleanUpRun(
     duration_ms: result.durationMs,
   });
   return failed;
+}
+
+/**
+ * The objects of an evaluation run were removed while the run was `running`: the runner was lost
+ * (a restart, a crash). Not the agent's fault, and the result is gone: the run is stopped and
+ * queued again for the next attempt, or fails (`runner_lost`) after `MAX_EVALUATION_ATTEMPTS`.
+ * Returns true when the run was changed. Any other state, or no such run, changes nothing.
+ */
+async function abandonEvaluationRun(scope: TenantScope, runId: string): Promise<boolean> {
+  const run = await scope.evaluationRuns.getById(runId);
+  if (run?.status !== 'running') return false;
+  if (run.attempt >= MAX_EVALUATION_ATTEMPTS) {
+    return scope.evaluationRuns.markFailed(runId, 'runner_lost');
+  }
+  if (!(await scope.evaluationRuns.markPreempted(runId))) return false;
+  return scope.evaluationRuns.requeue(runId);
 }
 
 /**

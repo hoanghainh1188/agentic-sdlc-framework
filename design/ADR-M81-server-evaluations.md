@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L04, PR 4a done; for review) |
+| Status | **Proposed** (task L04, PR 4b done; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L04 plan approved 2026-10-14, with answers to QUESTIONS #460–#464) |
 | Related | D-08 task L04 (AC1–AC5), then L05 (plans, API, CLI, schedules) and L06 (reports in the dashboard); ADR-M78 (the harness), ADR-M25 (sandbox, guard), ADR-M33 §2.6 (runner queue), ADR-M24 and ADR-M45 (cost), ADR-M29 (agent path), ADR-M80 §4.1 (canary search); D-07 §3–§5; D-05 §6.8 (the tables); QUESTIONS #450, #460–#464 |
@@ -44,6 +44,7 @@ As built (PR 4a): the contract (`@sdlc/contracts` `EvaluationRunContract`, kind 
 
 - Evaluation runs go on their own Temporal task queue, `sdlc-runner-eval`.
 - They use **free slots only**, at most `SDLC_RUNNER_MAX_EVAL_SANDBOXES` (default 1, never above `SDLC_RUNNER_MAX_SANDBOXES`). A real run always counts first.
+- As built (PR 4b): the runner's `SlotPool` has a second class. `acquireEvaluation(onPreempt)` is granted only while an evaluation slot is free (`SDLC_RUNNER_MAX_EVAL_SANDBOXES`), the pool has a free slot and no real run waits; a freed slot goes to a waiting real run first. When a real run waits and no slot is free, the evaluation runs holding slots are asked to stop (once each, newest first, as many as real runs wait); the evaluation activity (PR 4c) then interrupts its agent, marks the run `preempted`, queues it again and frees the slot. After a lost runner (a restart or a crash) the sweep queues a `running` evaluation run again, and fails it with `runner_lost` after three attempts (`MAX_EVALUATION_ATTEMPTS`).
 - When a real run waits and no slot is free, a running evaluation run is stopped (interrupt, then kill), marked `preempted`, queued again and **not counted** in the results.
 - Because the kill switch is for real runs, an evaluation run is stopped by its own path (`cancelled` or `preempted`), never by `kill_run`.
 
@@ -64,6 +65,9 @@ The runner talks to Docker only through its endpoint allowlist, which has no ima
 3. The agent's diff and the hidden tests are applied and run with no egress: no network, no capability, `no-new-privileges`, user `node`, memory, CPU, process and time limits as today.
 
 Developer machines use the same three steps (replacing `sdlc-eval-base`), so both places score the same way. As built (PR 2, `LocalExecutor`): the container is created from the sandbox image with the sandbox user, no capability, a read-only root and one volume `/workspace` (the repository, its packages and the pnpm store); the pinned commit and the inputs go in through `docker exec … tar`, never a bind mount. Step 1 first waits until the package proxy answers. If the packages cannot be installed, scoring throws and the run gets no result (it is not the agent's fault, and it can be repeated). The diff is recomputed outside the sandbox with hardened git (ADR-M29 §2.5). A new guard rule needs its own test and a note in ADR-M25.
+
+As built (PR 4b, `scoreEvaluationRun` in the runner): the Docker client has no exec, so each step is a container over one workspace volume, and the proxy is "detached" by the next container having no network at all. Step 1 is a container on the run's internal network with the package proxy attached; it installs and exits. The container, the proxy attachment and the network are removed. Step 3 is a new container with `NetworkMode: none` over the same volume (the repository, its packages, the pnpm store and the corepack cache all live on it). The guard rule is in ADR-M25 §2.5. The inputs go into the volume with one archive before step 1 (the pinned commit's tree, the two patches, the two scripts, the hidden tests); the result is the script's last line on the container's standard output. The step that runs the agent's code is stronger than on a developer machine: not a network that was detached, but none. The live test `pnpm test:eval-score` shows the same score as `LocalExecutor` for the reference solution and for the untouched base of a task, and that the proxy, the internet and DNS all fail from step 3 (with a positive control). Known limit, the same on both: the tests of the task run as the same user as the script, so code written to forge the result could try; the last line of the output and the fixed command make it hard, not impossible (ADR-M80).
+
 
 ### 2.6. Data classes and models (AC4)
 
@@ -126,3 +130,4 @@ Only the operator command `pnpm sdlc ops eval start --tenant --project --config 
 | 0.2 | 2026-10-14 | Claude (task L04, PR 2) | §2.1, §2.5 as built: `@sdlc/eval`, `EvalExecutor`, `LocalExecutor`, the hardware block, scoring in the sandbox image |
 | 0.3 | 2026-10-14 | Claude (task L04, PR 3) | §2.2, §2.6, §2.7 as built: the tables, the data-class rule without a project default, the operator command; budget service and queue primitives in core |
 | 0.4 | 2026-10-14 | Claude (task L04, PR 4a) | §2.2, §2.4 as built: the evaluation contract, the key and the sync; §3: PR 4 is split into 4a, 4b and 4c because the runner's provisioning and driver are tied to `runs` (4b and 4c reuse their polling and caps without a `runs` row) |
+| 0.5 | 2026-10-14 | Claude (task L04, PR 4b) | §2.3, §2.5 as built: the slot pool, the sweep of lost evaluation runs, scoring in two containers over one volume with the guard rule |

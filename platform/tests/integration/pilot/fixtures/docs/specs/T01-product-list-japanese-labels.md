@@ -1,9 +1,9 @@
 # T01 商品一覧画面の日本語表示 / Japanese labels on the product list screen
 
-| 項目 / Item | 値 / Value |
-|---|---|
-| リスク区分 / Risk tier | Low (D-09 §7) |
-| 関連機能 / Related features | F1 |
+| 項目 / Item                 | 値 / Value    |
+| --------------------------- | ------------- |
+| リスク区分 / Risk tier      | Low (D-09 §7) |
+| 関連機能 / Related features | F1            |
 
 > リスク区分と自律レベルはプラットフォームが決める。この表は人のための参考情報。
 > The platform decides the risk tier and the autonomy level. This table is for people.
@@ -25,14 +25,14 @@ Warehouse and sales staff can read the product list screen in Japanese.
 - AC1: 商品一覧画面の文言を次の日本語にする。
   The product list screen shows these Japanese texts.
 
-  | 現在 / Now | 変更後 / New |
-  |---|---|
-  | Products | 商品一覧 |
-  | New product | 商品を登録 |
-  | SKU | SKU |
-  | Name | 商品名 |
-  | Price | 価格 |
-  | Sales status | 販売状態 |
+  | 現在 / Now       | 変更後 / New                   |
+  | ---------------- | ------------------------------ |
+  | Products         | 商品一覧                       |
+  | New product      | 商品を登録                     |
+  | SKU              | SKU                            |
+  | Name             | 商品名                         |
+  | Price            | 価格                           |
+  | Sales status     | 販売状態                       |
   | No products yet. | 商品はまだ登録されていません。 |
 
 - AC2: 販売状態を `on_sale` → 販売中、`discontinued` → 販売終了 と表示する。

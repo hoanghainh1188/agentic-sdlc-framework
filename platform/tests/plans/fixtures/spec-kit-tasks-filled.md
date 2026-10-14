@@ -1,5 +1,5 @@
 ---
-description: "Task list for T03: filter orders by status"
+description: 'Task list for T03: filter orders by status'
 ---
 
 # Tasks: Filter orders by status / 注文をステータスで絞り込む

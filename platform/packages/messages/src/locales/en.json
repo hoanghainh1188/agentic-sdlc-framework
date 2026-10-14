@@ -700,6 +700,8 @@
   "runner.docker.unreachable": "The runner cannot reach the Docker socket ({code}).",
   "runner.docker.response_too_large": "Docker sent an answer larger than the runner accepts.",
   "runner.slot_wait_aborted": "The run stopped waiting for a free sandbox slot.",
+  "runner.scoring_failed": "Scoring of an evaluation run failed ({reason}).",
+  "runner.eval_slots_off": "Evaluation runs are turned off on this runner (SDLC_RUNNER_MAX_EVAL_SANDBOXES is 0).",
   "runner.agent_failed": "The agent of the run could not be started or driven: {reason}.",
   "runner.agent_not_configured": "The runner has no agent adapter configured.",
   "agent.error.invalid_input": "The agent request is invalid ({field}).",

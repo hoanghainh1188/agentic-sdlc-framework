@@ -76,7 +76,7 @@ function digestOf(image: string): string {
   return match[1]!;
 }
 
-async function ensureImage(docker: DockerClient, image: string): Promise<void> {
+export async function ensureImage(docker: DockerClient, image: string): Promise<void> {
   if (await docker.imageInspect(image)) return;
   try {
     await docker.imagePull(image);

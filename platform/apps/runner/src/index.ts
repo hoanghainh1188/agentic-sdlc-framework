@@ -9,9 +9,23 @@ export type {
 export {
   assertSafeContainerSpec,
   assertSafeNetworkSpec,
+  assertSafeScoringSpec,
   SANDBOX_ENV_ALLOWLIST,
+  SCORING_COMMANDS,
+  SCORING_ENV_ALLOWLIST,
+  SCORING_ENTRYPOINT,
   type ContainerSpec,
+  type ScoringContainerSpec,
+  type ScoringPhase,
 } from './docker/guard.js';
+export { buildScoringSpec, type ScoringSpecInput } from './sandbox/scoring-spec.js';
+export {
+  scoreEvaluationRun,
+  ScoringError,
+  type ScoreEvaluationDeps,
+  type ScoreEvaluationInput,
+  type ScoringFailure,
+} from './evaluation/score.js';
 export { agentUrl, attachRunner } from './agent/access.js';
 export {
   AGENT_WORKING_DIR,
@@ -81,6 +95,7 @@ export {
 } from './process.js';
 export {
   findRunObjects,
+  MAX_EVALUATION_ATTEMPTS,
   reconcileOnStart,
   sweepOrphans,
   type ReconcileDeps,

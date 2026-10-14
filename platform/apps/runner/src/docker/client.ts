@@ -9,7 +9,14 @@
 import http from 'node:http';
 
 import { RunnerError } from '../errors.js';
-import { assertSafeContainerSpec, assertSafeNetworkSpec, type ContainerSpec } from './guard.js';
+import {
+  assertSafeContainerSpec,
+  assertSafeNetworkSpec,
+  assertSafeScoringSpec,
+  type ContainerSpec,
+  type ScoringContainerSpec,
+  type ScoringPhase,
+} from './guard.js';
 
 /** Docker Engine 25 or later (API 1.44). The server answers older versions for newer clients. */
 export const DOCKER_API_VERSION = 'v1.44';
@@ -175,6 +182,20 @@ export class DockerClient {
   /** Creates a container from a guarded spec (guard.ts). Returns its ID. */
   async containerCreate(name: string, spec: ContainerSpec): Promise<string> {
     assertSafeContainerSpec(name, spec);
+    const res = await this.#expect('POST', '/containers/create', [201], spec, { name });
+    return (JSON.parse(res.body.toString('utf8')) as { Id: string }).Id;
+  }
+
+  /**
+   * Creates a scoring container of an evaluation run (task L04, ADR-M81 §2.5) from a spec the
+   * scoring guard accepts for `phase` (guard.ts). Returns its ID.
+   */
+  async scoringContainerCreate(
+    name: string,
+    spec: ScoringContainerSpec,
+    phase: ScoringPhase,
+  ): Promise<string> {
+    assertSafeScoringSpec(name, spec, phase);
     const res = await this.#expect('POST', '/containers/create', [201], spec, { name });
     return (JSON.parse(res.body.toString('utf8')) as { Id: string }).Id;
   }

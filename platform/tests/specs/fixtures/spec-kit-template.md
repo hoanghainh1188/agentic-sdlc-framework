@@ -1,6 +1,6 @@
 # Feature Specification: [FEATURE NAME]
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 <!--
   IMPORTANT: User stories should be PRIORITIZED as user journeys.
@@ -19,10 +19,10 @@
 
 ---
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 - **SC-001**: [Measurable metric]

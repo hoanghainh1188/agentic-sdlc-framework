@@ -870,6 +870,8 @@ services:
       SDLC_RUNNER_DOCKER_SOCKET: /run/docker-proxy/docker.sock
       SDLC_RUNNER_INSTANCE: ${COMPOSE_PROJECT_NAME:-sdlc}
       SDLC_RUNNER_MAX_SANDBOXES: ${SDLC_RUNNER_MAX_SANDBOXES:-1}
+      # L04 (ADR-M81 §2.3): free slots only, never above the line before; 0 turns evaluations off.
+      SDLC_RUNNER_MAX_EVAL_SANDBOXES: ${SDLC_RUNNER_MAX_EVAL_SANDBOXES:-1}
       SDLC_RUNNER_SWEEP_INTERVAL_SECONDS: ${SDLC_RUNNER_SWEEP_INTERVAL_SECONDS:-300}
       SDLC_RUNNER_EGRESS_SERVICES: litellm=${COMPOSE_PROJECT_NAME:-sdlc}-litellm-1:4000,npm-proxy=${COMPOSE_PROJECT_NAME:-sdlc}-npm-proxy-1:4873
       SDLC_RUNNER_NPM_REGISTRY: http://npm-proxy:4873/

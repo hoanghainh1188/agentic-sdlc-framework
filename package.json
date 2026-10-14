@@ -47,6 +47,7 @@
     "eval": "tsc -b platform/eval && platform/eval/run.sh",
     "eval:report": "tsc -b platform/eval && node platform/eval/dist/cli.js report",
     "eval:pairs": "tsc -b platform/eval && node platform/eval/dist/cli.js pairs",
+    "test:eval-score": "SDLC_EVAL_SCORE_TEST=1 vitest run --config vitest.integration.config.ts platform/tests/integration/eval/score-server.test.ts",
     "test:attack": "SDLC_ATTACK_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/attack platform/deploy/scripts/test-db.sh",
     "test:agent-api": "SDLC_AGENT_API_TEST=1 SDLC_TEST_DB_DIR=platform/tests/integration/agent/agent-api.test.ts platform/deploy/scripts/test-db.sh",
     "openbao:bootstrap": "platform/deploy/openbao/bootstrap.sh",

@@ -91,7 +91,7 @@ export class Runner {
     this.#deps = { ...deps, held: this.held };
     this.#hooks = hooks;
     this.#agent = agent;
-    this.pool = new SlotPool(deps.settings.maxSandboxes);
+    this.pool = new SlotPool(deps.settings.maxSandboxes, deps.settings.maxEvalSandboxes);
   }
 
   /** Cleans up after the previous process, then sweeps at the configured interval. */

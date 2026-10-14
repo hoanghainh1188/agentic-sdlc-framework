@@ -14,6 +14,7 @@ export const RUNNER_ENV = {
   dockerSocket: 'SDLC_RUNNER_DOCKER_SOCKET',
   instance: 'SDLC_RUNNER_INSTANCE',
   maxSandboxes: 'SDLC_RUNNER_MAX_SANDBOXES',
+  maxEvalSandboxes: 'SDLC_RUNNER_MAX_EVAL_SANDBOXES',
   memoryMb: 'SDLC_RUNNER_SANDBOX_MEMORY_MB',
   cpus: 'SDLC_RUNNER_SANDBOX_CPUS',
   pids: 'SDLC_RUNNER_SANDBOX_PIDS',
@@ -97,6 +98,12 @@ export interface RunnerSettings {
   readonly instance: string;
   /** Concurrent sandboxes (D-03 §10.1: 1–2 on the internal server). Extra runs wait. */
   readonly maxSandboxes: number;
+  /**
+   * Sandboxes evaluation runs may hold at the same time (task L04, ADR-M81 §2.3, QUESTIONS #461):
+   * free slots only, never above `maxSandboxes`; 0 turns evaluations off. A waiting real run takes
+   * the slot of a running evaluation run, which is stopped and queued again.
+   */
+  readonly maxEvalSandboxes: number;
   readonly limits: SandboxLimits;
   readonly egressServices: readonly EgressService[];
   /** npm registry URL given to the sandbox; its host must be an egress service alias. */
@@ -124,6 +131,7 @@ export const DEFAULT_DOCKER_SOCKET = '/var/run/docker.sock';
 export const DEFAULTS = {
   instance: 'sdlc',
   maxSandboxes: 1,
+  maxEvalSandboxes: 1,
   memoryMb: 2048,
   cpus: '1.5',
   pids: 512,
@@ -304,16 +312,26 @@ export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Run
   const cpus = env[RUNNER_ENV.cpus] || DEFAULTS.cpus;
   if (!CPUS.test(cpus) || Number(cpus) <= 0) throw invalid(RUNNER_ENV.cpus);
   const egressServices = parseEgressServices(env[RUNNER_ENV.egressServices]);
+  const maxSandboxes = intSetting(
+    env,
+    RUNNER_ENV.maxSandboxes,
+    DEFAULTS.maxSandboxes,
+    1,
+    MAX_SANDBOXES_LIMIT,
+  );
+  // Never above the pool: an evaluation run can only use a slot the pool has (ADR-M81 §2.3).
+  const maxEvalSandboxes = intSetting(
+    env,
+    RUNNER_ENV.maxEvalSandboxes,
+    Math.min(DEFAULTS.maxEvalSandboxes, maxSandboxes),
+    0,
+    maxSandboxes,
+  );
   return {
     dockerSocket,
     instance,
-    maxSandboxes: intSetting(
-      env,
-      RUNNER_ENV.maxSandboxes,
-      DEFAULTS.maxSandboxes,
-      1,
-      MAX_SANDBOXES_LIMIT,
-    ),
+    maxSandboxes,
+    maxEvalSandboxes,
     limits: {
       memoryBytes: intSetting(env, RUNNER_ENV.memoryMb, DEFAULTS.memoryMb, 256, 65_536) * MIB,
       nanoCpus: Math.round(Number(cpus) * 1e9),

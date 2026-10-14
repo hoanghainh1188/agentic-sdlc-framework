@@ -124,27 +124,29 @@ export function packTar(entries: readonly TarEntry[]): Buffer {
 }
 
 /**
- * Packs a directory (the cloned repository, `.git` included) with `.` as its root entry. Refuses
- * special files, and a total content size above `maxBytes` (`workspace_too_large`).
+ * The entries of a directory tree, without the root entry, each path starting with `prefix` when
+ * given (task L04: the evaluation scoring puts the tree under `work/`). Refuses special files,
+ * hard links, symbolic-link tricks and a total content size above `maxBytes`
+ * (`workspace_too_large`). A symbolic link is kept as the link itself, never its target.
  */
-export function packDirectory(root: string, maxBytes: number): Buffer {
+export function directoryEntries(root: string, maxBytes: number, prefix = ''): TarEntry[] {
   const rootStat = fs.lstatSync(root);
   if (!rootStat.isDirectory()) throw new RunnerError('runner.workspace.special_file');
   const realRoot = path.resolve(root);
-  const entries: TarEntry[] = [{ type: 'dir', path: '.' }];
+  const entries: TarEntry[] = [];
+  const named = (rel: string): string => (prefix ? `${prefix}/${rel}` : rel);
   let total = 0;
-  const walk = (dir: string, prefix: string): void => {
+  const walk = (dir: string, relDir: string): void => {
     const names = fs.readdirSync(dir).sort();
     for (const name of names) {
       const full = path.join(dir, name);
-      const rel = prefix ? `${prefix}/${name}` : name;
+      const rel = relDir ? `${relDir}/${name}` : name;
       insideWorkspace(realRoot, full, rel);
       const stat = fs.lstatSync(full);
       if (stat.isSymbolicLink()) {
-        // The link itself, never its target.
-        entries.push({ type: 'symlink', path: rel, target: fs.readlinkSync(full) });
+        entries.push({ type: 'symlink', path: named(rel), target: fs.readlinkSync(full) });
       } else if (stat.isDirectory()) {
-        entries.push({ type: 'dir', path: rel });
+        entries.push({ type: 'dir', path: named(rel) });
         walk(full, rel);
       } else if (stat.isFile()) {
         if (stat.nlink > 1) throw new RunnerError('runner.workspace.special_file');
@@ -152,7 +154,7 @@ export function packDirectory(root: string, maxBytes: number): Buffer {
         if (total > maxBytes) throw new RunnerError('runner.workspace.too_large');
         entries.push({
           type: 'file',
-          path: rel,
+          path: named(rel),
           content: readRegularFile(full, stat),
           executable: (stat.mode & 0o111) !== 0,
         });
@@ -162,7 +164,15 @@ export function packDirectory(root: string, maxBytes: number): Buffer {
     }
   };
   walk(realRoot, '');
-  return packTar(entries);
+  return entries;
+}
+
+/**
+ * Packs a directory (the cloned repository, `.git` included) with `.` as its root entry. Refuses
+ * special files, and a total content size above `maxBytes` (`workspace_too_large`).
+ */
+export function packDirectory(root: string, maxBytes: number): Buffer {
+  return packTar([{ type: 'dir', path: '.' }, ...directoryEntries(root, maxBytes)]);
 }
 
 /** Refuses an entry whose path would leave the workspace after normalisation. */

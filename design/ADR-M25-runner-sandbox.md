@@ -102,6 +102,8 @@ The sandbox never receives a provider key, the LiteLLM master key, an OpenBao ad
 
   Items 1 and 2 belong to A10 (infrastructure operator); item 3 is MVP+1.
 
+**Scoring containers (task L04, ADR-M81 §2.5, QUESTIONS #463).** The runner scores an evaluation run with the sandbox image, with no new endpoint (still no exec, no build, no archive read). A new guard rule `assertSafeScoringSpec` accepts a container only if it is a hardened sandbox of the run (same name, labels, image by digest, user, capabilities, read-only root, limits, the one volume of the run) with **one fixed command**: `Entrypoint` `/bin/sh -c` and `Cmd` `sh /workspace/in/install.sh` or `sh /workspace/in/score.sh`, never another. The `install` step is on the run's own internal network with the package proxy; the `score` step, which runs the agent's diff and the hidden tests, must have `NetworkMode: none`. Its environment allowlist is its own (`HOME`, `CI`, the proxy, the pnpm store and the corepack cache, both on the volume); a provider key or token is refused. The result is read from the container's standard output (the logs endpoint is already allowed), never from a file the agent's code could have rewritten after the script. Tests: `tests/runner/guard-scoring.test.ts` (every refusal), `score-evaluation.test.ts` (the order of Docker calls, with the stub) and the live `pnpm test:eval-score` (no network, same score as the developer machine).
+
 ### 2.6. Settings
 
 Deployment settings come from the environment (`SDLC_RUNNER_*`), not from the project configuration: they describe the Docker host. They choose sizes and reachable services; nothing can loosen §2.4.
@@ -111,6 +113,7 @@ Deployment settings come from the environment (`SDLC_RUNNER_*`), not from the pr
 | `SDLC_RUNNER_DOCKER_SOCKET` | `/var/run/docker.sock` | Absolute path; in Compose the socket proxy |
 | `SDLC_RUNNER_INSTANCE` | `sdlc` | Label value; separates runner deployments on one Docker host |
 | `SDLC_RUNNER_MAX_SANDBOXES` | `1` | 1–16. D-03 §10.1: 1–2 on the internal server |
+| `SDLC_RUNNER_MAX_EVAL_SANDBOXES` | `1` | 0 to `SDLC_RUNNER_MAX_SANDBOXES`. Evaluation runs (ADR-M81 §2.3): free slots only; 0 turns them off |
 | `SDLC_RUNNER_SANDBOX_MEMORY_MB`, `_CPUS`, `_PIDS`, `_TMP_MB` | 2048, 1.5, 512, 512 | ADR-M10 §2.5 |
 | `SDLC_RUNNER_EGRESS_SERVICES` | none | `alias=container:port,…`, for example `litellm=sdlc-litellm-1:4000,npm-proxy=sdlc-npm-proxy-1:4873` |
 | `SDLC_RUNNER_NPM_REGISTRY` | none | For example `http://npm-proxy:4873/`; its host and port must be an egress service |
@@ -244,3 +247,4 @@ C04 adds no handbook threshold. Budget, iteration and loop limits belong to C05 
 | 0.4 | 2026-09-27 | Claude (task C04, session 2 review) | §2.3: what goes into the archive: links as link entries only (never read or followed, O_NOFOLLOW, same inode), hard links and special files refused, paths inside the workspace after normalisation (Harry's review of PR #91) |
 | 0.5 | 2026-09-27 | Claude (task C04, session 3) | §2.5: wollomatic/socket-proxy with the endpoint allowlist, bind mounts refused, the honest limit (no body inspection) and mitigations; §2.6: sweep, database and heartbeat settings, one process per instance; §2.7: the Temporal handoff moves to C06 (QUESTIONS #55), the slot pool around provisioning; §2.8: workspace reserved before the claim, clean-up at start, sweep, `run_abandoned`; §2.9: image `node24`, build script, local registry on 127.0.0.1, CI job; §2.10: Verdaccio 6.9.3, accepted exfiltration risk, request log |
 | 0.6 | 2026-10-09 | Claude (runner fix), approved by Harry | §2.8 restart: the clean-up also removes the `publish-*` folders of a push the old process did not finish (they hold client code); other entries of the work folder stay |
+| 0.7 | 2026-10-14 | Claude (task L04, PR 4b), approved by Harry | §2.5: the scoring guard rule for evaluation runs (a fixed command, `NetworkMode: none` for the step that runs the agent's code); `SDLC_RUNNER_MAX_EVAL_SANDBOXES` (§2.6 row) |

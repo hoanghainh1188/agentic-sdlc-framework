@@ -34,6 +34,27 @@ describe('runner settings', () => {
     expect(settings({ SDLC_RUNNER_MAX_SANDBOXES: '2' }).maxSandboxes).toBe(2);
   });
 
+  it('reads the evaluation sandbox limit: 1 by default, never above the pool, 0 turns it off (L04)', () => {
+    expect(runnerSettingsFromEnv({}).maxEvalSandboxes).toBe(1);
+    expect(
+      settings({ SDLC_RUNNER_MAX_SANDBOXES: '4', SDLC_RUNNER_MAX_EVAL_SANDBOXES: '3' })
+        .maxEvalSandboxes,
+    ).toBe(3);
+    expect(settings({ SDLC_RUNNER_MAX_EVAL_SANDBOXES: '0' }).maxEvalSandboxes).toBe(0);
+    expect(() =>
+      runnerSettingsFromEnv({
+        SDLC_RUNNER_MAX_SANDBOXES: '2',
+        SDLC_RUNNER_MAX_EVAL_SANDBOXES: '3',
+      }),
+    ).toThrow(RunnerError);
+    expect(() => runnerSettingsFromEnv({ SDLC_RUNNER_MAX_EVAL_SANDBOXES: '-1' })).toThrow(
+      RunnerError,
+    );
+    expect(() => runnerSettingsFromEnv({ SDLC_RUNNER_MAX_EVAL_SANDBOXES: '1.5' })).toThrow(
+      RunnerError,
+    );
+  });
+
   it('reads the egress services and the npm registry of the package proxy', () => {
     const s = settings();
     expect(s.egressServices).toEqual([
