@@ -22,6 +22,7 @@ import type {
   RunContractVerifier,
   StartAgentRun,
 } from '@sdlc/contracts';
+import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
 import { loadTaskSet } from '@sdlc/eval';
 import { Redacted } from '@sdlc/secrets';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest';
@@ -38,12 +39,16 @@ import {
 } from '../../../apps/runner/src/index.js';
 import { packTar, type TarEntry } from '../../../apps/runner/src/workspace/tar.js';
 import {
+  createEvaluationPlan,
   evaluationContractBytes,
   issueEvaluationContract,
+  startEvaluationPlan,
+  type EvaluationPlanDeps,
 } from '../../../packages/core/src/evaluation/index.js';
 import { StubDocker } from '../../runner/stub-docker.js';
 import { repoRoot } from '../../workspace/helpers';
 import { seedEvaluation, type SeededEvaluation } from '../evaluation-seed.js';
+import { seedPlanWorld } from '../plan-seed.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
 
 const NOW = new Date('2026-10-14T08:00:00.000Z');
@@ -517,4 +522,98 @@ describeDb('L04 PR 4c: executeEvaluation on PostgreSQL (stub Docker, scripted ag
       expect(typeof evaluationContractBytes).toBe('function');
     },
   );
+
+  /** L05: an evaluation of a plan whose configuration has a prompt variant in the repository. */
+  async function planWorld(promptOnBranch: string, promptInRepo: string) {
+    const w = await seedPlanWorld(t.app, `exec-plan-${String(++tenants)}`, NOW);
+    // The variant is committed to the sample repository: the runner reads it at that commit.
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', ...args], {
+        cwd: source,
+        encoding: 'utf8',
+      }).trim();
+    git('checkout', '-q', '-B', `prompt-${String(tenants)}`, baseSha);
+    fs.mkdirSync(path.join(source, 'eval/prompts'), { recursive: true });
+    fs.writeFileSync(path.join(source, 'eval/prompts/short.md'), promptInRepo);
+    git('add', '-A');
+    git('commit', '-q', '-m', 'prompt');
+    const promptCommit = git('rev-parse', 'HEAD');
+    git('checkout', '-q', 'main');
+    const planDeps: EvaluationPlanDeps = {
+      policyFactory: (config, models) => createSimplePolicyEngine({ config, models }),
+      models: () => Promise.resolve([{ model: 'gpt-oss-20b', providerType: 'self_hosted' }]),
+      taskSet: () => Promise.resolve({ version: 1, baseSha, taskIds: ['feat-tax'] }),
+      gitHost: {
+        getBranchHead: () => Promise.resolve(promptCommit),
+        getFileAtCommit: () => Promise.resolve(promptOnBranch),
+      },
+      now: () => NOW,
+    };
+    const plan = await createEvaluationPlan(w.scope, planDeps, {
+      projectId: w.projectId,
+      code: 'short-prompt',
+      content: {
+        dataClass: 'internal',
+        taskSetVersion: 1,
+        taskIds: ['feat-tax'],
+        runsPerTask: 1,
+        budgetPerRunUsd: '1',
+        monthlyCapUsd: '5',
+        trigger: 'once',
+        configurations: [
+          {
+            id: 'oss-short',
+            model: 'gpt-oss-20b',
+            providerType: 'self_hosted',
+            maxIterations: 30,
+            maxDurationMin: 20,
+            promptPath: 'eval/prompts/short.md',
+          },
+        ],
+      },
+      userId: w.users.a,
+    });
+    const evaluation = await startEvaluationPlan(w.scope, planDeps, {
+      planId: plan.id,
+      actor: { type: 'human', userId: w.users.a },
+    });
+    const [run] = await w.scope.evaluationRuns.listForEvaluation(evaluation.id);
+    const seeded = { scope: w.scope, evaluationId: evaluation.id } as unknown as SeededEvaluation;
+    return { w: seeded, runId: run!.id };
+  }
+
+  it('L05: a run of a plan reads its prompt variant at the recorded commit, checked by SHA-256', async () => {
+    const prompt = 'Plan prompt: run the tests first.\n';
+    const { w, runId } = await planWorld(prompt, prompt);
+    await issue(w, runId);
+    exporting(w, runId, true);
+    scoreOutput(runId);
+    agent.finish();
+    const result = await executeEvaluation(deps(), input(w, runId), {
+      signal: new AbortController().signal,
+    });
+    expect(result.outcome).toBe('scored');
+    if (result.outcome !== 'scored') return;
+    // The agent read the variant as its instructions.
+    expect(result.measures.instructionsSha256).toBe(
+      crypto.createHash('sha256').update(prompt, 'utf8').digest('hex'),
+    );
+    expect(JSON.stringify(result)).not.toContain('Plan prompt');
+    // The token was used for both clones, then revoked once.
+    expect(revoked).toEqual([TOKEN]);
+  });
+
+  it('L05: a prompt variant that changed since the start fails the run with a code', async () => {
+    const { w, runId } = await planWorld('What the plan read.\n', 'Something else.\n');
+    await issue(w, runId);
+    const result = await executeEvaluation(deps(), input(w, runId), {
+      signal: new AbortController().signal,
+    });
+    expect(result).toEqual({ outcome: 'failed', reason: 'task_unavailable' });
+    expect(await status(w, runId)).toMatchObject({
+      status: 'failed',
+      stop_reason: 'task_unavailable',
+    });
+    expect(revoked).toEqual([TOKEN]);
+  });
 });

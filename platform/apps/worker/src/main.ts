@@ -21,6 +21,7 @@ import {
   loadEffectiveConfig,
   pollProject,
   prepareEvaluationRun,
+  advanceEvaluationPlan,
   Registry,
 } from '@sdlc/core';
 import { t } from '@sdlc/messages';
@@ -40,6 +41,8 @@ import { CostSyncLoop } from './cost-sync-loop.js';
 import { openWorkerEvidence } from './evidence-store.js';
 import { EscalationLoop } from './escalation-loop.js';
 import { EvaluationLoop } from './evaluation-loop.js';
+import { EvaluationPlanLoop } from './evaluation-plan-loop.js';
+import { taskSetReader } from './task-sets.js';
 import { jsonLogger } from './logger.js';
 import { PollerLoop } from './poller-loop.js';
 import { ReconcileLoop } from './reconcile-loop.js';
@@ -214,6 +217,28 @@ async function main(): Promise<void> {
         })
       : undefined;
   evaluations?.start(settings.evaluation.tickMs);
+  // The evaluation plan loop (L05, ADR-M82 §2.4): Run now requests, schedules, `on_change`.
+  const taskSets = taskSetReader(settings.evaluation.tasksDir);
+  const plans = workerRuns
+    ? new EvaluationPlanLoop({
+        listTenants: (now, limit) => db.system.listTenantsWithPlanWork(now, limit),
+        forTenant: (tenantId) => db.forTenant(tenantId),
+        advance: (scope, planId) =>
+          advanceEvaluationPlan(
+            scope,
+            {
+              policyFactory: (config, models) => createSimplePolicyEngine({ config, models }),
+              models: workerRuns.models,
+              taskSet: taskSets,
+              gitHost,
+            },
+            planId,
+          ),
+        now: () => new Date(),
+        logger,
+      })
+    : undefined;
+  plans?.start(settings.evaluation.tickMs);
   // Evidence retention (E05, ADR-M51): its own SeaweedFS identity `worker-purge`.
   const retentionStore = await openRetentionStore(settings.retention, secrets, logger);
   // Pack IDs found without a row, kept across passes: deleted only when seen twice.
@@ -307,6 +332,7 @@ async function main(): Promise<void> {
       reconcile?.stop(),
       costSync?.stop(),
       evaluations?.stop(),
+      plans?.stop(),
       retention?.stop(),
       intentWorker?.shutdown(),
     ])
