@@ -20,6 +20,12 @@ import { AdminTenantAdminsController } from './admin/tenant-admins.controller.js
 import { AdminUsersController } from './admin/users.controller.js';
 import { AiRecordsController } from './ai-records/ai-records.controller.js';
 import { AiRecordsService } from './ai-records/ai-records.service.js';
+import {
+  EvalPlansController,
+  EvaluationsController,
+  ProjectEvalPlansController,
+} from './evaluations/evaluations.controller.js';
+import { EvaluationsService } from './evaluations/evaluations.service.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { OAuthStates } from './auth/oauth-states.js';
 import { RateLimiter } from './auth/rate-limiter.js';
@@ -79,6 +85,7 @@ import {
   PASSKEYS,
   SIGN_IN,
   SPECS,
+  EVALUATIONS,
 } from './tokens.js';
 
 /** Largest accepted request body. Intents carry at most ~10 kB of text. */
@@ -185,6 +192,9 @@ class ApiModule {
         EvidenceHoldsController,
         EscalationsController,
         AiRecordsController,
+        ProjectEvalPlansController,
+        EvalPlansController,
+        EvaluationsController,
         AdminProjectsController,
         AdminUsersController,
         AdminTenantAdminsController,
@@ -243,6 +253,14 @@ class ApiModule {
           }),
         },
         { provide: AI_RECORDS, useValue: new AiRecordsService(signals, wakeLogger, now) },
+        {
+          provide: EVALUATIONS,
+          useValue: new EvaluationsService({
+            ...(deps.gitHost ? { gitHost: deps.gitHost } : {}),
+            policyFactory: (config, models) => createSimplePolicyEngine({ config, models }),
+            now,
+          }),
+        },
         {
           provide: APP_GUARD,
           useFactory: (reflector: Reflector) =>

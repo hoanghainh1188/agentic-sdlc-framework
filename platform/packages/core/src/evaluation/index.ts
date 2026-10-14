@@ -55,6 +55,7 @@ export {
   planChangeNeedsStepUp,
   planFleetSha256,
   readEvaluationPlan,
+  requestEvaluationPlanRun,
   resolveConfigurations,
   startEvaluationPlan,
   startOfNextUtcMonth,

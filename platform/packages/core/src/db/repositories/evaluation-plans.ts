@@ -12,7 +12,7 @@ import { sql, type Kysely } from 'kysely';
 
 import { fromMicros, isUsd, toMicros } from '../../cost/money.js';
 import { DbError } from '../errors.js';
-import type { Database, EvaluationPlan, EvaluationPlanVersion } from '../schema.js';
+import type { Database, Evaluation, EvaluationPlan, EvaluationPlanVersion } from '../schema.js';
 import { isUuid } from '../tenant-id.js';
 import {
   AGENT_KEY_PATTERN,
@@ -332,6 +332,8 @@ export class EvaluationPlanRepository extends TenantRepository {
           .updateTable('evaluation_plans')
           .set({
             status: 'archived',
+            run_requested_at: null,
+            run_requested_by: null,
             pause_reason: null,
             paused_until: null,
             next_run_at: null,
@@ -386,6 +388,104 @@ export class EvaluationPlanRepository extends TenantRepository {
         });
         return true;
       }),
+    );
+  }
+
+  /**
+   * Records a person's Run now (QUESTIONS #476) and writes `evaluation_plan.run_requested`. False
+   * when the plan is not active or a request waits already.
+   */
+  async requestRun(planId: string, by: string): Promise<boolean> {
+    if (!isUuid(planId)) return false;
+    if (!isUuid(by)) invalid('by');
+    return this.run(
+      this.transactional(async (db) => {
+        const updated = await db
+          .updateTable('evaluation_plans')
+          .set({
+            run_requested_at: sql<Date>`now()`,
+            run_requested_by: by,
+            last_refusal: null,
+            last_refusal_at: null,
+            updated_at: sql<Date>`now()`,
+          })
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', planId)
+          .where('status', '=', 'active')
+          .where('run_requested_at', 'is', null)
+          .returning('current_version')
+          .executeTakeFirst();
+        if (!updated) return false;
+        await new AuditLogRepository(db, this.tenantId).append({
+          action: 'evaluation_plan.run_requested',
+          actorType: 'human',
+          actorId: by,
+          entityId: planId,
+          payload: { version: updated.current_version },
+        });
+        return true;
+      }),
+    );
+  }
+
+  /** The worker took the request: it is cleared, started or refused. */
+  async clearRequest(planId: string): Promise<boolean> {
+    if (!isUuid(planId)) return false;
+    const result = await this.run(
+      this.db
+        .updateTable('evaluation_plans')
+        .set({ run_requested_at: null, run_requested_by: null, updated_at: sql<Date>`now()` })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', planId)
+        .where('run_requested_at', 'is not', null)
+        .executeTakeFirst(),
+    );
+    return Number(result.numUpdatedRows) === 1;
+  }
+
+  /** The worker could not start the plan: the code stays on the plan, and in the audit log. */
+  async recordRefusal(planId: string, reason: string): Promise<boolean> {
+    if (!isUuid(planId)) return false;
+    if (!CODE.test(reason)) invalid('reason');
+    return this.run(
+      this.transactional(async (db) => {
+        const updated = await db
+          .updateTable('evaluation_plans')
+          .set({
+            last_refusal: reason,
+            last_refusal_at: sql<Date>`now()`,
+            updated_at: sql<Date>`now()`,
+          })
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', planId)
+          .where('status', '!=', 'archived')
+          .returning('current_version')
+          .executeTakeFirst();
+        if (!updated) return false;
+        await new AuditLogRepository(db, this.tenantId).append({
+          action: 'evaluation_plan.run_refused',
+          actorType: 'system',
+          actorId: null,
+          entityId: planId,
+          payload: { version: updated.current_version, reason },
+        });
+        return true;
+      }),
+    );
+  }
+
+  /** The plan's evaluations, newest first (at most `limit`). */
+  async evaluations(planId: string, limit: number): Promise<Evaluation[]> {
+    if (!isUuid(planId)) return [];
+    return this.run(
+      this.db
+        .selectFrom('evaluations')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('plan_id', '=', planId)
+        .orderBy('created_at', 'desc')
+        .limit(limit)
+        .execute(),
     );
   }
 

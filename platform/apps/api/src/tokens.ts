@@ -16,3 +16,4 @@ export const EVIDENCE = Symbol('EvidenceService');
 export const INTENT_SIGNALS = Symbol('IntentWorkflowSignals');
 export const SIGN_IN = Symbol('SignInEndpoints');
 export const PASSKEYS = Symbol('PasskeyEndpoints');
+export const EVALUATIONS = Symbol('EvaluationsService');

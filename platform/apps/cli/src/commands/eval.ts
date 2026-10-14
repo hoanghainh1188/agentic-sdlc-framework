@@ -1,0 +1,229 @@
+// `sdlc eval …`: evaluation plans and evaluations over the API (task L05, design/ADR-M82 §2.7).
+// - `sdlc eval plan list --project <slug>` and `sdlc eval plan show <plan-id>`;
+// - `sdlc eval plan create --project <slug> --file <plan.json>` and
+//   `sdlc eval plan change <plan-id> --file <plan.json> --expected-version <n>`: the file holds the
+//   plan's fields as the API takes them (codes, numbers, amounts, a prompt variant's path; never a
+//   prompt text), at most 64 KB;
+// - `sdlc eval plan archive <plan-id>`; `sdlc eval run <plan-id>` (Run now: the worker starts it);
+// - `sdlc eval list --project <slug> | --plan <plan-id>` and `sdlc eval show <EVAL-…>`.
+// A role in the project's `access.eval_roles` changes and runs plans; a role on the project reads.
+import fs from 'node:fs';
+
+import { t } from '@sdlc/messages';
+
+import {
+  evalPlanListSchema,
+  evalPlanSchema,
+  evaluationListSchema,
+  evaluationSchema,
+  type EvalPlanSummaryView,
+  type EvaluationView,
+} from '../api/schemas.js';
+import { parseCommand, segment, withApi } from '../api/session.js';
+import { EXIT, type CliContext } from '../context.js';
+import { say, show, toJson } from '../output.js';
+
+const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const EVAL_CODE = /^EVAL-[0-9]{4}-[0-9]{4,9}$/;
+const MAX_FILE_BYTES = 64 * 1024;
+
+export async function runEval(args: readonly string[], ctx: CliContext): Promise<number> {
+  const [command, ...rest] = args;
+  if (command === 'plan') return runPlan(rest, ctx);
+  if (command === 'run') return runRun(rest, ctx);
+  if (command === 'list') return runList(rest, ctx);
+  if (command === 'show') return runShow(rest, ctx);
+  return usage(ctx);
+}
+
+async function runPlan(args: readonly string[], ctx: CliContext): Promise<number> {
+  const [command, ...rest] = args;
+  switch (command) {
+    case 'list': {
+      const parsed = parseCommand(rest, { project: { type: 'string' } });
+      const project = parsed?.values.project;
+      if (typeof project !== 'string' || !SLUG.test(project)) return usage(ctx);
+      const json = parsed?.values.json === true;
+      return withApi(ctx, json, async (client) => {
+        const list = await client.get(
+          `/v1/projects/${segment(project)}/eval-plans`,
+          evalPlanListSchema,
+        );
+        if (json) ctx.stdout(toJson(list));
+        else if (list.plans.length === 0) say(ctx, 'cli.eval.plan.none', { project });
+        else for (const plan of list.plans) printPlan(ctx, plan);
+        return EXIT.ok;
+      });
+    }
+    case 'show':
+    case 'archive': {
+      const parsed = parseCommand(rest, {}, 1);
+      const id = parsed?.positionals[0];
+      if (!parsed || id === undefined || !UUID.test(id)) return usage(ctx);
+      const json = parsed.values.json === true;
+      return withApi(ctx, json, async (client) => {
+        const path = `/v1/eval-plans/${segment(id)}`;
+        const plan =
+          command === 'show'
+            ? await client.get(path, evalPlanSchema)
+            : await client.post(`${path}/archive`, evalPlanSchema);
+        if (json) ctx.stdout(toJson(plan));
+        else {
+          printPlan(ctx, plan);
+          say(ctx, 'cli.eval.plan.current', {
+            trigger: plan.current.trigger,
+            configurations: plan.current.configurations.map((c) => c.id).join(','),
+            runs_per_task: plan.current.runs_per_task,
+            budget: plan.current.budget_per_run_usd,
+            cap: plan.current.monthly_cap_usd,
+          });
+        }
+        return EXIT.ok;
+      });
+    }
+    case 'create':
+    case 'change': {
+      const parsed = parseCommand(
+        rest,
+        {
+          project: { type: 'string' },
+          file: { type: 'string' },
+          'expected-version': { type: 'string' },
+        },
+        command === 'change' ? 1 : 0,
+      );
+      const values = parsed?.values;
+      const file = values?.file;
+      if (!parsed || !values || typeof file !== 'string') return usage(ctx);
+      const body = readPlanFile(ctx, file);
+      if (body === undefined) return EXIT.usage;
+      const json = values.json === true;
+      if (command === 'create') {
+        const project = values.project;
+        if (typeof project !== 'string' || !SLUG.test(project)) return usage(ctx);
+        return withApi(ctx, json, async (client) => {
+          const plan = await client.post(
+            `/v1/projects/${segment(project)}/eval-plans`,
+            evalPlanSchema,
+            body,
+          );
+          if (json) ctx.stdout(toJson(plan));
+          else say(ctx, 'cli.eval.plan.created', { id: plan.id, code: plan.code });
+          return EXIT.ok;
+        });
+      }
+      const id = parsed.positionals[0];
+      const expected = values['expected-version'];
+      if (id === undefined || !UUID.test(id) || typeof expected !== 'string') return usage(ctx);
+      if (!/^[1-9][0-9]{0,8}$/.test(expected)) return usage(ctx);
+      return withApi(ctx, json, async (client) => {
+        const plan = await client.post(`/v1/eval-plans/${segment(id)}/versions`, evalPlanSchema, {
+          ...body,
+          expected_version: Number(expected),
+        });
+        if (json) ctx.stdout(toJson(plan));
+        else say(ctx, 'cli.eval.plan.changed', { id: plan.id, version: plan.version });
+        return EXIT.ok;
+      });
+    }
+    default:
+      return usage(ctx);
+  }
+}
+
+async function runRun(args: readonly string[], ctx: CliContext): Promise<number> {
+  const parsed = parseCommand(args, {}, 1);
+  const id = parsed?.positionals[0];
+  if (!parsed || id === undefined || !UUID.test(id)) return usage(ctx);
+  const json = parsed.values.json === true;
+  return withApi(ctx, json, async (client) => {
+    const plan = await client.post(`/v1/eval-plans/${segment(id)}/runs`, evalPlanSchema);
+    if (json) ctx.stdout(toJson(plan));
+    else say(ctx, 'cli.eval.run.requested', { code: plan.code });
+    return EXIT.ok;
+  });
+}
+
+async function runList(args: readonly string[], ctx: CliContext): Promise<number> {
+  const parsed = parseCommand(args, { project: { type: 'string' }, plan: { type: 'string' } });
+  const values = parsed?.values;
+  const project = values?.project;
+  const plan = values?.plan;
+  if (!values) return usage(ctx);
+  if (project !== undefined && (typeof project !== 'string' || !SLUG.test(project))) {
+    return usage(ctx);
+  }
+  if (plan !== undefined && (typeof plan !== 'string' || !UUID.test(plan))) return usage(ctx);
+  const json = values.json === true;
+  const query = new URLSearchParams();
+  if (typeof project === 'string') query.set('project', project);
+  if (typeof plan === 'string') query.set('plan', plan);
+  return withApi(ctx, json, async (client) => {
+    const list = await client.get(`/v1/evaluations?${query.toString()}`, evaluationListSchema);
+    if (json) ctx.stdout(toJson(list));
+    else if (list.evaluations.length === 0) say(ctx, 'cli.eval.none');
+    else for (const evaluation of list.evaluations) printEvaluation(ctx, evaluation);
+    return EXIT.ok;
+  });
+}
+
+async function runShow(args: readonly string[], ctx: CliContext): Promise<number> {
+  const parsed = parseCommand(args, {}, 1);
+  const code = parsed?.positionals[0];
+  if (!parsed || code === undefined || !EVAL_CODE.test(code)) return usage(ctx);
+  const json = parsed.values.json === true;
+  return withApi(ctx, json, async (client) => {
+    const evaluation = await client.get(`/v1/evaluations/${segment(code)}`, evaluationSchema);
+    if (json) ctx.stdout(toJson(evaluation));
+    else {
+      printEvaluation(ctx, evaluation);
+      if (evaluation.runs) {
+        say(ctx, 'cli.eval.runs', { ...evaluation.runs, spent: show(evaluation.spent_usd) });
+      }
+    }
+    return EXIT.ok;
+  });
+}
+
+/** The plan file: JSON, at most 64 KB, an object. Never printed back. */
+function readPlanFile(ctx: CliContext, file: string): Record<string, unknown> | undefined {
+  try {
+    const stat = fs.statSync(file);
+    if (!stat.isFile() || stat.size > MAX_FILE_BYTES) throw new Error('size');
+    const value: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (typeof value !== 'object' || value === null || Array.isArray(value))
+      throw new Error('shape');
+    return value as Record<string, unknown>;
+  } catch {
+    ctx.stderr(t('cli.eval.file_unreadable'));
+    return undefined;
+  }
+}
+
+function printPlan(ctx: CliContext, plan: EvalPlanSummaryView): void {
+  say(ctx, 'cli.eval.plan.line', {
+    id: plan.id,
+    code: plan.code,
+    version: plan.version,
+    status: plan.status,
+    next_run_at: show(plan.next_run_at),
+    requested: show(plan.run_requested_at),
+    refusal: show(plan.last_refusal),
+  });
+}
+
+function printEvaluation(ctx: CliContext, evaluation: EvaluationView): void {
+  say(ctx, 'cli.eval.line', {
+    code: evaluation.code,
+    status: evaluation.status,
+    stop_reason: show(evaluation.stop_reason),
+    budget: evaluation.budget_usd,
+    created_at: evaluation.created_at,
+  });
+}
+
+function usage(ctx: CliContext): number {
+  ctx.stderr(t('cli.eval.usage'));
+  return EXIT.usage;
+}

@@ -665,6 +665,16 @@ export const AUDIT_ACTIONS = {
       budget_usd: 'decimal',
     },
   },
+  /** A person asked to run a plan now (L05, QUESTIONS #476); the worker starts it. */
+  'evaluation_plan.run_requested': {
+    entityType: 'evaluation_plan',
+    fields: { version: 'version' },
+  },
+  /** The worker could not start a plan (L05): `reason` a code (`model_not_allowed`, …). */
+  'evaluation_plan.run_refused': {
+    entityType: 'evaluation_plan',
+    fields: { version: 'version', reason: 'code' },
+  },
   /** A plan's schedule paused (L05): `reason` a code (`monthly_cap_used`). */
   'evaluation_plan.paused': { entityType: 'evaluation_plan', fields: { reason: 'code' } },
 } as const satisfies Readonly<Record<string, AuditActionSpec>>;

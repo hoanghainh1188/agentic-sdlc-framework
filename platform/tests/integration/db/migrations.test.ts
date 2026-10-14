@@ -188,6 +188,11 @@ const UPDATABLE: Record<string, readonly string[]> = {
     'next_run_at',
     'seen_sha256',
     'updated_at',
+    // Migration 0032: a person's Run now and the worker's last refusal (QUESTIONS #476).
+    'run_requested_at',
+    'run_requested_by',
+    'last_refusal',
+    'last_refusal_at',
   ],
   evaluation_plan_versions: [],
   evaluation_configurations: [],
@@ -336,8 +341,9 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // L04: evaluations → projects, users; evaluation_runs → evaluations; evaluation_run_results →
     // evaluation_runs; cost_records → evaluation_runs; evaluation_run_contracts → evaluation_runs.
     // L05: evaluation_plans → projects, users; evaluation_plan_versions → evaluation_plans, users;
-    // evaluations → evaluation_plans; evaluation_configurations → evaluations, agents.
-    expect(fks).toHaveLength(79);
+    // evaluations → evaluation_plans; evaluation_configurations → evaluations, agents;
+    // evaluation_plans → users (run_requested_by, migration 0032).
+    expect(fks).toHaveLength(80);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

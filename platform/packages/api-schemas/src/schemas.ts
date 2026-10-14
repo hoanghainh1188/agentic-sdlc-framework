@@ -680,3 +680,97 @@ export const passkeyRegistrationOptionsSchema = z.object({
   expires_in_seconds: z.number().int().min(1).max(600),
 });
 export type PasskeyRegistrationOptions = z.infer<typeof passkeyRegistrationOptionsSchema>;
+
+// Evaluation plans and evaluations (task L05, ADR-M82 §2.7). Codes, IDs, amounts, hashes.
+const decimal = z.string().regex(/^[0-9]{1,15}(\.[0-9]{1,6})?$/);
+const sha = z.string().regex(/^[0-9a-f]{40,64}$/);
+
+export const evalPlanConfigurationSchema = z.object({
+  id: code,
+  agent_key: code.nullable(),
+  model: z.string().max(128).nullable(),
+  provider_type: code.nullable(),
+  max_iterations: z.number().int(),
+  max_duration_min: z.number().int(),
+  prompt: z.object({ path: z.string().max(512), commit: sha, sha256: sha }).nullable(),
+});
+
+export const evalPlanVersionSchema = z.object({
+  version: z.number().int(),
+  data_class: code,
+  task_set_version: z.number().int(),
+  task_ids: z.array(code).max(64).nullable(),
+  runs_per_task: z.number().int(),
+  budget_per_run_usd: decimal,
+  monthly_cap_usd: decimal,
+  trigger: code,
+  schedule: z
+    .object({ every: code, hour: z.number().int(), weekday: z.number().int().nullable() })
+    .nullable(),
+  configurations: z.array(evalPlanConfigurationSchema).max(16),
+  changed_by: id.nullable(),
+  created_at: time,
+});
+
+export const evaluationSchema = z.object({
+  id,
+  code,
+  project_id: id,
+  plan_id: id.nullable(),
+  plan_version: z.number().int().nullable(),
+  config_name: code.nullable(),
+  data_class: code,
+  task_set_version: z.number().int(),
+  task_ids: z.array(code).max(64),
+  configuration_ids: z.array(code).max(16),
+  runs_per_task: z.number().int(),
+  budget_usd: decimal,
+  status: code,
+  stop_reason: code.nullable(),
+  started_by: id.nullable(),
+  created_at: time,
+  finished_at: time.nullable(),
+  runs: z
+    .object({
+      queued: z.number().int(),
+      running: z.number().int(),
+      preempted: z.number().int(),
+      scored: z.number().int(),
+      failed: z.number().int(),
+      cancelled: z.number().int(),
+    })
+    .optional(),
+  spent_usd: decimal.optional(),
+});
+export type EvaluationView = z.infer<typeof evaluationSchema>;
+export const evaluationListSchema = z.object({
+  evaluations: z.array(evaluationSchema).max(200),
+});
+
+export const evalPlanSummarySchema = z.object({
+  id,
+  project: z.object({ id, slug: code }),
+  code,
+  version: z.number().int(),
+  status: code,
+  pause_reason: code.nullable(),
+  paused_until: time.nullable(),
+  next_run_at: time.nullable(),
+  run_requested_at: time.nullable(),
+  last_refusal: code.nullable(),
+  last_refusal_at: time.nullable(),
+  created_by: id.nullable(),
+  created_at: time,
+  updated_at: time,
+});
+export type EvalPlanSummaryView = z.infer<typeof evalPlanSummarySchema>;
+export const evalPlanListSchema = z.object({ plans: z.array(evalPlanSummarySchema).max(1000) });
+
+export const evalPlanSchema = evalPlanSummarySchema.extend({
+  current: evalPlanVersionSchema,
+  versions: z
+    .array(z.object({ version: z.number().int(), changed_by: id.nullable(), created_at: time }))
+    .max(10_000),
+  evaluations: z.array(evaluationSchema).max(200),
+});
+export type EvalPlanView = z.infer<typeof evalPlanSchema>;

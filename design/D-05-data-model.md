@@ -794,7 +794,7 @@ The same-run CHECK ties `contract_json` to its row (kind `evaluation`, run, tena
 | `evaluations` | + `plan_id` (nullable), `plan_version` (nullable); `config_name` now nullable | Exactly one of `config_name` (operator, L04) and `plan_id` (a CHECK); one open evaluation per plan (unique index) |
 | `evaluation_configurations` (AO) | `evaluation_id`, `configuration_id`, `agent_id`, `model`, `provider_type`, `agent_version`, `max_iterations`, `max_duration_min`, `instructions_path`, `instructions_commit`, `instructions_sha256` | The configurations an evaluation of a plan runs, resolved at its start (QUESTIONS #475) |
 
-As built: `evaluation_plans` adds `paused_until` (the start of the next UTC month for a used-up cap); the configurations JSON holds `id`, `agent_key` or `model` with `provider_type`, `max_iterations`, `max_duration_min` and `prompt` (`path`, `commit`, `sha256`); trigger `SDA23` keeps the plan's identity, keeps an archived plan final and the version going up.
+As built: `evaluation_plans` adds `paused_until` (the start of the next UTC month for a used-up cap); the configurations JSON holds `id`, `agent_key` or `model` with `provider_type`, `max_iterations`, `max_duration_min` and `prompt` (`path`, `commit`, `sha256`); trigger `SDA23` keeps the plan's identity, keeps an archived plan final and the version going up. Migration `0032-evaluation-plan-requests` (QUESTIONS #476): `run_requested_at`, `run_requested_by` (a person's Run now, until the worker takes it), `last_refusal`, `last_refusal_at` (the worker's last refusal code).
 
 ## 7. Audit log: hash chain
 
@@ -990,3 +990,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.46 | 2026-10-14 | Claude (task L04, PR 4a), approved by Harry | §6.8: migration `0030-evaluation-contracts`: `evaluation_run_contracts`, `evaluations.base_sha`, `evaluation_runs.max_iterations` / `max_duration_min`; cost records of evaluation runs are synced with the `gate` label `EVAL` (ADR-M81 §2.2, §2.4) |
 | 1.47 | 2026-10-14 | Claude (task L05, PR 1) | §6.9 draft: `evaluation_plans`, `evaluation_plan_versions` (AO), `evaluations.plan_id` / `plan_version` (ADR-M82) |
 | 1.48 | 2026-10-14 | Claude (task L05, PR 2) | §6.9 as built (migration `0031-evaluation-plans`): `evaluation_configurations` (AO), `paused_until`, the configurations JSON, `config_name` nullable, trigger `SDA23` (QUESTIONS #475) |
+| 1.49 | 2026-10-14 | Claude (task L05, PR 3) | §6.9: migration `0032-evaluation-plan-requests`: the Run now request and the worker's last refusal on `evaluation_plans` (QUESTIONS #476) |
