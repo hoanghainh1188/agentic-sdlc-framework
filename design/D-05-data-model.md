@@ -78,6 +78,7 @@ erDiagram
     users ||--o{ evaluations : "starts"
     evaluations ||--o{ evaluation_runs : "queues"
     evaluation_runs ||--o| evaluation_run_results : "is scored as"
+    evaluation_runs ||--o{ evaluation_run_contracts : "is granted"
     evaluation_runs ||--o{ cost_records : "costs (evaluation)"
     intents ||--o{ evidence_items : "has evidence"
     intents ||--o{ evidence_packs : "packaged as (versions)"
@@ -768,7 +769,18 @@ As built in L04 PR 3. Every table has `tenant_id`; tenant data only through `Ten
 
 - `evaluation_run_results` is append-only: triggers and `SELECT, INSERT` only for `platform_app` (section 7.2). `platform_app` may update `evaluations` (`status`, `stop_reason`, `budget_usd`, `finished_at`, `updated_at`) and `evaluation_runs` (`attempt`, `status`, `stop_reason`, `runner_instance`, `started_at`, `finished_at`, `updated_at`). No DELETE or TRUNCATE on any of the three.
 - **`cost_records.evaluation_run_id`** (uuid FK null, QUESTIONS #462): the cost of an evaluation run. Then `intent_id` and `run_id` are null (CHECK), so a record belongs to an intent or to an evaluation run, never both. The table stays append-only. The cost report of intents (ADR-M45) does not read these records; evaluations get their own line (L06). The evaluation's spend is the sum of the cost records of its runs.
-- The signed Run Contract of kind `evaluation` (ADR-M81 §2.2) is stored with L04 PR 4: `run_contracts.run_id` is a foreign key to `runs`, so it needs its own place.
+- Version 1.46 (L04 PR 4a, migration `0030-evaluation-contracts`): `evaluations.base_sha` (the task set's commit, 40 hex characters; null for rows made before the migration), `evaluation_runs.max_iterations` and `max_duration_min` (the configuration's caps, copied at start like the model), and the table below. The guard triggers of 0029 fix the new columns.
+
+**`evaluation_run_contracts`** (written once)
+
+| Column | Type | Notes |
+|---|---|---|
+| tenant_id, evaluation_run_id, attempt | | Primary key: one contract per attempt (a run stopped for a real run gets a new one) |
+| contract_json | jsonb | The signed contract of kind `evaluation` (ADR-M81 §2.2): the evaluation run, evaluation and project IDs, the evaluation code, the sample repository and its commit, the codes of the configuration and the task, the attempt, the one model, the caps (the cost cap is what was left of the evaluation's budget), the egress hosts, `issued_at`, `expires_at`. No intent, plan, branch or prompt |
+| contract_sha256, signature, key_version | | SHA-256 of the RFC 8785 canonical bytes; the Transit signature (same key as the Run Contract) and its key version |
+| issued_at, expires_at, revoked_at, created_at | timestamptz | `revoked_at` is not used yet (no grant, as for `run_contracts`) |
+
+The same-run CHECK ties `contract_json` to its row (kind `evaluation`, run, tenant, attempt). `platform_app` has `SELECT, INSERT` only; UPDATE and DELETE are refused by trigger.
 - Indexes: `evaluations` (`tenant_id`, `status`) and (`tenant_id`, `project_id`, `created_at`); `evaluation_runs` (`tenant_id`, `evaluation_id`, `status`) and a partial index of the queued runs; `cost_records` (`tenant_id`, `evaluation_run_id`).
 
 ---
@@ -964,3 +976,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.43 | 2026-10-13 | Claude (task V13), approved by Harry | §6.4: run event `model_selected` (the model a run calls, written by `prepareRun`) and the value kind `model`; no migration: the database CHECK already accepts these names (ADR-M79 §2.3, QUESTIONS #434) |
 | 1.44 | 2026-10-14 | Claude (task L04, PR 1), approved by Harry | §6.8 draft: `evaluations`, `evaluation_runs`, `evaluation_run_results` (AO) and the column `cost_records.evaluation_run_id` (ADR-M81, QUESTIONS #460–#464); migration and ERD with L04 PR 3 |
 | 1.45 | 2026-10-14 | Claude (task L04, PR 3), approved by Harry | §6.8 as built (migration `0029-evaluations`): hardware as flat columns, `config_name`, status machines and triggers `SDA21` / `SDA22`; the evaluation contract is stored with PR 4; the cost report of intents leaves evaluation records out |
+| 1.46 | 2026-10-14 | Claude (task L04, PR 4a), approved by Harry | §6.8: migration `0030-evaluation-contracts`: `evaluation_run_contracts`, `evaluations.base_sha`, `evaluation_runs.max_iterations` / `max_duration_min`; cost records of evaluation runs are synced with the `gate` label `EVAL` (ADR-M81 §2.2, §2.4) |

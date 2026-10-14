@@ -15,7 +15,7 @@ import {
 
 import { DbError } from '../db/errors.js';
 import type { PlatformDatabase } from '../db/platform-database.js';
-import type { Intent, Project, Run } from '../db/schema.js';
+import type { Evaluation, EvaluationRun, Intent, Project, Run } from '../db/schema.js';
 import { parseTenantId } from '../db/tenant-id.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import type { CostLogger } from './logger.js';
@@ -57,6 +57,16 @@ interface SyncDeps {
   readonly logger: CostLogger;
 }
 
+/** The `gate` label of an evaluation run's calls (controller.ts `EVALUATION_GATE_LABEL`). */
+const EVALUATION_GATE = 'EVAL';
+
+interface EvaluationContext {
+  readonly scope: TenantScope;
+  readonly run: EvaluationRun;
+  readonly evaluation: Evaluation;
+  readonly project: Project;
+}
+
 interface RunContext {
   readonly scope: TenantScope;
   readonly run: Run;
@@ -70,6 +80,7 @@ const AGENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 class Resolver {
   private readonly scopes = new Map<string, TenantScope | null>();
   private readonly runs = new Map<string, RunContext | null>();
+  private readonly evaluationRuns = new Map<string, EvaluationContext | null>();
 
   constructor(private readonly db: PlatformDatabase) {}
 
@@ -79,6 +90,20 @@ class Resolver {
       this.scopes.set(slug, tenant ? this.db.forTenant(parseTenantId(tenant.id)) : null);
     }
     return this.scopes.get(slug) ?? null;
+  }
+
+  async evaluationRun(scope: TenantScope, runId: string): Promise<EvaluationContext | null> {
+    const cacheKey = `${scope.tenantId}/${runId}`;
+    if (!this.evaluationRuns.has(cacheKey)) {
+      const run = await scope.evaluationRuns.getById(runId);
+      const evaluation = run ? await scope.evaluations.getById(run.evaluation_id) : undefined;
+      const project = evaluation ? await scope.projects.getById(evaluation.project_id) : undefined;
+      this.evaluationRuns.set(
+        cacheKey,
+        run && evaluation && project ? { scope, run, evaluation, project } : null,
+      );
+    }
+    return this.evaluationRuns.get(cacheKey) ?? null;
   }
 
   async run(scope: TenantScope, runId: string): Promise<RunContext | null> {
@@ -95,6 +120,46 @@ class Resolver {
 
 type Outcome = 'inserted' | 'duplicate' | SyncSkipReason;
 
+/** A call of an evaluation run: recorded with `evaluation_run_id`, never with an intent. */
+async function syncEvaluationCall(
+  record: SpendRecord,
+  context: EvaluationContext | null,
+  providerTypes: ReadonlyMap<string, ProviderType>,
+): Promise<Outcome> {
+  if (!context) return 'unknown_run';
+  const { labels } = record;
+  if (labels.intent_id !== context.evaluation.code || labels.project !== context.project.slug) {
+    return 'label_mismatch';
+  }
+  const agent = labels.agent ?? null;
+  if (agent !== null && !AGENT.test(agent)) return 'label_mismatch';
+  const providerType = providerTypes.get(record.model);
+  if (!providerType) return 'unknown_model';
+  if (!isUsd(record.costUsd)) return 'invalid_record';
+  try {
+    const inserted = await context.scope.costRecords.insertIfNew({
+      projectId: context.project.id,
+      intentId: null,
+      runId: null,
+      gate: null,
+      agent,
+      model: record.model,
+      providerType,
+      inputTokens: record.inputTokens,
+      outputTokens: record.outputTokens,
+      cachedInputTokens: record.cachedInputTokens,
+      costUsd: record.costUsd,
+      sourceRef: record.sourceRef,
+      occurredAt: record.occurredAt,
+      evaluationRunId: context.run.id,
+    });
+    return inserted ? 'inserted' : 'duplicate';
+  } catch (error) {
+    if (error instanceof DbError && error.code === 'invalid_value') return 'invalid_record';
+    throw error;
+  }
+}
+
 async function syncOne(
   record: SpendRecord,
   resolver: Resolver,
@@ -107,6 +172,9 @@ async function syncOne(
   if (!tenant || !runId) return 'unlabelled';
   const scope = await resolver.scope(tenant);
   if (!scope) return 'unknown_tenant';
+  if (record.labels.gate === EVALUATION_GATE) {
+    return syncEvaluationCall(record, await resolver.evaluationRun(scope, runId), providerTypes);
+  }
   const context = await resolver.run(scope, runId);
   if (!context) return 'unknown_run';
   const { labels } = record;

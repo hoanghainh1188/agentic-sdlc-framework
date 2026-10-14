@@ -16,6 +16,7 @@ import {
   COST_LABEL_NAMES,
   COST_LABEL_VALUE,
   GATE_CODES,
+  validateEvaluationContract,
   validateRunContract,
   type CostLabels,
   type GateCode,
@@ -65,13 +66,19 @@ export interface EndRun {
   readonly syncFrom: Date;
 }
 
+/** The `gate` label of the model calls of an evaluation run (QUESTIONS #462). */
+export const EVALUATION_GATE_LABEL = 'EVAL';
+
 function checkLabels(labels: CostLabels): CostLabels {
   for (const name of COST_LABEL_NAMES) {
     if (!COST_LABEL_VALUE.test(labels[name])) {
       throw new CostError('invalid_label', `cost label ${name} is not a code`, name);
     }
   }
-  if (!(GATE_CODES as readonly string[]).includes(labels.gate)) {
+  if (
+    labels.gate !== EVALUATION_GATE_LABEL &&
+    !(GATE_CODES as readonly string[]).includes(labels.gate)
+  ) {
     throw new CostError('invalid_label', 'cost label gate is not a gate code', 'gate');
   }
   return labels;
@@ -153,6 +160,94 @@ export class CostController {
       monthlyBudgetUsd: monthly === null ? null : fromMicros(toMicros(monthly)),
     });
     // The key lives for the contract's start window plus the run's time cap.
+    const startWindowMin = Math.ceil(
+      (Date.parse(contract.expires_at) - Date.parse(contract.issued_at)) / 60_000,
+    );
+    const key = await this.gateway.createRunKey({
+      runId: run.id,
+      labels,
+      maxBudgetUsd,
+      models: contract.allowed_models,
+      durationMinutes: contract.max_duration_min + startWindowMin,
+      tenantGroupId,
+    });
+    this.logger.log('info', 'cost.run_key_issued', {
+      tenant_id: input.tenantId,
+      run_id: run.id,
+      max_budget_usd: maxBudgetUsd,
+      limited_by: limitedBy,
+    });
+    return { key, labels, maxBudgetUsd, limitedBy };
+  }
+
+  /**
+   * The virtual key of one evaluation run (task L04, ADR-M81 §2.4, QUESTIONS #462). The seven labels
+   * stay: `intent_id` is the evaluation code, `run_id` the evaluation run, `gate` is `EVAL`, `agent`
+   * the configuration. The cap is the smallest of the contract's cap (what was left of the
+   * evaluation's budget when it was issued), what is left now and what is left of the tenant's
+   * budget this month. Nothing left is refused, never turned into a zero-budget key.
+   */
+  async issueEvaluationRunKey(input: {
+    readonly tenantId: TenantId;
+    readonly evaluationRunId: string;
+  }): Promise<IssuedRunKey> {
+    const scope = this.db.forTenant(input.tenantId);
+    const run = await scope.evaluationRuns.getById(input.evaluationRunId);
+    const evaluation = run ? await scope.evaluations.getById(run.evaluation_id) : undefined;
+    const stored = run
+      ? await scope.evaluationContracts.getForAttempt(run.id, run.attempt)
+      : undefined;
+    const project = evaluation ? await scope.projects.getById(evaluation.project_id) : undefined;
+    const tenant = await this.db.system.getTenant(input.tenantId);
+    if (!run || !evaluation || !stored || !project || !tenant) {
+      throw new CostError('run_not_found', 'evaluation run, contract, project or tenant not found');
+    }
+    if (run.status !== 'queued') {
+      throw new CostError('run_not_startable', `evaluation run is ${run.status}`);
+    }
+    const checked = validateEvaluationContract(stored.contract_json);
+    if (!checked.ok) throw new CostError('run_not_found', 'the stored contract is not valid');
+    const contract = checked.contract;
+    const labels = checkLabels({
+      tenant: tenant.slug,
+      project: project.slug,
+      intent_id: evaluation.code,
+      run_id: run.id,
+      gate: EVALUATION_GATE_LABEL,
+      agent: run.configuration_id,
+      data_class: evaluation.data_class,
+    });
+
+    const left =
+      toMicros(evaluation.budget_usd) -
+      toMicros(await scope.costRecords.totalForEvaluation(evaluation.id));
+    if (left <= 0n) {
+      throw new CostError('intent_budget_exhausted', 'the evaluation budget is used up');
+    }
+    let tenantLeft: bigint | undefined;
+    const monthly = tenant.monthly_budget_usd;
+    if (monthly === null) {
+      this.logger.log('warn', 'cost.tenant_budget_unset', { tenant_id: input.tenantId });
+    } else {
+      const spent = await scope.costRecords.totalSince(startOfUtcMonth(this.now()));
+      tenantLeft = toMicros(monthly) - toMicros(spent);
+      if (tenantLeft <= 0n) {
+        throw new CostError(
+          'tenant_budget_exhausted',
+          'the tenant budget of this month is used up',
+        );
+      }
+    }
+    let cap = toMicros(contract.max_budget_usd);
+    let limitedBy: IssuedRunKey['limitedBy'] = 'run';
+    if (left < cap) [cap, limitedBy] = [left, 'intent'];
+    if (tenantLeft !== undefined && tenantLeft < cap) [cap, limitedBy] = [tenantLeft, 'tenant'];
+    const maxBudgetUsd = fromMicros(cap);
+
+    const { tenantGroupId } = await this.gateway.ensureTenantBudget({
+      tenantSlug: tenant.slug,
+      monthlyBudgetUsd: monthly === null ? null : fromMicros(toMicros(monthly)),
+    });
     const startWindowMin = Math.ceil(
       (Date.parse(contract.expires_at) - Date.parse(contract.issued_at)) / 60_000,
     );

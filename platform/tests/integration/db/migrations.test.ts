@@ -176,6 +176,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
     'updated_at',
   ],
   evaluation_run_results: [],
+  // L04 PR 4a (migration 0030): a contract is written once for an attempt and never changed.
+  evaluation_run_contracts: [],
   // U05 (migration 0027): seen time only grows; the end is set once (trigger SDA18). No DELETE.
   web_sessions: ['last_seen_at', 'revoked_at', 'end_reason'],
   // U06 (migration 0028): the counter and the last use only grow; revoked once (SDA20). No DELETE.
@@ -319,8 +321,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // U06: webauthn_credentials → users ×2 (user_id, revoked_by); passkey_challenges → users,
     // web_sessions, intents, escalations.
     // L04: evaluations → projects, users; evaluation_runs → evaluations; evaluation_run_results →
-    // evaluation_runs; cost_records → evaluation_runs.
-    expect(fks).toHaveLength(71);
+    // evaluation_runs; cost_records → evaluation_runs; evaluation_run_contracts → evaluation_runs.
+    expect(fks).toHaveLength(72);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

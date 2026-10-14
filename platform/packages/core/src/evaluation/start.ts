@@ -34,6 +34,8 @@ export interface StartEvaluationInput {
   readonly dataClass: DataClass;
   readonly taskSetVersion: number;
   readonly configName: string;
+  /** The task set's commit the runs start from. */
+  readonly baseSha: string;
   readonly taskIds: readonly string[];
   readonly configurations: readonly EvaluationConfigurationInput[];
   readonly runsPerTask: number;

@@ -574,6 +574,8 @@ export interface EvaluationsTable {
   finished_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
   updated_at: ColumnType<Date, Date | undefined, Date>;
   created_at: CreatedAt;
+  /** The task set's commit the runs start from (migration 0030); null before it. */
+  base_sha: Immutable<string | null>;
 }
 
 /** One run of one task for one configuration (L04, migration 0029). */
@@ -594,6 +596,27 @@ export interface EvaluationRunsTable {
   started_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
   finished_at: ColumnType<Date | null, Date | null | undefined, Date | null>;
   updated_at: ColumnType<Date, Date | undefined, Date>;
+  created_at: CreatedAt;
+  /** The configuration's caps, copied at start (migration 0030). */
+  max_iterations: ColumnType<number, number | undefined, never>;
+  max_duration_min: ColumnType<number, number | undefined, never>;
+}
+
+/**
+ * The signed contract of one attempt of an evaluation run (L04, migration 0030, ADR-M81 §2.2).
+ * Written once, never changed.
+ */
+export interface EvaluationRunContractsTable {
+  tenant_id: Immutable<string>;
+  evaluation_run_id: Immutable<string>;
+  attempt: Immutable<number>;
+  contract_json: ColumnType<Record<string, unknown>, string, never>;
+  contract_sha256: Immutable<string>;
+  signature: Immutable<string>;
+  key_version: Immutable<number>;
+  issued_at: Immutable<Date>;
+  expires_at: Immutable<Date>;
+  revoked_at: ColumnType<Date | null, never, never>;
   created_at: CreatedAt;
 }
 
@@ -849,6 +872,7 @@ export interface Database {
   evaluations: EvaluationsTable;
   evaluation_runs: EvaluationRunsTable;
   evaluation_run_results: EvaluationRunResultsTable;
+  evaluation_run_contracts: EvaluationRunContractsTable;
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
@@ -1302,6 +1326,7 @@ export const TABLE_COLUMNS = {
     'finished_at',
     'updated_at',
     'created_at',
+    'base_sha',
   ]),
   evaluation_runs: columns<EvaluationRunsTable>()([
     'id',
@@ -1321,6 +1346,8 @@ export const TABLE_COLUMNS = {
     'finished_at',
     'updated_at',
     'created_at',
+    'max_iterations',
+    'max_duration_min',
   ]),
   evaluation_run_results: columns<EvaluationRunResultsTable>()([
     'id',
@@ -1355,6 +1382,19 @@ export const TABLE_COLUMNS = {
     'hw_docker_version',
     'hw_gpu',
     'hw_runner_instance',
+    'created_at',
+  ]),
+  evaluation_run_contracts: columns<EvaluationRunContractsTable>()([
+    'tenant_id',
+    'evaluation_run_id',
+    'attempt',
+    'contract_json',
+    'contract_sha256',
+    'signature',
+    'key_version',
+    'issued_at',
+    'expires_at',
+    'revoked_at',
     'created_at',
   ]),
   tenant_role_bindings: columns<TenantRoleBindingsTable>()([
@@ -1459,6 +1499,7 @@ export const TENANT_COLUMN = {
   evaluations: 'tenant_id',
   evaluation_runs: 'tenant_id',
   evaluation_run_results: 'tenant_id',
+  evaluation_run_contracts: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
   web_sessions: 'tenant_id',
@@ -1490,6 +1531,7 @@ export type CostRecordRow = Selectable<CostRecordsTable>;
 export type Evaluation = Selectable<EvaluationsTable>;
 export type EvaluationRun = Selectable<EvaluationRunsTable>;
 export type EvaluationRunResultRow = Selectable<EvaluationRunResultsTable>;
+export type EvaluationRunContractRow = Selectable<EvaluationRunContractsTable>;
 export type GitEventReceipt = Selectable<GitEventReceiptsTable>;
 export type Escalation = Selectable<EscalationsTable>;
 export type EscalationNotice = Selectable<EscalationNoticesTable>;

@@ -36,6 +36,9 @@ export interface EvaluationConfigurationInput {
   readonly model: string;
   readonly providerType: ProviderType;
   readonly agentVersion: string;
+  /** The configuration's caps, copied to its runs (migration 0030). */
+  readonly maxIterations: number;
+  readonly maxDurationMin: number;
 }
 
 export interface NewEvaluation {
@@ -44,6 +47,8 @@ export interface NewEvaluation {
   readonly taskSetVersion: number;
   /** The configuration file the runner reads, as a code. */
   readonly configName: string;
+  /** The task set's commit the runs start from (40 hex characters). */
+  readonly baseSha: string;
   readonly taskIds: readonly string[];
   readonly configurations: readonly EvaluationConfigurationInput[];
   readonly runsPerTask: number;
@@ -96,7 +101,14 @@ export function checkNewEvaluation(input: NewEvaluation): void {
     if (!MODEL.test(c.model)) invalid('model');
     if (!(PROVIDER_TYPES as readonly string[]).includes(c.providerType)) invalid('providerType');
     if (!VERSION.test(c.agentVersion)) invalid('agentVersion');
+    if (!Number.isSafeInteger(c.maxIterations) || c.maxIterations < 1 || c.maxIterations > 200) {
+      invalid('maxIterations');
+    }
+    if (!Number.isSafeInteger(c.maxDurationMin) || c.maxDurationMin < 1 || c.maxDurationMin > 120) {
+      invalid('maxDurationMin');
+    }
   }
+  if (!/^[0-9a-f]{40}$/.test(input.baseSha)) invalid('baseSha');
   if (!Number.isSafeInteger(input.runsPerTask) || input.runsPerTask < 1 || input.runsPerTask > 50) {
     invalid('runsPerTask');
   }
@@ -133,6 +145,7 @@ export class EvaluationRepository extends TenantRepository {
             data_class: input.dataClass,
             task_set_version: input.taskSetVersion,
             config_name: input.configName,
+            base_sha: input.baseSha,
             task_ids: [...input.taskIds],
             configuration_ids: input.configurations.map((c) => c.id),
             runs_per_task: input.runsPerTask,
@@ -152,6 +165,8 @@ export class EvaluationRepository extends TenantRepository {
               model: configuration.model,
               provider_type: configuration.providerType,
               agent_version: configuration.agentVersion,
+              max_iterations: configuration.maxIterations,
+              max_duration_min: configuration.maxDurationMin,
             })),
           ),
         );
