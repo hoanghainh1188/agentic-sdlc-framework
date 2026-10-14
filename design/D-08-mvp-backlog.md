@@ -1129,10 +1129,10 @@ flowchart LR
 
 - [ ] AC1: A person with a role in project config `access.eval_roles` (default Person A, Person B, governance, admin; never `viewer`, a mandatory rule) makes an evaluation plan: the configurations (agent versions and models from the agent register and the gateway, and **prompt variants**: another instructions file to try before it changes `AGENTS.md`), the task set, the number of runs, a budget
 - [ ] AC2: When it runs: once, on a schedule (for example weekly), or when a new model or agent version appears
-- [ ] AC3: Through the API, `sdlc eval plan|run|list|show` and the dashboard; every plan and run audited (IDs, codes, hashes only)
+- [ ] AC3: **Dashboard first** (QUESTIONS #465): a manager makes, starts and follows a plan in the dashboard (a write only through the fixed paths of `src/api/writes.ts` with the CSRF layers of ADR-M73); the API and `sdlc eval plan|run|list|show` give the same actions; every plan and run audited (IDs, codes, hashes only)
 - [ ] AC4: Tests: roles, budgets, schedules, tenants, refusals
 
-> Note: QUESTIONS #450
+> Note: QUESTIONS #450, #465 (dashboard first)
 
 #### L06. Evaluation reports and recommendations for managers
 
@@ -1142,13 +1142,13 @@ flowchart LR
 
 **Acceptance criteria**
 
-- [ ] AC1: The report of an evaluation (ADR-M78 §2.5) in the dashboard and the CLI, with the real-run numbers of V13 for the same agents and models next to it; a notice when an evaluation ends
+- [ ] AC1: **Dashboard first** (QUESTIONS #465): the report of an evaluation (ADR-M78 §2.5) is a page of the dashboard, read-only, written for a manager (plain words, numbers with their intervals); the CLI gives the same data, with the real-run numbers of V13 for the same agents and models next to it; a notice when an evaluation ends
 - [ ] AC2: **Recommendations by rules**, each with the numbers and intervals it rests on, never a claim the data does not show: for example a cheaper model that resolves as well (no difference by the report's test), a low CI-on-the-first-try rate (add the checks to the instructions), unstable results (pass@k far above pass^k), runs stopped at a cap, scope breaches
 - [ ] AC3: A recommendation is a proposal only: a change of model or prompt still goes through the agent register (a new version, approvals, 2+N)
 - [ ] AC4: Recommendations written by a model come later, and only after they were checked against people's judgement (as the LLM judge, QUESTIONS #438)
 - [ ] AC5: Tests: each rule on synthetic results (fires, does not fire, the numbers quoted), texts from the catalog
 
-> Note: QUESTIONS #450
+> Note: QUESTIONS #450, #465 (dashboard first)
 
 #### L07. A project's own task set from its merged intents
 
