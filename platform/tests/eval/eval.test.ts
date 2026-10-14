@@ -355,14 +355,16 @@ describe('the scoring script (ADR-M78 §2.3)', () => {
   it('applies the base and the agent change, then CI, pass_to_pass, the hidden files and fail_to_pass, in that order', () => {
     const script = scoringScript(task);
     const at = (text: string) => script.indexOf(text);
-    expect(at('git apply --whitespace=nowarn /in/base.patch')).toBeGreaterThan(-1);
-    expect(at('/in/agent.patch')).toBeGreaterThan(at('/in/base.patch'));
-    expect(at("'pnpm lint'")).toBeGreaterThan(at('/in/agent.patch'));
+    expect(at('git apply --whitespace=nowarn /workspace/in/base.patch')).toBeGreaterThan(-1);
+    expect(at('/workspace/in/agent.patch')).toBeGreaterThan(at('/workspace/in/base.patch'));
+    expect(at("'pnpm lint'")).toBeGreaterThan(at('/workspace/in/agent.patch'));
     expect(at("'pnpm --filter @pilot/api test'")).toBeGreaterThan(at("'pnpm lint'"));
-    expect(at('cp -R /in/hidden/.')).toBeGreaterThan(at("'pnpm --filter @pilot/api test'"));
-    expect(at('tax-rules.hidden')).toBeGreaterThan(at('cp -R /in/hidden/.'));
+    expect(at('cp -R /workspace/in/hidden/.')).toBeGreaterThan(
+      at("'pnpm --filter @pilot/api test'"),
+    );
+    expect(at('tax-rules.hidden')).toBeGreaterThan(at('cp -R /workspace/in/hidden/.'));
     // The hidden tests are never in the agent's repository before scoring.
-    expect(at('cp -R /in/hidden/.')).toBeGreaterThan(at('/in/agent.patch'));
+    expect(at('cp -R /workspace/in/hidden/.')).toBeGreaterThan(at('/workspace/in/agent.patch'));
   });
 
   it('refuses a command with a quote', () => {

@@ -4,6 +4,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { checkHardware, isPlace, type ExecutionPlace, type HardwareInfo } from './hardware.js';
+
 export interface RunResult {
   readonly schema: 1;
   readonly task_set: number;
@@ -42,6 +44,9 @@ export interface RunResult {
   readonly cached_input_tokens: number;
   /** Decimal string, 6 decimals (D-05 D6). */
   readonly cost_usd: string;
+  /** Where the run happened and on what hardware (L04, ADR-M81 §2.1); absent in results of L02. */
+  readonly where?: ExecutionPlace;
+  readonly hardware?: HardwareInfo;
 }
 
 const CODE = /^[a-z][a-z0-9_.:-]{0,63}$/;
@@ -50,7 +55,10 @@ const SHA256 = /^[0-9a-f]{64}$/;
 const USD6 = /^[0-9]{1,12}\.[0-9]{6}$/;
 
 const SPEC: Readonly<
-  Record<keyof RunResult, 'count' | 'bool' | 'code' | 'code?' | 'name' | 'sha' | 'usd' | 'schema'>
+  Record<
+    keyof RunResult,
+    'count' | 'bool' | 'code' | 'code?' | 'name' | 'sha' | 'usd' | 'schema' | 'where?' | 'hardware?'
+  >
 > = {
   schema: 'schema',
   task_set: 'count',
@@ -81,6 +89,8 @@ const SPEC: Readonly<
   output_tokens: 'count',
   cached_input_tokens: 'count',
   cost_usd: 'usd',
+  where: 'where?',
+  hardware: 'hardware?',
 };
 
 /** The fields of a run result, in the report's order. */
@@ -104,6 +114,16 @@ function valid(kind: (typeof SPEC)[keyof RunResult], value: unknown): boolean {
       return typeof value === 'string' && SHA256.test(value);
     case 'usd':
       return typeof value === 'string' && USD6.test(value);
+    case 'where?':
+      return value === undefined || isPlace(value);
+    case 'hardware?':
+      if (value === undefined) return true;
+      try {
+        checkHardware(value);
+        return true;
+      } catch {
+        return false;
+      }
   }
 }
 

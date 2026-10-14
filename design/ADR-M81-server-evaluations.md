@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L04, PR 1 of 5; for review) |
+| Status | **Proposed** (task L04, PR 2 of 5 done; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L04 plan approved 2026-10-14, with answers to QUESTIONS #460–#464) |
 | Related | D-08 task L04 (AC1–AC5), then L05 (plans, API, CLI, schedules) and L06 (reports in the dashboard); ADR-M78 (the harness), ADR-M25 (sandbox, guard), ADR-M33 §2.6 (runner queue), ADR-M24 and ADR-M45 (cost), ADR-M29 (agent path), ADR-M80 §4.1 (canary search); D-07 §3–§5; D-05 §6.8 (the tables); QUESTIONS #450, #460–#464 |
@@ -17,11 +17,11 @@ Two risks shape the design: an evaluation must never slow down or block a real r
 
 ### 2.1. One engine, two executors (AC1)
 
-- The pure parts of `platform/eval/src` (tasks, configurations, scoring script, statistics, report, result shape) move to a workspace package `@sdlc/eval`.
+- The pure parts of `platform/eval/src` (tasks, configurations, scoring script, statistics, report, result shape) are the workspace package `@sdlc/eval` (PR 2: the folder `platform/eval` stays, with the task sets and configurations; it now has a `package.json`).
 - An interface `EvalExecutor` runs one task for one configuration and returns one run result (numbers and codes). Two implementations:
   - `LocalExecutor`: the Docker CLI path of today's `pnpm eval`. Behaviour and result shape stay as before.
   - `ServerExecutor`: the worker queues the run, the deployed runner drives the agent and scores it.
-- Both call the same scoring and statistics code. A result and a report say where they ran (`developer` or `server`) and on what hardware: CPU model, cores, memory, Docker version, GPU if any, and (on the server) the runner instance label.
+- Both call the same scoring and statistics code. A result and a report say where they ran (`developer` or `server`) and on what hardware: CPU model, cores, memory, Docker version, GPU if any, and (on the server) the runner instance label. As built (PR 2): a run result has the optional fields `where` and `hardware` (checked like every other field; results of L02 stay valid without them), the report has a section "Where it ran", and `buildRunResult` builds the result for both executors.
 - `core` does not import `@sdlc/eval` adapters directly; the worker and runner depend on the interface (module boundaries as in CLAUDE.md).
 
 ### 2.2. Own tables, never `runs` (QUESTIONS #460)
@@ -60,7 +60,7 @@ The runner talks to Docker only through its endpoint allowlist, which has no ima
 2. The proxy is detached from the container.
 3. The agent's diff and the hidden tests are applied and run with no egress: no network, no capability, `no-new-privileges`, user `node`, memory, CPU, process and time limits as today.
 
-Developer machines use the same three steps (replacing `sdlc-eval-base`), so both places score the same way. The diff is recomputed outside the sandbox with hardened git (ADR-M29 §2.5). A new guard rule needs its own test and a note in ADR-M25.
+Developer machines use the same three steps (replacing `sdlc-eval-base`), so both places score the same way. As built (PR 2, `LocalExecutor`): the container is created from the sandbox image with the sandbox user, no capability, a read-only root and one volume `/workspace` (the repository, its packages and the pnpm store); the pinned commit and the inputs go in through `docker exec … tar`, never a bind mount. Step 1 first waits until the package proxy answers. If the packages cannot be installed, scoring throws and the run gets no result (it is not the agent's fault, and it can be repeated). The diff is recomputed outside the sandbox with hardened git (ADR-M29 §2.5). A new guard rule needs its own test and a note in ADR-M25.
 
 ### 2.6. Data classes and models (AC4)
 
@@ -118,3 +118,4 @@ Only the operator command `pnpm sdlc ops eval start --tenant --project --config 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-14 | Claude (task L04, PR 1) | First version |
+| 0.2 | 2026-10-14 | Claude (task L04, PR 2) | §2.1, §2.5 as built: `@sdlc/eval`, `EvalExecutor`, `LocalExecutor`, the hardware block, scoring in the sandbox image |

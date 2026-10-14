@@ -1,0 +1,16 @@
+{
+  "name": "@sdlc/eval",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "The evaluation engine: tasks, scoring, statistics, report, and the executors for a developer machine and the server. See design/ADR-M78, ADR-M81.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@sdlc/config": "workspace:*",
+    "@sdlc/messages": "workspace:*"
+  }
+}

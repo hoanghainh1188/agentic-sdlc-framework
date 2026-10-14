@@ -25,21 +25,20 @@ import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
-  diffStats,
-  ensureBaseImage,
+  buildRunResult,
   ensureClone,
   hasRunResult,
   litellmModelList,
   loadConfigurations,
   loadTaskSet,
+  LocalExecutor,
   prepareBase,
-  scoreRun,
   writeRunResult,
   type EvalConfiguration,
   type EvalTask,
   type TaskSet,
   writeDiff,
-} from '../../../eval/src/index.js';
+} from '@sdlc/eval';
 import {
   DockerClient,
   driveAgent,
@@ -103,6 +102,40 @@ function litellmImage(): string {
   return image;
 }
 
+/** Verdaccio on `names.net`, its storage kept between evaluations (scoring step 1 and the agent). */
+function startPackageProxy(): void {
+  docker('network', 'create', names.net);
+  docker('pull', '-q', VERDACCIO);
+  docker(
+    'run',
+    '-d',
+    '--name',
+    names.npm,
+    '--network',
+    names.net,
+    '--read-only',
+    '--tmpfs',
+    '/tmp',
+    '--cap-drop',
+    'ALL',
+    '-v',
+    `${NPM_CACHE_VOLUME}:/verdaccio/storage`,
+    '-v',
+    `${path.join(repoRoot(), 'platform/deploy/verdaccio/config.yaml')}:/verdaccio/conf/config.yaml:ro`,
+    VERDACCIO,
+  );
+}
+
+function newExecutor(sandboxImage: string, clone: string, commit: string): LocalExecutor {
+  return new LocalExecutor({
+    image: sandboxImage,
+    cloneDir: clone,
+    commit,
+    proxyContainer: names.npm,
+    proxyUrl: `http://${names.npm}:4873`,
+  });
+}
+
 const policy = (() => {
   const loaded = loadProjectConfig('');
   if (!loaded.ok) throw new Error('default configuration refused');
@@ -112,22 +145,30 @@ const policy = (() => {
 describe.skipIf(!enabled || MODE !== 'check')('L02: the task set checks itself', () => {
   const s = enabled ? settings() : undefined;
   let set: TaskSet;
-  let image: string;
+  let executor: LocalExecutor;
   let clone: string;
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-eval-check-'));
 
-  beforeAll(() => {
+  beforeAll(async () => {
     set = loadTaskSet(s!.tasksDir, s!.tasks);
     clone = ensureClone(s!.cache, set);
-    image = ensureBaseImage(clone, set.commit);
+    startPackageProxy();
+    const sandboxImage =
+      process.env.SDLC_SANDBOX_IMAGE || (await buildSandboxImage(names.registry));
+    executor = newExecutor(sandboxImage, clone, set.commit);
   }, 1_800_000);
 
-  afterAll(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  afterAll(() => {
+    quietly('rm', '-f', '-v', names.registry);
+    quietly('rm', '-f', names.npm);
+    quietly('network', 'rm', names.net);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }, 300_000);
 
   it(
     'every task: the reference solution resolves it, the base does not',
     { timeout: 3_600_000 },
-    () => {
+    async () => {
       for (const task of set.tasks) {
         expect(task.solutionPatch, `${task.id}: solution.patch`).not.toBeNull();
         const base = prepareBase({
@@ -137,13 +178,16 @@ describe.skipIf(!enabled || MODE !== 'check')('L02: the task set checks itself',
           instructionsText: null,
           workDir: fs.mkdtempSync(path.join(tmp, `${task.id}-`)),
         });
-        const solved = scoreRun({
-          image,
+        const solved = await executor.score({
           task,
           basePatch: base.basePatch,
           agentPatch: task.solutionPatch!,
         });
-        const untouched = scoreRun({ image, task, basePatch: base.basePatch, agentPatch: '' });
+        const untouched = await executor.score({
+          task,
+          basePatch: base.basePatch,
+          agentPatch: '',
+        });
         process.stderr.write(
           `L02 CHECK ${task.id} solution=${JSON.stringify(solved)} base=${JSON.stringify(untouched)}\n`,
         );
@@ -166,7 +210,7 @@ describe.skipIf(!enabled || MODE !== 'evaluate')(
     let t: TestDatabase;
     let set: TaskSet;
     let configurations: EvalConfiguration[];
-    let image: string;
+    let executor: LocalExecutor;
     let sandboxImage: string;
     let clone: string;
     let client: DockerClient;
@@ -249,30 +293,11 @@ describe.skipIf(!enabled || MODE !== 'evaluate')(
       set = loadTaskSet(s!.tasksDir, s!.tasks);
       configurations = loadConfigurations(s!.configFile, s!.configurations);
       clone = ensureClone(s!.cache, set);
-      image = ensureBaseImage(clone, set.commit);
       t = await createTestDatabase();
       sandboxImage = process.env.SDLC_SANDBOX_IMAGE || (await buildSandboxImage(names.registry));
       client = new DockerClient({ socketPath: dockerSocket(), timeoutMs: 900_000 });
-      docker('network', 'create', names.net);
-      docker('pull', '-q', VERDACCIO);
-      docker(
-        'run',
-        '-d',
-        '--name',
-        names.npm,
-        '--network',
-        names.net,
-        '--read-only',
-        '--tmpfs',
-        '/tmp',
-        '--cap-drop',
-        'ALL',
-        '-v',
-        `${NPM_CACHE_VOLUME}:/verdaccio/storage`,
-        '-v',
-        `${path.join(repoRoot(), 'platform/deploy/verdaccio/config.yaml')}:/verdaccio/conf/config.yaml:ro`,
-        VERDACCIO,
-      );
+      startPackageProxy();
+      executor = newExecutor(sandboxImage, clone, set.commit);
       if (configurations.some((c) => c.model.provider === 'stub')) {
         docker('pull', '-q', NODE_IMAGE);
         docker(
@@ -385,48 +410,43 @@ describe.skipIf(!enabled || MODE !== 'evaluate')(
           }
         }
         const agentPatch = diffs.map((d) => d.content.toString('utf8')).join('');
-        const score = scoreRun({ image, task, basePatch: base.basePatch, agentPatch });
+        const score = await executor.score({ task, basePatch: base.basePatch, agentPatch });
         const changed = (result.outputs?.changedFiles ?? []).map((f) => f.path);
         const scope = policy.checkScope({
           plannedFiles: [...task.plannedFiles],
           changedFiles: changed,
         });
-        const stats = diffStats(agentPatch);
         const sum = (pick: (r: (typeof records)[number]) => string) =>
           records.reduce((n, r) => n + Number(pick(r)), 0);
         const costMicros = records.reduce((n, r) => n + toMicros(r.cost_usd), 0n);
         const run_ = await fixture.scope.runs.getById(runId);
-        const file = writeRunResult(s!.out, {
-          schema: 1,
-          task_set: set.version,
-          task: task.id,
-          configuration: config.id,
-          model: config.model.name,
-          agent_version: config.agentVersion,
-          instructions_sha256: base.instructionsSha256,
-          run,
-          outcome: result.outcome,
-          status: run_?.status ?? result.status ?? 'unknown',
-          stop_reason: run_?.stop_reason ?? null,
-          applied: score.applied,
-          resolved: score.applied && score.failToPass && score.passToPass,
-          fail_to_pass_passed: score.failToPass,
-          pass_to_pass_passed: score.passToPass,
-          ci_passed: score.ci,
-          scope_breach: scope.outOfScope.length > 0,
-          out_of_plan_files: scope.outOfScope.length,
-          lint_findings: score.lintFindings,
-          diff_files: stats.files,
-          diff_lines_added: stats.added,
-          diff_lines_removed: stats.removed,
-          seconds,
-          iterations: result.outputs?.iterations ?? 0,
-          model_calls: records.length,
-          input_tokens: sum((r) => r.input_tokens),
-          output_tokens: sum((r) => r.output_tokens),
-          cached_input_tokens: sum((r) => r.cached_input_tokens),
-          cost_usd: formatUsd6(fromMicros(costMicros)),
-        });
+        const file = writeRunResult(
+          s!.out,
+          buildRunResult({
+            taskSet: set.version,
+            task,
+            configuration: config,
+            run,
+            instructionsSha256: base.instructionsSha256,
+            agentPatch,
+            score,
+            measures: {
+              outcome: result.outcome,
+              status: run_?.status ?? result.status ?? 'unknown',
+              stopReason: run_?.stop_reason ?? null,
+              seconds,
+              iterations: result.outputs?.iterations ?? 0,
+              modelCalls: records.length,
+              inputTokens: sum((r) => r.input_tokens),
+              outputTokens: sum((r) => r.output_tokens),
+              cachedInputTokens: sum((r) => r.cached_input_tokens),
+              costUsd: formatUsd6(fromMicros(costMicros)),
+              outOfPlanFiles: scope.outOfScope.length,
+            },
+            where: executor.where,
+            hardware: await executor.hardware(),
+          }),
+        );
         // QUESTIONS #445: the diff stays on this machine for blind review (`pnpm eval:pairs`),
         // never in a result or the report; `pnpm eval:pairs purge-diffs` deletes it.
         writeDiff(

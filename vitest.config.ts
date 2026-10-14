@@ -29,6 +29,10 @@ export default defineConfig({
         find: `@sdlc/${name}`,
         replacement: path.resolve(import.meta.dirname, `platform/packages/${name}/src/index.ts`),
       })),
+      {
+        find: '@sdlc/eval',
+        replacement: path.resolve(import.meta.dirname, 'platform/eval/src/index.ts'),
+      },
       ...SOURCE_ADAPTERS.map((name) => ({
         find: `@sdlc/adapter-${name}`,
         replacement: path.resolve(

@@ -9,6 +9,7 @@
 // Labels come from the message catalog (`eval.report.*`).
 import { t } from '@sdlc/messages';
 
+import { hardwareLabel, type ExecutionPlace, type HardwareInfo } from './hardware.js';
 import type { RunResult } from './result.js';
 import {
   bootstrapMean,
@@ -62,12 +63,20 @@ export interface Comparison {
   readonly better: string | null;
 }
 
+export interface Environment {
+  readonly where: ExecutionPlace | null;
+  readonly hardware: HardwareInfo | null;
+  readonly runs: number;
+}
+
 export interface EvalReport {
   readonly taskSet: number;
   readonly configurations: readonly ConfigurationSummary[];
   readonly tasks: readonly TaskRow[];
   readonly comparisons: readonly Comparison[];
   /** Bradley-Terry strengths, highest first; empty without pairwise choices. */
+  /** Where the runs happened and on what hardware; results of L02 have no such block. */
+  readonly environments: readonly Environment[];
   readonly ranking: readonly { readonly configuration: string; readonly strength: number }[];
   readonly pairChoices: number;
 }
@@ -172,6 +181,18 @@ function compare(
   };
 }
 
+/** The distinct places and machines behind the results, with their run counts. */
+function environmentsOf(results: readonly RunResult[]): Environment[] {
+  const groups = new Map<string, Environment>();
+  for (const r of results) {
+    const hardware = r.hardware ?? null;
+    const where = r.where ?? null;
+    const key = JSON.stringify([where, hardware]);
+    groups.set(key, { where, hardware, runs: (groups.get(key)?.runs ?? 0) + 1 });
+  }
+  return [...groups.values()].sort((x, y) => y.runs - x.runs);
+}
+
 /** Builds the report of one task set version (`seed` makes the bootstrap repeatable). */
 export function buildReport(
   results: readonly RunResult[],
@@ -208,7 +229,15 @@ export function buildReport(
   const ranking = [...bradleyTerry(choices)]
     .map(([configuration, strength]) => ({ configuration, strength: round(strength) }))
     .sort((x, y) => y.strength - x.strength || x.configuration.localeCompare(y.configuration));
-  return { taskSet, configurations, tasks, comparisons, ranking, pairChoices: choices.length };
+  return {
+    taskSet,
+    configurations,
+    tasks,
+    comparisons,
+    environments: environmentsOf(ofSet),
+    ranking,
+    pairChoices: choices.length,
+  };
 }
 
 const percent = (value: number): string => `${(value * 100).toFixed(0)}%`;
@@ -278,6 +307,24 @@ export function renderMarkdown(report: EvalReport): string {
   for (const row of report.tasks) {
     lines.push(
       `| ${row.task} | ${row.configuration} | ${String(row.resolved)} / ${String(row.runs)} |`,
+    );
+  }
+  lines.push('', `## ${t('eval.report.where')}`, '');
+  for (const e of report.environments) {
+    lines.push(
+      e.where === null || e.hardware === null
+        ? `- ${t('eval.report.where_unknown', { runs: e.runs })}`
+        : `- ${t('eval.report.where_line', {
+            where:
+              e.where === 'server'
+                ? t('eval.report.place.server')
+                : t('eval.report.place.developer'),
+            hardware: hardwareLabel(e.hardware),
+            docker: e.hardware.docker_version,
+            gpu: e.hardware.gpu ?? t('eval.report.no_gpu'),
+            runner: e.hardware.runner_instance ?? '-',
+            runs: e.runs,
+          })}`,
     );
   }
   lines.push('', `## ${t('eval.report.ranking')}`, '');
