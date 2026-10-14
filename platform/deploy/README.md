@@ -526,6 +526,36 @@ Logs: `worker.cost_synced` (counts), `worker.cost_sync_failed` (an error code; t
 
 **Manual sync: no operator command yet (open item, ADR-M24 §3).** After a `worker.cost_sync_gap` warning, set `SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES` to cover the gap (at most 10080, seven days) and restart `sdlc-worker`: its first pass reads that window again. Calls already recorded are never counted twice. Calls older than seven days, or older than LiteLLM keeps its spend logs, cannot be recovered this way.
 
+## Evaluations on the server (L04)
+
+Design: [ADR-M81](../../design/ADR-M81-server-evaluations.md). An evaluation runs agent configurations (agent × model × instructions) on a fixed task set through the deployed runner, LiteLLM and the Cost Controller, and keeps the results per tenant in the database. Real runs always come first: an evaluation run uses only free sandbox slots and stops when a real run waits. The same engine runs on a developer machine with `pnpm eval`; see [Evaluation harness](../DEVELOPMENT.md).
+
+**Before the first evaluation**
+- The worker runs the evaluation loop when it has the `cost-controller` AppRole and Temporal (the same condition as agent runs and the spend sync). Without it the worker logs `worker.runs_off` and no evaluation starts.
+- Install the GitHub App on the sample repository `pilot-order-inventory` (the task set clones it at a pinned commit), and create it as a project of the tenant with that repository name. The project needs an AI record that allows the data class of the evaluation (default `internal`).
+- The task set v1 and the configuration files are packed in the runner image (`/app/eval-tasks`, `/app/eval-configs`; the reference solutions are removed). A private task set: mount a folder and set `SDLC_EVAL_TASKS_DIR` (runner and the `sdlc` command); other configuration files: `SDLC_EVAL_CONFIG_DIR`.
+- Every model of a configuration must be listed by LiteLLM and allowed for the data class by the project's policy. `client_restricted` data goes to self-hosted models only. The worker checks the model again when each run is issued.
+
+**Settings (technical, no handbook rule)**
+
+| Setting | Process | Default | Bounds | Meaning |
+|---|---|---|---|---|
+| `SDLC_RUNNER_MAX_EVAL_SANDBOXES` | runner | 1 | 0 – `SDLC_RUNNER_MAX_SANDBOXES` | Evaluation runs at one time; 0 turns evaluations off. A waiting real run takes the slot back |
+| `SDLC_EVAL_TASKS_DIR`, `SDLC_EVAL_CONFIG_DIR` | runner, `sdlc ops eval` | the image | a folder | Another task set, other configuration files |
+| `SDLC_RUNNER_GPU` | runner | none | a name | The GPU name written in the hardware block of each result |
+| `SDLC_WORKER_EVAL_TICK_SECONDS` | worker | 15 | 5–300 | Time between two passes of the evaluation loop |
+| `SDLC_WORKER_EVAL_MAX_IN_FLIGHT` | worker | 2 | 1–16 | Runs handed to the runner at one time (running, or waiting for a slot) |
+
+**Start one (operator, on the server, `SDLC_DB_URL` set)**
+
+```bash
+pnpm sdlc ops eval start --tenant <slug> --project <slug> --config platform/eval/configs/local.yaml --budget 5 --n 3
+```
+
+It prints the evaluation code (`EVAL-YYYY-NNNN`) and the counts, and writes `evaluation.started` in the audit log as done by the platform. Options: `--configurations a,b`, `--tasks t1,t2`, `--data-class <class>`, `--tasks-dir <folder>`, `--json`. The budget is the evaluation's own: each run's virtual key is capped at what is left of it, and when it is used up the evaluation ends `stopped_budget`. Its cost is a separate line in the cost report, never inside an intent. Reading the results by command, plans and schedules come with L05, reports in the dashboard with L06; until then the rows are in the tables `evaluations`, `evaluation_runs` and `evaluation_run_results` (numbers and codes only: no prompt, task text or diff).
+
+**Logs.** `worker.evaluation_run_handed_over`, `worker.evaluation_requeued` (a run without a live workflow got its next attempt), `worker.evaluation_refused` (`reason`: `budget_used`, `tenant_budget_used`, `model_not_allowed`, `not_startable`), `worker.evaluation_failed` (`step`, an error code; a run that fails to be handed over five times in a row is cancelled with `prepare_failed`), and on the runner `runner.evaluation_started` and `runner.evaluation_ended`. A run lost with its runner is queued again and fails with `runner_lost` after three attempts.
+
 ## Shared Valkey: memory limit
 
 Langfuse and LiteLLM share one Valkey with `maxmemory-policy noeviction`, which Langfuse requires. The limit is `VALKEY_MAXMEMORY` in `.env` (default `256mb`). **When Valkey is full, writes fail for both Langfuse and LiteLLM.** Watch memory use:
@@ -638,6 +668,7 @@ Run `pnpm doctor` first ([Doctor](#doctor-pnpm-doctor)): it checks the rows of t
 | `worker.runs_off`; every intent waits at G4 | The worker has no `cost-controller` AppRole | `pnpm openbao:bootstrap worker-credentials`, restart `sdlc-worker` |
 | Intents wait at G8; packs answer `evidence_unavailable` | No evidence credential for the worker or the API | `api-evidence-credentials` (runbook T11 §5h) or `worker-evidence-credentials` (§5i) |
 | `worker.cost_sync_gap` | The spend sync was down longer than its catch-up window | [Scheduled spend sync](#scheduled-spend-sync-c12) |
+| An evaluation stays `queued`, or the worker logs `worker.evaluation_failed` or `worker.evaluation_refused` | The runner has no evaluation slot (`SDLC_RUNNER_MAX_EVAL_SANDBOXES=0`, or every slot is busy with a real run), the worker has no `cost-controller` AppRole, the GitHub App is not installed on the sample repository, or the budget or the model was refused | [Evaluations on the server](#evaluations-on-the-server-l04) |
 | LiteLLM lists no model | Profile `models` not started, or the provider entry is not in OpenBao | `pnpm compose:models`; runbook T11 §5d |
 | A service stays unhealthy | See its log | `docker compose -f platform/deploy/docker-compose.yml logs <service>`; [what "healthy" means](#health-what-healthy-means) |
 | Valkey writes fail in Langfuse and LiteLLM | Valkey is full | [Shared Valkey](#shared-valkey-memory-limit) |

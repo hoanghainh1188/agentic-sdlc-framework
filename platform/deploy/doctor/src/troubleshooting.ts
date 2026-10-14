@@ -19,6 +19,7 @@ export const TROUBLESHOOTING: Readonly<Record<string, Coverage>> = {
   '`worker.runs_off`': { checks: ['credentials.approle', 'credentials.logs'] },
   'Intents wait at G8': { checks: ['credentials.logs'] },
   '`worker.cost_sync_gap`': { checks: ['credentials.logs'] },
+  'An evaluation stays `queued`': { reason: 'doctor.no_check.evaluation' },
   'LiteLLM lists no model': { checks: ['models.litellm'] },
   'A service stays unhealthy': { checks: ['services.health'] },
   'Valkey writes fail': { checks: ['valkey.memory'] },

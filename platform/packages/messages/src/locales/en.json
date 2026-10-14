@@ -1516,6 +1516,7 @@
   "doctor.access.origin_missing": "The GitHub sign-in is on, but SDLC_API_PUBLIC_ORIGIN is not set; set it to {expected}.",
   "doctor.access.trusted_wrong": "SDLC_API_TRUSTED_PROXY must be the proxy's address, {expected}.",
   "doctor.access.trusted_ok": "The api trusts forwarded addresses from the proxy ({address}) only.",
+  "doctor.no_check.evaluation": "No check: why an evaluation waits depends on the evaluation, its budget and its models, which doctor does not read; follow the logs named in the row.",
   "doctor.no_check.shared_address": "No check: the address the proxy sees depends on how Docker publishes ports, which doctor cannot read; compare the client addresses in the proxy's log.",
   "doctor.skipped.access_off": "Not checked: team access is off.",
   "doctor.skipped.access_no_host": "Not checked: SDLC_ACCESS_HOSTNAME is not set.",
