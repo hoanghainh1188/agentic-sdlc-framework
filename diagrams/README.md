@@ -37,4 +37,4 @@ Diagrams D9–D13 are copies of the Mermaid blocks in the design docs: when a de
 
 ## Progress snapshot
 
-[status/platform-status.svg](status/platform-status.svg): the MVP architecture (design/D-03 §4) coloured by build progress, with progress per milestone. It is drawn by hand, not generated from Mermaid, and shows one date (in its subtitle): the current drawing is of **2026-10-06** and does not show the work merged after that date. Update it after a milestone or when asked; the source of truth for progress is the GitHub issues of the D-08 tasks.
+[status/platform-status.svg](status/platform-status.svg): the MVP architecture (design/D-03 §4, with the parts added since) coloured by build progress, with progress per milestone. It is drawn by hand, not generated from Mermaid, and shows one date (in its subtitle): the current drawing is of **2026-10-14** and does not show the work merged after that date. Update it after a milestone or when asked; the source of truth for progress is the GitHub issues of the D-08 tasks.
