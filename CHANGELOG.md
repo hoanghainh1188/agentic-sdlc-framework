@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Upgrade notes
+- **On a running stack (when this is released):** (1) `pnpm install`; (2) apply the migrations (`pnpm db:migrate`: `0029` and `0030` add the evaluation tables, a nullable `cost_records.evaluation_run_id` and the evaluation contracts); (3) rebuild `sdlc-api`, `sdlc-worker` and `sdlc-runner` (the runner image now carries the task set and the configuration files; the worker runs the evaluation loop and a second workflow); (4) start the platform again as usual: volumes are kept, no unseal beyond the usual one.
+- New optional settings, all with defaults: `SDLC_RUNNER_MAX_EVAL_SANDBOXES` (1), `SDLC_EVAL_TASKS_DIR`, `SDLC_EVAL_CONFIG_DIR`, `SDLC_RUNNER_GPU`, `SDLC_WORKER_EVAL_TICK_SECONDS` (15), `SDLC_WORKER_EVAL_MAX_IN_FLIGHT` (2). Nothing runs until an operator starts an evaluation.
+- To evaluate on the server, the GitHub App must be installed on the sample repository `pilot-order-inventory` (deployment README "Evaluations on the server").
+
+### Added
+- L04 (ADR-M81, QUESTIONS #460–#464): evaluations on the server. One engine (`@sdlc/eval`) now runs in two places: `pnpm eval` on a developer machine (unchanged) and `sdlc ops eval start` on the server, through the deployed runner, LiteLLM and the Cost Controller. Runs live in their own tables (`evaluations`, `evaluation_runs`, append-only `evaluation_run_results`), never in `runs`; they use free runner slots only on their own Temporal queue and a waiting real run takes the slot back; each evaluation has its own budget, each run's virtual key is capped at what is left, and the cost is its own line in the cost report. Scoring uses the sandbox image in two containers (install through the package proxy, then the diff and the hidden tests with no network). Each result says where it ran and on what hardware. The worker's `EvaluationLoop` hands runs over, a workflow per run attempt carries the wait, and `finishEvaluationRun` writes the result with the cost from the cost records. Plans, API, CLI for people and schedules come with L05; reports in the dashboard with L06.
+
 ## [0.3.0] - 2026-10-13
 
 The third release of the milestone UX: **are agents worth it, and are they safe?** `sdlc metrics agents` shows, from real runs, how each agent version and model does: outcomes, stop reasons, retries, CI on the first try, review rounds, time and cost per merged intent (V13). `pnpm eval` runs agents, models and prompts on a fixed task set with hidden tests and a statistical report, so a choice of model rests on numbers (L02; the first measurement of local models is in D-07 §9). `sdlc help` and next-step hints after a command make the CLI easier to learn (V10). And the **threat model of an agent run** (ADR-M80, H01): attacks from inside the sandbox are now tests (`pnpm test:attack`), and every gap it found has a task or an acceptance. A minor release for the new commands and one new run event; nothing to migrate.
