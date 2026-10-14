@@ -12,6 +12,7 @@ const INTENT_CODE_LOCK_CLASS = 0x49_4e_54_01;
 const INTENT_LOCK_CLASS = 0x49_4e_54_02;
 const ESCALATION_CODE_LOCK_CLASS = 0x45_53_43_01;
 const PROJECT_ROLES_LOCK_CLASS = 0x52_4f_4c_01;
+const EVALUATION_CODE_LOCK_CLASS = 0x45_56_41_01;
 
 async function lock(db: Kysely<Database>, lockClass: number, key: string): Promise<void> {
   await db
@@ -42,4 +43,9 @@ export function lockEscalationCodes(db: Kysely<Database>, tenantId: TenantId): P
  */
 export function lockProjectRoles(db: Kysely<Database>, projectId: string): Promise<void> {
   return lock(db, PROJECT_ROLES_LOCK_CLASS, projectId);
+}
+
+/** Serialises evaluation code numbering within the tenant, until the transaction ends (L04). */
+export function lockEvaluationCodes(db: Kysely<Database>, tenantId: TenantId): Promise<void> {
+  return lock(db, EVALUATION_CODE_LOCK_CLASS, tenantId);
 }

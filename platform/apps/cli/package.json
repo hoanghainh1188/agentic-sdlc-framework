@@ -13,9 +13,11 @@
     "dist"
   ],
   "dependencies": {
+    "@sdlc/adapter-policy-simple": "workspace:*",
     "@sdlc/api-schemas": "workspace:*",
     "@sdlc/contracts": "workspace:*",
     "@sdlc/core": "workspace:*",
+    "@sdlc/eval": "workspace:*",
     "@sdlc/messages": "workspace:*",
     "zod": "4.6.5"
   }

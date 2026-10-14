@@ -7,6 +7,12 @@
   "include": ["src"],
   "references": [
     {
+      "path": "../../eval"
+    },
+    {
+      "path": "../../packages/adapters/policy-simple"
+    },
+    {
       "path": "../../packages/api-schemas"
     },
     {

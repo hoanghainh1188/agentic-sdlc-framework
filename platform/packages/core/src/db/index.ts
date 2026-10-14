@@ -24,6 +24,18 @@ export { hashSessionSecret } from './repositories/web-sessions.js';
 export type { AgentQuery, AgentUpdate, NewAgent } from './repositories/agents.js';
 export type { AuditEvent } from './repositories/audit-log.js';
 export type { NewCostRecord } from './repositories/cost-records.js';
+export {
+  checkNewEvaluation,
+  formatEvaluationCode,
+  MAX_EVALUATION_RUNS,
+  type EvaluationConfigurationInput,
+  type EvaluationCounts,
+  type NewEvaluation,
+} from './repositories/evaluations.js';
+export {
+  checkEvaluationRunResult,
+  type NewEvaluationRunResult,
+} from './repositories/evaluation-runs.js';
 export type { NewEvidenceItem } from './repositories/evidence-items.js';
 export type { NewEvidencePack, StoredPackFile } from './repositories/evidence-packs.js';
 export type { NewEvidenceHold } from './repositories/evidence-holds.js';

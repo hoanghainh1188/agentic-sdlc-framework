@@ -30,6 +30,11 @@ export interface NewCostRecord {
   readonly costUsd: string;
   readonly sourceRef: string;
   readonly occurredAt: Date;
+  /**
+   * The evaluation run this call belongs to (L04, QUESTIONS #462): then `intentId` and `runId`
+   * are null. Optional; a call of a real run leaves it out.
+   */
+  readonly evaluationRunId?: string | null;
 }
 
 // Same formats as the CHECKs of migration 0005.
@@ -120,6 +125,10 @@ function checkRecord(r: NewCostRecord): void {
     invalid('cachedInputTokens');
   if (!USD.test(r.costUsd)) invalid('costUsd');
   if (!SOURCE_REF.test(r.sourceRef)) invalid('sourceRef');
+  if (r.evaluationRunId !== undefined && r.evaluationRunId !== null) {
+    if (!isUuid(r.evaluationRunId)) invalid('evaluationRunId');
+    if (r.intentId !== null || r.runId !== null) invalid('evaluationRunId');
+  }
   if (!(r.occurredAt instanceof Date) || Number.isNaN(r.occurredAt.getTime()))
     invalid('occurredAt');
 }
@@ -150,6 +159,7 @@ export class CostRecordRepository extends TenantRepository {
           cost_usd: record.costUsd,
           source_ref: record.sourceRef,
           occurred_at: record.occurredAt,
+          evaluation_run_id: record.evaluationRunId ?? null,
         })
         .onConflict((oc) => oc.columns(['tenant_id', 'source_ref']).doNothing())
         .returning('id')
@@ -167,6 +177,29 @@ export class CostRecordRepository extends TenantRepository {
         .select((eb) => eb.fn.coalesce(eb.fn.sum<string>('cost_usd'), eb.val('0')).as('total'))
         .where('tenant_id', '=', this.tenantId)
         .where('intent_id', '=', intentId)
+        .executeTakeFirstOrThrow(),
+    );
+    return String(row.total);
+  }
+
+  /**
+   * Total cost of one evaluation (all its runs), as a decimal string: the base of its budget
+   * (ADR-M81 §2.4).
+   */
+  async totalForEvaluation(evaluationId: string): Promise<string> {
+    if (!isUuid(evaluationId)) return '0';
+    const row = await this.run(
+      this.db
+        .selectFrom('cost_records as cr')
+        .innerJoin('evaluation_runs as er', (join) =>
+          join
+            .onRef('er.tenant_id', '=', 'cr.tenant_id')
+            .onRef('er.id', '=', 'cr.evaluation_run_id')
+            .on('er.tenant_id', '=', this.tenantId),
+        )
+        .select((eb) => eb.fn.coalesce(eb.fn.sum<string>('cr.cost_usd'), eb.val('0')).as('total'))
+        .where('cr.tenant_id', '=', this.tenantId)
+        .where('er.evaluation_id', '=', evaluationId)
         .executeTakeFirstOrThrow(),
     );
     return String(row.total);
@@ -289,35 +322,39 @@ export class CostRecordRepository extends TenantRepository {
   /** The records of the report: the tenant, the range, the project or intent; runs and names joined. */
   private reportBase(query: Omit<CostReportQuery, 'groupBy' | 'limit'>) {
     const tenantId = this.tenantId;
-    return this.db
-      .selectFrom('cost_records as cr')
-      .innerJoin('projects as p', (join) =>
-        join
-          .onRef('p.tenant_id', '=', 'cr.tenant_id')
-          .onRef('p.id', '=', 'cr.project_id')
-          .on('p.tenant_id', '=', tenantId),
-      )
-      .leftJoin('intents as i', (join) =>
-        join
-          .onRef('i.tenant_id', '=', 'cr.tenant_id')
-          .onRef('i.id', '=', 'cr.intent_id')
-          .on('i.tenant_id', '=', tenantId),
-      )
-      .leftJoin('runs as r', (join) =>
-        join
-          .onRef('r.tenant_id', '=', 'cr.tenant_id')
-          .onRef('r.id', '=', 'cr.run_id')
-          .on('r.tenant_id', '=', tenantId),
-      )
-      .where('cr.tenant_id', '=', tenantId)
-      .where('cr.occurred_at', '>=', query.from)
-      .where('cr.occurred_at', '<', query.to)
-      .$if(query.projectId !== undefined, (qb) =>
-        qb.where('cr.project_id', '=', query.projectId ?? ''),
-      )
-      .$if(query.intentId !== undefined, (qb) =>
-        qb.where('cr.intent_id', '=', query.intentId ?? ''),
-      );
+    return (
+      this.db
+        .selectFrom('cost_records as cr')
+        .innerJoin('projects as p', (join) =>
+          join
+            .onRef('p.tenant_id', '=', 'cr.tenant_id')
+            .onRef('p.id', '=', 'cr.project_id')
+            .on('p.tenant_id', '=', tenantId),
+        )
+        .leftJoin('intents as i', (join) =>
+          join
+            .onRef('i.tenant_id', '=', 'cr.tenant_id')
+            .onRef('i.id', '=', 'cr.intent_id')
+            .on('i.tenant_id', '=', tenantId),
+        )
+        .leftJoin('runs as r', (join) =>
+          join
+            .onRef('r.tenant_id', '=', 'cr.tenant_id')
+            .onRef('r.id', '=', 'cr.run_id')
+            .on('r.tenant_id', '=', tenantId),
+        )
+        .where('cr.tenant_id', '=', tenantId)
+        // Evaluations are their own line, never inside an intent or the "no intent" group (QUESTIONS #462).
+        .where('cr.evaluation_run_id', 'is', null)
+        .where('cr.occurred_at', '>=', query.from)
+        .where('cr.occurred_at', '<', query.to)
+        .$if(query.projectId !== undefined, (qb) =>
+          qb.where('cr.project_id', '=', query.projectId ?? ''),
+        )
+        .$if(query.intentId !== undefined, (qb) =>
+          qb.where('cr.intent_id', '=', query.intentId ?? ''),
+        )
+    );
   }
 
   private sums(eb: ReportEb, wasted: readonly RunStatus[]) {

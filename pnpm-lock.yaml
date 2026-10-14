@@ -189,6 +189,9 @@ importers:
 
   platform/apps/cli:
     dependencies:
+      '@sdlc/adapter-policy-simple':
+        specifier: workspace:*
+        version: link:../../packages/adapters/policy-simple
       '@sdlc/api-schemas':
         specifier: workspace:*
         version: link:../../packages/api-schemas
@@ -198,6 +201,9 @@ importers:
       '@sdlc/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@sdlc/eval':
+        specifier: workspace:*
+        version: link:../../eval
       '@sdlc/messages':
         specifier: workspace:*
         version: link:../../packages/messages

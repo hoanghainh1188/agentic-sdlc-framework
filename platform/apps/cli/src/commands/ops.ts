@@ -9,7 +9,8 @@
 // - `sdlc ops agent show|list|suspend|quarantine` (ops-agent.ts);
 // - `sdlc ops ai-record set|show` (ops-ai-record.ts);
 // - `sdlc ops run kill` (ops-run.ts, C11);
-// - `sdlc ops retention report` (ops-retention.ts, E05): counts only.
+// - `sdlc ops retention report` (ops-retention.ts, E05): counts only;
+// - `sdlc ops eval start` (ops-eval.ts, L04): queues an evaluation on the server.
 // A token is printed once, to stdout, and never logged. Run these in a terminal, not in a chat.
 import { parseArgs } from 'node:util';
 
@@ -31,6 +32,7 @@ import { parseAgentCommand, runAgentCommand } from './ops-agent.js';
 import { parseAiRecordCommand, runAiRecordCommand } from './ops-ai-record.js';
 import { parseRoleCommand, runRoleCommand } from './ops-roles.js';
 import { parseRetentionCommand, runRetentionCommand } from './ops-retention.js';
+import { parseEvalCommand, runEvalCommand } from './ops-eval.js';
 import { parseRunCommand, runRunCommand } from './ops-run.js';
 
 type Values = Record<string, string | boolean | undefined>;
@@ -86,6 +88,10 @@ export async function runOps(args: readonly string[], ctx: CliContext): Promise<
   }
   if (first === 'run') {
     return runScoped(parseRunCommand(args.slice(1)), runRunCommand, 'cli.ops.run.usage', ctx);
+  }
+  if (first === 'eval') {
+    const parsed = parseEvalCommand(args.slice(1));
+    return runScoped(parsed, runEvalCommand, 'cli.ops.eval.usage', ctx);
   }
   if (first === 'retention') {
     const parsed = parseRetentionCommand(args.slice(1));
