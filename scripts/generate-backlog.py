@@ -645,17 +645,17 @@ t("L05","EVAL","Evaluation plans that managers make themselves","M",["L04"],"FR-
  "platform/apps/api (evaluations), platform/apps/cli (sdlc eval …), platform/apps/dashboard, platform/packages/config (access.eval_roles), platform/packages/core, platform/tests/*, handbook Ch.19",
  ["A person with a role in project config `access.eval_roles` (default Person A, Person B, governance, admin; never `viewer`, a mandatory rule) makes an evaluation plan: the configurations (agent versions and models from the agent register and the gateway, and **prompt variants**: another instructions file to try before it changes `AGENTS.md`), the task set, the number of runs, a budget",
   "When it runs: once, on a schedule (for example weekly), or when a new model or agent version appears",
-  "Through the API, `sdlc eval plan|run|list|show` and the dashboard; every plan and run audited (IDs, codes, hashes only)",
+  "**Dashboard first** (QUESTIONS #465): a manager makes, starts and follows a plan in the dashboard (a write only through the fixed paths of `src/api/writes.ts` with the CSRF layers of ADR-M73); the API and `sdlc eval plan|run|list|show` give the same actions; every plan and run audited (IDs, codes, hashes only)",
   "Tests: roles, budgets, schedules, tenants, refusals"],
- "QUESTIONS #450")
+ "QUESTIONS #450, #465 (dashboard first)")
 t("L06","EVAL","Evaluation reports and recommendations for managers","M",["L05"],"FR-53, NFR-08",
  "platform/packages/core (recommendations), platform/apps/api, platform/apps/cli, platform/apps/dashboard, platform/packages/messages, platform/tests/*, handbook Ch.19",
- ["The report of an evaluation (ADR-M78 §2.5) in the dashboard and the CLI, with the real-run numbers of V13 for the same agents and models next to it; a notice when an evaluation ends",
+ ["**Dashboard first** (QUESTIONS #465): the report of an evaluation (ADR-M78 §2.5) is a page of the dashboard, read-only, written for a manager (plain words, numbers with their intervals); the CLI gives the same data, with the real-run numbers of V13 for the same agents and models next to it; a notice when an evaluation ends",
   "**Recommendations by rules**, each with the numbers and intervals it rests on, never a claim the data does not show: for example a cheaper model that resolves as well (no difference by the report's test), a low CI-on-the-first-try rate (add the checks to the instructions), unstable results (pass@k far above pass^k), runs stopped at a cap, scope breaches",
   "A recommendation is a proposal only: a change of model or prompt still goes through the agent register (a new version, approvals, 2+N)",
   "Recommendations written by a model come later, and only after they were checked against people's judgement (as the LLM judge, QUESTIONS #438)",
   "Tests: each rule on synthetic results (fires, does not fire, the numbers quoted), texts from the catalog"],
- "QUESTIONS #450")
+ "QUESTIONS #450, #465 (dashboard first)")
 t("L07","EVAL","A project's own task set from its merged intents","M",["L02","E01"],"FR-40, D-07 §4",
  "platform/eval/*, platform/packages/core, platform/apps/cli, platform/tests/*, design/ADR (next free number)",
  ["Make evaluation tasks from a project's merged intents, as SWE-bench does: the spec, the base commit, and the tests the pull request added as hidden tests; a person reviews each task before it enters the set",
@@ -928,7 +928,8 @@ SKIP_LATER={"U01","U02","U03","K02"}
 DONE={**{t:"v0.1.0" for t in ("V01","V02","V03")},
       **{t:"v0.1.1" for t in ("V04","V05","V06","V11")},
       **{t:"v0.2.0" for t in ("V07","V08","V09","V12","U05","U06")},
-      **{t:"v0.3.0" for t in ("V10","V13","L02","H01")}}
+      **{t:"v0.3.0" for t in ("V10","V13","L02","H01")},
+      **{t:"next release" for t in ("L04",)}}
 r=[]; a=r.append
 a("""# Roadmap
 
