@@ -710,6 +710,67 @@ Every table (except `tenants`) has `tenant_id uuid not null` and `created_at tim
 
 ---
 
+### 6.8. Evaluations (draft, task L04, ADR-M81, QUESTIONS #460–#464)
+
+Draft for review. The migration and the final column types come with L04 PR 3; the ERD (D13) is updated then. Every table has `tenant_id`; tenant data only through `TenantScope`. Every text column is a code with a format CHECK, never free text. No prompt, task text, code or diff is stored.
+
+**`evaluations`**
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| code | text | `EVAL-…`, unique per tenant; used as the `intent_id` label in LiteLLM |
+| project_id | uuid FK | |
+| data_class | data_class | Never below the project's default; `prohibited` is refused at start (ADR-M81 §2.6) |
+| task_set_version | text | Code, for example `v1` |
+| configuration_ids | text[] | Codes of the configurations (agent version, model, instructions version) |
+| task_ids | text[] | Codes of the tasks |
+| runs_per_task | int | `n` |
+| budget_usd | numeric(18,6) | Own budget; only goes up, by a decision (ADR-M28) |
+| status | text | `queued`, `running`, `completed`, `stopped_budget`, `cancelled`, `failed` |
+| executor | text | `server` (a `developer` result is never stored here) |
+| started_by | uuid FK users null | Null when an operator started it as `system` |
+| created_at, updated_at | timestamptz | |
+
+**`evaluation_runs`**
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | Used as `run_id` label in LiteLLM |
+| evaluation_id | uuid FK | |
+| configuration_id, task_id | text | Codes |
+| run_index | int | 1…`runs_per_task` |
+| attempt | int | Grows when a run is `preempted` and queued again |
+| status | text | `queued`, `running`, `scored`, `failed`, `preempted`, `cancelled` |
+| runner_instance | text null | The instance label of the runner that held it |
+| started_at, finished_at | timestamptz null | |
+
+**`evaluation_run_results`** (AO)
+
+| Column | Type | Notes |
+|---|---|---|
+| id | bigserial PK | |
+| evaluation_run_id | uuid FK | At most one result per run and attempt that was scored |
+| resolved | boolean | Hidden `fail_to_pass` and `pass_to_pass` passed |
+| ci_first_try | boolean | |
+| scope_breach | boolean | |
+| stop_reason | text null | Code, as `runs.stop_reason` |
+| new_findings | int | Static-analysis findings (count) |
+| files_changed, lines_added, lines_removed | int | |
+| wall_clock_ms | bigint | |
+| model_calls | int | |
+| input_tokens, output_tokens, cached_input_tokens | bigint | |
+| cost_usd | numeric(18,6) | Internal cost equivalent for self-hosted models (D-07 §3) |
+| hardware | jsonb | Coded fields only: CPU model, cores, memory, Docker version, GPU, runner instance (ADR-M81 §2.1) |
+| occurred_at | timestamptz | |
+
+- `evaluation_run_results` is append-only: triggers and `SELECT, INSERT` only for `platform_app` (section 7.2). A `preempted` run has no result.
+- **`cost_records.evaluation_run_id`** (uuid FK null, new column, QUESTIONS #462): set for the cost of an evaluation run. A record has `intent_id` or `evaluation_run_id`, never both (CHECK). The table stays append-only. The cost report shows evaluations as their own line.
+- Run Contract kind `evaluation` (ADR-M81 §2.2): `run_contracts.run_id` is a foreign key to `runs`, so where the signed evaluation contract is stored (a column on `evaluation_runs` or a table of its own) is decided in L04 PR 3 and written here then. The contract has the kind and no `intent_id` or `plan_id`.
+- Indexes: `evaluations` (`tenant_id`, `project_id`, `created_at`); `evaluation_runs` (`tenant_id`, `evaluation_id`, `status`); `cost_records` (`tenant_id`, `evaluation_run_id`).
+
+---
+
 ## 7. Audit log: hash chain
 
 [Doc] An earlier internal draft proposes an append-only table + hash chain, with an extra copy on locked object storage.
@@ -899,3 +960,4 @@ CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
 | 1.41 | 2026-10-10 | Claude (task U05), approved by Harry | §4 ERD (D13) and §6.1: `web_sessions` as built (hashes only, the identity used, the end reasons, trigger `SDA18`, no DELETE, the CSRF column with U06); `user_identities` UNIQUE (`tenant_id`, `id`) (migration `0027-web-sessions`, ADR-M73 §2.2, QUESTIONS #385–#389) |
 | 1.42 | 2026-10-12 | Claude (task U06), approved by Harry | §4 ERD (D13) and §6.1: `web_sessions.csrf_sha256` and UNIQUE (`tenant_id`, `id`); `webauthn_credentials` and `passkey_challenges` as built (triggers `SDA20`, `SDA19`, no DELETE); audit `passkey.registered`, `passkey.revoked` (migration `0028-dashboard-writes`, ADR-M73 §2.3, §2.4, QUESTIONS #410–#414) |
 | 1.43 | 2026-10-13 | Claude (task V13), approved by Harry | §6.4: run event `model_selected` (the model a run calls, written by `prepareRun`) and the value kind `model`; no migration: the database CHECK already accepts these names (ADR-M79 §2.3, QUESTIONS #434) |
+| 1.44 | 2026-10-14 | Claude (task L04, PR 1), approved by Harry | §6.8 draft: `evaluations`, `evaluation_runs`, `evaluation_run_results` (AO) and the column `cost_records.evaluation_run_id` (ADR-M81, QUESTIONS #460–#464); migration and ERD with L04 PR 3 |
