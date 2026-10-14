@@ -33,6 +33,8 @@ export const WORKER_ENV = {
   costSyncLookbackMinutes: 'SDLC_WORKER_COST_SYNC_LOOKBACK_MINUTES',
   costSyncCatchUpMinutes: 'SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES',
   costSyncSettleMinutes: 'SDLC_WORKER_COST_SYNC_SETTLE_MINUTES',
+  evalTickSeconds: 'SDLC_WORKER_EVAL_TICK_SECONDS',
+  evalMaxInFlight: 'SDLC_WORKER_EVAL_MAX_IN_FLIGHT',
   evidenceUrl: 'SDLC_WORKER_EVIDENCE_URL',
   evidenceBucket: 'SDLC_WORKER_EVIDENCE_BUCKET',
   evidenceSecretPath: 'SDLC_WORKER_EVIDENCE_SECRET_PATH',
@@ -136,6 +138,8 @@ const schema = z.object({
   [WORKER_ENV.costSyncLookbackMinutes]: z.coerce.number().int().min(10).max(1440).default(120),
   [WORKER_ENV.costSyncCatchUpMinutes]: z.coerce.number().int().min(10).max(10_080).default(1440),
   [WORKER_ENV.costSyncSettleMinutes]: z.coerce.number().int().min(5).max(1440).default(30),
+  [WORKER_ENV.evalTickSeconds]: z.coerce.number().int().min(5).max(300).default(15),
+  [WORKER_ENV.evalMaxInFlight]: z.coerce.number().int().min(1).max(16).default(2),
   // E03 (ADR-M49 §2.2): the evidence store for G8's release pack, SeaweedFS's S3 API on the
   // Compose network; `off`: intents wait at G8. An origin only.
   [WORKER_ENV.evidenceUrl]: z
@@ -326,6 +330,14 @@ export interface CostSyncSettings {
   readonly settleMs: number;
 }
 
+/** L04 (ADR-M81 §2.8): the evaluation loop. Technical settings. */
+export interface EvaluationLoopSettings {
+  /** Time between two passes. */
+  readonly tickMs: number;
+  /** Runs handed to the runner at most at one time (running, or waiting for a slot there). */
+  readonly maxInFlight: number;
+}
+
 export interface WorkerSettings {
   readonly database: WorkerDatabase;
   readonly githubApiUrl: string;
@@ -352,6 +364,8 @@ export interface WorkerSettings {
   readonly runs: WorkerRunSettings | null;
   /** C12: the scheduled spend sync; it runs when `runs` is set (the cost-controller AppRole). */
   readonly costSync: CostSyncSettings;
+  /** L04: the evaluation loop; it runs when `runs` is set (it needs the Cost Controller). */
+  readonly evaluation: EvaluationLoopSettings;
   /** E03: the evidence store for G8's release pack; null: `SDLC_WORKER_EVIDENCE_URL=off`. */
   readonly evidence: WorkerEvidenceSettings | null;
   /** E05: the retention loop; null: `SDLC_WORKER_RETENTION_URL=off`. */
@@ -467,6 +481,10 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
       lookbackMs: lookbackMinutes * 60_000,
       catchUpMs: catchUpMinutes * 60_000,
       settleMs: v[WORKER_ENV.costSyncSettleMinutes] * 60_000,
+    },
+    evaluation: {
+      tickMs: v[WORKER_ENV.evalTickSeconds] * 1000,
+      maxInFlight: v[WORKER_ENV.evalMaxInFlight],
     },
     evidence:
       v[WORKER_ENV.evidenceUrl] === 'off'

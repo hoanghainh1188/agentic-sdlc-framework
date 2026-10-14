@@ -32,6 +32,7 @@ describe('worker settings', () => {
         catchUpMs: 86_400_000,
         settleMs: 1_800_000,
       },
+      evaluation: { tickMs: 15_000, maxInFlight: 2 },
       evidence: {
         url: 'http://seaweedfs:8333',
         bucket: 'evidence',
@@ -160,6 +161,16 @@ describe('worker settings', () => {
       catchUpMs: 1_200_000,
       settleMs: 300_000,
     });
+    // L04: the evaluation loop (ADR-M81 §2.8).
+    expect(
+      loadSettings({
+        SDLC_WORKER_EVAL_TICK_SECONDS: '30',
+        SDLC_WORKER_EVAL_MAX_IN_FLIGHT: '4',
+      }).evaluation,
+    ).toEqual({ tickMs: 30_000, maxInFlight: 4 });
+    expect(() => loadSettings({ SDLC_WORKER_EVAL_MAX_IN_FLIGHT: '0' })).toThrow(
+      expect.objectContaining({ setting: 'SDLC_WORKER_EVAL_MAX_IN_FLIGHT' }),
+    );
     expect(() =>
       loadSettings({
         SDLC_WORKER_COST_SYNC_INTERVAL_SECONDS: '600',

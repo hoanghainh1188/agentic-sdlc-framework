@@ -200,6 +200,122 @@ export class EvaluationRunRepository extends TenantRepository {
   }
 
   /**
+   * Queued runs of open evaluations that have no contract for their current attempt yet: what the
+   * worker's loop prepares next, oldest first (ADR-M81 §2.8).
+   */
+  async listToPrepare(limit: number): Promise<EvaluationRun[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1) return [];
+    return this.run(
+      this.db
+        .selectFrom('evaluation_runs as er')
+        .innerJoin('evaluations as e', (join) =>
+          join
+            .onRef('e.tenant_id', '=', 'er.tenant_id')
+            .onRef('e.id', '=', 'er.evaluation_id')
+            .on('e.tenant_id', '=', this.tenantId),
+        )
+        .selectAll('er')
+        .where('er.tenant_id', '=', this.tenantId)
+        .where('er.status', '=', 'queued')
+        .where('e.status', 'in', ['queued', 'running'])
+        .where((eb) =>
+          eb.not(
+            eb.exists(
+              eb
+                .selectFrom('evaluation_run_contracts as c')
+                .select('c.attempt')
+                .where('c.tenant_id', '=', this.tenantId)
+                .whereRef('c.evaluation_run_id', '=', 'er.id')
+                .whereRef('c.attempt', '=', 'er.attempt'),
+            ),
+          ),
+        )
+        .orderBy('er.created_at')
+        .orderBy('er.id')
+        .limit(limit)
+        .execute(),
+    );
+  }
+
+  /**
+   * Queued runs that have a contract for their current attempt: handed to a workflow, waiting for
+   * a runner. If no workflow lives for one (the worker stopped between the contract and the
+   * start), the loop gives it the next attempt.
+   */
+  async listHandedOver(limit: number): Promise<EvaluationRun[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1) return [];
+    return this.run(
+      this.db
+        .selectFrom('evaluation_runs as er')
+        .selectAll('er')
+        .where('er.tenant_id', '=', this.tenantId)
+        .where('er.status', '=', 'queued')
+        .where((eb) =>
+          eb.exists(
+            eb
+              .selectFrom('evaluation_run_contracts as c')
+              .select('c.attempt')
+              .where('c.tenant_id', '=', this.tenantId)
+              .whereRef('c.evaluation_run_id', '=', 'er.id')
+              .whereRef('c.attempt', '=', 'er.attempt'),
+          ),
+        )
+        .orderBy('er.created_at')
+        .orderBy('er.id')
+        .limit(limit)
+        .execute(),
+    );
+  }
+
+  /** Runs a runner works on, of evaluations that already ended (the workflow is cancelled). */
+  async runningOfClosedEvaluations(limit: number): Promise<EvaluationRun[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1) return [];
+    return this.run(
+      this.db
+        .selectFrom('evaluation_runs as er')
+        .innerJoin('evaluations as e', (join) =>
+          join
+            .onRef('e.tenant_id', '=', 'er.tenant_id')
+            .onRef('e.id', '=', 'er.evaluation_id')
+            .on('e.tenant_id', '=', this.tenantId),
+        )
+        .selectAll('er')
+        .where('er.tenant_id', '=', this.tenantId)
+        .where('er.status', '=', 'running')
+        .where('e.status', 'not in', ['queued', 'running'])
+        .orderBy('er.id')
+        .limit(limit)
+        .execute(),
+    );
+  }
+
+  /** Runs that are `running`, or `queued` with a contract: how much is on its way to the runner. */
+  async countInFlight(): Promise<number> {
+    const row = await this.run(
+      this.db
+        .selectFrom('evaluation_runs as er')
+        .select((eb) => eb.fn.countAll<string>().as('n'))
+        .where('er.tenant_id', '=', this.tenantId)
+        .where((eb) =>
+          eb.or([
+            eb('er.status', '=', 'running'),
+            eb.exists(
+              eb
+                .selectFrom('evaluation_run_contracts as c')
+                .select('c.attempt')
+                .where('c.tenant_id', '=', this.tenantId)
+                .whereRef('c.evaluation_run_id', '=', 'er.id')
+                .whereRef('c.attempt', '=', 'er.attempt')
+                .where(eb('er.status', '=', 'queued')),
+            ),
+          ]),
+        )
+        .executeTakeFirstOrThrow(),
+    );
+    return Number(row.n);
+  }
+
+  /**
    * The runner takes one queued run for the attempt its contract names: `queued` → `running`, with
    * one conditional update (two runners never take the same run). False when the run is not queued
    * any more, or is on another attempt. The first start of an evaluation moves it to `running`.
@@ -304,6 +420,30 @@ export class EvaluationRunRepository extends TenantRepository {
       stop_reason: stopReason,
       finished_at: sql<Date>`now()`,
     });
+  }
+
+  /**
+   * Cancels one run no runner works on (`queued`, `preempted`) with a stop reason code: its model
+   * is not allowed any more, or it could not be handed over. False if it was neither.
+   */
+  async cancelOne(id: string, stopReason: string): Promise<boolean> {
+    if (!isUuid(id)) return false;
+    if (!CODE.test(stopReason)) invalid('stopReason');
+    const result = await this.run(
+      this.db
+        .updateTable('evaluation_runs')
+        .set({
+          status: 'cancelled',
+          stop_reason: stopReason,
+          finished_at: sql<Date>`now()`,
+          updated_at: sql<Date>`now()`,
+        })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .where('status', 'in', ['queued', 'preempted'])
+        .executeTakeFirst(),
+    );
+    return Number(result.numUpdatedRows) === 1;
   }
 
   /**
