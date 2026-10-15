@@ -7,7 +7,8 @@
 //
 // U06 (ADR-M73 §2.3): writes go through `send` only, with the session cookie and the session's
 // CSRF token in `X-SDLC-CSRF`, a JSON body or none. The paths are fixed in `writes.ts` (sign out,
-// passkeys); a static test refuses any other. No write changes an intent, gate, run or escalation.
+// passkeys, the step-up, and L05's four evaluation plan actions); a static test refuses any other.
+// No write changes an intent, gate, run or escalation.
 import { errorEnvelopeSchema, webSessionSchema } from '@sdlc/api-schemas';
 import type { z } from 'zod';
 
@@ -19,6 +20,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
+    /** The API's refusal reason, a code (L05: `evaluation.error.<reason>` in the catalog). */
+    readonly reason?: string,
   ) {
     super(code);
   }
@@ -159,9 +162,10 @@ async function request(
   if (!response.ok) {
     const envelope = errorEnvelopeSchema.safeParse(body);
     const code = envelope.success ? envelope.data.error.code : 'unexpected';
+    const reason = envelope.success ? envelope.data.error.reason : undefined;
     // An expired or revoked token or session ends the tab's sign-in; the person signs in again.
     if (response.status === 401 && endsCurrentSignIn(credential)) session.signOut();
-    throw new ApiError(response.status, code);
+    throw new ApiError(response.status, code, reason);
   }
   return body;
 }

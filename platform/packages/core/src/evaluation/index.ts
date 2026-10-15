@@ -50,6 +50,7 @@ export {
   changeEvaluationPlan,
   changedPlanFields,
   createEvaluationPlan,
+  mayChangePlans,
   mayReadPlans,
   nextScheduledRun,
   planChangeNeedsStepUp,

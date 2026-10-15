@@ -24,7 +24,11 @@ export function dashboardCatalog(): Plugin {
       const all = JSON.parse(readFileSync(file, 'utf8')) as Record<string, string>;
       const own = Object.fromEntries(
         Object.entries(all).filter(
-          ([key]) => key.startsWith('dashboard.') || key.startsWith('intent.waiting'),
+          ([key]) =>
+            key.startsWith('dashboard.') ||
+            key.startsWith('intent.waiting') ||
+            // L05: the refusals of evaluation plans, by the reason the API gives.
+            key.startsWith('evaluation.error.'),
         ),
       );
       return `export default ${JSON.stringify(own)};`;

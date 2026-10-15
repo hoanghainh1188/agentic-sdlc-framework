@@ -9,14 +9,21 @@ import {
   archiveEvaluationPlan,
   changeEvaluationPlan,
   CommandError,
+  consumeStepUp,
   createEvaluationPlan,
+  mayChangePlans,
   mayReadPlans,
+  PasskeyError,
+  planChangeNeedsStepUp,
+  stepUpRequestSha256,
   readEvaluationPlan,
   requestEvaluationPlanRun,
   type EvaluationPlan,
   type EvaluationPlanDeps,
+  type PlanContent,
   type PlanContentInput,
   type Project,
+  type StepUpAction,
   type TenantScope,
 } from '@sdlc/core';
 import type { GitHostAdapter } from '@sdlc/contracts';
@@ -24,6 +31,7 @@ import type { z } from 'zod';
 
 import type { Principal } from '../auth/principal.js';
 import { ApiError } from '../errors/api-error.js';
+import type { PasskeysService, StepUpAnswer } from '../passkeys/passkeys.service.js';
 import { presentEvaluation, presentPlan, presentVersion } from './present.js';
 import type {
   changePlanSchema,
@@ -41,8 +49,46 @@ export class EvaluationsService {
       readonly gitHost?: Pick<GitHostAdapter, 'getBranchHead' | 'getFileAtCommit'>;
       readonly policyFactory: EvaluationPlanDeps['policyFactory'];
       readonly now: () => Date;
+      /** The passkey step-up of a dashboard session (U06); undefined without sign-in. */
+      readonly passkeys?: PasskeysService;
     },
   ) {}
+
+  /**
+   * Runs a write; for a dashboard session that needs the step-up (ADR-M82 §2.7), first checks the
+   * passkey answer and uses it in the write's transaction, bound to the action and to the SHA-256
+   * of the body as the page sent it (without `step_up`) with `decision` and `target`. A token
+   * never needs it.
+   */
+  private async withStepUp<T>(
+    p: Principal,
+    need: boolean,
+    action: StepUpAction,
+    target: string,
+    raw: Readonly<Record<string, unknown>>,
+    write: (scope: TenantScope) => Promise<T>,
+  ): Promise<T> {
+    if (p.credential.kind !== 'session' || !need) return write(p.scope);
+    const { step_up: answer, ...rest } = raw as { step_up?: StepUpAnswer };
+    if (!answer || !this.deps.passkeys) throw new ApiError(403, 'step_up_refused');
+    const verified = await this.deps.passkeys.verifyStepUp(p, answer);
+    const decision = action.slice('eval_plan.'.length);
+    const binding = {
+      action,
+      decision,
+      intentId: null,
+      escalationId: null,
+      gate: null,
+      expectedInputSha256: null,
+      requestSha256: stepUpRequestSha256({ ...rest, decision, target }),
+    };
+    return p.scope.transaction(async (tx) => {
+      await consumeStepUp(tx, verified, binding, this.deps.now()).catch((error: unknown) => {
+        throw error instanceof PasskeyError ? new ApiError(403, 'step_up_refused') : error;
+      });
+      return write(tx);
+    });
+  }
 
   private planDeps(): EvaluationPlanDeps {
     if (!this.deps.gitHost) throw new ApiError(503, 'git_host_unavailable');
@@ -56,21 +102,34 @@ export class EvaluationsService {
   async listPlans(p: Principal, slug: string): Promise<Record<string, unknown>> {
     const project = await this.readableProject(p, slug);
     const plans = await p.scope.evaluationPlans.listForProject(project.id);
-    return { plans: plans.map((plan) => presentPlan(plan, project)) };
+    return {
+      can_change: await mayChangePlans(p.scope, p.userId, project.id),
+      plans: plans.map((plan) => presentPlan(plan, project)),
+    };
   }
 
   async createPlan(
     p: Principal,
     slug: string,
     body: z.infer<typeof createPlanSchema>,
+    raw: Readonly<Record<string, unknown>>,
   ): Promise<Record<string, unknown>> {
     const project = await this.readableProject(p, slug);
-    const plan = await createEvaluationPlan(p.scope, this.planDeps(), {
-      projectId: project.id,
-      code: body.code,
-      content: contentOf(body),
-      userId: p.userId,
-    });
+    const content = contentOf(body);
+    const plan = await this.withStepUp(
+      p,
+      planChangeNeedsStepUp(null, content as unknown as PlanContent),
+      'eval_plan.create',
+      slug,
+      raw,
+      (scope) =>
+        createEvaluationPlan(scope, this.planDeps(), {
+          projectId: project.id,
+          code: body.code,
+          content,
+          userId: p.userId,
+        }),
+    );
     return this.showPlan(p, plan.id);
   }
 
@@ -82,6 +141,8 @@ export class EvaluationsService {
     const evaluations = await p.scope.evaluationPlans.evaluations(plan.id, PLAN_EVALUATIONS);
     return {
       ...presentPlan(read.plan, project),
+      can_change:
+        read.plan.status !== 'archived' && (await mayChangePlans(p.scope, p.userId, project.id)),
       current: presentVersion(read.version),
       versions: versions.map((v) => ({
         version: v.version,
@@ -96,14 +157,25 @@ export class EvaluationsService {
     p: Principal,
     planId: string,
     body: z.infer<typeof changePlanSchema>,
+    raw: Readonly<Record<string, unknown>>,
   ): Promise<Record<string, unknown>> {
-    await this.readablePlan(p, planId);
-    await changeEvaluationPlan(p.scope, this.planDeps(), {
-      planId,
-      expectedVersion: body.expected_version,
-      content: contentOf(body),
-      userId: p.userId,
-    });
+    const { plan } = await this.readablePlan(p, planId);
+    const content = contentOf(body);
+    const before = await p.scope.evaluationPlans.getVersion(plan.id, plan.current_version);
+    await this.withStepUp(
+      p,
+      planChangeNeedsStepUp(before ?? null, content as unknown as PlanContent),
+      'eval_plan.change',
+      plan.id,
+      raw,
+      (scope) =>
+        changeEvaluationPlan(scope, this.planDeps(), {
+          planId,
+          expectedVersion: body.expected_version,
+          content,
+          userId: p.userId,
+        }),
+    );
     return this.showPlan(p, planId);
   }
 
@@ -113,9 +185,17 @@ export class EvaluationsService {
     return this.showPlan(p, planId);
   }
 
-  async requestRun(p: Principal, planId: string): Promise<Record<string, unknown>> {
-    await this.readablePlan(p, planId);
-    await requestEvaluationPlanRun(p.scope, { planId, userId: p.userId });
+  async requestRun(
+    p: Principal,
+    planId: string,
+    /** The body as sent (checked by the controller with `runPlanSchema`): `{}` or `step_up`. */
+    raw: Readonly<Record<string, unknown>>,
+  ): Promise<Record<string, unknown>> {
+    const { plan } = await this.readablePlan(p, planId);
+    // Run now spends money: a dashboard session always confirms it with a passkey.
+    await this.withStepUp(p, true, 'eval_plan.run', plan.id, raw, (scope) =>
+      requestEvaluationPlanRun(scope, { planId, userId: p.userId }),
+    );
     return this.showPlan(p, planId);
   }
 

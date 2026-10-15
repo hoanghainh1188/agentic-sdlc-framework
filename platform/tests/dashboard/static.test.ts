@@ -56,7 +56,7 @@ describe('the dashboard writes only its own session and passkeys (AC1; U05, U06)
     }
   });
 
-  it('the writes are exactly sign-out and the own passkeys: no business path', () => {
+  it('the writes are exactly sign-out, the own passkeys, the step-up and the plan actions', () => {
     const writes = sources.find((s) => s.file === 'src/api/writes.ts')!.text;
     const calls = [
       ...writes.matchAll(/send\(\s*apiPath\([`']([^`']+)[`']\),\s*'(POST|DELETE)'/g),
@@ -68,6 +68,12 @@ describe('the dashboard writes only its own session and passkeys (AC1; U05, U06)
         'POST /v1/me/passkeys/registration-options',
         'POST /v1/me/passkeys',
         'DELETE /v1/me/passkeys/X',
+        // L05 (ADR-M82 §2.7, QUESTIONS #470): the step-up and the four evaluation plan actions.
+        'POST /v1/auth/step-up',
+        'POST /v1/projects/X/eval-plans',
+        'POST /v1/eval-plans/X/versions',
+        'POST /v1/eval-plans/X/archive',
+        'POST /v1/eval-plans/X/runs',
       ].sort(),
     );
     expect([...writes.matchAll(/\bsend\(/g)]).toHaveLength(calls.length);

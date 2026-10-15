@@ -2,6 +2,7 @@
 // this PR; the dashboard's four session actions come with L05 PR 5 (CSRF, passkey step-up).
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
 
+import { SessionAction } from '../auth/auth.guard.js';
 import { CurrentPrincipal, type Principal } from '../auth/principal.js';
 import { EVALUATIONS } from '../tokens.js';
 import { parseRequest } from '../validation.js';
@@ -13,6 +14,7 @@ import {
   listEvaluationsSchema,
   planIdSchema,
   projectSlugSchema,
+  runPlanSchema,
 } from './schemas.js';
 
 @Controller('v1/projects/:project/eval-plans')
@@ -29,6 +31,8 @@ export class ProjectEvalPlansController {
 
   @Post()
   @HttpCode(201)
+  // L05 (ADR-M82 §2.7, QUESTIONS #470): one of the four plan actions a dashboard session may send.
+  @SessionAction('actions')
   create(
     @CurrentPrincipal() p: Principal,
     @Param('project') project: string,
@@ -38,6 +42,7 @@ export class ProjectEvalPlansController {
       p,
       parseRequest(projectSlugSchema, project, 'path'),
       parseRequest(createPlanSchema, body, 'body'),
+      body as Record<string, unknown>,
     );
   }
 }
@@ -53,16 +58,19 @@ export class EvalPlansController {
 
   @Post('versions')
   @HttpCode(201)
+  @SessionAction('actions')
   change(@CurrentPrincipal() p: Principal, @Param('plan') plan: string, @Body() body: unknown) {
     return this.evaluations.changePlan(
       p,
       parseRequest(planIdSchema, plan, 'path'),
       parseRequest(changePlanSchema, body, 'body'),
+      body as Record<string, unknown>,
     );
   }
 
   @Post('archive')
   @HttpCode(200)
+  @SessionAction('actions')
   archive(@CurrentPrincipal() p: Principal, @Param('plan') plan: string) {
     return this.evaluations.archivePlan(p, parseRequest(planIdSchema, plan, 'path'));
   }
@@ -70,8 +78,13 @@ export class EvalPlansController {
   /** Run now: the worker starts the run within a pass of its loop (QUESTIONS #476). */
   @Post('runs')
   @HttpCode(202)
-  run(@CurrentPrincipal() p: Principal, @Param('plan') plan: string) {
-    return this.evaluations.requestRun(p, parseRequest(planIdSchema, plan, 'path'));
+  @SessionAction('actions')
+  run(@CurrentPrincipal() p: Principal, @Param('plan') plan: string, @Body() body: unknown) {
+    return this.evaluations.requestRun(
+      p,
+      parseRequest(planIdSchema, plan, 'path'),
+      parseRequest(runPlanSchema, body ?? {}, 'body') && ((body ?? {}) as Record<string, unknown>),
+    );
   }
 }
 

@@ -11,6 +11,7 @@ import {
   isUuid,
   listPasskeys,
   listUserPasskeys,
+  mayReadPlans,
   openChallenge,
   projectAccess,
   registerPasskey,
@@ -163,6 +164,10 @@ export class PasskeysService {
       expectedInputSha256: request.expected_input_sha256 ?? null,
       requestSha256: stepUpRequestSha256(request.request),
     };
+    if (request.action.startsWith('eval_plan.')) {
+      await this.#readablePlanTarget(p, request.request.target);
+      return { ...common, intentId: null, escalationId: null, gate: null };
+    }
     if (request.action === 'gate.decide') {
       const intent = await this.#readableIntent(p, request.intent ?? '');
       return {
@@ -250,6 +255,22 @@ export class PasskeysService {
       throw new ApiError(404, 'intent_not_found');
     }
     return intent.id;
+  }
+
+  /** L05: the project (create) or the plan (change, run) a plan step-up names must be readable. */
+  async #readablePlanTarget(p: Principal, target: unknown): Promise<void> {
+    const plan =
+      typeof target === 'string' && isUuid(target)
+        ? await p.scope.evaluationPlans.getById(target)
+        : undefined;
+    const project = plan
+      ? await p.scope.projects.getById(plan.project_id)
+      : typeof target === 'string'
+        ? await p.scope.projects.getBySlug(target)
+        : undefined;
+    if (!project || !(await mayReadPlans(p.scope, p.userId, project.id))) {
+      throw new ApiError(404, 'not_found');
+    }
   }
 
   async #readableEscalation(p: Principal, code: string): Promise<string> {

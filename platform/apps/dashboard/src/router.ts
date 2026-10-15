@@ -3,7 +3,14 @@ import { useEffect, useState } from 'preact/hooks';
 
 import { parseRoute, type Route } from './model/route.js';
 
-export { href, intentHref, parseRoute, type Route } from './model/route.js';
+export {
+  evaluationHref,
+  href,
+  intentHref,
+  parseRoute,
+  planHref,
+  type Route,
+} from './model/route.js';
 
 export function useRoute(): Route {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash));

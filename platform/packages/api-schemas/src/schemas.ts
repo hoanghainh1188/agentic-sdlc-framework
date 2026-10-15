@@ -681,6 +681,25 @@ export const passkeyRegistrationOptionsSchema = z.object({
 });
 export type PasskeyRegistrationOptions = z.infer<typeof passkeyRegistrationOptionsSchema>;
 
+/**
+ * `POST /v1/auth/step-up` (U06; used by L05's plan actions): the challenge's ID and the WebAuthn
+ * request options, handed as they are to the browser's passkey library.
+ */
+export const stepUpOptionsSchema = z.object({
+  challenge_id: z.string().regex(UUID_TEXT),
+  options: z
+    .object({
+      challenge: z.string().regex(/^[A-Za-z0-9_-]{16,128}$/),
+      allowCredentials: z
+        .array(z.object({ id: z.string().max(1366), type: z.literal('public-key') }).passthrough())
+        .max(10)
+        .optional(),
+    })
+    .passthrough(),
+  expires_in_seconds: z.number().int().min(1).max(600),
+});
+export type StepUpOptions = z.infer<typeof stepUpOptionsSchema>;
+
 // Evaluation plans and evaluations (task L05, ADR-M82 §2.7). Codes, IDs, amounts, hashes.
 const decimal = z.string().regex(/^[0-9]{1,15}(\.[0-9]{1,6})?$/);
 const sha = z.string().regex(/^[0-9a-f]{40,64}$/);
@@ -764,9 +783,14 @@ export const evalPlanSummarySchema = z.object({
   updated_at: time,
 });
 export type EvalPlanSummaryView = z.infer<typeof evalPlanSummarySchema>;
-export const evalPlanListSchema = z.object({ plans: z.array(evalPlanSummarySchema).max(1000) });
+export const evalPlanListSchema = z.object({
+  /** QUESTIONS #477: the caller may change and run the project's plans (for the UI only). */
+  can_change: z.boolean(),
+  plans: z.array(evalPlanSummarySchema).max(1000),
+});
 
 export const evalPlanSchema = evalPlanSummarySchema.extend({
+  can_change: z.boolean(),
   current: evalPlanVersionSchema,
   versions: z
     .array(z.object({ version: z.number().int(), changed_by: id.nullable(), created_at: time }))

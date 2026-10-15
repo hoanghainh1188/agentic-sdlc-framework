@@ -119,6 +119,21 @@ export async function assertEvalRole(
   }
 }
 
+/** True when the person may change and run the project's plans (QUESTIONS #477): for the UI. */
+export async function mayChangePlans(
+  scope: TenantScope,
+  userId: string,
+  projectId: string,
+): Promise<boolean> {
+  try {
+    await assertEvalRole(scope, userId, projectId);
+    return true;
+  } catch (error) {
+    if (error instanceof EvaluationError) return false;
+    throw error;
+  }
+}
+
 /** True when the person may read the project's plans: an admin or any role on the project. */
 export async function mayReadPlans(
   scope: TenantScope,
