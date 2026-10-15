@@ -7,9 +7,17 @@ export type Route =
   | { readonly name: 'escalations'; readonly query: URLSearchParams }
   | { readonly name: 'numbers'; readonly query: URLSearchParams }
   | { readonly name: 'audit'; readonly query: URLSearchParams }
-  | { readonly name: 'passkeys'; readonly query: URLSearchParams };
+  | { readonly name: 'passkeys'; readonly query: URLSearchParams }
+  // L05 (ADR-M82 §2.7): evaluation plans of a project, one plan, its form, one evaluation.
+  | { readonly name: 'evaluations'; readonly query: URLSearchParams }
+  | { readonly name: 'eval-plan'; readonly id: string; readonly query: URLSearchParams }
+  | { readonly name: 'eval-plan-new'; readonly query: URLSearchParams }
+  | { readonly name: 'eval-plan-edit'; readonly id: string; readonly query: URLSearchParams }
+  | { readonly name: 'evaluation'; readonly code: string; readonly query: URLSearchParams };
 
 const INTENT_CODE = /^INT-[0-9]{4}-[0-9]{4,}$/;
+const EVAL_CODE = /^EVAL-[0-9]{4}-[0-9]{4,9}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export function parseRoute(hash: string): Route {
   const raw = hash.replace(/^#/, '');
@@ -23,6 +31,18 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'numbers') return { name: 'numbers', query };
   if (parts[0] === 'audit') return { name: 'audit', query };
   if (parts[0] === 'passkeys') return { name: 'passkeys', query };
+  if (parts[0] === 'evaluations') {
+    if (parts[1] === 'plans' && parts[2] === 'new') return { name: 'eval-plan-new', query };
+    if (parts[1] === 'plans' && parts[2] !== undefined && UUID.test(parts[2])) {
+      return parts[3] === 'edit'
+        ? { name: 'eval-plan-edit', id: parts[2], query }
+        : { name: 'eval-plan', id: parts[2], query };
+    }
+    if (parts[1] !== undefined && EVAL_CODE.test(parts[1])) {
+      return { name: 'evaluation', code: parts[1], query };
+    }
+    return { name: 'evaluations', query };
+  }
   return { name: 'intents', query };
 }
 
@@ -39,4 +59,13 @@ export function href(
   for (const [key, value] of Object.entries(query)) if (value) params.set(key, value);
   const search = params.toString();
   return `#/${path}${search ? `?${search}` : ''}`;
+}
+
+/** L05: the route of one plan, its form, or one evaluation; the list for anything else. */
+export function planHref(id: string, edit = false): string {
+  return UUID.test(id) ? `#/evaluations/plans/${id}${edit ? '/edit' : ''}` : '#/evaluations';
+}
+
+export function evaluationHref(code: string): string {
+  return EVAL_CODE.test(code) ? `#/evaluations/${code}` : '#/evaluations';
 }

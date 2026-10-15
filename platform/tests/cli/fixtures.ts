@@ -773,6 +773,7 @@ export function evalPlanBody(): Record<string, unknown> {
   } as PlanVersionView;
   return {
     ...presentEvalPlan(plan, PROJECT),
+    can_change: true,
     current: presentVersion(version),
     versions: [{ version: 2, changed_by: USER, created_at: AT.toISOString() }],
     evaluations: [evaluationBody()],

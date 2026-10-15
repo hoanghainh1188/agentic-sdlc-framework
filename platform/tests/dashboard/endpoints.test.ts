@@ -22,11 +22,14 @@ function controllers(dir: string): string[] {
 /** Routes of one method as patterns, `:param` → one segment. */
 function routesOf(method: 'Get' | 'Post' | 'Delete'): RegExp[] {
   return controllers(apiSrc).flatMap((file) => {
+    // A file may hold several controllers (L05): each route takes the base of the one above it.
     const text = fs.readFileSync(file, 'utf8');
-    const base = /@Controller\('([^']*)'\)/.exec(text)?.[1] ?? '';
-    return [...text.matchAll(new RegExp(`@${method}\\((?:'([^']*)')?\\)`, 'g'))].map((m) => {
-      const full = `/${[base, m[1] ?? ''].filter((p) => p !== '').join('/')}`;
-      return new RegExp(`^${full.replace(/:[a-z_]+/g, '[^/]+')}$`);
+    return text.split(/(?=@Controller\()/).flatMap((part) => {
+      const base = /@Controller\('([^']*)'\)/.exec(part)?.[1] ?? '';
+      return [...part.matchAll(new RegExp(`@${method}\\((?:'([^']*)')?\\)`, 'g'))].map((m) => {
+        const full = `/${[base, m[1] ?? ''].filter((p) => p !== '').join('/')}`;
+        return new RegExp(`^${full.replace(/:[a-z_]+/g, '[^/]+')}$`);
+      });
     });
   });
 }
@@ -86,7 +89,8 @@ describe('U06: the dashboard writes existing routes only, with their method', ()
     const calls = [
       ...writes.matchAll(/send\(\s*apiPath\([`']([^`']+)[`']\),\s*'(POST|DELETE)'/g),
     ].map((m) => ({ path: m[1]!.replace(/\$\{[^}]+\}/g, 'X'), method: m[2]! }));
-    expect(calls.length).toBe(5);
+    // U06: sign out (2), passkeys (3); L05: the step-up and the four plan actions (5).
+    expect(calls.length).toBe(10);
     for (const call of calls) {
       const routes = routesOf(call.method === 'POST' ? 'Post' : 'Delete');
       expect(

@@ -1,6 +1,8 @@
 // Request schemas of evaluation plans and evaluations (task L05, ADR-M82 §2.1, §2.7). Codes,
 // numbers, decimal amounts and one repository path per prompt variant: never a prompt text.
 import { DATA_CLASSES, PROVIDER_TYPES } from '@sdlc/contracts';
+
+import { stepUpAnswerSchema } from '../passkeys/schemas.js';
 import { z } from 'zod';
 
 export const projectSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/);
@@ -47,16 +49,27 @@ const content = {
   configurations: z.array(configuration).min(1).max(16),
 };
 
+/**
+ * The passkey answer of a dashboard session (ADR-M82 §2.7): needed for Run now, and for a create
+ * or change that turns a schedule or `on_change` on or raises a budget. A token never needs it.
+ */
+const stepUp = { step_up: stepUpAnswerSchema.optional() };
+
 export const createPlanSchema = z.strictObject({
   code: z.string().regex(/^[a-z][a-z0-9-]{0,47}$/),
   ...content,
+  ...stepUp,
 });
 
 export const changePlanSchema = z.strictObject({
   /** The version the caller read: a plan changed since then is refused (`plan_changed`). */
   expected_version: z.number().int().min(1),
   ...content,
+  ...stepUp,
 });
+
+/** The body of Run now: empty, or the passkey answer of a dashboard session. */
+export const runPlanSchema = z.strictObject(stepUp);
 
 export const listEvaluationsSchema = z.strictObject({
   project: projectSlugSchema.optional(),

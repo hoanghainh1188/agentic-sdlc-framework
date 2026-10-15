@@ -17,6 +17,10 @@ import { Audit } from './views/Audit.js';
 import { Escalations } from './views/Escalations.js';
 import { IntentDetail } from './views/IntentDetail.js';
 import { IntentsBoard } from './views/IntentsBoard.js';
+import { EvalPlan } from './views/EvalPlan.js';
+import { EvalPlanEdit, EvalPlanNew } from './views/EvalPlanForm.js';
+import { Evaluation } from './views/Evaluation.js';
+import { Evaluations } from './views/Evaluations.js';
 import { Numbers } from './views/Numbers.js';
 import { Passkeys } from './views/Passkeys.js';
 import { SignIn, type SignInNotice } from './views/SignIn.js';
@@ -123,6 +127,7 @@ export function App() {
               <NavItem route={route} name="intents" label={t('dashboard.nav.intents')} />
               <NavItem route={route} name="escalations" label={t('dashboard.nav.escalations')} />
               <NavItem route={route} name="numbers" label={t('dashboard.nav.numbers')} />
+              <NavItem route={route} name="evaluations" label={t('dashboard.nav.evaluations')} />
               {me.tenant_admin === true && (
                 <NavItem route={route} name="audit" label={t('dashboard.nav.audit')} />
               )}
@@ -172,7 +177,10 @@ function NavItem({
   readonly name: Route['name'];
   readonly label: string;
 }) {
-  const active = route.name === name || (name === 'intents' && route.name === 'intent');
+  const active =
+    route.name === name ||
+    (name === 'intents' && route.name === 'intent') ||
+    (name === 'evaluations' && route.name.startsWith('eval'));
   return (
     <li>
       <a href={href(name)} aria-current={active ? 'page' : undefined}>
@@ -190,6 +198,16 @@ function Screen({ route, me }: { readonly route: Route; readonly me: Me }) {
       return <Escalations />;
     case 'numbers':
       return <Numbers me={me} query={route.query} />;
+    case 'evaluations':
+      return <Evaluations me={me} query={route.query} />;
+    case 'eval-plan':
+      return <EvalPlan id={route.id} />;
+    case 'eval-plan-new':
+      return <EvalPlanNew query={route.query} />;
+    case 'eval-plan-edit':
+      return <EvalPlanEdit id={route.id} />;
+    case 'evaluation':
+      return <Evaluation code={route.code} />;
     case 'passkeys':
       return session.actions() ? <Passkeys /> : <IntentsBoard me={me} query={route.query} />;
     case 'audit':

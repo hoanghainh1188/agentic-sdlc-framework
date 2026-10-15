@@ -828,3 +828,136 @@ tbody th.mono {
   border-color: var(--alert);
   color: var(--paper);
 }
+
+/* Evaluation plans (L05) */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.config-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-section);
+  padding: 0;
+  list-style: none;
+}
+
+.config-list li {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent-fill);
+  background: var(--paper-raised);
+  border-radius: var(--radius-chip);
+}
+
+.notice-inline {
+  color: var(--alert);
+  font-size: var(--text-small);
+}
+
+.plan-form {
+  display: grid;
+  gap: var(--space-6);
+  max-width: 48rem;
+}
+
+.plan-form fieldset {
+  /* A fieldset is as wide as its content by default: on a phone it must fit the screen. */
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-card);
+  background: var(--paper-raised);
+}
+
+.plan-form legend {
+  padding: 0 var(--space-2);
+  font-weight: 600;
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.field-label {
+  font-weight: 600;
+  font-size: var(--text-small);
+}
+
+.field-hint {
+  color: var(--ink-muted);
+  font-size: var(--text-small);
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-chip);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+
+.field input:focus-visible,
+.field select:focus-visible,
+.choice input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+}
+
+.plan-form .row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr));
+  gap: var(--space-3);
+}
+
+.config-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px dashed var(--rule);
+}
+
+.chip.plan-paused,
+.chip.evaluation-stopped_budget {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.chip.plan-archived,
+.chip.evaluation-cancelled {
+  color: var(--ink-muted);
+}
+
+.chip.evaluation-failed {
+  border-color: var(--alert);
+  color: var(--alert);
+}
+
+.chip.evaluation-completed,
+.chip.plan-active {
+  border-color: var(--ok);
+  color: var(--ok);
+}

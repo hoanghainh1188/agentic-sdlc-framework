@@ -4,6 +4,10 @@ import {
   chainSchema,
   costReportSchema,
   escalationListSchema,
+  evalPlanListSchema,
+  evalPlanSchema,
+  evaluationListSchema,
+  evaluationSchema,
   evidenceFileSchema,
   evidenceListSchema,
   gateMetricsSchema,
@@ -121,3 +125,19 @@ export const readGateMetrics = (
 
 export const readAuditCheck = (o: Signal = {}) =>
   getJson(apiPath('/v1/admin/audit/verify'), chainSchema, o);
+
+/** L05: the evaluation plans of a project, and whether the person may change them. */
+export const readEvalPlans = (project: string, o: Signal = {}) =>
+  getJson(apiPath(`/v1/projects/${segment(project)}/eval-plans`), evalPlanListSchema, o);
+
+/** L05: one plan with its current version, its versions and its latest evaluations. */
+export const readEvalPlan = (id: string, o: Signal = {}) =>
+  getJson(apiPath(`/v1/eval-plans/${segment(id)}`), evalPlanSchema, o);
+
+/** L05: the evaluations of a project (newest first). */
+export const readEvaluations = (project: string, o: Signal = {}) =>
+  getJson(apiPath('/v1/evaluations', { project, limit: 20 }), evaluationListSchema, o);
+
+/** L05: one evaluation with its runs by status and its spend. */
+export const readEvaluation = (code: string, o: Signal = {}) =>
+  getJson(apiPath(`/v1/evaluations/${segment(code)}`), evaluationSchema, o);

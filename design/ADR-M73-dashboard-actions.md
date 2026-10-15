@@ -119,6 +119,7 @@ Writes from a browser need what the read-only dashboard avoids: a sign-in that i
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 1.3 | 2026-10-12 | Claude (task U06, PR 1), approved by Harry | §2.3b, §2.4b: U06 as built: the CSRF token derived from the session secret, one guard rule for session writes, the actions setting, the ceremonies, the two tables, the endpoints, the binding with the request's hash, the use in the decision's transaction for U07; the library versions (QUESTIONS #410–#414) |
+| 1.5 | 2026-10-15 | Claude (task L05, PR 5) | §2.4b: the step-up actions `eval_plan.create`, `eval_plan.change`, `eval_plan.run` (no intent or escalation; the request SHA-256 names the plan or project) are the first used (ADR-M82 §2.7) |
 | 1.4 | 2026-10-14 | Claude (task L05, PR 1) | §2.3b: the four evaluation plan actions of L05 as a named exception before U07 (ADR-M82 §2.7, QUESTIONS #470) |
 | 1.2 | 2026-10-12 | Claude (task V09, PR 1) | Wording only: the "Related" row links ADR-M67 (no longer "not written yet"); meaning unchanged |
 | 1.1 | 2026-10-10 | Claude (task U05), approved by Harry | §2.2b: U05 as built: settings, endpoints, pending sign-ins in memory, the user token revoked, reads only before U06, no DELETE on `web_sessions`, the client secret's path (QUESTIONS #385–#389) |

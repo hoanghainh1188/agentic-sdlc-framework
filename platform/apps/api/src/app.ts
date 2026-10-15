@@ -259,6 +259,7 @@ class ApiModule {
             ...(deps.gitHost ? { gitHost: deps.gitHost } : {}),
             policyFactory: (config, models) => createSimplePolicyEngine({ config, models }),
             now,
+            passkeys: passkeys.service,
           }),
         },
         {

@@ -72,6 +72,14 @@ export const stepUpRequestSchema = z.discriminatedUnion('action', [
     expected_input_sha256: sha256.optional(),
     request: decisionBody,
   }),
+  // L05 (ADR-M82 §2.7): the body the plan endpoint will receive, with `decision` (`create`,
+  // `change`, `run`) and `target` (the project's slug for create, else the plan's ID).
+  z.strictObject({
+    action: z.enum([STEP_UP_ACTIONS[2], STEP_UP_ACTIONS[3], STEP_UP_ACTIONS[4]]),
+    request: decisionBody.refine((body) => typeof body.target === 'string', {
+      message: 'target',
+    }),
+  }),
 ]);
 
 /** The passkey answer a decision carries (`step_up`, used from U07). */

@@ -19,6 +19,8 @@ import path from 'node:path';
 
 import { loadDashboardFiles, registerDashboard } from '../../apps/api/dist/dashboard/static.js';
 import { WebAuthnCeremonies } from '../../apps/api/dist/passkeys/webauthn.js';
+import { stepUpRequestSha256 } from '../../packages/core/dist/passkeys/index.js';
+import { evalPlans } from './eval-stub.mjs';
 import { fixtures } from './fixtures.mjs';
 
 const root = path.resolve(import.meta.dirname, '../../..');
@@ -215,6 +217,8 @@ async function passkeyRoutes(req, res, url) {
       const row = {
         id: randomUUID(),
         credentialId: verified.credentialId,
+        publicKey: verified.publicKey,
+        signCount: 0,
         aaguid: verified.aaguid,
         created_at: new Date().toISOString(),
         last_used_at: null,
@@ -234,6 +238,71 @@ async function passkeyRoutes(req, res, url) {
     return (json(res, 200, presentPasskey(row)), true);
   }
   return false;
+}
+
+/** Step-up challenges: ID → { challenge SHA-256, action, request SHA-256 }. */
+const stepUps = new Map();
+
+/** Checks a step-up answer like the API: the challenge, the binding, the passkey, once. */
+async function stepUpHolds(answer, action, requestSha256) {
+  const open = answer && stepUps.get(answer.challenge_id);
+  stepUps.delete(answer?.challenge_id);
+  if (!open || open.action !== action || open.requestSha256 !== requestSha256) return false;
+  const passkey = passkeys.find(
+    (p) => p.revoked_at === null && p.credentialId === answer.response?.id,
+  );
+  if (!passkey) return false;
+  try {
+    passkey.signCount = await ceremonies.verifyAuthentication(answer.response, open.sha, passkey);
+    passkey.last_used_at = new Date().toISOString();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function stepUpAndPlans(req, res, url) {
+  const local = (req.headers.host ?? '').startsWith('localhost:');
+  const secret = cookieOf(req, '__Host-sdlc_session');
+  if (url.pathname === '/v1/auth/step-up' && req.method === 'POST' && local) {
+    if (!secret || !sessions.has(secret)) return (json(res, 401, error('session_ended')), true);
+    if (!writeAllowed(req, secret)) return (json(res, 403, error('csrf_refused')), true);
+    const body = await readBody(req);
+    const allow = passkeys.filter((p) => p.revoked_at === null).map((p) => p.credentialId);
+    if (allow.length === 0) return (json(res, 404, error('passkey_not_found')), true);
+    const challenge = randomBytes(32).toString('base64url');
+    const id = randomUUID();
+    stepUps.set(id, {
+      sha: sha256(challenge),
+      action: body?.action,
+      requestSha256: stepUpRequestSha256(body?.request ?? {}),
+    });
+    const options = await ceremonies.authenticationOptions({ challenge, allow });
+    return (json(res, 200, { challenge_id: id, options, expires_in_seconds: 120 }), true);
+  }
+  const isPlanPath =
+    url.pathname.startsWith('/v1/eval-plans/') ||
+    url.pathname.startsWith('/v1/evaluations') ||
+    /^\/v1\/projects\/[a-z0-9-]+\/eval-plans$/.test(url.pathname);
+  if (!isPlanPath) return false;
+  if (req.method === 'GET') {
+    if (!authenticate(req, res)) return true;
+    const answer = evalPlans.read(url);
+    return (
+      answer ? json(res, answer.status ?? 200, answer.body) : json(res, 404, error('not_found')),
+      true
+    );
+  }
+  if (req.method !== 'POST' || !local) return false;
+  if (!secret || !sessions.has(secret)) return (json(res, 401, error('session_ended')), true);
+  if (!writeAllowed(req, secret)) return (json(res, 403, error('csrf_refused')), true);
+  const body = (await readBody(req)) ?? {};
+  const answer = await evalPlans.write(url, body, (action, target) => {
+    const { step_up: stepUp, ...rest } = body;
+    const decision = action.slice('eval_plan.'.length);
+    return stepUpHolds(stepUp, action, stepUpRequestSha256({ ...rest, decision, target }));
+  });
+  return (json(res, answer.status, answer.body), true);
 }
 
 /** The caller's credential: the token, a session cookie, or neither. Both: 400. */
@@ -272,6 +341,9 @@ http
     if ((req.headers.host ?? '').startsWith('localhost:') && (await passkeyRoutes(req, res, url))) {
       return;
     }
+    // L05: the step-up and the evaluation plans (reads with a token or a session; writes from a
+    // session on `localhost` only, with the CSRF layers and, where the API needs it, a passkey).
+    if (await stepUpAndPlans(req, res, url)) return;
     // The dashboard is read only: the stub refuses every other method (the test counts them).
     if (req.method !== 'GET') return json(res, 405, error('method_not_allowed'));
     if (!authenticate(req, res)) return;

@@ -36,7 +36,14 @@ export const MAX_OPEN_CHALLENGES = 5;
  * The actions a step-up may be bound to. U07 uses the first two; U09 adds the admin changes.
  * A kill and an acknowledgement never take a step-up (ADR-M73 §2.4).
  */
-export const STEP_UP_ACTIONS = ['gate.decide', 'escalation.decide'] as const;
+export const STEP_UP_ACTIONS = [
+  'gate.decide',
+  'escalation.decide',
+  // L05 (ADR-M82 §2.7, QUESTIONS #470): the evaluation plan actions of the dashboard.
+  'eval_plan.create',
+  'eval_plan.change',
+  'eval_plan.run',
+] as const;
 export type StepUpAction = (typeof STEP_UP_ACTIONS)[number];
 
 export function isStepUpAction(value: unknown): value is StepUpAction {
@@ -120,7 +127,14 @@ export function assertStepUpBinding(binding: StepUpBinding): void {
     bad('expected_input_sha256');
   }
   if (binding.decision === null || !CODE.test(binding.decision)) bad('decision');
-  if (binding.action === 'gate.decide') {
+  if (binding.action.startsWith('eval_plan.')) {
+    // An evaluation plan action binds no intent or escalation: the plan and its body are in the
+    // request's SHA-256; the decision is the action's own name (`create`, `change`, `run`).
+    if (binding.intentId !== null || binding.escalationId !== null || binding.gate !== null) {
+      bad('intent');
+    }
+    if (binding.decision !== binding.action.slice('eval_plan.'.length)) bad('decision');
+  } else if (binding.action === 'gate.decide') {
     if (binding.intentId === null || !isUuid(binding.intentId)) bad('intent');
     if (binding.gate === null || !(GATE_CODES as readonly string[]).includes(binding.gate)) {
       bad('gate');
