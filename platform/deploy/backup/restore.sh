@@ -125,10 +125,14 @@ temp_key=""
   cat >/tmp/restore.snap && bao operator raft snapshot restore -force /tmp/restore.snap; rc=$?;
   rm -f /tmp/restore.snap; exit $rc' || fail "could not restore the OpenBao snapshot"
 temp_token=""
-# The restore returns before OpenBao has sealed itself and loaded the restored seal configuration.
-# Until then, seal-status may still show the throw-away 1-of-1 configuration, and an ORIGINAL
-# share is checked as a whole key and rejected (seen once in CI). Wait until OpenBao is sealed
-# with a configuration that is not the throw-away one (the key-holder listener 8210, openbao.hcl).
+# The restore returns before OpenBao has sealed itself and loaded the restored seal configuration,
+# and it does not always seal by itself: seal-status may keep the throw-away 1-of-1 configuration
+# (an ORIGINAL share is then rejected) or never report sealed (both seen in CI). A restart always
+# comes back sealed and reads the seal configuration from the restored raft data. Then wait until
+# OpenBao is sealed with a configuration that is not the throw-away one (the key-holder listener
+# 8210, openbao.hcl).
+compose restart openbao >/dev/null 2>&1 || fail "could not restart OpenBao after the restore"
+compose --profile core up -d --wait openbao >/dev/null 2>&1 || fail "OpenBao did not start again"
 waited=0
 until compose exec -T openbao wget -q -O - http://127.0.0.1:8210/v1/sys/seal-status </dev/null 2>/dev/null |
   tr -d ' \n' | grep '"sealed":true' | grep -v '"t":1,"n":1,' >/dev/null; do
