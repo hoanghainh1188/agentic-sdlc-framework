@@ -232,12 +232,13 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 | `sdlc metrics gates --project <slug>` | How long gates wait for people |
 | `sdlc metrics agents --project <slug>` | How agents and models did: ended well, CI first try, cost per merged intent |
 | `sdlc evidence build\|list\|show\|export <INT>` | The Evidence Pack |
+| `sdlc eval plan list\|show\|create\|change\|archive`, `sdlc eval run <plan-id>`, `sdlc eval list\|show` | Evaluation plans: agents, models and prompt variants measured on a fixed task set ([handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md)) |
 
 Every command takes `--json`. Exit code 0 means done; 4 means log in again with a new API token. The other codes: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#exit-codes).
 
-### The dashboard (read only)
+### The dashboard
 
-The dashboard shows intents by gate, escalations, cost and gate waiting times; it decides nothing yet. Its address: on the platform machine `http://localhost:8090/dashboard/` (write `localhost`, not `127.0.0.1`: the GitHub sign-in needs it); from another machine, through team access, `https://<server name>:8443/dashboard/`. With a GitHub sign-in and actions on, add a **passkey** there within 5 minutes of signing in: the dashboard will ask for it before each decision made there (coming with task U07). Where to open it, how to sign in, passkeys and what each screen shows: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only).
+The dashboard shows intents by gate, escalations, cost and gate waiting times, and evaluation plans; it decides no gate. Its only actions are on evaluation plans (create, change, archive, Run now with a passkey). Its address: on the platform machine `http://localhost:8090/dashboard/` (write `localhost`, not `127.0.0.1`: the GitHub sign-in needs it); from another machine, through team access, `https://<server name>:8443/dashboard/`. With a GitHub sign-in and actions on, add a **passkey** there within 5 minutes of signing in: the dashboard will ask for it before each decision made there (coming with task U07). Where to open it, how to sign in, passkeys and what each screen shows: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only).
 
 ## 5. When something goes wrong
 

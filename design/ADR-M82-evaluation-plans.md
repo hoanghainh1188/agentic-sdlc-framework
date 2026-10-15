@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L05, PR 5 done; for review) |
+| Status | **Proposed** (task L05 done, PRs 1–6; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L05 plan approved 2026-10-14, with answers to QUESTIONS #470–#474) |
 | Related | D-08 task L05 (AC1–AC4), then L06 (reports, recommendations) and L07 (a project's own task set); ADR-M81 (evaluations on the server), ADR-M73 (the dashboard's actions, CSRF, passkey step-up), ADR-M78 (the harness), ADR-M31 (the agent register), ADR-M39 and ADR-M40 (files read from the default branch, hashes only), ADR-M28 (budgets only go up by a decision); D-05 §6.8; QUESTIONS #450, #465, #470–#474 |
@@ -115,6 +115,7 @@ New audit actions, IDs, codes, hashes and amounts only: `evaluation_plan.created
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-14 | Claude (task L05, PR 1) | First version |
+| 0.6 | 2026-10-15 | Claude (task L05, PR 6) | Status: all PRs done; usage in handbook Ch.19 §19.8c, §19.8e and the deployment README "Evaluation plans" |
 | 0.5 | 2026-10-15 | Claude (task L05, PR 5) | §2.7 as built: the session actions, the step-up binding of plan actions, `can_change`, the four dashboard screens (QUESTIONS #477, #478) |
 | 0.4 | 2026-10-15 | Claude (task L05, PR 4) | §2.4 as built: the plan loop, task set v1 in the worker image, the runner reading a plan's configurations and prompt variants |
 | 0.3 | 2026-10-14 | Claude (task L05, PR 3) | §2.7 as built: the API and CLI; Run now as a request the worker starts (QUESTIONS #476, migration 0032) |

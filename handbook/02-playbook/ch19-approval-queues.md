@@ -338,6 +338,20 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - Cost measures: input and output tokens, the cached share of input tokens, total cost, wasted cost (runs that failed, were cancelled or stopped), cost per run and **cost per merged intent** (the whole cost of the intent, divided by the intents merged). Calls that belong to no run are shown apart and are not in any row. Money is a decimal string; a measure without data is empty, never 0.
 - It never shows a person. With `--json`, the amounts stay strings and the counts are numbers.
 
+**Evaluation plans** (task L05). An evaluation runs agents, models and prompt variants on a fixed task set with hidden tests, through the platform's own runner, and records numbers and codes per run. A person with a role in the project's `access.eval_roles` (never `viewer`) makes and runs plans; anybody with a role on the project reads them:
+
+| Command | What it does |
+|---|---|
+| `sdlc eval plan list --project <slug>` | The project's plans: status, next run, a run that waits, the last refusal |
+| `sdlc eval plan show <plan-id>` | One plan: what it runs, when, its budgets, its versions and evaluations |
+| `sdlc eval plan create --project <slug> --file <plan.json>` | A new plan from a JSON file (at most 64 KB) |
+| `sdlc eval plan change <plan-id> --file <plan.json> --expected-version <n>` | A new version; refused when someone changed it since you read it |
+| `sdlc eval plan archive <plan-id>` | Ends the plan for good |
+| `sdlc eval run <plan-id>` | Run now: the platform starts the evaluation within a minute |
+| `sdlc eval list --project <slug>` / `--plan <plan-id>`, `sdlc eval show <EVAL-…>` | Evaluations: status, runs by status, spend |
+
+The plan file holds codes, numbers and amounts only: `code`, `data_class`, `task_set_version`, `task_ids` (empty: every task), `runs_per_task`, `budget_per_run_usd`, `monthly_cap_usd`, `trigger` (`once`, `schedule`, `on_change`), `schedule` (`every` `daily` or `weekly`, `hour` in UTC, `weekday` 1–7) and `configurations`. A configuration names an agent of the register (`agent_key`) or a model (`model`, `provider_type`) run by the project's default agent, its caps (`max_iterations`, `max_duration_min`), and optionally `prompt_path`: **a file on the project's default branch** to try instead of `AGENTS.md`. The platform keeps that file's path, commit and SHA-256, never its text, and reads it again when a run starts. Budgets: each run has `budget_per_run_usd`; the plan spends at most `monthly_cap_usd` per UTC month (then its schedule pauses until next month); the tenant's monthly budget applies too. Amounts change only by a new version, never below what the plan spent this month. When the platform cannot start a run (a model the gateway no longer lists, a missing task, the cap used up), the plan shows the reason as its last refusal.
+
 <a id="exit-codes"></a>**When a command fails.** The message says why. The exit code tells scripts what happened (this is the one list; other documents link here):
 
 | Exit code | Meaning |
@@ -405,11 +419,11 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 
 - When the platform is upgraded and its default settings change, it checks every stored project configuration when it starts. A configuration nobody changed is saved again with the new defaults, and the audit log shows it as a change by the platform. A configuration that was changed outside the platform, or that the new defaults make invalid, is not used: the project stops until an admin saves a configuration again.
 
-## 19.8e. Using the platform: the dashboard (read only)
+## 19.8e. Using the platform: the dashboard
 
 > **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task U01, 2026-10-07, and kept in line with the platform code (`design/ADR-M54-read-only-dashboard.md`).
 
-The dashboard shows in one page what the CLI shows one command at a time. **It only reads.** You still decide gates with comments, reviews and the CLI (§19.8b, §19.8c).
+The dashboard shows in one page what the CLI shows one command at a time. **It decides no gate.** You still decide gates with comments, reviews and the CLI (§19.8b, §19.8c). The only business actions it has are those of evaluation plans (below).
 
 **Open it.** With team access (task V09), open the team address the operator gives you, for example `https://sdlc.example.internal:8443/dashboard/`, from your own machine; your browser must trust the company's certificate authority. Without it, open `http://127.0.0.1:8090/dashboard/` on the machine that runs the platform (the API's own address; no other port); with GitHub sign-in on there, open `http://localhost:8090/dashboard/` instead: the sign-in works on `localhost`, not on `127.0.0.1`. With team access, the GitHub sign-in works on the team address only. Then sign in one of two ways.
 
@@ -453,6 +467,8 @@ Never publish the API's port 8090 to other machines. People on other machines us
 | **Passkeys** | With a GitHub sign-in and actions on: your passkeys; add and remove them | `sdlc admin passkey list` (tenant admins, for a person) |
 
 **"Who decides this gate" and "what holds it".** "Who decides this gate" names the people (or the platform) that decide the gate. **What holds it** shows why the platform keeps the intent where it is, as the workflow recorded it the last time it looked: a failed G4 check and which one, a plan to submit again, a spec that cannot be read, a frozen intent, CI still running, a HOTL block window and when it closes. The board shows it on the card as **held**. A plain wait for a person's decision is not a hold. The same reason is printed by `sdlc intent show`.
+
+**Evaluations** (task L05). Pick a project to see its evaluation plans and latest evaluations. With a role in `access.eval_roles`, a GitHub sign-in and actions on, you create a plan (the same fields as the plan file of §19.8c; a prompt variant is a path on the default branch, never text), change it (a new version), archive it (asked twice), and press **Run now**. Run now is always confirmed with your passkey; so is a plan that runs on a schedule or on a change, or a higher budget. One evaluation's screen shows its runs by status and what it spent of its budget; the full report comes later.
 
 **Times.** Waiting times are wall-clock time, not working hours. A deadline in the next hour shows in amber, a missed one in red.
 
@@ -525,6 +541,7 @@ Never publish the API's port 8090 to other machines. People on other machines us
 | 0.38 | 2026-10-13 | Claude (task V13) | §19.8c: a run's model comes from the run event `model_selected`, with the cost records as the fallback for older runs (QUESTIONS #434) |
 | 0.39 | 2026-10-13 | Claude (task V10) | §19.8c: `sdlc help`, `--help`, the next-step line and what to do after a failure |
 | 0.40 | 2026-10-14 | Claude (task L04) | §19.8d: the operator command `sdlc ops eval start` (ADR-M81) |
+| 0.41 | 2026-10-15 | Claude (task L05) | §19.8c: `sdlc eval plan|run|list|show`, the plan file, budgets and refusals; §19.8e: the dashboard's evaluation screens and its only business actions, confirmed with a passkey (ADR-M82) |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |
