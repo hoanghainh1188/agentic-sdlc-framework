@@ -37,6 +37,15 @@ describe('backup scripts (A10)', () => {
     expect(code).not.toMatch(/echo .*\$(temp_key|temp_token)/);
   });
 
+  it('restore.sh waits until OpenBao is sealed with the restored keys, not the throw-away ones', () => {
+    const code = readDeployFile('backup/restore.sh');
+    const restore = code.indexOf('operator raft snapshot restore -force');
+    const wait = code.indexOf('grep -v \'"t":1,"n":1,\'');
+    expect(wait).toBeGreaterThan(restore);
+    expect(wait).toBeLessThan(code.indexOf('it is sealed with the ORIGINAL keys'));
+    expect(code).toMatch(/did not seal with the restored keys within 60 seconds/);
+  });
+
   it('the backup job reads only the snapshot, hardened, and never starts with up.sh', () => {
     const job = compose.services['backup-agent']!;
     expect(job.profiles).toEqual(['backup']);

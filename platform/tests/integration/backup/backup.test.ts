@@ -251,9 +251,9 @@ describe.skipIf(!enabled)('backup and restore drill (live)', { timeout: TEST_TIM
     expect(r.stdout).toMatch(/sealed with the ORIGINAL keys/);
     expect(fs.statSync(envFile).mode & 0o777).toBe(0o600);
 
-    expect(ok(run(bootstrap, ['status']), 'status').stdout).toMatch(/sealed/);
+    expect(ok(run(bootstrap, ['status']), 'status').stdout).toMatch(/OpenBao is sealed$/m);
     ok(run(bootstrap, ['unseal'], `${shares[1]}\n${shares[2]}\n`), 'unseal with original shares');
-    expect(ok(run(bootstrap, ['status']), 'status').stdout).toMatch(/unsealed/);
+    expect(ok(run(bootstrap, ['status']), 'status').stdout).toMatch(/OpenBao is unsealed$/m);
 
     const kv = ok(withRoot('bao kv get -mount=kv -field=value backup-test/probe'), 'kv get');
     expect(kv.stdout.trim() === kvValue).toBe(true);
