@@ -541,7 +541,7 @@ Design: [ADR-M81](../../design/ADR-M81-server-evaluations.md). An evaluation run
 | Setting | Process | Default | Bounds | Meaning |
 |---|---|---|---|---|
 | `SDLC_RUNNER_MAX_EVAL_SANDBOXES` | runner | 1 | 0 – `SDLC_RUNNER_MAX_SANDBOXES` | Evaluation runs at one time; 0 turns evaluations off. A waiting real run takes the slot back |
-| `SDLC_EVAL_TASKS_DIR`, `SDLC_EVAL_CONFIG_DIR` | runner, `sdlc ops eval` | the image | a folder | Another task set, other configuration files |
+| `SDLC_EVAL_TASKS_DIR`, `SDLC_EVAL_CONFIG_DIR` | runner, worker (tasks only, L05), `sdlc ops eval` | the image | a folder | Another task set, other configuration files. The worker's plan loop reads the task set's version, commit and task IDs; give the worker and the runner the same folder |
 | `SDLC_RUNNER_GPU` | runner | none | a name | The GPU name written in the hardware block of each result |
 | `SDLC_WORKER_EVAL_TICK_SECONDS` | worker | 15 | 5–300 | Time between two passes of the evaluation loop |
 | `SDLC_WORKER_EVAL_MAX_IN_FLIGHT` | worker | 2 | 1–16 | Runs handed to the runner at one time (running, or waiting for a slot) |
@@ -552,9 +552,24 @@ Design: [ADR-M81](../../design/ADR-M81-server-evaluations.md). An evaluation run
 pnpm sdlc ops eval start --tenant <slug> --project <slug> --config platform/eval/configs/local.yaml --budget 5 --n 3
 ```
 
-It prints the evaluation code (`EVAL-YYYY-NNNN`) and the counts, and writes `evaluation.started` in the audit log as done by the platform. Options: `--configurations a,b`, `--tasks t1,t2`, `--data-class <class>`, `--tasks-dir <folder>`, `--json`. The budget is the evaluation's own: each run's virtual key is capped at what is left of it, and when it is used up the evaluation ends `stopped_budget`. Its cost is a separate line in the cost report, never inside an intent. Reading the results by command, plans and schedules come with L05, reports in the dashboard with L06; until then the rows are in the tables `evaluations`, `evaluation_runs` and `evaluation_run_results` (numbers and codes only: no prompt, task text or diff).
+It prints the evaluation code (`EVAL-YYYY-NNNN`) and the counts, and writes `evaluation.started` in the audit log as done by the platform. Options: `--configurations a,b`, `--tasks t1,t2`, `--data-class <class>`, `--tasks-dir <folder>`, `--json`. The budget is the evaluation's own: each run's virtual key is capped at what is left of it, and when it is used up the evaluation ends `stopped_budget`. Its cost is a separate line in the cost report, never inside an intent. People follow evaluations with `sdlc eval list|show` and in the dashboard (Evaluations); the full report comes with L06. The tables `evaluations`, `evaluation_runs` and `evaluation_run_results` hold numbers and codes only: no prompt, task text or diff.
 
 **Logs.** `worker.evaluation_run_handed_over`, `worker.evaluation_requeued` (a run without a live workflow got its next attempt), `worker.evaluation_refused` (`reason`: `budget_used`, `tenant_budget_used`, `model_not_allowed`, `not_startable`), `worker.evaluation_failed` (`step`, an error code; a run that fails to be handed over five times in a row is cancelled with `prepare_failed`), and on the runner `runner.evaluation_started` and `runner.evaluation_ended`. A run lost with its runner is queued again and fails with `runner_lost` after three attempts.
+
+## Evaluation plans (L05)
+
+Design: [ADR-M82](../../design/ADR-M82-evaluation-plans.md). People with a role in the project's `access.eval_roles` (default `person_a`, `person_b`, `governance`, `admin`; never `viewer`) make **evaluation plans** themselves, in the dashboard (Evaluations) or with `sdlc eval plan …`, instead of asking the operator. Each run of a plan is an evaluation of [Evaluations on the server](#evaluations-on-the-server-l04).
+
+**What the deployment needs.** Everything of L04, and:
+- `pnpm db:migrate` (migrations `0031` and `0032`).
+- The worker image carries task set v1 without the reference solutions (`/app/eval-tasks`). A server with its own task set mounts it into the worker **and** the runner and sets `SDLC_EVAL_TASKS_DIR` in both.
+- The dashboard's plan actions need GitHub sign-in and `SDLC_API_DASHBOARD_ACTIONS=on` (runbook T11 §5n), and a passkey per person: **Run now** is always confirmed with a passkey; a plan that runs on a schedule or on a change, or a higher budget, too. The CLI with an API token needs no passkey.
+- A plan whose configuration names a model (not an agent) runs it with the project's default agent: set `run.agent_key` in the project configuration.
+- A prompt variant is a file on the project's default branch; the GitHub App reads it when the plan is saved and the runner reads it again, at the recorded commit, when a run starts.
+
+**How plans run.** The worker's plan loop runs every `SDLC_WORKER_EVAL_TICK_SECONDS`, with the Cost Controller (the same condition as the evaluation loop). It starts **Run now** requests (within a pass), due schedules (UTC; a schedule missed while the worker was down runs once) and `on_change` plans (a change of the gateway's models or the plan's agent versions). A plan never has two open evaluations. Its monthly cap pauses its schedule until the next UTC month; the tenant's monthly budget still applies to every run.
+
+**Logs.** `worker.evaluation_plan_started` (`plan_id`, `evaluation_id`, `reason` `manual`, `schedule` or `on_change`), `worker.evaluation_plan_refused` (`code`: for example `model_not_allowed`, `task_set_not_found`, `monthly_cap_used`, `evaluation_open`; the code is also on the plan, as "Last refusal" in the dashboard), `worker.evaluation_plan_failed` (`step`, an error code; tried again on the next pass).
 
 ## Shared Valkey: memory limit
 

@@ -39,7 +39,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 ## EVAL: Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)
 
 - **L04** Evaluations on the server, one engine for the server and developer machines (done, next release)
-- **L05** Evaluation plans that managers make themselves
+- **L05** Evaluation plans that managers make themselves (done, next release)
 - **L06** Evaluation reports and recommendations for managers
 - **L07** A project's own task set from its merged intents
 - **L08** Design: evaluations in the agent register's approvals
