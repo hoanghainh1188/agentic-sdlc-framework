@@ -34,6 +34,7 @@ export const WORKER_ENV = {
   costSyncCatchUpMinutes: 'SDLC_WORKER_COST_SYNC_CATCH_UP_MINUTES',
   costSyncSettleMinutes: 'SDLC_WORKER_COST_SYNC_SETTLE_MINUTES',
   evalTickSeconds: 'SDLC_WORKER_EVAL_TICK_SECONDS',
+  evalTasksDir: 'SDLC_EVAL_TASKS_DIR',
   evalMaxInFlight: 'SDLC_WORKER_EVAL_MAX_IN_FLIGHT',
   evidenceUrl: 'SDLC_WORKER_EVIDENCE_URL',
   evidenceBucket: 'SDLC_WORKER_EVIDENCE_BUCKET',
@@ -139,6 +140,8 @@ const schema = z.object({
   [WORKER_ENV.costSyncCatchUpMinutes]: z.coerce.number().int().min(10).max(10_080).default(1440),
   [WORKER_ENV.costSyncSettleMinutes]: z.coerce.number().int().min(5).max(1440).default(30),
   [WORKER_ENV.evalTickSeconds]: z.coerce.number().int().min(5).max(300).default(15),
+  // L05: the task sets the plan loop checks a plan against (the image's copy of task set v1).
+  [WORKER_ENV.evalTasksDir]: z.string().min(1).max(4096).default('/app/eval-tasks'),
   [WORKER_ENV.evalMaxInFlight]: z.coerce.number().int().min(1).max(16).default(2),
   // E03 (ADR-M49 §2.2): the evidence store for G8's release pack, SeaweedFS's S3 API on the
   // Compose network; `off`: intents wait at G8. An origin only.
@@ -336,6 +339,8 @@ export interface EvaluationLoopSettings {
   readonly tickMs: number;
   /** Runs handed to the runner at most at one time (running, or waiting for a slot there). */
   readonly maxInFlight: number;
+  /** L05: the task set folder the plan loop reads (versions, commit, task IDs). */
+  readonly tasksDir: string;
 }
 
 export interface WorkerSettings {
@@ -485,6 +490,7 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
     evaluation: {
       tickMs: v[WORKER_ENV.evalTickSeconds] * 1000,
       maxInFlight: v[WORKER_ENV.evalMaxInFlight],
+      tasksDir: v[WORKER_ENV.evalTasksDir],
     },
     evidence:
       v[WORKER_ENV.evidenceUrl] === 'off'

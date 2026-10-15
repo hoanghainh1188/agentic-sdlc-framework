@@ -66,3 +66,4 @@ export {
   type PlanContentInput,
 } from './plans.js';
 export { checkEvaluationScope } from './start.js';
+export { advanceEvaluationPlan, type PlanStep } from './plan-loop.js';

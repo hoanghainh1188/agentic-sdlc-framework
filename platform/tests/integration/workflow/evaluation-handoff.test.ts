@@ -193,6 +193,11 @@ describeWorkflow(
       expect(results).toHaveLength(2);
       expect(results[0]).toMatchObject({ resolved: true, outcome: 'finished' });
       expect(revoked.sort()).toEqual([...w.runs].sort());
+      // The evaluation is marked completed inside the last activity; the workflow closes only
+      // after that activity returns. Wait for each workflow to close before checking it.
+      for (const id of w.runs) {
+        await env.client.workflow.getHandle(evaluationRunWorkflowId(input(id))).result();
+      }
       expect(await dispatcher.isRunning({ ...input(w.runs[0]!) })).toBe(false);
 
       const history = await env.client.workflow

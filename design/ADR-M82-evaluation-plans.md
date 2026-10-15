@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L05, PR 3 done; for review) |
+| Status | **Proposed** (task L05, PR 4 done; for review) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L05 plan approved 2026-10-14, with answers to QUESTIONS #470–#474) |
 | Related | D-08 task L05 (AC1–AC4), then L06 (reports, recommendations) and L07 (a project's own task set); ADR-M81 (evaluations on the server), ADR-M73 (the dashboard's actions, CSRF, passkey step-up), ADR-M78 (the harness), ADR-M31 (the agent register), ADR-M39 and ADR-M40 (files read from the default branch, hashes only), ADR-M28 (budgets only go up by a decision); D-05 §6.8; QUESTIONS #450, #465, #470–#474 |
@@ -41,7 +41,9 @@ A prompt variant is the path of an instructions file on the project's default br
 - `schedule`: daily or weekly, at an hour in UTC (and a weekday for weekly). The plan row holds `next_run_at`.
 - `on_change`: when the gateway's model list or the active versions of the plan's agents change. The plan row holds a SHA-256 of the sorted model names and agent version IDs it last saw.
 
-A plain worker loop, `EvaluationPlanLoop` (never a Temporal schedule), checks the due plans. A plan never has two open evaluations: a due plan with an open evaluation waits for the next time. A schedule that was missed while the worker was down runs once, not once per missed time. Every start, by a person or by the loop, writes `evaluation_plan.run_started`; an automatic start has the actor `system` and the reason code `schedule` or `on_change`.
+A plain worker loop, `EvaluationPlanLoop` (never a Temporal schedule), checks the due plans.
+
+As built (PR 4): the loop runs every `SDLC_WORKER_EVAL_TICK_SECONDS` when the worker has the Cost Controller; it visits only tenants with plan work (`SystemScope.listTenantsWithPlanWork`) and advances each plan one step (core `advanceEvaluationPlan`): an ended pause is lifted; a Run now request is taken once and started as the person who asked; a due schedule starts one run as the system and the next time is set from now (a missed schedule runs once; an open evaluation waits for the next time); for `on_change` the first sight records the hash without a run and a change starts one. A refusal stays on the plan (`last_refusal`) and in the audit log; a Git host that cannot be read leaves a request for the next pass. The worker image carries task set v1 without the reference solutions (`/app/eval-tasks`, `SDLC_EVAL_TASKS_DIR`). The runner builds a plan's configuration from `evaluation_configurations`; a prompt variant is read from a second clone at the recorded commit with the same single-repository token, must be a regular file of the repository (at most 256 KB) and must have the recorded SHA-256, else the run fails with `task_unavailable`. A plan never has two open evaluations: a due plan with an open evaluation waits for the next time. A schedule that was missed while the worker was down runs once, not once per missed time. Every start, by a person or by the loop, writes `evaluation_plan.run_started`; an automatic start has the actor `system` and the reason code `schedule` or `on_change`.
 
 ### 2.5. Budgets (QUESTIONS #473)
 
@@ -111,5 +113,6 @@ New audit actions, IDs, codes, hashes and amounts only: `evaluation_plan.created
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-14 | Claude (task L05, PR 1) | First version |
+| 0.4 | 2026-10-15 | Claude (task L05, PR 4) | §2.4 as built: the plan loop, task set v1 in the worker image, the runner reading a plan's configurations and prompt variants |
 | 0.3 | 2026-10-14 | Claude (task L05, PR 3) | §2.7 as built: the API and CLI; Run now as a request the worker starts (QUESTIONS #476, migration 0032) |
 | 0.2 | 2026-10-14 | Claude (task L05, PR 2) | §2.1 as built: configurations from the agent register or a model with the default agent, resolved into `evaluation_configurations` at start (QUESTIONS #475); migration 0031, SDA23, M33 |

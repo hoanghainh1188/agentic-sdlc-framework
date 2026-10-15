@@ -33,6 +33,7 @@ import type {
   ExecuteEvaluationRunInput,
   ExecuteEvaluationRunResult,
   RunContractVerifier,
+  RedactedSecret,
   RunKeySpendReader,
   SecretUnwrapper,
 } from '@sdlc/contracts';
@@ -40,6 +41,7 @@ import {
   loadEffectiveConfig,
   parseTenantId,
   verifyEvaluationContract,
+  type EvaluationConfigurationRow,
   type PlatformDatabase,
 } from '@sdlc/core';
 import {
@@ -221,13 +223,25 @@ export async function executeEvaluation(
     const set = loadTaskSet(settings.evaluation.tasksDir, [contract.task_id]);
     const task: EvalTask = set.tasks[0]!;
     if (set.version !== contract.task_set_version) throw new TaskError('task set', 'version');
-    // An evaluation of a plan (L05) has its configurations in the database; the runner reads them
-    // with L05 PR 4. Until then such a run fails with a code instead of guessing a file.
-    if (evaluation.config_name === null) throw new TaskError('configuration', 'from a plan');
-    const configuration: EvalConfiguration = loadConfigurations(
-      configurationFile(settings.evaluation.configDir, evaluation.config_name),
-      [contract.configuration_id],
-    )[0]!;
+    // An operator evaluation (L04) names a configuration file; an evaluation of a plan (L05,
+    // QUESTIONS #475) has its resolved configurations in the database, and maybe a prompt variant:
+    // a file of the repository at a recorded commit, read below with the clone token.
+    let instructionsText: string | null = null;
+    let variant: EvaluationConfigurationRow | undefined;
+    if (evaluation.config_name !== null) {
+      const configuration: EvalConfiguration = loadConfigurations(
+        configurationFile(settings.evaluation.configDir, evaluation.config_name),
+        [contract.configuration_id],
+      )[0]!;
+      instructionsText = configuration.instructionsText;
+    } else {
+      const row = (await scope.evaluations.configurations(evaluation.id)).find(
+        (c) => c.configuration_id === contract.configuration_id,
+      );
+      if (!row) throw new TaskError('configuration', 'not found');
+      if (row.model !== contract.model) throw new TaskError('configuration', 'model');
+      if (row.instructions_path !== null) variant = row;
+    }
     const { config } = await loadEffectiveConfig(scope.projectConfigs, contract.project_id);
 
     const token = (await deps.unwrapper.unwrap(new Redacted(input.wrappedGitToken))).token;
@@ -246,6 +260,16 @@ export async function executeEvaluation(
         dir: pinned,
       };
       pinnedRepo = await (deps.clone ?? ((i) => cloneForRun(settings.git, i)))(cloneInput);
+      if (variant) {
+        instructionsText = await readPromptVariant(
+          deps,
+          settings,
+          workDir,
+          contract.repo,
+          token,
+          variant,
+        );
+      }
     } finally {
       // The run needs GitHub only for the clone: the token ends here, whatever happened.
       await deps.tokenRevoker?.revokeShortLivedToken(token).catch(() => undefined);
@@ -256,7 +280,7 @@ export async function executeEvaluation(
       clone: pinnedRepo,
       commit: contract.base_sha,
       task,
-      instructionsText: configuration.instructionsText,
+      instructionsText,
       workDir,
     });
     // The layout `computeRunPatch` expects: `<root>/repo` and `<root>/home`.
@@ -418,3 +442,47 @@ export async function executeEvaluation(
     slot?.release();
   }
 }
+
+/**
+ * The prompt variant of a plan's configuration (L05, ADR-M82 §2.3): the file at the commit the
+ * evaluation recorded, from a second clone with the same single-repository token. The text must
+ * have the recorded SHA-256 (else `task_unavailable`); it is a regular file inside the clone (no
+ * link out of it). Never logged; the clone is removed at once.
+ */
+async function readPromptVariant(
+  deps: ExecuteEvaluationDeps,
+  settings: RunnerSettings,
+  workDir: string,
+  repo: string,
+  token: RedactedSecret,
+  row: EvaluationConfigurationRow,
+): Promise<string> {
+  const dir = path.join(workDir, 'prompt');
+  fs.mkdirSync(dir, { mode: 0o700 });
+  try {
+    const clone = await (deps.clone ?? ((i) => cloneForRun(settings.git, i)))({
+      repo,
+      baseSha: row.instructions_commit!,
+      branch: 'evaluation',
+      token,
+      dir,
+    });
+    const file = path.resolve(clone, row.instructions_path!);
+    const root = fs.realpathSync(clone);
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || !fs.realpathSync(file).startsWith(`${root}${path.sep}`)) {
+      throw new TaskError('prompt', 'not a file of the repository');
+    }
+    if (stat.size > MAX_PROMPT_BYTES) throw new TaskError('prompt', 'too large');
+    const text = fs.readFileSync(file, 'utf8');
+    if (createHash('sha256').update(text, 'utf8').digest('hex') !== row.instructions_sha256) {
+      throw new TaskError('prompt', 'changed');
+    }
+    return text;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** The largest prompt variant the runner reads. */
+const MAX_PROMPT_BYTES = 256 * 1024;

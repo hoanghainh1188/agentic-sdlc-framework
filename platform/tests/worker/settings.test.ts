@@ -32,7 +32,7 @@ describe('worker settings', () => {
         catchUpMs: 86_400_000,
         settleMs: 1_800_000,
       },
-      evaluation: { tickMs: 15_000, maxInFlight: 2 },
+      evaluation: { tickMs: 15_000, maxInFlight: 2, tasksDir: '/app/eval-tasks' },
       evidence: {
         url: 'http://seaweedfs:8333',
         bucket: 'evidence',
@@ -167,7 +167,7 @@ describe('worker settings', () => {
         SDLC_WORKER_EVAL_TICK_SECONDS: '30',
         SDLC_WORKER_EVAL_MAX_IN_FLIGHT: '4',
       }).evaluation,
-    ).toEqual({ tickMs: 30_000, maxInFlight: 4 });
+    ).toEqual({ tickMs: 30_000, maxInFlight: 4, tasksDir: '/app/eval-tasks' });
     expect(() => loadSettings({ SDLC_WORKER_EVAL_MAX_IN_FLIGHT: '0' })).toThrow(
       expect.objectContaining({ setting: 'SDLC_WORKER_EVAL_MAX_IN_FLIGHT' }),
     );

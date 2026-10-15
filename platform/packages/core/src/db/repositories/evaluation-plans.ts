@@ -557,6 +557,21 @@ export class EvaluationPlanRepository extends TenantRepository {
     );
   }
 
+  /** The plans of the tenant that are not archived: what the worker's plan loop looks at. */
+  async listOpen(limit: number): Promise<EvaluationPlan[]> {
+    return this.run(
+      this.db
+        .selectFrom('evaluation_plans')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('status', '!=', 'archived')
+        .orderBy('created_at')
+        .orderBy('id')
+        .limit(limit)
+        .execute(),
+    );
+  }
+
   /** The plans of a project, archived last, then by code. */
   async listForProject(projectId: string): Promise<EvaluationPlan[]> {
     if (!isUuid(projectId)) return [];
