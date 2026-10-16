@@ -1,5 +1,5 @@
 // One evaluation (task L05, design/ADR-M82 §2.7): its status, its runs by status, what it spent
-// of its budget, and the plan it came from. The full report and recommendations come with L06.
+// of its budget, and the plan it came from. L06: the report and its recommendations below.
 import { readEvaluation } from '../api/reads.js';
 import { useApi } from '../api/use-api.js';
 import { Bar, codeClass, Show, Txt, When } from '../components/common.js';
@@ -7,6 +7,7 @@ import { t } from '../i18n.js';
 import { micros, RUN_STATE_KEYS } from '../model/evaluations.js';
 import { planHref } from '../router.js';
 import { Facts } from './EvalPlan.js';
+import { EvaluationReport } from './EvaluationReport.js';
 
 const RUN_STATES = ['queued', 'running', 'preempted', 'scored', 'failed', 'cancelled'] as const;
 
@@ -72,7 +73,7 @@ export function Evaluation({ code }: { readonly code: string }) {
                   ],
                 ]}
               />
-              <p class="sub">{t('dashboard.eval.report_later')}</p>
+              <EvaluationReport code={e.code} />
             </>
           );
         }}

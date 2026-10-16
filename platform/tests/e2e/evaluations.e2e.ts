@@ -129,11 +129,30 @@ test('L05: signed in with a token: the plans, and no action', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Run now' })).toHaveCount(0);
 });
 
+test('L06: the report of an evaluation, its recommendations and the recent notice', async ({
+  page,
+}) => {
+  await manager(page);
+  await page.goto(`${LOCAL}/dashboard/#/evaluations?project=shop`);
+  const recent = page.getByRole('complementary', { name: 'Evaluations ended in the last 7 days' });
+  await expect(recent.getByRole('link', { name: 'EVAL-2026-0002' })).toBeVisible();
+  await recent.getByRole('link', { name: 'EVAL-2026-0002' }).click();
+  await expect(page.getByRole('heading', { name: 'Report' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: '60% (43%–77%)' })).toBeVisible();
+  await expect(
+    page.getByText('qwen and gpt-oss: no difference found on 10 paired tasks'),
+  ).toBeVisible();
+  await expect(page.getByText(/^gpt-oss \(gpt-oss:20b\) costs 0\.020000 USD a run/)).toBeVisible();
+  await expect(page.getByText(/This is a proposal only/)).toBeVisible();
+  await expect(page.getByText(/^Not shown: this needs a role/)).toBeVisible();
+});
+
 const SCREENS = [
   ['list', '#/evaluations?project=shop', 'Evaluation plans'],
   ['plan', `#/evaluations/plans/${PLAN}`, 'weekly-models'],
   ['form', '#/evaluations/plans/new?project=shop', 'New evaluation plan'],
   ['evaluation', '#/evaluations/EVAL-2026-0001', 'EVAL-2026-0001'],
+  ['report', '#/evaluations/EVAL-2026-0002', 'EVAL-2026-0002'],
 ] as const;
 
 for (const width of [320, 768, 1024, 1440]) {
@@ -144,6 +163,8 @@ for (const width of [320, 768, 1024, 1440]) {
     for (const [name, route, heading] of SCREENS) {
       await page.goto(`${LOCAL}/dashboard/${route}`);
       await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+      // L06: the report loads after the evaluation; take the picture once nothing is loading.
+      await expect(page.locator('.notice[role="status"]')).toHaveCount(0);
       for (const scheme of ['light', 'dark'] as const) {
         await page.setViewportSize({ width, height: 900 });
         await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });

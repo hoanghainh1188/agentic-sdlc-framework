@@ -1,6 +1,10 @@
 // L05 (ADR-M82 §2.7): the dashboard's evaluation plan model, without a browser: the routes, the
 // body of the form (codes, numbers, amounts, a path; never a prompt text), when a passkey is
 // needed (the API's rule), the body a step-up is bound to, and the refusal messages.
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { recommendationKey, type RecommendationRule } from '@sdlc/eval';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -13,8 +17,31 @@ import {
   stepUpRequest,
   type PlanForm,
 } from '../../apps/dashboard/src/model/evaluations.js';
+import {
+  comparisonMessage,
+  percent,
+  pValue,
+  realRunsState,
+  recommendationMessage,
+  RULE_KEYS,
+  withInterval,
+} from '../../apps/dashboard/src/model/report.js';
 import { evaluationHref, parseRoute, planHref } from '../../apps/dashboard/src/model/route.js';
 import { evalPlanBody } from '../cli/fixtures.js';
+import { repoRoot } from '../workspace/helpers';
+
+const en = JSON.parse(
+  fs.readFileSync(path.join(repoRoot(), 'platform/packages/messages/src/locales/en.json'), 'utf8'),
+) as Record<string, string>;
+
+/** Every rule of `@sdlc/eval`: the type check fails when a rule is added and not listed here. */
+const EVERY_RULE: Readonly<Record<RecommendationRule, true>> = {
+  cheaper_model_no_difference: true,
+  low_ci_first_try: true,
+  unstable_results: true,
+  stopped_at_cap: true,
+  scope_breach: true,
+};
 
 const PLAN = '88888888-8888-4888-8888-888888888888';
 
@@ -176,5 +203,57 @@ describe('the passkey step-up', () => {
     );
     expect(evalErrorKey({ code: 'step_up_refused' })).toBe('dashboard.eval.error.step_up');
     expect(evalErrorKey({ code: 'x', reason: '<b>' })).toBe('dashboard.eval.error.failed');
+  });
+});
+
+// L06 (ADR-M83 §2.2, §2.3): the report page's model. Rates with their intervals, a difference only
+// when the API found one, recommendations from the catalog with the numbers they rest on.
+describe('the evaluation report', () => {
+  const interval = { estimate: 0.425, low: 0.31, high: 0.555 };
+
+  it('shows every rate with its interval and p-values without false precision', () => {
+    expect(percent(0.005)).toBe('1%');
+    expect(withInterval(interval)).toBe('43% (31%–56%)');
+    expect(pValue(0.04321)).toBe('0.043');
+    expect(pValue(0.0001)).toBe('< 0.001');
+  });
+
+  it('calls a difference only when the API names the better configuration', () => {
+    const base = { a: 'cfg-a', b: 'cfg-b', pairs: 20, paired_tasks: 10, only_a: 1, only_b: 2 };
+    expect(comparisonMessage({ ...base, p_value: 0.6, better: null })).toEqual({
+      key: 'dashboard.eval.report.no_difference',
+      params: { a: 'cfg-a', b: 'cfg-b', better: '', tasks: 10, p: '0.6' },
+    });
+    expect(comparisonMessage({ ...base, p_value: 0.01, better: 'cfg-b' }).key).toBe(
+      'dashboard.eval.report.difference',
+    );
+  });
+
+  it('maps every rule to the same catalog key as @sdlc/eval, and an unknown rule to none', () => {
+    for (const rule of Object.keys(RULE_KEYS))
+      expect(RULE_KEYS[rule]).toBe(recommendationKey(rule));
+    expect(Object.keys(RULE_KEYS).sort()).toEqual(Object.keys(EVERY_RULE).sort());
+    const rec = {
+      rule: 'scope_breach',
+      configuration: 'cfg-a',
+      other: null,
+      numbers: { breaches: '2', runs: '10', model: 'm' },
+    };
+    expect(recommendationMessage(rec)).toEqual({
+      key: 'eval.recommendation.scope_breach',
+      params: { configuration: 'cfg-a', other: '', breaches: '2', runs: '10', model: 'm' },
+    });
+    expect(recommendationMessage({ ...rec, rule: 'newer_rule' })).toBeUndefined();
+  });
+
+  it('every recommendation key and the register note are in the catalog', () => {
+    for (const key of [...Object.values(RULE_KEYS), 'eval.recommendation.register_note']) {
+      expect(en[key], key).toBeTypeOf('string');
+    }
+  });
+
+  it('shows real runs only when the API gave them', () => {
+    expect(realRunsState(null)).toBe('hidden');
+    expect(realRunsState({ available: false, reason: 'no_role' })).toBe('hidden');
   });
 });

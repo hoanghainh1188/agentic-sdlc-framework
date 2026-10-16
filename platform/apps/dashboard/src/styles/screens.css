@@ -961,3 +961,35 @@ tbody th.mono {
   border-color: var(--ok);
   color: var(--ok);
 }
+
+/* L06: the report of an evaluation (ADR-M83 §2.2). */
+.report {
+  margin-top: var(--space-section);
+}
+
+.report h3 {
+  margin-top: var(--space-6);
+}
+
+.report-table th[scope='row'] .sub {
+  display: block;
+}
+
+.report-list {
+  margin: 0;
+  padding-left: var(--space-6);
+  max-width: 75ch;
+}
+
+.report-list li + li {
+  margin-top: var(--space-2);
+}
+
+.recent-evals {
+  margin-bottom: var(--space-6);
+}
+
+.recent-evals h2 {
+  margin-top: 0;
+  font-size: 1rem;
+}
