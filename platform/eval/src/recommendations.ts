@@ -192,6 +192,11 @@ const RULE_KEYS: Readonly<Record<RecommendationRule, MessageKey>> = {
   scope_breach: 'eval.recommendation.scope_breach',
 };
 
+/** The catalog key of a rule; undefined for a code this version does not know. */
+export function recommendationKey(rule: string): MessageKey | undefined {
+  return Object.hasOwn(RULE_KEYS, rule) ? RULE_KEYS[rule as RecommendationRule] : undefined;
+}
+
 /** The recommendation as text from the catalog, with the agent register note (AC3). */
 export function renderRecommendation(rec: Recommendation, locale?: string): string {
   const params = { configuration: rec.configuration, other: rec.other ?? '', ...rec.numbers };

@@ -1,10 +1,18 @@
 // `sdlc next <INT> [--json]` (task V06): where an intent is and what the signed-in person does
 // next. Reads `GET /v1/me` and `GET /v1/intents/:intent` only (no new endpoint; QUESTIONS #368,
 // #369); the advice comes from `next/advice.ts`, every text from the catalog (`cli.next.*`).
+// `sdlc next` without an intent (task L06, QUESTIONS #482): the evaluations that ended in the last 7
+// days in the projects where the person has a role in `access.eval_roles`
+// (`GET /v1/evaluations/recent`), each with the command that shows its report.
 import { isHold, WAITING_CAUSE_KEYS, WAITING_REASON_KEYS } from '@sdlc/api-schemas';
 import { t, type MessageKey } from '@sdlc/messages';
 
-import { intentDetailSchema, meSchema, type IntentDetail } from '../api/schemas.js';
+import {
+  intentDetailSchema,
+  meSchema,
+  recentEvaluationsSchema,
+  type IntentDetail,
+} from '../api/schemas.js';
 import { parseCommand, segment, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
 import { say, sayError, show, toJson } from '../output.js';
@@ -12,6 +20,8 @@ import { intentRef } from './intent.js';
 import { adviceKey, adviseNext, noteKey, type Advice } from './next/advice.js';
 
 export async function runNext(args: readonly string[], ctx: CliContext): Promise<number> {
+  const none = parseCommand(args, {}, 0);
+  if (none) return runRecentEvaluations(ctx, none.values.json === true);
   const parsed = parseCommand(args, {}, 1);
   const ref = parsed ? intentRef(parsed.positionals[0] ?? '') : undefined;
   if (!parsed || ref === undefined) {
@@ -27,6 +37,25 @@ export async function runNext(args: readonly string[], ctx: CliContext): Promise
     const next = adviseNext(intent, me);
     if (json) ctx.stdout(toJson(jsonView(intent, next)));
     else print(ctx, intent, next);
+    return EXIT.ok;
+  });
+}
+
+async function runRecentEvaluations(ctx: CliContext, json: boolean): Promise<number> {
+  return withApi(ctx, json, async (client) => {
+    const recent = await client.get('/v1/evaluations/recent', recentEvaluationsSchema);
+    if (json) ctx.stdout(toJson(recent));
+    else if (recent.evaluations.length === 0) say(ctx, 'cli.next.evaluations_none');
+    else {
+      for (const e of recent.evaluations) {
+        say(ctx, 'cli.next.evaluation_ended', {
+          code: e.code,
+          project: e.project,
+          status: e.status,
+          finished_at: show(e.finished_at),
+        });
+      }
+    }
     return EXIT.ok;
   });
 }

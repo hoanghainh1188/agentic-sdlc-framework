@@ -766,6 +766,84 @@ export const evaluationListSchema = z.object({
   evaluations: z.array(evaluationSchema).max(200),
 });
 
+// The report of an evaluation (task L06, ADR-M83 §2.2, §2.3). Numbers and codes only.
+const share = z.number().min(0).max(1);
+const interval = z.object({ estimate: share, low: share, high: share });
+
+export const evaluationReportSchema = z.object({
+  evaluation: evaluationSchema,
+  final: z.boolean(),
+  results: count,
+  thresholds: z.object({
+    alpha: share,
+    min_paired_tasks: count,
+    low_ci_first_try_rate: share,
+    unstable_gap: share,
+    stopped_at_cap_share: share,
+  }),
+  configurations: z
+    .array(
+      z.object({
+        configuration: code,
+        model: z.string().max(128),
+        tasks: count,
+        runs: count,
+        k: count,
+        resolved: interval,
+        pass_at_1: share,
+        pass_at_k: share,
+        pass_hat_k: share,
+        ci_first_try: share,
+        scope_breaches: count,
+        stopped: count,
+        stopped_at_cap: count,
+        median_seconds: count,
+        total_cost_usd: usd6,
+        cost_per_run_usd: usd6,
+        cost_per_resolved_usd: usd6.nullable(),
+      }),
+    )
+    .max(16),
+  comparisons: z
+    .array(
+      z.object({
+        a: code,
+        b: code,
+        pairs: count,
+        paired_tasks: count,
+        only_a: count,
+        only_b: count,
+        p_value: share,
+        better: code.nullable(),
+      }),
+    )
+    .max(120),
+  recommendations: z
+    .array(
+      z.object({
+        rule: code,
+        configuration: code,
+        other: code.nullable(),
+        numbers: z.record(code, z.string().max(128)),
+      }),
+    )
+    .max(200),
+  real_runs: z
+    .discriminatedUnion('available', [
+      agentMetricsSchema.shape.metrics.extend({ available: z.literal(true) }),
+      z.object({ available: z.literal(false), reason: code }),
+    ])
+    .nullable(),
+});
+export type EvaluationReportView = z.infer<typeof evaluationReportSchema>;
+
+/** `GET /v1/evaluations/recent` (L06, QUESTIONS #482): evaluations that ended in the last 7 days. */
+export const recentEvaluationsSchema = z.object({
+  since: time,
+  evaluations: z.array(evaluationSchema.extend({ project: code })).max(50),
+});
+export type RecentEvaluationsView = z.infer<typeof recentEvaluationsSchema>;
+
 export const evalPlanSummarySchema = z.object({
   id,
   project: z.object({ id, slug: code }),
