@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C13, PR 1: design; PR 2: code) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C13) |
 | Date | 2026-10-09 |
 | Decided by | Harry (C13 plan approved 2026-10-09, with answers to QUESTIONS #335–#337) |
 | Related | D-08 task C13; D-02 FR-03, FR-10, FR-11; D-03 §6 (L1 runs, state machine), §7.5; D-09 T09; ADR-M30 §2.2 (only the workflow moves an intent), ADR-M33 §2.9 (the proposal as evidence), ADR-M48 §2.2–§2.3 (the api's evidence identity, the hash check); handbook Ch.13 §13.10.4, Ch.19 §19.8c; QUESTIONS #335–#337 |
@@ -57,3 +57,4 @@ Only the L1 proposal case. Withdrawing an intent at any gate (a running run, a p
 |---|---|---|---|
 | 0.1 | 2026-10-09 | Claude Code (task C13, PR 1) | The download, the end of the intent by a G4 rejection, the scope |
 | 0.2 | 2026-10-09 | Claude Code (task C13, PR 2) | As built: the answer is JSON with the bytes in base64; the CLI finds the latest run with a proposal; the rejection has no `waited_seconds`; after the code review: the 32 MiB cap, `no-store`, `--force` through a rename |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

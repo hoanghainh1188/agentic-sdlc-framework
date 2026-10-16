@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C01, PR for review); condition met in C05 session 2 (§3, QUESTIONS #78) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C01) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25) |
 | Related | D-08 tasks C01, C04, C05, C11; D-02 FR-30…FR-35, FR-50, FR-51; D-03 sections 5.3, 7.2, 8, 9, 12 (ADR-M04), 13; D-07 section 3; D-01 section 5.1; ADR-M17; design/QUESTIONS.md #13, #14, #15 |
@@ -176,3 +176,4 @@ With the default of 1–2 concurrent runs, reserve about 2 GiB per sandbox (the 
 | 0.1 | 2026-09-25 | Claude (task C01) | First version |
 | 0.2 | 2026-09-27 | Claude (task C05, session 2), approved by Harry | §2: the condition is one real run with a local Ollama model (QUESTIONS #78); §3: two runs with `gpt-oss:20b` passed, numbers recorded; API-model run before M-E (QUESTIONS #81) |
 | 0.3 | 2026-10-06 | Claude (coordinator), approved by Harry | §2: the API-model run is needed before M-F, not before M-E (QUESTIONS #81) |
+| 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task V01, PR 2) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task V01) |
 | Date | 2026-10-09 |
 | Decided by | Harry (V01 PR 2 plan and its risk measures approved 2026-10-09) |
 | Related | D-08 task V01; QUESTIONS #340–#342; `TRIAL.md` §6; `design/M-E-TRIAL-PLAN.md` §7.1, §8; ADR-M36 (the CLI's API client), ADR-M45 (cost report), ADR-M47 (gate metrics); handbook Ch.19 §19.8c |

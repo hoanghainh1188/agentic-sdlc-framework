@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C11, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C11) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #180–#184) |
 | Related | D-08 task C11 (AC1–AC3); D-02 FR-11, FR-18, FR-34, FR-35, §10 item 5d; D-03 §6, §6.5, §7.1, §8.2, §9 (version 1.22; PR 2: §6.5, §7.2, 1.24); D-05 §5, §6.2, §6.4 (version 1.27; PR 2: 1.29); config rule M27 (PR 2); handbook Ch.3 §3.6, Ch.6 §6.7, Ch.18; ADR-M10 §4.1, ADR-M22, ADR-M23, ADR-M25, ADR-M27, ADR-M28, ADR-M29, ADR-M33 §2.6–§2.7, ADR-M34 §2.2, §2.6, ADR-M38 §2.3; QUESTIONS #44, #52, #180–#184 |
@@ -131,3 +131,4 @@ As built in PR 2 (`packages/adapters/agent-openhands/src/loop.ts`, `apps/runner/
 |---|---|---|---|
 | 1.0 | 2026-10-03 | Claude (task C11, PR 1), approved by Harry | Kill switch (§2.1–§2.6); loop detection planned |
 | 1.1 | 2026-10-04 | Claude (task C11, PR 2), approved by Harry | §2.7 as built: the adapter's counts, the runner's loop watch, rule M27, the order of stops, the periodic-events check, the OpenHands stuck detector; §2.8 |
+| 1.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

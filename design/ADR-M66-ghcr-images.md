@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task V04) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task V04) |
 | Date | 2026-10-10 |
 | Decided by | Harry (V04 plan approved 2026-10-10: images built before the tag, amd64 and arm64, the registry path below; QUESTIONS #370, #371) |
 | Related | D-08 tasks V04, V12, O02; QUESTIONS #54, #342, #355, #364, #370, #371; D-03 §10 (version 1.39); ADR-M10 §2.1 (licences), ADR-M25 §2.9 (sandbox images), A09 (`ci.yml`, Trivy); `platform/deploy/README.md` "Verify the published images" |

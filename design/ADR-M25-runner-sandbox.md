@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C04; sessions 1 and 2 merged in PR #89 and PR #91, approved by Harry 2026-09-27; session 3 in review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C04) |
 | Date | 2026-09-27 |
 | Decided by | Harry (C04 plan approved 2026-09-27; session 3 plan approved 2026-09-27; QUESTIONS #44, #52, #53, #54, #55, #59) |
 | Related | D-02 FR-30, FR-33, FR-34, FR-50; D-03 sections 4, 5.1, 6.5, 7.2, 8, 8.2, 9, 10, 10.1, 13 (version 1.6); D-05 section 6.4; D-08 tasks C04, C05, C06, C08, C09, C11, R01; ADR-M10, ADR-M17, ADR-M19, ADR-M21, ADR-M22, ADR-M23, ADR-M24 |
@@ -248,3 +248,4 @@ C04 adds no handbook threshold. Budget, iteration and loop limits belong to C05 
 | 0.5 | 2026-09-27 | Claude (task C04, session 3) | §2.5: wollomatic/socket-proxy with the endpoint allowlist, bind mounts refused, the honest limit (no body inspection) and mitigations; §2.6: sweep, database and heartbeat settings, one process per instance; §2.7: the Temporal handoff moves to C06 (QUESTIONS #55), the slot pool around provisioning; §2.8: workspace reserved before the claim, clean-up at start, sweep, `run_abandoned`; §2.9: image `node24`, build script, local registry on 127.0.0.1, CI job; §2.10: Verdaccio 6.9.3, accepted exfiltration risk, request log |
 | 0.6 | 2026-10-09 | Claude (runner fix), approved by Harry | §2.8 restart: the clean-up also removes the `publish-*` folders of a push the old process did not finish (they hold client code); other entries of the work folder stay |
 | 0.7 | 2026-10-14 | Claude (task L04, PR 4b), approved by Harry | §2.5: the scoring guard rule for evaluation runs (a fixed command, `NetworkMode: none` for the step that runs the agent's code); `SDLC_RUNNER_MAX_EVAL_SANDBOXES` (§2.6 row) |
+| 0.8 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

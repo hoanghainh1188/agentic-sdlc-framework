@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task V13, for review); §2.3 model attribution decided in QUESTIONS #434 (option C) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task V13) |
 | Date | 2026-10-12 |
 | Decided by | Harry (plan approved 2026-10-12, with answers to QUESTIONS #430–#433) |
 | Related | D-08 task V13; D-02 FR-12, FR-53; D-05 §6.3–§6.5; D-07 §5; ADR-M45 (cost report); ADR-M47 (gate metrics); ADR-M42 (kill switch, stop reasons); ADR-M26 §2.5; QUESTIONS #422, #430–#433 |
@@ -71,3 +71,4 @@ A measure with no data is null, never 0. Runs still in progress are counted apar
 |---|---|---|---|
 | 0.1 | 2026-10-12 | Claude (task V13) | First version |
 | 0.2 | 2026-10-13 | Claude (task V13), approved by Harry | §2.3: a run's model from the run event `model_selected`, the cost records as the fallback (QUESTIONS #434, option C) |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

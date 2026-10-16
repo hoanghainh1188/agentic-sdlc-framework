@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A12, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task A12) |
 | Date | 2026-10-04 |
 | Decided by | Harry (plan approved 2026-10-04, with answers to QUESTIONS #239, #245, #246) |
 | Related | D-08 task A12 (AC1–AC4); D-03 §9, §10 (version 1.30); ADR-M12 (SeaweedFS); ADR-M17 (Compose); ADR-M33 §2.9 (gaps 3, 4); ADR-M51 §4 (gap 5, closed by this ADR); handbook T11 §5g–§5j, §5l; QUESTIONS #239, #245, #246 |
@@ -84,3 +84,4 @@ server -dir=/data -ip=127.0.0.1 -ip.bind=127.0.0.1 -s3.ip.bind=0.0.0.0
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-04 | Claude (task A12) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task E02, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task E02) |
 | Date | 2026-10-04 |
 | Decided by | Harry (plan approved 2026-10-04, with answers to QUESTIONS #215–#219) |
 | Related | D-08 task E02 (AC1–AC4), E03, E05; D-02 FR-40, FR-42, FR-43, FR-44; D-03 §5.2, §7.5, §8.2, §10; D-05 §6.6, §10; ADR-M32 (project AI record, disclosure format); ADR-M33 §2.9 (evidence store, gaps 1–4); ADR-M45 (cost sums); ADR-M26 §2.5; handbook Ch.2 Rule 6, Ch.15 §15.10.2, T11 §5h; QUESTIONS #215–#219 |
@@ -143,3 +143,4 @@ What existed before E02:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-04 | Claude (task E02) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

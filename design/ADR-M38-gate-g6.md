@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C08; PR 1 merged (#133): the push and the pull request; PR 2 in review: G6 reads CI) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C08) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03: two PRs; QUESTIONS #155 A, #156, #157 A with a known limit, #158, #159) |
 | Related | D-02 FR-13, FR-17, FR-18, FR-30, FR-33; D-02 §5 (version 1.2); D-03 sections 4, 6, 6.1, 7.1, 8.2, 9, 10 (versions 1.18, 1.19); D-05 sections 6.2, 6.4 (versions 1.23, 1.24); D-08 C08 AC1–AC3; D-09 N2, N6; handbook Ch.14 §14.10, template T2; ADR-M23, ADR-M25 §2.1, ADR-M28, ADR-M29 §2.5, ADR-M30 §2.1, ADR-M33 §2.5, §2.9, ADR-M34 §2.8–§2.9; QUESTIONS #52, #57, #123, #124, #134, #155–#159 |
@@ -149,3 +149,4 @@ When the pull request of the intent's last run is linked, the G6 step (`stepCi`,
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task C08, PR 1), approved by Harry | §2.1–§2.6 the push and the pull request; §2.7 PR 2 as planned; QUESTIONS #155–#159. After the code and security reviews: every failure is counted, a different PR head is a counted retry, the contract and the diff path are checked again, exact ref match |
 | 0.2 | 2026-10-03 | Claude (task C08, PR 2), approved by Harry | §2.7 as built (after the code review: the merge ref, rules tagged `security`, the outage, the HITL deadline start): `ci_checked`, the step's order, the CI clock, findings from code scanning (fail closed), the G6 escalations and their decisions, the retry instruction; §2.8 rows |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

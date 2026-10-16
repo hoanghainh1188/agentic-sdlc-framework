@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C05; session 1 merged in PR #97; session 2 in review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C05) |
 | Date | 2026-09-27 |
 | Decided by | Harry (C05 plan approved 2026-09-27, with conditions; QUESTIONS #13, #78–#80) |
 | Related | D-02 FR-11, FR-30…FR-33, FR-35, FR-50; D-03 sections 7.2, 8, 9; D-05 section 6.4; D-07 sections 3, 4, 6; D-08 tasks C05, C06, C07, C08, C11; ADR-M04, ADR-M10, ADR-M22, ADR-M24, ADR-M25 |
@@ -184,3 +184,4 @@ These are technical settings, not handbook rules.
 | 0.2 | 2026-09-27 | Claude (task C05, session 1 review) | §2.4: iteration cap status accepted (QUESTIONS #82); §2.5: recomputation outside the sandbox tracked in D-08 1.7 (C07, C08) |
 | 0.3 | 2026-09-27 | Claude (task C05, session 2) | §2.9: the real-model run with a local Ollama model, the LiteLLM entry, reasoning effort and context at the gateway, `pnpm test:agent-real`; open items done |
 | 0.4 | 2026-10-06 | Claude (coordinator), approved by Harry | Open items: the API-model run before M-F (QUESTIONS #81) |
+| 0.5 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

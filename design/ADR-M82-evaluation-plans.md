@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L05 done, PRs 1–6; for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task L05) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L05 plan approved 2026-10-14, with answers to QUESTIONS #470–#474) |
 | Related | D-08 task L05 (AC1–AC4), then L06 (reports, recommendations) and L07 (a project's own task set); ADR-M81 (evaluations on the server), ADR-M73 (the dashboard's actions, CSRF, passkey step-up), ADR-M78 (the harness), ADR-M31 (the agent register), ADR-M39 and ADR-M40 (files read from the default branch, hashes only), ADR-M28 (budgets only go up by a decision); D-05 §6.8; QUESTIONS #450, #465, #470–#474 |
@@ -120,3 +120,4 @@ New audit actions, IDs, codes, hashes and amounts only: `evaluation_plan.created
 | 0.4 | 2026-10-15 | Claude (task L05, PR 4) | §2.4 as built: the plan loop, task set v1 in the worker image, the runner reading a plan's configurations and prompt variants |
 | 0.3 | 2026-10-14 | Claude (task L05, PR 3) | §2.7 as built: the API and CLI; Run now as a request the worker starts (QUESTIONS #476, migration 0032) |
 | 0.2 | 2026-10-14 | Claude (task L05, PR 2) | §2.1 as built: configurations from the agent register or a model with the default agent, resolved into `evaluation_configurations` at start (QUESTIONS #475); migration 0031, SDA23, M33 |
+| 0.7 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

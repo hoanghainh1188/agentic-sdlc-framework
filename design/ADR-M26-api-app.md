@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B03, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B03) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27, with answers D1–D7) |
 | Related | D-08 tasks B03, B04, B06, B07, B12, B13, E07; D-02 FR-10, FR-11, FR-17, FR-20, NFR-02, NFR-08; D-03 sections 5.1, 5.2, 6.2, 6.3, 8.2, 9, 10; D-05 sections 6.1–6.3; ADR-M09, ADR-M16, ADR-M18, ADR-M19, ADR-M20, ADR-M21; QUESTIONS #58, #63–#67 |
@@ -164,3 +164,4 @@ B03 covers only what is needed to use and test the API. Everything else in #58 i
 | 0.1 | 2026-09-27 | Claude (task B03) | First version |
 | 0.2 | 2026-09-27 | Claude (task B06) | §2.7: refusal reason keys renamed `gate.reason.*`, same texts (ADR-M27) |
 | 0.3 | 2026-10-12 | Claude (task V09, PR 1) | §2.7: a note, the reverse proxy and `trustProxy` are decided in ADR-M67 §2.5 (QUESTIONS #408) |
+| 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

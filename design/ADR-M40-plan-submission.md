@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B09, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B09) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #165–#169; PR 2 plan approved 2026-10-04, with answers to QUESTIONS #210–#212) |
 | Related | D-08 task B09 (AC1–AC3); D-02 FR-11, FR-15, FR-16, FR-17; D-03 §6 (version 1.20); D-05 §6.2 (version 1.25); handbook Ch.12 §12.4, template T13; ADR-M20, ADR-M30, ADR-M33 §2.1, ADR-M34 §2.8, ADR-M39, ADR-M29 §2.3, ADR-M33 §2.7, ADR-M41 §2.7; QUESTIONS #34, #108, #131, #165–#169, #210–#212 |
@@ -133,3 +133,4 @@ As built:
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task B09, PR 1) | §2.1–§2.6 |
 | 0.2 | 2026-10-04 | Claude (task B09, PR 2), approved by Harry | §2.2 text fields must be text (QUESTIONS #210); new §2.7 the plan in the agent's prompt, as built, and what happens after `plan_unavailable` (QUESTIONS #169, #211); §2.3 the stored commit is the head the platform read (QUESTIONS #212); §3, §4 updated |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

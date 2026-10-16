@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B05, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B05) |
 | Date | 2026-09-26 |
 | Decided by | Harry (plan approved 2026-09-26; QUESTIONS #42 option A, #43; native `fetch`) |
 | Related | D-02 FR-11, FR-21, FR-22; D-03 sections 5.1, 7.1, 8.2, 9, 12 (ADR-M07, ADR-M11) (version 1.4); D-05 sections 6.1, 9; D-08 tasks B05, B06, B08, C04, C08, C11, E01; ADR-M16, ADR-M18, ADR-M19, ADR-M21; QUESTIONS #42â€“#45 |
@@ -104,3 +104,4 @@ Task B05 builds the first Git host adapter: GitHub, through a GitHub App. D-03 Â
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-26 | Claude (task B05) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

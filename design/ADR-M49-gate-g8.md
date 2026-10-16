@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task E03, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task E03) |
 | Date | 2026-10-04 |
 | Decided by | Harry (plan approved 2026-10-04, with answers to QUESTIONS #220–#222) |
 | Related | D-08 task E03 (AC1–AC3); D-02 FR-10, FR-11, FR-12, FR-17, FR-40, FR-43, §6.2, §10; D-03 §5.2, §6, §6.1, §8.2, §10 (version 1.27); D-05 §6.2, §6.6 (version 1.32); codes table §4 row G8; handbook Ch.15 §15.4, §15.5 Step 4, §15.8, §15.10.3; ADR-M28, ADR-M30, ADR-M38 §2.7, ADR-M41, ADR-M48; QUESTIONS #16, #215–#217, #220–#222 |
@@ -90,3 +90,4 @@ The platform never deploys (D-02 §4.2). In the MVP the release is the merge plu
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-04 | Claude (task E03) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

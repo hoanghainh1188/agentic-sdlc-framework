@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A06, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task A06) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25) |
 | Related | D-05 sections 3, 5, 6.1, 6.7, 7, 8, 9, 10 and 11; D-03 AP6 and section 12; D-08 tasks A06, A07; ADR-M16; ADR-M17; ADR-M18; NFR-02, NFR-04; FR-41, FR-44 |
@@ -209,3 +209,4 @@ Fields marked `?` are optional (ADR-M20 section 2.4): left out when there is no 
 | 0.4 | 2026-09-25 | Claude (task A07) | §2.8 audit log: triggers, hash chain with `hash_version`, payload rule (IDs, codes, hashes, versions only; declared fields; 2048 bytes), audited config and AI record saves, `sdlc audit verify` (temporary direct DB access, B04 moves it behind the API); §2.7 QUESTIONS #12 done |
 | 0.5 | 2026-09-25 | Claude (task B02) | §2.8: registry audit actions, optional fields, `SDA04`. `gate_decisions` attaches `forbid_mutation()` (ADR-M20) |
 | 0.6 | 2026-09-27 | Claude (task B06) | §2.4: `listPollableProjects()` added to the system scope (IDs only, ADR-M27); `TenantScope.savepoint` issues savepoint statements outside the guard (no table); `SDA06` |
+| 0.7 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

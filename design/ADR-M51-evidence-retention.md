@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task E05 PR 1, merged; PR 2, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task E05) |
 | Date | 2026-10-04 |
 | Decided by | Harry (plan approved 2026-10-04, with answers to QUESTIONS #235–#239) |
 | Related | D-08 task E05 (AC1–AC4); D-02 FR-44, §10; D-03 §7.5, §8.2, §10; D-05 §6.6, §7.4, §10, §10.1; ADR-M17 (Compose, SeaweedFS); ADR-M24 §2.5 and ADR-M28 (worker loops); ADR-M33 §2.9 (gaps 1–4); ADR-M35 (Langfuse holds client data); ADR-M37 (archive); ADR-M48 §2.1, §2.7; ADR-M49 §2.7; handbook Ch.15, Ch.19 §19.8d, T11 §5j; QUESTIONS #235–#239 |
@@ -259,3 +259,4 @@ Tests use a fake clock: day 179 is kept and day 181 purged. They also cover a co
 | 0.4 | 2026-10-04 | Claude (task E05, PR 2) | §2.9: the daily audit anchor (AC4): the live check of COMPLIANCE on SeaweedFS 4.48, the bucket `audit-anchors`, the identity `worker-anchor`, check then write once per tenant and UTC day, the mismatch reasons, the lock check, the later optimisation; §3: two alternatives |
 | 0.5 | 2026-10-04 | Claude (task A12) | §2.1 and §4: gap 5 closed by ADR-M52 |
 | 0.6 | 2026-10-05 | Claude (task E08) | §2.6, §2.8 and §4: the Langfuse purge is a step of the pass; `project.purged` waits for it (`purged`, `not_deployed`); the open item closed by ADR-M53 |
+| 0.7 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

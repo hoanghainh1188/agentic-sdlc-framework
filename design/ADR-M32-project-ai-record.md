@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B12, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B12) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27: D1 = A, D2 = A, D3, D4 = C, D5 = A, D6 = A; no re-check before G1 → G2) |
 | Related | D-02 §3, FR-03, FR-19, FR-43; D-03 sections 5.2, 6 ("submit (AI record checked)"); D-05 sections 5, 6.1, 6.2 (version 1.14); D-07 §4; D-08 tasks B04, B10 AC6, B12, B13, C06, E02, E03; handbook Ch.2 §2.3–§2.5, template T7; ADR-M18, ADR-M20, ADR-M26, ADR-M30, ADR-M31; QUESTIONS #89, #103–#106 |
@@ -103,3 +103,4 @@ The fixed rules stay in code (Harry, B12 plan): they are the floor of handbook C
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task B12) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

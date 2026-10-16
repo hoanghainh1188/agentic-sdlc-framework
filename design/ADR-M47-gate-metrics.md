@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task E06, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task E06) |
 | Date | 2026-10-04 |
 | Decided by | Harry (plan approved 2026-10-04, with answers to QUESTIONS #205–#207) |
 | Related | D-08 task E06 (AC1); D-02 FR-12, §14; D-05 §6.2 (`gate_entered_at`), §6.3 (`waited_seconds`); ADR-M30 §2.4, §2.9; ADR-M45 (the cost report, same shape); ADR-M26 §2.5; ADR-M37 §2.5; QUESTIONS #205–#207 |
@@ -110,3 +110,4 @@ What existed before E06:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-04 | Claude (task E06) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

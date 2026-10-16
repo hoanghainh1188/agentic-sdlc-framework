@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task U01, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task U01) |
 | Date | 2026-10-07 |
 | Decided by | Harry (QUESTIONS #255; U01 plan approved 2026-10-07 with the answers to QUESTIONS #260–#263: the four read-only fields, #263 option B, the token in memory only) |
 | Related | D-08 task U01 (AC1–AC6); D-02 §4.2 (version 1.4); D-03 §5.1, §9, §11 (version 1.32); ADR-M03 (no web UI in the MVP), ADR-M26 (the API), ADR-M36 (the CLI's API client), ADR-M30 (intent workflow), ADR-M28 (escalations), ADR-M45 (cost report), ADR-M47 (gate metrics), ADR-M48 (Evidence Packs); handbook Ch.19 §19.8e; QUESTIONS #255, #260–#265; task U02 |
@@ -135,3 +135,4 @@ Harry decided (QUESTIONS #255, 2026-10-07): a **read-only** dashboard, started i
 | 0.3 | 2026-10-07 | Claude (task U01, PR 2) | §2.5b as built (the shared schemas package, the build, the catalog plugin, the routes, the size), §2.6 the smoke test and the CI flag `run_dashboard` |
 | 0.2 | 2026-10-07 | Claude (task U01, PR 1) | After the code review: what `waiting_for` does not say (§2.4); Harry: task U02 exposes the workflow's last waiting reason and moves the notice audiences to the shared function (QUESTIONS #264, #265; §4) |
 | 0.1 | 2026-10-07 | Claude (task U01, PR 1) | First version: read only, served by the api under `/dashboard/`, 127.0.0.1 only, CSP, the token in memory, the four fields, one oversight resolution for the workflow and `waiting_for`; PR 2's app and tests |
+| 0.7 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

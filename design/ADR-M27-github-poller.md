@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B06, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B06) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27: D1 = A, D2, D3, D4 = A, with conditions) |
 | Related | D-02 FR-10, FR-11, FR-17, FR-21, FR-22 and the "Receiving GitHub events" note; D-03 sections 5.1, 6.2, 6.3, 7.1, 12 (ADR-M11); D-05 sections 6.1, 6.1b (version 1.8), 6.3; D-08 tasks B06, B07, B11, B13, E01; ADR-M09, ADR-M18, ADR-M19, ADR-M20, ADR-M21, ADR-M23, ADR-M26; QUESTIONS #43, #45, #64, #68 |
@@ -191,3 +191,4 @@ These points were open:
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task B06) | First version |
 | 0.2 | 2026-09-27 | Claude (task B06, review of PR #94) | §2.2: failed attempts counted per event outside the batch, `failed_internal` after `SDLC_WORKER_MAX_EVENT_ATTEMPTS`; §2.3: exact rule for a reason code alone; §2.7: live test scope, human-account check later; §3 updated |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

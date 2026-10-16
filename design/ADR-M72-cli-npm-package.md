@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task V05) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task V05) |
 | Date | 2026-10-10 |
 | Decided by | Harry (V05 plan approved 2026-10-10; QUESTIONS #365–#367 answered 2026-10-10) |
 | Related | D-08 task V05; QUESTIONS #357, #364, #365–#367; ADR-M16 (monorepo tooling); ADR-M36 (the CLI's API client); `platform/USER-GUIDE.md` §2; task V12 (the release process) |
@@ -66,3 +66,4 @@ Task V12 may fold this job into the release workflow; V04 (images on GHCR) has i
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-10 | Claude (task V05) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

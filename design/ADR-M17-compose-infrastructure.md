@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A02, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task A02) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25) |
 | Related | D-03 sections 5.3, 10 and 10.1; D-01 section 5.8e; D-07 section 3; D-08 task A02; NFR-01, NFR-03, NFR-04 |
@@ -90,3 +90,4 @@ All licences allow commercial use and redistribution (NFR-04). No MinIO, Redis o
 | 0.2 | 2026-09-26 | Claude (task A11), approved by Harry | §2.3: "since A11" notes for OpenBao (no host port, gateway pinned and left out of the AppRole CIDRs; QUESTIONS #27, #37) |
 | 0.3 | 2026-09-26 | Claude (task C03), approved by Harry | §2.3: profile `models` with the LiteLLM sidecar; development-only LiteLLM keys in `.env` (ADR-M24) |
 | 0.4 | 2026-10-07 | Claude (issue #177, PR 2), approved by Harry | §2.1: OpenBao 2.7.1, ClickHouse 26.3.39.7, Langfuse 4.50.0; no configuration change (release notes read; live tests on throw-away stacks) |
+| 0.5 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |
