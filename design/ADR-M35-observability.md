@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A08, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task A08) |
 | Date | 2026-09-30 |
 | Decided by | Harry (QUESTIONS #4 answer A, 2026-09-30; A08 plan approved 2026-09-30 with D1–D4 and conditions 1–4) |
 | Related | D-02 NFR-06, FR-31, FR-44; D-03 sections 5.3, 10 (version 1.14); D-05 section 2; D-07 sections 3, 5; D-08 tasks A08, A10, E05; ADR-M17 §2.5, ADR-M24 §2.2, ADR-M25, ADR-M26, ADR-M27, ADR-M30, ADR-M33; QUESTIONS #4 |
@@ -124,3 +124,4 @@ All pinned to exact versions (Apache-2.0): `@opentelemetry/api` 1.9.1, `@opentel
 |---|---|---|---|
 | 0.1 | 2026-09-30 | Claude (task A08) | First version |
 | 0.2 | 2026-10-05 | Claude (task E08) | §4: the Langfuse purge is done by ADR-M53; the worker has its own Langfuse key |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

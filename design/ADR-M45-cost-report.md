@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task E04, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task E04) |
 | Date | 2026-10-04 |
 | Decided by | Harry (plan approved 2026-10-04, with answers to QUESTIONS #195–#197) |
 | Related | D-08 task E04 (AC1, AC2); D-02 §3, FR-51, FR-53; D-05 D6, §6.4, §6.5; D-07 §5; ADR-M24 §2.3, §2.5; ADR-M26 §2.5; ADR-M36; ADR-M37 §2.1, §2.5; QUESTIONS #195–#197 |
@@ -102,3 +102,4 @@ No migration: the indexes of migration 0005 cover the query.
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-04 | Claude (task E04) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

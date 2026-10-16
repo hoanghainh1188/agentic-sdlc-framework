@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A04, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task A04) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25, decisions D1–D3) |
 | Related | D-03 sections 8, 8.1, 8.2, 9; D-08 task A04; ADR-M05, ADR-M16, ADR-M17 §2.3, ADR-M18, ADR-M19; QUESTIONS #1, #2, #20, #27 |
@@ -114,3 +114,4 @@ A04 is not affected. The sidecar is OpenBao's own Agent, not this client. The `l
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task A04) | First version |
 | 0.2 | 2026-09-26 | Claude (task A11), approved by Harry | §2.2, §2.5: "since A11" notes (no host port, gateway left out of the bound CIDRs; QUESTIONS #27, #37) |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B07: session 1 merged in PR #101; session 2 adds HOTL, the block window, the gate deadline and overdue escalations, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B07) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27: QUESTIONS #88–#92, #68 option A, with conditions; review of PR #101: §2.4 current-gate rule accepted, strict re-approval kept for the pilot; session 2 plan approved 2026-09-27: D1–D4, §2.4b, §2.9) |
 | Related | D-02 FR-10, FR-12, FR-14, FR-17, FR-18, FR-22; D-03 sections 5.1, 6, 6.1–6.4, 12 (ADR-M02, ADR-M14); D-05 sections 6.2, 6.2b, 6.3 (version 1.12); D-08 tasks B07, B08, B09, B10, B12, C06, E06; handbook codes table §4, Ch.11, Ch.12, Ch.19 §19.8b; ADR-M16, ADR-M20, ADR-M26, ADR-M27, ADR-M28; QUESTIONS #16, #21, #53, #55, #64, #68, #73, #76, #88–#92 |
@@ -201,3 +201,4 @@ Adding the default key `oversight.gate_overdue` changes the effective `config_ha
 | 0.1 | 2026-09-27 | Claude (task B07, session 1) | First version |
 | 0.2 | 2026-09-27 | Claude (task B07, review of PR #101) | §2.4: current-gate rule accepted and checked under the intent lock; strict re-approval after a request for changes kept for the pilot, with the way to loosen it |
 | 0.3 | 2026-09-27 | Claude (task B07, session 2) | §2.2 the one timer (`wakeInMs`); §2.4 no scope at G1–G3 (D3), `waited_seconds`; new §2.4b HOTL and the block window (#88, D1, D2); new §2.9 overdue gates (#90, D4); §2.7 session 2 tests and the Compose smoke test; §2.8 rules |
+| 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

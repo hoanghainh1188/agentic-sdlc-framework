@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task K01, PR for review); decision of §2 taken by Harry on 2026-10-08: option A, K02 deferred (QUESTIONS #300) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task K01) |
 | Date | 2026-10-08 |
 | Decided by | Harry (plan approved 2026-10-08, with six additions) |
 | Related | D-08 tasks K01, K02; D-01 §5.8b; D-02 §4.2; D-07 §3–§4; D-09 §7–§8; ADR-M25 §2.2; design/QUESTIONS.md #285, #300 |
@@ -181,3 +181,4 @@ Revisit when a real project (M-F) has requirement documents outside the reposito
 |---|---|---|---|
 | 0.1 | 2026-10-08 | Claude (task K01) | First version: no-go for K02 now; numbers, licences, Trivy, isolation, network checks; limits for a later attempt |
 | 0.2 | 2026-10-08 | Claude (task K01), decided by Harry | §2, §6: Harry chose option A, K02 deferred (QUESTIONS #300) |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

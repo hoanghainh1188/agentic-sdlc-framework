@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C06; session 1 merged in PR #105; session 2a merged in PR #108: the Temporal `sdlc-runner` handoff and the run's end; session 2b in review: the L1 proposal as evidence) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C06) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27: QUESTIONS #108–#112, two sessions, with conditions on #111 and #112 and the rule for lost runs, §2.7; session 2 plan approved 2026-09-27: PRs 2a and 2b, D1–D3 with conditions, §2.6–§2.7, §2.9) |
 | Related | D-02 FR-03, FR-17, FR-19, FR-30…FR-36, FR-50; D-03 sections 6, 6.1, 7.1, 8, 8.2, 9 (version 1.11); D-05 sections 5, 6.2, 6.3 (version 1.15); D-08 tasks C06, C07, C08, C09, C11, E02; handbook codes table §3–§4, Ch.13 §13.5 Step 1 and §13.8, Ch.20; ADR-M22, ADR-M24, ADR-M25, ADR-M28, ADR-M29, ADR-M30, ADR-M31, ADR-M32; QUESTIONS #5, #6, #17, #21, #22, #32, #44, #53, #55, #79, #82, #88, #94, #108–#112 |
@@ -231,3 +231,4 @@ Adding the default key `run.agent_key` changes the effective `config_hash` of ev
 | 0.2 | 2026-09-27 | Claude (task C06, session 2a) | §2.4 check 7 includes the tenant's monthly budget; §2.6 the handoff as built (a cancel stops the agent before the sandbox is removed) (the round from the database, no run twice, the re-check after signing, what the history holds, L1 waits); §2.7 how a run ends, lost runs, back from `paused`; §2.9 session 2b plan with Harry's conditions |
 | 0.3 | 2026-09-27 | Claude (task C06, session 2b) | §2.6 L1 no longer waits; §2.7 `succeeded_proposal_only` → `paused` (`proposal_ready`); §2.9 SeaweedFS and `@aws-sdk/client-s3` checks, as built, remaining gaps; §4 consequences of 2b |
 | 0.4 | 2026-10-04 | Claude (task B09, PR 2), approved by Harry | §2.7 the decisions on a failed run's escalation: `modify` and `roll_back` → G3 HITL for every stop reason and after a kill (QUESTIONS #211) |
+| 0.5 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

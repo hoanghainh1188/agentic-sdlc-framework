@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C10, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C10) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27: D1 A, D2, D3 and D4 as recommended, with additions) |
 | Related | D-02 FR-03, FR-36; D-03 sections 5.2, 8, 9, 12 (ADR-M15); D-05 sections 5, 6.1, 6.4; D-07 §4; D-08 tasks B13, C06, C09 AC5, C10, E07; handbook Ch.20, template T6; ADR-M18, ADR-M22, ADR-M26, ADR-M29; QUESTIONS #32, #65, #79, #93–#95 |
@@ -125,3 +125,4 @@ Four points were open in the C10 plan:
 |---|---|---|---|
 | 0.1 | 2026-09-27 | Claude (task C10) | First version |
 | 0.2 | 2026-10-03 | Claude (task B13, PR 2) | Note: §2.2's known gap is closed by ADR-M37 §2.8: the register through the API with handbook Ch.20's approvals; the operator keeps `sdlc ops agent show|list|suspend|quarantine` |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

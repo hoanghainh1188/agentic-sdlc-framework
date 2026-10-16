@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A03, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task A03) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25, with changes) |
 | Related | D-03 sections 8, 8.1, 8.2, 10.2; D-08 tasks A03, A11; ADR-M05, ADR-M17; handbook Ch.3; runbook T11; QUESTIONS #1, #2, #20, #27, #37, #42, #140 |
@@ -135,3 +135,4 @@ Since C04 (QUESTIONS #44, ADR-M25 §2.11) the `runner` policy can **not** read t
 | 0.5 | 2026-09-26 | Claude (task C03), approved by Harry | §2.3, §2.4: AppRole `litellm` for the LiteLLM sidecar (provider keys, salt key, the master key path); §3 open item done (QUESTIONS #1, ADR-M24) |
 | 0.6 | 2026-09-27 | Claude (task C04), approved by Harry | §2.4, §2.8: the `runner` AppRole no longer reads `shared/github-app`; the worker hands it a response-wrapped token; `worker.hcl` gets `sys/wrapping/wrap` (QUESTIONS #44, ADR-M25) |
 | 0.7 | 2026-09-30 | Claude (test maintenance), approved by Harry | §2.5: a rotation destroys every other secret ID of the AppRole after the delivery (accessor from the create response); one process per AppRole; tokens of an old secret ID stay valid until their TTL, revoke them after a leak (QUESTIONS #140, runbook T11 §8.3) |
+| 0.8 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

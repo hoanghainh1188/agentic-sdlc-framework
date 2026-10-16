@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task E08, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task E08) |
 | Date | 2026-10-05 |
 | Decided by | Harry (E08 plan approved 2026-10-05: D1 = A, D2 = B, D3 = A, D4; QUESTIONS #250–#253) |
 | Related | D-08 task E08 (AC1–AC4); D-02 FR-44, §10; D-03 §5.2, §8.2, §10 (version 1.31); D-05 §6.6, §10.1 (version 1.35); ADR-M24 §2.2 (labels as tags), ADR-M35 (the collector, Langfuse v4, client data), ADR-M51 (retention, §2.6, §4), ADR-M52 (SeaweedFS access); runbook T11 §5j, §5m; QUESTIONS #238, #250–#253 |
@@ -138,3 +138,4 @@ It needs the retention loop (`worker-purge`) to run. Langfuse is behind an inter
 | 0.2 | 2026-10-05 | Claude (task E08) | After the code review: the key's project checked before any Langfuse step; the tenant guard; no starvation (order, set aside); the request recorded before the delete is sent; `up.sh` keeps the purge on when Langfuse's volume exists; the gaps |
 | 0.3 | 2026-10-07 | Claude (issue #177, PR 2), approved by Harry | §2.5: checked again on Langfuse 4.50.0 and ClickHouse 26.3.39.7 |
 | 0.4 | 2026-10-09 | Claude (task A10), approved by Harry | §2.3 and the gaps: access management of `langfuse` replaced by the loopback-only `sdlc_admin` (ADR-M63 §6, QUESTIONS #330) |
+| 0.5 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C03, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C03) |
 | Date | 2026-09-26 |
 | Decided by | Harry (plan approved 2026-09-26, with answers D1–D5 and two additions) |
 | Related | D-08 tasks C03, C12; D-02 FR-50, FR-51; D-03 sections 7.4, 8.2, 10; D-05 sections 6.5, 7.2; D-07 sections 3–6; ADR-M10 §4.2, ADR-M17, ADR-M19, ADR-M21, ADR-M09; QUESTIONS #1, #4, #14, #17, #197, #225 |
@@ -144,3 +144,4 @@ Same responsibilities. Differences:
 | 0.1 | 2026-09-26 | Claude (task C03) | First version |
 | 0.2 | 2026-10-04 | Claude (task C12), approved by Harry | §2.5: the scheduled sync as built: a worker loop instead of a Temporal schedule, look-back and catch-up windows, runs that just ended, slices, `truncated`, failures and the gap warning, the lock, G8; §3: open items (QUESTIONS #197, #225) |
 | 0.3 | 2026-10-07 | Claude (issue #177, PR 1), approved by Harry | §1, §2.2: checked again on LiteLLM v1.104.0: a budget block answers 422 with `budget_exceeded` (was 429), kept as the upstream default; cached input tokens without a cache price cost the input price (was 0) |
+| 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

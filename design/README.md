@@ -16,57 +16,59 @@
 | — | [Positioning](POSITIONING.md): what the framework offers and to whom, compared with the alternatives; risks, what to confirm; the business model (open for everyone, services only) | Draft; §7 decided 2026-10-08 | |
 | — | [Web UI scope](MVP1-UI-SCOPE.md): the plan of the dashboard's actions (waves, what never goes in, the security of writes from a browser, tasks after approval); revised with the M-E data | Approved (V11) | |
 | — | [M-E trial plan](M-E-TRIAL-PLAN.md): tasks T01–T10 on the sample repo, prerequisites, roles, order, what is measured, the data report, stop rules | Approved (Harry, 2026-10-06) | |
-| ADR-M09 | [Database access and migration tooling](ADR-M09-database-tooling.md) (task A06) | Proposed | |
-| ADR-M10 | [OpenHands Agent Server: result of the C01 PoC](ADR-M10-openhands-agent-server.md) (task C01) | Proposed | |
+| ADR-M09 | [Database access and migration tooling](ADR-M09-database-tooling.md) (task A06) | Accepted (2026-10-16) | |
+| ADR-M10 | [OpenHands Agent Server: result of the C01 PoC](ADR-M10-openhands-agent-server.md) (task C01) | Accepted (2026-10-16) | |
 | ADR-M16 | [Monorepo tooling](ADR-M16-monorepo-tooling.md) (task A01) | ✅ Accepted | 2026-09-25 |
-| ADR-M17 | [Docker Compose infrastructure](ADR-M17-compose-infrastructure.md) (task A02) | Proposed | |
-| ADR-M18 | [Project configuration package and message catalog](ADR-M18-config-and-message-catalog.md) (task A05) | Proposed | |
-| ADR-M19 | [OpenBao bootstrap: tool, policy layout, token handling](ADR-M19-openbao-bootstrap.md) (task A03) | Proposed | |
-| ADR-M20 | [Registry: intents, gate decisions, POLICY, void links, reason codes](ADR-M20-registry.md) (task B02) | Proposed | |
-| ADR-M21 | [OpenBao client for the platform processes](ADR-M21-openbao-client.md) (task A04) | Proposed | |
-| ADR-M22 | [Run Contract: schema, signed form, verification, run events](ADR-M22-run-contract.md) (task C02) | Proposed | |
-| ADR-M23 | [GitHub adapter: HTTP client, App authentication, polling cursor, webhook check](ADR-M23-github-adapter.md) (task B05) | Proposed | |
-| ADR-M24 | [LiteLLM adapter, keys from OpenBao, Cost Controller (part 1)](ADR-M24-litellm-cost-controller.md) (task C03) | Proposed | |
-| ADR-M25 | [Runner: sandbox egress, image, workspace, Docker access, clean-up](ADR-M25-runner-sandbox.md) (task C04) | Proposed | |
-| ADR-M26 | [API app (NestJS), personal API tokens, admin bootstrap, gate commands](ADR-M26-api-app.md) (task B03) | Proposed | |
-| ADR-M27 | [GitHub poller and comment commands](ADR-M27-github-poller.md) (task B06) | Proposed | |
-| ADR-M28 | [Escalations: routing, durable clocks in the database, freeze](ADR-M28-escalations.md) (task B11; partly supersedes ADR-M14) | Proposed | |
-| ADR-M29 | [OpenHands adapter: driving the agent in the sandbox](ADR-M29-openhands-adapter.md) (task C05) | Proposed | |
-| ADR-M30 | [Intent workflow on Temporal: a thin loop over the database](ADR-M30-intent-workflow.md) (task B07) | Proposed | |
-| ADR-M31 | [Agent register: table, lifecycle, operator commands, the check before a run](ADR-M31-agent-register.md) (task C10) | Proposed | |
-| ADR-M32 | [Project AI record: codes only, version history, who writes it, the G1 check](ADR-M32-project-ai-record.md) (task B12) | Proposed | |
-| ADR-M33 | [Gate G4: the checks, the run proposal, and the handoff to the runner](ADR-M33-gate-g4.md) (task C06) | Proposed | |
-| ADR-M34 | [Gate G5: the run's changes, the budget during the run, and the G5 decision](ADR-M34-gate-g5.md) (task C07) | Proposed | |
-| ADR-M35 | [Observability: structured logs, OpenTelemetry traces, one OTLP pipeline to Langfuse](ADR-M35-observability.md) (task A08) | Proposed | |
-| ADR-M36 | [CLI: API client and credentials](ADR-M36-cli-api-client.md) (task B04) | Proposed | |
-| ADR-M37 | [Admin onboarding: tenant admins, projects, users, identities, roles, configuration](ADR-M37-admin-onboarding.md) (task B13) | Proposed | |
-| ADR-M38 | [Gate G6: the push, the pull request and CI](ADR-M38-gate-g6.md) (task C08) | Proposed | |
-| ADR-M39 | [Spec linking and the spec hash check](ADR-M39-spec-linking.md) (task B08) | Proposed | |
-| ADR-M40 | [Plan submission and the G3 approval](ADR-M40-plan-submission.md) (task B09) | Proposed | |
-| ADR-M41 | [Gate G7: review and merge](ADR-M41-gate-g7.md) (task E01) | Proposed | |
-| ADR-M42 | [The kill switch and loop detection](ADR-M42-kill-switch.md) (task C11) | Proposed | |
-| ADR-M45 | [The cost report](ADR-M45-cost-report.md) (task E04) | Proposed | |
-| ADR-M47 | [Gate waiting-time metrics](ADR-M47-gate-metrics.md) (task E06) | Proposed | |
-| ADR-M48 | [Evidence Builder and the readable Evidence Pack](ADR-M48-evidence-builder.md) (task E02) | Proposed | |
-| ADR-M49 | [Gate G8: release approval, sealing the Evidence Pack, closing the intent](ADR-M49-gate-g8.md) (task E03) | Proposed | |
-| ADR-M51 | [Evidence retention: object lock, the purge, holds, archived projects](ADR-M51-evidence-retention.md) (task E05) | Proposed | |
-| ADR-M52 | [SeaweedFS internal access: loopback binding and keys made at each start](ADR-M52-seaweedfs-internal-access.md) (task A12) | Proposed | |
-| ADR-M53 | [Purge a project's data from Langfuse](ADR-M53-langfuse-purge.md) (task E08) | Proposed | |
-| ADR-M54 | [A read-only web dashboard](ADR-M54-read-only-dashboard.md) (task U01) | Proposed | |
-| ADR-M59 | [WeKnora for document knowledge: result of the K01 spike](ADR-M59-weknora-spike.md) (task K01) | Proposed; decision taken: option A, K02 deferred (QUESTIONS #300) | 2026-10-08 (the decision) |
-| ADR-M61 | [The structure of a spec, and G2 needs acceptance criteria](ADR-M61-spec-structure.md) (task S01) | Proposed | |
-| ADR-M62 | [`sdlc plan draft`: a plan file draft from Spec Kit tasks or a BMAD story](ADR-M62-plan-draft.md) (task S02) | Proposed | |
-| ADR-M63 | [OpenBao TLS everywhere, and backups](ADR-M63-openbao-tls-and-backups.md) (task A10) | Proposed | |
-| ADR-M64 | [Taking an L1 proposal forward: the download and the end of the intent](ADR-M64-l1-proposal-hand-over.md) (task C13) | Proposed | |
-| ADR-M65 | [The trial report: an anonymous summary built from the existing reads](ADR-M65-trial-report.md) (task V01) | Proposed | |
-| ADR-M66 | [The platform's images on GHCR for each release](ADR-M66-ghcr-images.md) (task V04) | Proposed | |
+| ADR-M17 | [Docker Compose infrastructure](ADR-M17-compose-infrastructure.md) (task A02) | Accepted (2026-10-16) | |
+| ADR-M18 | [Project configuration package and message catalog](ADR-M18-config-and-message-catalog.md) (task A05) | Accepted (2026-10-16) | |
+| ADR-M19 | [OpenBao bootstrap: tool, policy layout, token handling](ADR-M19-openbao-bootstrap.md) (task A03) | Accepted (2026-10-16) | |
+| ADR-M20 | [Registry: intents, gate decisions, POLICY, void links, reason codes](ADR-M20-registry.md) (task B02) | Accepted (2026-10-16) | |
+| ADR-M21 | [OpenBao client for the platform processes](ADR-M21-openbao-client.md) (task A04) | Accepted (2026-10-16) | |
+| ADR-M22 | [Run Contract: schema, signed form, verification, run events](ADR-M22-run-contract.md) (task C02) | Accepted (2026-10-16) | |
+| ADR-M23 | [GitHub adapter: HTTP client, App authentication, polling cursor, webhook check](ADR-M23-github-adapter.md) (task B05) | Accepted (2026-10-16) | |
+| ADR-M24 | [LiteLLM adapter, keys from OpenBao, Cost Controller (part 1)](ADR-M24-litellm-cost-controller.md) (task C03) | Accepted (2026-10-16) | |
+| ADR-M25 | [Runner: sandbox egress, image, workspace, Docker access, clean-up](ADR-M25-runner-sandbox.md) (task C04) | Accepted (2026-10-16) | |
+| ADR-M26 | [API app (NestJS), personal API tokens, admin bootstrap, gate commands](ADR-M26-api-app.md) (task B03) | Accepted (2026-10-16) | |
+| ADR-M27 | [GitHub poller and comment commands](ADR-M27-github-poller.md) (task B06) | Accepted (2026-10-16) | |
+| ADR-M28 | [Escalations: routing, durable clocks in the database, freeze](ADR-M28-escalations.md) (task B11; partly supersedes ADR-M14) | Accepted (2026-10-16) | |
+| ADR-M29 | [OpenHands adapter: driving the agent in the sandbox](ADR-M29-openhands-adapter.md) (task C05) | Accepted (2026-10-16) | |
+| ADR-M30 | [Intent workflow on Temporal: a thin loop over the database](ADR-M30-intent-workflow.md) (task B07) | Accepted (2026-10-16) | |
+| ADR-M31 | [Agent register: table, lifecycle, operator commands, the check before a run](ADR-M31-agent-register.md) (task C10) | Accepted (2026-10-16) | |
+| ADR-M32 | [Project AI record: codes only, version history, who writes it, the G1 check](ADR-M32-project-ai-record.md) (task B12) | Accepted (2026-10-16) | |
+| ADR-M33 | [Gate G4: the checks, the run proposal, and the handoff to the runner](ADR-M33-gate-g4.md) (task C06) | Accepted (2026-10-16) | |
+| ADR-M34 | [Gate G5: the run's changes, the budget during the run, and the G5 decision](ADR-M34-gate-g5.md) (task C07) | Accepted (2026-10-16) | |
+| ADR-M35 | [Observability: structured logs, OpenTelemetry traces, one OTLP pipeline to Langfuse](ADR-M35-observability.md) (task A08) | Accepted (2026-10-16) | |
+| ADR-M36 | [CLI: API client and credentials](ADR-M36-cli-api-client.md) (task B04) | Accepted (2026-10-16) | |
+| ADR-M37 | [Admin onboarding: tenant admins, projects, users, identities, roles, configuration](ADR-M37-admin-onboarding.md) (task B13) | Accepted (2026-10-16) | |
+| ADR-M38 | [Gate G6: the push, the pull request and CI](ADR-M38-gate-g6.md) (task C08) | Accepted (2026-10-16) | |
+| ADR-M39 | [Spec linking and the spec hash check](ADR-M39-spec-linking.md) (task B08) | Accepted (2026-10-16) | |
+| ADR-M40 | [Plan submission and the G3 approval](ADR-M40-plan-submission.md) (task B09) | Accepted (2026-10-16) | |
+| ADR-M41 | [Gate G7: review and merge](ADR-M41-gate-g7.md) (task E01) | Accepted (2026-10-16) | |
+| ADR-M42 | [The kill switch and loop detection](ADR-M42-kill-switch.md) (task C11) | Accepted (2026-10-16) | |
+| ADR-M45 | [The cost report](ADR-M45-cost-report.md) (task E04) | Accepted (2026-10-16) | |
+| ADR-M47 | [Gate waiting-time metrics](ADR-M47-gate-metrics.md) (task E06) | Accepted (2026-10-16) | |
+| ADR-M48 | [Evidence Builder and the readable Evidence Pack](ADR-M48-evidence-builder.md) (task E02) | Accepted (2026-10-16) | |
+| ADR-M49 | [Gate G8: release approval, sealing the Evidence Pack, closing the intent](ADR-M49-gate-g8.md) (task E03) | Accepted (2026-10-16) | |
+| ADR-M51 | [Evidence retention: object lock, the purge, holds, archived projects](ADR-M51-evidence-retention.md) (task E05) | Accepted (2026-10-16) | |
+| ADR-M52 | [SeaweedFS internal access: loopback binding and keys made at each start](ADR-M52-seaweedfs-internal-access.md) (task A12) | Accepted (2026-10-16) | |
+| ADR-M53 | [Purge a project's data from Langfuse](ADR-M53-langfuse-purge.md) (task E08) | Accepted (2026-10-16) | |
+| ADR-M54 | [A read-only web dashboard](ADR-M54-read-only-dashboard.md) (task U01) | Accepted (2026-10-16) | |
+| ADR-M59 | [WeKnora for document knowledge: result of the K01 spike](ADR-M59-weknora-spike.md) (task K01) | Accepted (2026-10-16); decision taken: option A, K02 deferred (QUESTIONS #300) | 2026-10-08 (the decision) |
+| ADR-M61 | [The structure of a spec, and G2 needs acceptance criteria](ADR-M61-spec-structure.md) (task S01) | Accepted (2026-10-16) | |
+| ADR-M62 | [`sdlc plan draft`: a plan file draft from Spec Kit tasks or a BMAD story](ADR-M62-plan-draft.md) (task S02) | Accepted (2026-10-16) | |
+| ADR-M63 | [OpenBao TLS everywhere, and backups](ADR-M63-openbao-tls-and-backups.md) (task A10) | Accepted (2026-10-16) | |
+| ADR-M64 | [Taking an L1 proposal forward: the download and the end of the intent](ADR-M64-l1-proposal-hand-over.md) (task C13) | Accepted (2026-10-16) | |
+| ADR-M65 | [The trial report: an anonymous summary built from the existing reads](ADR-M65-trial-report.md) (task V01) | Accepted (2026-10-16) | |
+| ADR-M66 | [The platform's images on GHCR for each release](ADR-M66-ghcr-images.md) (task V04) | Accepted (2026-10-16) | |
 | ADR-M67 | [Team access from other machines: a TLS reverse proxy](ADR-M67-team-access.md) (task V09) | Accepted | 2026-10-12 |
-| ADR-M72 | [The CLI on npm: one bundled file, published from a tag with provenance](ADR-M72-cli-npm-package.md) (task V05) | Proposed | |
+| ADR-M72 | [The CLI on npm: one bundled file, published from a tag with provenance](ADR-M72-cli-npm-package.md) (task V05) | Accepted (2026-10-16) | |
 | ADR-M73 | [Actions in the web dashboard: GitHub sign-in, sessions, CSRF, passkey step-up](ADR-M73-dashboard-actions.md) (task V11; built by U05–U09) | Accepted | |
 | ADR-M76 | [The trial stack's key file: age with a passphrase, through the library `age-encryption`](ADR-M76-trial-key-file.md) (task V08) | Accepted | |
-| ADR-M78 | [The evaluation harness for agents, models and prompts](ADR-M78-evaluation-harness.md) (task L02) | Proposed | |
-| ADR-M79 | [The agent efficiency report](ADR-M79-agent-metrics.md) (task V13) | Proposed | |
-| ADR-M80 | [Threat model of an agent run and attack tests](ADR-M80-threat-model.md) (task H01) | Proposed | |
+| ADR-M78 | [The evaluation harness for agents, models and prompts](ADR-M78-evaluation-harness.md) (task L02) | Accepted (2026-10-16) | |
+| ADR-M79 | [The agent efficiency report](ADR-M79-agent-metrics.md) (task V13) | Accepted (2026-10-16) | |
+| ADR-M80 | [Threat model of an agent run and attack tests](ADR-M80-threat-model.md) (task H01) | Accepted (2026-10-16) | |
+| ADR-M81 | [Evaluations on the server: one engine for the server and developer machines](ADR-M81-server-evaluations.md) (task L04) | Accepted (2026-10-16) | |
+| ADR-M82 | [Evaluation plans that managers make themselves, dashboard first](ADR-M82-evaluation-plans.md) (task L05) | Accepted (2026-10-16) | |
 
 
 ## Number blocks (QUESTIONS and ADR numbers)

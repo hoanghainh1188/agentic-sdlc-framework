@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L04, PR 4d done; for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task L04) |
 | Date | 2026-10-14 |
 | Decided by | Harry (L04 plan approved 2026-10-14, with answers to QUESTIONS #460–#464) |
 | Related | D-08 task L04 (AC1–AC5), then L05 (plans, API, CLI, schedules) and L06 (reports in the dashboard); ADR-M78 (the harness), ADR-M25 (sandbox, guard), ADR-M33 §2.6 (runner queue), ADR-M24 and ADR-M45 (cost), ADR-M29 (agent path), ADR-M80 §4.1 (canary search); D-07 §3–§5; D-05 §6.8 (the tables); QUESTIONS #450, #460–#464 |
@@ -152,3 +152,4 @@ The workflow `evaluationRunWorkflow` (ID `evaluation-run/<tenant>/<run>/<attempt
 | 0.5 | 2026-10-14 | Claude (task L04, PR 4b) | §2.3, §2.5 as built: the slot pool, the sweep of lost evaluation runs, scoring in two containers over one volume with the guard rule |
 | 0.6 | 2026-10-14 | Claude (task L04, PR 4c) | §2.8 as built on the runner side; §3: PR 4 is now 4a to 4d (4d is the worker side); the result is written by the worker because it adds the cost |
 | 0.7 | 2026-10-14 | Claude (task L04, PR 4d) | §2.8 as built on the worker side: the loop, `prepareEvaluationRun`, the workflow, `finishEvaluationRun`, the settings `SDLC_WORKER_EVAL_TICK_SECONDS` and `SDLC_WORKER_EVAL_MAX_IN_FLIGHT` |
+| 0.8 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

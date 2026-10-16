@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task S01, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task S01) |
 | Date | 2026-10-08 |
 | Decided by | Harry (plan approved 2026-10-08, with answers to QUESTIONS #290–#292) |
 | Related | D-08 task S01 (AC1–AC5); D-02 §4.1 item 10, §6.2 (G2 "Acceptance criteria present"), FR-02; D-03 §6 (version 1.34); D-05 §6.2 (version 1.38); D-09 §7, §8; ADR-M30 §2.4b; ADR-M39; ADR-M54 §2.4b; QUESTIONS #285, #290–#292 |

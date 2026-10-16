@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task S02, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task S02) |
 | Date | 2026-10-08 |
 | Decided by | Harry (plan approved 2026-10-08, with answers to QUESTIONS #295–#297) |
 | Related | D-08 task S02 (AC1–AC4); D-02 §4.1 item 10; ADR-M40 §2.2 (plan schema version 1, unchanged); ADR-M61 §2.2 (pinned Spec Kit v1.1.2, BMAD v6.12.1); `design/POSITIONING.md` §6.1; QUESTIONS #167, #285, #295–#297 |
@@ -60,3 +60,4 @@
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-08 | Claude (task S02) | First version (QUESTIONS #295–#297) |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B04, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B04) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03: decisions 1–5; notes on `sdlc logout` and on plain-text storage) |
 | Related | D-02 FR-20, NFR-03, NFR-08; D-03 section 5.1; D-08 tasks B04, B13; handbook Ch.18 §18.8b, Ch.19 §19.8b–§19.8c; ADR-M18, ADR-M26, ADR-M28 §2.7, ADR-M32 §2.4; QUESTIONS #77 |
@@ -106,3 +106,4 @@ Points to settle:
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task B04) | First version |
 | 0.2 | 2026-10-03 | Claude (task B13, PR 2) | Note: since B13, `sdlc logout` revokes the token through the API before it deletes the saved login (§4 follow-up done), and the operator commands are `sdlc ops …` (ADR-M37 §2.8) |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

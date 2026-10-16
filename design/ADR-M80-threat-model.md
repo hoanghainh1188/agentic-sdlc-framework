@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task H01 done in three PRs: the model, the tests with their findings, and this PR's follow-up of every gap) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task H01) |
 | Date | 2026-10-13 |
 | Decided by | Harry (H01 plan approved 2026-10-13: severity scale, Critical and High fixed inside H01, one optional local-model trial) |
 | Related | D-08 task H01; D-02 FR-33, FR-50, NFR-03; D-03 §9; ADR-M25 (sandbox), ADR-M29 (agent adapter), ADR-M34 (G5), ADR-M40 §2.7 (plan in the prompt), ADR-M41 §2.7 (review feedback), ADR-M42 (kill switch); handbook Ch.7 (standards); task H02 (dependencies an agent adds) |
@@ -240,3 +240,4 @@ Optional, once, outside CI: one run with `gpt-oss:20b` (Ollama on the owner's ma
 | 0.1 | 2026-10-13 | Claude (task H01, PR 1) | First version: assets, attackers, ASI01–ASI10, gaps with severity, test plan |
 | 0.2 | 2026-10-13 | Claude (task H01, PR 2) | Test results: G-2 half confirmed, half refuted (Low); G-9 and G-10 confirmed; §6 lists the tests as built |
 | 0.3 | 2026-10-13 | Claude (task H01, PR 3) | Every gap has a task or an acceptance: H02 (G-1, G-5), H04 (G-10), H05 (G-9), H06 (G-6), H07 (G-7); QUESTIONS #455, #456; TRIAL.md says a trial exposes the machine's Docker |
+| 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

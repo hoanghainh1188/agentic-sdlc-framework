@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B02, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B02) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25: D1–D4 and reason codes) |
 | Related | D-05 sections 5, 6.2, 6.3, 10 (version 1.4); D-02 FR-01, FR-03, FR-10, FR-11, FR-17; D-03 sections 6, 6.1, 6.2, 6.3; D-08 task B02; ADR-M09 section 2.8; QUESTIONS #6, #16, #21, #22 |
@@ -99,3 +99,4 @@ Task B02 creates the registry tables `intents`, `spec_refs`, `plans` and `gate_d
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-25 | Claude (task B02) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

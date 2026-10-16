@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A05, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task A05) |
 | Date | 2026-09-25 |
 | Decided by | Harry (plan approved 2026-09-25) |
 | Related | D-08 task A05; D-02 FR-14…FR-18, NFR-04, NFR-08; D-03 sections 6.1, 6.4, 7.3, 11, ADR-M13; D-05 sections 5, 6.1, 10; D-07 section 6; ADR-M16; codes table §3, §4, §6.3; design/QUESTIONS.md #5–#10 |
@@ -93,3 +93,4 @@ Task A05 reads the per-project configuration: the gate × risk oversight matrix,
 | 0.1 | 2026-09-25 | Claude (task A05) | First version |
 | 0.2 | 2026-09-25 | Claude (task A05) | Review of PR #53: calendar floor in M11 (5 days, 7 hours), holiday warning (> 20 a year), reserved `unit` / `kind` keys |
 | 0.3 | 2026-09-25 | Claude (task B01) | §2.2: `ValidatedProjectConfig` brand; §2.4: G6 security threshold in M6 and its warning (QUESTIONS.md #19) |
+| 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

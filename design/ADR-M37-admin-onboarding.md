@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B13, PR 1 merged or in review, PR 2 for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B13) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #150–#154) |
 | Related | D-08 task B13 (AC1–AC8); D-02 FR-11, FR-14, FR-19; D-05 sections 5, 6.1 (version 1.19); handbook codes table §5, Ch.5, Ch.19, Ch.20 §20.7, §20.9, §20.11; ADR-M09, ADR-M18, ADR-M26, ADR-M31 §2.2, ADR-M36; QUESTIONS #45, #63, #65, #95, #150–#154 |
@@ -251,3 +251,4 @@ Every handler works on the caller's tenant scope. Another tenant's objects give 
 | 0.1 | 2026-10-03 | Claude (task B13, PR 1) | First version |
 | 0.2 | 2026-10-03 | Claude (task B13, PR 1), Harry's review | §2.9: follow-up for the configuration history (effective configuration as canonical JSON in an append-only versions table) |
 | 0.3 | 2026-10-03 | Claude (task B13, PR 2) | §2.8 as built: tokens, the audit check, `sdlc ops`, the agent register with `agent_approvals` |
+| 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

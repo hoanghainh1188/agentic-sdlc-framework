@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task A10: PR 1 TLS, PR 2 backups, §6 ClickHouse) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task A10) |
 | Date | 2026-10-09 |
 | Decided by | Harry (A10 plans approved 2026-10-09, with answers to QUESTIONS #325–#329) |
 | Related | D-08 task A10 (AC1–AC3); D-03 §10.2 (backups, drills); D-03 §8.2, §9 (TLS for internal services); QUESTIONS #20 (the internal CA), #27 (no host port), #67 (plain HTTP until A10), #325–#330; ADR-M53 §2.3 (§6 supersedes part); ADR-M19 §2.5, §3; ADR-M21 §2.4 (the client always verifies); runbook T11 section 3c |
@@ -80,3 +80,4 @@
 | 0.1 | 2026-10-09 | Claude Code (task A10, PR 1) | TLS everywhere, the throw-away CA on development machines and in CI, `openbao-tls-init`, renewal by SIGHUP, `tls.sh` |
 | 0.2 | 2026-10-09 | Claude Code (task A10, PR 2) | §5: backups and the restore drill (QUESTIONS #326–#329) |
 | 0.3 | 2026-10-09 | Claude Code (task A10) | §6: ClickHouse access management moves from `langfuse` to the loopback-only `sdlc_admin` (QUESTIONS #330; supersedes part of ADR-M53 §2.3) |
+| 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

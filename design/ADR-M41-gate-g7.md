@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task E01, for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task E01) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-10-03, with answers to QUESTIONS #175–#179) |
 | Related | QUESTIONS #191 (PR 2); D-08 task E01 (AC1–AC5); D-02 FR-11, FR-12, FR-16, FR-17, §5; D-03 §6, §6.1, §6.2, §7.1 (version 1.21; PR 2: 1.23); D-05 §5, §6.2, §6.4 (version 1.26; PR 2: 1.28); handbook Ch.15 §15.4, §15.5, §15.10; ADR-M07, ADR-M20, ADR-M23, ADR-M27, ADR-M30, ADR-M33, ADR-M38, ADR-M42; QUESTIONS #16, #45, #124, #134, #175–#179, #190 |

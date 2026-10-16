@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C07; PR 1 merged (#126): the runner's part and the G4 instruction-file check; PR 2 in review: the G5 workflow step) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C07) |
 | Date | 2026-10-03 |
 | Decided by | Harry (plan approved 2026-09-28: two PRs, QUESTIONS #130–#134 with conditions; the PR 1 step-1 adjustments approved 2026-10-03, with two conditions: re-read the spend after an agent error before choosing `stopped_budget` or `failed`, and record the exact cause of a G4 refusal in the audit event; the PR 2 adjustments and decisions A–C approved 2026-10-03) |
 | Related | D-02 FR-11, FR-13, FR-17, FR-18, FR-32, FR-50…FR-52; D-03 sections 6, 7.1, 7.4 (version 1.16); D-05 sections 5, 6.2, 6.4, 6.6 (version 1.20); handbook Ch.13 §13.10.5, Ch.18 §18.8b; D-08 tasks C07, C08, C09, E02, E05; D-09 N1, N3; handbook Ch.13, Ch.20 §20.9; ADR-M24, ADR-M25, ADR-M28, ADR-M29 §2.5, ADR-M31 §2.5, ADR-M33 §2.4, §2.6–§2.9; QUESTIONS #14, #21, #82, #126, #130–#134 |
@@ -146,3 +146,4 @@ Blind spot: paths the ignore rules of `base_sha` ignore (`node_modules`, build o
 |---|---|---|---|
 | 0.1 | 2026-10-03 | Claude (task C07, PR 1), approved by Harry | First version: §2.1–§2.7 for PR 1; PR 2 adds the G5 step |
 | 0.2 | 2026-10-03 | Claude (task C07, PR 2), approved by Harry | §2.8 the G5 step, §2.9 the decision on a G5 escalation and the budget increase; §2.7, §4 updated (migration 0015, rule M22, SQLSTATE SDA12) |
+| 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task B11; PR 1 merged, PR 2 for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task B11) |
 | Date | 2026-09-27 |
 | Decided by | Harry (plan approved 2026-09-27: QUESTIONS #73–#77 as recommended, with conditions) |
 | Related | D-02 FR-12, FR-17, FR-18, §10 item 5c; D-03 sections 6, 6.4 (version 1.7), 12 (ADR-M14); D-05 sections 5, 6.1b, 6.4b (version 1.9), 10; D-08 tasks B07, B10, B11, C06, C07, C08, C11, E01, E03; handbook codes table §6.3, Ch.6 §6.4–§6.6, template T16; ADR-M09, ADR-M14, ADR-M18, ADR-M20, ADR-M27; QUESTIONS #21, #73–#77 |
@@ -211,3 +211,4 @@ Escalations are kept at least 2 years (D-05 §10), so they hold codes, IDs, hash
 | 0.2 | 2026-09-27 | Claude (task B11, PR 1 review) | §2.5: notifying the client stays out of the MVP (Harry) |
 | 0.4 | 2026-09-27 | Claude (task B11, PR 2 review) | §2.7: `resume` no longer allows `budget_increase` by default; a budget increase needs an explicit amount, bound and audited (Harry) |
 | 0.3 | 2026-09-27 | Claude (task B11, PR 2) | §2.7 as built: comments, API, acting roles, decision record and default scope, binding and void, close, notices; §2.2 how B07 learns about a decision; §3 notice delay |
+| 0.5 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |

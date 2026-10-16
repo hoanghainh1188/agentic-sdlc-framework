@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task C02, PR for review) |
+| Status | **Accepted** (Harry, 2026-10-16; built by task C02) |
 | Date | 2026-09-26 |
 | Decided by | Harry (plan approved 2026-09-26; QUESTIONS #32–#34; changes: no `@` in run event values, clock skew setting) |
 | Related | D-03 sections 6.5, 8, 8.1, 8.2 (version 1.3); D-05 sections 5, 6.4, 7, 9 (version 1.5); D-08 tasks C02, C04, C06, C11; ADR-M05, ADR-M09, ADR-M18, ADR-M19, ADR-M20, ADR-M21; handbook Ch.13 (G4), template T13; QUESTIONS #13, #22, #32–#34 |
@@ -164,3 +164,4 @@ C02 does not check the agent register: the table comes with C10. **C06 (G4) must
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-09-26 | Claude (task C02) | First version |
+| 0.2 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |
