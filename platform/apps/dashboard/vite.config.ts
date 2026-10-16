@@ -28,7 +28,9 @@ export function dashboardCatalog(): Plugin {
             key.startsWith('dashboard.') ||
             key.startsWith('intent.waiting') ||
             // L05: the refusals of evaluation plans, by the reason the API gives.
-            key.startsWith('evaluation.error.'),
+            key.startsWith('evaluation.error.') ||
+            // L06: the recommendations of an evaluation report, by rule (ADR-M83 §2.3).
+            key.startsWith('eval.recommendation.'),
         ),
       );
       return `export default ${JSON.stringify(own)};`;

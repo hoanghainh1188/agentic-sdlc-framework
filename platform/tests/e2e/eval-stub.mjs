@@ -59,6 +59,128 @@ const EVALUATION = {
   finished_at: null,
 };
 
+// L06: the report of the evaluation (fictional numbers) and the evaluations that ended lately.
+const ENDED = {
+  ...EVALUATION,
+  id: '00000000-0000-4000-8000-000000000502',
+  code: 'EVAL-2026-0002',
+  configuration_ids: ['qwen', 'gpt-oss'],
+  status: 'completed',
+  finished_at: NOW(),
+};
+
+const config = (configuration, model, resolved, extra) => ({
+  configuration,
+  model,
+  tasks: 10,
+  runs: 30,
+  k: 3,
+  resolved,
+  pass_at_1: resolved.estimate,
+  ...extra,
+});
+
+const REPORT = {
+  evaluation: ENDED,
+  final: true,
+  results: 60,
+  thresholds: {
+    alpha: 0.05,
+    min_paired_tasks: 8,
+    low_ci_first_try_rate: 0.5,
+    unstable_gap: 0.3,
+    stopped_at_cap_share: 0.2,
+  },
+  configurations: [
+    config(
+      'qwen',
+      'qwen3-coder:30b',
+      { estimate: 0.6, low: 0.43, high: 0.77 },
+      {
+        pass_at_k: 0.8,
+        pass_hat_k: 0.4,
+        ci_first_try: 0.37,
+        scope_breaches: 0,
+        stopped: 3,
+        stopped_at_cap: 2,
+        median_seconds: 412,
+        total_cost_usd: '1.200000',
+        cost_per_run_usd: '0.040000',
+        cost_per_resolved_usd: '0.066667',
+      },
+    ),
+    config(
+      'gpt-oss',
+      'gpt-oss:20b',
+      { estimate: 0.53, low: 0.37, high: 0.7 },
+      {
+        pass_at_k: 0.7,
+        pass_hat_k: 0.5,
+        ci_first_try: 0.6,
+        scope_breaches: 1,
+        stopped: 1,
+        stopped_at_cap: 1,
+        median_seconds: 365,
+        total_cost_usd: '0.600000',
+        cost_per_run_usd: '0.020000',
+        cost_per_resolved_usd: '0.037500',
+      },
+    ),
+  ],
+  comparisons: [
+    {
+      a: 'qwen',
+      b: 'gpt-oss',
+      pairs: 30,
+      paired_tasks: 10,
+      only_a: 4,
+      only_b: 2,
+      p_value: 0.6875,
+      better: null,
+    },
+  ],
+  recommendations: [
+    {
+      rule: 'cheaper_model_no_difference',
+      configuration: 'gpt-oss',
+      other: 'qwen',
+      numbers: {
+        model: 'gpt-oss:20b',
+        other_model: 'qwen3-coder:30b',
+        cost_per_run_usd: '0.020000',
+        other_cost_per_run_usd: '0.040000',
+        paired_tasks: '10',
+        resolved: '53%',
+        resolved_low: '37%',
+        resolved_high: '70%',
+        other_resolved: '60%',
+        other_resolved_low: '43%',
+        other_resolved_high: '77%',
+        p_value: '0.688',
+      },
+    },
+    {
+      rule: 'low_ci_first_try',
+      configuration: 'qwen',
+      other: null,
+      numbers: { model: 'qwen3-coder:30b', ci_first_try: '11', runs: '30', threshold: '50%' },
+    },
+    {
+      rule: 'unstable_results',
+      configuration: 'qwen',
+      other: null,
+      numbers: { model: 'qwen3-coder:30b', k: '3', pass_at_k: '80%', pass_hat_k: '40%' },
+    },
+    {
+      rule: 'scope_breach',
+      configuration: 'gpt-oss',
+      other: null,
+      numbers: { model: 'gpt-oss:20b', breaches: '1', runs: '30' },
+    },
+  ],
+  real_runs: { available: false, reason: 'no_role' },
+};
+
 const plans = [];
 
 function seed() {
@@ -151,6 +273,32 @@ export const evalPlans = {
     if (one) {
       const plan = plans.find((x) => x.id === one[1]);
       return plan ? { body: show(plan) } : undefined;
+    }
+    if (p === '/v1/evaluations/recent') {
+      return { body: { since: NOW(), evaluations: [{ ...ENDED, project: 'shop' }] } };
+    }
+    if (p === `/v1/evaluations/${EVALUATION.code}/report`) {
+      return {
+        body: {
+          ...REPORT,
+          evaluation: EVALUATION,
+          final: false,
+          results: 2,
+          configurations: [],
+          comparisons: [],
+          recommendations: [],
+        },
+      };
+    }
+    if (p === `/v1/evaluations/${ENDED.code}/report`) return { body: REPORT };
+    if (p === `/v1/evaluations/${ENDED.code}`) {
+      return {
+        body: {
+          ...ENDED,
+          runs: { queued: 0, running: 0, preempted: 0, scored: 60, failed: 0, cancelled: 0 },
+          spent_usd: '1.80',
+        },
+      };
     }
     if (p === '/v1/evaluations') {
       return {

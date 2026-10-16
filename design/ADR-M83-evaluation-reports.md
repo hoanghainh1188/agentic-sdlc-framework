@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L06) |
+| Status | **Accepted** (Harry, 2026-10-16; task L06) |
 | Date | 2026-10-16 |
 | Decided by | Harry (L06 plan approved 2026-10-16, with answers to QUESTIONS #480–#481) |
 | Related | D-08 task L06 (AC1–AC5); ADR-M78 §2.5 (statistics, report), ADR-M81 (evaluations on the server), ADR-M82 (evaluation plans), ADR-M79 (V13, real-run numbers), ADR-M31 (the agent register); QUESTIONS #438, #450, #465, #480–#482 |
@@ -27,6 +27,7 @@ L04 and L05 run evaluations on the server, and the dashboard shows an evaluation
 - The dashboard page is read-only, in plain words, every number with its interval. Numbers and codes only; no prompt, task text or diff.
 - A notice when an evaluation ends (QUESTIONS #482): no new channel and no new table. `GET /v1/evaluations/recent` lists the evaluations that ended in the last 7 days in the projects where the caller has a role in `access.eval_roles`; the dashboard shows them, and `sdlc next` without an intent prints them.
 - As built (PR 2): `GET /v1/evaluations/:code/report` (anybody with a role on the project; no role → 404). The real-run numbers are the V13 rows of the last 30 days for the evaluation's models, only for a caller with a role in both `access.cost_read_roles` and `access.metrics_read_roles`; otherwise `real_runs` says `no_role`. The CLI: `sdlc eval report <EVAL-…>`.
+- As built (PR 3): the report is part of the screen of one evaluation (`#/evaluations/EVAL-…`), below its runs and spend; the Evaluations page shows the evaluations of `GET /v1/evaluations/recent` when there are any. The dashboard reads the two GET routes of PR 2 only; it adds no endpoint and no write. Recommendation texts come from the same catalog keys as the CLI (a test checks that the dashboard's rule keys equal those of `@sdlc/eval`).
 
 ### 2.3. Recommendation rules (AC2, QUESTIONS #481)
 
@@ -63,3 +64,5 @@ Guards:
 |---|---|---|---|
 | 0.1 | 2026-10-16 | Claude (draft) | Decisions of QUESTIONS #480–#481 |
 | 0.2 | 2026-10-16 | Claude (draft) | §2.2: the notice (QUESTIONS #482) and the API and CLI as built (PR 2) |
+| 0.3 | 2026-10-16 | Claude (draft) | §2.2: the dashboard as built (PR 3) |
+| 1.0 | 2026-10-16 | Harry | Accepted |

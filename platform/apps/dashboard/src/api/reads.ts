@@ -7,6 +7,7 @@ import {
   evalPlanListSchema,
   evalPlanSchema,
   evaluationListSchema,
+  evaluationReportSchema,
   evaluationSchema,
   evidenceFileSchema,
   evidenceListSchema,
@@ -15,6 +16,7 @@ import {
   intentPageSchema,
   meSchema,
   passkeyListSchema,
+  recentEvaluationsSchema,
   runListSchema,
   webSessionSchema,
   type EscalationView,
@@ -141,3 +143,11 @@ export const readEvaluations = (project: string, o: Signal = {}) =>
 /** L05: one evaluation with its runs by status and its spend. */
 export const readEvaluation = (code: string, o: Signal = {}) =>
   getJson(apiPath(`/v1/evaluations/${segment(code)}`), evaluationSchema, o);
+
+/** L06 (ADR-M83 §2.2): the report of one evaluation, with its recommendations by rules. */
+export const readEvaluationReport = (code: string, o: Signal = {}) =>
+  getJson(apiPath(`/v1/evaluations/${segment(code)}/report`), evaluationReportSchema, o);
+
+/** L06 (QUESTIONS #482): the evaluations that ended in the last 7 days, in the person's projects. */
+export const readRecentEvaluations = (o: Signal = {}) =>
+  getJson(apiPath('/v1/evaluations/recent'), recentEvaluationsSchema, o);

@@ -4,7 +4,7 @@
 // #477) when the dashboard may write (a GitHub sign-in with actions on).
 import type { Me } from '@sdlc/api-schemas';
 
-import { readEvalPlans, readEvaluations } from '../api/reads.js';
+import { readEvalPlans, readEvaluations, readRecentEvaluations } from '../api/reads.js';
 import { useApi } from '../api/use-api.js';
 import { codeClass, Empty, Show, Txt, When } from '../components/common.js';
 import { t } from '../i18n.js';
@@ -46,6 +46,7 @@ export function Evaluations({ me, query }: { readonly me: Me; readonly query: UR
           </button>
         </div>
       </div>
+      <RecentEvaluations />
       {project === undefined ? (
         <Empty messageKey="dashboard.eval.no_project" />
       ) : (
@@ -123,6 +124,31 @@ export function Evaluations({ me, query }: { readonly me: Me; readonly query: UR
         </Show>
       )}
     </section>
+  );
+}
+
+/**
+ * L06 (QUESTIONS #482): the notice of evaluations that ended in the last 7 days, in the projects
+ * where the person has a role in `access.eval_roles`. Nothing when there is none.
+ */
+function RecentEvaluations() {
+  const { result } = useApi((signal) => readRecentEvaluations({ signal }), []);
+  if (result.state !== 'ok' || result.data.evaluations.length === 0) return null;
+  return (
+    <aside class="notice recent-evals" aria-labelledby="recent-evals-title">
+      <h2 id="recent-evals-title">{t('dashboard.eval.recent.title')}</h2>
+      <ul class="report-list">
+        {result.data.evaluations.map((e) => (
+          <li key={e.code}>
+            <a class="mono" href={evaluationHref(e.code)}>
+              <Txt value={e.code} />
+            </a>{' '}
+            {t('dashboard.eval.recent.line', { project: e.project, status: e.status })}{' '}
+            <When iso={e.finished_at} />
+          </li>
+        ))}
+      </ul>
+    </aside>
   );
 }
 
