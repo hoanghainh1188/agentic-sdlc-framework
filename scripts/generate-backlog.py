@@ -729,7 +729,7 @@ def lp(k):
         if c[0]>b[0]: b=c
     return (b[0]+W[IDX[k]['size']],b[1]+[k])
 CP=" → ".join(max((lp(k) for k in IDX),key=lambda x:x[0])[1])
-MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)"),("EVAL","Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)"),("EXT","Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)"),("Models","Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424)"),("Server","A team on a server: toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done)")]
+MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)"),("EVAL","Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)"),("EXT","Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL)"),("Models","Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424)"),("Server","A team on a server: toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done)")]
 o=[];w=o.append
 w(f"""# D-08. Platform backlog
 
@@ -786,8 +786,8 @@ flowchart LR
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
     UX --> EV["EVAL L04–L08: evaluations, reports, recommendations for managers"]
-    EV --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.4.0)"]
-    EXT --> MO["Models L01 (early in v0.4.0), L03"]
+    EV --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.5.0)"]
+    EXT --> MO["Models L01 (early in v0.5.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
     MD --> MU["U01–U03 read-only dashboard, done (Later)"]
@@ -910,6 +910,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.46 | 2026-10-13 | Claude (task L02, PR 3), approved by Harry | L02 note: kept diffs for blind pairs (QUESTIONS #445); Langfuse scores later (QUESTIONS #446) |
 | 1.47 | 2026-10-13 | Claude, approved by Harry | New milestone EVAL after v0.3.0, before EXT (QUESTIONS #450): L04 (evaluations on the server, one engine with developer machines), L05 (evaluation plans by managers), L06 (reports and recommendations), L07 (a project's task set from its merged intents), L08 (design: evaluations in the agent register's approvals) |
 | 1.49 | 2026-10-13 | Claude (task H01, PR 3), approved by Harry (QUESTIONS #455, #456 answered) | H01 done: its gaps become H04 (secret scan of the diff, Medium), H05 (diff size bound, Medium), H06 (stronger sandbox runtime, Later), H07 (Docker authorization plugin, High) and two criteria of H02; QUESTIONS #455, #456 |
+| 1.50 | 2026-10-16 | Claude, approved by Harry | Release v0.4.0 with L04 and L05 (the first part of EVAL); EXT and Models move to v0.5.0; L06–L08 finish EVAL first |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
@@ -929,7 +930,7 @@ DONE={**{t:"v0.1.0" for t in ("V01","V02","V03")},
       **{t:"v0.1.1" for t in ("V04","V05","V06","V11")},
       **{t:"v0.2.0" for t in ("V07","V08","V09","V12","U05","U06")},
       **{t:"v0.3.0" for t in ("V10","V13","L02","H01")},
-      **{t:"next release" for t in ("L04","L05")}}
+      **{t:"v0.4.0" for t in ("L04","L05")}}
 r=[]; a=r.append
 a("""# Roadmap
 
