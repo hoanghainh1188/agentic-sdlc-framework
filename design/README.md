@@ -69,7 +69,7 @@
 | ADR-M80 | [Threat model of an agent run and attack tests](ADR-M80-threat-model.md) (task H01) | Accepted (2026-10-16) | |
 | ADR-M81 | [Evaluations on the server: one engine for the server and developer machines](ADR-M81-server-evaluations.md) (task L04) | Accepted (2026-10-16) | |
 | ADR-M82 | [Evaluation plans that managers make themselves, dashboard first](ADR-M82-evaluation-plans.md) (task L05) | Accepted (2026-10-16) | |
-| ADR-M83 | [Evaluation reports and recommendations for managers](ADR-M83-evaluation-reports.md) (task L06) | Proposed | |
+| ADR-M83 | [Evaluation reports and recommendations for managers](ADR-M83-evaluation-reports.md) (task L06) | Accepted | |
 
 
 ## Number blocks (QUESTIONS and ADR numbers)

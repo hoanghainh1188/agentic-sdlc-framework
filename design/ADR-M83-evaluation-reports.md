@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L06) |
+| Status | **Accepted** (Harry, 2026-10-16; task L06) |
 | Date | 2026-10-16 |
 | Decided by | Harry (L06 plan approved 2026-10-16, with answers to QUESTIONS #480–#481) |
 | Related | D-08 task L06 (AC1–AC5); ADR-M78 §2.5 (statistics, report), ADR-M81 (evaluations on the server), ADR-M82 (evaluation plans), ADR-M79 (V13, real-run numbers), ADR-M31 (the agent register); QUESTIONS #438, #450, #465, #480–#482 |
@@ -65,3 +65,4 @@ Guards:
 | 0.1 | 2026-10-16 | Claude (draft) | Decisions of QUESTIONS #480–#481 |
 | 0.2 | 2026-10-16 | Claude (draft) | §2.2: the notice (QUESTIONS #482) and the API and CLI as built (PR 2) |
 | 0.3 | 2026-10-16 | Claude (draft) | §2.2: the dashboard as built (PR 3) |
+| 1.0 | 2026-10-16 | Harry | Accepted |
