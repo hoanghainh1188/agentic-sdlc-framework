@@ -3,6 +3,7 @@
 export * from './base.js';
 export * from './config.js';
 export * from './pairs.js';
+export * from './recommendations.js';
 export * from './report.js';
 export * from './result.js';
 export * from './scoring.js';

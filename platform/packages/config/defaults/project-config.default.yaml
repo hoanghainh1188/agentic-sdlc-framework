@@ -306,3 +306,15 @@ sandbox:
   # agent-server base plus the project toolchain, referenced by digest (a tag alone is refused).
   # Default: the pinned base itself (ADR-M10 §2.1), which has no project toolchain.
   image: ghcr.io/openhands/agent-server:1.48.0-python-slim@sha256:8fcfab2dedb4b41b6aef219b9fa9b1f2588033fad3d998ae6aa11fe8c4fcf8b7
+
+evaluation:
+  # Task L06, ADR-M83 §2.3, QUESTIONS #481. Thresholds of the recommendation rules of an
+  # evaluation report. A comparing rule fires only with at least `min_paired_tasks` paired tasks,
+  # and a difference is called only when McNemar's p < `alpha` and the intervals do not overlap.
+  # [Proposal] defaults; review after the first evaluations on the server.
+  recommendations:
+    alpha: 0.05
+    min_paired_tasks: 8
+    low_ci_first_try_rate: 0.5
+    unstable_gap: 0.3
+    stopped_at_cap_share: 0.2

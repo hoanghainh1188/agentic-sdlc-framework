@@ -54,6 +54,8 @@ function isValidIsoDate(value: string): boolean {
 }
 
 const positiveInt = z.number().int().positive();
+/** A share strictly between 0 and 1 (L06 thresholds). */
+const share = z.number().gt(0).lt(1);
 const nonNegativeInt = z.number().int().nonnegative();
 const usd = z
   .number()
@@ -262,6 +264,16 @@ export const projectConfigSchema = z.strictObject({
   }),
   agents: z.strictObject({ recertification_months: positiveInt }),
   sandbox: z.strictObject({ image: pinnedImage }),
+  // L06 (ADR-M83 §2.3, QUESTIONS #481): thresholds of the evaluation recommendation rules.
+  evaluation: z.strictObject({
+    recommendations: z.strictObject({
+      alpha: share.max(0.1),
+      min_paired_tasks: positiveInt.min(2).max(1000),
+      low_ci_first_try_rate: share,
+      unstable_gap: share,
+      stopped_at_cap_share: share,
+    }),
+  }),
 });
 
 /** Maps zod issues to catalog-keyed configuration issues. Zod's own English text is never used. */
