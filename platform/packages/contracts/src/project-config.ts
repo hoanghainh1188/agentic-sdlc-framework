@@ -268,6 +268,17 @@ export interface ProjectConfig {
   };
   /** Sandbox image of the project, pinned by digest (QUESTIONS #59, ADR-M25). */
   readonly sandbox: { readonly image: string };
+  /** Evaluation reports (task L06, ADR-M83 §2.3, QUESTIONS #481). */
+  readonly evaluation: {
+    /** Thresholds of the recommendation rules; shares and alpha are numbers between 0 and 1. */
+    readonly recommendations: {
+      readonly alpha: number;
+      readonly min_paired_tasks: number;
+      readonly low_ci_first_try_rate: number;
+      readonly unstable_gap: number;
+      readonly stopped_at_cap_share: number;
+    };
+  };
 }
 
 declare const validatedConfig: unique symbol;

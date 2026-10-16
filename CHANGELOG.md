@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- L06 PR 1 (ADR-M83, QUESTIONS #480–#481): recommendations by rules for an evaluation report, in `@sdlc/eval`: a cheaper model with no difference found on enough paired tasks, a low CI-on-the-first-try rate, unstable results (pass@k far above pass^k), runs stopped at a cap, scope breaches. Each one quotes its numbers and intervals and is a proposal only (changes still go through the agent register). One test calls a difference (`differs`: McNemar below alpha and intervals apart). The thresholds are the new project configuration section `evaluation.recommendations`, so the default configuration hash changes. The API, CLI and dashboard report come in the next pull requests.
+
 ## [0.4.0] - 2026-10-16
 
 The first release of the milestone EVAL: **measure agents, models and prompts on the server, and let managers plan it themselves.** The evaluation engine of `pnpm eval` now also runs on the server through the deployed runner, LiteLLM and the Cost Controller, with results per tenant; real runs always come first (L04). Managers make evaluation plans themselves in the dashboard or with `sdlc eval`: configurations from the agent register, prompt variants as files on the default branch, a budget per run and a monthly cap, and runs on demand, on a schedule or when a model or an agent version changes; Run now is confirmed with a passkey (L05). A minor release: four migrations, rebuilt images, one new project configuration key.

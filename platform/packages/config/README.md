@@ -58,6 +58,7 @@ escalation:
 | `access.evidence_build_roles`, `access.evidence_read_roles` | Who may build, and who may list, show and export, an intent's Evidence Pack (E02, ADR-M48). Defaults: `person_a`, `person_b`, `pm_brse`, `governance`, `admin` (build); the same and `second_approver` (read); tenant admins always may; never `viewer` (M30) |
 | `access.evidence_hold_roles` | Who may put an intent's evidence on hold and release it (E05, ADR-M51); held evidence is never purged. Default `[governance, admin]`; never `viewer` (rule M32) |
 | `access.eval_roles` | Who may create, change, archive and run the project's evaluation plans (L05, ADR-M82). Default: `person_a`, `person_b`, `governance`, `admin`; tenant admins always may; never `viewer` (M33) |
+| `evaluation.recommendations` | Thresholds of the evaluation recommendation rules (L06, ADR-M83 §2.3): `alpha` (default 0.05, at most 0.1), `min_paired_tasks` (8), `low_ci_first_try_rate` (0.5), `unstable_gap` (0.3), `stopped_at_cap_share` (0.2); shares are between 0 and 1 |
 | `access.metrics_read_roles` | Who may read the gate waiting-time metrics of a project (E06, ADR-M47). Default: `person_a`, `person_b`, `second_approver`, `pm_brse`, `governance`, `admin`; tenant admins always may; never `viewer` (M29) |
 
 Durations: `{ value, unit }` with `minutes`, `hours`, `days` (wall clock) or `working_hours`, `working_days` (working calendar; one working day = the working hours). Deadlines may also be `{ kind: end_of_working_day }` or `{ kind: next_planned_work }` (no clock).

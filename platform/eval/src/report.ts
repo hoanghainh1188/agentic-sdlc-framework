@@ -2,9 +2,10 @@
 // results only (numbers and codes), so it can never hold a prompt, task text, code or a diff.
 // - Per configuration: resolve rate with a bootstrap interval over tasks, pass@1, pass@k and
 //   pass^k (k = the fewest runs of any task), CI on the first try, scope breaches, stops, time,
-//   tokens, cost, cost per resolved run.
+//   tokens, cost, cost per run and per resolved run.
 // - Per pair of configurations: McNemar's exact test on runs paired by (task, run number). A
-//   difference is called only when the intervals do not overlap and p < 0.05.
+//   difference is called only by `differs`: the intervals do not overlap and p < alpha (default
+//   0.05; ADR-M83 §2.3 makes alpha configuration on the server).
 // - The Bradley-Terry ranking of blind pairwise choices, when there are any.
 // Labels come from the message catalog (`eval.report.*`).
 import { t } from '@sdlc/messages';
@@ -36,10 +37,14 @@ export interface ConfigurationSummary {
   readonly scopeBreaches: number;
   /** Runs that ended at a cap or stalled (`stopped_*`), or failed. */
   readonly stopped: number;
+  /** Runs that ended at a cap or stalled (`stopped_*`) only; a failed run is not a cap. */
+  readonly stoppedAtCap: number;
   readonly medianSeconds: number;
   readonly meanInputTokens: number;
   readonly meanOutputTokens: number;
   readonly totalCostUsd: string;
+  /** Total cost divided by runs (decimal string). */
+  readonly costPerRunUsd: string;
   /** Total cost divided by resolved runs; null when none resolved. */
   readonly costPerResolvedUsd: string | null;
 }
@@ -56,6 +61,8 @@ export interface Comparison {
   readonly b: string;
   /** Paired runs (same task and run number in both). */
   readonly pairs: number;
+  /** Distinct tasks with at least one paired run. */
+  readonly pairedTasks: number;
   readonly onlyA: number;
   readonly onlyB: number;
   readonly pValue: number;
@@ -135,45 +142,61 @@ function summarise(
     ciFirstTry: round(results.filter((r) => r.ci_passed).length / results.length),
     scopeBreaches: results.filter((r) => r.scope_breach).length,
     stopped: results.filter((r) => r.status === 'failed' || r.status.startsWith('stopped_')).length,
+    stoppedAtCap: results.filter((r) => r.status.startsWith('stopped_')).length,
     medianSeconds: median(results.map((r) => r.seconds)),
     meanInputTokens: Math.round(results.reduce((s, r) => s + r.input_tokens, 0) / results.length),
     meanOutputTokens: Math.round(results.reduce((s, r) => s + r.output_tokens, 0) / results.length),
     totalCostUsd: usd(total),
+    costPerRunUsd: usd(total / BigInt(results.length)),
     costPerResolvedUsd: resolvedRuns === 0 ? null : usd(total / BigInt(resolvedRuns)),
   };
+}
+
+/** The default significance level of a difference (ADR-M78 §2.5). */
+export const DEFAULT_ALPHA = 0.05;
+
+/**
+ * The only test that says two configurations differ (ADR-M83 §2.3, QUESTIONS #481): McNemar's p
+ * below alpha and resolve-rate intervals that do not overlap. Every rule that compares uses it.
+ */
+export function differs(a: Interval, b: Interval, pValue: number, alpha: number): boolean {
+  const apart = a.low > b.high || b.low > a.high;
+  return apart && pValue < alpha;
 }
 
 function compare(
   a: ConfigurationSummary,
   b: ConfigurationSummary,
   results: readonly RunResult[],
+  alpha: number,
 ): Comparison {
   const key = (r: RunResult) => `${r.task}\u0000${String(r.run)}`;
   const ofB = new Map(
     results.filter((r) => r.configuration === b.configuration).map((r) => [key(r), r]),
   );
   let pairs = 0;
+  const pairedTasks = new Set<string>();
   let onlyA = 0;
   let onlyB = 0;
   for (const ra of results.filter((r) => r.configuration === a.configuration)) {
     const rb = ofB.get(key(ra));
     if (!rb) continue;
     pairs += 1;
+    pairedTasks.add(ra.task);
     if (ra.resolved && !rb.resolved) onlyA += 1;
     if (rb.resolved && !ra.resolved) onlyB += 1;
   }
   const pValue = mcnemarExact(onlyA, onlyB);
-  const apart = a.resolved.low > b.resolved.high || b.resolved.low > a.resolved.high;
-  const better =
-    apart && pValue < 0.05
-      ? a.resolved.estimate > b.resolved.estimate
-        ? a.configuration
-        : b.configuration
-      : null;
+  const better = differs(a.resolved, b.resolved, pValue, alpha)
+    ? a.resolved.estimate > b.resolved.estimate
+      ? a.configuration
+      : b.configuration
+    : null;
   return {
     a: a.configuration,
     b: b.configuration,
     pairs,
+    pairedTasks: pairedTasks.size,
     onlyA,
     onlyB,
     pValue: round(pValue, 4),
@@ -199,6 +222,7 @@ export function buildReport(
   taskSet: number,
   choices: readonly PairChoice[] = [],
   seed = 1,
+  alpha = DEFAULT_ALPHA,
 ): EvalReport {
   const ofSet = results.filter((r) => r.task_set === taskSet);
   const ids = [...new Set(ofSet.map((r) => r.configuration))].sort();
@@ -223,7 +247,7 @@ export function buildReport(
   const comparisons: Comparison[] = [];
   for (let i = 0; i < configurations.length; i++) {
     for (let j = i + 1; j < configurations.length; j++) {
-      comparisons.push(compare(configurations[i]!, configurations[j]!, ofSet));
+      comparisons.push(compare(configurations[i]!, configurations[j]!, ofSet, alpha));
     }
   }
   const ranking = [...bradleyTerry(choices)]
