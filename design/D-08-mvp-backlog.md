@@ -46,8 +46,8 @@
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) | 14 | S×3 · M×9 · L×2 |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 5 | S×1 · M×3 · L×1 |
-| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424) | 8 | S×4 · M×2 · L×2 |
-| Models | Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424) | 2 | S×1 · M×1 |
+| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL) | 8 | S×4 · M×2 · L×2 |
+| Models | Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424) | 2 | S×1 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 11 | S×3 · M×8 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 16 | S×4 · M×6 · L×6 |
 | **Total** | | **111** | |
@@ -64,8 +64,8 @@ flowchart LR
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
     UX --> EV["EVAL L04–L08: evaluations, reports, recommendations for managers"]
-    EV --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.4.0)"]
-    EXT --> MO["Models L01 (early in v0.4.0), L03"]
+    EV --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.5.0)"]
+    EXT --> MO["Models L01 (early in v0.5.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
     MD --> MU["U01–U03 read-only dashboard, done (Later)"]
@@ -1179,7 +1179,7 @@ flowchart LR
 > Note: QUESTIONS #450
 
 
-### EXT — Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)
+### EXT — Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL)
 
 #### X09. Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
 
@@ -1303,7 +1303,7 @@ flowchart LR
 > Note: QUESTIONS #395 (Harry, 2026-10-12). Relates to X08 (lessons at G8)
 
 
-### Models — Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424)
+### Models — Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424)
 
 #### L01. A self-hosted model service (vLLM) on an optional GPU host
 
@@ -1818,6 +1818,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.46 | 2026-10-13 | Claude (task L02, PR 3), approved by Harry | L02 note: kept diffs for blind pairs (QUESTIONS #445); Langfuse scores later (QUESTIONS #446) |
 | 1.47 | 2026-10-13 | Claude, approved by Harry | New milestone EVAL after v0.3.0, before EXT (QUESTIONS #450): L04 (evaluations on the server, one engine with developer machines), L05 (evaluation plans by managers), L06 (reports and recommendations), L07 (a project's task set from its merged intents), L08 (design: evaluations in the agent register's approvals) |
 | 1.49 | 2026-10-13 | Claude (task H01, PR 3), approved by Harry (QUESTIONS #455, #456 answered) | H01 done: its gaps become H04 (secret scan of the diff, Medium), H05 (diff size bound, Medium), H06 (stronger sandbox runtime, Later), H07 (Docker authorization plugin, High) and two criteria of H02; QUESTIONS #455, #456 |
+| 1.50 | 2026-10-16 | Claude, approved by Harry | Release v0.4.0 with L04 and L05 (the first part of EVAL); EXT and Models move to v0.5.0; L06–L08 finish EVAL first |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

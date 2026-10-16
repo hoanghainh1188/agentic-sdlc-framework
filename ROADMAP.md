@@ -7,8 +7,8 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 | M-E | The trial, run by the community (QUESTIONS #340) |
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) |
-| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424) |
-| Models | Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424) |
+| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL) |
+| Models | Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424) |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) |
 | M-F | Adjust gates, budgets and rules from the trial data, then a trial on a real internal tool (D-02 §13.3) |
@@ -38,13 +38,13 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 
 ## EVAL: Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)
 
-- **L04** Evaluations on the server, one engine for the server and developer machines (done, next release)
-- **L05** Evaluation plans that managers make themselves (done, next release)
+- **L04** Evaluations on the server, one engine for the server and developer machines (done, v0.4.0)
+- **L05** Evaluation plans that managers make themselves (done, v0.4.0)
 - **L06** Evaluation reports and recommendations for managers
 - **L07** A project's own task set from its merged intents
 - **L08** Design: evaluations in the agent register's approvals
 
-## EXT: Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)
+## EXT: Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL)
 
 - **X09** Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
 - **X01** Spike: a second, open-source coding agent (Aider or OpenCode)
@@ -55,7 +55,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **X11** Context condensing for agent runs
 - **X12** Design: agent memory across runs
 
-## Models: Self-hosted models: L01 early in v0.4.0, with X09 (QUESTIONS #362, #424)
+## Models: Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424)
 
 - **L01** A self-hosted model service (vLLM) on an optional GPU host
 - **L03** GPU sizing note for leadership
