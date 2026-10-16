@@ -12,6 +12,7 @@
     { "path": "../../packages/config" },
     { "path": "../../packages/messages" },
     { "path": "../../packages/core" },
+    { "path": "../../eval" },
     { "path": "../../packages/secrets" },
     { "path": "../../packages/workflow-client" },
     { "path": "../../packages/adapters/evidence-s3" },

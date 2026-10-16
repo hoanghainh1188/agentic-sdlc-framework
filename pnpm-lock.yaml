@@ -158,6 +158,9 @@ importers:
       '@sdlc/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@sdlc/eval':
+        specifier: workspace:*
+        version: link:../../eval
       '@sdlc/messages':
         specifier: workspace:*
         version: link:../../packages/messages

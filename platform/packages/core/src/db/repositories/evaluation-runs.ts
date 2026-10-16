@@ -543,10 +543,14 @@ export class EvaluationRunRepository extends TenantRepository {
   }
 
   /** The results of one evaluation with the codes of their runs, in a fixed order. */
-  async resultsForEvaluation(
-    evaluationId: string,
-  ): Promise<
-    (EvaluationRunResultRow & { configuration_id: string; task_id: string; run_index: number })[]
+  async resultsForEvaluation(evaluationId: string): Promise<
+    (EvaluationRunResultRow & {
+      configuration_id: string;
+      task_id: string;
+      run_index: number;
+      model: string;
+      agent_version: string;
+    })[]
   > {
     if (!isUuid(evaluationId)) return [];
     return this.run(
@@ -559,7 +563,13 @@ export class EvaluationRunRepository extends TenantRepository {
             .on('er.tenant_id', '=', this.tenantId),
         )
         .selectAll('r')
-        .select(['er.configuration_id', 'er.task_id', 'er.run_index'])
+        .select([
+          'er.configuration_id',
+          'er.task_id',
+          'er.run_index',
+          'er.model',
+          'er.agent_version',
+        ])
         .where('r.tenant_id', '=', this.tenantId)
         .where('er.evaluation_id', '=', evaluationId)
         .orderBy('er.configuration_id')

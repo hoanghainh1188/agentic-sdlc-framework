@@ -545,7 +545,8 @@ describe('sdlc next (command, mocked API)', () => {
     });
   });
 
-  it.each([[[]], [['bogus']], [[CODE, 'extra']], [['--unknown', CODE]]])(
+  // No argument lists the evaluations that ended (L06, QUESTIONS #482): `eval-report.test.ts`.
+  it.each([[['bogus']], [[CODE, 'extra']], [['--unknown', CODE]], [['--unknown']]])(
     '%j: usage, exit 2',
     async (args) => {
       const h = await harness({ routes: {} });

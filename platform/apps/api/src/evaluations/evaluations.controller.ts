@@ -97,6 +97,18 @@ export class EvaluationsController {
     return this.evaluations.listEvaluations(p, parseRequest(listEvaluationsSchema, query, 'query'));
   }
 
+  /** Evaluations that ended in the last 7 days (the notice of task L06, QUESTIONS #482). */
+  @Get('recent')
+  recent(@CurrentPrincipal() p: Principal) {
+    return this.evaluations.recent(p);
+  }
+
+  /** The report of one evaluation (task L06, ADR-M83). Read only. */
+  @Get(':code/report')
+  report(@CurrentPrincipal() p: Principal, @Param('code') code: string) {
+    return this.evaluations.report(p, parseRequest(evaluationCodeSchema, code, 'path'));
+  }
+
   @Get(':code')
   show(@CurrentPrincipal() p: Principal, @Param('code') code: string) {
     return this.evaluations.showEvaluation(p, parseRequest(evaluationCodeSchema, code, 'path'));

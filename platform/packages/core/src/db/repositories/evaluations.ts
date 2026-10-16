@@ -326,6 +326,30 @@ export class EvaluationRepository extends TenantRepository {
     );
   }
 
+  /**
+   * Evaluations of the given projects that ended at or after `since`, newest first (the notice of
+   * task L06, QUESTIONS #482). An empty project list gives none.
+   */
+  async listEndedSince(filter: {
+    readonly projectIds: readonly string[];
+    readonly since: Date;
+    readonly limit: number;
+  }): Promise<Evaluation[]> {
+    if (filter.projectIds.length === 0) return [];
+    return this.run(
+      this.db
+        .selectFrom('evaluations')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('project_id', 'in', [...filter.projectIds])
+        .where('finished_at', '>=', filter.since)
+        .orderBy('finished_at', 'desc')
+        .orderBy('id')
+        .limit(filter.limit)
+        .execute(),
+    );
+  }
+
   /** Evaluations that are not final: what the loop works on, oldest first. */
   async listOpen(limit: number): Promise<Evaluation[]> {
     return this.run(

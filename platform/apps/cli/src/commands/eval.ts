@@ -5,17 +5,22 @@
 //   plan's fields as the API takes them (codes, numbers, amounts, a prompt variant's path; never a
 //   prompt text), at most 64 KB;
 // - `sdlc eval plan archive <plan-id>`; `sdlc eval run <plan-id>` (Run now: the worker starts it);
-// - `sdlc eval list --project <slug> | --plan <plan-id>` and `sdlc eval show <EVAL-…>`.
+// - `sdlc eval list --project <slug> | --plan <plan-id>` and `sdlc eval show <EVAL-…>`;
+// - `sdlc eval report <EVAL-…>` (task L06, ADR-M83): the report with its recommendations by rules
+//   and the real-run numbers of V13 for the same models; every text from the catalog.
 // A role in the project's `access.eval_roles` changes and runs plans; a role on the project reads.
 import fs from 'node:fs';
 
+import { recommendationKey } from '@sdlc/eval';
 import { t } from '@sdlc/messages';
 
 import {
   evalPlanListSchema,
   evalPlanSchema,
   evaluationListSchema,
+  evaluationReportSchema,
   evaluationSchema,
+  type EvaluationReportView,
   type EvalPlanSummaryView,
   type EvaluationView,
 } from '../api/schemas.js';
@@ -34,6 +39,7 @@ export async function runEval(args: readonly string[], ctx: CliContext): Promise
   if (command === 'run') return runRun(rest, ctx);
   if (command === 'list') return runList(rest, ctx);
   if (command === 'show') return runShow(rest, ctx);
+  if (command === 'report') return runReport(rest, ctx);
   return usage(ctx);
 }
 
@@ -184,6 +190,88 @@ async function runShow(args: readonly string[], ctx: CliContext): Promise<number
     }
     return EXIT.ok;
   });
+}
+
+async function runReport(args: readonly string[], ctx: CliContext): Promise<number> {
+  const parsed = parseCommand(args, {}, 1);
+  const code = parsed?.positionals[0];
+  if (!parsed || code === undefined || !EVAL_CODE.test(code)) return usage(ctx);
+  const json = parsed.values.json === true;
+  return withApi(ctx, json, async (client) => {
+    const report = await client.get(
+      `/v1/evaluations/${segment(code)}/report`,
+      evaluationReportSchema,
+    );
+    if (json) ctx.stdout(toJson(report));
+    else printReport(ctx, report);
+    return EXIT.ok;
+  });
+}
+
+const pct = (value: number): string => `${String(Math.round(value * 100))}%`;
+
+function printReport(ctx: CliContext, report: EvaluationReportView): void {
+  printEvaluation(ctx, report.evaluation);
+  say(ctx, report.final ? 'cli.eval.report.final' : 'cli.eval.report.not_final', {
+    results: report.results,
+  });
+  for (const c of report.configurations) {
+    say(ctx, 'cli.eval.report.configuration', {
+      configuration: c.configuration,
+      model: c.model,
+      tasks: c.tasks,
+      runs: c.runs,
+      resolved: pct(c.resolved.estimate),
+      low: pct(c.resolved.low),
+      high: pct(c.resolved.high),
+      k: c.k,
+      pass_at_k: pct(c.pass_at_k),
+      pass_hat_k: pct(c.pass_hat_k),
+      ci_first_try: pct(c.ci_first_try),
+      cost_per_run: c.cost_per_run_usd,
+      cost_per_resolved: show(c.cost_per_resolved_usd),
+    });
+  }
+  for (const c of report.comparisons) {
+    say(ctx, c.better === null ? 'cli.eval.report.no_difference' : 'cli.eval.report.difference', {
+      a: c.a,
+      b: c.b,
+      better: show(c.better),
+      tasks: c.paired_tasks,
+      p: c.p_value,
+    });
+  }
+  if (report.recommendations.length === 0) say(ctx, 'cli.eval.report.no_recommendation');
+  for (const rec of report.recommendations) {
+    say(ctx, 'cli.eval.report.recommendation', {
+      text: recommendationText(rec),
+    });
+  }
+  const real = report.real_runs;
+  if (real === null || !real.available) say(ctx, 'cli.eval.report.real_runs_hidden');
+  else if (real.rows.length === 0) say(ctx, 'cli.eval.report.real_runs_none');
+  else {
+    for (const row of real.rows) {
+      say(ctx, 'cli.eval.report.real_run', {
+        agent: row.agent,
+        version: row.agent_version,
+        model: row.model,
+        runs: row.runs.total,
+        ci: `${String(row.ci.first_try_passed)}/${String(row.ci.first_try_total)}`,
+        merged: row.merged.intents,
+        without_changes: row.merged.without_changes_requested,
+        cost_per_run: show(row.cost.per_run_usd),
+      });
+    }
+  }
+}
+
+/** A recommendation's text; an unknown rule (a newer server) shows its code. */
+function recommendationText(rec: EvaluationReportView['recommendations'][number]): string {
+  const key = recommendationKey(rec.rule);
+  if (key === undefined) return rec.rule;
+  const params = { configuration: rec.configuration, other: rec.other ?? '', ...rec.numbers };
+  return `${t(key, params)} ${t('eval.recommendation.register_note')}`;
 }
 
 /** The plan file: JSON, at most 64 KB, an object. Never printed back. */

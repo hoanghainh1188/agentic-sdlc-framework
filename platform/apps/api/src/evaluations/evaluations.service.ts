@@ -7,6 +7,7 @@
 // Every value is a code, an ID, a number, an amount or a hash.
 import {
   archiveEvaluationPlan,
+  buildAgentMetrics,
   changeEvaluationPlan,
   CommandError,
   consumeStepUp,
@@ -17,6 +18,7 @@ import {
   planChangeNeedsStepUp,
   stepUpRequestSha256,
   readEvaluationPlan,
+  loadEffectiveConfig,
   requestEvaluationPlanRun,
   type EvaluationPlan,
   type EvaluationPlanDeps,
@@ -27,12 +29,15 @@ import {
   type TenantScope,
 } from '@sdlc/core';
 import type { GitHostAdapter } from '@sdlc/contracts';
+import { thresholdsFromConfig } from '@sdlc/eval';
 import type { z } from 'zod';
 
 import type { Principal } from '../auth/principal.js';
 import { ApiError } from '../errors/api-error.js';
 import type { PasskeysService, StepUpAnswer } from '../passkeys/passkeys.service.js';
+import { presentAgentMetrics } from '../metrics/present.js';
 import { presentEvaluation, presentPlan, presentVersion } from './present.js';
+import { buildEvaluationReport } from './report.js';
 import type {
   changePlanSchema,
   createPlanSchema,
@@ -42,6 +47,15 @@ import type {
 
 /** How many evaluations a plan shows. */
 const PLAN_EVALUATIONS = 20;
+/** The notice of an ended evaluation lasts this long (QUESTIONS #482). */
+const RECENT_DAYS = 7;
+const RECENT_LIMIT = 50;
+const FINAL_STATUSES: ReadonlySet<string> = new Set([
+  'completed',
+  'stopped_budget',
+  'cancelled',
+  'failed',
+]);
 
 export class EvaluationsService {
   constructor(
@@ -232,6 +246,82 @@ export class EvaluationsService {
       counts: await p.scope.evaluations.counts(evaluation.id),
       spentUsd: await p.scope.evaluations.spentUsd(evaluation.id),
     });
+  }
+
+  /**
+   * The report of one evaluation (task L06, ADR-M83 §2.2): summaries, comparisons and
+   * recommendations by rules, with the thresholds of the project configuration, and the V13
+   * numbers of real runs for the same models when the caller may read them (a role in both
+   * `access.cost_read_roles` and `access.metrics_read_roles`, ADR-M79; else `no_role`).
+   */
+  async report(p: Principal, code: string): Promise<Record<string, unknown>> {
+    const evaluation = await p.scope.evaluations.getByCode(code);
+    if (!evaluation || !(await mayReadPlans(p.scope, p.userId, evaluation.project_id))) {
+      throw new ApiError(404, 'not_found');
+    }
+    const [{ config }, rows, project, counts, spentUsd] = await Promise.all([
+      loadEffectiveConfig(p.scope.projectConfigs, evaluation.project_id),
+      p.scope.evaluationRuns.resultsForEvaluation(evaluation.id),
+      p.scope.projects.getById(evaluation.project_id),
+      p.scope.evaluations.counts(evaluation.id),
+      p.scope.evaluations.spentUsd(evaluation.id),
+    ]);
+    const thresholds = thresholdsFromConfig(config.evaluation.recommendations);
+    const models = new Set(rows.map((row) => row.model));
+    return {
+      evaluation: presentEvaluation(evaluation, { counts, spentUsd }),
+      final: FINAL_STATUSES.has(evaluation.status),
+      ...buildEvaluationReport(rows, evaluation.task_set_version, thresholds),
+      real_runs: project ? await this.realRuns(p, project.slug, models) : null,
+    };
+  }
+
+  /**
+   * Evaluations that ended in the last 7 days in the projects where the caller has a role in
+   * `access.eval_roles` (tenant admins: every project): the notice of QUESTIONS #482.
+   */
+  async recent(p: Principal): Promise<Record<string, unknown>> {
+    const projects = await p.scope.projects.list();
+    const allowed: string[] = [];
+    for (const project of projects) {
+      if (await mayChangePlans(p.scope, p.userId, project.id)) allowed.push(project.id);
+    }
+    const since = new Date(this.deps.now().getTime() - RECENT_DAYS * 24 * 3600 * 1000);
+    const rows = await p.scope.evaluations.listEndedSince({
+      projectIds: allowed,
+      since,
+      limit: RECENT_LIMIT,
+    });
+    const slugs = new Map(projects.map((project) => [project.id, project.slug]));
+    return {
+      since: since.toISOString(),
+      evaluations: rows.map((e) => ({ ...presentEvaluation(e), project: slugs.get(e.project_id) })),
+    };
+  }
+
+  private async realRuns(
+    p: Principal,
+    projectSlug: string,
+    models: ReadonlySet<string>,
+  ): Promise<Record<string, unknown>> {
+    try {
+      const metrics = await buildAgentMetrics(
+        p.scope,
+        { userId: p.userId },
+        { projectSlug },
+        this.deps.now(),
+      );
+      const body = presentAgentMetrics({
+        ...metrics,
+        rows: metrics.rows.filter((row) => models.has(row.model)),
+      }).metrics as Record<string, unknown>;
+      return { available: true, ...body };
+    } catch (error) {
+      if (error instanceof CommandError && error.code === 'forbidden') {
+        return { available: false, reason: 'no_role' };
+      }
+      throw error;
+    }
   }
 
   private async readableProject(p: Principal, slug: string): Promise<Project> {
