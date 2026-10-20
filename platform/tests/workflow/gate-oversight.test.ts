@@ -1,7 +1,7 @@
 // One oversight resolution for the workflow and the API's `waiting_for` (task U01, QUESTIONS #261,
 // design/ADR-M54 §2.4). The cases the workflow treats apart from the plain matrix cell, and a
 // static check that every gate step resolves through the shared function.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
@@ -83,21 +83,17 @@ describe('resolveGateOversight', () => {
 });
 
 describe('the workflow resolves oversight through the shared function', () => {
-  // U02 (QUESTIONS #264): the notice audiences of the plan and spec checks too.
-  const steps = [
-    'step.ts',
-    'g4.ts',
-    'g5.ts',
-    'g6-verify.ts',
-    'g7.ts',
-    'g8.ts',
-    'plan-check.ts',
-    'spec-check.ts',
-  ];
+  // U02 (QUESTIONS #264): the notice audiences of the plan and spec checks too. W01 PR 3 (R047a):
+  // every file of the workflow folder, so a new step module is checked too; only oversight.ts,
+  // the shared function, calls the policy.
+  const dir = path.join(repoRoot(), 'platform/packages/core/src/workflow');
+  const steps = readdirSync(dir).filter((f) => f.endsWith('.ts') && f !== 'oversight.ts');
+  it('checks the step modules', () => {
+    expect(steps).toEqual(expect.arrayContaining(['step.ts', 'g4.ts', 'g8.ts', 'plan-check.ts']));
+  });
   for (const file of steps) {
     it(`${file} never calls oversightMode itself`, () => {
-      const file_ = path.join(repoRoot(), 'platform/packages/core/src/workflow', file);
-      expect(readFileSync(file_, 'utf8')).not.toMatch(/\.oversightMode\(/);
+      expect(readFileSync(path.join(dir, file), 'utf8')).not.toMatch(/\.oversightMode\(/);
     });
   }
 });

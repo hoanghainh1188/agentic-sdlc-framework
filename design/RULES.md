@@ -23,9 +23,9 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R013 | Everything in English | text-only | – | none | keep-root |
 | R014a | User-facing messages through `@sdlc/messages` | test | tests/messages/catalog.test.ts:41 | partial | move:platform/packages/messages; add-lint |
 | R015 | Plain English (writing-style link) | text-only | – | none | keep-root (pointer) |
-| R016 | Handbook never cites internal source docs | text-only | – | none | move:handbook; add-test (grep) |
+| R016 | Handbook never cites internal source docs | test | tests/workspace/docs-codes.test.ts | full | move:handbook (pointer) |
 | R024a | Only canonical codes | test | tests/config/codes-table-drift.test.ts:317 | partial | keep-root |
-| R024b | Never reintroduce old codes (G0–G12, S0–S9) | hook-candidate | – | none | add-test (grep) |
+| R024b | Never reintroduce old codes (G0–G12, S0–S9) | test | tests/workspace/docs-codes.test.ts (the old gate and level codes; the old S codes are not checked, since "S3" is the storage API) | partial | keep-root |
 | R025 | Codes table wins; conflicts to QUESTIONS | text-only | – | none | keep-root |
 | R026a | Every table has tenant_id | test | tests/db/schema.test.ts:54 | full | pointer-only |
 | R026b | Every query through forTenant/TenantScope | runtime+test | packages/core/src/db/tenant-scope.ts:97; tests/db/tenant-guard.test.ts | full | pointer-only |
@@ -35,7 +35,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R028c | Agents never deploy to production | ? | – | none | keep-root |
 | R028d | Platform never merges | runtime+test | GitHost contract has no merge method; tests/integration/db/gate-g7.test.ts:161 | partial | keep-root; add-test |
 | R029 | Separation of duties, A ≠ B | test+runtime | tests/policy/approvers.test.ts:91 | full | keep-root (short) |
-| R030a | Append-only tables: triggers + grants | db+test | migrations/0002-audit-log.ts:48; tests/db/schema.test.ts:68 | full | pointer-only; add-test (one general test for all append-only tables) |
+| R030a | Append-only tables: triggers + grants | db+test | migrations/0002-audit-log.ts:48; tests/db/schema.test.ts:68; tests/db/append-only.test.ts (one list, every table) | full | pointer-only |
 | R030b | Append-only rows hold no free text | db+test | tests/db/runs-sql.test.ts:63 | partial | keep-root |
 | R030c | No deletion path for audit/gates/escalations | db | same as R030a | partial (escalations are not append-only) | keep-root |
 | R030d | Audit hash chain RFC 8785 + SHA-256 | test | tests/audit/hash-chain.test.ts:52 | full | move:platform/packages/core |
@@ -58,7 +58,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R041 | Sandbox concurrency configurable; obs optional | runtime+test | tests/runner/settings.test.ts:16 | full | pointer-only |
 | R042 | Every FR has tests for its AC | text-only | – | none | keep-root |
 | R091 | Design docs approved; differences to QUESTIONS | text-only | CODEOWNERS review | partial | keep-root |
-| R092 | D-08 + CSV generated, never by hand | hook-candidate | – | none | add-test (regenerate and diff in CI) |
+| R092 | D-08 + CSV generated, never by hand | test | tests/workspace/backlog-generated.test.ts (runs the script, compares) | full | pointer-only |
 | R093 | Diagrams: render and commit SVG | ci+test | ci.yml:169; tests/workspace/diagrams.test.ts:46 | partial | pointer-only |
 | R094 | Handbook split: what Claude may edit | text-only | – | none | move:handbook |
 | R095 | Keep CHANGELOG updated | ci | release-check at release time | partial | keep-root |
@@ -80,13 +80,13 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R043b | Workflow code imports only allowed modules | lint | eslint.config.mjs:116 | full | pointer-only |
 | R044a | Escalation clocks in the `escalations` row | text-only | – | none | move:platform/apps/worker |
 | R044b | Gate deadline is the only workflow timer | test | tests/workflow/hotl-overdue.test.ts:65 | partial | add-test |
-| R044c | Plain loops, never Temporal schedules | text-only | – | none | add-lint (ban ScheduleClient) |
+| R044c | Plain loops, never Temporal schedules | lint | eslint.config.mjs (worker: no ScheduleClient, no `.schedule.create`); tests/workspace/lint-rules.test.ts | full | pointer-only |
 | R045a | assertActionAllowed / revalidate before acting | runtime+test | tests/integration/db/escalations.test.ts:358 | partial | move:platform/packages/core/src/escalation |
 | R045b | kill_run, revoke_credentials never frozen | runtime+test | packages/contracts/src/escalation.ts:105 | full | pointer-only |
 | R045c | Budget up only by a named decision | runtime+test | tests/integration/db/escalation-commands.test.ts:450 | full | move:platform/packages/core/src/escalation |
 | R045d | Budgets only go up | db | migrations/0015-gate-g5.ts:29 | full | pointer-only |
 | R046 | No run while the HOTL block window is open | runtime+test | packages/core/src/workflow/g4.ts:158 | full | move:platform/packages/core/src/workflow |
-| R047a | Oversight via resolveGateOversight only | test | tests/workflow/gate-oversight.test.ts:98 (fixed file list) | full | pointer-only; add-lint (covers new files) |
+| R047a | Oversight via resolveGateOversight only | test | tests/workflow/gate-oversight.test.ts (every file of `workflow/`) | full | pointer-only |
 | R047b | Waiting reasons only in the step | text-only | – | none | move:platform/packages/core/src/workflow |
 | R047c | New reason needs enum, label, map, rules | test+db | tests/cli/next.test.ts:76 | full | pointer-only |
 | R048a | G2 needs ≥1 acceptance criterion | runtime+test | tests/integration/db/spec-linking.test.ts:501 | full | pointer-only |
@@ -108,7 +108,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R053d | Eval stores codes/numbers, never prompts | partial | – | partial | move:platform/packages/core/src/evaluation |
 | R053e | Scoring containers, NetworkMode none | runtime+test | apps/runner/src/docker/guard.ts:149 | full | pointer-only |
 | R053f | Eval queue, no run event | runtime | packages/contracts/src/evaluation-activity.ts:9 | partial | move:platform/apps/runner |
-| R053g | EvaluationLoop plain loop, one workflow per attempt | test | tests/integration/db/evaluation-loop.test.ts:418 | partial | move:platform/apps/worker |
+| R053g | EvaluationLoop plain loop, one workflow per attempt | lint+test | eslint.config.mjs (no Temporal schedule); tests/integration/db/evaluation-loop.test.ts:418 | partial | move:platform/apps/worker |
 | R054a | Only eval_roles change/run plans | runtime+test | packages/config/src/mandatory-rules.ts:632 | full | pointer-only |
 | R054b | Prompt variant = path, commit, hash | test | tests/integration/db/evaluation-plans.test.ts:165 | full | pointer-only |
 | R054c | One open evaluation per plan | db | migrations/0031-evaluation-plans.ts:135 | full | pointer-only |
@@ -172,8 +172,8 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R074e | Never `weed shell s3.config.show` | test | specific scripts only | partial | add-hook |
 | R074f | Never S3 keys as process arguments | text-only | – | none | move:platform/deploy |
 | R075a | Migrations are plain SQL in TypeScript files | test | tests/db/schema.test.ts:38 | partial | keep (wording fixed in W01 PR 1) |
-| R075b | Never edit a merged migration | hook-candidate | – | none | add-test (CI diff check) |
-| R075c | Audit only via TenantScope.audit.append | db | migrations/0002-audit-log.ts | partial | add-lint |
+| R075b | Never edit a merged migration | test | migrations/migrations.lock.json; tests/db/migrations-lock.test.ts | full | pointer-only |
+| R075c | Audit only via TenantScope.audit.append | db+lint | migrations/0002-audit-log.ts; eslint.config.mjs (`insertInto('audit_log')` only in its repository); tests/workspace/lint-rules.test.ts | full | pointer-only |
 | R075d | New event/action declared with a test | test | tests/audit/actions.test.ts:48 | partial | keep-root |
 | R076a | OpenBao TLS, verification never off | runtime+test | packages/secrets/src/transport.ts:38 | full | pointer-only |
 | R076b | No plain listener / host TLS mount | test | tests/deploy/openbao-tls-static.test.ts:21 | full | pointer-only |
@@ -190,23 +190,23 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R079b | Backup schedule is the server's | test | tests/deploy/backup-static.test.ts:49 | partial | move:platform/deploy |
 | R080a | doctor through commands.ts allowlist | test+runtime | tests/doctor/host-readonly.test.ts:78 | full | pointer-only |
 | R080b | doctor never writes | test | tests/doctor/host-readonly.test.ts:96 | partial | move:platform/deploy/doctor |
-| R080c | doctor `--env`, never `--env-file` | runtime | platform/deploy/doctor/src/main.ts:26 | partial | add-test |
+| R080c | doctor `--env`, never `--env-file` | runtime+test | platform/deploy/doctor/src/main.ts:26; tests/trial/compose-project-name.test.ts | full | pointer-only |
 | R080d | doctor prints no secret | test | tests/doctor/no-secrets.test.ts:81 | full | pointer-only |
 | R080e | Troubleshooting rows ↔ troubleshooting.ts | test | tests/deploy/doctor-troubleshooting.test.ts:51 | full | pointer-only |
 | R081a | trial only on developer machines | test | tests/deploy/trial-up-static.test.ts:111 | partial | move:platform/deploy/trial |
 | R081b | Every compose call passes `-p` | test | tests/trial/trial-start.test.ts:136 | partial | add-test |
-| R081c | No inherited COMPOSE_PROJECT_NAME | runtime | platform/deploy/trial/src/host.ts:20 | partial | add-test |
+| R081c | No inherited COMPOSE_PROJECT_NAME | runtime+test | platform/deploy/trial/src/host.ts:20; tests/trial/compose-project-name.test.ts | full | pointer-only |
 | R081d | Passphrase never from arg/env | test | tests/deploy/trial-up-static.test.ts:204 | full | pointer-only |
 | R081e | Fresh deployment ↔ up.ts ↔ test:fresh-deploy | test+ci | tests/deploy/trial-up-static.test.ts:38 | partial | keep-root |
 | R082a–f | Access proxy rules | test | tests/deploy/access-static.test.ts; tests/trial/trial-up.test.ts:307 | full | pointer-only |
 | R083a,b | GitHub App manifest; secrets dropped | test | tests/deploy/github-app.test.ts:58 | full | pointer-only |
-| R084a | Log only through the platform logger | test | tests/observability/logger.test.ts:178 | partial | add-lint (no-console) |
+| R084a | Log only through the platform logger | lint+test | eslint.config.mjs (`no-console` in apps and packages; `migrate-cli.ts` excepted); tests/observability/logger.test.ts:178; tests/workspace/lint-rules.test.ts | full | pointer-only |
 | R084b | Spans hold no headers/SQL params | test | tests/observability/tracing.test.ts:100 | full | pointer-only |
 | R084c | Pools have error listeners | test | tests/db/connection.test.ts:44 | partial | move:platform/packages/core |
 | R084d | api/worker import telemetry first | test | tests/observability/load-order.test.ts:23 | full | pointer-only |
 | R084e | otel-collector rules | test | tests/deploy/observability-static.test.ts:31 | full | pointer-only |
 | R085a | Dashboard writes only via writes.ts | test+lint | tests/dashboard/static.test.ts:36 | full | pointer-only |
-| R085b | `@SessionAction` limit before U07 | test | tests/integration/db/web-sessions.test.ts:449 | partial | add-test (count decorators) |
+| R085b | `@SessionAction` limit before U07 | test | tests/integration/db/web-sessions.test.ts:449; tests/api/session-actions.test.ts (the marked routes, by file) | full | keep-root (until U07) |
 | R085c–e | Passkey step-up, bearer XOR cookie, CSRF | test | tests/integration/db/web-sessions.test.ts:440 | full | pointer-only |
 | R086a–e,g | Cookie, token, no inline/innerHTML/storage, reads.ts, sign-in nav | lint+test | eslint.config.mjs:89; tests/dashboard/static.test.ts | full | pointer-only |
 | R086f | Server text via cleanText | lint+test | tests/dashboard/static.test.ts:138 | partial | move:platform/apps/dashboard |
@@ -249,3 +249,4 @@ Some rows group several rules with the same check (for example R082a–f).
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-20 | Claude (task W01, PR 1) | First version, from a review of every bullet of the root `CLAUDE.md` |
+| 0.3 | 2026-10-20 | Claude (task W01, PR 3) | R016, R024b, R030a, R044c, R047a, R053g, R075b, R075c, R080c, R081c, R084a, R085b, R092: lint rules and tests |
