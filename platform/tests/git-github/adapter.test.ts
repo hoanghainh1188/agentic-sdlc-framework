@@ -5,7 +5,7 @@ import { MAX_COMMENT_CHARS } from '@sdlc/adapter-git-github';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { startHarness, type Harness } from './helpers';
-import { checkRun, pull, REPO, review, SHA_A, status, user } from './stub-github';
+import { checkRun, pull, REPO, review, SHA_A, SHA_B, status, user } from './stub-github';
 
 let h: Harness;
 
@@ -405,6 +405,118 @@ describe('getReviews, getCommitAuthors, mergedBy (E01)', () => {
       merged: true,
       mergeCommitSha: 'f'.repeat(40),
       mergedBy: { id: '3003', login: 'person-b', type: 'user' },
+    });
+  });
+});
+
+describe('getMergedChange, getCommitParents, compareChangedFiles (L07, ADR-M85 §2.3)', () => {
+  const SHA_C = 'c'.repeat(40);
+  const merged = (extra: Record<string, unknown> = {}) => ({
+    body: {
+      ...pull(7, '2026-10-20T07:00:00Z', SHA_A, 'closed'),
+      merged_at: '2026-10-20T07:00:00Z',
+      merge_commit_sha: SHA_C,
+      merged_by: user(1001, 'harry'),
+      commits: 3,
+      changed_files: 3,
+      ...extra,
+    },
+  });
+
+  it('returns the files with their status, the commit count and the merge parents', async () => {
+    h.stub.on('GET', '/repos/acme/shop/pulls/7', merged());
+    h.stub.on('GET', '/repos/acme/shop/pulls/7/files', {
+      body: [
+        { filename: 'src/b.ts', status: 'modified' },
+        { filename: 'src/b.test.ts', status: 'added' },
+        { filename: 'src/new.ts', previous_filename: 'src/old.ts', status: 'renamed' },
+      ],
+    });
+    h.stub.on('GET', `/repos/acme/shop/git/commits/${SHA_C}`, {
+      body: { sha: SHA_C, parents: [{ sha: SHA_B }, { sha: SHA_A }] },
+    });
+    expect(await h.adapter().getMergedChange(REPO, 7)).toEqual({
+      mergeCommitSha: SHA_C,
+      mergeCommitParents: [SHA_B, SHA_A],
+      commitCount: 3,
+      files: [
+        { path: 'src/b.test.ts', status: 'added', previousPath: null },
+        { path: 'src/b.ts', status: 'modified', previousPath: null },
+        { path: 'src/new.ts', status: 'renamed', previousPath: 'src/old.ts' },
+      ],
+    });
+  });
+
+  it('refuses a pull request that is not merged, a short list and an unknown status', async () => {
+    h.stub.on('GET', '/repos/acme/shop/pulls/7', { body: pull(7, '2026-10-20T07:00:00Z') });
+    await expect(h.adapter().getMergedChange(REPO, 7)).rejects.toMatchObject({
+      code: 'invalid_input',
+      params: { field: 'pr' },
+    });
+    h.stub.on('GET', '/repos/acme/shop/pulls/7', merged());
+    h.stub.on('GET', '/repos/acme/shop/pulls/7/files', {
+      body: [{ filename: 'a.ts', status: 'added' }],
+    });
+    await expect(h.adapter().getMergedChange(REPO, 7)).rejects.toMatchObject({
+      code: 'invalid_response',
+      params: { field: 'files' },
+    });
+    h.stub.on('GET', '/repos/acme/shop/pulls/7', merged({ changed_files: 1 }));
+    h.stub.on('GET', '/repos/acme/shop/pulls/7/files', {
+      body: [{ filename: 'a.ts', status: 'unchanged' }],
+    });
+    await expect(h.adapter().getMergedChange(REPO, 7)).rejects.toMatchObject({
+      code: 'invalid_response',
+      params: { field: 'file.status' },
+    });
+  });
+
+  it('reads the parents of a commit and checks the commit it got', async () => {
+    h.stub.on('GET', `/repos/acme/shop/git/commits/${SHA_C}`, {
+      body: { sha: SHA_C, parents: [{ sha: SHA_B }] },
+    });
+    expect(await h.adapter().getCommitParents(REPO, SHA_C)).toEqual([SHA_B]);
+    h.stub.on('GET', `/repos/acme/shop/git/commits/${SHA_C}`, {
+      body: { sha: SHA_A, parents: [] },
+    });
+    await expect(h.adapter().getCommitParents(REPO, SHA_C)).rejects.toMatchObject({
+      code: 'invalid_response',
+      params: { field: 'commit.sha' },
+    });
+    await expect(h.adapter().getCommitParents(REPO, 'main')).rejects.toMatchObject({
+      code: 'invalid_input',
+    });
+  });
+
+  it('compares two commits: both paths of a rename, sorted; never a partial list', async () => {
+    const COMPARE = `/repos/acme/shop/compare/${SHA_B}...${SHA_C}`;
+    h.stub.on('GET', COMPARE, {
+      body: {
+        files: [
+          { filename: 'src/z.ts', status: 'modified' },
+          { filename: 'src/new.ts', previous_filename: 'src/old.ts', status: 'renamed' },
+        ],
+      },
+    });
+    expect(await h.adapter().compareChangedFiles(REPO, SHA_B, SHA_C)).toEqual([
+      'src/new.ts',
+      'src/old.ts',
+      'src/z.ts',
+    ]);
+    h.stub.on('GET', COMPARE, {
+      body: {
+        files: Array.from({ length: 300 }, (_, i) => ({
+          filename: `f${String(i)}.ts`,
+          status: 'added',
+        })),
+      },
+    });
+    await expect(h.adapter().compareChangedFiles(REPO, SHA_B, SHA_C)).rejects.toMatchObject({
+      code: 'too_many_files',
+      params: { max_files: 300 },
+    });
+    await expect(h.adapter().compareChangedFiles(REPO, 'x', SHA_C)).rejects.toMatchObject({
+      code: 'invalid_input',
     });
   });
 });

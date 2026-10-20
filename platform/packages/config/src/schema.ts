@@ -67,6 +67,12 @@ const usd = z
     }
   });
 
+// L07 (ADR-M85 §2.4): a repository-relative glob (no `..`, no absolute path, no `.git`) and a
+// command run with `sh -c` in the scoring container: plain words only, as the task format of
+// `@sdlc/eval`. `{file}` in a `fail_to_pass` command stands for one hidden test file.
+const TEST_GLOB = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))(?!\.git(?:\/|$))[A-Za-z0-9._*/@{},-]{1,200}$/;
+const TASK_COMMAND = /^[A-Za-z0-9@][A-Za-z0-9 @/._:={}-]{0,199}$/;
+const taskCommands = z.array(z.string().regex(TASK_COMMAND)).max(20);
 const role = z.enum(PROJECT_ROLES);
 const oversightMode = z.enum(OVERSIGHT_MODES);
 
@@ -266,6 +272,16 @@ export const projectConfigSchema = z.strictObject({
   sandbox: z.strictObject({ image: pinnedImage }),
   // L06 (ADR-M83 §2.3, QUESTIONS #481): thresholds of the evaluation recommendation rules.
   evaluation: z.strictObject({
+    // L07 (ADR-M85 §2.4, QUESTIONS #485): how `sdlc eval task draft` finds the hidden tests of a
+    // merged pull request and which commands it proposes for the task card.
+    tasks: z.strictObject({
+      test_globs: uniqueList(z.string().regex(TEST_GLOB)).min(1).max(20),
+      commands: z.strictObject({
+        fail_to_pass: taskCommands,
+        pass_to_pass: taskCommands,
+        ci: taskCommands,
+      }),
+    }),
     recommendations: z.strictObject({
       alpha: share.max(0.1),
       min_paired_tasks: positiveInt.min(2).max(1000),

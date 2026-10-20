@@ -47,6 +47,30 @@ export interface PullRequestInfo {
   readonly url: string;
 }
 
+/** How a pull request changed one file (task L07, ADR-M85 §2.4). */
+export type PullRequestFileStatus = 'added' | 'modified' | 'removed' | 'renamed' | 'copied';
+
+export interface PullRequestFile {
+  readonly path: string;
+  readonly status: PullRequestFileStatus;
+  /** The old path of a renamed or copied file, else null. */
+  readonly previousPath: string | null;
+}
+
+/**
+ * A merged pull request as Git sees it (task L07, ADR-M85 §2.3): its files with their status, the
+ * number of its commits and the parents of its merge commit. The base commit of an evaluation
+ * task is found from these.
+ */
+export interface MergedChange {
+  readonly mergeCommitSha: string;
+  /** The merge commit's parents: two for a merge commit, one for a squash or a rebase merge. */
+  readonly mergeCommitParents: readonly string[];
+  readonly commitCount: number;
+  /** Sorted by path. Never a partial list. */
+  readonly files: readonly PullRequestFile[];
+}
+
 /**
  * A new pull request (task C08, D-08 C08 AC1, design/ADR-M38 §2.4). The platform fills the title
  * and body from the message catalog with coded values only (QUESTIONS #123: the pilot repository
@@ -283,6 +307,18 @@ export interface GitHostAdapter {
   getReviews(ref: RepoRef, pr: number): Promise<ReviewDecision[]>;
   /** The accounts that authored the pull request's commits (task E01). Never a partial list. */
   getCommitAuthors(ref: RepoRef, pr: number): Promise<CommitAuthors>;
+  /**
+   * A merged pull request's files with their status, its commit count and the parents of its
+   * merge commit (task L07). A pull request that is not merged fails (`invalid_input`, field `pr`).
+   */
+  getMergedChange(ref: RepoRef, pr: number): Promise<MergedChange>;
+  /** The parents of a commit, first parent first (task L07). */
+  getCommitParents(ref: RepoRef, sha: string): Promise<string[]>;
+  /**
+   * The paths changed from `base` to `head` (task L07), with both paths of a renamed file, sorted
+   * and unique, as `getChangedFiles`. Never a partial list.
+   */
+  compareChangedFiles(ref: RepoRef, base: string, head: string): Promise<string[]>;
   /** The file content as UTF-8 text, exactly as stored (no line-ending changes). */
   getFileAtCommit(ref: RepoRef, path: string, sha: string): Promise<string>;
   /** The commit a branch points to now (40 hex characters). G4 reads the run's base (C06). */

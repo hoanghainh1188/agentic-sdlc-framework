@@ -1,6 +1,8 @@
 // GitHub implementation of `GitHostAdapter` (design/D-03 section 7.1, D-08 B05, ADR-M23).
 import type {
   Approval,
+  PullRequestFile,
+  PullRequestFileStatus,
   CheckItem,
   CheckSummary,
   CommitAuthors,
@@ -9,6 +11,7 @@ import type {
   GitEvent,
   GitHostAdapter,
   IssueCommentText,
+  MergedChange,
   NewPullRequest,
   PullRequestInfo,
   RedactedSecret,
@@ -56,6 +59,16 @@ export const MAX_PULL_REQUEST_FILES = 3000;
 export const MAX_PULL_REQUEST_TITLE_CHARS = 256;
 /** GitHub lists at most 250 commits of a pull request. */
 export const MAX_PULL_REQUEST_COMMITS = 250;
+/** GitHub's compare API lists at most 300 files, on its first page only. */
+export const MAX_COMPARE_FILES = 300;
+const FILE_STATUSES: Readonly<Record<string, PullRequestFileStatus>> = {
+  added: 'added',
+  modified: 'modified',
+  changed: 'modified',
+  removed: 'removed',
+  renamed: 'renamed',
+  copied: 'copied',
+};
 const FAILED: ReadonlySet<string> = new Set([
   'failure',
   'error',
@@ -316,6 +329,90 @@ export class GitHubAdapter implements GitHostAdapter {
     return { accounts: [...accounts.values()], withoutAccount };
   }
 
+  /**
+   * A merged pull request's files with their status, its commit count and its merge commit's
+   * parents (task L07, ADR-M85 §2.3). Never a partial list: a list GitHub cuts short fails.
+   */
+  async getMergedChange(ref: RepoRef, pr: number): Promise<MergedChange> {
+    const base = repoPath(ref);
+    checkNumber(pr, 'pr');
+    const res = await this.#auth.withRepoAuth(ref, (auth) =>
+      this.#http.json('GET', `${base}/pulls/${pr}`, { auth }),
+    );
+    const info = pullRequestInfo(res.body);
+    if (!info.merged || info.mergeCommitSha === null) {
+      throw new GitHostError('invalid_input', { field: 'pr' });
+    }
+    const commitCount = int(obj(res.body, 'pull').commits, 'pull.commits');
+    if (commitCount < 1 || commitCount >= MAX_PULL_REQUEST_COMMITS) {
+      throw new GitHostError('invalid_response', { field: 'pull.commits' });
+    }
+    if (info.changedFiles > MAX_PULL_REQUEST_FILES) {
+      throw new GitHostError('too_many_files', { max_files: MAX_PULL_REQUEST_FILES });
+    }
+    const list = await this.#auth.withRepoAuth(ref, (auth) =>
+      listPages(this.#http, `${base}/pulls/${pr}/files`, { auth, maxPages: LIST_PAGES }),
+    );
+    if (list.truncated || list.items.length !== info.changedFiles) {
+      throw new GitHostError('invalid_response', { field: 'files' });
+    }
+    const files = list.items.map((item) => pullRequestFile(item));
+    if (new Set(files.map((f) => f.path)).size !== files.length) {
+      throw new GitHostError('invalid_response', { field: 'files' });
+    }
+    return {
+      mergeCommitSha: info.mergeCommitSha,
+      mergeCommitParents: await this.getCommitParents(ref, info.mergeCommitSha),
+      commitCount,
+      files: files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
+    };
+  }
+
+  /** The parents of a commit, first parent first (task L07): the Git commits API. */
+  async getCommitParents(ref: RepoRef, commitSha: string): Promise<string[]> {
+    const base = repoPath(ref);
+    if (!isSha(commitSha)) throw new GitHostError('invalid_input', { field: 'sha' });
+    const res = await this.#auth.withRepoAuth(ref, (auth) =>
+      this.#http.json('GET', `${base}/git/commits/${commitSha}`, { auth }),
+    );
+    const commit = obj(res.body, 'commit');
+    if (sha(commit.sha, 'commit.sha') !== commitSha) {
+      throw new GitHostError('invalid_response', { field: 'commit.sha' });
+    }
+    return arr(commit.parents, 'commit.parents').map((parent) =>
+      sha(obj(parent, 'commit.parent').sha, 'commit.parent.sha'),
+    );
+  }
+
+  /**
+   * The paths changed from `base` to `head` (task L07), both paths of a renamed file, sorted and
+   * unique. GitHub's compare API lists at most 300 files; a bigger change fails (`too_many_files`)
+   * instead of a partial list.
+   */
+  async compareChangedFiles(ref: RepoRef, baseSha: string, headSha: string): Promise<string[]> {
+    const base = repoPath(ref);
+    if (!isSha(baseSha)) throw new GitHostError('invalid_input', { field: 'base' });
+    if (!isSha(headSha)) throw new GitHostError('invalid_input', { field: 'head' });
+    const res = await this.#auth.withRepoAuth(ref, (auth) =>
+      this.#http.json('GET', `${base}/compare/${baseSha}...${headSha}`, {
+        auth,
+        query: { per_page: 1 },
+      }),
+    );
+    const body = obj(res.body, 'compare');
+    const files = arr(body.files ?? [], 'compare.files');
+    if (files.length >= MAX_COMPARE_FILES) {
+      throw new GitHostError('too_many_files', { max_files: MAX_COMPARE_FILES });
+    }
+    const paths = new Set<string>();
+    for (const item of files) {
+      const f = pullRequestFile(item);
+      paths.add(f.path);
+      if (f.previousPath !== null) paths.add(f.previousPath);
+    }
+    return [...paths].sort();
+  }
+
   async getFileAtCommit(ref: RepoRef, path: string, commitSha: string): Promise<string> {
     const base = repoPath(ref);
     if (!isSha(commitSha)) throw new GitHostError('invalid_input', { field: 'sha' });
@@ -546,6 +643,15 @@ export class GitHubAdapter implements GitHostAdapter {
 }
 
 /** A pull request of the REST API (single read or create answer). */
+/** One file of a pull request or a comparison (task L07). An unknown status is refused. */
+function pullRequestFile(item: unknown): PullRequestFile {
+  const f = obj(item, 'file');
+  const status = FILE_STATUSES[str(f.status, 'file.status')];
+  if (status === undefined) throw new GitHostError('invalid_response', { field: 'file.status' });
+  const previousPath = optStr(f.previous_filename, 'file.previous_filename');
+  return { path: str(f.filename, 'file.filename'), status, previousPath };
+}
+
 function pullRequestInfo(body: unknown): PullRequestInfo {
   const p = obj(body, 'pull');
   const head = obj(p.head, 'pull.head');
