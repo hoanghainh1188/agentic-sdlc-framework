@@ -27,6 +27,8 @@ A plan is versioned: every change writes a new row of `evaluation_plan_versions`
 
 As built (PR 2, QUESTIONS #475): a configuration names an agent of the register by its key, or a model by name (with its provider type) run by the project's default agent (`run.agent_key`). When a run starts, each configuration is resolved: the agent must be `active` and have a model, the model must be on the gateway's list and allowed for the data class; the result (agent, version, model, provider type, caps, the instructions file's path, commit and SHA-256) is stored in `evaluation_configurations` (append-only), and the runner reads it there instead of a configuration file (PR 4). An evaluation has either a `config_name` (the operator command of L04) or a plan, never both (a CHECK). Migration `0031-evaluation-plans`; trigger SDA23 fixes a plan's identity, keeps an archived plan final and the version going up; a unique index keeps one open evaluation per plan. The default of `access.eval_roles` is `person_a`, `person_b`, `governance`, `admin` (the project role codes); mandatory rule M33.
 
+Changed by ADR-M86 §2.2 (task L09): a configuration may also name an agent that is `proposed` or `suspended` (never `quarantined` or `retired`), so a new version is evaluated before it is approved. Real runs still need an `active` agent.
+
 ### 2.2. Who (AC1, AC4)
 
 A new project configuration key `access.eval_roles` (default `person_a`, `person_b`, `governance`, `tenant_admin`, the role codes of the project). A mandatory rule refuses `viewer` in it (`config.rule.viewer_never_runs_evaluations`). People with a role in the list create, change, archive and run plans; everybody who may read the project reads plans and their evaluations. Agents never do: there is no agent capability for plans. The operator command of L04 stays.
@@ -121,3 +123,4 @@ New audit actions, IDs, codes, hashes and amounts only: `evaluation_plan.created
 | 0.3 | 2026-10-14 | Claude (task L05, PR 3) | §2.7 as built: the API and CLI; Run now as a request the worker starts (QUESTIONS #476, migration 0032) |
 | 0.2 | 2026-10-14 | Claude (task L05, PR 2) | §2.1 as built: configurations from the agent register or a model with the default agent, resolved into `evaluation_configurations` at start (QUESTIONS #475); migration 0031, SDA23, M33 |
 | 0.7 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |
+| 0.8 | 2026-10-20 | Claude (task L08) | Note: ADR-M86 §2.2 lets a plan configuration name a `proposed` or `suspended` agent (built by L09); real runs still need an `active` agent |

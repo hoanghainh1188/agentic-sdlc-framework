@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.52 |
+| Version | 1.53 |
 | Date | 2026-10-20 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -46,12 +46,12 @@
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) | 14 | S×3 · M×9 · L×2 |
 | DEV | Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479) | 1 | M×1 |
-| EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 5 | S×1 · M×3 · L×1 |
+| EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 7 | S×2 · M×4 · L×1 |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL) | 8 | S×4 · M×2 · L×2 |
 | Models | Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424) | 2 | S×1 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 11 | S×3 · M×8 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 16 | S×4 · M×6 · L×6 |
-| **Total** | | **112** | |
+| **Total** | | **114** | |
 
 ### Order and dependencies between milestones
 
@@ -64,7 +64,7 @@ flowchart LR
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
-    UX --> EV["EVAL L04–L08: evaluations, reports, recommendations for managers"]
+    UX --> EV["EVAL L04–L10: evaluations, reports, recommendations for managers"]
     EV --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.5.0)"]
     EXT --> MO["Models L01 (early in v0.5.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
@@ -1195,7 +1195,38 @@ flowchart LR
 - [ ] AC1: A design for a new agent version (model, instructions) to reach a threshold on the project's task set before Person B and the owner approve it, and for the 3-month recertification (FR-36) to use evaluation numbers
 - [ ] AC2: No code in this task; implementation tasks follow Harry's approval
 
-> Note: QUESTIONS #450
+> Note: QUESTIONS #450. Design: ADR-M86 (QUESTIONS #496–#500): an evaluation counts for an agent version by its fingerprint (model, instructions SHA-256, tools SHA-256); thresholds in project configuration `agents.evaluation` (default mode `warn`); built by L09 and L10
+
+#### L09. Evaluations in the agent register's approvals
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | L08, L07, B13 | FR-11, FR-36 | platform/packages/core (agents, evaluation, db/migrations), platform/packages/config (agents.evaluation), platform/apps/api, platform/apps/cli, platform/packages/messages, platform/tests/*, design/D-05 §6.1 and §6.9, design/ADR-M86, handbook Ch.20 §20.5b |
+
+**Acceptance criteria**
+
+- [ ] AC1: The fingerprint of ADR-M86 §2.1: `evaluation_configurations` gains `source` and `tools_sha256`; plan configurations may name `proposed` and `suspended` agents, never `quarantined` or `retired`; real runs still need an `active` agent
+- [ ] AC2: Project configuration `agents.evaluation` (`mode` `off`/`warn`/`required`, default `warn`; `min_tasks`, `min_resolve_rate`, `approval_max_age_days`, `recertification_max_age_days`) with its mandatory rules
+- [ ] AC3: An `activate` approval takes `evaluation_code` (`--evaluation`); the platform checks every condition of ADR-M86 §2.3 (finished, fingerprint, whole task set, enough tasks, resolve rate, no scope breach, not worse than the baseline for a change, fresh, latest); one evaluation per round; `agent_approvals` gains `evaluation_id` and `evaluation_result`; `warn` accepts with a warning, `required` refuses with the codes of §2.8
+- [ ] AC4: `sdlc admin agent show` and `GET /v1/admin/agents/:key` show the latest evaluation of the current fingerprint and whether it qualifies; audit IDs and codes only
+- [ ] AC5: Tests: each condition (passes, fails, its code and numbers), both modes, the baseline of a change, a different evaluation in one round, tenants, texts from the catalog
+
+> Note: ADR-M86 §2.1–§2.5, §2.7–§2.8; QUESTIONS #496–#500
+
+#### L10. Evaluations in the agent recertification
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | L09 | FR-36 | platform/packages/core (agents), platform/apps/api, platform/apps/cli, platform/packages/messages, platform/tests/*, design/ADR-M86, handbook Ch.20 §20.5b |
+
+**Acceptance criteria**
+
+- [ ] AC1: `recertify` takes `evaluation_code`; the evaluation qualifies for the active version (ADR-M86 §2.3) within `recertification_max_age_days`
+- [ ] AC2: Aging: compared with the evaluation of the last activation on the shared tasks with the one test of ADR-M83; a significant drop refuses (`evaluation_quality_dropped`, a warning in `warn` mode); fewer shared tasks than `min_tasks` skip the comparison and say so; the platform never suspends by itself
+- [ ] AC3: FR-36 unchanged: an overdue agent still runs, with the warning; `sdlc admin agent list --overdue` shows the latest qualifying evaluation; `agent.recertified` gains the evaluation ID and the result code
+- [ ] AC4: Tests: fresh and old evaluations, a drop and no drop, too few shared tasks, both modes
+
+> Note: ADR-M86 §2.6; QUESTIONS #499
 
 
 ### EXT — Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL)
@@ -1840,6 +1871,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.50 | 2026-10-16 | Claude, approved by Harry | Release v0.4.0 with L04 and L05 (the first part of EVAL); EXT and Models move to v0.5.0; L06–L08 finish EVAL first |
 | 1.51 | 2026-10-20 | Claude (task W01, PR 1), approved by the repository owner | New milestone DEV with task W01: rules as checks (a rules register, hooks, lint and tests, a shorter CLAUDE.md; QUESTIONS #479, ADR-M84) |
 | 1.52 | 2026-10-20 | Claude (task L07, PR 1), approved by the repository owner | L07 note and code areas: task cards in the project's repository, the check on the server, the reviewer rule (ADR-M85, QUESTIONS #485–#487) |
+| 1.53 | 2026-10-20 | Claude (task L08), approved by the repository owner | L08 design (ADR-M86, QUESTIONS #496–#500); new tasks L09 (evaluations in the agent approvals) and L10 (evaluations in the recertification) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

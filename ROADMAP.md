@@ -48,6 +48,8 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **L06** Evaluation reports and recommendations for managers
 - **L07** A project's own task set from its merged intents
 - **L08** Design: evaluations in the agent register's approvals
+- **L09** Evaluations in the agent register's approvals
+- **L10** Evaluations in the agent recertification
 
 ## EXT: Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL)
 

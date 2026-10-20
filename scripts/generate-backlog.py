@@ -667,7 +667,22 @@ t("L08","EVAL","Design: evaluations in the agent register's approvals","S",["L06
  "design/ADR (next free number), design/ADR-M31, handbook Ch.20, design/QUESTIONS.md",
  ["A design for a new agent version (model, instructions) to reach a threshold on the project's task set before Person B and the owner approve it, and for the 3-month recertification (FR-36) to use evaluation numbers",
   "No code in this task; implementation tasks follow Harry's approval"],
- "QUESTIONS #450")
+ "QUESTIONS #450. Design: ADR-M86 (QUESTIONS #496–#500): an evaluation counts for an agent version by its fingerprint (model, instructions SHA-256, tools SHA-256); thresholds in project configuration `agents.evaluation` (default mode `warn`); built by L09 and L10")
+t("L09","EVAL","Evaluations in the agent register's approvals","M",["L08","L07","B13"],"FR-11, FR-36",
+ "platform/packages/core (agents, evaluation, db/migrations), platform/packages/config (agents.evaluation), platform/apps/api, platform/apps/cli, platform/packages/messages, platform/tests/*, design/D-05 §6.1 and §6.9, design/ADR-M86, handbook Ch.20 §20.5b",
+ ["The fingerprint of ADR-M86 §2.1: `evaluation_configurations` gains `source` and `tools_sha256`; plan configurations may name `proposed` and `suspended` agents, never `quarantined` or `retired`; real runs still need an `active` agent",
+  "Project configuration `agents.evaluation` (`mode` `off`/`warn`/`required`, default `warn`; `min_tasks`, `min_resolve_rate`, `approval_max_age_days`, `recertification_max_age_days`) with its mandatory rules",
+  "An `activate` approval takes `evaluation_code` (`--evaluation`); the platform checks every condition of ADR-M86 §2.3 (finished, fingerprint, whole task set, enough tasks, resolve rate, no scope breach, not worse than the baseline for a change, fresh, latest); one evaluation per round; `agent_approvals` gains `evaluation_id` and `evaluation_result`; `warn` accepts with a warning, `required` refuses with the codes of §2.8",
+  "`sdlc admin agent show` and `GET /v1/admin/agents/:key` show the latest evaluation of the current fingerprint and whether it qualifies; audit IDs and codes only",
+  "Tests: each condition (passes, fails, its code and numbers), both modes, the baseline of a change, a different evaluation in one round, tenants, texts from the catalog"],
+ "ADR-M86 §2.1–§2.5, §2.7–§2.8; QUESTIONS #496–#500")
+t("L10","EVAL","Evaluations in the agent recertification","S",["L09"],"FR-36",
+ "platform/packages/core (agents), platform/apps/api, platform/apps/cli, platform/packages/messages, platform/tests/*, design/ADR-M86, handbook Ch.20 §20.5b",
+ ["`recertify` takes `evaluation_code`; the evaluation qualifies for the active version (ADR-M86 §2.3) within `recertification_max_age_days`",
+  "Aging: compared with the evaluation of the last activation on the shared tasks with the one test of ADR-M83; a significant drop refuses (`evaluation_quality_dropped`, a warning in `warn` mode); fewer shared tasks than `min_tasks` skip the comparison and say so; the platform never suspends by itself",
+  "FR-36 unchanged: an overdue agent still runs, with the warning; `sdlc admin agent list --overdue` shows the latest qualifying evaluation; `agent.recertified` gains the evaluation ID and the result code",
+  "Tests: fresh and old evaluations, a drop and no drop, too few shared tasks, both modes"],
+ "ADR-M86 §2.6; QUESTIONS #499")
 t("W01","DEV","Rules as checks: a rules register, hooks, lint and tests, a shorter CLAUDE.md","M",["A01","A09"],"NFR-05, NFR-07",
  "design/RULES.md, design/ADR-M84, .claude/settings.json and its hook script, eslint.config.mjs, platform/tools/eslint-rules/*, platform/tests/workspace/*, CLAUDE.md and nested CLAUDE.md files, design/QUESTIONS.md",
  ["PR 1: `design/RULES.md` lists every rule of the root CLAUDE.md with its ID, the check that enforces it (lint, test, database, runtime, CI, hook or none), its coverage and a proposal; rules that look outdated or are worded wrongly go to QUESTIONS; duplicate rules are merged",
@@ -742,7 +757,7 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.52 |
+| Version | 1.53 |
 | Date | 2026-10-20 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -792,7 +807,7 @@ flowchart LR
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
-    UX --> EV["EVAL L04–L08: evaluations, reports, recommendations for managers"]
+    UX --> EV["EVAL L04–L10: evaluations, reports, recommendations for managers"]
     EV --> EXT["EXT X09 first, X01–X04, X07, X11, X12 (v0.5.0)"]
     EXT --> MO["Models L01 (early in v0.5.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
@@ -920,6 +935,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.50 | 2026-10-16 | Claude, approved by Harry | Release v0.4.0 with L04 and L05 (the first part of EVAL); EXT and Models move to v0.5.0; L06–L08 finish EVAL first |
 | 1.51 | 2026-10-20 | Claude (task W01, PR 1), approved by the repository owner | New milestone DEV with task W01: rules as checks (a rules register, hooks, lint and tests, a shorter CLAUDE.md; QUESTIONS #479, ADR-M84) |
 | 1.52 | 2026-10-20 | Claude (task L07, PR 1), approved by the repository owner | L07 note and code areas: task cards in the project's repository, the check on the server, the reviewer rule (ADR-M85, QUESTIONS #485–#487) |
+| 1.53 | 2026-10-20 | Claude (task L08), approved by the repository owner | L08 design (ADR-M86, QUESTIONS #496–#500); new tasks L09 (evaluations in the agent approvals) and L10 (evaluations in the recertification) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
