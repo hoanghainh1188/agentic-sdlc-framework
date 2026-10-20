@@ -22,6 +22,7 @@ const APPEND_ONLY = [
   'evaluation_plan_versions',
   'evaluation_configurations',
   'evaluation_task_decisions',
+  'evaluation_task_check_contracts',
 ];
 
 const trigger = (event: string, table: string) =>

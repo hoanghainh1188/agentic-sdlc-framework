@@ -79,3 +79,16 @@ export {
   type RegisterEvaluationTaskInput,
   type ReviewEvaluationTaskInput,
 } from './tasks.js';
+export {
+  MAX_TASK_CHECK_ATTEMPTS,
+  finishTaskCheck,
+  prepareTaskCheck,
+  taskCheckContractBytes,
+  taskCheckContractSha256,
+  verifyTaskCheckContract,
+  type FinishTaskCheckInput,
+  type PrepareTaskCheckResult,
+  type TaskCheckContractVerification,
+  type TaskCheckDeps,
+  type VerifyTaskCheckDeps,
+} from './task-check.js';

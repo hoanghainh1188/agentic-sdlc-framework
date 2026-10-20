@@ -633,6 +633,26 @@ export const AUDIT_ACTIONS = {
       card_commit: 'code',
     },
   },
+  /**
+   * The check of an evaluation task ended (L07 PR 4, ADR-M85 §2.5): `result` is `checked` or
+   * `check_failed`, with the failure `code`; `attempt` counts the hand-overs to a runner.
+   */
+  'evaluation_task.checked': {
+    entityType: 'evaluation_task',
+    fields: {
+      project_id: 'uuid',
+      task: 'code',
+      card_sha256: 'sha256',
+      result: 'code',
+      attempt: 'count',
+      code: 'code?',
+    },
+  },
+  /** An evaluation task's card was removed from the default branch: the task is gone (L07). */
+  'evaluation_task.gone': {
+    entityType: 'evaluation_task',
+    fields: { project_id: 'uuid', task: 'code' },
+  },
   /** A reviewer approved an evaluation task (L07): bound to the card's SHA-256. */
   'evaluation_task.approved': {
     entityType: 'evaluation_task',

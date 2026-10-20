@@ -102,6 +102,7 @@ export class EvaluationTaskRepository extends TenantRepository {
                 merge_commit: input.mergeCommit,
                 status: 'registered',
                 check_code: null,
+                check_attempt: 0,
                 updated_at: new Date(),
               })
               .where('tenant_id', '=', this.tenantId)
@@ -143,33 +144,135 @@ export class EvaluationTaskRepository extends TenantRepository {
   }
 
   /**
-   * Records the result of a task's check (PR 4's worker; tests): `checked`, or `check_failed`
-   * with its code. Only a task in `registered` or `checking` for this card SHA-256 moves.
+   * Hands the check of a registered task to a runner (L07 PR 4, ADR-M85 §2.5): `checking`, one
+   * more attempt. Only a `registered` task with this card moves; undefined otherwise.
+   */
+  async startCheck(id: string, cardSha256: string): Promise<EvaluationTask | undefined> {
+    if (!isUuid(id)) invalid('id');
+    if (!SHA256.test(cardSha256)) invalid('cardSha256');
+    return this.run(
+      this.db
+        .updateTable('evaluation_tasks')
+        .set((eb) => ({
+          status: 'checking',
+          check_attempt: eb('check_attempt', '+', 1),
+          updated_at: new Date(),
+        }))
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .where('card_sha256', '=', cardSha256)
+        .where('status', '=', 'registered')
+        .returningAll()
+        .executeTakeFirst(),
+    );
+  }
+
+  /** A check that did not end (a lost runner, a refused contract): back to `registered`. */
+  async requeueCheck(id: string, cardSha256: string): Promise<boolean> {
+    if (!isUuid(id)) invalid('id');
+    if (!SHA256.test(cardSha256)) invalid('cardSha256');
+    const updated = await this.run(
+      this.db
+        .updateTable('evaluation_tasks')
+        .set({ status: 'registered', updated_at: new Date() })
+        .where('tenant_id', '=', this.tenantId)
+        .where('id', '=', id)
+        .where('card_sha256', '=', cardSha256)
+        .where('status', '=', 'checking')
+        .executeTakeFirst(),
+    );
+    return Number(updated.numUpdatedRows) === 1;
+  }
+
+  /**
+   * Records the result of a task's check: `checked`, or `check_failed` with its code, and
+   * `evaluation_task.checked` (codes only). Only a task in `registered` or `checking` for this
+   * card SHA-256 moves (`checking` itself: `startCheck`).
    */
   async recordCheck(
     id: string,
     cardSha256: string,
     result:
-      | { readonly status: 'checking' | 'checked' }
-      | { readonly status: 'check_failed'; readonly code: string },
+      { readonly status: 'checked' } | { readonly status: 'check_failed'; readonly code: string },
   ): Promise<boolean> {
     if (!isUuid(id)) invalid('id');
     if (!SHA256.test(cardSha256)) invalid('cardSha256');
     const code = result.status === 'check_failed' ? result.code : null;
     if (code !== null && !CODE.test(code)) invalid('code');
-    const from: EvaluationTaskStatus[] =
-      result.status === 'checking' ? ['registered'] : ['registered', 'checking'];
-    const updated = await this.run(
-      this.db
-        .updateTable('evaluation_tasks')
-        .set({ status: result.status, check_code: code, updated_at: new Date() })
-        .where('tenant_id', '=', this.tenantId)
-        .where('id', '=', id)
-        .where('card_sha256', '=', cardSha256)
-        .where('status', 'in', from)
-        .executeTakeFirst(),
+    const from: EvaluationTaskStatus[] = ['registered', 'checking'];
+    return this.run(
+      this.transactional(async (db) => {
+        const task = await db
+          .updateTable('evaluation_tasks')
+          .set({ status: result.status, check_code: code, updated_at: new Date() })
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', id)
+          .where('card_sha256', '=', cardSha256)
+          .where('status', 'in', from)
+          .returningAll()
+          .executeTakeFirst();
+        if (!task) return false;
+        await new AuditLogRepository(db, this.tenantId).append({
+          action: 'evaluation_task.checked',
+          actorType: 'system',
+          actorId: null,
+          entityId: task.id,
+          payload: {
+            project_id: task.project_id,
+            task: task.task_id,
+            card_sha256: cardSha256,
+            result: result.status,
+            attempt: task.check_attempt,
+            ...(code === null ? {} : { code }),
+          },
+        });
+        return true;
+      }),
     );
-    return Number(updated.numUpdatedRows) === 1;
+  }
+
+  /**
+   * The card was removed from the default branch (ADR-M85 §2.8): the task is `gone`, final, and
+   * `evaluation_task.gone` is written. Its row, decisions and past results stay.
+   */
+  async markGone(id: string): Promise<boolean> {
+    if (!isUuid(id)) invalid('id');
+    return this.run(
+      this.transactional(async (db) => {
+        const task = await db
+          .updateTable('evaluation_tasks')
+          .set({ status: 'gone', updated_at: new Date() })
+          .where('tenant_id', '=', this.tenantId)
+          .where('id', '=', id)
+          .where('status', '!=', 'gone')
+          .returningAll()
+          .executeTakeFirst();
+        if (!task) return false;
+        await new AuditLogRepository(db, this.tenantId).append({
+          action: 'evaluation_task.gone',
+          actorType: 'system',
+          actorId: null,
+          entityId: task.id,
+          payload: { project_id: task.project_id, task: task.task_id },
+        });
+        return true;
+      }),
+    );
+  }
+
+  /** The tenant's tasks in a state, oldest change first (the worker's check loop). */
+  async listByStatus(status: 'registered' | 'checking', limit: number): Promise<EvaluationTask[]> {
+    return this.run(
+      this.db
+        .selectFrom('evaluation_tasks')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('status', '=', status)
+        .orderBy('updated_at')
+        .orderBy('id')
+        .limit(limit)
+        .execute(),
+    );
   }
 
   /**
