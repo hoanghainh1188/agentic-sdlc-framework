@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M32 and their sources:
+// Rule ids M1–M34 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -46,6 +46,9 @@
 //   M31 evidence_retention_days between 180 and 3650 ................. D-05 §10.1, D-02 FR-44,
 //                                                                      ADR-M51, QUESTIONS.md #236
 //   M32 the viewer role never puts evidence on hold .................. ADR-M51, QUESTIONS.md #235
+//   M33 the viewer role never creates or runs evaluation plans ....... ADR-M82, QUESTIONS.md #470
+//   M34 an evaluation counts for a recertification ≤ 90 days ......... Ch.20 §20.8, ADR-M86 §2.4,
+//                                                                      QUESTIONS.md #499
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -70,6 +73,9 @@ export const MVP_MAX_AUTONOMY: AutonomyLevel = 'L2';
 
 /** Handbook Ch.20 §20.8: every agent is recertified at least every 3 months (rule M18). */
 export const MAX_RECERTIFICATION_MONTHS = 3;
+
+/** ADR-M86 §2.4: an evaluation older than 90 days never counts for a recertification (rule M34). */
+export const MAX_RECERTIFICATION_EVALUATION_AGE_DAYS = 90;
 
 export const FORCED_HITL_G3_FLAGS: readonly ChangeFlag[] = [
   'migration',
@@ -633,6 +639,17 @@ const m33: Rule = (c) =>
     ? [issue('config.rule.viewer_never_runs_evaluations', 'access.eval_roles')]
     : [];
 
+const m34: Rule = (c) =>
+  c.agents.evaluation.recertification_max_age_days > MAX_RECERTIFICATION_EVALUATION_AGE_DAYS
+    ? [
+        issue(
+          'config.rule.recertification_evaluation_max_age',
+          'agents.evaluation.recertification_max_age_days',
+          { maximum: MAX_RECERTIFICATION_EVALUATION_AGE_DAYS },
+        ),
+      ]
+    : [];
+
 type Rule = (config: ProjectConfig) => ConfigIssue[];
 
 export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
@@ -669,6 +686,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M31: m31,
   M32: m32,
   M33: m33,
+  M34: m34,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

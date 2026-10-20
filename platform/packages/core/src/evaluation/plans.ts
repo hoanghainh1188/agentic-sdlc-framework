@@ -3,8 +3,8 @@
 // - Who: a tenant admin, or a person with a role on the project in `access.eval_roles` (never
 //   `viewer`, rule M33). No role on the project → `project_not_found`; another role → `forbidden`.
 //   An automatic start (a schedule, `on_change`) acts as the system.
-// - A configuration is an agent of the register (its current version and model when a run starts)
-//   or a model by name with the project's default agent (`run.agent_key`), and an optional prompt
+// - A configuration is an agent of the register (its current version, model and tools when a run
+//   starts; `proposed`, `active` or `suspended`, ADR-M86 §2.2) or a model by name with the project's default agent (`run.agent_key`), and an optional prompt
 //   variant: a file on the project's default branch. The platform reads it when the plan is saved
 //   and again when a run starts, and keeps only the path, the commit and the SHA-256.
 // - Budgets (QUESTIONS #473): a budget per run, a monthly cap per plan (UTC month), and the
@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { canonicalJson } from '@sdlc/config';
 import {
   GitHostError,
+  type AgentStatus,
   type DataClass,
   type GitHostAdapter,
   type ModelRef,
@@ -39,7 +40,7 @@ import {
   type PlanSchedule,
   type PlanVersionView,
 } from '../db/repositories/evaluation-plans.js';
-import type { Evaluation, EvaluationPlan, Project } from '../db/schema.js';
+import type { Agent, Evaluation, EvaluationPlan, Project } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import type { EvaluationPlanTrigger, TaskSetKind } from '../db/vocabulary.js';
 import { loadEffectiveConfig } from '../registry/effective-config.js';
@@ -186,7 +187,8 @@ export async function planFleetSha256(
   );
   for (const key of keys) {
     const agent = await scope.agents.getByKey(key);
-    lines.push(`agent:${key}@${agent?.status === 'active' ? agent.version : '-'}`);
+    // ADR-M86 §2.2: the version of each agent, whatever its status.
+    lines.push(`agent:${key}@${agent ? agent.version : '-'}`);
   }
   lines.sort();
   return createHash('sha256').update(lines.join('\n'), 'utf8').digest('hex');
@@ -305,7 +307,18 @@ async function buildContent(
   return content;
 }
 
-/** Every configuration's agent is in the register, active and has a model. */
+/**
+ * ADR-M86 §2.2 (changes ADR-M82 §2.1): an evaluation may run an agent that is `proposed`,
+ * `active` or `suspended`, so a new version is evaluated before it is approved. Never a
+ * `quarantined` or `retired` agent. Real runs still need an `active` agent (`checkAgentForRun`).
+ */
+const EVALUABLE_STATUSES: readonly AgentStatus[] = ['proposed', 'active', 'suspended'];
+
+function isEvaluable(agent: Agent): boolean {
+  return EVALUABLE_STATUSES.includes(agent.status);
+}
+
+/** Every configuration's agent is in the register, may be evaluated and has a model. */
 async function checkAgents(
   scope: TenantScope,
   projectId: string,
@@ -318,8 +331,8 @@ async function checkAgents(
       throw new EvaluationError('agent_not_found', 'no agent for the configuration');
     const agent = await scope.agents.getByKey(key);
     if (!agent) throw new EvaluationError('agent_not_found', `agent ${key} not found`);
-    if (agent.status !== 'active') {
-      throw new EvaluationError('agent_not_active', `agent ${key} is not active`);
+    if (!isEvaluable(agent)) {
+      throw new EvaluationError('agent_not_active', `agent ${key} is ${agent.status}`);
     }
     if (c.agent_key !== null && !agent.model_ref) {
       throw new EvaluationError('agent_no_model', `agent ${key} has no model`);
@@ -328,8 +341,9 @@ async function checkAgents(
 }
 
 /**
- * The configurations as an evaluation runs them: the register's agent (its active version and its
- * model) or the model with the project's default agent; the gateway's provider type.
+ * The configurations as an evaluation runs them: the register's agent (its current version, its
+ * model and its tools) or the model with the project's default agent (its version and tools); the
+ * gateway's provider type.
  */
 export async function resolveConfigurations(
   scope: TenantScope,
@@ -346,8 +360,8 @@ export async function resolveConfigurations(
       throw new EvaluationError('agent_not_found', 'no agent for the configuration');
     const agent = await scope.agents.getByKey(key);
     if (!agent) throw new EvaluationError('agent_not_found', `agent ${key} not found`);
-    if (agent.status !== 'active') {
-      throw new EvaluationError('agent_not_active', `agent ${key} is not active`);
+    if (!isEvaluable(agent)) {
+      throw new EvaluationError('agent_not_active', `agent ${key} is ${agent.status}`);
     }
     const modelName = c.agent_key !== null ? agent.model_ref : c.model;
     if (!modelName) throw new EvaluationError('agent_no_model', `agent ${key} has no model`);
@@ -364,6 +378,8 @@ export async function resolveConfigurations(
       maxDurationMin: c.max_duration_min,
       agentId: agent.id,
       instructions: c.prompt,
+      source: c.agent_key !== null ? 'agent' : 'model',
+      allowedTools: agent.allowed_tools,
     });
   }
   return resolved;

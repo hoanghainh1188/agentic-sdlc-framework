@@ -6,6 +6,7 @@ export {
   isAgentRegisterErrorCode,
   type AgentRegisterErrorCode,
 } from './errors.js';
+export { toolsSha256 } from './fingerprint.js';
 export {
   checkAgentForRun,
   instructionsPath,

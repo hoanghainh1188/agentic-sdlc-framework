@@ -265,6 +265,22 @@ export interface ProjectConfig {
      * §20.8: every 3 months; mandatory rule M18: never more than 3).
      */
     readonly recertification_months: number;
+    /**
+     * Evaluations as evidence for approvals and recertifications (task L09, ADR-M86 §2.4).
+     * `off`: no check; `warn`: accepted with a warning; `required`: refused without a qualifying
+     * evaluation.
+     */
+    readonly evaluation: {
+      readonly mode: AgentEvaluationMode;
+      /** Distinct tasks with a scored run of the candidate (at least 1). */
+      readonly min_tasks: number;
+      /** The candidate's resolve rate, between 0 and 1. */
+      readonly min_resolve_rate: number;
+      /** Days an evaluation stays valid for an approval. */
+      readonly approval_max_age_days: number;
+      /** Days an evaluation stays valid for a recertification (rule M34: 90 or less). */
+      readonly recertification_max_age_days: number;
+    };
   };
   /** Sandbox image of the project, pinned by digest (QUESTIONS #59, ADR-M25). */
   readonly sandbox: { readonly image: string };
@@ -291,6 +307,9 @@ export interface ProjectConfig {
     };
   };
 }
+
+/** How strictly the agent register checks evaluations (task L09, ADR-M86 §2.4). */
+export type AgentEvaluationMode = 'off' | 'warn' | 'required';
 
 declare const validatedConfig: unique symbol;
 

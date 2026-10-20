@@ -9,7 +9,11 @@ import { validateRunContract, type EvaluationRunContract, type RunContract } fro
 /** The local branch the agent works on in its sandbox; the runner never pushes it. */
 export const EVALUATION_AGENT_BRANCH = 'agent/INT-0000-0000';
 
-/** The tools of the agent in an evaluation, as the L02 harness gave them (ADR-M78, ADR-M29). */
+/**
+ * The tools of the agent in an evaluation, as the L02 harness gave them (ADR-M78, ADR-M29): for
+ * an operator evaluation (L04) and for configurations stored before L09. An evaluation of a plan
+ * gives the agent its own `allowed_tools` (L09, QUESTIONS #501).
+ */
 export const EVALUATION_AGENT_TOOLS = ['file_editor', 'terminal'] as const;
 
 export interface AgentContractInput {
@@ -20,6 +24,8 @@ export interface AgentContractInput {
   readonly plannedFiles: readonly string[];
   /** SHA-256 of the instructions the agent reads. */
   readonly instructionsSha256: string;
+  /** The configuration's tools (L09); default `EVALUATION_AGENT_TOOLS`. */
+  readonly allowedTools?: readonly string[];
 }
 
 export class AgentContractError extends Error {
@@ -43,7 +49,7 @@ export function agentContractOf(input: AgentContractInput): RunContract {
     agent_id: contract.evaluation_id,
     agent_version: contract.agent_version,
     instructions_sha256: input.instructionsSha256,
-    allowed_tools: [...EVALUATION_AGENT_TOOLS],
+    allowed_tools: [...(input.allowedTools ?? EVALUATION_AGENT_TOOLS)],
     autonomy_level: 'L2',
     max_budget_usd: contract.max_budget_usd,
     max_iterations: contract.max_iterations,

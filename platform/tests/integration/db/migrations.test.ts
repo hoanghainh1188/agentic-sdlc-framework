@@ -360,7 +360,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // evaluation_plans → users (run_requested_by, migration 0032).
     // L07: evaluation_tasks → projects, intents, users; evaluation_task_decisions →
     // evaluation_tasks, users; evaluation_task_check_contracts → evaluation_tasks (0034).
-    expect(fks).toHaveLength(86);
+    // L09: agent_approvals → evaluations (0036).
+    expect(fks).toHaveLength(87);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

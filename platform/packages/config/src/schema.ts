@@ -268,7 +268,18 @@ export const projectConfigSchema = z.strictObject({
     eval_roles: uniqueList(role).min(1),
     conflicting_roles: z.array(uniqueList(role).length(2)),
   }),
-  agents: z.strictObject({ recertification_months: positiveInt }),
+  agents: z.strictObject({
+    recertification_months: positiveInt,
+    // L09 (ADR-M86 §2.4, QUESTIONS #496–#499): what an evaluation must reach before an agent
+    // version is approved or recertified. Rule M34 keeps the recertification age at 90 days or less.
+    evaluation: z.strictObject({
+      mode: z.enum(['off', 'warn', 'required']),
+      min_tasks: positiveInt.max(1000),
+      min_resolve_rate: z.number().min(0).max(1),
+      approval_max_age_days: positiveInt.max(365),
+      recertification_max_age_days: positiveInt.max(365),
+    }),
+  }),
   sandbox: z.strictObject({ image: pinnedImage }),
   // L06 (ADR-M83 §2.3, QUESTIONS #481): thresholds of the evaluation recommendation rules.
   evaluation: z.strictObject({

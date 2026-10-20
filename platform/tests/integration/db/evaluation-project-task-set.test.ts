@@ -198,6 +198,8 @@ describeDb("L07 PR 4c: evaluations on a project's task set on PostgreSQL", () =>
         task_set_commit: TASK_HEAD,
         base_sha: null,
         task_ids: ['tax-rule'],
+        // L09 (QUESTIONS #503): the project's approved tasks at the start.
+        approved_tasks_at_start: 1,
       });
       const runs = await w.scope.evaluationRuns.listForEvaluation(evaluation.id);
       expect(runs).toHaveLength(2);
