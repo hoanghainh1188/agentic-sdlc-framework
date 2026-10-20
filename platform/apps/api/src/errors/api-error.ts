@@ -475,6 +475,7 @@ const EVALUATION_STATUS: Readonly<Partial<Record<EvaluationErrorCode, [number, A
   task_gone: [409, 'evaluation_conflict'],
   task_changed: [409, 'evaluation_conflict'],
   task_not_checked: [409, 'evaluation_conflict'],
+  task_set_empty: [409, 'evaluation_conflict'],
 };
 
 /** The catalog text of each evaluation refusal (`evaluation.error.<code>`). */
@@ -517,6 +518,8 @@ const EVALUATION_MESSAGES: Readonly<Record<EvaluationErrorCode, MessageKey>> = {
   task_changed: 'evaluation.error.task_changed',
   task_not_checked: 'evaluation.error.task_not_checked',
   producer_cannot_review: 'evaluation.error.producer_cannot_review',
+  task_set_empty: 'evaluation.error.task_set_empty',
+  data_class_below_tasks: 'evaluation.error.data_class_below_tasks',
 };
 
 function evaluationApiError(error: EvaluationError): ApiError {

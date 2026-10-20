@@ -21,6 +21,7 @@ export interface ConfigForm {
 export interface PlanForm {
   readonly code: string;
   readonly dataClass: string;
+  /** A task set number, or `project`: the project's approved tasks (L07, ADR-M85 §2.10). */
   readonly taskSetVersion: string;
   /** Task IDs separated by commas; empty: every task of the set. */
   readonly taskIds: string;
@@ -41,6 +42,8 @@ export const DATA_CLASS_CHOICES = [
   'client_restricted',
 ];
 export const MAX_CONFIGURATIONS = 16;
+/** The word the task set field takes for the project's own tasks. */
+export const PROJECT_TASK_SET = 'project';
 
 export const emptyConfig = (index: number): ConfigForm => ({
   id: `config-${String(index + 1)}`,
@@ -74,7 +77,7 @@ export function planFormOf(plan: EvalPlanView): PlanForm {
   return {
     code: plan.code,
     dataClass: c.data_class,
-    taskSetVersion: String(c.task_set_version),
+    taskSetVersion: c.task_set_version === null ? PROJECT_TASK_SET : String(c.task_set_version),
     taskIds: (c.task_ids ?? []).join(', '),
     runsPerTask: String(c.runs_per_task),
     budgetPerRunUsd: c.budget_per_run_usd,
@@ -127,8 +130,9 @@ export function planBody(form: PlanForm, mode: 'create' | 'change'): BodyResult 
   const bad = (field: string): BodyResult => ({ ok: false, field });
   if (mode === 'create' && !PLAN_CODE.test(form.code.trim())) return bad('code');
   if (!DATA_CLASS_CHOICES.includes(form.dataClass)) return bad('data_class');
-  const taskSet = int(form.taskSetVersion, 1, 1000);
-  if (taskSet === null) return bad('task_set_version');
+  const project = form.taskSetVersion.trim().toLowerCase() === PROJECT_TASK_SET;
+  const taskSet = project ? null : int(form.taskSetVersion, 1, 1000);
+  if (!project && taskSet === null) return bad('task_set_version');
   const tasks = form.taskIds
     .split(',')
     .map((x) => x.trim())
@@ -185,6 +189,7 @@ export function planBody(form: PlanForm, mode: 'create' | 'change'): BodyResult 
     body: {
       ...(mode === 'create' ? { code: form.code.trim() } : {}),
       data_class: form.dataClass,
+      task_set_kind: project ? 'project' : 'folder',
       task_set_version: taskSet,
       task_ids: tasks.length === 0 ? null : tasks,
       runs_per_task: runs,

@@ -21,7 +21,11 @@ import {
   type DataClass,
   type ProviderType,
 } from '@sdlc/contracts';
-import { EVALUATION_PLAN_TRIGGERS, type EvaluationPlanTrigger } from '../vocabulary.js';
+import {
+  EVALUATION_PLAN_TRIGGERS,
+  type EvaluationPlanTrigger,
+  type TaskSetKind,
+} from '../vocabulary.js';
 import { AuditLogRepository } from './audit-log.js';
 import { TenantRepository } from './base.js';
 
@@ -67,7 +71,10 @@ export interface PlanSchedule {
 /** The content of one version. */
 export interface PlanContent {
   readonly dataClass: DataClass;
-  readonly taskSetVersion: number;
+  /** L07 (ADR-M85 §2.10): default `folder`; a `project` plan runs the project's approved tasks. */
+  readonly taskSetKind?: TaskSetKind;
+  /** The number of a `folder` task set; null for `project`. */
+  readonly taskSetVersion: number | null;
   /** Null: every task of the set. */
   readonly taskIds: readonly string[] | null;
   readonly runsPerTask: number;
@@ -104,7 +111,11 @@ const isInt = (value: unknown, min: number, max: number): boolean =>
 export function checkPlanContent(c: PlanContent): void {
   if (!(DATA_CLASSES as readonly string[]).includes(c.dataClass)) invalid('dataClass');
   if (c.dataClass === 'prohibited') invalid('dataClass');
-  if (!isInt(c.taskSetVersion, 1, 1000)) invalid('taskSetVersion');
+  if ((c.taskSetKind ?? 'folder') === 'folder') {
+    if (!isInt(c.taskSetVersion, 1, 1000)) invalid('taskSetVersion');
+  } else if (c.taskSetKind !== 'project' || c.taskSetVersion !== null) {
+    invalid('taskSetKind');
+  }
   if (c.taskIds !== null) {
     if (c.taskIds.length < 1 || c.taskIds.length > 64) invalid('taskIds');
     if (new Set(c.taskIds).size !== c.taskIds.length) invalid('taskIds');
@@ -169,6 +180,7 @@ function configurationsJson(configurations: readonly PlanConfiguration[]): strin
 function versionRow(c: PlanContent) {
   return {
     data_class: c.dataClass,
+    task_set_kind: c.taskSetKind ?? 'folder',
     task_set_version: c.taskSetVersion,
     task_ids: c.taskIds === null ? null : [...c.taskIds],
     runs_per_task: c.runsPerTask,
@@ -187,6 +199,7 @@ export function planVersionView(row: EvaluationPlanVersion): PlanVersionView {
   return {
     version: row.version,
     dataClass: row.data_class,
+    taskSetKind: row.task_set_kind,
     taskSetVersion: row.task_set_version,
     taskIds: row.task_ids,
     runsPerTask: row.runs_per_task,

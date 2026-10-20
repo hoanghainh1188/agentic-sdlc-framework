@@ -2,7 +2,8 @@
 // ADR-M81 §2.2, QUESTIONS #460). A second kind of Run Contract: the same Transit key and the same
 // signed form (RFC 8785 canonical JSON), its own schema (`@sdlc/contracts`), stored per attempt in
 // `evaluation_run_contracts`. No intent and no plan: the contract names the evaluation run, the
-// sample repository's commit, the one model of the configuration and the caps.
+// project's repository and the commit the run starts from, the task set (a numbered `folder` set,
+// or the project's task cards at a commit, L07), the one model of the configuration and the caps.
 //
 // The cap is what is left of the evaluation's budget (ADR-M81 §2.4); an evaluation whose budget is
 // used up gets no contract. The runner checks the signature first, then the stored contract, the
@@ -104,8 +105,10 @@ export async function issueEvaluationContract(
   if (evaluation?.status !== 'queued' && evaluation?.status !== 'running') {
     throw new EvaluationContractError('evaluation_closed', 'the evaluation is not open');
   }
-  if (evaluation.base_sha === null) {
-    throw new EvaluationContractError('base_sha_missing', 'the evaluation has no base commit');
+  // A `folder` set's runs start at the evaluation's commit; a project task's run at its own (L07).
+  const baseSha = run.base_sha ?? evaluation.base_sha;
+  if (baseSha === null) {
+    throw new EvaluationContractError('base_sha_missing', 'the run has no base commit');
   }
   const project = await scope.projects.getById(evaluation.project_id);
   if (!project) {
@@ -128,10 +131,12 @@ export async function issueEvaluationContract(
     tenant_id: scope.tenantId,
     project_id: evaluation.project_id,
     repo: project.repo_full_name,
-    base_sha: evaluation.base_sha,
+    base_sha: baseSha,
     configuration_id: run.configuration_id,
     task_id: run.task_id,
+    task_set_kind: evaluation.task_set_kind,
     task_set_version: evaluation.task_set_version,
+    task_set_commit: evaluation.task_set_commit,
     run_index: run.run_index,
     attempt: run.attempt,
     agent_version: run.agent_version,

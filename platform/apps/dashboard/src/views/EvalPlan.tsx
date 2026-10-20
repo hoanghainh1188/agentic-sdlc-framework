@@ -213,7 +213,7 @@ function PlanFacts({ plan }: { readonly plan: EvalPlanView }) {
         [
           t('dashboard.eval.facts.tasks'),
           t('dashboard.eval.facts.tasks_value', {
-            set: c.task_set_version,
+            set: c.task_set_version ?? t('dashboard.eval.project_task_set'),
             tasks: c.task_ids === null ? t('dashboard.eval.all_tasks') : c.task_ids.join(', '),
             runs: c.runs_per_task,
           }),

@@ -150,6 +150,9 @@ export const EVALUATION_PLAN_STATUSES = ['active', 'paused', 'archived'] as cons
 export type EvaluationPlanStatus = (typeof EVALUATION_PLAN_STATUSES)[number];
 export const EVALUATION_PLAN_TRIGGERS = ['once', 'schedule', 'on_change'] as const;
 export type EvaluationPlanTrigger = (typeof EVALUATION_PLAN_TRIGGERS)[number];
+/** L07 (ADR-M85 §2.10, migration 0035): a numbered task set, or the project's approved tasks. */
+export const TASK_SET_KINDS = ['folder', 'project'] as const;
+export type TaskSetKind = (typeof TASK_SET_KINDS)[number];
 /** L07 (ADR-M85 §2.7): the states of a project's evaluation task; `gone` is final. */
 export const EVALUATION_TASK_STATUSES = [
   'registered',

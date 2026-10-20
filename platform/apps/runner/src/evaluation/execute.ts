@@ -30,6 +30,7 @@ import type {
   AgentAdapter,
   AgentTask,
   EvaluationHardwareBlock,
+  EvaluationRunContract,
   ExecuteEvaluationRunInput,
   ExecuteEvaluationRunResult,
   RunContractVerifier,
@@ -43,6 +44,7 @@ import {
   verifyEvaluationContract,
   type EvaluationConfigurationRow,
   type PlatformDatabase,
+  type TenantScope,
 } from '@sdlc/core';
 import {
   describeHardware,
@@ -71,6 +73,7 @@ import { gitArgs, gitEnv } from '../workspace/proposal.js';
 import { packDirectory } from '../workspace/tar.js';
 import { agentContractOf, EVALUATION_AGENT_BRANCH } from './agent-contract.js';
 import { driveEvaluationAgent } from './drive.js';
+import { ProjectTaskError, readProjectTask } from './project-task.js';
 import { scoreEvaluationRun, ScoringError } from './score.js';
 
 const run = promisify(execFile);
@@ -220,9 +223,13 @@ export async function executeEvaluation(
     step('prepare');
     const evaluation = await scope.evaluations.getById(contract.evaluation_id);
     if (!evaluation) throw new TaskError('evaluation', 'not found');
-    const set = loadTaskSet(settings.evaluation.tasksDir, [contract.task_id]);
-    const task: EvalTask = set.tasks[0]!;
-    if (set.version !== contract.task_set_version) throw new TaskError('task set', 'version');
+    // A numbered task set is in the runner; a project's task (L07) is read from the clone below.
+    let task: EvalTask | undefined;
+    if (contract.task_set_kind === 'folder') {
+      const set = loadTaskSet(settings.evaluation.tasksDir, [contract.task_id]);
+      task = set.tasks[0]!;
+      if (set.version !== contract.task_set_version) throw new TaskError('task set', 'version');
+    }
     // An operator evaluation (L04) names a configuration file; an evaluation of a plan (L05,
     // QUESTIONS #475) has its resolved configurations in the database, and maybe a prompt variant:
     // a file of the repository at a recorded commit, read below with the clone token.
@@ -275,6 +282,17 @@ export async function executeEvaluation(
       await deps.tokenRevoker?.revokeShortLivedToken(token).catch(() => undefined);
     }
     checkStop();
+
+    let hiddenDir = task ? path.join(task.dir, 'hidden') : '';
+    if (contract.task_set_kind === 'project') {
+      ({ task, hiddenDir } = await readTaskOfProject(scope, contract, {
+        repo: pinnedRepo,
+        home: path.join(pinned, 'home'),
+        workDir,
+        timeoutMs: settings.git.timeoutMs,
+      }));
+    }
+    if (!task) throw new TaskError('task', 'not found');
 
     const prepared = prepareBase({
       clone: pinnedRepo,
@@ -385,7 +403,7 @@ export async function executeEvaluation(
         tenantId: input.tenantId,
         image: config.sandbox.image,
         treeDir: tree,
-        hiddenDir: path.join(task.dir, 'hidden'),
+        hiddenDir,
         basePatch: prepared.basePatch,
         agentPatch,
         task,
@@ -440,6 +458,37 @@ export async function executeEvaluation(
     if (workDir) fs.rmSync(workDir, { recursive: true, force: true });
     deps.held.release(runId);
     slot?.release();
+  }
+}
+
+/**
+ * The task of a project's task set (L07, ADR-M85 §2.10): the card at the evaluation's commit, with
+ * the SHA-256 the platform approved, for the run's base commit. Anything else: `task_unavailable`.
+ */
+async function readTaskOfProject(
+  scope: TenantScope,
+  contract: EvaluationRunContract,
+  where: {
+    readonly repo: string;
+    readonly home: string;
+    readonly workDir: string;
+    readonly timeoutMs: number;
+  },
+): Promise<{ task: EvalTask; hiddenDir: string }> {
+  const stored = await scope.evaluationTasks.getByTaskId(contract.project_id, contract.task_id);
+  if (!stored || contract.task_set_commit === null) throw new TaskError('task', 'not found');
+  try {
+    const read = await readProjectTask({
+      ...where,
+      taskId: contract.task_id,
+      cardCommit: contract.task_set_commit,
+      cardSha256: stored.card_sha256,
+    });
+    if (read.card.baseCommit !== contract.base_sha) throw new TaskError('task', 'base commit');
+    return { task: read.task, hiddenDir: read.hiddenDir };
+  } catch (error) {
+    if (error instanceof ProjectTaskError) throw new TaskError('task', error.code);
+    throw error;
   }
 }
 

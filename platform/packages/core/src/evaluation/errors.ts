@@ -79,6 +79,10 @@ export const EVALUATION_ERROR_CODES = [
   'task_not_checked',
   /** A producer of the intent never reviews its task (R029). */
   'producer_cannot_review',
+  /** The project's task set has no approved task (or none of the plan's tasks is approved). */
+  'task_set_empty',
+  /** The data class is below the highest data class of the tasks' intents (ADR-M85 §2.7). */
+  'data_class_below_tasks',
 ] as const;
 export type EvaluationErrorCode = (typeof EVALUATION_ERROR_CODES)[number];
 

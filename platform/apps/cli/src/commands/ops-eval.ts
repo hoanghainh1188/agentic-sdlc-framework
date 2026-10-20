@@ -83,6 +83,8 @@ const ERROR_KEYS: Readonly<Record<EvaluationErrorCode, MessageKey>> = {
   task_changed: 'evaluation.error.task_changed',
   task_not_checked: 'evaluation.error.task_not_checked',
   producer_cannot_review: 'evaluation.error.producer_cannot_review',
+  task_set_empty: 'evaluation.error.task_set_empty',
+  data_class_below_tasks: 'evaluation.error.data_class_below_tasks',
 };
 
 const list = (value: string | boolean | undefined): string[] | undefined =>

@@ -21,7 +21,8 @@ import {
   type Check,
 } from './contract-checks.js';
 
-export const EVALUATION_CONTRACT_SCHEMA_VERSION = 1;
+/** 2 (L07, ADR-M85 §2.10): the task set's kind and commit; the version only for a `folder` set. */
+export const EVALUATION_CONTRACT_SCHEMA_VERSION = 2;
 export const EVALUATION_CONTRACT_KIND = 'evaluation';
 
 export interface EvaluationRunContract {
@@ -33,12 +34,18 @@ export interface EvaluationRunContract {
   readonly evaluation_code: string;
   readonly tenant_id: string;
   readonly project_id: string;
-  /** `owner/name` on the Git host: the sample repository of the task set. */
+  /** `owner/name` on the Git host: the project's repository. */
   readonly repo: string;
+  /** The commit the run starts from: the task set's (`folder`) or the task's (`project`). */
   readonly base_sha: string;
   readonly configuration_id: string;
   readonly task_id: string;
-  readonly task_set_version: number;
+  /** `folder`: a numbered task set in the runner; `project`: the project's task cards (L07). */
+  readonly task_set_kind: 'folder' | 'project';
+  /** The number of a `folder` set; null for `project`. */
+  readonly task_set_version: number | null;
+  /** The default branch's commit the task card is read at (`project`); null for `folder`. */
+  readonly task_set_commit: string | null;
   readonly run_index: number;
   /** Grows when a preempted run is queued again; one contract per attempt. */
   readonly attempt: number;
@@ -81,7 +88,9 @@ const FIELDS: Readonly<Record<keyof EvaluationRunContract, Check>> = {
   base_sha: text(GIT_SHA),
   configuration_id: text(CODE),
   task_id: text(CODE),
-  task_set_version: positiveInt,
+  task_set_kind: (value) => value === 'folder' || value === 'project',
+  task_set_version: (value) => value === null || positiveInt(value),
+  task_set_commit: (value) => value === null || text(GIT_SHA)(value),
   run_index: positiveInt,
   attempt: positiveInt,
   agent_version: text(VERSION_LABEL),
@@ -118,6 +127,12 @@ export function validateEvaluationContract(value: unknown): EvaluationContractVa
   }
   if (Date.parse(record.expires_at as string) <= Date.parse(record.issued_at as string)) {
     return { ok: false, field: 'expires_at' };
+  }
+  if ((record.task_set_kind === 'folder') !== (record.task_set_version !== null)) {
+    return { ok: false, field: 'task_set_version' };
+  }
+  if ((record.task_set_kind === 'project') !== (record.task_set_commit !== null)) {
+    return { ok: false, field: 'task_set_commit' };
   }
   const allowed = record.allowed_models as readonly string[];
   if (allowed.length !== 1 || allowed[0] !== record.model) {

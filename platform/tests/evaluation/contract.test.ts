@@ -20,7 +20,7 @@ import { runContractBytes } from '../../packages/core/src/run-contract/canonical
 
 const ID = '11111111-1111-4111-8111-111111111111';
 const contract = (over: Record<string, unknown> = {}): EvaluationRunContract => ({
-  schema_version: 1,
+  schema_version: 2,
   kind: 'evaluation',
   evaluation_run_id: '22222222-2222-4222-8222-222222222222',
   evaluation_id: '33333333-3333-4333-8333-333333333333',
@@ -31,7 +31,9 @@ const contract = (over: Record<string, unknown> = {}): EvaluationRunContract => 
   base_sha: '7d5341d'.padEnd(40, '0'),
   configuration_id: 'gpt-oss-20b',
   task_id: 'feat-tax',
+  task_set_kind: 'folder',
   task_set_version: 1,
+  task_set_commit: null,
   run_index: 1,
   attempt: 1,
   agent_version: '1.0.0',
@@ -67,6 +69,16 @@ describe('the evaluation contract schema', () => {
     ['a second model', { allowed_models: ['gpt-oss-20b', 'qwen3-8b'] }],
     ['a model other than the configuration', { allowed_models: ['qwen3-8b'] }],
     ['an expiry before the issue', { expires_at: '2026-10-14T07:00:00.000Z' }],
+    ['schema 1 (before L07)', { schema_version: 1 }],
+    ['another task set kind', { task_set_kind: 'sample' }],
+    ['a folder set without a version', { task_set_version: null }],
+    ['a folder set with a commit', { task_set_commit: '7d5341d'.padEnd(40, '1') }],
+    ['a project set with a version', { task_set_kind: 'project', task_set_commit: 'a'.repeat(40) }],
+    ['a project set without a commit', { task_set_kind: 'project', task_set_version: null }],
+    [
+      'a project set with a short commit',
+      { task_set_kind: 'project', task_set_version: null, task_set_commit: 'abc' },
+    ],
   ])('refuses %s', (_name, over) => {
     const value: Record<string, unknown> = { ...contract() };
     for (const [key, v] of Object.entries(over)) {
@@ -74,6 +86,15 @@ describe('the evaluation contract schema', () => {
       else value[key] = v;
     }
     expect(validateEvaluationContract(value).ok).toBe(false);
+  });
+
+  it("accepts a project's task set: a commit and no version (L07)", () => {
+    const value = contract({
+      task_set_kind: 'project',
+      task_set_version: null,
+      task_set_commit: 'a'.repeat(40),
+    });
+    expect(validateEvaluationContract(value)).toEqual({ ok: true, contract: value });
   });
 
   it('names the first field that fails', () => {
@@ -85,7 +106,7 @@ describe('the evaluation contract schema', () => {
   });
 
   it('has a fixed list of fields', () => {
-    expect(EVALUATION_CONTRACT_FIELDS).toHaveLength(24);
+    expect(EVALUATION_CONTRACT_FIELDS).toHaveLength(26);
     expect(EVALUATION_CONTRACT_KIND).toBe('evaluation');
   });
 });

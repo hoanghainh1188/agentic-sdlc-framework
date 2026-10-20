@@ -29,6 +29,7 @@ import { DbError } from '../db/errors.js';
 import type {
   EvaluationConfigurationInput,
   EvaluationFromPlan,
+  NewEvaluation,
 } from '../db/repositories/evaluations.js';
 import {
   checkPlanContent,
@@ -40,10 +41,11 @@ import {
 } from '../db/repositories/evaluation-plans.js';
 import type { Evaluation, EvaluationPlan, Project } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
-import type { EvaluationPlanTrigger } from '../db/vocabulary.js';
+import type { EvaluationPlanTrigger, TaskSetKind } from '../db/vocabulary.js';
 import { loadEffectiveConfig } from '../registry/effective-config.js';
 import { projectRepoRef } from '../workflow/g4-proposal.js';
 import { EvaluationError } from './errors.js';
+import { checkProjectTaskSet, readProjectTaskSet } from './project-task-set.js';
 import { checkEvaluationScope, type EvaluationPolicyFactory } from './start.js';
 
 /** The pause reason of a plan whose monthly cap is used up. */
@@ -84,7 +86,10 @@ export interface PlanConfigurationInput {
 
 export interface PlanContentInput {
   readonly dataClass: DataClass;
-  readonly taskSetVersion: number;
+  /** L07 (ADR-M85 §2.10): default `folder`; `project` runs the project's approved tasks. */
+  readonly taskSetKind?: TaskSetKind;
+  /** The number of a `folder` task set; null for `project`. */
+  readonly taskSetVersion: number | null;
   readonly taskIds?: readonly string[] | null;
   readonly runsPerTask: number;
   readonly budgetPerRunUsd: string;
@@ -228,7 +233,8 @@ async function buildContent(
   input: PlanContentInput,
 ): Promise<PlanContent> {
   const taskIds = input.taskIds && input.taskIds.length > 0 ? [...input.taskIds] : null;
-  if (deps.taskSet) {
+  const kind = input.taskSetKind ?? 'folder';
+  if (kind === 'folder' && deps.taskSet && input.taskSetVersion !== null) {
     const set = await deps.taskSet(input.taskSetVersion);
     if (!set) throw new EvaluationError('task_set_not_found', 'unknown task set version');
     if (taskIds?.some((id) => !set.taskIds.includes(id))) {
@@ -250,6 +256,7 @@ async function buildContent(
   }
   const content: PlanContent = {
     dataClass: input.dataClass,
+    taskSetKind: kind,
     taskSetVersion: input.taskSetVersion,
     taskIds,
     runsPerTask: input.runsPerTask,
@@ -265,6 +272,13 @@ async function buildContent(
   } catch (error) {
     if (error instanceof DbError) throw new EvaluationError('invalid_input', error.message);
     throw error;
+  }
+  if (kind === 'project') {
+    await checkProjectTaskSet(scope, {
+      projectId: project.id,
+      dataClass: content.dataClass,
+      taskIds,
+    });
   }
   if (deps.models) {
     const resolved = await resolveConfigurations(
@@ -421,6 +435,7 @@ export async function createEvaluationPlan(
 
 const FIELDS: readonly (readonly [string, (c: PlanContent) => unknown])[] = [
   ['data_class', (c) => c.dataClass],
+  ['task_set_kind', (c) => c.taskSetKind ?? 'folder'],
   ['task_set_version', (c) => c.taskSetVersion],
   ['task_ids', (c) => c.taskIds],
   ['runs_per_task', (c) => c.runsPerTask],
@@ -536,8 +551,7 @@ export async function startEvaluationPlan(
   if (!deps.models || !deps.taskSet) {
     throw new Error('startEvaluationPlan needs the gateway and the task sets (the worker)');
   }
-  const set = await deps.taskSet(version.taskSetVersion);
-  if (!set) throw new EvaluationError('task_set_not_found', 'unknown task set version');
+  const taskSet = await planTaskSet(scope, deps, project, version);
   // Prompt variants are read again: the run uses the file as it is now, and records it.
   const configurations: PlanConfiguration[] = [];
   for (const c of version.configurations) {
@@ -571,11 +585,9 @@ export async function startEvaluationPlan(
       const evaluation = await tx.evaluations.create({
         projectId: project.id,
         dataClass: version.dataClass,
-        taskSetVersion: set.version,
         configName: null,
         plan: fromPlan,
-        baseSha: set.baseSha,
-        taskIds: version.taskIds ?? set.taskIds,
+        ...taskSet,
         configurations: resolved,
         runsPerTask: version.runsPerTask,
         budgetUsd,
@@ -598,6 +610,46 @@ export async function startEvaluationPlan(
     }
     throw error;
   }
+}
+
+/**
+ * The task set an evaluation of a plan runs: a numbered set the server has, or the project's
+ * approved tasks read from the default branch now (ADR-M85 §2.10).
+ */
+async function planTaskSet(
+  scope: TenantScope,
+  deps: EvaluationPlanDeps,
+  project: Project,
+  version: PlanContent,
+): Promise<
+  Pick<
+    NewEvaluation,
+    'taskSetKind' | 'taskSetVersion' | 'taskSetCommit' | 'taskBaseShas' | 'baseSha' | 'taskIds'
+  >
+> {
+  if (version.taskSetKind === 'project') {
+    const set = await readProjectTaskSet(scope, deps.gitHost, {
+      project,
+      dataClass: version.dataClass,
+      taskIds: version.taskIds,
+    });
+    return {
+      taskSetKind: 'project',
+      taskSetVersion: null,
+      taskSetCommit: set.commit,
+      taskBaseShas: set.baseShas,
+      baseSha: null,
+      taskIds: set.taskIds,
+    };
+  }
+  const set =
+    version.taskSetVersion === null ? undefined : await deps.taskSet?.(version.taskSetVersion);
+  if (!set) throw new EvaluationError('task_set_not_found', 'unknown task set version');
+  return {
+    taskSetVersion: set.version,
+    baseSha: set.baseSha,
+    taskIds: version.taskIds ?? set.taskIds,
+  };
 }
 
 /**

@@ -271,7 +271,8 @@ export class EvaluationsService {
     return {
       evaluation: presentEvaluation(evaluation, { counts, spentUsd }),
       final: FINAL_STATUSES.has(evaluation.status),
-      ...buildEvaluationReport(rows, evaluation.task_set_version, thresholds),
+      // The engine compares the results of one task set; a project's set has no number (L07).
+      ...buildEvaluationReport(rows, evaluation.task_set_version ?? 0, thresholds),
       real_runs: project ? await this.realRuns(p, project.slug, models) : null,
     };
   }
@@ -352,6 +353,7 @@ async function isAdmin(scope: TenantScope, userId: string): Promise<boolean> {
 function contentOf(body: PlanBody): PlanContentInput {
   return {
     dataClass: body.data_class,
+    taskSetKind: body.task_set_kind,
     taskSetVersion: body.task_set_version,
     taskIds: body.task_ids,
     runsPerTask: body.runs_per_task,

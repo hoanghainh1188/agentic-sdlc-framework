@@ -32,5 +32,6 @@
   "0031-evaluation-plans.ts": "c113aa4f1e292d4cb5d7b19ed363d87ec815734e8ba6233e3ec31ba8582d22b5",
   "0032-evaluation-plan-requests.ts": "339afd460152c10d499a72893e644b9ebc3fa2f1ef125e93d54ea7a2d7addbe0",
   "0033-evaluation-tasks.ts": "c007e61b510d38dac91ba10ecdc168c5b1168dcab1d38eec9defa44019154c3a",
-  "0034-evaluation-task-checks.ts": "bd1418595e1115288d56bb06eb2df122d78e82b66023b192232f36f27a3d2061"
+  "0034-evaluation-task-checks.ts": "bd1418595e1115288d56bb06eb2df122d78e82b66023b192232f36f27a3d2061",
+  "0035-project-task-sets.ts": "21ba577f29a9d7a123d73a49f1bd045ba8d0eb1d7c5df067f7d75ea9138c2606"
 }

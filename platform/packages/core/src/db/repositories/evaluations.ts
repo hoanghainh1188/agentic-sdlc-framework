@@ -18,6 +18,7 @@ import {
   EVALUATION_FINAL_STATUSES,
   type EvaluationRunStatus,
   type EvaluationStatus,
+  type TaskSetKind,
 } from '../vocabulary.js';
 import { AuditLogRepository } from './audit-log.js';
 import { TenantRepository } from './base.js';
@@ -27,6 +28,7 @@ import { lockEvaluationCodes } from './locks.js';
 const CODE = /^[a-z][a-z0-9_.-]{0,63}$/;
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$/;
 const VERSION = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
+const SHA = /^[0-9a-f]{40}$/;
 
 /** The most runs one evaluation may queue: a limit of the platform, not of the database. */
 export const MAX_EVALUATION_RUNS = 5000;
@@ -60,13 +62,20 @@ export interface EvaluationFromPlan {
 export interface NewEvaluation {
   readonly projectId: string;
   readonly dataClass: DataClass;
-  readonly taskSetVersion: number;
+  /** The number of a `folder` task set; null for a `project` task set. */
+  readonly taskSetVersion: number | null;
+  /** L07 (ADR-M85 §2.10): default `folder`. */
+  readonly taskSetKind?: TaskSetKind;
+  /** `project` only: the default branch's commit the task cards were read from. */
+  readonly taskSetCommit?: string;
+  /** `project` only: the base commit of each task, by task ID (each run starts there). */
+  readonly taskBaseShas?: Readonly<Record<string, string>>;
   /** The configuration file the runner reads, as a code; null for an evaluation of a plan. */
   readonly configName: string | null;
   /** L05: the plan; its evaluations store their resolved configurations instead of a file. */
   readonly plan?: EvaluationFromPlan;
-  /** The task set's commit the runs start from (40 hex characters). */
-  readonly baseSha: string;
+  /** The commit a `folder` task set's runs start from (40 hex characters); null for `project`. */
+  readonly baseSha: string | null;
   readonly taskIds: readonly string[];
   readonly configurations: readonly EvaluationConfigurationInput[];
   readonly runsPerTask: number;
@@ -105,8 +114,26 @@ export function checkNewEvaluation(input: NewEvaluation): void {
   if (!isUuid(input.projectId)) invalid('projectId');
   if (!(DATA_CLASSES as readonly string[]).includes(input.dataClass)) invalid('dataClass');
   if (input.dataClass === 'prohibited') invalid('dataClass');
-  if (!Number.isSafeInteger(input.taskSetVersion) || input.taskSetVersion < 1) {
-    invalid('taskSetVersion');
+  if ((input.taskSetKind ?? 'folder') === 'folder') {
+    if (
+      input.taskSetVersion === null ||
+      !Number.isSafeInteger(input.taskSetVersion) ||
+      input.taskSetVersion < 1
+    ) {
+      invalid('taskSetVersion');
+    }
+    if (input.baseSha === null || !SHA.test(input.baseSha)) invalid('baseSha');
+    if (input.taskSetCommit !== undefined || input.taskBaseShas !== undefined) invalid('taskSet');
+  } else {
+    if (input.taskSetKind !== 'project') invalid('taskSetKind');
+    if (input.taskSetVersion !== null || input.baseSha !== null) invalid('taskSet');
+    if (input.taskSetCommit === undefined || !SHA.test(input.taskSetCommit)) {
+      invalid('taskSetCommit');
+    }
+    const shas = input.taskBaseShas ?? {};
+    if (input.taskIds.some((id) => !Object.hasOwn(shas, id) || !SHA.test(shas[id] ?? ''))) {
+      invalid('taskBaseShas');
+    }
   }
   if (input.plan === undefined) {
     if (input.configName === null || !CODE.test(input.configName)) invalid('configName');
@@ -145,7 +172,6 @@ export function checkNewEvaluation(input: NewEvaluation): void {
       invalid('configurations');
     }
   }
-  if (!/^[0-9a-f]{40}$/.test(input.baseSha)) invalid('baseSha');
   if (!Number.isSafeInteger(input.runsPerTask) || input.runsPerTask < 1 || input.runsPerTask > 50) {
     invalid('runsPerTask');
   }
@@ -190,6 +216,8 @@ export class EvaluationRepository extends TenantRepository {
             started_by: input.startedBy,
             plan_id: input.plan?.id ?? null,
             plan_version: input.plan?.version ?? null,
+            task_set_kind: input.taskSetKind ?? 'folder',
+            task_set_commit: input.taskSetCommit ?? null,
           })
           .returningAll()
           .executeTakeFirstOrThrow();
@@ -206,6 +234,7 @@ export class EvaluationRepository extends TenantRepository {
               agent_version: configuration.agentVersion,
               max_iterations: configuration.maxIterations,
               max_duration_min: configuration.maxDurationMin,
+              base_sha: input.taskBaseShas?.[taskId] ?? null,
             })),
           ),
         );
@@ -246,7 +275,10 @@ export class EvaluationRepository extends TenantRepository {
             project_id: input.projectId,
             code,
             data_class: input.dataClass,
-            task_set_version: input.taskSetVersion,
+            ...(input.taskSetVersion === null ? {} : { task_set_version: input.taskSetVersion }),
+            ...(input.taskSetCommit === undefined
+              ? {}
+              : { task_set_kind: 'project', task_set_commit: input.taskSetCommit }),
             ...(input.configName === null ? {} : { config_name: input.configName }),
             runs_total: runs.length,
             budget_usd: fromMicros(toMicros(input.budgetUsd)),

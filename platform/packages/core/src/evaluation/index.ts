@@ -92,3 +92,8 @@ export {
   type TaskCheckDeps,
   type VerifyTaskCheckDeps,
 } from './task-check.js';
+export {
+  checkProjectTaskSet,
+  readProjectTaskSet,
+  type ProjectTaskSet,
+} from './project-task-set.js';

@@ -30,6 +30,7 @@ export function presentVersion(version: PlanVersionView): Record<string, unknown
   return {
     version: version.version,
     data_class: version.dataClass,
+    task_set_kind: version.taskSetKind ?? 'folder',
     task_set_version: version.taskSetVersion,
     task_ids: version.taskIds,
     runs_per_task: version.runsPerTask,
@@ -63,7 +64,9 @@ export function presentEvaluation(
     plan_version: evaluation.plan_version,
     config_name: evaluation.config_name,
     data_class: evaluation.data_class,
+    task_set_kind: evaluation.task_set_kind,
     task_set_version: evaluation.task_set_version,
+    task_set_commit: evaluation.task_set_commit,
     task_ids: evaluation.task_ids,
     configuration_ids: evaluation.configuration_ids,
     runs_per_task: evaluation.runs_per_task,
