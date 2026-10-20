@@ -6,6 +6,19 @@ import tseslint from 'typescript-eslint';
 
 import sdlcLocal from './platform/tools/eslint-rules/module-boundaries.mjs';
 
+// Rules of CLAUDE.md checked by lint (task W01 PR 3, ADR-M84; IDs in design/RULES.md).
+// `no-restricted-syntax` takes one list per file, so a block that adds a selector repeats these.
+const AUDIT_INSERT = {
+  selector: "CallExpression[callee.property.name='insertInto'][arguments.0.value='audit_log']",
+  message: 'Audit events are written only through TenantScope.audit.append (R075c).',
+};
+const TEMPORAL_SCHEDULE = {
+  selector:
+    "MemberExpression[property.name='create'][object.type='MemberExpression'][object.property.name='schedule']",
+  message:
+    'Clocks, retention and spend sync are plain worker loops, never Temporal schedules (R044c).',
+};
+
 export default tseslint.config(
   {
     // Documents are never linted or changed by tools. Only platform code and root config files are.
@@ -73,6 +86,46 @@ export default tseslint.config(
             // another app. The schemas depend on nothing in the workspace.
             { from: '@sdlc/dashboard', allowOnly: ['@sdlc/api-schemas'] },
             { from: '@sdlc/api-schemas', allowOnly: [] },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
+    // R075c: the audit log's one writer is the repository behind TenantScope.audit.append.
+    files: ['platform/**/*.ts'],
+    rules: { 'no-restricted-syntax': ['error', AUDIT_INSERT] },
+  },
+  {
+    files: ['platform/packages/core/src/db/repositories/audit-log.ts'],
+    rules: { 'no-restricted-syntax': 'off' },
+  },
+  {
+    // R084a: platform code logs only through the platform logger (ADR-M35). Output for people goes
+    // through process.stdout / process.stderr and the message catalog.
+    files: ['platform/apps/*/src/**/*.{ts,tsx}', 'platform/packages/**/src/**/*.ts'],
+    rules: { 'no-console': 'error' },
+  },
+  {
+    // The migration command line runs before any logger exists and prints status for the operator.
+    files: ['platform/packages/core/src/db/migrate-cli.ts'],
+    rules: { 'no-console': 'off' },
+  },
+  {
+    // R044c, R053g: the worker never creates a Temporal schedule.
+    files: ['platform/apps/worker/src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', AUDIT_INSERT, TEMPORAL_SCHEDULE],
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@temporalio/client',
+              importNames: ['ScheduleClient'],
+              message: TEMPORAL_SCHEDULE.message,
+            },
           ],
         },
       ],

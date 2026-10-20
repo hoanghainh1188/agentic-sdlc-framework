@@ -33,6 +33,12 @@
   3. text in a `CLAUDE.md`, only when 1 and 2 are not possible.
 - A rule with a full check needs one short line in `CLAUDE.md` (what it protects and the ADR), not the detail.
 
+- As built (PR 3): lint rules and tests for rules that had no full check (IDs in `design/RULES.md`).
+  - Lint (`eslint.config.mjs`): no `console.*` in `platform/apps` and `platform/packages` (R084a; `migrate-cli.ts` excepted); no Temporal schedule in the worker (R044c, R053g); `insertInto('audit_log')` only in the audit log repository (R075c). `platform/tests/workspace/lint-rules.test.ts` checks that each rule fires.
+  - `migrations.lock.json` holds the SHA-256 of every migration; a new migration adds its line, and an edited one fails `platform/tests/db/migrations-lock.test.ts` (R075b).
+  - One list of append-only tables, each with UPDATE/DELETE and TRUNCATE triggers, and no such table outside the list (R030a). The test found `evaluation_run_contracts`, which the list in `CLAUDE.md` did not name.
+  - The generated D-08, CSV and ROADMAP equal the script's output (R092); every file of `workflow/` is checked for `oversightMode` (R047a); the routes marked `@SessionAction` are listed by file (R085b); doctor's options and the trial's `COMPOSE_PROJECT_NAME` (R080c, R081c); internal sources and old codes in the documents (R016, R024b).
+
 ### 2.3. Hooks
 
 - The hook refuses commands only. It never changes a command and never runs one.
@@ -77,3 +83,4 @@
 |---|---|---|---|
 | 0.1 | 2026-10-20 | Claude (task W01, PR 1) | Proposed |
 | 0.2 | 2026-10-20 | Claude (task W01, PR 2) | §2.3 as built: the hook |
+| 0.3 | 2026-10-20 | Claude (task W01, PR 3) | §2.2 as built: lint rules and tests |
