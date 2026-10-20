@@ -9,7 +9,7 @@
 
 This register lists every rule of the root `CLAUDE.md` and the check that enforces it today. Use it to find the rules that are only text, and to decide where a rule belongs (ADR-M84).
 
-- **ID**: `R` + the number of the bullet in the root `CLAUDE.md` on 2026-10-20 (R001–R131), with a letter when one bullet holds several rules. Bullets that only hold commands, reading lists, decisions or the layout (R001–R012, R017–R023, R097–R120, R128–R131) are not listed. IDs never change and are never reused; a removed rule keeps its row with the proposal `removed`.
+- **ID**: `R` + the number of the bullet in the root `CLAUDE.md` on 2026-10-20 (R001–R131; later rules from R132), with a letter when one bullet holds several rules. Bullets that only hold commands, reading lists, decisions or the layout (R001–R012, R017–R023, R097–R120, R128–R131) are not listed. IDs never change and are never reused; a removed rule keeps its row with the proposal `removed`.
 - **Kind**: lint · test · db (trigger, grant, constraint in a migration) · runtime (guard code) · ci · hook-candidate · text-only · INFO.
 - **Enforced by**: the file and line of the check. Paths that start with `tests/`, `packages/` or `apps/` are under `platform/`; `migrations/` is `platform/packages/core/src/db/migrations/`.
 - **Coverage**: full (a change that breaks the rule fails a check) · partial (some cases only) · none.
@@ -31,7 +31,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R026b | Every query through forTenant/TenantScope | runtime+test | packages/core/src/db/tenant-scope.ts:97; tests/db/tenant-guard.test.ts | full | pointer-only |
 | R027 | LLM calls via LiteLLM with 7 labels | test | tests/agent/request.test.ts:49 | partial | keep-root |
 | R028a | Agents never hold provider keys | test | tests/deploy/litellm-static.test.ts:105 | full | pointer-only |
-| R028b | Agents never push to default branch | test | tests/integration/db/publish-run.test.ts:363 | partial | keep-root |
+| R028b | Agents never push to default branch | test+hook | tests/integration/db/publish-run.test.ts:363; the hook refuses Claude's push to `main` (W01 PR 2) | partial | keep-root |
 | R028c | Agents never deploy to production | ? | – | none | keep-root |
 | R028d | Platform never merges | runtime+test | GitHost contract has no merge method; tests/integration/db/gate-g7.test.ts:161 | partial | keep-root; add-test |
 | R029 | Separation of duties, A ≠ B | test+runtime | tests/policy/approvers.test.ts:91 | full | keep-root (short) |
@@ -47,14 +47,14 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R034b | Secrets in OpenBao, AppRole, files not env | test | tests/deploy/worker-static.test.ts:43 | full | move:platform/deploy |
 | R034c | Sandboxes never reach OpenBao | runtime+test | apps/runner/src/docker/guard.ts:138 | full | pointer-only |
 | R034d | Never write key shares/root tokens to files | test | tests/deploy/openbao-static.test.ts:72 | partial | keep-root |
-| R035 | Secret commands only in owner's Terminal | hook-candidate | – | none | add-hook |
+| R035 | Secret commands only in owner's Terminal | hook | platform/tools/claude-hooks/guard-bash.mjs; tests/workspace/claude-hook.test.ts | partial (the commands listed in CLAUDE.md) | pointer-only |
 | R036 | Run Contracts signed by OpenBao Transit | test | tests/deploy/openbao-static.test.ts:132 | full | pointer-only |
 | R037a | Polling now, webhooks later, same handler | test | tests/worker/poller-loop.test.ts:70 | partial | move:platform/packages/adapters/git-github |
 | R037b | Users by numeric GitHub ID; bots never decide | test | tests/admin/onboarding.test.ts:117 | full | pointer-only |
 | R038a | SeaweedFS + Valkey; never MinIO/Redis/ES | test | tests/deploy/compose-static.test.ts:192 | full | pointer-only |
 | R038b | Pin images exactly / by digest | test | tests/deploy/compose-static.test.ts:164 | full | pointer-only |
-| R039 | Never prune volumes or touch the dev stack | hook-candidate | – | none | add-hook |
-| R040 | Claude never tags, releases, publishes | hook-candidate | workflows guard the tag side only | partial | add-hook |
+| R039 | Never prune volumes or touch the dev stack | hook | platform/tools/claude-hooks/guard-bash.mjs; tests/workspace/claude-hook.test.ts | partial (prune only; "touch the dev stack" stays text) | keep-root |
+| R040 | Claude never tags, releases, publishes | hook+ci | platform/tools/claude-hooks/guard-bash.mjs; tests/workspace/claude-hook.test.ts; workflows guard the tag side | full | pointer-only |
 | R041 | Sandbox concurrency configurable; obs optional | runtime+test | tests/runner/settings.test.ts:16 | full | pointer-only |
 | R042 | Every FR has tests for its AC | text-only | – | none | keep-root |
 | R091 | Design docs approved; differences to QUESTIONS | text-only | CODEOWNERS review | partial | keep-root |
@@ -68,9 +68,10 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R122 | One task per session, own worktree | text-only | – | none | keep-root |
 | R123 | Project state snapshot | INFO | – | – | drop-or-move-to-doc (ROADMAP) |
 | R124 | Open docs follow-ups | INFO | – | – | drop-or-move-to-doc (QUESTIONS) |
-| R125 | Merge main into a reviewed branch; never rebase/force-push | hook-candidate | – | none | add-hook |
+| R125 | Merge main into a reviewed branch; never rebase/force-push | hook | platform/tools/claude-hooks/guard-bash.mjs; tests/workspace/claude-hook.test.ts | full | pointer-only |
 | R126 | QUESTIONS/ADR number blocks | INFO | – | none | move:design (README "Number blocks") |
 | R127 | Throw-away OpenBao keys in dev | INFO | – | – | drop-or-move-to-doc (runbook T11) |
+| R132 | Never weaken or bypass the Claude Code hook (added by W01 PR 2) | test | tests/workspace/claude-hook.test.ts (the settings file runs the script) | partial | keep-root |
 
 ## 2. Workflow and gates
 
@@ -169,7 +170,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R073a–d | Langfuse purge rules | test | tests/llm-traces/langfuse-store.test.ts; tests/deploy/worker-static.test.ts:235 | full | pointer-only |
 | R074a,b,d | SeaweedFS: S3 only, no Iceberg/Lance, weed shell master | test | tests/deploy/seaweedfs-static.test.ts | full | pointer-only |
 | R074c | JWT keys only in their file | test | tests/deploy/seaweedfs-static.test.ts:150 | partial | pointer-only |
-| R074e | Never `weed shell s3.config.show` | test | specific scripts only | partial | add-hook |
+| R074e | Never `weed shell s3.config.show` | test+hook | specific scripts; platform/tools/claude-hooks/guard-bash.mjs; tests/workspace/claude-hook.test.ts | full | pointer-only |
 | R074f | Never S3 keys as process arguments | text-only | – | none | move:platform/deploy |
 | R075a | Migrations are plain SQL in TypeScript files | test | tests/db/schema.test.ts:38 | partial | keep (wording fixed in W01 PR 1) |
 | R075b | Never edit a merged migration | hook-candidate | – | none | add-test (CI diff check) |
@@ -185,7 +186,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 |---|---|---|---|---|---|
 | R077 | `Redacted`; reveal() never logged | test | tests/secrets/redaction.test.ts:26 | partial | add-lint |
 | R078a | compose:env never overwrites | test | tests/deploy/compose-static.test.ts:353 | full | pointer-only |
-| R078b | `compose down -v` only to wipe dev | text-only | – | none | add-hook |
+| R078b | `compose down -v` only to wipe dev | hook | platform/tools/claude-hooks/guard-bash.mjs; tests/workspace/claude-hook.test.ts | full | pointer-only |
 | R079a | Backups encrypted while streaming | test | tests/deploy/backup-static.test.ts:20 | full | pointer-only |
 | R079b | Backup schedule is the server's | test | tests/deploy/backup-static.test.ts:49 | partial | move:platform/deploy |
 | R080a | doctor through commands.ts allowlist | test+runtime | tests/doctor/host-readonly.test.ts:78 | full | pointer-only |
@@ -249,3 +250,4 @@ Some rows group several rules with the same check (for example R082a–f).
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-20 | Claude (task W01, PR 1) | First version, from a review of every bullet of the root `CLAUDE.md` |
+| 0.2 | 2026-10-20 | Claude (task W01, PR 2) | R028b, R035, R039, R040, R074e, R078b, R125: the Claude Code hook (`.claude/settings.json`) |
