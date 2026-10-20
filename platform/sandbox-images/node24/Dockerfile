@@ -23,9 +23,6 @@ USER root
 #   §4.1) and VS Code is disabled in every sandbox (OH_ENABLE_VSCODE=false, ADR-M25 §2.4). They
 #   carried most CRITICAL findings of the base image and most GPL/LGPL packages (Harry,
 #   2026-09-27, C04 session 3). Two findings without a fix stay listed in .trivyignore.
-# - linux-libc-dev (kernel headers) is upgraded from Debian at build time: the base image's copy
-#   has a CRITICAL finding fixed in 6.12.111-1 (CVE-2026-90037, 2026-10-20). Remove the upgrade
-#   when a new base image ships the fix. Its other findings without a fix are in .trivyignore.
 # - The Agent Server keeps its own state (conversations, bash events) under the relative path
 #   `workspace/…` of its working directory by default. The runner starts the sandbox in
 #   /workspace, which is the repository, so the state would show up as changed files. The OH_*
@@ -36,10 +33,7 @@ RUN node --version | grep -Eq '^v24\.' \
   && corepack enable pnpm \
   && rm -rf /workspace/project \
   && chown 10001:10001 /workspace \
-  && chmod 0755 /workspace \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends --only-upgrade linux-libc-dev \
-  && rm -rf /var/lib/apt/lists/*
+  && chmod 0755 /workspace
 ENV COREPACK_HOME=/tmp/corepack \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
     COREPACK_ENABLE_AUTO_PIN=0 \
