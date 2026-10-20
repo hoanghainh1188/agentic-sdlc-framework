@@ -106,6 +106,13 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
 - A task belongs to one project and one tenant. Only evaluations of that project use it; it is never copied to another tenant or project.
 - The data class of an evaluation on the project's task set is never below the highest data class of the intents its tasks came from. `client_restricted` uses self-hosted models only; `prohibited` never makes a task (ADR-M32, D-07 §4).
 
+- As built (PR 3a): migration `0033-evaluation-tasks` (D-05 §6.10, trigger `SDA24`); `EvaluationTaskRepository` (`register`, `recordCheck`, `decide`); core `evaluation/tasks.ts`: `draftEvaluationTask`, `registerEvaluationTask`, `reviewEvaluationTask`, `listEvaluationTasks`.
+  - The draft and the register need a merged intent (the `pr_merged` event G7 recorded) of the project. The register also checks the card's merge commit and that its spec is one the intent linked (path and SHA-256).
+  - The reviewer's producers are those of G7 (`g7Producers`), with the commit authors read again from the Git host; a Git host that cannot be read refuses the review.
+  - A rejection names a reason code: `not_representative`, `tests_weak`, `too_large`, `needs_environment` or `other`.
+  - A card writes commits and hashes in quotes: YAML reads a commit of digits only as a number.
+  - Rule R134 in `platform/packages/core/CLAUDE.md`.
+
 ### 2.8. Retention and a card that is removed (QUESTIONS #486)
 
 - The platform keeps no client text for a task, so FR-44 retention changes nothing: the rows hold references and hashes, kept like other evaluation rows; evidence purge and holds work as before.
@@ -161,3 +168,4 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
 |---|---|---|---|
 | 0.1 | 2026-10-20 | Claude (task L07, PR 1) | Proposed |
 | 0.2 | 2026-10-20 | Claude (task L07, PR 2) | §2.4 as built: the task card module, the Git host functions, `evaluation.tasks` |
+| 0.3 | 2026-10-20 | Claude (task L07, PR 3a) | §2.7 as built: the tables, the repository and the core functions; rule R134 |

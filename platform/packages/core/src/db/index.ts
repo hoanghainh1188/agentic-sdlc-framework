@@ -44,6 +44,12 @@ export {
   type PlanVersionView,
 } from './repositories/evaluation-plans.js';
 export {
+  cardPathOf,
+  type NewEvaluationTask,
+  type RegisterOutcome,
+  type TaskDecisionInput,
+} from './repositories/evaluation-tasks.js';
+export {
   checkEvaluationRunResult,
   type NewEvaluationRunResult,
 } from './repositories/evaluation-runs.js';

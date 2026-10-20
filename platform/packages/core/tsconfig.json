@@ -5,5 +5,10 @@
     "outDir": "dist"
   },
   "include": ["src"],
-  "references": [{ "path": "../config" }, { "path": "../contracts" }, { "path": "../messages" }]
+  "references": [
+    { "path": "../config" },
+    { "path": "../contracts" },
+    { "path": "../../eval" },
+    { "path": "../messages" }
+  ]
 }

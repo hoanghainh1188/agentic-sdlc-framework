@@ -12,6 +12,7 @@
   "dependencies": {
     "@sdlc/config": "workspace:*",
     "@sdlc/contracts": "workspace:*",
+    "@sdlc/eval": "workspace:*",
     "@sdlc/messages": "workspace:*",
     "kysely": "0.29.6",
     "pg": "8.23.0"

@@ -30,5 +30,6 @@
   "0029-evaluations.ts": "426004f0863e92dcb900293f5d8e70876441767291b0c3289f40f2d385ed40b8",
   "0030-evaluation-contracts.ts": "028981443fec5ccc028de6e40fa1a4bde7e78f3134ca6de2e568ca6e001a2b8a",
   "0031-evaluation-plans.ts": "c113aa4f1e292d4cb5d7b19ed363d87ec815734e8ba6233e3ec31ba8582d22b5",
-  "0032-evaluation-plan-requests.ts": "339afd460152c10d499a72893e644b9ebc3fa2f1ef125e93d54ea7a2d7addbe0"
+  "0032-evaluation-plan-requests.ts": "339afd460152c10d499a72893e644b9ebc3fa2f1ef125e93d54ea7a2d7addbe0",
+  "0033-evaluation-tasks.ts": "c007e61b510d38dac91ba10ecdc168c5b1168dcab1d38eec9defa44019154c3a"
 }

@@ -619,6 +619,31 @@ export const AUDIT_ACTIONS = {
     },
   },
   /**
+   * A project's evaluation task was registered, or its changed card registered again (task L07,
+   * ADR-M85 §2.6). The entity is the task. `task` is the task ID; the card's SHA-256 and commit;
+   * never its content or a path of the project.
+   */
+  'evaluation_task.registered': {
+    entityType: 'evaluation_task',
+    fields: {
+      project_id: 'uuid',
+      task: 'code',
+      intent_id: 'uuid',
+      card_sha256: 'sha256',
+      card_commit: 'code',
+    },
+  },
+  /** A reviewer approved an evaluation task (L07): bound to the card's SHA-256. */
+  'evaluation_task.approved': {
+    entityType: 'evaluation_task',
+    fields: { project_id: 'uuid', task: 'code', card_sha256: 'sha256' },
+  },
+  /** A reviewer rejected an evaluation task (L07): a reason code, never text. */
+  'evaluation_task.rejected': {
+    entityType: 'evaluation_task',
+    fields: { project_id: 'uuid', task: 'code', card_sha256: 'sha256', reason: 'code' },
+  },
+  /**
    * An evaluation plan was created (task L05, ADR-M82 §2.8). The entity is the plan. Amounts are
    * decimals; `trigger` is `once`, `schedule` or `on_change`. Never a prompt text or a path.
    */

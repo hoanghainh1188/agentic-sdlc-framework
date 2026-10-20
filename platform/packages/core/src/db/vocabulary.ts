@@ -150,3 +150,26 @@ export const EVALUATION_PLAN_STATUSES = ['active', 'paused', 'archived'] as cons
 export type EvaluationPlanStatus = (typeof EVALUATION_PLAN_STATUSES)[number];
 export const EVALUATION_PLAN_TRIGGERS = ['once', 'schedule', 'on_change'] as const;
 export type EvaluationPlanTrigger = (typeof EVALUATION_PLAN_TRIGGERS)[number];
+/** L07 (ADR-M85 §2.7): the states of a project's evaluation task; `gone` is final. */
+export const EVALUATION_TASK_STATUSES = [
+  'registered',
+  'checking',
+  'checked',
+  'check_failed',
+  'approved',
+  'rejected',
+  'gone',
+] as const;
+export type EvaluationTaskStatus = (typeof EVALUATION_TASK_STATUSES)[number];
+/** L07: a review decision on a task, bound to the card's SHA-256. */
+export const EVALUATION_TASK_DECISIONS = ['approved', 'rejected'] as const;
+export type EvaluationTaskDecision = (typeof EVALUATION_TASK_DECISIONS)[number];
+/** L07: why a reviewer rejected a task (codes only; the words stay on GitHub). */
+export const EVALUATION_TASK_REJECT_REASONS = [
+  'not_representative',
+  'tests_weak',
+  'too_large',
+  'needs_environment',
+  'other',
+] as const;
+export type EvaluationTaskRejectReason = (typeof EVALUATION_TASK_REJECT_REASONS)[number];

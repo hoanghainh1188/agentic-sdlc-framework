@@ -196,6 +196,18 @@ const UPDATABLE: Record<string, readonly string[]> = {
   ],
   evaluation_plan_versions: [],
   evaluation_configurations: [],
+  // L07 (migration 0033): a task's card reference and state; its identity is fixed, gone is final
+  // (SDA24). Review decisions are append-only.
+  evaluation_tasks: [
+    'card_commit',
+    'card_sha256',
+    'base_commit',
+    'merge_commit',
+    'status',
+    'check_code',
+    'updated_at',
+  ],
+  evaluation_task_decisions: [],
   // U05 (migration 0027): seen time only grows; the end is set once (trigger SDA18). No DELETE.
   web_sessions: ['last_seen_at', 'revoked_at', 'end_reason'],
   // U06 (migration 0028): the counter and the last use only grow; revoked once (SDA20). No DELETE.
@@ -343,7 +355,9 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // L05: evaluation_plans → projects, users; evaluation_plan_versions → evaluation_plans, users;
     // evaluations → evaluation_plans; evaluation_configurations → evaluations, agents;
     // evaluation_plans → users (run_requested_by, migration 0032).
-    expect(fks).toHaveLength(80);
+    // L07: evaluation_tasks → projects, intents, users; evaluation_task_decisions →
+    // evaluation_tasks, users.
+    expect(fks).toHaveLength(85);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

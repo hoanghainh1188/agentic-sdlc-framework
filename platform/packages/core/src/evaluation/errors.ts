@@ -50,6 +50,35 @@ export const EVALUATION_ERROR_CODES = [
   'prompt_not_found',
   /** The Git host could not be read: try again later. */
   'git_host_unavailable',
+  // L07 (ADR-M85): a project's own evaluation tasks.
+  /** No such intent in the project. */
+  'intent_not_found',
+  /** The intent has no merged pull request (G7 recorded no merge). */
+  'intent_not_merged',
+  /** The intent has no linked spec. */
+  'spec_missing',
+  /** The pull request added or changed no test file (`evaluation.tasks.test_globs`). */
+  'no_tests',
+  /** The pull request changed only test files. */
+  'no_planned_files',
+  /** The commit before the change cannot be found for sure (ADR-M85 §2.3). */
+  'base_unclear',
+  /** More than 20 hidden tests or 20 planned files. */
+  'too_many_files',
+  /** The task card is not on the project's default branch. */
+  'card_not_found',
+  /** The task card is not valid, or does not match its intent (merge commit, spec, path). */
+  'card_invalid',
+  /** The task ID belongs to a task of another intent. */
+  'task_id_taken',
+  /** The task is gone: its card was removed; it never runs again. */
+  'task_gone',
+  /** The task or its card changed since the caller read it. */
+  'task_changed',
+  /** Only a task whose check passed is reviewed. */
+  'task_not_checked',
+  /** A producer of the intent never reviews its task (R029). */
+  'producer_cannot_review',
 ] as const;
 export type EvaluationErrorCode = (typeof EVALUATION_ERROR_CODES)[number];
 

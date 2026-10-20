@@ -35,6 +35,8 @@ import type {
   EvaluationRunStatus,
   EvaluationStatus,
   EvaluationPlanStatus,
+  EvaluationTaskDecision,
+  EvaluationTaskStatus,
   EvaluationPlanTrigger,
   GateDecisionSource,
   GitProvider,
@@ -648,6 +650,41 @@ export interface EvaluationConfigurationsTable {
   created_at: CreatedAt;
 }
 
+/**
+ * A project's own evaluation task (L07, migration 0033, ADR-M85 §2.7): a reference to its card on
+ * the default branch, never its content. The identity never changes; `gone` is final (SDA24).
+ */
+export interface EvaluationTasksTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  project_id: Immutable<string>;
+  task_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  card_path: Immutable<string>;
+  card_commit: ColumnType<string, string, string>;
+  card_sha256: ColumnType<string, string, string>;
+  base_commit: ColumnType<string, string, string>;
+  merge_commit: ColumnType<string, string, string>;
+  status: ColumnType<EvaluationTaskStatus, EvaluationTaskStatus | undefined, EvaluationTaskStatus>;
+  check_code: ColumnType<string | null, string | null | undefined, string | null>;
+  registered_by: Immutable<string | null>;
+  updated_at: ColumnType<Date, Date | undefined, Date>;
+  created_at: CreatedAt;
+}
+
+/** A review decision on a task (L07, migration 0033). Append-only: codes and IDs. */
+export interface EvaluationTaskDecisionsTable {
+  /** bigint identity; `pg` returns int8 as a string. */
+  id: ColumnType<string, never, never>;
+  tenant_id: Immutable<string>;
+  task_id: Immutable<string>;
+  card_sha256: Immutable<string>;
+  decision: Immutable<EvaluationTaskDecision>;
+  reason: Immutable<string | null>;
+  decided_by: Immutable<string>;
+  created_at: CreatedAt;
+}
+
 /** One run of one task for one configuration (L04, migration 0029). */
 export interface EvaluationRunsTable {
   id: GeneratedId;
@@ -946,6 +983,8 @@ export interface Database {
   evaluation_plans: EvaluationPlansTable;
   evaluation_plan_versions: EvaluationPlanVersionsTable;
   evaluation_configurations: EvaluationConfigurationsTable;
+  evaluation_tasks: EvaluationTasksTable;
+  evaluation_task_decisions: EvaluationTaskDecisionsTable;
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
@@ -1526,6 +1565,33 @@ export const TABLE_COLUMNS = {
     'instructions_sha256',
     'created_at',
   ]),
+  evaluation_tasks: columns<EvaluationTasksTable>()([
+    'id',
+    'tenant_id',
+    'project_id',
+    'task_id',
+    'intent_id',
+    'card_path',
+    'card_commit',
+    'card_sha256',
+    'base_commit',
+    'merge_commit',
+    'status',
+    'check_code',
+    'registered_by',
+    'updated_at',
+    'created_at',
+  ]),
+  evaluation_task_decisions: columns<EvaluationTaskDecisionsTable>()([
+    'id',
+    'tenant_id',
+    'task_id',
+    'card_sha256',
+    'decision',
+    'reason',
+    'decided_by',
+    'created_at',
+  ]),
   tenant_role_bindings: columns<TenantRoleBindingsTable>()([
     'id',
     'tenant_id',
@@ -1632,6 +1698,8 @@ export const TENANT_COLUMN = {
   evaluation_plans: 'tenant_id',
   evaluation_plan_versions: 'tenant_id',
   evaluation_configurations: 'tenant_id',
+  evaluation_tasks: 'tenant_id',
+  evaluation_task_decisions: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
   web_sessions: 'tenant_id',
@@ -1667,6 +1735,8 @@ export type EvaluationRunContractRow = Selectable<EvaluationRunContractsTable>;
 export type EvaluationPlan = Selectable<EvaluationPlansTable>;
 export type EvaluationPlanVersion = Selectable<EvaluationPlanVersionsTable>;
 export type EvaluationConfigurationRow = Selectable<EvaluationConfigurationsTable>;
+export type EvaluationTask = Selectable<EvaluationTasksTable>;
+export type EvaluationTaskDecisionRow = Selectable<EvaluationTaskDecisionsTable>;
 export type GitEventReceipt = Selectable<GitEventReceiptsTable>;
 export type Escalation = Selectable<EscalationsTable>;
 export type EscalationNotice = Selectable<EscalationNoticesTable>;
