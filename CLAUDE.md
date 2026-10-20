@@ -171,6 +171,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - Deployment helpers: `pnpm doctor [--env <file>] [--json]` (deploy README "Doctor"), `pnpm access:tls …` (ADR-M67, T11 §3d), `pnpm github-app:create --out <file outside the repo>` (deploy README "Create the GitHub App"; owner's terminal only).
 - Trial on a developer machine (`TRIAL.md`, ADR-M76, T11 §3.1b): `pnpm trial:up --settings <file outside the repo>`, `pnpm trial:start`, `pnpm trial:down [--wipe]`.
 - Releases (`RELEASING.md`, ADR-M66, ADR-M72): `pnpm images mode|get|export`, `pnpm release:lock <run-id>`, `pnpm cli:pack` / `pnpm cli:pack-check`. Order: version PR → `release-images` `push: true` (Harry) → lock file PR → tag (Harry) → `release.yml`, `npm-publish.yml`.
+- Claude Code hook (W01, ADR-M84 §2.3): `.claude/settings.json` runs `platform/tools/claude-hooks/guard-bash.mjs` before every Bash call and refuses the commands this file forbids for Claude (rule IDs in `design/RULES.md`); never weaken or bypass it.
 - CI: `.github/workflows/ci.yml` (A09; jobs, triggers and path filters in `platform/DEVELOPMENT.md` §2). Actions pinned by commit SHA; thresholds in the workflow `env:`. Short checks share the `scan` job; do not add a job for a check under a minute; every job has `timeout-minutes`.
 
 ## Current constraints
