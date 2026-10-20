@@ -126,3 +126,4 @@ Four points were open in the C10 plan:
 | 0.1 | 2026-09-27 | Claude (task C10) | First version |
 | 0.2 | 2026-10-03 | Claude (task B13, PR 2) | Note: §2.2's known gap is closed by ADR-M37 §2.8: the register through the API with handbook Ch.20's approvals; the operator keeps `sdlc ops agent show|list|suspend|quarantine` |
 | 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |
+| 0.4 | 2026-10-20 | Claude (task L08) | Note: ADR-M86 adds evaluation evidence to the approvals (§2.2 via ADR-M37 §2.8) and to the recertification (§2.7), built by L09 and L10; the check before a run (§2.6) does not change |
