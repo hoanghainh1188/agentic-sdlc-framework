@@ -657,12 +657,12 @@ t("L06","EVAL","Evaluation reports and recommendations for managers","M",["L05"]
   "Tests: each rule on synthetic results (fires, does not fire, the numbers quoted), texts from the catalog"],
  "QUESTIONS #450, #465 (dashboard first)")
 t("L07","EVAL","A project's own task set from its merged intents","M",["L02","E01"],"FR-40, D-07 §4",
- "platform/eval/*, platform/packages/core, platform/apps/cli, platform/tests/*, design/ADR (next free number)",
+ "platform/eval/*, platform/packages/core, platform/packages/contracts, platform/packages/adapters/git-github, platform/packages/config (evaluation.test_globs, evaluation.commands), platform/apps/api, platform/apps/cli, platform/apps/worker, platform/apps/runner, platform/packages/messages, platform/tests/*, design/ADR-M85, design/D-05 §6.8, handbook Ch.19",
  ["Make evaluation tasks from a project's merged intents, as SWE-bench does: the spec, the base commit, and the tests the pull request added as hidden tests; a person reviews each task before it enters the set",
   "The task set is private to the project and tenant and follows its data class and retention (FR-44); never copied to another tenant",
   "The task check of ADR-M78 (`--check`) runs on every new task",
   "Tests: a task made from a fixture intent, refused when the pull request added no test"],
- "QUESTIONS #450: evaluations on a project's own code, not only the sample repository")
+ "QUESTIONS #450: evaluations on a project's own code, not only the sample repository. Design (ADR-M85, QUESTIONS #485–#487): a task is a card `.sdlc/eval-tasks/<id>.yaml` on the project's default branch, written by `sdlc eval task draft` on the person's machine and merged by a person; the platform stores its path, commit and SHA-256 only; the check runs on the server in the runner; a reviewer has a role in `access.eval_roles` and is never a producer of the intent; four PRs")
 t("L08","EVAL","Design: evaluations in the agent register's approvals","S",["L06","C10"],"FR-11, FR-36",
  "design/ADR (next free number), design/ADR-M31, handbook Ch.20, design/QUESTIONS.md",
  ["A design for a new agent version (model, instructions) to reach a threshold on the project's task set before Person B and the owner approve it, and for the 3-month recertification (FR-36) to use evaluation numbers",
@@ -742,7 +742,7 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.51 |
+| Version | 1.52 |
 | Date | 2026-10-20 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -919,6 +919,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.49 | 2026-10-13 | Claude (task H01, PR 3), approved by Harry (QUESTIONS #455, #456 answered) | H01 done: its gaps become H04 (secret scan of the diff, Medium), H05 (diff size bound, Medium), H06 (stronger sandbox runtime, Later), H07 (Docker authorization plugin, High) and two criteria of H02; QUESTIONS #455, #456 |
 | 1.50 | 2026-10-16 | Claude, approved by Harry | Release v0.4.0 with L04 and L05 (the first part of EVAL); EXT and Models move to v0.5.0; L06–L08 finish EVAL first |
 | 1.51 | 2026-10-20 | Claude (task W01, PR 1), approved by the repository owner | New milestone DEV with task W01: rules as checks (a rules register, hooks, lint and tests, a shorter CLAUDE.md; QUESTIONS #479, ADR-M84) |
+| 1.52 | 2026-10-20 | Claude (task L07, PR 1), approved by the repository owner | L07 note and code areas: task cards in the project's repository, the check on the server, the reviewer rule (ADR-M85, QUESTIONS #485–#487) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
