@@ -39,6 +39,11 @@
 - The hook is a backstop. The owner's permission settings and the rules stay in place.
 - The hook script has unit tests.
 - The hook never reads or prints a secret value.
+- As built (PR 2): `.claude/settings.json` runs `platform/tools/claude-hooks/guard-bash.mjs` before every Bash tool call (`PreToolUse`, matcher `Bash`).
+  - The script splits the command at `;`, `&&`, `||`, `|`, `&` and new lines, and checks each part. It skips heredoc bodies and quoted text (a commit message is not a command). It checks the command inside `bash -c "…"` too.
+  - It refuses: volume prunes and `down -v` (R039, R078b); tags, `push --tags`, `gh release create|edit|delete|upload`, `gh workflow run … push=true`, `npm|pnpm|yarn publish`, `npm token` (R040); force-push, `push --delete`, `rebase` except `--abort` (R125); a push to `main` or `master` (R028b); `openbao:bootstrap init|unseal|root-token|*-credentials`, `sdlc ops bootstrap|token`, `github-app:create`, `test:*-live` (R035); the SeaweedFS key listing given to `weed` on its line or in its heredoc (R074e).
+  - A refusal exits 2 and names the rule in `design/RULES.md`. Input it cannot read, and other tools, are let through.
+  - Tests: `platform/tests/workspace/claude-hook.test.ts` (a table of refused and allowed commands, the script with the hook's JSON, the settings file).
 
 ### 2.4. Rules by folder
 
@@ -71,3 +76,4 @@
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-20 | Claude (task W01, PR 1) | Proposed |
+| 0.2 | 2026-10-20 | Claude (task W01, PR 2) | §2.3 as built: the hook |
