@@ -288,6 +288,16 @@ describe('reading and writing a task card (ADR-M85 §2.1)', () => {
     expect(parseTaskCard(renderTaskCard(card), PATH)).toEqual(card);
   });
 
+  it('round-trips commits and hashes that YAML could read as numbers', () => {
+    const digits = {
+      ...card,
+      baseCommit: '1'.repeat(40),
+      mergeCommit: `${'2'.repeat(10)}e${'3'.repeat(29)}`,
+      spec: { ...SPEC, commit: '4'.repeat(40), sha256: '5'.repeat(64) },
+    };
+    expect(parseTaskCard(renderTaskCard(digits), PATH)).toEqual(digits);
+  });
+
   it('holds codes, commits, paths and commands only (no title, no text)', () => {
     const text = renderTaskCard(card);
     expect(text).not.toMatch(/title|description|body/);
@@ -312,7 +322,7 @@ describe('reading and writing a task card (ADR-M85 §2.1)', () => {
     ],
     [
       'the same commit twice',
-      (t) => t.replace(`merge_commit: ${MERGE}`, `merge_commit: ${BASE}`),
+      (t) => t.replace(`merge_commit: "${MERGE}"`, `merge_commit: "${BASE}"`),
       'must differ',
     ],
     ['a short spec hash', (t) => t.replace('a'.repeat(64), 'abc'), 'spec.sha256'],

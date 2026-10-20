@@ -116,6 +116,8 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R054b | Prompt variant = path, commit, hash | test | tests/integration/db/evaluation-plans.test.ts:165 | full | pointer-only | platform/packages/core/CLAUDE.md |
 | R054c | One open evaluation per plan | db | migrations/0031-evaluation-plans.ts:135 | full | pointer-only | platform/packages/core/CLAUDE.md |
 | R054d | Amounts by new version, never below spend | db+test | tests/integration/db/evaluation-plans.test.ts:227 | full | pointer-only | platform/packages/core/CLAUDE.md |
+| R134a | Evaluation task = card path, commit, SHA-256; never its content (added by L07 PR 3a) | db+test | migrations/0033-evaluation-tasks.ts; tests/integration/db/evaluation-tasks.test.ts ("the tables hold no text") | full | pointer-only | platform/packages/core/CLAUDE.md |
+| R134b | Task reviewer has an eval role, is never a producer; decision bound to the card's SHA-256 (added by L07 PR 3a) | test | tests/integration/db/evaluation-tasks.test.ts ("refuses producers") | full | pointer-only | platform/packages/core/CLAUDE.md |
 | R055 | Never offer approval to producer / role-less | test | tests/cli/next.test.ts:200 | partial | move:platform/apps/cli | platform/packages/core/CLAUDE.md |
 | R056a | Producers never decide G7/G8 | runtime+test | tests/policy/approvers.test.ts:91 | full | pointer-only | platform/packages/core/CLAUDE.md |
 | R056b | Escalations decided by owner/backup/governance | test | tests/integration/db/escalations.test.ts:427 | full | pointer-only | platform/packages/core/CLAUDE.md |

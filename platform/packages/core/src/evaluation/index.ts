@@ -68,3 +68,14 @@ export {
 } from './plans.js';
 export { checkEvaluationScope } from './start.js';
 export { advanceEvaluationPlan, type PlanStep } from './plan-loop.js';
+export {
+  draftEvaluationTask,
+  listEvaluationTasks,
+  registerEvaluationTask,
+  reviewEvaluationTask,
+  type DraftEvaluationTaskInput,
+  type EvaluationTaskDeps,
+  type EvaluationTaskGitHost,
+  type RegisterEvaluationTaskInput,
+  type ReviewEvaluationTaskInput,
+} from './tasks.js';

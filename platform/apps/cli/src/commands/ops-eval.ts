@@ -69,6 +69,20 @@ const ERROR_KEYS: Readonly<Record<EvaluationErrorCode, MessageKey>> = {
   agent_no_model: 'evaluation.error.agent_no_model',
   prompt_not_found: 'evaluation.error.prompt_not_found',
   git_host_unavailable: 'evaluation.error.git_host_unavailable',
+  intent_not_found: 'evaluation.error.intent_not_found',
+  intent_not_merged: 'evaluation.error.intent_not_merged',
+  spec_missing: 'evaluation.error.spec_missing',
+  no_tests: 'evaluation.error.no_tests',
+  no_planned_files: 'evaluation.error.no_planned_files',
+  base_unclear: 'evaluation.error.base_unclear',
+  too_many_files: 'evaluation.error.too_many_files',
+  card_not_found: 'evaluation.error.card_not_found',
+  card_invalid: 'evaluation.error.card_invalid',
+  task_id_taken: 'evaluation.error.task_id_taken',
+  task_gone: 'evaluation.error.task_gone',
+  task_changed: 'evaluation.error.task_changed',
+  task_not_checked: 'evaluation.error.task_not_checked',
+  producer_cannot_review: 'evaluation.error.producer_cannot_review',
 };
 
 const list = (value: string | boolean | undefined): string[] | undefined =>

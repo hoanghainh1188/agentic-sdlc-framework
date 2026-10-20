@@ -417,6 +417,9 @@ importers:
       '@sdlc/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@sdlc/eval':
+        specifier: workspace:*
+        version: link:../../eval
       '@sdlc/messages':
         specifier: workspace:*
         version: link:../messages

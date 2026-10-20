@@ -166,7 +166,8 @@ function yamlList(items: readonly string[]): string {
 }
 
 /**
- * Writes a card as YAML, fields in a fixed order. A draft may have empty command lists: the person
+ * Writes a card as YAML, fields in a fixed order. Commits and hashes are quoted: YAML would read a
+ * commit of digits only (or digits with one `e`) as a number. A draft may have empty command lists: the person
  * writes them before the card is committed (`parseTaskCard` refuses empty lists).
  */
 export function renderTaskCard(card: TaskCard): string {
@@ -176,12 +177,12 @@ export function renderTaskCard(card: TaskCard): string {
     `schema: ${String(TASK_CARD_SCHEMA)}`,
     `id: ${card.id}`,
     `intent: ${card.intent}`,
-    `base_commit: ${card.baseCommit}`,
-    `merge_commit: ${card.mergeCommit}`,
+    `base_commit: ${JSON.stringify(card.baseCommit)}`,
+    `merge_commit: ${JSON.stringify(card.mergeCommit)}`,
     'spec:',
     `  path: ${JSON.stringify(card.spec.path)}`,
-    `  commit: ${card.spec.commit}`,
-    `  sha256: ${card.spec.sha256}`,
+    `  commit: ${JSON.stringify(card.spec.commit)}`,
+    `  sha256: ${JSON.stringify(card.spec.sha256)}`,
     `hidden_tests:${yamlList(card.hiddenTests)}`,
     `planned_files:${yamlList(card.plannedFiles)}`,
     `fail_to_pass:${yamlList(card.failToPass)}`,

@@ -32,6 +32,7 @@ import { migration0029Evaluations } from './0029-evaluations.js';
 import { migration0030EvaluationContracts } from './0030-evaluation-contracts.js';
 import { migration0031EvaluationPlans } from './0031-evaluation-plans.js';
 import { migration0032EvaluationPlanRequests } from './0032-evaluation-plan-requests.js';
+import { migration0033EvaluationTasks } from './0033-evaluation-tasks.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -67,4 +68,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0030-evaluation-contracts': migration0030EvaluationContracts,
   '0031-evaluation-plans': migration0031EvaluationPlans,
   '0032-evaluation-plan-requests': migration0032EvaluationPlanRequests,
+  '0033-evaluation-tasks': migration0033EvaluationTasks,
 };
