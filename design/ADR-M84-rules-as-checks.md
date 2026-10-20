@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task W01, PR 1) |
+| Status | **Accepted** (repository owner, 2026-10-20, after W01 PR 1–4) |
 | Date | 2026-10-20 |
 | Decided by | The repository owner (W01 plan approved in the session, 2026-10-20) |
 | Related | D-08 task W01 (AC1–AC4); `design/RULES.md`; QUESTIONS #424–#426 (the first slimming of CLAUDE.md), #479; ADR-M16 (tooling, lint) |
@@ -90,3 +90,4 @@
 | 0.2 | 2026-10-20 | Claude (task W01, PR 2) | §2.3 as built: the hook |
 | 0.3 | 2026-10-20 | Claude (task W01, PR 3) | §2.2 as built: lint rules and tests |
 | 0.4 | 2026-10-20 | Claude (task W01, PR 4) | §2.4 as built: rules by folder, ID tags, a word budget |
+| 1.0 | 2026-10-20 | Repository owner | Accepted |

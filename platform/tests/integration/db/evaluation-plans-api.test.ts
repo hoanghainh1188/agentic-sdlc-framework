@@ -198,6 +198,29 @@ describeDb('L05 PR 3: evaluation plans through the API', () => {
         'evaluation_refused',
         'prompt_not_found',
       );
+      // L07: the project's own task set needs an approved task; it has no version.
+      refusal(
+        await call(
+          'POST',
+          '/v1/projects/shop/eval-plans',
+          'a',
+          body({ code: 'z', task_set_kind: 'project', task_set_version: null, task_ids: null }),
+        ),
+        409,
+        'evaluation_conflict',
+        'task_set_empty',
+      );
+      refusal(
+        await call(
+          'POST',
+          '/v1/projects/shop/eval-plans',
+          'a',
+          body({ code: 'z', task_set_kind: 'project', task_set_version: 1 }),
+        ),
+        422,
+        'evaluation_refused',
+        'invalid_input',
+      );
       // A prompt text is never accepted: only a path.
       refusal(
         await call(

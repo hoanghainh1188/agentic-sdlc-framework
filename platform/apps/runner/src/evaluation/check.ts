@@ -17,7 +17,6 @@
 // (`preempted`, `refused`, or a thrown error: the workflow calls it lost). Paths, the repository,
 // the diff, the spec and the tests never reach a log, an error or the returned value.
 import { execFile } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -34,14 +33,7 @@ import {
   verifyTaskCheckContract,
   type PlatformDatabase,
 } from '@sdlc/core';
-import {
-  parseTaskCard,
-  prepareBase,
-  TaskError,
-  taskCardPath,
-  taskOfCard,
-  type TaskCard,
-} from '@sdlc/eval';
+import { prepareBase, TaskError } from '@sdlc/eval';
 import { Redacted } from '@sdlc/secrets';
 
 import type { DockerClient } from '../docker/client.js';
@@ -53,12 +45,10 @@ import type { RunnerSettings } from '../settings.js';
 import type { GitTokenRevoker } from '../tokens.js';
 import { cloneForRun, type CloneInput } from '../workspace/git.js';
 import { gitArgs, gitEnv } from '../workspace/proposal.js';
+import { ProjectTaskError, readProjectTask } from './project-task.js';
 import { scoreEvaluationRun, ScoringError, type ScoreEvaluationInput } from './score.js';
 
 const run = promisify(execFile);
-
-/** The largest card, spec or hidden test file the check reads from Git. */
-const MAX_FILE_BYTES = 1024 * 1024;
 
 export interface CheckTaskDeps {
   readonly db: PlatformDatabase;
@@ -106,29 +96,6 @@ async function gitText(
   });
   return stdout;
 }
-
-/** A file of the repository at a commit, as bytes; undefined when it does not exist there. */
-async function fileAt(
-  repo: string,
-  home: string,
-  commit: string,
-  file: string,
-  timeoutMs: number,
-): Promise<Buffer | undefined> {
-  try {
-    const { stdout } = await run('git', gitArgs(repo, ['show', `${commit}:${file}`]), {
-      env: gitEnv(home),
-      timeout: timeoutMs,
-      encoding: 'buffer',
-      maxBuffer: MAX_FILE_BYTES,
-    });
-    return stdout;
-  } catch {
-    return undefined;
-  }
-}
-
-const sha256 = (bytes: Buffer | string): string => createHash('sha256').update(bytes).digest('hex');
 
 /** The pinned commit's files without `.git`: what the scoring volume gets. */
 function copyTree(from: string, to: string): void {
@@ -211,36 +178,19 @@ export async function checkTask(
     const home = path.join(pinned, 'home');
     checkStop();
 
-    const cardBytes = await fileAt(
+    const { card, task, hiddenDir } = await readProjectTask({
       repo,
       home,
-      contract.card_commit,
-      taskCardPath(contract.task_id),
+      taskId: contract.task_id,
+      cardCommit: contract.card_commit,
+      cardSha256: contract.card_sha256,
+      workDir,
       timeoutMs,
-    );
-    if (!cardBytes || sha256(cardBytes) !== contract.card_sha256)
-      throw new CheckFailed('card_changed');
-    let card: TaskCard;
-    try {
-      card = parseTaskCard(cardBytes.toString('utf8'), taskCardPath(contract.task_id));
-    } catch {
-      throw new CheckFailed('card_changed');
-    }
+    }).catch((error: unknown) => {
+      throw error instanceof ProjectTaskError ? new CheckFailed(error.code) : error;
+    });
     if (card.baseCommit !== contract.base_sha || card.mergeCommit !== contract.merge_sha) {
       throw new CheckFailed('card_changed');
-    }
-    const spec = await fileAt(repo, home, card.spec.commit, card.spec.path, timeoutMs);
-    if (!spec || sha256(spec) !== card.spec.sha256) throw new CheckFailed('spec_changed');
-
-    const hiddenDir = path.join(workDir, 'hidden');
-    fs.mkdirSync(hiddenDir, { mode: 0o700 });
-    for (const file of card.hiddenTests) {
-      const bytes = await fileAt(repo, home, card.mergeCommit, file, timeoutMs);
-      if (!bytes) throw new CheckFailed('hidden_test_missing');
-      const target = path.resolve(hiddenDir, file);
-      if (!target.startsWith(`${hiddenDir}${path.sep}`)) throw new CheckFailed('card_changed');
-      fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
-      fs.writeFileSync(target, bytes, { mode: 0o600 });
     }
     const solution = await gitText(
       repo,
@@ -259,7 +209,6 @@ export async function checkTask(
       timeoutMs,
     );
 
-    const task = taskOfCard(card, spec.toString('utf8'));
     const prepared = prepareBase({
       clone: repo,
       commit: card.baseCommit,

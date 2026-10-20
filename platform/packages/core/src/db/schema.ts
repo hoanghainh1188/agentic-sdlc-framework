@@ -44,6 +44,7 @@ import type {
   ProjectStatus,
   SpecSourceTool,
   SpecStructureCode,
+  TaskSetKind,
   TenantRole,
   TenantStatus,
   UserStatus,
@@ -563,7 +564,8 @@ export interface EvaluationsTable {
   /** `EVAL-YYYY-NNNN`; also the `intent_id` label of its model calls (QUESTIONS #462). */
   code: Immutable<string>;
   data_class: Immutable<DataClass>;
-  task_set_version: Immutable<number>;
+  /** The number of a `folder` task set; null for a `project` task set (migration 0035). */
+  task_set_version: Immutable<number | null>;
   /** The configuration file the runner reads (a code, no path); null for a plan's evaluation. */
   config_name: Immutable<string | null>;
   task_ids: Immutable<string[]>;
@@ -583,6 +585,10 @@ export interface EvaluationsTable {
   /** L05 (migration 0031): the plan and its version, or null for an operator evaluation. */
   plan_id: ColumnType<string | null, string | null | undefined, never>;
   plan_version: ColumnType<number | null, number | null | undefined, never>;
+  /** L07 (migration 0035, ADR-M85 §2.10): `folder` (a numbered set) or `project`. */
+  task_set_kind: ColumnType<TaskSetKind, TaskSetKind | undefined, never>;
+  /** The default branch's commit the cards of a `project` task set were read from. */
+  task_set_commit: ColumnType<string | null, string | null | undefined, never>;
 }
 
 /** An evaluation plan of a project (L05, migration 0031, ADR-M82). */
@@ -616,7 +622,8 @@ export interface EvaluationPlanVersionsTable {
   plan_id: Immutable<string>;
   version: Immutable<number>;
   data_class: Immutable<DataClass>;
-  task_set_version: Immutable<number>;
+  /** Null for a `project` task set (migration 0035). */
+  task_set_version: Immutable<number | null>;
   task_ids: Immutable<string[] | null>;
   runs_per_task: Immutable<number>;
   budget_per_run_usd: Immutable<string>;
@@ -629,6 +636,8 @@ export interface EvaluationPlanVersionsTable {
   configurations: ColumnType<unknown[], string, never>;
   changed_by: Immutable<string | null>;
   created_at: CreatedAt;
+  /** L07 (migration 0035): `folder` or `project` (a `project` plan has no version). */
+  task_set_kind: ColumnType<TaskSetKind, TaskSetKind | undefined, never>;
 }
 
 /** A configuration an evaluation of a plan runs, resolved at its start (L05, migration 0031). */
@@ -725,6 +734,8 @@ export interface EvaluationRunsTable {
   /** The configuration's caps, copied at start (migration 0030). */
   max_iterations: ColumnType<number, number | undefined, never>;
   max_duration_min: ColumnType<number, number | undefined, never>;
+  /** L07 (migration 0035): the base commit of the run's task (`project` task sets only). */
+  base_sha: ColumnType<string | null, string | null | undefined, never>;
 }
 
 /**
@@ -1460,6 +1471,8 @@ export const TABLE_COLUMNS = {
     'base_sha',
     'plan_id',
     'plan_version',
+    'task_set_kind',
+    'task_set_commit',
   ]),
   evaluation_runs: columns<EvaluationRunsTable>()([
     'id',
@@ -1481,6 +1494,7 @@ export const TABLE_COLUMNS = {
     'created_at',
     'max_iterations',
     'max_duration_min',
+    'base_sha',
   ]),
   evaluation_run_results: columns<EvaluationRunResultsTable>()([
     'id',
@@ -1567,6 +1581,7 @@ export const TABLE_COLUMNS = {
     'configurations',
     'changed_by',
     'created_at',
+    'task_set_kind',
   ]),
   evaluation_configurations: columns<EvaluationConfigurationsTable>()([
     'id',

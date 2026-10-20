@@ -594,7 +594,10 @@ export const AUDIT_ACTIONS = {
       project_id: 'uuid',
       code: 'code',
       data_class: 'code',
-      task_set_version: 'version',
+      // L07: a numbered task set has a version; a project's task set has a kind and a commit.
+      task_set_version: 'version?',
+      task_set_kind: 'code?',
+      task_set_commit: 'code?',
       config_name: 'code?',
       runs_total: 'version',
       budget_usd: 'decimal',

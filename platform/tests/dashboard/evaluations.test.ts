@@ -90,6 +90,7 @@ describe('the form', () => {
       body: {
         code: 'weekly-models',
         data_class: 'internal',
+        task_set_kind: 'folder',
         task_set_version: 1,
         task_ids: ['feat-tax', 'bug-stock'],
         runs_per_task: 3,
@@ -162,6 +163,20 @@ describe('the form', () => {
       budgetPerRunUsd: '2.5',
       configurations: [{ id: 'oss-short', source: 'model', promptPath: 'eval/prompts/short.md' }],
     });
+  });
+  it("takes the project's own tasks as the word project, and keeps it on a change (L07)", () => {
+    const result = planBody(form({ taskSetVersion: ' Project ' }), 'change');
+    expect(result.ok && result.body).toMatchObject({
+      task_set_kind: 'project',
+      task_set_version: null,
+    });
+    expect(planBody(form({ taskSetVersion: 'v1' }), 'create')).toEqual({
+      ok: false,
+      field: 'task_set_version',
+    });
+    const view = evalPlanBody() as Parameters<typeof planFormOf>[0];
+    const project = { ...view, current: { ...view.current, task_set_version: null } };
+    expect(planFormOf(project).taskSetVersion).toBe('project');
   });
 });
 

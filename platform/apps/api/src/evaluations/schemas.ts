@@ -33,7 +33,9 @@ const configuration = z
 
 const content = {
   data_class: z.enum(DATA_CLASSES),
-  task_set_version: z.number().int().min(1).max(1000),
+  // L07 (ADR-M85 §2.10): a `project` plan runs the project's approved tasks and has no version.
+  task_set_kind: z.enum(['folder', 'project']).default('folder'),
+  task_set_version: z.number().int().min(1).max(1000).nullable().default(null),
   task_ids: z.array(z.string().max(64)).max(64).nullable().default(null),
   runs_per_task: z.number().int().min(1).max(20),
   budget_per_run_usd: usd,

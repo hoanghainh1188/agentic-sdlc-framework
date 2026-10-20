@@ -353,6 +353,23 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 
 The plan file holds codes, numbers and amounts only: `code`, `data_class`, `task_set_version`, `task_ids` (empty: every task), `runs_per_task`, `budget_per_run_usd`, `monthly_cap_usd`, `trigger` (`once`, `schedule`, `on_change`), `schedule` (`every` `daily` or `weekly`, `hour` in UTC, `weekday` 1–7) and `configurations`. A configuration names an agent of the register (`agent_key`) or a model (`model`, `provider_type`) run by the project's default agent, its caps (`max_iterations`, `max_duration_min`), and optionally `prompt_path`: **a file on the project's default branch** to try instead of `AGENTS.md`. The platform keeps that file's path, commit and SHA-256, never its text, and reads it again when a run starts. Budgets: each run has `budget_per_run_usd`; the plan spends at most `monthly_cap_usd` per UTC month (then its schedule pauses until next month); the tenant's monthly budget applies too. Amounts change only by a new version, never below what the plan spent this month. When the platform cannot start a run (a model the gateway no longer lists, a missing task, the cap used up), the plan shows the reason as its last refusal.
 
+<a id="project-tasks"></a>**A project's own task set** (task L07, `design/ADR-M85-project-task-sets.md`). Task set 1 holds sample tasks on the sample repository. A project can also measure agents on **its own code**. A task comes from a merged intent: the commit before the change, the intent's spec, and the test files its pull request added or changed. The agent never sees those tests (they are the "hidden tests"). The reference solution is the rest of the pull request's change.
+
+| Command | What it does |
+|---|---|
+| `sdlc eval task draft <INT-…> --project <slug> --task <id>` | Writes the task card `.sdlc/eval-tasks/<id>.yaml` on your machine (never over a file without `--force`). It says when the test commands are missing: write them in the card |
+| `sdlc eval task register <id> --project <slug>` | After a person merged the card through a normal pull request: the platform reads it from the default branch and stores its path, commit and SHA-256 |
+| `sdlc eval task list --project <slug>` | The project's tasks: status, the code of a failed check, the card's SHA-256 |
+| `sdlc eval task approve <task-uuid> --card <sha256>` | Approves a task whose check passed |
+| `sdlc eval task reject <task-uuid> --card <sha256> --reason <code>` | Rejects it: `not_representative`, `tests_weak`, `too_large`, `needs_environment` or `other` |
+
+- **The check.** The server checks every registered task before anybody reviews it, with no agent and no cost. It installs the repository with `pnpm install --frozen-lockfile` (other package managers are not supported yet), with no network for the tests. The hidden tests must **fail** on the commit before the change and **pass** with the reference solution. A failed check has a code: `passes_without_change`, `solution_fails`, `install_failed`, `card_changed`, `spec_changed`, `hidden_test_missing`, or `check_lost` (the server could not finish it three times). Tests that need a browser or a database fail the check.
+- **The review.** A person with a role in `access.eval_roles` approves or rejects the task. That person never worked on the intent: not its creator, not the person who started its runs or submitted its plan, not an author of its commits. The approval is bound to the card's SHA-256: a changed card is checked and reviewed again (register it again).
+- **A removed card** makes its task `gone`: it never runs again; its past results stay.
+- **Running it.** In a plan file, write `"task_set_kind": "project"` and `"task_set_version": null` (in the dashboard, write `project` in the task set field). `task_ids` may name some approved tasks; empty means every approved task. When the evaluation starts, the platform reads the cards on the default branch. A card that changed since its approval is left out. The evaluation records that commit with the task IDs: this is the version of the set, and the report shows both. Each run starts at its own task's commit.
+- **Data class.** The plan's data class is never below the data class of an intent its tasks came from (`data_class_below_tasks`). `client_restricted` data goes to self-hosted models only. A plan with no approved task to run is refused (`task_set_empty`).
+- `sdlc ops eval start` runs the numbered task sets only. A project's own task set runs through a plan.
+
 <a id="exit-codes"></a>**When a command fails.** The message says why. The exit code tells scripts what happened (this is the one list; other documents link here):
 
 | Exit code | Meaning |
@@ -544,6 +561,7 @@ Never publish the API's port 8090 to other machines. People on other machines us
 | 0.40 | 2026-10-14 | Claude (task L04) | §19.8d: the operator command `sdlc ops eval start` (ADR-M81) |
 | 0.41 | 2026-10-15 | Claude (task L05) | §19.8c: `sdlc eval plan|run|list|show`, the plan file, budgets and refusals; §19.8e: the dashboard's evaluation screens and its only business actions, confirmed with a passkey (ADR-M82) |
 | 0.42 | 2026-10-16 | Claude (task L06) | §19.8c: `sdlc eval report`; §19.8e: the evaluation report in the dashboard and the list of evaluations that ended in the last 7 days (ADR-M83) |
+| 0.43 | 2026-10-20 | Claude (task L07) | §19.8c: a project's own task set: `sdlc eval task draft\|register\|list\|approve\|reject`, the check on the server, the review, plans on the task set `project` (ADR-M85) |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

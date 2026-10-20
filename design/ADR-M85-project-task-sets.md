@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L07, PR 1) |
+| Status | **Accepted** (repository owner, 2026-10-20, after L07 PR 1–4c) |
 | Date | 2026-10-20 |
-| Decided by | The repository owner (L07 plan approved in the session, 2026-10-20, with answers to QUESTIONS #485–#487; PR 4 plan with answers to QUESTIONS #488–#490) |
+| Decided by | The repository owner (L07 plan approved in the session, 2026-10-20, with answers to QUESTIONS #485–#487; PR 4 plan with answers to QUESTIONS #488–#490; PR 4c with answers to QUESTIONS #491–#492) |
 | Related | D-08 task L07 (AC1–AC4); ADR-M78 (the harness, the task format, `--check`); ADR-M81 (evaluations on the server, the scoring containers); ADR-M82 (plans, `access.eval_roles`, files read from the default branch); ADR-M39 (specs, `spec_refs`); ADR-M32 (data classes); FR-40, FR-44; D-07 §4; QUESTIONS #450, #474, #485–#487 |
 
 ## 1. Context
@@ -136,6 +136,12 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
 - Storage (QUESTIONS #490): `task_set_kind` (`folder` or `project`) and `task_set_commit` on evaluations and plan versions; `base_sha` on each evaluation run.
 - The evaluation contract (ADR-M81 §2.2) names the project's repository instead of the sample repository, and each run names the base commit of its task. `evaluations.base_sha` stays for task sets v1 and private sets.
 - The runner clones the project's repository like a real run, as in §2.5.
+- As built (PR 4c; QUESTIONS #491, #492):
+  - Migration `0035-project-task-sets` (D-05 §6.10, version 1.52): `evaluations.task_set_kind` and `task_set_commit` (a `project` evaluation has no `task_set_version` and no `base_sha`); `evaluation_plan_versions.task_set_kind` (a `project` plan has no version and no commit: each evaluation reads the commit when it starts); `evaluation_runs.base_sha`. The guard triggers keep them fixed.
+  - Core `evaluation/project-task-set.ts`: `checkProjectTaskSet` when a plan is saved (only approved tasks, at least one, `task_set_empty`; the data class not below the highest data class of the tasks' intents, `data_class_below_tasks`); `readProjectTaskSet` when an evaluation of the plan starts (the default branch's head; each card at that commit; a removed card makes its task `gone`, a changed card is left out; a Git host that cannot be read refuses).
+  - The evaluation contract is schema 2: `task_set_kind`, `task_set_version` (a `folder` set only) and `task_set_commit` (a `project` set only); `base_sha` is the run's base commit for a `project` set. A contract of schema 1 issued before the upgrade is refused (`malformed`) and the run gets its next attempt.
+  - The runner reads the card at `task_set_commit` with the SHA-256 the platform approved, the spec at its commit and the hidden tests at the merge commit (`apps/runner/src/evaluation/project-task.ts`, shared with the check), and checks the card's base commit against the contract. Anything else fails the run with `task_unavailable`.
+  - The API and the dashboard take `task_set_kind` (`project` in the dashboard's task set field); the CLI sends the plan file as it is. `sdlc ops eval start` keeps the numbered sets (QUESTIONS #492).
 
 ## 3. Pull requests
 
@@ -180,3 +186,5 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
 | 0.4 | 2026-10-20 | Claude (task L07, PR 3b) | §2.7 as built: the API and the CLI |
 | 0.5 | 2026-10-20 | Claude (task L07, PR 4a) | QUESTIONS #488–#490; §2.5 as built: the worker side of the check |
 | 0.6 | 2026-10-20 | Claude (task L07, PR 4b) | §2.5 as built: the runner's check |
+| 0.7 | 2026-10-20 | Claude (task L07, PR 4c) | QUESTIONS #491–#492; §2.10 as built: evaluations on the project's task set |
+| 1.0 | 2026-10-20 | Repository owner | Accepted |

@@ -571,6 +571,20 @@ Design: [ADR-M82](../../design/ADR-M82-evaluation-plans.md). People with a role 
 
 **Logs.** `worker.evaluation_plan_started` (`plan_id`, `evaluation_id`, `reason` `manual`, `schedule` or `on_change`), `worker.evaluation_plan_refused` (`code`: for example `model_not_allowed`, `task_set_not_found`, `monthly_cap_used`, `evaluation_open`; the code is also on the plan, as "Last refusal" in the dashboard), `worker.evaluation_plan_failed` (`step`, an error code; tried again on the next pass).
 
+## A project's own task set (L07)
+
+Design: [ADR-M85](../../design/ADR-M85-project-task-sets.md); usage: handbook Ch.19 §19.8c "A project's own task set". A project's tasks are task cards (`.sdlc/eval-tasks/<id>.yaml`) on its default branch, made from merged intents. The platform stores their path, commit and SHA-256 only.
+
+**What the deployment needs.** Everything of L04 and L05, and:
+- `pnpm db:migrate` (migrations `0033`, `0034` and `0035`).
+- The GitHub App installed on the **project's** repository (not only the sample repository): the api reads the merged pull request and the card; the worker reads the cards; the runner clones the repository with a single-repository read token.
+- At least one evaluation slot on the runner (`SDLC_RUNNER_MAX_EVAL_SANDBOXES` 1 or more). The check of a new task uses that slot, with no agent, no model and no cost; a real run takes the slot back.
+- A sandbox image (`sandbox.image` of the project configuration) that can install the project with `pnpm install --frozen-lockfile` through the package proxy. Other package managers fail the check with `install_failed`.
+
+**How it runs.** The worker's check loop (every `SDLC_WORKER_EVAL_TICK_SECONDS`) hands each registered task to the runner with a signed contract of kind `evaluation_task_check`. The runner scores twice: the commit before the change (the hidden tests must fail), then with the reference solution (everything must pass). A check that does not end is handed over again, at most 3 times (then `check_lost`). An evaluation of a plan on the task set `project` reads the cards on the default branch when it starts; each run starts at its own task's commit. `sdlc ops eval start` runs the numbered task sets only.
+
+**Logs.** `worker.task_check_handed_over`, `worker.task_check_requeued`, `worker.task_check_refused` and `worker.task_check_failed` (codes and IDs only). The task's status and check code are in `sdlc eval task list`.
+
 ## Shared Valkey: memory limit
 
 Langfuse and LiteLLM share one Valkey with `maxmemory-policy noeviction`, which Langfuse requires. The limit is `VALKEY_MAXMEMORY` in `.env` (default `256mb`). **When Valkey is full, writes fail for both Langfuse and LiteLLM.** Watch memory use:

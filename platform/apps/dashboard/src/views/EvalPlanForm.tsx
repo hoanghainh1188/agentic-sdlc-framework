@@ -160,7 +160,7 @@ function PlanEditor({
               ))}
             </select>
           </Field>
-          <Field label="dashboard.eval.form.task_set">
+          <Field label="dashboard.eval.form.task_set" hint="dashboard.eval.form.task_set_hint">
             <input
               inputMode="numeric"
               value={form.taskSetVersion}

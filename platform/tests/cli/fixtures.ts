@@ -802,6 +802,8 @@ export function evaluationBody(extra = false): Record<string, unknown> {
     base_sha: 'a'.repeat(40),
     plan_id: PLAN_ID,
     plan_version: 2,
+    task_set_kind: 'folder',
+    task_set_commit: null,
   } as Evaluation;
   return presentEvaluation(
     evaluation,

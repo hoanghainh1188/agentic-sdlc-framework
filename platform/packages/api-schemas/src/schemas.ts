@@ -717,7 +717,8 @@ export const evalPlanConfigurationSchema = z.object({
 export const evalPlanVersionSchema = z.object({
   version: z.number().int(),
   data_class: code,
-  task_set_version: z.number().int(),
+  task_set_kind: code,
+  task_set_version: z.number().int().nullable(),
   task_ids: z.array(code).max(64).nullable(),
   runs_per_task: z.number().int(),
   budget_per_run_usd: decimal,
@@ -739,7 +740,12 @@ export const evaluationSchema = z.object({
   plan_version: z.number().int().nullable(),
   config_name: code.nullable(),
   data_class: code,
-  task_set_version: z.number().int(),
+  task_set_kind: code,
+  task_set_version: z.number().int().nullable(),
+  task_set_commit: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/)
+    .nullable(),
   task_ids: z.array(code).max(64),
   configuration_ids: z.array(code).max(16),
   runs_per_task: z.number().int(),
