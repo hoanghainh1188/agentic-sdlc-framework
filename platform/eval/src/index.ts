@@ -9,6 +9,7 @@ export * from './result.js';
 export * from './scoring.js';
 export * from './stats.js';
 export * from './task.js';
+export * from './task-card.js';
 export * from './executor.js';
 export * from './hardware.js';
 export * from './local-executor.js';

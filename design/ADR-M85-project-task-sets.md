@@ -70,6 +70,10 @@
 - A new adapter function of the Git host (`GitHost`) returns the changed files of a pull request with their status. `getChangedFiles` (paths only) stays.
 - A removed test file is not a hidden test.
 - The commands come from `evaluation.commands` in the project configuration: `fail_to_pass` (a template with the hidden test files), `pass_to_pass` and `ci`. A project without this section gets no proposal, and the person writes the commands in the card.
+- As built (PR 2):
+  - `@sdlc/eval` `task-card.ts`: `parseTaskCard` and `renderTaskCard` (schema 2, strict as `task.ts`; a card needs at least one command of each kind), `isTestFile` (Node's `path.posix.matchesGlob`, as G5), `findBaseCommit` (§2.3; a rebase merge is followed back at most 50 commits) and `draftTaskCard` (refusal codes `no_tests`, `no_planned_files`, `base_unclear`, `too_many_files` (more than 20 files of a kind), `unsafe_path`).
+  - The Git host: `getMergedChange`, `getCommitParents` and `compareChangedFiles` (D-03 §7.1 version 1.43). GitHub's compare lists at most 300 files: a bigger change fails.
+  - The configuration section `evaluation.tasks`: `test_globs` (default `**/*.test.*`, `**/*.spec.*`, `test/**`) and `commands` (`fail_to_pass`, `pass_to_pass`, `ci`; default empty, so the person writes them). The default configuration hash changes.
 - The scoring container has no network (ADR-M81 §2.5). A task whose tests need a browser or a database fails its check (`check_failed`) and does not enter the set. The handbook says so.
 
 ### 2.5. The check on the server (AC3)
@@ -156,3 +160,4 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-20 | Claude (task L07, PR 1) | Proposed |
+| 0.2 | 2026-10-20 | Claude (task L07, PR 2) | §2.4 as built: the task card module, the Git host functions, `evaluation.tasks` |

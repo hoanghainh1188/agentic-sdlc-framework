@@ -308,6 +308,21 @@ sandbox:
   image: ghcr.io/openhands/agent-server:1.48.0-python-slim@sha256:8fcfab2dedb4b41b6aef219b9fa9b1f2588033fad3d998ae6aa11fe8c4fcf8b7
 
 evaluation:
+  # Task L07, ADR-M85 §2.4. A project's own evaluation tasks come from its merged intents.
+  # `test_globs`: a file the pull request added or changed and that matches one of these is a
+  # hidden test of the task. `commands`: what `sdlc eval task draft` writes into a new task card;
+  # `{file}` in `fail_to_pass` gives one command per hidden test file. Empty lists: the person
+  # writes the commands into the card. The scoring container has no network, so tests that need a
+  # browser or a database fail the task's check.
+  tasks:
+    test_globs:
+      - '**/*.test.*'
+      - '**/*.spec.*'
+      - 'test/**'
+    commands:
+      fail_to_pass: []
+      pass_to_pass: []
+      ci: []
   # Task L06, ADR-M83 §2.3, QUESTIONS #481. Thresholds of the recommendation rules of an
   # evaluation report. A comparing rule fires only with at least `min_paired_tasks` paired tasks,
   # and a difference is called only when McNemar's p < `alpha` and the intervals do not overlap.

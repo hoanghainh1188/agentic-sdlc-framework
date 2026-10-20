@@ -268,8 +268,19 @@ export interface ProjectConfig {
   };
   /** Sandbox image of the project, pinned by digest (QUESTIONS #59, ADR-M25). */
   readonly sandbox: { readonly image: string };
-  /** Evaluation reports (task L06, ADR-M83 §2.3, QUESTIONS #481). */
+  /** Evaluation reports (task L06, ADR-M83 §2.3, QUESTIONS #481) and tasks (L07, ADR-M85). */
   readonly evaluation: {
+    /** How a task card is drafted from a merged intent (task L07, ADR-M85 §2.4). */
+    readonly tasks: {
+      /** A file the pull request added or changed that matches one of these is a hidden test. */
+      readonly test_globs: readonly string[];
+      /** Proposed commands; `{file}` in `fail_to_pass` gives one command per hidden test. */
+      readonly commands: {
+        readonly fail_to_pass: readonly string[];
+        readonly pass_to_pass: readonly string[];
+        readonly ci: readonly string[];
+      };
+    };
     /** Thresholds of the recommendation rules; shares and alpha are numbers between 0 and 1. */
     readonly recommendations: {
       readonly alpha: number;
