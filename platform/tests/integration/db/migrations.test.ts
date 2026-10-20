@@ -206,8 +206,11 @@ const UPDATABLE: Record<string, readonly string[]> = {
     'status',
     'check_code',
     'updated_at',
+    // Migration 0034: the hand-overs of a check.
+    'check_attempt',
   ],
   evaluation_task_decisions: [],
+  evaluation_task_check_contracts: [],
   // U05 (migration 0027): seen time only grows; the end is set once (trigger SDA18). No DELETE.
   web_sessions: ['last_seen_at', 'revoked_at', 'end_reason'],
   // U06 (migration 0028): the counter and the last use only grow; revoked once (SDA20). No DELETE.
@@ -356,8 +359,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // evaluations → evaluation_plans; evaluation_configurations → evaluations, agents;
     // evaluation_plans → users (run_requested_by, migration 0032).
     // L07: evaluation_tasks → projects, intents, users; evaluation_task_decisions →
-    // evaluation_tasks, users.
-    expect(fks).toHaveLength(85);
+    // evaluation_tasks, users; evaluation_task_check_contracts → evaluation_tasks (0034).
+    expect(fks).toHaveLength(86);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

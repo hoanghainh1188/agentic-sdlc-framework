@@ -77,7 +77,9 @@ export function prepareBase(input: {
   }
   git(repoDir, 'add', '-A');
   git(repoDir, 'commit', '-q', '-m', 'evaluation base');
-  const agents = fs.readFileSync(path.join(repoDir, 'AGENTS.md'));
+  // A project's own repository may have no AGENTS.md (L07): its hash is then the empty file's.
+  const agentsFile = path.join(repoDir, 'AGENTS.md');
+  const agents = fs.existsSync(agentsFile) ? fs.readFileSync(agentsFile) : Buffer.alloc(0);
   return {
     repoDir,
     basePatch: `${git(repoDir, 'diff', '--binary', input.commit, 'HEAD')}\n`,

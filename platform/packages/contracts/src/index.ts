@@ -19,3 +19,4 @@ export * from './audit-anchor.js';
 export * from './evidence.js';
 export * from './llm-traces.js';
 export * from './web-sign-in.js';
+export * from './evaluation-task-check.js';

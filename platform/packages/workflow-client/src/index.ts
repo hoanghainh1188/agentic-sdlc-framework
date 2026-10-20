@@ -9,14 +9,18 @@ import {
 } from '@temporalio/client';
 import {
   EVALUATION_RUN_WORKFLOW_TYPE,
+  EVALUATION_TASK_CHECK_WORKFLOW_TYPE,
   evaluationRunWorkflowId,
+  evaluationTaskCheckWorkflowId,
   INTENT_KILL_SIGNAL,
   INTENT_TASK_QUEUE,
   INTENT_WAKE_SIGNAL,
   INTENT_WORKFLOW_TYPE,
   intentWorkflowId,
+  type CheckEvaluationTaskInput,
   type EvaluationRunDispatcher,
   type EvaluationRunWorkflowInput,
+  type EvaluationTaskCheckDispatcher,
   type IntentWorkflowRef,
   type IntentWorkflowSignals,
 } from '@sdlc/contracts';
@@ -130,6 +134,40 @@ export class TemporalEvaluationDispatcher implements EvaluationRunDispatcher {
       await this.client.workflow.getHandle(evaluationRunWorkflowId(ref)).cancel();
     } catch (error) {
       if (!(error instanceof WorkflowNotFoundError)) throw error;
+    }
+  }
+}
+
+/**
+ * Starts and checks the workflow of one task check attempt (task L07, ADR-M85 §2.5). The workflow
+ * ID names the task, the card and the attempt, so a second start is refused and treated as done.
+ */
+export class TemporalTaskCheckDispatcher implements EvaluationTaskCheckDispatcher {
+  constructor(private readonly client: Client) {}
+
+  async start(input: CheckEvaluationTaskInput): Promise<void> {
+    try {
+      await this.client.workflow.start(EVALUATION_TASK_CHECK_WORKFLOW_TYPE, {
+        workflowId: evaluationTaskCheckWorkflowId(input),
+        taskQueue: INTENT_TASK_QUEUE,
+        args: [input],
+      });
+    } catch (error) {
+      if (!(error instanceof WorkflowExecutionAlreadyStartedError)) throw error;
+    }
+  }
+
+  async isRunning(
+    ref: Parameters<EvaluationTaskCheckDispatcher['isRunning']>[0],
+  ): Promise<boolean> {
+    try {
+      const described = await this.client.workflow
+        .getHandle(evaluationTaskCheckWorkflowId(ref))
+        .describe();
+      return described.status.name === 'RUNNING';
+    } catch (error) {
+      if (error instanceof WorkflowNotFoundError) return false;
+      throw error;
     }
   }
 }

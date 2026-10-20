@@ -2,7 +2,12 @@
 // run in the worker process with the database and the registry; the workflow only sees their
 // coded results. The run activities return IDs, codes and two single-use OpenBao wrapping tokens:
 // never a raw token, a virtual key, its ID or client data (ADR-M30 §2.1, QUESTIONS #112).
-import type { EvidenceStore, IntentStepResult, IntentWorkflowRef } from '@sdlc/contracts';
+import type {
+  CheckEvaluationTaskResult,
+  EvidenceStore,
+  IntentStepResult,
+  IntentWorkflowRef,
+} from '@sdlc/contracts';
 import {
   abandonPublish,
   abandonRun,
@@ -10,6 +15,7 @@ import {
   finishPublish,
   finishEvaluationRun,
   finishRun,
+  finishTaskCheck,
   parseTenantId,
   preparePublish,
   revokeKilledRunKey,
@@ -82,6 +88,21 @@ export interface IntentActivities {
    * `finishEvaluationRun`). Idempotent.
    */
   finishEvaluationRun(input: FinishEvaluationRunInput): Promise<void>;
+  /**
+   * L07 (ADR-M85 §2.5): the check of a project's evaluation task ended on the runner (or was
+   * lost). Writes `checked` or `check_failed`, or hands the check back (core `finishTaskCheck`).
+   * Idempotent.
+   */
+  finishEvaluationTaskCheck(input: FinishEvaluationTaskCheckInput): Promise<void>;
+}
+
+/** What the check workflow tells the finishing activity: IDs, a hash and the coded answer. */
+export interface FinishEvaluationTaskCheckInput {
+  readonly tenantId: string;
+  readonly evaluationTaskId: string;
+  readonly cardSha256: string;
+  readonly attempt: number;
+  readonly end: CheckEvaluationTaskResult | { readonly outcome: 'lost' };
 }
 
 /** What the workflow tells the finishing activity: IDs, a time and the runner's coded result. */
@@ -202,6 +223,14 @@ export function createIntentActivities(deps: IntentActivityDeps): IntentActiviti
           end: input.end,
         },
       );
+    },
+    async finishEvaluationTaskCheck(input) {
+      await finishTaskCheck(deps.db.forTenant(parseTenantId(input.tenantId)), {
+        evaluationTaskId: input.evaluationTaskId,
+        cardSha256: input.cardSha256,
+        attempt: input.attempt,
+        end: input.end,
+      });
     },
     async buildReleasePack(ref) {
       if (!deps.releases) return 'unavailable';

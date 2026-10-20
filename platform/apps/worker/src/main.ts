@@ -21,6 +21,7 @@ import {
   loadEffectiveConfig,
   pollProject,
   prepareEvaluationRun,
+  prepareTaskCheck,
   advanceEvaluationPlan,
   Registry,
 } from '@sdlc/core';
@@ -31,6 +32,7 @@ import {
   connectTemporal,
   NO_INTENT_SIGNALS,
   TemporalEvaluationDispatcher,
+  TemporalTaskCheckDispatcher,
   TemporalIntentSignals,
   type TemporalClient,
 } from '@sdlc/workflow-client';
@@ -41,6 +43,7 @@ import { CostSyncLoop } from './cost-sync-loop.js';
 import { openWorkerEvidence } from './evidence-store.js';
 import { EscalationLoop } from './escalation-loop.js';
 import { EvaluationLoop } from './evaluation-loop.js';
+import { TaskCheckLoop } from './evaluation-task-check-loop.js';
 import { EvaluationPlanLoop } from './evaluation-plan-loop.js';
 import { taskSetReader } from './task-sets.js';
 import { jsonLogger } from './logger.js';
@@ -217,6 +220,25 @@ async function main(): Promise<void> {
         })
       : undefined;
   evaluations?.start(settings.evaluation.tickMs);
+  // The check of a project's evaluation tasks (L07, ADR-M85 §2.5): a registered task goes to the
+  // runner's evaluation queue with a signed contract and a single-repository read token.
+  const taskChecks =
+    workerRuns && temporal && gitHost
+      ? new TaskCheckLoop({
+          listTenants: (limit) => db.system.listTenantsWithTasksToCheck(limit),
+          forTenant: (tenantId) => db.forTenant(tenantId),
+          prepare: (scope, evaluationTaskId) =>
+            prepareTaskCheck(
+              scope,
+              { signer: workerRuns.runs.signer, gitHost, wrapper: workerRuns.runs.wrapper },
+              evaluationTaskId,
+            ),
+          dispatcher: new TemporalTaskCheckDispatcher(temporal.client),
+          logger,
+          maxInFlight: settings.evaluation.maxInFlight,
+        })
+      : undefined;
+  taskChecks?.start(settings.evaluation.tickMs);
   // The evaluation plan loop (L05, ADR-M82 §2.4): Run now requests, schedules, `on_change`.
   const taskSets = taskSetReader(settings.evaluation.tasksDir);
   const plans = workerRuns
@@ -332,6 +354,7 @@ async function main(): Promise<void> {
       reconcile?.stop(),
       costSync?.stop(),
       evaluations?.stop(),
+      taskChecks?.stop(),
       plans?.stop(),
       retention?.stop(),
       intentWorker?.shutdown(),

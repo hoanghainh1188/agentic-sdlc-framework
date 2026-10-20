@@ -246,6 +246,27 @@ export class SystemScope {
   }
 
   /**
+   * The tenants with an evaluation task to check, or being checked (task L07, ADR-M85 §2.5): the
+   * worker's check loop hands a registered task to a runner and looks for checks that ended
+   * without an answer. IDs only.
+   */
+  async listTenantsWithTasksToCheck(limit: number): Promise<TenantId[]> {
+    const rows = await run(
+      this.db
+        .selectFrom('evaluation_tasks as et')
+        .innerJoin('tenants as tn', 'tn.id', 'et.tenant_id')
+        .select('et.tenant_id')
+        .distinct()
+        .where('et.status', 'in', ['registered', 'checking'])
+        .where('tn.status', '=', 'active')
+        .orderBy('et.tenant_id')
+        .limit(limit)
+        .execute(),
+    );
+    return rows.map((row) => parseTenantId(row.tenant_id));
+  }
+
+  /**
    * The tenants with an evaluation plan the worker's plan loop must look at (task L05, ADR-M82
    * §2.4): a Run now request, a schedule that is due, an `on_change` plan, or a pause that ended.
    * IDs only, active tenants, ordered.

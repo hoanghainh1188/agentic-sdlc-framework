@@ -11,6 +11,7 @@ import { AuditLogRepository } from './repositories/audit-log.js';
 import { CostRecordRepository } from './repositories/cost-records.js';
 import { EvaluationContractRepository } from './repositories/evaluation-contracts.js';
 import { EvaluationPlanRepository } from './repositories/evaluation-plans.js';
+import { EvaluationTaskCheckContractRepository } from './repositories/evaluation-task-check-contracts.js';
 import { EvaluationTaskRepository } from './repositories/evaluation-tasks.js';
 import { EvaluationRunRepository } from './repositories/evaluation-runs.js';
 import { EvaluationRepository } from './repositories/evaluations.js';
@@ -81,6 +82,7 @@ export class TenantScope {
   readonly evaluationContracts: EvaluationContractRepository;
   readonly evaluationPlans: EvaluationPlanRepository;
   readonly evaluationTasks: EvaluationTaskRepository;
+  readonly evaluationTaskCheckContracts: EvaluationTaskCheckContractRepository;
   readonly escalations: EscalationRepository;
   readonly escalationNotices: EscalationNoticeRepository;
   readonly agents: AgentRepository;
@@ -129,6 +131,10 @@ export class TenantScope {
     this.evaluationContracts = new EvaluationContractRepository(this.db, this.tenantId);
     this.evaluationPlans = new EvaluationPlanRepository(this.db, this.tenantId);
     this.evaluationTasks = new EvaluationTaskRepository(this.db, this.tenantId);
+    this.evaluationTaskCheckContracts = new EvaluationTaskCheckContractRepository(
+      this.db,
+      this.tenantId,
+    );
     this.escalations = new EscalationRepository(this.db, this.tenantId);
     this.escalationNotices = new EscalationNoticeRepository(this.db, this.tenantId);
     this.agents = new AgentRepository(this.db, this.tenantId);

@@ -667,8 +667,26 @@ export interface EvaluationTasksTable {
   merge_commit: ColumnType<string, string, string>;
   status: ColumnType<EvaluationTaskStatus, EvaluationTaskStatus | undefined, EvaluationTaskStatus>;
   check_code: ColumnType<string | null, string | null | undefined, string | null>;
+  /** L07 (migration 0034): hand-overs of the current card's check to a runner. */
+  check_attempt: ColumnType<number, number | undefined, number>;
   registered_by: Immutable<string | null>;
   updated_at: ColumnType<Date, Date | undefined, Date>;
+  created_at: CreatedAt;
+}
+
+/** The signed contract of one check attempt of a task (L07, migration 0034). Append-only. */
+export interface EvaluationTaskCheckContractsTable {
+  tenant_id: Immutable<string>;
+  evaluation_task_id: Immutable<string>;
+  card_sha256: Immutable<string>;
+  attempt: Immutable<number>;
+  /** The contract as JSON (written as a string). */
+  contract_json: ColumnType<Record<string, unknown>, string, never>;
+  contract_sha256: Immutable<string>;
+  signature: Immutable<string>;
+  key_version: Immutable<number>;
+  issued_at: Immutable<Date>;
+  expires_at: Immutable<Date>;
   created_at: CreatedAt;
 }
 
@@ -985,6 +1003,7 @@ export interface Database {
   evaluation_configurations: EvaluationConfigurationsTable;
   evaluation_tasks: EvaluationTasksTable;
   evaluation_task_decisions: EvaluationTaskDecisionsTable;
+  evaluation_task_check_contracts: EvaluationTaskCheckContractsTable;
   git_event_receipts: GitEventReceiptsTable;
   escalations: EscalationsTable;
   escalation_notices: EscalationNoticesTable;
@@ -1581,6 +1600,20 @@ export const TABLE_COLUMNS = {
     'registered_by',
     'updated_at',
     'created_at',
+    'check_attempt',
+  ]),
+  evaluation_task_check_contracts: columns<EvaluationTaskCheckContractsTable>()([
+    'tenant_id',
+    'evaluation_task_id',
+    'card_sha256',
+    'attempt',
+    'contract_json',
+    'contract_sha256',
+    'signature',
+    'key_version',
+    'issued_at',
+    'expires_at',
+    'created_at',
   ]),
   evaluation_task_decisions: columns<EvaluationTaskDecisionsTable>()([
     'id',
@@ -1700,6 +1733,7 @@ export const TENANT_COLUMN = {
   evaluation_configurations: 'tenant_id',
   evaluation_tasks: 'tenant_id',
   evaluation_task_decisions: 'tenant_id',
+  evaluation_task_check_contracts: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
   web_sessions: 'tenant_id',
@@ -1737,6 +1771,7 @@ export type EvaluationPlanVersion = Selectable<EvaluationPlanVersionsTable>;
 export type EvaluationConfigurationRow = Selectable<EvaluationConfigurationsTable>;
 export type EvaluationTask = Selectable<EvaluationTasksTable>;
 export type EvaluationTaskDecisionRow = Selectable<EvaluationTaskDecisionsTable>;
+export type EvaluationTaskCheckContractRow = Selectable<EvaluationTaskCheckContractsTable>;
 export type GitEventReceipt = Selectable<GitEventReceiptsTable>;
 export type Escalation = Selectable<EscalationsTable>;
 export type EscalationNotice = Selectable<EscalationNoticesTable>;

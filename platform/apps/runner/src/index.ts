@@ -208,3 +208,4 @@ export {
   type EvaluationActivityDeps,
 } from './evaluation/activities.js';
 export { ServerExecutor, type ServerExecutorOptions } from './evaluation/server-executor.js';
+export { checkTask, type CheckTaskDeps } from './evaluation/check.js';

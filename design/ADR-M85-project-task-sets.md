@@ -4,7 +4,7 @@
 |---|---|
 | Status | **Proposed** (task L07, PR 1) |
 | Date | 2026-10-20 |
-| Decided by | The repository owner (L07 plan approved in the session, 2026-10-20, with answers to QUESTIONS #485–#487) |
+| Decided by | The repository owner (L07 plan approved in the session, 2026-10-20, with answers to QUESTIONS #485–#487; PR 4 plan with answers to QUESTIONS #488–#490) |
 | Related | D-08 task L07 (AC1–AC4); ADR-M78 (the harness, the task format, `--check`); ADR-M81 (evaluations on the server, the scoring containers); ADR-M82 (plans, `access.eval_roles`, files read from the default branch); ADR-M39 (specs, `spec_refs`); ADR-M32 (data classes); FR-40, FR-44; D-07 §4; QUESTIONS #450, #474, #485–#487 |
 
 ## 1. Context
@@ -84,6 +84,10 @@
 - It scores twice, in the scoring containers of ADR-M81 §2.5 (`NetworkMode: none`):
   1. the base without a change: the `fail_to_pass` commands must fail;
   2. the base with the reference solution: `fail_to_pass`, `pass_to_pass` and `ci` must pass.
+- The runner trusts a signed contract of a third kind, `evaluation_task_check` (QUESTIONS #488): the same Transit key and canonical form as the Run Contract; it names the task, the repository, the card's commit and SHA-256, the base and merge commits. It is stored append-only per check; the runner verifies it against the stored copy and the task (`checking`, the same card SHA-256). It holds no path of the project or the spec: the runner reads them from the card.
+- The scoring container installs with `pnpm install --frozen-lockfile`; other package managers are not supported yet (QUESTIONS #489, `install_failed`).
+- As built (PR 4a): `prepareTaskCheck`, `verifyTaskCheckContract` and `finishTaskCheck` (core `evaluation/task-check.ts`); the worker's `TaskCheckLoop` and the workflow `evaluationTaskCheckWorkflow` (ID `evaluation-task-check/<tenant>/<task>/<card SHA-256>/<attempt>`). The worker reads the card on the default branch again before each hand-over: removed → `gone`; changed since it was registered → `check_failed` (`card_changed`, the person registers it again). A check that does not end (a lost runner, a refused contract, a real run that took the slot) is handed over again, at most 3 times, then fails with `check_lost`. The runner's activity `checkEvaluationTask` and the start of the loop come in PR 4b.
+- As built (PR 4b): the runner's activity `checkEvaluationTask` (`apps/runner/src/evaluation/check.ts`) on the evaluation queue and slots; the worker starts the check loop. The base is the task's base commit with the spec written where the agent reads it (`docs/specs/<id>.md`, as for task set v1); a repository without `AGENTS.md` is allowed. A failure of the Git host, OpenBao or Docker is not the task's fault: the check is handed over again.
 - The result is a status and a code (`checked`, or `check_failed` with a reason code such as `passes_without_change`, `solution_fails`, `install_failed`, `card_changed`, `spec_changed`). No output of the tests is kept.
 
 ### 2.6. Who reviews a task (AC1)
@@ -129,6 +133,7 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
 ### 2.10. Evaluations on the project's task set
 
 - A plan (ADR-M82) or `ops eval start` can name the task set `project`. The evaluation takes the approved tasks of that project at start.
+- Storage (QUESTIONS #490): `task_set_kind` (`folder` or `project`) and `task_set_commit` on evaluations and plan versions; `base_sha` on each evaluation run.
 - The evaluation contract (ADR-M81 §2.2) names the project's repository instead of the sample repository, and each run names the base commit of its task. `evaluations.base_sha` stays for task sets v1 and private sets.
 - The runner clones the project's repository like a real run, as in §2.5.
 
@@ -173,3 +178,5 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
 | 0.2 | 2026-10-20 | Claude (task L07, PR 2) | §2.4 as built: the task card module, the Git host functions, `evaluation.tasks` |
 | 0.3 | 2026-10-20 | Claude (task L07, PR 3a) | §2.7 as built: the tables, the repository and the core functions; rule R134 |
 | 0.4 | 2026-10-20 | Claude (task L07, PR 3b) | §2.7 as built: the API and the CLI |
+| 0.5 | 2026-10-20 | Claude (task L07, PR 4a) | QUESTIONS #488–#490; §2.5 as built: the worker side of the check |
+| 0.6 | 2026-10-20 | Claude (task L07, PR 4b) | §2.5 as built: the runner's check |
