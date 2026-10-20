@@ -876,3 +876,43 @@ export const evalPlanSchema = evalPlanSummarySchema.extend({
   evaluations: z.array(evaluationSchema).max(200),
 });
 export type EvalPlanView = z.infer<typeof evalPlanSchema>;
+
+// L07 (ADR-M85): a project's own evaluation tasks. A task card's fields (the draft; the CLI writes
+// the YAML) and a registered task: codes, commits, paths of the card and hashes.
+const repoPath = z.string().max(200);
+export const evalTaskCardSchema = z.object({
+  id: code,
+  intent: code,
+  base_commit: sha,
+  merge_commit: sha,
+  spec: z.object({ path: repoPath, commit: sha, sha256: sha }),
+  hidden_tests: z.array(repoPath).max(20),
+  planned_files: z.array(repoPath).max(20),
+  fail_to_pass: z.array(repoPath).max(20),
+  pass_to_pass: z.array(repoPath).max(20),
+  ci: z.array(repoPath).max(20),
+});
+export type EvalTaskCardView = z.infer<typeof evalTaskCardSchema>;
+export const evalTaskDraftSchema = z.object({ card: evalTaskCardSchema });
+
+export const evalTaskSchema = z.object({
+  id,
+  task: code,
+  intent: code,
+  card_path: repoPath,
+  card_commit: sha,
+  card_sha256: sha,
+  base_commit: sha,
+  merge_commit: sha,
+  status: code,
+  check_code: code.nullable(),
+  created_at: time,
+  updated_at: time,
+});
+export type EvalTaskView = z.infer<typeof evalTaskSchema>;
+export const evalTaskListSchema = z.object({ tasks: z.array(evalTaskSchema).max(10_000) });
+export const evalTaskRegisteredSchema = z.object({
+  outcome: z.enum(['created', 'changed', 'unchanged']),
+  task: evalTaskSchema,
+});
+export const evalTaskReviewedSchema = z.object({ task: evalTaskSchema });

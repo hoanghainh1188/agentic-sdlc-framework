@@ -8,15 +8,11 @@
 // - the decisions table is append-only; a gone task is final (SDA24).
 import { createHash } from 'node:crypto';
 
-import {
-  GitHostError,
-  type CommitAuthors,
-  type MergedChange,
-} from '../../../packages/contracts/src/index.js';
 import { renderTaskCard, type TaskCard } from '@sdlc/eval';
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { GitHostError } from '../../../packages/contracts/src/index.js';
 import { DbError } from '../../../packages/core/src/db/errors.js';
 import {
   draftEvaluationTask,
@@ -26,26 +22,19 @@ import {
   reviewEvaluationTask,
   type EvaluationTaskDeps,
 } from '../../../packages/core/src/evaluation/index.js';
-import { seedRun, type SeededRun } from '../cost-seed.js';
+import {
+  fakeTaskGitHost,
+  seedTaskWorld,
+  taskGitState,
+  TASK_BASE as BASE,
+  TASK_FILES as FILES,
+  TASK_HEAD as HEAD,
+  TASK_MERGE as MERGE,
+  TASK_SPEC as SPEC,
+  type TaskGitState,
+  type TaskWorld as World,
+} from '../task-seed.js';
 import { createTestDatabase, describeDb, type TestDatabase } from './helpers.js';
-
-const NOW = new Date('2026-10-20T08:00:00.000Z');
-const BASE = '1'.repeat(40);
-const MERGE = '2'.repeat(40);
-const HEAD = '3'.repeat(40);
-const SPEC = { path: 'docs/specs/tax.md', commit: '4'.repeat(40), sha256: '5'.repeat(64) };
-const AUTHOR = { id: '4242', login: 'carol', type: 'user' as const };
-
-const FILES: MergedChange['files'] = [
-  { path: 'apps/api/src/tax.ts', status: 'modified', previousPath: null },
-  { path: 'apps/api/src/tax.spec.ts', status: 'added', previousPath: null },
-];
-
-interface World extends SeededRun {
-  readonly reviewer: string;
-  readonly author: string;
-  readonly viewer: string;
-}
 
 async function code(promise: Promise<unknown>): Promise<string | undefined> {
   try {
@@ -60,9 +49,7 @@ async function code(promise: Promise<unknown>): Promise<string | undefined> {
 describeDb('L07 PR 3a: a project’s own evaluation tasks on PostgreSQL', () => {
   let t: TestDatabase;
   let tenants = 0;
-  let files: Map<string, string>;
-  let change: MergedChange;
-  let authors: CommitAuthors;
+  let git: TaskGitState;
 
   beforeAll(async () => {
     t = await createTestDatabase();
@@ -71,83 +58,12 @@ describeDb('L07 PR 3a: a project’s own evaluation tasks on PostgreSQL', () => 
     await t?.drop();
   });
 
-  const deps = (): EvaluationTaskDeps => ({
-    gitHost: {
-      getBranchHead: () => Promise.resolve(HEAD),
-      getFileAtCommit: (_ref, path) => {
-        const text = files.get(path);
-        return text === undefined
-          ? Promise.reject(new GitHostError('not_found'))
-          : Promise.resolve(text);
-      },
-      getMergedChange: () => Promise.resolve(change),
-      getCommitParents: () => Promise.resolve([BASE]),
-      compareChangedFiles: (_ref, base, head) =>
-        Promise.resolve(
-          base === BASE && head === MERGE ? FILES.map((f) => f.path).sort() : ['other.ts'],
-        ),
-      getCommitAuthors: () => Promise.resolve(authors),
-    },
-  });
+  const deps = (): EvaluationTaskDeps => ({ gitHost: fakeTaskGitHost(git) });
 
   /** A tenant with a merged intent (a pushed run, `pr_merged`), its spec and three more people. */
   async function world(merged = true): Promise<World> {
-    files = new Map();
-    change = {
-      mergeCommitSha: MERGE,
-      mergeCommitParents: [BASE, '6'.repeat(40)],
-      commitCount: 2,
-      files: FILES,
-    };
-    authors = { accounts: [AUTHOR], withoutAccount: 0 };
-    const seeded = await seedRun(t.app, {
-      slug: `tasks-${String(++tenants)}`,
-      models: ['m'],
-      now: NOW,
-    });
-    const { scope } = seeded;
-    const person = async (name: string, role: 'person_b' | 'viewer') => {
-      const user = await scope.users.create({ display_name: name, email: `${name}@example.com` });
-      await scope.roleBindings.grant({ user_id: user.id, project_id: seeded.projectId, role });
-      return user.id;
-    };
-    const reviewer = await person('rob', 'person_b');
-    const author = await person('carol', 'person_b');
-    const viewer = await person('vic', 'viewer');
-    await scope.userIdentities.link({
-      user_id: author,
-      provider: 'github',
-      external_id: AUTHOR.id,
-      external_login: AUTHOR.login,
-    });
-    await scope.roleBindings.grant({
-      user_id: seeded.personA,
-      project_id: seeded.projectId,
-      role: 'person_a',
-    });
-    await scope.specRefs.link(seeded.intentId, {
-      path: SPEC.path,
-      commitSha: SPEC.commit,
-      contentSha256: SPEC.sha256,
-      structure: 'spec_kit',
-      acceptanceCriteria: 2,
-      actorType: 'human',
-      actorId: seeded.personA,
-    });
-    await scope.runEvents.append(seeded.runId, 'branch_pushed', {
-      head_sha: '7'.repeat(40),
-      parent_sha: BASE,
-      diff_sha256: '8'.repeat(64),
-      paths_sha256: '9'.repeat(64),
-    });
-    if (merged) {
-      await scope.runEvents.append(seeded.runId, 'pr_merged', {
-        pr_number: 12,
-        head_sha: '7'.repeat(40),
-        merge_commit_sha: MERGE,
-      });
-    }
-    return { ...seeded, reviewer, author, viewer };
+    git = taskGitState();
+    return seedTaskWorld(t.app, `tasks-${String(++tenants)}`, merged);
   }
 
   const draft = (w: World, userId = w.personA, taskId = 'tax-rule') =>
@@ -168,7 +84,7 @@ describeDb('L07 PR 3a: a project’s own evaluation tasks on PostgreSQL', () => 
       ...over,
     };
     const text = renderTaskCard(card);
-    files.set('.sdlc/eval-tasks/tax-rule.yaml', text);
+    git.files.set('.sdlc/eval-tasks/tax-rule.yaml', text);
     return createHash('sha256').update(text, 'utf8').digest('hex');
   }
 
@@ -209,9 +125,9 @@ describeDb('L07 PR 3a: a project’s own evaluation tasks on PostgreSQL', () => 
 
     it('refuses a pull request without a test, a viewer, an unknown or unmerged intent', async () => {
       const w = await world();
-      change = { ...change, files: [FILES[0]!] };
+      git.change = { ...git.change, files: [FILES[0]!] };
       expect(await code(draft(w))).toBe('no_tests');
-      change = { ...change, files: FILES };
+      git.change = { ...git.change, files: FILES };
       expect(await code(draft(w, w.viewer))).toBe('forbidden');
       expect(
         await code(
@@ -286,7 +202,7 @@ describeDb('L07 PR 3a: a project’s own evaluation tasks on PostgreSQL', () => 
     it('refuses a missing card, an invalid card and a card that does not match its intent', async () => {
       const w = await world();
       expect(await code(register(w))).toBe('card_not_found');
-      files.set('.sdlc/eval-tasks/tax-rule.yaml', 'schema: 2\nid: tax-rule\n');
+      git.files.set('.sdlc/eval-tasks/tax-rule.yaml', 'schema: 2\nid: tax-rule\n');
       expect(await code(register(w))).toBe('card_invalid');
       await commitCard(w, { mergeCommit: 'a'.repeat(40) });
       expect(await code(register(w))).toBe('card_invalid');
@@ -350,7 +266,7 @@ describeDb('L07 PR 3a: a project’s own evaluation tasks on PostgreSQL', () => 
       expect(await code(review(w, task.id, sha, w.author))).toBe('producer_cannot_review');
       expect(await code(review(w, task.id, sha, w.viewer))).toBe('forbidden');
       expect(await code(review(w, task.id, 'f'.repeat(64), w.reviewer))).toBe('task_changed');
-      authors = { accounts: [], withoutAccount: 0 };
+      git.authors = { accounts: [], withoutAccount: 0 };
       // Without the commit, carol is no producer any more and may reject.
       expect((await review(w, task.id, sha, w.author, 'rejected')).status).toBe('rejected');
       expect(await w.scope.evaluationTasks.listDecisions(task.id)).toMatchObject([

@@ -27,6 +27,7 @@ import {
 import { parseCommand, segment, withApi } from '../api/session.js';
 import { EXIT, type CliContext } from '../context.js';
 import { say, show, toJson } from '../output.js';
+import { runEvalTask } from './eval-task.js';
 
 const SLUG = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -40,6 +41,7 @@ export async function runEval(args: readonly string[], ctx: CliContext): Promise
   if (command === 'list') return runList(rest, ctx);
   if (command === 'show') return runShow(rest, ctx);
   if (command === 'report') return runReport(rest, ctx);
+  if (command === 'task') return runEvalTask(rest, ctx);
   return usage(ctx);
 }
 

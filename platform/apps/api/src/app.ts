@@ -10,7 +10,12 @@ import type {
   IntentWorkflowSignals,
   WebSignInProvider,
 } from '@sdlc/contracts';
-import { Registry, type PlatformDatabase, type PlatformLogger } from '@sdlc/core';
+import {
+  Registry,
+  type EvaluationTaskGitHost,
+  type PlatformDatabase,
+  type PlatformLogger,
+} from '@sdlc/core';
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
 import { AdminAgentsController } from './admin/agents.controller.js';
@@ -26,6 +31,8 @@ import {
   ProjectEvalPlansController,
 } from './evaluations/evaluations.controller.js';
 import { EvaluationsService } from './evaluations/evaluations.service.js';
+import { EvalTasksController, ProjectEvalTasksController } from './evaluations/tasks.controller.js';
+import { EvaluationTasksService } from './evaluations/tasks.service.js';
 import { AuthGuard } from './auth/auth.guard.js';
 import { OAuthStates } from './auth/oauth-states.js';
 import { RateLimiter } from './auth/rate-limiter.js';
@@ -86,6 +93,7 @@ import {
   SIGN_IN,
   SPECS,
   EVALUATIONS,
+  EVAL_TASKS,
 } from './tokens.js';
 
 /** Largest accepted request body. Intents carry at most ~10 kB of text. */
@@ -114,6 +122,12 @@ export interface ApiDeps {
    * `git_host_unavailable`.
    */
   readonly gitHost?: Pick<GitHostAdapter, 'getBranchHead' | 'getFileAtCommit'>;
+  /**
+   * The Git host reads of a project's evaluation tasks (L07, ADR-M85): the merged pull request,
+   * commit parents, comparisons and commit authors. Undefined: the task endpoints answer
+   * `git_host_unavailable` (list excepted).
+   */
+  readonly evalTaskGitHost?: EvaluationTaskGitHost;
   /**
    * The evidence store of the Evidence Pack endpoints (E02, ADR-M48), with the api's identity
    * `api-evidence`. Undefined (no credential, or dev mode without OpenBao): building or reading a
@@ -195,6 +209,8 @@ class ApiModule {
         ProjectEvalPlansController,
         EvalPlansController,
         EvaluationsController,
+        ProjectEvalTasksController,
+        EvalTasksController,
         AdminProjectsController,
         AdminUsersController,
         AdminTenantAdminsController,
@@ -261,6 +277,12 @@ class ApiModule {
             now,
             passkeys: passkeys.service,
           }),
+        },
+        {
+          provide: EVAL_TASKS,
+          useValue: new EvaluationTasksService(
+            deps.evalTaskGitHost ? { gitHost: deps.evalTaskGitHost } : {},
+          ),
         },
         {
           provide: APP_GUARD,

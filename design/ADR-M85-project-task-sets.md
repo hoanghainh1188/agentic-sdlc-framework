@@ -113,6 +113,9 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
   - A card writes commits and hashes in quotes: YAML reads a commit of digits only as a number.
   - Rule R134 in `platform/packages/core/CLAUDE.md`.
 
+- As built (PR 3b): the API `GET /v1/projects/:project/eval-tasks` (list), `GET …/eval-tasks/draft?intent=&task=` (the card's fields, nothing stored), `POST …/eval-tasks` (register), `POST /v1/eval-tasks/:id/approve|reject` (with `card_sha256`; a rejection with its reason code). Token callers only: the dashboard has no task action. The api reads the Git host for tasks through `evalTaskGitHost` (the same GitHub adapter); without it the task writes and the draft answer 503.
+  - The CLI `sdlc eval task draft|register|list|approve|reject`. `draft` writes `.sdlc/eval-tasks/<id>.yaml` in the nearest folder that holds `.git` (or `--output`), never over a file without `--force` and never through a link; it says when the commands are missing.
+
 ### 2.8. Retention and a card that is removed (QUESTIONS #486)
 
 - The platform keeps no client text for a task, so FR-44 retention changes nothing: the rows hold references and hashes, kept like other evaluation rows; evidence purge and holds work as before.
@@ -169,3 +172,4 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
 | 0.1 | 2026-10-20 | Claude (task L07, PR 1) | Proposed |
 | 0.2 | 2026-10-20 | Claude (task L07, PR 2) | §2.4 as built: the task card module, the Git host functions, `evaluation.tasks` |
 | 0.3 | 2026-10-20 | Claude (task L07, PR 3a) | §2.7 as built: the tables, the repository and the core functions; rule R134 |
+| 0.4 | 2026-10-20 | Claude (task L07, PR 3b) | §2.7 as built: the API and the CLI |
