@@ -1,5 +1,6 @@
 // Request schemas of evaluation plans and evaluations (task L05, ADR-M82 §2.1, §2.7). Codes,
 // numbers, decimal amounts and one repository path per prompt variant: never a prompt text.
+import { EVALUATION_TASK_REJECT_REASONS } from '@sdlc/core';
 import { DATA_CLASSES, PROVIDER_TYPES } from '@sdlc/contracts';
 
 import { stepUpAnswerSchema } from '../passkeys/schemas.js';
@@ -78,3 +79,19 @@ export const listEvaluationsSchema = z.strictObject({
 });
 
 export type PlanBody = z.infer<typeof createPlanSchema> | z.infer<typeof changePlanSchema>;
+
+// L07 (ADR-M85): a project's own evaluation tasks. Codes, IDs and hashes only.
+const taskIdSchema = z.string().regex(/^[a-z][a-z0-9-]{1,47}$/);
+export const evalTaskIdSchema = z.uuid();
+export const draftTaskSchema = z.strictObject({
+  intent: z.string().regex(/^INT-[0-9]{4}-[0-9]{4,9}$/),
+  task: taskIdSchema,
+});
+export const registerTaskSchema = z.strictObject({ task: taskIdSchema });
+export const approveTaskSchema = z.strictObject({
+  card_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+export const rejectTaskSchema = z.strictObject({
+  card_sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  reason: z.enum(EVALUATION_TASK_REJECT_REASONS),
+});

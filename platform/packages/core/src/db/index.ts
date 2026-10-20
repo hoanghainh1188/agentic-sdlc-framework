@@ -131,6 +131,8 @@ export type {
   Evaluation,
   EvaluationConfigurationRow,
   EvaluationPlan,
+  EvaluationTask,
+  EvaluationTaskDecisionRow,
   EvaluationRun,
   EvidenceItem,
   EvidenceHold,
