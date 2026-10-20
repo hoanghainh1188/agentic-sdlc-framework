@@ -6,6 +6,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 |---|---|
 | M-E | The trial, run by the community (QUESTIONS #340) |
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) |
+| DEV | Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479) |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL) |
 | Models | Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424) |
@@ -35,6 +36,10 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **L02** Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision) (done, v0.3.0)
 - **V13** Agent efficiency report from real runs: `sdlc metrics agents` (done, v0.3.0)
 - **H01** Threat model for agent runs and attack tests (done, v0.3.0)
+
+## DEV: Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479)
+
+- **W01** Rules as checks: a rules register, hooks, lint and tests, a shorter CLAUDE.md
 
 ## EVAL: Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)
 

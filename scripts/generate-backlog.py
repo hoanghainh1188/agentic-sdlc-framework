@@ -668,6 +668,13 @@ t("L08","EVAL","Design: evaluations in the agent register's approvals","S",["L06
  ["A design for a new agent version (model, instructions) to reach a threshold on the project's task set before Person B and the owner approve it, and for the 3-month recertification (FR-36) to use evaluation numbers",
   "No code in this task; implementation tasks follow Harry's approval"],
  "QUESTIONS #450")
+t("W01","DEV","Rules as checks: a rules register, hooks, lint and tests, a shorter CLAUDE.md","M",["A01","A09"],"NFR-05, NFR-07",
+ "design/RULES.md, design/ADR-M84, .claude/settings.json and its hook script, eslint.config.mjs, platform/tools/eslint-rules/*, platform/tests/workspace/*, CLAUDE.md and nested CLAUDE.md files, design/QUESTIONS.md",
+ ["PR 1: `design/RULES.md` lists every rule of the root CLAUDE.md with its ID, the check that enforces it (lint, test, database, runtime, CI, hook or none), its coverage and a proposal; rules that look outdated or are worded wrongly go to QUESTIONS; duplicate rules are merged",
+  "PR 2: a Claude Code `PreToolUse` hook in `.claude/settings.json` refuses the commands CLAUDE.md forbids for Claude (volume prune, `compose down -v`, tags and releases, `npm publish`, force-push and rebase, the OpenBao commands that print a secret, `weed shell s3.config.show`); the hook script has unit tests and prints a catalog-free English refusal (developer tooling, not a user-facing message)",
+  "PR 3: lint rules and tests for the important rules that have no check today (at least: no `console.*` outside the logger, no Temporal schedules in the worker, audit writes only through `TenantScope.audit.append`, no edit of a merged migration, one test for every append-only table, the generated D-08 equals the script's output); each closes a row of the register",
+  "PR 4: rules that apply to one folder move to a nested CLAUDE.md in that folder; the root CLAUDE.md keeps the hard rules and a pointer to the register; a test checks that every rule ID of the register is found in exactly one CLAUDE.md or marked as enforced by a check"],
+ "QUESTIONS #479 (2026-10-20): the root CLAUDE.md has about 190 rules in 131 bullets and is read by every session; about half have a mechanical check. ADR-M84 records the approach. Four PRs, each in its own session")
 t("L01","Models","A self-hosted model service (vLLM) on an optional GPU host","M",["L02"],"D-07 §3, §4, NFR-01",
  "platform/deploy (profile models-local), platform/deploy/litellm/config.ctmpl, design/D-03 §10.1, design/D-07, design/ADR-M71, handbook T11",
  ["A Compose profile `models-local` with vLLM pinned (Apache-2.0), a health check and a limit of concurrent requests, on the server or a separate GPU host",
@@ -729,14 +736,14 @@ def lp(k):
         if c[0]>b[0]: b=c
     return (b[0]+W[IDX[k]['size']],b[1]+[k])
 CP=" → ".join(max((lp(k) for k in IDX),key=lambda x:x[0])[1])
-MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)"),("EVAL","Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)"),("EXT","Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL)"),("Models","Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424)"),("Server","A team on a server: toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done)")]
+MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)"),("DEV","Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479)"),("EVAL","Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)"),("EXT","Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL)"),("Models","Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424)"),("Server","A team on a server: toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done)")]
 o=[];w=o.append
 w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.49 |
-| Date | 2026-10-13 |
+| Version | 1.51 |
+| Date | 2026-10-20 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-05 (data), D-07 (tokens), D-09 (sample repo) |
@@ -911,6 +918,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.47 | 2026-10-13 | Claude, approved by Harry | New milestone EVAL after v0.3.0, before EXT (QUESTIONS #450): L04 (evaluations on the server, one engine with developer machines), L05 (evaluation plans by managers), L06 (reports and recommendations), L07 (a project's task set from its merged intents), L08 (design: evaluations in the agent register's approvals) |
 | 1.49 | 2026-10-13 | Claude (task H01, PR 3), approved by Harry (QUESTIONS #455, #456 answered) | H01 done: its gaps become H04 (secret scan of the diff, Medium), H05 (diff size bound, Medium), H06 (stronger sandbox runtime, Later), H07 (Docker authorization plugin, High) and two criteria of H02; QUESTIONS #455, #456 |
 | 1.50 | 2026-10-16 | Claude, approved by Harry | Release v0.4.0 with L04 and L05 (the first part of EVAL); EXT and Models move to v0.5.0; L06–L08 finish EVAL first |
+| 1.51 | 2026-10-20 | Claude (task W01, PR 1), approved by the repository owner | New milestone DEV with task W01: rules as checks (a rules register, hooks, lint and tests, a shorter CLAUDE.md; QUESTIONS #479, ADR-M84) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
@@ -923,7 +931,7 @@ with open('design/D-08-backlog.csv','w',newline='',encoding='utf-8') as f:
     for x in T: c.writerow([x['id'],x['ms'],x['title'],x['size'],";".join(x['deps']),x['fr'],x['area']," | ".join(x['ac']),x['note']])
 
 # ---------- ROADMAP.md (public, generated) ----------
-RM_MS=["M-E","UX","EVAL","EXT","Models","Server","Later"]
+RM_MS=["M-E","UX","DEV","EVAL","EXT","Models","Server","Later"]
 SKIP_LATER={"U01","U02","U03","K02"}
 # Released tasks shown in ROADMAP.md: task -> the release that shipped it.
 DONE={**{t:"v0.1.0" for t in ("V01","V02","V03")},
