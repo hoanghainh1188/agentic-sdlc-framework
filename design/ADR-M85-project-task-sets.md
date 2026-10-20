@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task L07, PR 1) |
+| Status | **Accepted** (repository owner, 2026-10-20, after L07 PR 1–4c) |
 | Date | 2026-10-20 |
 | Decided by | The repository owner (L07 plan approved in the session, 2026-10-20, with answers to QUESTIONS #485–#487; PR 4 plan with answers to QUESTIONS #488–#490; PR 4c with answers to QUESTIONS #491–#492) |
 | Related | D-08 task L07 (AC1–AC4); ADR-M78 (the harness, the task format, `--check`); ADR-M81 (evaluations on the server, the scoring containers); ADR-M82 (plans, `access.eval_roles`, files read from the default branch); ADR-M39 (specs, `spec_refs`); ADR-M32 (data classes); FR-40, FR-44; D-07 §4; QUESTIONS #450, #474, #485–#487 |
@@ -187,3 +187,4 @@ Two new tables, both with `tenant_id`, codes and references only (D-05 §6.8, in
 | 0.5 | 2026-10-20 | Claude (task L07, PR 4a) | QUESTIONS #488–#490; §2.5 as built: the worker side of the check |
 | 0.6 | 2026-10-20 | Claude (task L07, PR 4b) | §2.5 as built: the runner's check |
 | 0.7 | 2026-10-20 | Claude (task L07, PR 4c) | QUESTIONS #491–#492; §2.10 as built: evaluations on the project's task set |
+| 1.0 | 2026-10-20 | Repository owner | Accepted |

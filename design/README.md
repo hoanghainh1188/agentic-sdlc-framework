@@ -70,8 +70,8 @@
 | ADR-M81 | [Evaluations on the server: one engine for the server and developer machines](ADR-M81-server-evaluations.md) (task L04) | Accepted (2026-10-16) | |
 | ADR-M82 | [Evaluation plans that managers make themselves, dashboard first](ADR-M82-evaluation-plans.md) (task L05) | Accepted (2026-10-16) | |
 | ADR-M83 | [Evaluation reports and recommendations for managers](ADR-M83-evaluation-reports.md) (task L06) | Accepted | |
-| ADR-M84 | [Rules as checks: a rules register, hooks, lint and tests, a shorter CLAUDE.md](ADR-M84-rules-as-checks.md) (task W01) | Proposed | |
-| ADR-M85 | [A project's own task set from its merged intents](ADR-M85-project-task-sets.md) (task L07) | Proposed | |
+| ADR-M84 | [Rules as checks: a rules register, hooks, lint and tests, a shorter CLAUDE.md](ADR-M84-rules-as-checks.md) (task W01) | Accepted (2026-10-20) | |
+| ADR-M85 | [A project's own task set from its merged intents](ADR-M85-project-task-sets.md) (task L07) | Accepted (2026-10-20) | |
 
 
 ## Number blocks (QUESTIONS and ADR numbers)
