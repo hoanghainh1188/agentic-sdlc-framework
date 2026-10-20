@@ -512,6 +512,8 @@ export function roundBody(completed = false): Record<string, unknown> {
     approver_id: USER,
     round_at: AT,
     created_at: AT,
+    evaluation_id: null,
+    evaluation_result: null,
   };
   return presentRound(
     {

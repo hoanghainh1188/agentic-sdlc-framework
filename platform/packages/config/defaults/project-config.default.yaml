@@ -300,6 +300,20 @@ agents:
   # owner is warned when the last recertification is older; the run is not blocked (D-02 FR-36).
   # Mandatory rule M18: never more than 3. Task C10, ADR-M31.
   recertification_months: 3
+  # Task L09, ADR-M86 §2.4, QUESTIONS #496–#499. An approval to activate an agent (and, from L10,
+  # a recertification) names an evaluation of this project. It qualifies when it is the latest
+  # finished evaluation of the agent version's fingerprint (model, instructions, tools), ran the
+  # whole task set, scored at least `min_tasks` tasks, reached `min_resolve_rate`, had no scope
+  # breach, is not worse than the last approved version for a change, and is not older than the
+  # age limit. `mode`: `off` (no check), `warn` (accepted with a warning), `required` (refused).
+  # Default `warn`: most projects have no own task set yet. Mandatory rule M34:
+  # `recertification_max_age_days` never more than 90. [Proposal] numbers.
+  evaluation:
+    mode: warn
+    min_tasks: 8
+    min_resolve_rate: 0.5
+    approval_max_age_days: 30
+    recertification_max_age_days: 90
 
 sandbox:
   # QUESTIONS #59 (A), ADR-M25: one sandbox image per project, built on the pinned OpenHands

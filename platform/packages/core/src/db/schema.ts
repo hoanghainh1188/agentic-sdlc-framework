@@ -178,6 +178,10 @@ export interface AgentApprovalsTable {
   /** The agent's `updated_at` when the approval was given: its round. */
   round_at: Immutable<Date>;
   created_at: CreatedAt;
+  /** L09 (migration 0036, ADR-M86 §2.5): the evaluation the approval named, or none. */
+  evaluation_id: ColumnType<string | null, string | null | undefined, never>;
+  /** `passed`, `missing` or a refusal code of ADR-M86 §2.8; null when the check was off. */
+  evaluation_result: ColumnType<string | null, string | null | undefined, never>;
 }
 
 /** Tenant-level roles (task B13, QUESTIONS #150, ADR-M37). Withdrawn by `revoked_at`, never deleted. */
@@ -589,6 +593,8 @@ export interface EvaluationsTable {
   task_set_kind: ColumnType<TaskSetKind, TaskSetKind | undefined, never>;
   /** The default branch's commit the cards of a `project` task set were read from. */
   task_set_commit: ColumnType<string | null, string | null | undefined, never>;
+  /** L09 (migration 0036, QUESTIONS #503): the project's approved tasks at the start; null before. */
+  approved_tasks_at_start: ColumnType<number | null, number | null | undefined, never>;
 }
 
 /** An evaluation plan of a project (L05, migration 0031, ADR-M82). */
@@ -657,7 +663,18 @@ export interface EvaluationConfigurationsTable {
   instructions_commit: Immutable<string | null>;
   instructions_sha256: Immutable<string | null>;
   created_at: CreatedAt;
+  /** L09 (migration 0036, ADR-M86 §2.1): `agent` (named by its key) or `model`; null before. */
+  source: ColumnType<
+    EvaluationConfigurationSource | null,
+    EvaluationConfigurationSource | null | undefined,
+    never
+  >;
+  /** The tools the agent gets in the runs (QUESTIONS #501) and their SHA-256; null before. */
+  allowed_tools: ColumnType<string[] | null, string[] | null | undefined, never>;
+  tools_sha256: ColumnType<string | null, string | null | undefined, never>;
 }
+
+export type EvaluationConfigurationSource = 'agent' | 'model';
 
 /**
  * A project's own evaluation task (L07, migration 0033, ADR-M85 §2.7): a reference to its card on
@@ -1473,6 +1490,7 @@ export const TABLE_COLUMNS = {
     'plan_version',
     'task_set_kind',
     'task_set_commit',
+    'approved_tasks_at_start',
   ]),
   evaluation_runs: columns<EvaluationRunsTable>()([
     'id',
@@ -1598,6 +1616,9 @@ export const TABLE_COLUMNS = {
     'instructions_commit',
     'instructions_sha256',
     'created_at',
+    'source',
+    'allowed_tools',
+    'tools_sha256',
   ]),
   evaluation_tasks: columns<EvaluationTasksTable>()([
     'id',
@@ -1658,6 +1679,8 @@ export const TABLE_COLUMNS = {
     'approver_id',
     'round_at',
     'created_at',
+    'evaluation_id',
+    'evaluation_result',
   ]),
   web_sessions: columns<WebSessionsTable>()([
     'id',

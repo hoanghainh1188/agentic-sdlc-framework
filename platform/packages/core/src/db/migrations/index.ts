@@ -35,6 +35,7 @@ import { migration0032EvaluationPlanRequests } from './0032-evaluation-plan-requ
 import { migration0033EvaluationTasks } from './0033-evaluation-tasks.js';
 import { migration0034EvaluationTaskChecks } from './0034-evaluation-task-checks.js';
 import { migration0035ProjectTaskSets } from './0035-project-task-sets.js';
+import { migration0036EvaluationFingerprints } from './0036-evaluation-fingerprints.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -73,4 +74,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0033-evaluation-tasks': migration0033EvaluationTasks,
   '0034-evaluation-task-checks': migration0034EvaluationTaskChecks,
   '0035-project-task-sets': migration0035ProjectTaskSets,
+  '0036-evaluation-fingerprints': migration0036EvaluationFingerprints,
 };

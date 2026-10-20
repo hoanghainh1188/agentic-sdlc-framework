@@ -235,6 +235,8 @@ export async function executeEvaluation(
     // a file of the repository at a recorded commit, read below with the clone token.
     let instructionsText: string | null = null;
     let variant: EvaluationConfigurationRow | undefined;
+    // L09 (QUESTIONS #501): the agent's own tools, as the evaluation recorded them at its start.
+    let allowedTools: readonly string[] | undefined;
     if (evaluation.config_name !== null) {
       const configuration: EvalConfiguration = loadConfigurations(
         configurationFile(settings.evaluation.configDir, evaluation.config_name),
@@ -248,6 +250,7 @@ export async function executeEvaluation(
       if (!row) throw new TaskError('configuration', 'not found');
       if (row.model !== contract.model) throw new TaskError('configuration', 'model');
       if (row.instructions_path !== null) variant = row;
+      if (row.allowed_tools !== null) allowedTools = row.allowed_tools;
     }
     const { config } = await loadEffectiveConfig(scope.projectConfigs, contract.project_id);
 
@@ -320,6 +323,7 @@ export async function executeEvaluation(
       baseSha,
       plannedFiles: task.plannedFiles,
       instructionsSha256: prepared.instructionsSha256,
+      ...(allowedTools === undefined ? {} : { allowedTools }),
     });
     const agentTask: AgentTask = {
       spec: {

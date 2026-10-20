@@ -498,6 +498,14 @@ const CASES: Case[] = [
     key: 'config.rule.viewer_never_runs_evaluations',
     path: 'access.eval_roles',
   },
+  // M34: an evaluation counts for a recertification for 90 days at most (L09, ADR-M86 §2.4).
+  {
+    name: 'an evaluation counts for a recertification for 91 days',
+    rule: 'M34',
+    yaml: 'agents:\n  evaluation:\n    recertification_max_age_days: 91\n',
+    key: 'config.rule.recertification_evaluation_max_age',
+    path: 'agents.evaluation.recertification_max_age_days',
+  },
   // M30: the viewer never builds or reads an Evidence Pack (E02, ADR-M48, QUESTIONS #218).
   {
     name: 'viewer may build evidence packs',

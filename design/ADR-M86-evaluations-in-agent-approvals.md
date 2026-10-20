@@ -133,8 +133,22 @@ Agents belong to the tenant, but a task set belongs to a project, and in practic
 - D-05 §6.1 (`agent_approvals`) and §6.9 (`evaluation_configurations`) change in L09.
 - A project without its own task set uses a numbered set until it has one.
 
+## 6. As built
+
+### 6.1. L09 PR 1: the fingerprint, plans with agents that are not active, the configuration
+
+- Migration `0036-evaluation-fingerprints`. `evaluation_configurations` gains `source` (`agent` or `model`), `tools_sha256` and also `allowed_tools`, the list itself (QUESTIONS #501): the runner gives the agent the tools the evaluation recorded at its start. `tools_sha256` is the SHA-256 of the sorted list as JSON (`toolsSha256`, `platform/packages/core/src/agents/fingerprint.ts`). All three are null on rows written before the migration; those never match.
+- The tools in the runs (QUESTIONS #501, changes ADR-M78 for plans only): a configuration that names an agent gets that agent's `allowed_tools`; a configuration that names a model gets the tools of the project's default agent (`run.agent_key`). An operator evaluation (L04) keeps the harness's `file_editor` and `terminal`.
+- The instructions part (QUESTIONS #502): compared by run. A configuration matches a version when its model and `tools_sha256` match and every scored run of it read instructions with the version's `instructions_sha256` (`evaluation_run_results.instructions_sha256`). No new column.
+- `evaluations.approved_tasks_at_start` (QUESTIONS #503): the number of approved tasks of the project, counted in the transaction that starts the evaluation; fixed by the guard trigger (`SDA21`). It decides the exception of QUESTIONS #498.
+- `agent_approvals.evaluation_id` (a foreign key with the tenant) and `evaluation_result` (`passed`, `missing` or `evaluation_…`); a named evaluation needs a result. Still append-only.
+- Plans (§2.2): `proposed`, `active` and `suspended` agents; a `quarantined` or `retired` agent keeps the refusal code `agent_not_active` (its text now says so). `planFleetSha256` hashes every agent's version, whatever its status, so suspending an agent alone no longer looks like a change to `on_change`; a new version does.
+- Configuration `agents.evaluation` (§2.4) with the defaults of §2.4; `min_tasks` 1–1000, `min_resolve_rate` 0–1 and the age limits 1–365 days are checked by the schema; mandatory rule **M34** keeps `recertification_max_age_days` at 90 or less. The default `config_hash` changes.
+- The check of an approval, `show`, the API and the CLI come in L09 PR 2.
+
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 1.0 | 2026-10-20 | Claude (task L08), accepted by the repository owner | Design with the answers to QUESTIONS #496–#500 |
+| 1.1 | 2026-10-20 | Claude (task L09, PR 1), approved by the repository owner | §6.1 as built, with the answers to QUESTIONS #501–#503 |

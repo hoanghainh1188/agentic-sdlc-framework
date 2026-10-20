@@ -10,9 +10,15 @@
 import { DATA_CLASSES, PROVIDER_TYPES, type DataClass, type ProviderType } from '@sdlc/contracts';
 import { sql, type Kysely } from 'kysely';
 
+import { toolsSha256 } from '../../agents/fingerprint.js';
 import { fromMicros, isUsd, toMicros } from '../../cost/money.js';
 import { DbError } from '../errors.js';
-import type { Database, Evaluation, EvaluationConfigurationRow } from '../schema.js';
+import type {
+  Database,
+  Evaluation,
+  EvaluationConfigurationRow,
+  EvaluationConfigurationSource,
+} from '../schema.js';
 import { isUuid } from '../tenant-id.js';
 import {
   EVALUATION_FINAL_STATUSES,
@@ -43,6 +49,13 @@ export interface EvaluationConfigurationInput {
   readonly maxDurationMin: number;
   /** L05: the register's agent the configuration came from, if any. */
   readonly agentId?: string | null;
+  /**
+   * L09 (ADR-M86 §2.1): `agent` when the plan named the agent by its key, `model` when it named a
+   * model (with the project's default agent). An evaluation of a plan always has it.
+   */
+  readonly source?: EvaluationConfigurationSource;
+  /** L09 (QUESTIONS #501): the tools the agent gets in the runs, its own `allowed_tools`. */
+  readonly allowedTools?: readonly string[];
   /** L05: a prompt variant (path, commit, SHA-256 read at start); null: the repository's own. */
   readonly instructions?: {
     readonly path: string;
@@ -185,6 +198,19 @@ export function checkNewEvaluation(input: NewEvaluation): void {
   }
 }
 
+/** The fingerprint columns of a configuration (ADR-M86 §2.1); both or none. */
+function fingerprintColumns(c: EvaluationConfigurationInput): {
+  source: EvaluationConfigurationSource | null;
+  allowed_tools: string[] | null;
+  tools_sha256: string | null;
+} {
+  if (c.source === undefined || c.allowedTools === undefined) {
+    return { source: null, allowed_tools: null, tools_sha256: null };
+  }
+  const tools = [...c.allowedTools].sort();
+  return { source: c.source, allowed_tools: tools, tools_sha256: toolsSha256(tools) };
+}
+
 export class EvaluationRepository extends TenantRepository {
   /**
    * Writes the evaluation and its runs (all `queued`) and the audit event, in one transaction.
@@ -198,6 +224,14 @@ export class EvaluationRepository extends TenantRepository {
     return this.run(
       this.transactional(async (db) => {
         await lockEvaluationCodes(db, this.tenantId);
+        // L09 (QUESTIONS #503): how many tasks of the project are approved now, at the start.
+        const approved = await db
+          .selectFrom('evaluation_tasks')
+          .select((eb) => eb.fn.countAll<string>().as('n'))
+          .where('tenant_id', '=', this.tenantId)
+          .where('project_id', '=', input.projectId)
+          .where('status', '=', 'approved')
+          .executeTakeFirstOrThrow();
         const code = formatEvaluationCode(year, (await this.lastNumber(db, year)) + 1);
         const evaluation = await db
           .insertInto('evaluations')
@@ -218,6 +252,7 @@ export class EvaluationRepository extends TenantRepository {
             plan_version: input.plan?.version ?? null,
             task_set_kind: input.taskSetKind ?? 'folder',
             task_set_commit: input.taskSetCommit ?? null,
+            approved_tasks_at_start: Number(approved.n),
           })
           .returningAll()
           .executeTakeFirstOrThrow();
@@ -261,6 +296,7 @@ export class EvaluationRepository extends TenantRepository {
                 instructions_path: c.instructions?.path ?? null,
                 instructions_commit: c.instructions?.commit ?? null,
                 instructions_sha256: c.instructions?.sha256 ?? null,
+                ...fingerprintColumns(c),
               })),
             )
             .execute();
