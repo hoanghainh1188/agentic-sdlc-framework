@@ -61,6 +61,11 @@
   - a pointer to the register.
 - A test checks that every rule ID of the register is found in exactly one `CLAUDE.md`, or is marked as enforced by a check.
 
+- As built (PR 4): seven folder files hold the module rules: `platform/packages/core` (workflow, gates, evaluations, evidence, retention, reports, migrations, audit; also for the worker), `platform/apps/runner`, `platform/deploy`, `platform/apps/api`, `platform/apps/dashboard`, `platform/apps/cli` and `platform/eval`.
+  - The root `CLAUDE.md` keeps the hard rules, the platform-wide module rules (secrets, logging, release), the workflow, the commands and the constraints, with an index of the folder files. It says to read a folder's file before changing the folder **or its tests**, because Claude Code reads a folder's file only when it opens a file there.
+  - Every rule bullet ends with its IDs (`[R043]`); `design/RULES.md` names the file of each ID; `platform/tests/workspace/claude-md.test.ts` checks that each ID is in that file once, that no tag is unknown, that the index lists every folder file, and that the root stays under 3,000 words.
+  - The root fell from 4,790 to about 2,860 words (−40 %). The first target (1,800 words) would have meant cutting the hard rules or the commands, which every session needs; the budget is 3,000 instead.
+
 ### 2.5. Four pull requests
 
 | PR | Content |
@@ -84,3 +89,4 @@
 | 0.1 | 2026-10-20 | Claude (task W01, PR 1) | Proposed |
 | 0.2 | 2026-10-20 | Claude (task W01, PR 2) | §2.3 as built: the hook |
 | 0.3 | 2026-10-20 | Claude (task W01, PR 3) | §2.2 as built: lint rules and tests |
+| 0.4 | 2026-10-20 | Claude (task W01, PR 4) | §2.4 as built: rules by folder, ID tags, a word budget |
