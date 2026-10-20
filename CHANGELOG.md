@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Sandbox image `node24`: three new CRITICAL findings in `linux-libc-dev` (kernel headers) of the pinned OpenHands base image blocked the CI job `sandbox-image`. The build now upgrades `linux-libc-dev` from Debian, which fixes CVE-2026-90037; CVE-2026-63825 and CVE-2026-93221 have no fix yet and are accepted in `platform/sandbox-images/.trivyignore` (a sandbox runs on the host's kernel, not these headers).
+
 ### Added
 - W01 PR 3 (ADR-M84 §2.2): lint rules and tests for rules of `CLAUDE.md` that had no full check: no `console.*` in platform code, no Temporal schedule in the worker, audit rows only through `TenantScope.audit.append`, a lock file of migration hashes (`migrations.lock.json`: a new migration adds its line), one test for every append-only table, the generated backlog equals the script's output, and checks of `@SessionAction` routes, doctor's options, the trial's `COMPOSE_PROJECT_NAME`, internal sources and old codes in the documents. For developers: a new migration must add its SHA-256 to `migrations.lock.json`; the test message says how.
 - W01 PR 2 (ADR-M84 §2.3): a Claude Code hook. `.claude/settings.json` runs `platform/tools/claude-hooks/guard-bash.mjs` before every Bash command of a Claude Code session in this repository. It refuses the commands `CLAUDE.md` forbids for Claude: volume prunes and `compose down -v`, tags, releases and publishes, force-push and rebase, a push to `main`, and the commands that print or take a secret. Each refusal names its rule in `design/RULES.md`. Nothing changes for people outside Claude Code.
