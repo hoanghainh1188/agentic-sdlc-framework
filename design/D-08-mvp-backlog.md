@@ -2,8 +2,8 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.49 |
-| Date | 2026-10-13 |
+| Version | 1.51 |
+| Date | 2026-10-20 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-05 (data), D-07 (tokens), D-09 (sample repo) |
@@ -45,12 +45,13 @@
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) | 14 | S×3 · M×9 · L×2 |
+| DEV | Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479) | 1 | M×1 |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 5 | S×1 · M×3 · L×1 |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.5.0 (QUESTIONS #361, #420, #424; v0.4.0 is the first part of EVAL) | 8 | S×4 · M×2 · L×2 |
 | Models | Self-hosted models: L01 early in v0.5.0, with X09 (QUESTIONS #362, #424) | 2 | S×1 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 11 | S×3 · M×8 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 16 | S×4 · M×6 · L×6 |
-| **Total** | | **111** | |
+| **Total** | | **112** | |
 
 ### Order and dependencies between milestones
 
@@ -1101,6 +1102,24 @@ flowchart LR
 > Note: Found in the plan review after V13 (Harry, 2026-10-13, QUESTIONS #440): the repository is public and the community trial runs on people's own repositories. Before the first trial report from a real repository Done: ADR-M80 (PRs 1–3); the gaps it found are H02 (G-1, G-5), H04 (G-10), H05 (G-9), H06 (G-6) and H07 (G-7), QUESTIONS #455 and #456
 
 
+### DEV — Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479)
+
+#### W01. Rules as checks: a rules register, hooks, lint and tests, a shorter CLAUDE.md
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | A01, A09 | NFR-05, NFR-07 | design/RULES.md, design/ADR-M84, .claude/settings.json and its hook script, eslint.config.mjs, platform/tools/eslint-rules/*, platform/tests/workspace/*, CLAUDE.md and nested CLAUDE.md files, design/QUESTIONS.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: PR 1: `design/RULES.md` lists every rule of the root CLAUDE.md with its ID, the check that enforces it (lint, test, database, runtime, CI, hook or none), its coverage and a proposal; rules that look outdated or are worded wrongly go to QUESTIONS; duplicate rules are merged
+- [ ] AC2: PR 2: a Claude Code `PreToolUse` hook in `.claude/settings.json` refuses the commands CLAUDE.md forbids for Claude (volume prune, `compose down -v`, tags and releases, `npm publish`, force-push and rebase, the OpenBao commands that print a secret, `weed shell s3.config.show`); the hook script has unit tests and prints a catalog-free English refusal (developer tooling, not a user-facing message)
+- [ ] AC3: PR 3: lint rules and tests for the important rules that have no check today (at least: no `console.*` outside the logger, no Temporal schedules in the worker, audit writes only through `TenantScope.audit.append`, no edit of a merged migration, one test for every append-only table, the generated D-08 equals the script's output); each closes a row of the register
+- [ ] AC4: PR 4: rules that apply to one folder move to a nested CLAUDE.md in that folder; the root CLAUDE.md keeps the hard rules and a pointer to the register; a test checks that every rule ID of the register is found in exactly one CLAUDE.md or marked as enforced by a check
+
+> Note: QUESTIONS #479 (2026-10-20): the root CLAUDE.md has about 190 rules in 131 bullets and is read by every session; about half have a mechanical check. ADR-M84 records the approach. Four PRs, each in its own session
+
+
 ### EVAL — Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)
 
 #### L04. Evaluations on the server, one engine for the server and developer machines
@@ -1819,6 +1838,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.47 | 2026-10-13 | Claude, approved by Harry | New milestone EVAL after v0.3.0, before EXT (QUESTIONS #450): L04 (evaluations on the server, one engine with developer machines), L05 (evaluation plans by managers), L06 (reports and recommendations), L07 (a project's task set from its merged intents), L08 (design: evaluations in the agent register's approvals) |
 | 1.49 | 2026-10-13 | Claude (task H01, PR 3), approved by Harry (QUESTIONS #455, #456 answered) | H01 done: its gaps become H04 (secret scan of the diff, Medium), H05 (diff size bound, Medium), H06 (stronger sandbox runtime, Later), H07 (Docker authorization plugin, High) and two criteria of H02; QUESTIONS #455, #456 |
 | 1.50 | 2026-10-16 | Claude, approved by Harry | Release v0.4.0 with L04 and L05 (the first part of EVAL); EXT and Models move to v0.5.0; L06–L08 finish EVAL first |
+| 1.51 | 2026-10-20 | Claude (task W01, PR 1), approved by the repository owner | New milestone DEV with task W01: rules as checks (a rules register, hooks, lint and tests, a shorter CLAUDE.md; QUESTIONS #479, ADR-M84) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

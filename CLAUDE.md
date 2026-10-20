@@ -83,10 +83,10 @@ Workflow and gates
 - Evaluation plans (ADR-M82): only people with a role in `access.eval_roles` (never `viewer`) change or run them; a prompt variant is a file on the default branch, stored as path, commit and SHA-256, never its text; one open evaluation per plan; amounts change only by a new version, never below the month's spend.
 - Never offer an approval to a producer or to someone without the gate's role (`sdlc next`, the dashboard).
 - Producers never decide: at G7 the creator, every run's `triggered_by`, the plan submitters and the commit authors; at G8 the creator, the people who allowed its runs and the plan submitters (ADR-M41, ADR-M49). Escalations are acknowledged and decided only by the owner role, the backup role or governance, never a producer (ADR-M28).
-- A Git host or file that cannot be read makes the step wait; it never passes a gate (ADR-M39, ADR-M40). HOTL never passes G2 without acceptance criteria.
+- A Git host or file that cannot be read makes the step wait; it never passes a gate (ADR-M39, ADR-M40).
 - The platform never raises an intent's data class (ADR-M32). L1 runs never commit or push; their proposal is evidence, downloaded by a person (mode 600, never printed), and only that paused case takes a G4 rejection (ADR-M33 §2.9, ADR-M64).
 - `sdlc plan draft` is local only: no API call, no Git command, never submits, commits or pushes; never fill the `PERSON MUST` fields by guessing (ADR-M62).
-- Pull request text on the public pilot is codes only; GitHub logins are read when posting, never stored.
+- Pull request text on the public pilot is codes only; the GitHub logins a notice mentions are read when posting, never stored (ADR-M28, ADR-M30).
 
 Runner, sandbox, agent
 - Never add a sandbox environment variable, mount, capability or network outside `docker/guard.ts`. Sandbox egress = LiteLLM and the package proxy only; GitHub is reached by the runner, never by the sandbox (ADR-M25). The socket proxy allowlist equals `ALLOWED_ENDPOINTS`.
@@ -105,7 +105,7 @@ Evidence, retention, storage
 - Retention purges never send the object-lock bypass; only the archive purge and the orphan sweep do. Nothing younger than 180 days is purged for retention, whatever the configuration (ADR-M51). The audit anchor bucket is COMPLIANCE; never log an anchor hash in a mismatch.
 - Langfuse purge: select traces by run tags, check every trace's tags, never request `io`; no Langfuse step unless the key's project equals `SDLC_WORKER_LANGFUSE_PROJECT_ID` (ADR-M53). Never give the ClickHouse user `langfuse` access management (ADR-M63 §6).
 - SeaweedFS: only the S3 API is reachable; never publish or open another SeaweedFS port, never turn Iceberg or Lance on, never store its JWT keys anywhere else; admin work only with `docker compose exec seaweedfs weed shell -master=127.0.0.1:9333` (never `-master=seaweedfs:9333`). Never run `weed shell s3.config.show`; never pass S3 keys as process arguments (ADR-M52, ADR-M33 §2.9).
-- Migrations are plain SQL; never edit a merged one. Audit events are written only through `TenantScope.audit.append`. A new run event type, audit action or payload field is declared in `run-events/types.ts` / `audit/actions.ts` with a test.
+- Migrations are plain SQL (in TypeScript files under `migrations/`); never edit a merged one. Audit events are written only through `TenantScope.audit.append`. A new run event type, audit action or payload field is declared in `run-events/types.ts` / `audit/actions.ts` with a test.
 
 Secrets, TLS, deployment
 - OpenBao speaks TLS on 8200 everywhere; certificate verification can never be turned off. Never bind-mount host TLS files, never add a plain listener or `SDLC_OPENBAO_ALLOW_PLAINTEXT` to the compose file (ADR-M63). OpenBao "healthy" = API reachable, not unsealed.
@@ -135,6 +135,7 @@ Release
 - Handbook split: policies and generic process chapters are written outside Claude Code. **You own** the handbook parts that describe platform behaviour: Ch.13–16 and Ch.18–20 usage sections (CLI, `/approve` commands, config, troubleshooting) and runbooks (e.g. T11 OpenBao). When a task changes user-visible behaviour, update the matching handbook chapter in the same PR. Never edit template T13 or the policy chapters.
 - Keep `CHANGELOG.md` updated for notable changes.
 - **Keep this file short** (QUESTIONS #425): a new task adds at most one line to "Commands" and one line per new never/always rule to "Module rules". Its detail goes in its ADR, the deploy README, the runbook or `platform/DEVELOPMENT.md` (tests: one row there per new `pnpm test:*` script, checked by a test).
+- `design/RULES.md` lists every rule of this file and the check that enforces it: a new rule gets a row in the same PR, and a check (lint, test, hook) comes before text (ADR-M84).
 
 ## Workflow for each task (one task per session, see D-08 section 5)
 1. Read the task in D-08 and the related FR / design sections.
@@ -178,7 +179,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - State (2026-10-16): **v0.4.0 released** 2026-10-16 (L04, L05: the first part of the milestone EVAL; v0.3.0: V13, L02, V10, H01). L06 done on `main` (#382–#384, not yet released). Next: L07–L08 to finish EVAL, then EXT starts with X09 and L01 comes early in v0.5.0 (QUESTIONS #424, #450); U07 waits for trial users (Later); H04, H05, H07 and A10 PR 3 are in Server, and the first real agent run on the company server needs the runner in its own VM or on rootless Docker (QUESTIONS #455). The trial M-E is run by the community (`TRIAL.md`; no trial report yet). Bugs from trial reports always come first. Parked: A10 PR 3 (the company server), K02. The platform keeps the two-person rule (no single-person mode). History of releases: `CHANGELOG.md`; plan: `ROADMAP.md`, D-08.
 - Open docs follow-ups: align D-02 §3 and handbook Ch.2 §2.5 on who owns the project AI record (QUESTIONS #103); align template T13 with the plan schema v1 (handbook authors, never in Claude Code).
 - Conflicts with `main` on a branch under review: merge `origin/main` into the branch. Never rebase or force-push it.
-- `design/QUESTIONS.md` and ADR numbers: each session gets its own block when it is queued and uses only numbers from that block (history: `design/README.md` "Number blocks"; update both places). Held now: none. L06 used #480–#482 and ADR-M83. H01 used #455–#456 and ADR-M80. V13 used #430–#434 and ADR-M79; L02 used #435–#439, #445–#447 and ADR-M78; the plan review used #450; L04 used #460–#464 and ADR-M81; the coordinator used #465 (dashboard first in L05, L06); L05 used #470–#478 and ADR-M82. **Next free: QUESTIONS #479, then #485–#489; ADR-M84.**
+- `design/QUESTIONS.md` and ADR numbers: each session gets its own block when it is queued and uses only numbers from that block (history: `design/README.md` "Number blocks"; update both places). Held now: none. W01 used #479 and ADR-M84. L06 used #480–#482 and ADR-M83. H01 used #455–#456 and ADR-M80. V13 used #430–#434 and ADR-M79; L02 used #435–#439, #445–#447 and ADR-M78; the plan review used #450; L04 used #460–#464 and ADR-M81; the coordinator used #465 (dashboard first in L05, L06); L05 used #470–#478 and ADR-M82. **Next free: QUESTIONS #485–#489; ADR-M85.**
 - Development uses throw-away OpenBao keys only. The real OpenBao initialisation on the internal server waits until the three key holders are named and the company CA's certificate is issued (QUESTIONS #20, task A10 PR 3; runbook T11 §3c) (remove this line when both are done).
 
 ## Decisions (see design/D-02 section 11)
