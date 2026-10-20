@@ -11,3 +11,14 @@ CVE-2026-6653
 # base; no fixed version released yet; a sandbox runs on the host's kernel, not these headers.
 # Approved by Harry (C04 session 3 plan review, PR for issue #31).
 CVE-2026-43185
+# 2026-10-20 linux-libc-dev (kernel headers, used only to compile native modules) in the same
+# base; no fixed version released yet; a sandbox runs on the host's kernel, not these headers
+# (same reason as CVE-2026-43185). Found when PR #389 rebuilt the image. Person B approves in the
+# pull request that adds them.
+CVE-2026-63825
+CVE-2026-93221
+# 2026-10-20 linux-libc-dev, same base: Debian lists a fix (6.12.111-1), but the base image pins
+# apt to a Debian snapshot of 2026-09-13 (snapshot.debian.org), which still has 6.12.107-1, so a
+# build cannot install it. Same reason as above: kernel headers, the sandbox runs on the host's
+# kernel. Remove when a new base image carries the fix. Person B approves in the same pull request.
+CVE-2026-90037
