@@ -9,7 +9,7 @@ import path from 'node:path';
 
 import { readYamlMapping } from '@sdlc/config';
 
-import { TaskError } from './task.js';
+import { TaskError, type EvalTask } from './task.js';
 
 export const TASK_CARD_DIR = '.sdlc/eval-tasks';
 export const TASK_CARD_SCHEMA = 2;
@@ -342,5 +342,28 @@ export async function draftTaskCard(input: DraftInput, lookup: CommitLookup): Pr
       passToPass: expandCommands(input.commands.pass_to_pass, hiddenTests),
       ci: expandCommands(input.commands.ci, hiddenTests),
     },
+  };
+}
+
+/**
+ * The task of a card, in the shape the base and the scoring take (task L07, ADR-M85 §2.5): the
+ * spec text read from Git at the card's spec commit, no seed patch (the base is the commit before
+ * the change), the hidden tests as files of the repository. Never written to disk as a task folder.
+ */
+export function taskOfCard(card: TaskCard, specText: string): EvalTask {
+  return {
+    id: card.id,
+    title: card.id,
+    kind: 'feature',
+    shape: 'F0',
+    plannedFiles: card.plannedFiles,
+    failToPass: card.failToPass,
+    passToPass: card.passToPass,
+    ci: card.ci,
+    dir: '',
+    specText,
+    seedPatch: null,
+    solutionPatch: null,
+    hiddenFiles: card.hiddenTests,
   };
 }
