@@ -258,5 +258,113 @@ describe('sdlc admin agent', () => {
     expect(await h.run(['admin', 'agent', 'list', '--overdue', '--json'])).toBe(EXIT.ok);
     const listed = JSON.parse(h.out.at(-1) ?? '{}') as { items: { key: string }[] };
     expect(listed.items.map((agent) => agent.key)).toEqual(['coder']);
+    // L10: the server filters overdue agents and adds their latest evaluation.
+    expect(h.requests.at(-1)?.url.search).toBe('?overdue=true');
+  });
+
+  // L10 (ADR-M86 §2.6): a recertification names its evaluation; aging is said either way.
+  describe('evaluations in the recertification (L10)', () => {
+    const RECERTIFY = ['admin', 'agent', 'recertify', '--key', 'coder'];
+    const passed = (aging: Record<string, unknown>) => ({
+      mode: 'required',
+      code: 'EVAL-2026-0009',
+      result: 'passed',
+      qualifies: true,
+      params: {
+        key: 'coder',
+        code: 'EVAL-2026-0009',
+        rate: '0.875',
+        low: '0.6',
+        high: '1.0',
+        tasks: '8',
+      },
+      aging,
+    });
+    const recertified = (evaluation: unknown) => ({
+      'POST /v1/admin/agents/coder/recertify': {
+        status: 200,
+        body: { ...agentBody({ status: 'active' }), evaluation },
+      },
+    });
+
+    it('sends --evaluation and prints the comparison with the last activation', async () => {
+      const params = { before: 'EVAL-2026-0002', shared: '8', rate: '0.875', before_rate: '1.000' };
+      const h = await harness({
+        routes: recertified(passed({ status: 'compared', reason: null, params })),
+      });
+      expect(await h.run([...RECERTIFY, '--evaluation', 'EVAL-2026-0009'])).toBe(EXIT.ok);
+      expect(h.requests[0]?.body).toEqual({ evaluation_code: 'EVAL-2026-0009' });
+      expect(h.out.at(-1)).toBe(t('cli.admin.agent.aging_compared', params));
+    });
+
+    it.each([
+      ['no_activation_evaluation', {}],
+      ['too_few_shared_tasks', { before: 'EVAL-2026-0002', shared: '2', min: '8' }],
+    ] as const)('says when the comparison was skipped: %s', async (reason, params) => {
+      const h = await harness({
+        routes: recertified(passed({ status: 'skipped', reason, params })),
+      });
+      expect(await h.run([...RECERTIFY, '--evaluation', 'EVAL-2026-0009'])).toBe(EXIT.ok);
+      expect(h.out.at(-1)).toBe(t(`cli.admin.agent.aging_skipped.${reason}`, params));
+    });
+
+    it('prints a drop in warn mode as a warning with its numbers', async () => {
+      const params = {
+        key: 'coder',
+        code: 'EVAL-2026-0009',
+        before: 'EVAL-2026-0002',
+        shared: '8',
+        rate: '0.000',
+        before_rate: '1.000',
+        p_value: '0.0078',
+      };
+      const h = await harness({
+        routes: recertified({
+          mode: 'warn',
+          code: 'EVAL-2026-0009',
+          result: 'evaluation_quality_dropped',
+          qualifies: false,
+          params,
+        }),
+      });
+      expect(await h.run([...RECERTIFY, '--evaluation', 'EVAL-2026-0009'])).toBe(EXIT.ok);
+      const text = t('agent_register.error.evaluation_quality_dropped', params);
+      expect(text).toContain('0.0078');
+      expect(h.out.at(-1)).toBe(t('cli.admin.agent.evaluation_warning', { text }));
+    });
+
+    it('list --overdue prints each agent’s latest evaluation', async () => {
+      const h = await harness({
+        routes: {
+          'GET /v1/admin/agents': {
+            status: 200,
+            body: {
+              items: [
+                {
+                  ...agentBody({ status: 'active', last_recertified_at: '2026-01-05' }),
+                  evaluation: passed({ status: 'compared', reason: null, params: {} }),
+                },
+                {
+                  ...agentBody({
+                    agent_key: 'other',
+                    status: 'active',
+                    last_recertified_at: '2026-01-05',
+                  }),
+                  evaluation: null,
+                },
+              ],
+            },
+          },
+        },
+      });
+      expect(await h.run(['admin', 'agent', 'list', '--overdue'])).toBe(EXIT.ok);
+      expect(h.out).toContain(
+        t('cli.admin.agent.overdue_evaluation', {
+          code: 'EVAL-2026-0009',
+          verdict: t('cli.admin.agent.evaluation_qualifies'),
+        }),
+      );
+      expect(h.out.at(-1)).toBe(t('cli.admin.agent.overdue_no_evaluation'));
+    });
   });
 });

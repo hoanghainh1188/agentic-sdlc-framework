@@ -12,6 +12,7 @@ import { t } from '@sdlc/messages';
 import {
   agentDetailSchema,
   agentListSchema,
+  agentRecertifiedSchema,
   agentRoundSchema,
   agentSchema,
   type AgentEvaluationView,
@@ -163,16 +164,19 @@ export const AGENT_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
     },
   },
   'agent recertify': {
-    options: { ...key, date: { type: 'string' } },
+    options: { ...key, date: { type: 'string' }, evaluation: { type: 'string' } },
     required: ['key'],
     run: async (call) => {
       const day = opt(call.values, 'date');
-      const agent = await call.client.post(
-        `${agentPath(call)}/recertify`,
-        agentSchema,
-        day === undefined ? {} : { day },
-      );
-      return output(call, agent, () => sayAgent(call, 'cli.admin.agent.recertified', agent));
+      const evaluation = opt(call.values, 'evaluation');
+      const agent = await call.client.post(`${agentPath(call)}/recertify`, agentRecertifiedSchema, {
+        ...(day === undefined ? {} : { day }),
+        ...(evaluation === undefined ? {} : { evaluation_code: evaluation }),
+      });
+      return output(call, agent, () => {
+        sayAgent(call, 'cli.admin.agent.recertified', agent);
+        sayRecertificationEvaluation(call, agent.evaluation ?? null);
+      });
     },
   },
   'agent show': {
@@ -197,11 +201,19 @@ export const AGENT_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
     options: { overdue: { type: 'boolean', default: false } },
     required: [],
     run: async (call) => {
-      const all = await call.client.get('/v1/admin/agents', agentListSchema);
-      const items = all.items.filter((agent) => call.values.overdue !== true || agent.overdue);
+      const overdue = call.values.overdue === true;
+      // L10: the server filters overdue agents and adds each one's latest evaluation.
+      const all = await call.client.get(
+        overdue ? '/v1/admin/agents?overdue=true' : '/v1/admin/agents',
+        agentListSchema,
+      );
+      const items = all.items.filter((agent) => !overdue || agent.overdue);
       return output(call, { items }, () => {
         if (items.length === 0) say(call.ctx, 'cli.admin.agent.none');
-        for (const agent of items) say(call.ctx, 'cli.admin.agent.line', text(agent));
+        for (const agent of items) {
+          say(call.ctx, 'cli.admin.agent.line', text(agent));
+          if (overdue) sayOverdueEvaluation(call, agent.evaluation ?? null);
+        }
       });
     },
   },
@@ -223,6 +235,41 @@ function sayApprovalEvaluation(call: AdminCall, evaluation: AgentEvaluationView 
   } else {
     say(call.ctx, 'cli.admin.agent.evaluation_warning', { text: evaluationText(evaluation) });
   }
+}
+
+/** After a recertification (L10): the numbers, the comparison with the last activation, or the warning. */
+function sayRecertificationEvaluation(
+  call: AdminCall,
+  evaluation: AgentEvaluationView | null,
+): void {
+  if (!evaluation || evaluation.result === null) return;
+  if (!evaluation.qualifies) {
+    say(call.ctx, 'cli.admin.agent.evaluation_warning', { text: evaluationText(evaluation) });
+    return;
+  }
+  say(call.ctx, 'cli.admin.agent.evaluation_recertified', evaluation.params);
+  const aging = evaluation.aging;
+  if (aging?.status === 'compared') say(call.ctx, 'cli.admin.agent.aging_compared', aging.params);
+  if (aging?.reason === 'no_activation_evaluation') {
+    say(call.ctx, 'cli.admin.agent.aging_skipped.no_activation_evaluation');
+  }
+  if (aging?.reason === 'too_few_shared_tasks') {
+    say(call.ctx, 'cli.admin.agent.aging_skipped.too_few_shared_tasks', aging.params);
+  }
+}
+
+/** `list --overdue` (L10): the latest evaluation of each agent and whether it qualifies. */
+function sayOverdueEvaluation(call: AdminCall, evaluation: AgentEvaluationView | null): void {
+  if (!evaluation || evaluation.code === null) {
+    say(call.ctx, 'cli.admin.agent.overdue_no_evaluation');
+    return;
+  }
+  say(call.ctx, 'cli.admin.agent.overdue_evaluation', {
+    code: evaluation.code,
+    verdict: evaluation.qualifies
+      ? t('cli.admin.agent.evaluation_qualifies')
+      : evaluationText(evaluation),
+  });
 }
 
 /** `show` (L09): the latest evaluation of the current fingerprint and whether it qualifies. */

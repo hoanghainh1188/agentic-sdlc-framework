@@ -158,6 +158,15 @@ Agents belong to the tenant, but a task set belongs to a project, and in practic
 - `GET /v1/admin/agents/:key` (`sdlc admin agent show`) returns `evaluation`: the latest completed evaluation with the agent's current fingerprint in its projects and its check for an approval (`mode`, `code`, `result`, `qualifies`, `params`). For an active agent it is checked as a first use: there is no next version to compare.
 - New rule R135 in `platform/apps/api/CLAUDE.md`.
 
+### 6.3. L10: the recertification
+
+- `recertifyAgentAs` takes `evaluationCode` (`evaluation_code` in `POST /v1/admin/agents/:key/recertify`, `--evaluation` in the CLI) and checks it with `checkAgentEvaluation` for a recertification: the conditions of §2.3 for the agent's current version (no baseline: `change` is false), with `recertification_max_age_days`. The status of the agent does not matter (QUESTIONS #507). The mode works as for an approval: `off` checks and records nothing, `warn` recertifies and answers the result, `required` refuses anything but `passed`.
+- Aging: the evaluation of the last activation is the one the approvals of the latest completed `activate` round named (`lastActivation`). The candidate configurations of both evaluations are paired by task and run number on the tasks they share, and `differs` decides; a lower rate that `differs` calls different gives `evaluation_quality_dropped` with both rates, `p_value` and the shared task count. Fewer shared tasks than `min_tasks` skip the comparison (`too_few_shared_tasks`), and so does an activation that named no evaluation (`no_activation_evaluation`, QUESTIONS #506). The answer carries `aging` (`compared` or `skipped`, the reason and the numbers).
+- The platform never suspends an agent itself: a drop refuses or warns, and the agent keeps its status (rule R136).
+- `agent.recertified` gains `evaluation_id` (when one was found) and `evaluation_result` (none in `off` mode). No migration.
+- `GET /v1/admin/agents?overdue=true` lists the overdue agents only, each with its latest evaluation checked for a recertification; `sdlc admin agent list --overdue` uses it. Without the filter the list is unchanged (no evaluation, so it stays cheap).
+- FR-36 is unchanged: `checkAgentForRun` still warns about an overdue agent and lets the run start.
+
 ## Version history
 
 | Version | Date | Author | Notes |
@@ -165,3 +174,4 @@ Agents belong to the tenant, but a task set belongs to a project, and in practic
 | 1.0 | 2026-10-20 | Claude (task L08), accepted by the repository owner | Design with the answers to QUESTIONS #496–#500 |
 | 1.1 | 2026-10-20 | Claude (task L09, PR 1), approved by the repository owner | §6.1 as built, with the answers to QUESTIONS #501–#503 |
 | 1.2 | 2026-10-21 | Claude (task L09, PR 2), approved by the repository owner | §6.2 as built, with the answer to QUESTIONS #504 |
+| 1.3 | 2026-10-21 | Claude (task L10), approved by the repository owner | §6.3 as built, with the answers to QUESTIONS #506, #507 |

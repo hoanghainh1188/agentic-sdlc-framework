@@ -57,6 +57,8 @@ export function presentVerdict(
     result: verdict.result,
     qualifies: verdict.result === 'passed',
     params: verdict.params,
+    // L10: the comparison with the last activation of a recertification.
+    ...(verdict.aging ? { aging: verdict.aging } : {}),
   };
 }
 
