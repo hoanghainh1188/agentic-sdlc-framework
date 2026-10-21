@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task X09; the decisions of §5 wait for the repository owner) |
+| Status | **Accepted** (repository owner, 2026-10-21; result of task X09) |
 | Date | 2026-10-21 |
-| Decided by | — (plan approved by the repository owner on 2026-10-21: cloud versions only, desk research from the official documentation) |
+| Decided by | The repository owner (plan approved on 2026-10-21: cloud versions only, desk research from the official documentation; the decisions of §5 on 2026-10-21) |
 | Related | D-08 tasks X09, X10; D-02 NFR-05; D-03 §7.1; ADR-M11 (polling), ADR-M23 (the GitHub App), ADR-M25 (tokens in the sandbox), ADR-M38, ADR-M41 (G7), ADR-M42 §2.4 (revoking tokens), ADR-M49; design/QUESTIONS.md #361, #511–#513 |
 | Spike code | `platform/spikes/git-hosts/` (`matrix.json`; may be thrown away) |
 
@@ -94,7 +94,7 @@ None of the three hosts gives what the GitHub App gives: a one-hour token for on
 - **Rate limits for polling:** GitLab.com 5,000 requests per hour on Free (more on paid tiers); Bitbucket Cloud 1,000 per hour for repository data; Backlog 600 reads per minute on paid plans and one tenth of that on Free.
 - **Changing services:** Bitbucket Cloud removed App passwords, the issue tracker API and an option of the diff API in 2026, and changed OAuth client credentials. An adapter must expect more changes.
 
-## 3. Ranking and effort (AC3) [Proposal]
+## 3. Ranking and effort (AC3)
 
 | Rank | Host | Effort of an adapter | Why |
 |---|---|---|---|
@@ -110,13 +110,13 @@ The estimates are from documentation only. The order follows how much of G6 and 
 - **Bitbucket Cloud:** the `merged` time and the activity order; whether approvals reset on push on Standard; the `diffstat` spec for two commits; `max_depth` of the source listing.
 - **Backlog:** the status IDs of a closed and a merged pull request; the meaning of activity type 21; whether `branchCommit` is the current head; line positions of pull request comments; whether a user outside a protected branch's allow list can still press Merge.
 
-## 5. Decisions for the repository owner (QUESTIONS #511–#513)
+## 5. Decisions (repository owner, 2026-10-21; QUESTIONS #511–#513)
 
-1. **#511: the plan tier a project needs.** Proposal: the platform accepts a GitLab.com or Bitbucket Cloud project only when the host can stop a merge without approval (GitLab Premium, Bitbucket Premium) and the adapter has checked those settings by API; on lower tiers it refuses, because G7 would rest only on detection after the merge.
-2. **#512: tokens weaker than the GitHub App.** Proposal: accept GitLab project access tokens (one project, revoked by the platform after each run, a sweep for tokens left over, the creator token in OpenBao) as a written exception to the one-hour rule; refuse Bitbucket Cloud and Backlog for agent runs until each has a credential limited to one repository, or accept them only with a proxy that limits Git traffic to one repository (more work, its own ADR).
-3. **#513: Backlog.** Proposal: no adapter for now. If a client needs it, design it as "Backlog for pull requests and comments, an external CI for G6, comment commands for G7", which is a change of the G7 design (ADR-M41) and needs its own approval.
+1. **#511: the plan tier a project needs: Premium or higher.** The platform accepts a GitLab.com or Bitbucket Cloud project only when the host can stop a merge without approval (GitLab Premium, Bitbucket Premium) and the adapter has checked those settings by API; on lower tiers it refuses, because G7 would rest only on detection after the merge.
+2. **#512: tokens weaker than the GitHub App: GitLab as a written exception, Bitbucket Cloud and Backlog refused for agent runs.** Accept GitLab project access tokens (one project, revoked by the platform after each run, a sweep for tokens left over, the creator token in OpenBao) as a written exception to the one-hour rule; refuse Bitbucket Cloud and Backlog for agent runs until each has a credential limited to one repository. A proxy that limits Git traffic to one repository is not chosen now (it would need its own ADR).
+3. **#513: Backlog: no adapter for now.** If a client needs it, design it as "Backlog for pull requests and comments, an external CI for G6, comment commands for G7", which is a change of the G7 design (ADR-M41) and needs its own approval.
 
-Until then: no adapter is built (X10 waits for a real project, QUESTIONS #361), and nothing in the platform changes.
+No adapter is built yet: X10 waits for a real project (QUESTIONS #361), and nothing in the platform changes. When X10 starts, it builds the GitLab.com adapter first, with these rules, and checks §4 on a live account.
 
 ## 6. Alternatives not chosen
 
@@ -131,3 +131,4 @@ Until then: no adapter is built (X10 waits for a real project, QUESTIONS #361), 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-21 | Claude (task X09) | Result of the spike; decisions of §5 proposed (QUESTIONS #511–#513) |
+| 1.0 | 2026-10-21 | Repository owner | Accepted, with the answers to QUESTIONS #511–#513 (the proposals of §5) |
