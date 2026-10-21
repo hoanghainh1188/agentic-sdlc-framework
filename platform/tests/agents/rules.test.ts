@@ -1,7 +1,7 @@
 // D-08 C10: the agent register's formats, status moves and recertification clock (handbook Ch.20,
 // design/ADR-M31). Pure functions; the database part is in tests/integration/db/agents.test.ts.
 import { AGENT_STATUSES } from '@sdlc/contracts';
-import { t } from '@sdlc/messages';
+import { catalogFor, placeholdersOf, t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -165,9 +165,20 @@ describe('recertification clock (AC4, handbook Ch.20 §20.8)', () => {
 describe('messages (NFR-08)', () => {
   it('every refusal has a catalog text with no placeholder left', () => {
     for (const [code, key] of Object.entries(AGENT_REGISTER_ERROR_MESSAGES)) {
-      const error = new AgentRegisterError(code as AgentRegisterError['code'], 'x', 'version');
+      // L09: an evaluation refusal carries the numbers its text quotes.
+      const params = Object.fromEntries(
+        placeholdersOf(catalogFor('en')![key] ?? '')
+          .filter((name) => name !== 'key' && name !== 'field')
+          .map((name) => [name, '7']),
+      );
+      const error = new AgentRegisterError(
+        code as AgentRegisterError['code'],
+        'x',
+        'version',
+        params,
+      );
       const text = agentRegisterErrorMessage(error, 'coder-openhands');
-      expect(text, key).toBe(t(key, { key: 'coder-openhands', field: 'version' }));
+      expect(text, key).toBe(t(key, { ...params, key: 'coder-openhands', field: 'version' }));
       expect(text, key).not.toMatch(/\{[a-z_]+\}/);
     }
   });

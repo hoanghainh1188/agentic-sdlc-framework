@@ -1,9 +1,12 @@
 // `sdlc admin agent …`: the agent register through the API (task B13 AC7, handbook Ch.20,
 // ADR-M37 §2.8). An agent is activated or retired only by approvals: `approve --as <capacity>`;
 // the last approval of a set changes the status. `--owner` takes a user ID or an e-mail address.
+// An activation names its evaluation with `--evaluation` (L09, ADR-M86 §2.5); `show` gives the
+// latest evaluation of the agent's current fingerprint and whether it qualifies.
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
+import { AGENT_REGISTER_ERROR_MESSAGES, isAgentRegisterErrorCode } from '@sdlc/core';
 import { t } from '@sdlc/messages';
 
 import {
@@ -11,6 +14,7 @@ import {
   agentListSchema,
   agentRoundSchema,
   agentSchema,
+  type AgentEvaluationView,
   type AgentView,
 } from '../api/schemas.js';
 import { CommandExit, segment, type Values } from '../api/session.js';
@@ -121,14 +125,17 @@ export const AGENT_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
       purpose: { type: 'string' },
       as: { type: 'string' },
       reason: { type: 'string' },
+      evaluation: { type: 'string' },
     },
     required: ['key', 'purpose', 'as'],
     run: async (call) => {
       const reason = opt(call.values, 'reason');
+      const evaluation = opt(call.values, 'evaluation');
       const round = await call.client.post(`${agentPath(call)}/approvals`, agentRoundSchema, {
         purpose: str(call.values, 'purpose'),
         as: str(call.values, 'as'),
         ...(reason === undefined ? {} : { reason_code: reason }),
+        ...(evaluation === undefined ? {} : { evaluation_code: evaluation }),
       });
       return output(call, round, () => {
         say(call.ctx, 'cli.admin.agent.approval', {
@@ -138,6 +145,7 @@ export const AGENT_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
           capacity: str(call.values, 'as'),
           missing: round.missing.join(', ') || '-',
         });
+        sayApprovalEvaluation(call, round.evaluation ?? null);
         if (round.completed) sayAgent(call, 'cli.admin.agent.status_changed', round.agent);
       });
     },
@@ -181,6 +189,7 @@ export const AGENT_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
             missing: round.missing.join(', ') || '-',
           });
         }
+        sayLatestEvaluation(call, agent.evaluation ?? null);
       });
     },
   },
@@ -197,6 +206,41 @@ export const AGENT_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
     },
   },
 };
+
+/** The catalog text of an evaluation result that is not `passed` (ADR-M86 §2.8). */
+function evaluationText(evaluation: AgentEvaluationView): string {
+  const code = evaluation.result === 'missing' ? 'evaluation_missing' : (evaluation.result ?? '');
+  return isAgentRegisterErrorCode(code)
+    ? t(AGENT_REGISTER_ERROR_MESSAGES[code], evaluation.params)
+    : code;
+}
+
+/** After an approval (L09): the numbers of a qualifying evaluation, or the `warn` mode warning. */
+function sayApprovalEvaluation(call: AdminCall, evaluation: AgentEvaluationView | null): void {
+  if (!evaluation || evaluation.result === null) return;
+  if (evaluation.qualifies) {
+    say(call.ctx, 'cli.admin.agent.evaluation_passed', evaluation.params);
+  } else {
+    say(call.ctx, 'cli.admin.agent.evaluation_warning', { text: evaluationText(evaluation) });
+  }
+}
+
+/** `show` (L09): the latest evaluation of the current fingerprint and whether it qualifies. */
+function sayLatestEvaluation(call: AdminCall, evaluation: AgentEvaluationView | null): void {
+  if (evaluation?.mode === 'off') {
+    say(call.ctx, 'cli.admin.agent.evaluation_off');
+  } else if (!evaluation || evaluation.code === null) {
+    say(call.ctx, 'cli.admin.agent.evaluation_none', { mode: evaluation?.mode ?? '-' });
+  } else {
+    say(call.ctx, 'cli.admin.agent.evaluation_line', {
+      code: evaluation.code,
+      mode: evaluation.mode,
+      verdict: evaluation.qualifies
+        ? t('cli.admin.agent.evaluation_qualifies')
+        : evaluationText(evaluation),
+    });
+  }
+}
 
 function sayAgent(call: AdminCall, key: Parameters<typeof say>[1], agent: AgentView): void {
   say(call.ctx, key, { key: agent.key, version: agent.version, status: agent.status });

@@ -520,6 +520,16 @@ export const agentSchema = z.object({
 export type AgentView = z.infer<typeof agentSchema>;
 export const agentListSchema = z.object({ items: z.array(agentSchema).max(10_000) });
 
+/** The check of an evaluation in the agent register (L09, ADR-M86 §2.5, §2.8). */
+export const agentEvaluationSchema = z.object({
+  mode: code,
+  code: z.string().max(32).nullable(),
+  result: code.nullable(),
+  qualifies: z.boolean(),
+  params: z.record(z.string().max(32), z.string().max(64)),
+});
+export type AgentEvaluationView = z.infer<typeof agentEvaluationSchema>;
+
 export const agentRoundSchema = z.object({
   agent: agentSchema,
   purpose: code,
@@ -533,15 +543,19 @@ export const agentRoundSchema = z.object({
         purpose: code,
         capacity: code,
         approver_id: id,
+        evaluation_id: id.nullable().optional(),
+        evaluation_result: code.nullable().optional(),
         created_at: time,
       }),
     )
     .max(4),
   completed: z.boolean(),
+  evaluation: agentEvaluationSchema.nullable().optional(),
 });
 export type AgentRoundView = z.infer<typeof agentRoundSchema>;
 export const agentDetailSchema = agentSchema.extend({
   rounds: z.array(agentRoundSchema).max(2),
+  evaluation: agentEvaluationSchema.nullable().optional(),
 });
 
 const sha256 = z.string().regex(/^[0-9a-f]{64}$/);

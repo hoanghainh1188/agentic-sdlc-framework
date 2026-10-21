@@ -82,13 +82,13 @@ The platform keeps the register in its database. Only an agent that is registere
 | Step (stage) | Command | Who |
 |---|---|---|
 | Register (stage 2) | `sdlc admin agent register --key coder-openhands --version 1.0.0 --owner <email> --model claude-haiku-4-5-20251001 --instructions AGENTS.md@v5 --instructions-file AGENTS.md --tools file_editor,terminal --max-autonomy L2 --environments sandbox` (without `sandbox` the agent can never run) | A tenant admin, who names the technical owner |
-| Approve for use (stage 4) | `sdlc admin agent approve --key coder-openhands --purpose activate --as <owner\|person_a\|person_b>` | By agent type (§20.7): L0 Person A + technical owner; L1–L2 technical owner + Person B |
+| Approve for use (stage 4) | `sdlc admin agent approve --key coder-openhands --purpose activate --as <owner\|person_a\|person_b> [--evaluation EVAL-2026-0012]` | By agent type (§20.7): L0 Person A + technical owner; L1–L2 technical owner + Person B |
 | Recertify (stage 5) | `sdlc admin agent recertify --key coder-openhands [--date YYYY-MM-DD]` | The technical owner |
-| Change (stage 6) | Suspend (below), then `sdlc admin agent update --key … --version 1.1.0 [--model …] [--instructions … --instructions-file …]`, then approve again with `--purpose activate` | The agent owner or a tenant admin changes; technical owner + Person B approve (§20.11) |
+| Change (stage 6) | Evaluate the next version first (below), then suspend, then `sdlc admin agent update --key … --version 1.1.0 [--model …] [--instructions … --instructions-file …]`, then approve again with `--purpose activate --evaluation <code>` | The agent owner or a tenant admin changes; technical owner + Person B approve (§20.11) |
 | Suspend or quarantine (stage 6) | `sdlc admin agent suspend\|quarantine --key <key> --reason <code>` | Person B or leadership, at any time |
 | Retire (stage 7) | `sdlc admin agent approve --key <key> --purpose retire --as <owner\|governance> --reason <code>` | Agent owner + leadership |
 | New agent owner | `sdlc admin agent owner --key <key> --owner <email>` | A tenant admin |
-| Look | `sdlc admin agent show --key <key>` (with the approvals still missing); `sdlc admin agent list [--overdue] [--json]` | Anyone in the tenant |
+| Look | `sdlc admin agent show --key <key>` (with the approvals still missing and the latest evaluation of the agent as it is now); `sdlc admin agent list [--overdue] [--json]` | Anyone in the tenant |
 
 **How approvals work.**
 
@@ -99,6 +99,17 @@ The platform keeps the register in its database. Only an agent that is registere
 - If the platform is down, the server operator can still suspend or quarantine an agent (`sdlc ops agent suspend|quarantine --tenant <slug> --key <key> --reason <code>`). Nobody activates an agent outside the approvals.
 
 Reason codes: `incident`, `quality`, `security`, `no_owner`, `replaced`, `unused`, `provider_end_of_support`, `other`.
+
+**Evaluations as evidence for an approval** (stage 3 and 4, §20.6–§20.7, §20.11). An approval to activate an agent names an evaluation of a project's task set (Chapter 19 §19.8c) with `--evaluation <code>`. The platform checks it for the agent **as it is now** and shows the result with its numbers:
+
+- **The fingerprint.** An evaluation counts for an agent version only when one of its configurations had the same model, the same tools and, in every scored run, the same instructions as the version. A configuration that names a model with a prompt variant gives the fingerprint of a next version.
+- **What it must reach.** It is completed; it is of a project that runs the agent (`run.agent_key`); it ran the project's whole task set (a numbered set such as v1 counts only while the project has no approved task); it scored at least `min_tasks` tasks; the agent resolved at least `min_resolve_rate` of them (the answer gives the 95% interval too); no run changed files outside the task's plan; it ended no more than `approval_max_age_days` ago; and it is the latest completed evaluation of this fingerprint in the project (running it again until one passes does not help).
+- **For a change** (suspended → active): the evaluation also ran the version of the agent's last activation, by its key, and the new version is not worse. "Worse" means McNemar's test and the intervals both show a lower resolve rate on at least `min_tasks` paired tasks.
+- **One evaluation per round.** All approvers of one round name the same evaluation (or, in `warn` mode, none).
+- **The mode** is in the project configuration, `agents.evaluation.mode`, of the projects that run the agent; the strictest one applies. `warn` (default): an approval without a qualifying evaluation is accepted, and the answer shows a warning with the reason. `required`: it is refused. `off`: no check. The thresholds come from the evaluation's project. An agent that no project runs yet uses the default configuration (`warn`): set `run.agent_key` first to require evaluations for it.
+- The evaluation is evidence for the approvers, not a replacement for them. Safety, security and operations checks of the readiness record (§20.7) stay with people.
+
+The normal order for a change: make a plan with two configurations (the agent by its key, and the next version as its model with a prompt variant), run it, read the report, then suspend, update and approve with the evaluation's code. Real runs go on during the evaluation.
 
 Rules the platform enforces:
 
@@ -274,3 +285,4 @@ Old context must not quietly come back through caches, indexes or copied instruc
 | 0.3 | 2026-09-27 | Claude (task C10) | §20.5b: the agent register on the platform (commands, enforced rules, gaps) |
 | 0.4 | 2026-10-03 | Claude (task B13, PR 2) | §20.5b: the register through the API; approvals by agent type, change and retirement approvals, suspension by Person B or leadership (ADR-M37 §2.8) |
 | 0.5 | 2026-10-08 | Claude (docs fix PR A) | §20.5b: `register` needs `--environments sandbox`, or the agent can never run |
+| 0.6 | 2026-10-21 | Claude (task L09, PR 2) | §20.5b: an activation names its evaluation (`--evaluation`); the fingerprint, the conditions, a change compared with the last approved version, one evaluation per round, `agents.evaluation.mode` of the agent's projects; `show` gives the latest evaluation (ADR-M86, QUESTIONS #496–#504) |

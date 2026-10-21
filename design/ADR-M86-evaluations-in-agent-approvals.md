@@ -146,9 +146,22 @@ Agents belong to the tenant, but a task set belongs to a project, and in practic
 - Configuration `agents.evaluation` (§2.4) with the defaults of §2.4; `min_tasks` 1–1000, `min_resolve_rate` 0–1 and the age limits 1–365 days are checked by the schema; mandatory rule **M34** keeps `recertification_max_age_days` at 90 or less. The default `config_hash` changes.
 - The check of an approval, `show`, the API and the CLI come in L09 PR 2.
 
+### 6.2. L09 PR 2: the check of an approval, `show`, the API and the CLI
+
+- `checkAgentEvaluation` (`platform/packages/core/src/agents/evaluation-check.ts`) checks the conditions of §2.3 in their order and returns the first failing code with the numbers its catalog text quotes. It never throws a refusal; `approveAgent` applies the mode.
+- Whose configuration (QUESTIONS #504): the agent's projects are the active projects whose effective `run.agent_key` is the agent. The mode is the strictest of theirs (`required` > `warn` > `off`); with none, the default configuration. A named evaluation must be of one of them (`evaluation_other_project`), or of any project when the agent has none. The thresholds and `alpha` come from the evaluation's project. No `--project` option.
+- The statistics come from the same engine as the report: `toRunResult` moved from the api to `@sdlc/core` (`evaluation/report-rows.ts`), and the check uses `buildReport` and `differs` of `@sdlc/eval`.
+- The baseline of a change is the version of the latest `activate` round with approvals in two different capacities (every approver set of v0.1 has two). An agent activated before approvals existed has none: a change then gives `evaluation_no_baseline`. Fewer paired tasks than `min_tasks` give `evaluation_too_few_tasks` with the paired count.
+- "Latest": the completed evaluations of the same project that ended later (at most 50 are read). A later evaluation of another fingerprint does not count.
+- `approveAgent` takes `evaluationCode` (`evaluation_code` in the API, `--evaluation` in the CLI). `off`: nothing checked, nothing recorded. `warn`: the result is recorded and answered (`evaluation` in the round's body; the CLI prints the catalog text as a warning). `required`: anything but `passed` is refused with `agent_refused` (409) and the code as `reason`; `missing` refuses as `evaluation_missing`. A round whose approvals name another evaluation (or none against one) is refused with `evaluation_round_mismatch` in `warn` and `required` mode.
+- `agent.approval_recorded` gains `evaluation_id` (when one was found) and `evaluation_result`.
+- `GET /v1/admin/agents/:key` (`sdlc admin agent show`) returns `evaluation`: the latest completed evaluation with the agent's current fingerprint in its projects and its check for an approval (`mode`, `code`, `result`, `qualifies`, `params`). For an active agent it is checked as a first use: there is no next version to compare.
+- New rule R135 in `platform/apps/api/CLAUDE.md`.
+
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 1.0 | 2026-10-20 | Claude (task L08), accepted by the repository owner | Design with the answers to QUESTIONS #496–#500 |
 | 1.1 | 2026-10-20 | Claude (task L09, PR 1), approved by the repository owner | §6.1 as built, with the answers to QUESTIONS #501–#503 |
+| 1.2 | 2026-10-21 | Claude (task L09, PR 2), approved by the repository owner | §6.2 as built, with the answer to QUESTIONS #504 |

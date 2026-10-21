@@ -307,7 +307,7 @@ export function agentApiError(error: AgentRegisterError, agentKey: string): ApiE
   const text = (locale: string) =>
     t(
       AGENT_REGISTER_ERROR_MESSAGES[error.code],
-      { key: agentKey, field: error.field ?? '-' },
+      { ...error.params, key: agentKey, field: error.field ?? '-' },
       locale,
     );
   if (error.code === 'agent_not_found') return new ApiError(404, 'agent_not_found');

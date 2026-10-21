@@ -33,4 +33,20 @@ export class AgentApprovalRepository extends TenantRepository {
         .execute(),
     );
   }
+
+  /** Every approval of an agent for a purpose, oldest first (L09: the last completed round). */
+  listForAgent(agentId: string, purpose: AgentApproval['purpose']): Promise<AgentApproval[]> {
+    return this.run(
+      this.db
+        .selectFrom('agent_approvals')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('agent_id', '=', agentId)
+        .where('purpose', '=', purpose)
+        .orderBy('round_at')
+        .orderBy('created_at')
+        .orderBy('id')
+        .execute(),
+    );
+  }
 }
