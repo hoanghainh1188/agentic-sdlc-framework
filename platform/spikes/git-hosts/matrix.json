@@ -1,0 +1,103 @@
+{
+  "spike": "X09",
+  "adr": "design/ADR-M70-other-git-hosts.md",
+  "accessed": "2026-10-21",
+  "source": "official documentation, read through search excerpts (the session's proxy blocked the doc sites); Backlog also through Nulab's SDK source",
+  "status_codes": {
+    "works": "one documented call does it",
+    "partial": "possible with a documented workaround, or a part is missing",
+    "git": "no API: only with git on a local clone",
+    "missing": "no way found; refuse or use another system"
+  },
+  "hosts": {
+    "gitlab.com": {
+      "createIssueComment": "works",
+      "getPullRequest": "works",
+      "getChangedFiles": "partial",
+      "getCheckStatus": "works",
+      "getApprovals": "partial",
+      "getReviews": "partial",
+      "getCommitAuthors": "partial",
+      "getMergedChange": "works",
+      "getCommitParents": "works",
+      "compareChangedFiles": "partial",
+      "getFileAtCommit": "works",
+      "getBranchHead": "works",
+      "listPaths": "works",
+      "issueShortLivedToken": "partial",
+      "revokeShortLivedToken": "partial",
+      "openPullRequest": "works",
+      "findOpenPullRequest": "works",
+      "getSecurityFindings": "partial",
+      "getReviewFeedback": "partial",
+      "getIssueComment": "partial",
+      "listEventsSince": "partial",
+      "verifyWebhook": "works"
+    },
+    "bitbucket.cloud": {
+      "createIssueComment": "partial",
+      "getPullRequest": "works",
+      "getChangedFiles": "works",
+      "getCheckStatus": "works",
+      "getApprovals": "partial",
+      "getReviews": "partial",
+      "getCommitAuthors": "works",
+      "getMergedChange": "partial",
+      "getCommitParents": "works",
+      "compareChangedFiles": "works",
+      "getFileAtCommit": "works",
+      "getBranchHead": "works",
+      "listPaths": "partial",
+      "issueShortLivedToken": "missing",
+      "revokeShortLivedToken": "missing",
+      "openPullRequest": "works",
+      "findOpenPullRequest": "works",
+      "getSecurityFindings": "partial",
+      "getReviewFeedback": "partial",
+      "getIssueComment": "partial",
+      "listEventsSince": "partial",
+      "verifyWebhook": "works"
+    },
+    "backlog": {
+      "createIssueComment": "works",
+      "getPullRequest": "partial",
+      "getChangedFiles": "git",
+      "getCheckStatus": "missing",
+      "getApprovals": "missing",
+      "getReviews": "missing",
+      "getCommitAuthors": "git",
+      "getMergedChange": "partial",
+      "getCommitParents": "git",
+      "compareChangedFiles": "git",
+      "getFileAtCommit": "git",
+      "getBranchHead": "git",
+      "listPaths": "git",
+      "issueShortLivedToken": "missing",
+      "revokeShortLivedToken": "missing",
+      "openPullRequest": "works",
+      "findOpenPullRequest": "partial",
+      "getSecurityFindings": "missing",
+      "getReviewFeedback": "partial",
+      "getIssueComment": "partial",
+      "listEventsSince": "works",
+      "verifyWebhook": "missing"
+    }
+  },
+  "tier_notes": {
+    "gitlab.com": {
+      "project_access_tokens": "Premium",
+      "required_approvals_and_author_rules": "Premium",
+      "security_findings_api": "Ultimate"
+    },
+    "bitbucket.cloud": {
+      "enforced_merge_checks": "Premium",
+      "workspace_and_project_tokens": "Premium"
+    },
+    "backlog": {}
+  },
+  "effort_days": {
+    "gitlab.com": [15, 25],
+    "bitbucket.cloud": [15, 25],
+    "backlog": [12, 18]
+  }
+}
