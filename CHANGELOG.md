@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Design of tools for agents (X02, ADR-M69, **proposed**): a tool register like the agent register, MCP tools in one hardened container per tool and run, a run gets a tool only when the plan, the agent, the register and the signed contract allow it, and one summary run event per tool and run. Proposed changes to D-03 §8–§9, D-05 and the threat model (ADR-M80 §4.2). Nothing is built yet: X04 builds the register and the first tool. New backlog task X14: a spike of open-source MCP gateways before X04 (QUESTIONS #520).
+
 ## [0.5.0] - 2026-10-21
 
 The second and last release of the milestone EVAL: **managers read evaluation reports with recommendations, build a task set from their own project, and approve and recertify agents with evaluation numbers.** An evaluation report gives each configuration's resolve rate with its interval, and recommendations from fixed rules that quote their numbers (L06). A project's merged intents become its own evaluation tasks, checked on the server and reviewed by people (L07). The agent register's approvals and recertifications name an evaluation of the agent as it is now; the project configuration `agents.evaluation` decides whether that only warns (default) or is required (L08–L10). Also: the rules of `CLAUDE.md` become checks, with a Claude Code hook (W01), and a spike on other Git hosts (X09, ADR-M70). A minor release: four migrations, rebuilt images, new project configuration sections.
