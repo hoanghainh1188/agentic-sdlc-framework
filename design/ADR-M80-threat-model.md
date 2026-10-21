@@ -175,6 +175,21 @@ Test names: **U-n** = unit test without Docker (`pnpm test`, PR 2, `platform/tes
 
 Each A-test (a) asserts the platform's answer by code: a refused connection, an HTTP 401/403, `instructions_unpinned`, `stopped_*`, `failed` with a stop reason; and (b) plants **canaries** (a fake provider key, a fake GitHub token, a fake OpenBao token, a fake wrapping token, a fake spec and plan text) in the places the platform holds real ones (runner process memory and environment, the run's virtual key value, the clone token path, the plan text and the review feedback), then scans every run event, the audit events of the intent, the platform logger output, the runner's and worker's stdout, the stored diff and the Evidence Pack for the canary values. A canary anywhere is a failed test. The scan reuses the marker search of `pnpm test:workflow`.
 
+### 4.2. Tools for agents (task X02, proposed; ADR-M69)
+
+ADR-M69 adds register tools (`tool:<key>`): MCP servers in a hardened container of their own per tool and run. This section is the review that §4 asks of the EXT tasks. It is **proposed** with ADR-M69; X04 turns the planned tests into real ones.
+
+| Category | What changes with a tool | Control (ADR-M69) | Planned test (X04) |
+|---|---|---|---|
+| ASI01 goal hijack, ASI06 context poisoning | A tool's answer is text an attacker may control (a document in the repository) | Treated like I5 (repository content): data, never instructions; the agent's tools, network and limits do not change; G5 checks the real diff, G7 is a human review | A document with injected instructions: the run stays in scope or stops at G5 |
+| ASI02 tool misuse | The agent calls the tool many times, or uses it to reach something else | The tool is a server only, on the run network; `max_calls` per tool and run; identical calls count for loop detection; the tool container's own network holds only its backing services | Call over the cap → `tool_refused`; from the sandbox, the backing service is unreachable |
+| ASI03 identity and privilege | The tool's credential leaks to the sandbox, or the tool is called by another container | The credential is read-only, scoped to the tenant and project, short-lived, delivered as a single-use wrapping token and written as a file into the tool container only; a per-run key that only the sandbox and the tool hold; revoked at the end and at a kill | Canary credential never seen in the sandbox; a call without the per-run key → 401; a second run's sandbox cannot call the tool |
+| ASI04 supply chain | The tool image is someone else's software | Pinned by digest, approved by the owner and Person B or governance, a new digest is a new version, scanned like other images (ADR-M66) before approval, recertified every 3 months at most | An `http` tool with a tag and no digest is refused at registration and in the contract |
+| ASI07 inter-agent communication | A new party on the run network | One container per tool and run, never shared by runs or tenants; the tool cannot reach the Agent Server (it needs the session key) | From the tool container: the Agent Server → 401, the internet and OpenBao unreachable |
+| ASI08 cascading failures | A tool that hangs or fails | A health check before the sandbox starts (`tool_unavailable`); `tool_failed` during the run; the run's caps unchanged | A tool that never becomes healthy → `provisioning_failed` with `tool_unavailable`, everything removed |
+
+New gap, for X04: **G-11** (Medium): until an agent adapter configures MCP, no tool runs; the MCP support of OpenHands, Aider and OpenCode is not confirmed (QUESTIONS #519).
+
 ## 5. Gaps
 
 Severity scale (H01 plan): Critical, High, Medium, Low, as the escalation severity in the codes table. Critical and High are fixed inside H01 (PR 3). Medium and Low become backlog tasks with the severity in the title. "Confirmed" is updated by PR 2.
@@ -191,6 +206,7 @@ Severity scale (H01 plan): Critical, High, Medium, Low, as the escalation severi
 | G-8 | Instruction files under paths hidden by the base commit's ignore rules are not seen by the diff checks (ADR-M34 §2.3) | ASI06 | Low (cannot reach Git, so cannot persist) | Known | Accepted; revisit when the agent version changes |
 | G-9 | No limit on the size of a diff that a person must read at G7; a very large or generated diff defeats review | ASI09 | Medium | Confirmed (no size check in the runner, G5 or G7 code) | Task H05 (size bound for review); limits per QUESTIONS #456 (Harry: 40 files, 1500 lines, held at G5) (backlog tasks added in PR 3) |
 | G-10 | The agent may carry a secret it found in the repository into the diff or the pull request. The platform has no secret scan of the diff; G6 uses only what the project's CI reports | ASI09, ASI01 | Medium | Confirmed (no scan in the runner, G5 or G6 code) | Task H04 (secret scan of the diff before G5) (backlog tasks added in PR 3) |
+| G-11 | No agent adapter configures MCP yet, and the MCP support of OpenHands, Aider and OpenCode (per-run server over HTTP, a header key) is not confirmed. Until it is, no register tool runs (G4 refuses `tool_transport_not_supported`) | ASI02, ASI07 | Medium | Proposed with ADR-M69 (X02) | Task X04; QUESTIONS #519 |
 
 **No Critical gap was found. The one High gap (G-7) cannot be fixed inside H01**: it needs a separate VM or rootless Docker for the runner (A10) or an authorization plugin (H07). Every other gap is Medium or Low, tracked as a task or accepted with a reason. G-3, G-4 and G-8 are accepted as written above; no task.
 
@@ -241,3 +257,4 @@ Optional, once, outside CI: one run with `gpt-oss:20b` (Ollama on the owner's ma
 | 0.2 | 2026-10-13 | Claude (task H01, PR 2) | Test results: G-2 half confirmed, half refuted (Low); G-9 and G-10 confirmed; §6 lists the tests as built |
 | 0.3 | 2026-10-13 | Claude (task H01, PR 3) | Every gap has a task or an acceptance: H02 (G-1, G-5), H04 (G-10), H05 (G-9), H06 (G-6), H07 (G-7); QUESTIONS #455, #456; TRIAL.md says a trial exposes the machine's Docker |
 | 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |
+| 0.5 | 2026-10-21 | Claude (task X02) | §4.2 **proposed**: tools for agents (ADR-M69) against ASI01–ASI08, the planned tests for X04, gap G-11 (QUESTIONS #519) |
