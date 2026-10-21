@@ -12,6 +12,8 @@ export {
   agentProjects,
   checkAgentEvaluation,
   lastActivatedVersion,
+  lastActivation,
+  type AgentEvaluationAging,
   latestAgentEvaluation,
   strictestMode,
   type AgentEvaluationRefusal,
@@ -71,5 +73,6 @@ export {
   updateAgentAs,
   type AgentRound,
   type ApprovalResult,
+  type RecertifyResult,
   type ApproveAgent,
 } from './approvals.js';

@@ -225,6 +225,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R088e | Agents never deleted; key never reused | db+test | tests/db/agents-sql.test.ts:35 | full | pointer-only | platform/apps/api/CLAUDE.md |
 | R088f | Activation approvers different people | test | tests/integration/db/admin-agents.test.ts:195 | partial | move:platform/apps/api | platform/apps/api/CLAUDE.md |
 | R135 | Agent activation checked against its named evaluation; `required` refuses; one evaluation per round; IDs and codes only in the audit (added by L09 PR 2) | db+test | tests/integration/db/agent-evaluation-approvals.test.ts ("the mode", "one evaluation per round", "passes") | full | pointer-only | platform/apps/api/CLAUDE.md |
+| R136 | A quality drop at recertification never suspends the agent; a person decides (added by L10) | test | tests/integration/db/agent-evaluation-recertification.test.ts ("the agent stays active") | full | pointer-only | platform/apps/api/CLAUDE.md |
 | R089a | Never rename verify-images / npm | test | tests/workspace/release.test.ts:352 | full | pointer-only | CLAUDE.md |
 | R089b | Never edit images.lock by hand | test | tests/deploy/release-images.test.ts:216 | partial | add-hook | CLAUDE.md |
 | R089c–e | Tag never moves, Trivy, CLI licences | test+ci | tests/workspace/release.test.ts:301 | full | pointer-only | CLAUDE.md |
@@ -259,3 +260,4 @@ Some rows group several rules with the same check (for example R082a–f).
 | 0.3 | 2026-10-20 | Claude (task W01, PR 3) | R016, R024b, R030a, R044c, R047a, R053g, R075b, R075c, R080c, R081c, R084a, R085b, R092: lint rules and tests |
 | 0.4 | 2026-10-20 | Claude (task W01, PR 4) | Column "File": the root `CLAUDE.md` or a folder's `CLAUDE.md`; new row R133 |
 | 0.5 | 2026-10-21 | Claude (task L09, PR 2) | New row R135 (evaluations in the agent approvals, `platform/apps/api/CLAUDE.md`) |
+| 0.6 | 2026-10-21 | Claude (task L10) | New row R136 (the platform never suspends an agent by itself, `platform/apps/api/CLAUDE.md`) |

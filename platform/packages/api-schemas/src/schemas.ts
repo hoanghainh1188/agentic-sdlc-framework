@@ -518,7 +518,6 @@ export const agentSchema = z.object({
   updated_at: time,
 });
 export type AgentView = z.infer<typeof agentSchema>;
-export const agentListSchema = z.object({ items: z.array(agentSchema).max(10_000) });
 
 /** The check of an evaluation in the agent register (L09, ADR-M86 §2.5, §2.8). */
 export const agentEvaluationSchema = z.object({
@@ -527,8 +526,26 @@ export const agentEvaluationSchema = z.object({
   result: code.nullable(),
   qualifies: z.boolean(),
   params: z.record(z.string().max(32), z.string().max(64)),
+  // L10: the comparison of a recertification with the last activation.
+  aging: z
+    .object({
+      status: code,
+      reason: code.nullable(),
+      params: z.record(z.string().max(32), z.string().max(64)),
+    })
+    .optional(),
 });
 export type AgentEvaluationView = z.infer<typeof agentEvaluationSchema>;
+/** The list; with `?overdue=true` (L10) each item has its latest evaluation. */
+export const agentListSchema = z.object({
+  items: z
+    .array(agentSchema.extend({ evaluation: agentEvaluationSchema.nullable().optional() }))
+    .max(10_000),
+});
+/** The answer of `recertify` (L10): the agent and the check of its evaluation. */
+export const agentRecertifiedSchema = agentSchema.extend({
+  evaluation: agentEvaluationSchema.nullable().optional(),
+});
 
 export const agentRoundSchema = z.object({
   agent: agentSchema,

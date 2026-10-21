@@ -1,6 +1,17 @@
 // The agent register through the API (task B13 AC7, handbook Ch.20, ADR-M37 §2.8). Any person of
 // the tenant reads it; the changes follow the Ch.20 approval rules (`@sdlc/core` agents/approvals).
-import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import {
   AgentRegisterError,
   agentRound,
@@ -25,6 +36,7 @@ import {
   agentKeySchema,
   approveAgentSchema,
   changeOwnerSchema,
+  listAgentsSchema,
   recertifySchema,
   registerAgentSchema,
   stopAgentSchema,
@@ -38,10 +50,28 @@ export class AdminAgentsController {
   constructor(@Inject(CLOCK) private readonly now: () => Date) {}
 
   @Get()
-  async list(@CurrentPrincipal() p: Principal): Promise<Body> {
+  async list(@CurrentPrincipal() p: Principal, @Query() query: unknown): Promise<Body> {
+    const filter = parseRequest(listAgentsSchema, query ?? {}, 'query');
     const months = await recertificationMonths(p.scope, null);
-    const agents = await p.scope.agents.list();
-    return { items: agents.map((agent) => presentAgent(agent, months, this.now())) };
+    const now = this.now();
+    const items = (await p.scope.agents.list()).map((agent) => ({
+      agent,
+      body: presentAgent(agent, months, now),
+    }));
+    if (filter.overdue !== 'true') return { items: items.map((item) => item.body) };
+    // L10 (ADR-M86 §2.6): overdue agents only, each with its latest evaluation for a
+    // recertification.
+    const overdue = items.filter((item) => item.body.overdue === true);
+    return {
+      items: await Promise.all(
+        overdue.map(async ({ agent, body }) => ({
+          ...body,
+          evaluation: presentVerdict(
+            await latestAgentEvaluation(p.scope, agent, now, 'recertification'),
+          ),
+        })),
+      ),
+    };
   }
 
   @Get(':key')
@@ -177,15 +207,18 @@ export class AdminAgentsController {
   ): Promise<Body> {
     const agentKey = parseRequest(agentKeySchema, key, 'path');
     const input = parseRequest(recertifySchema, body ?? {}, 'body');
-    return this.call(agentKey, async () =>
-      this.present(
-        p,
-        await recertifyAgentAs(p.scope, actorOf(p), agentKey, {
-          now: this.now(),
-          ...(input.day === undefined ? {} : { day: input.day }),
-        }),
-      ),
-    );
+    return this.call(agentKey, async () => {
+      const result = await recertifyAgentAs(p.scope, actorOf(p), agentKey, {
+        now: this.now(),
+        ...(input.day === undefined ? {} : { day: input.day }),
+        ...(input.evaluation_code === undefined ? {} : { evaluationCode: input.evaluation_code }),
+      });
+      // L10: the agent and the check of its evaluation (a warning in `warn` mode).
+      return {
+        ...(await this.present(p, result.agent)),
+        evaluation: presentVerdict(result.evaluation),
+      };
+    });
   }
 
   private async stop(

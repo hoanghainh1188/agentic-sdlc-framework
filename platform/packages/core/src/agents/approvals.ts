@@ -101,16 +101,57 @@ export async function changeOwnerAs(
   });
 }
 
+export interface RecertifyResult {
+  readonly agent: Agent;
+  /** L10: the check of the named evaluation (ADR-M86 §2.6); in `warn` mode its result warns. */
+  readonly evaluation: AgentEvaluationVerdict;
+}
+
+/**
+ * Recertifies the agent (Ch.20 §20.8). L10 (ADR-M86 §2.6): the owner names an evaluation that
+ * qualifies for the agent's current version within `recertification_max_age_days` and shows no
+ * significant drop since the last activation. `required` refuses anything else, `warn` accepts it
+ * and answers the result, `off` checks nothing. A drop never suspends the agent: people decide.
+ */
 export async function recertifyAgentAs(
   scope: TenantScope,
   actor: Person,
   agentKey: string,
-  input: { readonly day?: string; readonly now?: Date } = {},
-): Promise<Agent> {
+  input: { readonly day?: string; readonly now?: Date; readonly evaluationCode?: string } = {},
+): Promise<RecertifyResult> {
   return scope.transaction(async (tx) => {
     const agent = await findAgent(tx, agentKey);
     if (agent.owner_id !== actor.userId) throw notPermitted('recertify the agent');
-    return recertifyAgent(tx, agentKey, { ...input, actor });
+    const evaluation = await checkAgentEvaluation(tx, {
+      agent,
+      evaluationCode: input.evaluationCode ?? null,
+      purpose: 'recertification',
+      change: false,
+      now: input.now ?? new Date(),
+    });
+    if (evaluation.mode === 'required' && evaluation.result !== 'passed') {
+      const code = evaluation.result === 'missing' ? 'evaluation_missing' : evaluation.result!;
+      throw new AgentRegisterError(
+        code,
+        `agent ${agentKey}: ${code}`,
+        undefined,
+        evaluation.params,
+      );
+    }
+    const recertified = await recertifyAgent(tx, agentKey, {
+      ...(input.day === undefined ? {} : { day: input.day }),
+      ...(input.now === undefined ? {} : { now: input.now }),
+      actor,
+      ...(evaluation.result
+        ? {
+            evaluation: {
+              id: evaluation.evaluation?.id ?? null,
+              result: evaluation.result,
+            },
+          }
+        : {}),
+    });
+    return { agent: recertified, evaluation };
   });
 }
 

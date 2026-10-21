@@ -105,6 +105,9 @@ export const updateAgentSchema = z.strictObject({
   approved_environments: environments.optional(),
 });
 
+/** `GET /v1/admin/agents?overdue=true` (L10): only overdue agents, with their latest evaluation. */
+export const listAgentsSchema = z.strictObject({ overdue: z.enum(['true', 'false']).optional() });
+
 export const approveAgentSchema = z.strictObject({
   purpose: z.enum(['activate', 'retire']),
   as: z.enum(['owner', 'person_a', 'person_b', 'governance']),
@@ -122,5 +125,10 @@ export const recertifySchema = z.strictObject({
   day: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  // L10 (ADR-M86 §2.6): the evaluation a recertification rests on.
+  evaluation_code: z
+    .string()
+    .regex(/^EVAL-[0-9]{4}-[0-9]{4,9}$/)
     .optional(),
 });

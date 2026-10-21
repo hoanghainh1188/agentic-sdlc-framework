@@ -446,7 +446,11 @@ export const AUDIT_ACTIONS = {
   /** The agent's owner changed (the owner left, Ch.20 §20.8). Never who the owner is. */
   'agent.owner_changed': { entityType: 'agent', fields: { agent_key: 'code' } },
   /** An agent was recertified (Ch.20 §20.8), or certified by its first activation (ADR-M31 §2.6). */
-  'agent.recertified': { entityType: 'agent', fields: { agent_key: 'code' } },
+  'agent.recertified': {
+    entityType: 'agent',
+    // L10 (ADR-M86 §2.6): the evaluation a recertification named and the result of its check.
+    fields: { agent_key: 'code', evaluation_id: 'uuid?', evaluation_result: 'code?' },
+  },
   /**
    * A run started with an agent whose recertification is overdue (FR-36: a warning, not a block).
    * Written by the G4 check of C06 (ADR-M31 §2.6).

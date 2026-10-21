@@ -83,12 +83,12 @@ The platform keeps the register in its database. Only an agent that is registere
 |---|---|---|
 | Register (stage 2) | `sdlc admin agent register --key coder-openhands --version 1.0.0 --owner <email> --model claude-haiku-4-5-20251001 --instructions AGENTS.md@v5 --instructions-file AGENTS.md --tools file_editor,terminal --max-autonomy L2 --environments sandbox` (without `sandbox` the agent can never run) | A tenant admin, who names the technical owner |
 | Approve for use (stage 4) | `sdlc admin agent approve --key coder-openhands --purpose activate --as <owner\|person_a\|person_b> [--evaluation EVAL-2026-0012]` | By agent type (§20.7): L0 Person A + technical owner; L1–L2 technical owner + Person B |
-| Recertify (stage 5) | `sdlc admin agent recertify --key coder-openhands [--date YYYY-MM-DD]` | The technical owner |
+| Recertify (stage 5) | `sdlc admin agent recertify --key coder-openhands [--date YYYY-MM-DD] [--evaluation EVAL-2026-0031]` | The technical owner |
 | Change (stage 6) | Evaluate the next version first (below), then suspend, then `sdlc admin agent update --key … --version 1.1.0 [--model …] [--instructions … --instructions-file …]`, then approve again with `--purpose activate --evaluation <code>` | The agent owner or a tenant admin changes; technical owner + Person B approve (§20.11) |
 | Suspend or quarantine (stage 6) | `sdlc admin agent suspend\|quarantine --key <key> --reason <code>` | Person B or leadership, at any time |
 | Retire (stage 7) | `sdlc admin agent approve --key <key> --purpose retire --as <owner\|governance> --reason <code>` | Agent owner + leadership |
 | New agent owner | `sdlc admin agent owner --key <key> --owner <email>` | A tenant admin |
-| Look | `sdlc admin agent show --key <key>` (with the approvals still missing and the latest evaluation of the agent as it is now); `sdlc admin agent list [--overdue] [--json]` | Anyone in the tenant |
+| Look | `sdlc admin agent show --key <key>` (with the approvals still missing and the latest evaluation of the agent as it is now); `sdlc admin agent list [--overdue] [--json]` (with `--overdue`, the latest evaluation of each agent and whether it qualifies for a recertification) | Anyone in the tenant |
 
 **How approvals work.**
 
@@ -108,6 +108,15 @@ Reason codes: `incident`, `quality`, `security`, `no_owner`, `replaced`, `unused
 - **One evaluation per round.** All approvers of one round name the same evaluation (or, in `warn` mode, none).
 - **The mode** is in the project configuration, `agents.evaluation.mode`, of the projects that run the agent; the strictest one applies. `warn` (default): an approval without a qualifying evaluation is accepted, and the answer shows a warning with the reason. `required`: it is refused. `off`: no check. The thresholds come from the evaluation's project. An agent that no project runs yet uses the default configuration (`warn`): set `run.agent_key` first to require evaluations for it.
 - The evaluation is evidence for the approvers, not a replacement for them. Safety, security and operations checks of the readiness record (§20.7) stay with people.
+
+**Evaluations as evidence for a recertification** (stage 5, §20.8). The owner names an evaluation with `recertify --evaluation <code>`. It must meet the same conditions as for an approval, for the agent's current version, and it may be up to `recertification_max_age_days` old (90 at most). Then the platform checks for **aging**:
+
+- It compares the evaluation with the one named by the agent's last activation, on the tasks both share, with the same test (McNemar and the intervals).
+- A significant drop gives `evaluation_quality_dropped` with both resolve rates. In `required` mode the recertification is refused; in `warn` mode it is recorded with a warning.
+- With fewer shared tasks than `min_tasks`, or when the last activation named no evaluation, the comparison is skipped and the answer says why.
+- **The platform never suspends the agent by itself.** A drop is a fact for the owner and Person B, who decide whether to suspend it (§20.9).
+- A run of an agent whose recertification is overdue still starts, and the owner gets the warning (D-02 FR-36).
+- To keep the evidence fresh, give the plan a weekly schedule or `on_change`. `list --overdue` shows each overdue agent's latest evaluation.
 
 The normal order for a change: make a plan with two configurations (the agent by its key, and the next version as its model with a prompt variant), run it, read the report, then suspend, update and approve with the evaluation's code. Real runs go on during the evaluation.
 
@@ -175,7 +184,7 @@ Controls during ramp-up: limited concurrent tasks, budget, tool and environment 
 - Are its credentials still correct and minimal?
 - Is its quality still acceptable? Has its risk tier changed?
 
-Agents can **age**: quality slowly drops as models, code and documents change. Do not wait for an incident to check.
+Agents can **age**: quality slowly drops as models, code and documents change. Do not wait for an incident to check. On the platform, a recertification can name an evaluation, and the platform compares it with the evaluation of the last activation (§20.5b).
 
 ---
 
@@ -286,3 +295,4 @@ Old context must not quietly come back through caches, indexes or copied instruc
 | 0.4 | 2026-10-03 | Claude (task B13, PR 2) | §20.5b: the register through the API; approvals by agent type, change and retirement approvals, suspension by Person B or leadership (ADR-M37 §2.8) |
 | 0.5 | 2026-10-08 | Claude (docs fix PR A) | §20.5b: `register` needs `--environments sandbox`, or the agent can never run |
 | 0.6 | 2026-10-21 | Claude (task L09, PR 2) | §20.5b: an activation names its evaluation (`--evaluation`); the fingerprint, the conditions, a change compared with the last approved version, one evaluation per round, `agents.evaluation.mode` of the agent's projects; `show` gives the latest evaluation (ADR-M86, QUESTIONS #496–#504) |
+| 0.7 | 2026-10-21 | Claude (task L10) | §20.5b, §20.8: a recertification names its evaluation (`--evaluation`); the aging comparison with the last activation; the platform never suspends an agent by itself; `list --overdue` shows the latest evaluation (ADR-M86 §2.6, QUESTIONS #506, #507) |

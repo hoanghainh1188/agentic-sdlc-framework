@@ -52,6 +52,21 @@ export interface AgentEvaluationVerdict {
   readonly result: AgentEvaluationResult | null;
   /** The numbers the catalog text quotes (decimal strings and counts as strings). */
   readonly params: Readonly<Record<string, string>>;
+  /**
+   * A recertification (L10, ADR-M86 §2.6): the comparison with the evaluation of the agent's last
+   * activation. Null for an approval, or when an earlier condition failed.
+   */
+  readonly aging?: AgentEvaluationAging | null;
+}
+
+/**
+ * The aging comparison (ADR-M86 §2.6). `skipped`: with `no_activation_evaluation` (QUESTIONS
+ * #506) or `too_few_shared_tasks`; `compared`: no significant drop was found.
+ */
+export interface AgentEvaluationAging {
+  readonly status: 'compared' | 'skipped';
+  readonly reason: 'no_activation_evaluation' | 'too_few_shared_tasks' | null;
+  readonly params: Readonly<Record<string, string>>;
 }
 
 /** A configuration that has the version's fingerprint, and its scored runs. */
@@ -127,24 +142,42 @@ async function usedWholeTaskSet(scope: TenantScope, evaluation: Evaluation): Pro
 }
 
 /**
- * The version of the agent's last completed activation round (ADR-M86 §2.5): the latest round of
- * `activate` approvals in two different capacities (every approver set of the MVP has two).
+ * The agent's last completed activation round (ADR-M86 §2.5, §2.6): the latest round of
+ * `activate` approvals in two different capacities (every approver set of the MVP has two), with
+ * its version and the evaluation its approvals named, if any.
  */
-export async function lastActivatedVersion(
+export async function lastActivation(
   scope: TenantScope,
   agentId: string,
-): Promise<string | null> {
-  const rounds = new Map<number, { version: string; capacities: Set<string> }>();
+): Promise<{ readonly version: string; readonly evaluationId: string | null } | null> {
+  const rounds = new Map<
+    number,
+    { version: string; evaluationId: string | null; capacities: Set<string> }
+  >();
   for (const approval of await scope.agentApprovals.listForAgent(agentId, 'activate')) {
     const key = approval.round_at.getTime();
-    const round = rounds.get(key) ?? { version: approval.agent_version, capacities: new Set() };
+    const round = rounds.get(key) ?? {
+      version: approval.agent_version,
+      evaluationId: null,
+      capacities: new Set<string>(),
+    };
     round.capacities.add(approval.capacity);
+    round.evaluationId ??= approval.evaluation_id;
     rounds.set(key, round);
   }
   const completed = [...rounds.entries()]
     .filter(([, round]) => round.capacities.size >= 2)
     .sort(([a], [b]) => b - a);
-  return completed[0]?.[1].version ?? null;
+  const last = completed[0]?.[1];
+  return last ? { version: last.version, evaluationId: last.evaluationId } : null;
+}
+
+/** The version of the agent's last completed activation round (ADR-M86 §2.5). */
+export async function lastActivatedVersion(
+  scope: TenantScope,
+  agentId: string,
+): Promise<string | null> {
+  return (await lastActivation(scope, agentId))?.version ?? null;
 }
 
 function summaries(
@@ -267,12 +300,90 @@ export async function checkAgentEvaluation(
       return verdict(evaluation, 'evaluation_not_latest', { latest: other.code });
     }
   }
-  return verdict(evaluation, 'passed', {
+  const passed = {
     rate: rate(own.resolved.estimate),
     low: rate(own.resolved.low),
     high: rate(own.resolved.high),
     tasks: String(tasks),
+  };
+  if (input.purpose !== 'recertification') return verdict(evaluation, 'passed', passed);
+  // Aging (§2.6): compared with the evaluation of the last activation, on the shared tasks.
+  const aging = await agingOf(scope, {
+    agent,
+    rows: candidate.rows,
+    minTasks: thresholds.min_tasks,
+    alpha,
   });
+  if (aging.dropped) {
+    return { ...verdict(evaluation, 'evaluation_quality_dropped', aging.params), aging: null };
+  }
+  return { ...verdict(evaluation, 'passed', passed), aging: aging.aging };
+}
+
+/** The candidate's rows under one configuration ID, so two evaluations can be paired by task. */
+const relabel = (rows: readonly StoredResult[], configuration: string): StoredResult[] =>
+  rows.map((row) => ({ ...row, configuration_id: configuration }));
+
+/**
+ * The aging comparison of a recertification (ADR-M86 §2.6): the candidate now and in the
+ * evaluation of the last activation, on the tasks both share, with the one test of ADR-M83 §2.3.
+ * A significant drop is a fact for people: the platform never suspends the agent (§20.9).
+ */
+async function agingOf(
+  scope: TenantScope,
+  input: {
+    readonly agent: Agent;
+    readonly rows: readonly StoredResult[];
+    readonly minTasks: number;
+    readonly alpha: number;
+  },
+): Promise<
+  | { dropped: true; params: Record<string, string> }
+  | { dropped: false; aging: AgentEvaluationAging }
+> {
+  const skipped = (
+    reason: NonNullable<AgentEvaluationAging['reason']>,
+    params: Record<string, string> = {},
+  ) => ({ dropped: false as const, aging: { status: 'skipped' as const, reason, params } });
+  const activation = await lastActivation(scope, input.agent.id);
+  const before = activation?.evaluationId
+    ? await scope.evaluations.getById(activation.evaluationId)
+    : undefined;
+  const then = before ? (await candidateOf(scope, before.id, input.agent)).candidate : null;
+  if (!before || !then) return skipped('no_activation_evaluation');
+  const shared = new Set(then.rows.map((row) => row.task_id));
+  const now = input.rows.filter((row) => shared.has(row.task_id));
+  const report = buildReport(
+    [...relabel(then.rows, 'before'), ...relabel(now, 'now')].map((row) => toRunResult(row, 0)),
+    0,
+    [],
+    1,
+    input.alpha,
+  );
+  const comparison = report.comparisons[0];
+  const sharedTasks = comparison?.pairedTasks ?? 0;
+  const was = report.configurations.find((c) => c.configuration === 'before');
+  const is = report.configurations.find((c) => c.configuration === 'now');
+  if (!comparison || !was || !is || sharedTasks < input.minTasks) {
+    return skipped('too_few_shared_tasks', {
+      before: before.code,
+      shared: String(sharedTasks),
+      min: String(input.minTasks),
+    });
+  }
+  const params = {
+    before: before.code,
+    shared: String(sharedTasks),
+    rate: rate(is.resolved.estimate),
+    before_rate: rate(was.resolved.estimate),
+    p_value: String(comparison.pValue),
+  };
+  const dropped =
+    differs(is.resolved, was.resolved, comparison.pValue, input.alpha) &&
+    is.resolved.estimate < was.resolved.estimate;
+  return dropped
+    ? { dropped: true, params }
+    : { dropped: false, aging: { status: 'compared', reason: null, params } };
 }
 
 /** `evaluation_no_baseline`, `evaluation_too_few_tasks` (paired) or `…_worse_than_baseline`. */
@@ -335,12 +446,14 @@ async function worseThanBaseline(
 
 /**
  * The latest completed evaluation with the agent's current fingerprint in its projects (any
- * active project when it has none), and its verdict for an approval (`sdlc admin agent show`).
+ * active project when it has none), and its verdict for an approval (`sdlc admin agent show`) or a
+ * recertification (`list --overdue`, L10).
  */
 export async function latestAgentEvaluation(
   scope: TenantScope,
   agent: Agent,
   now: Date,
+  purpose: CheckAgentEvaluation['purpose'] = 'approval',
 ): Promise<AgentEvaluationVerdict | null> {
   const own = await agentProjects(scope, agent.agent_key);
   const projectIds =
@@ -364,9 +477,10 @@ export async function latestAgentEvaluation(
   return checkAgentEvaluation(scope, {
     agent,
     evaluationCode: latest.code,
-    purpose: 'approval',
+    purpose,
     // An active agent has no next version yet: its evaluation is shown as for a first use.
-    change: agent.status === 'suspended' || agent.status === 'quarantined',
+    change:
+      purpose === 'approval' && (agent.status === 'suspended' || agent.status === 'quarantined'),
     now,
   });
 }

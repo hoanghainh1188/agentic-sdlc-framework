@@ -270,7 +270,13 @@ export async function changeAgentOwner(
 export async function recertifyAgent(
   scope: TenantScope,
   agentKey: string,
-  input: { readonly day?: string; readonly now?: Date; readonly actor?: AdminActor } = {},
+  input: {
+    readonly day?: string;
+    readonly now?: Date;
+    readonly actor?: AdminActor;
+    /** L10 (ADR-M86 §2.6): the evaluation the recertification named and its result code. */
+    readonly evaluation?: { readonly id: string | null; readonly result: string };
+  } = {},
 ): Promise<Agent> {
   const now = input.now ?? new Date();
   const day = input.day ?? utcDay(now);
@@ -286,7 +292,7 @@ export async function recertifyAgent(
       );
     }
     const updated = await tx.agents.update(agent.id, { lastRecertifiedAt: day }, now);
-    await appendRecertified(tx, updated, input.actor ?? SYSTEM_ACTOR);
+    await appendRecertified(tx, updated, input.actor ?? SYSTEM_ACTOR, input.evaluation);
     return updated;
   });
 }
@@ -295,12 +301,18 @@ async function appendRecertified(
   scope: TenantScope,
   agent: Agent,
   actor: AdminActor,
+  evaluation?: { readonly id: string | null; readonly result: string },
 ): Promise<void> {
   await scope.audit.append({
     action: 'agent.recertified',
     ...auditActor(actor),
     entityId: agent.id,
-    payload: { agent_key: agent.agent_key },
+    payload: {
+      agent_key: agent.agent_key,
+      // IDs and codes only (ADR-M86 §2.7): never the fingerprint.
+      ...(evaluation?.id ? { evaluation_id: evaluation.id } : {}),
+      ...(evaluation ? { evaluation_result: evaluation.result } : {}),
+    },
   });
 }
 
