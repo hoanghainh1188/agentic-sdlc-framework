@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-- Design of tools for agents (X02, ADR-M69, **proposed**): a tool register like the agent register, MCP tools in one hardened container per tool and run, a run gets a tool only when the plan, the agent, the register and the signed contract allow it, and one summary run event per tool and run. Proposed changes to D-03 §8–§9, D-05 and the threat model (ADR-M80 §4.2). Nothing is built yet: X04 builds the register and the first tool.
+- Design of tools for agents (X02, ADR-M69, **proposed**): a tool register like the agent register, MCP tools in one hardened container per tool and run, a run gets a tool only when the plan, the agent, the register and the signed contract allow it, and one summary run event per tool and run. Proposed changes to D-03 §8–§9, D-05 and the threat model (ADR-M80 §4.2). Nothing is built yet: X04 builds the register and the first tool. New backlog task X14: a spike of open-source MCP gateways before X04 (QUESTIONS #520).
 
 ## [0.5.0] - 2026-10-21
 

@@ -167,11 +167,11 @@ Built later, not in this pull request: handbook Ch.20 (registering a tool) and C
 - **Every tool as `stdio` inside the sandbox.** Rejected: the credential would be inside the sandbox, which an agent controls.
 - **One run event per tool call.** Rejected (QUESTIONS #518): append-only rows kept for at least 2 years, for counts that a summary gives. The words of D-08 X02 AC3 ("a run event per tool use") are read as "per tool used by a run".
 - **The tool's version pinned in the agent's row.** Rejected: every tool update would need a new agent version and new approvals. The contract and the evaluation fingerprint record the exact version instead.
-- **A gateway that checks each call** (D-01 §5.6). Not now (QUESTIONS #520): the register, G4 and the contract already decide which tools a run gets, and the first tool is read-only. D-01 §5.6 says never to write our own gateway; when a call-level policy is needed, an open-source MCP gateway goes in front of the tool containers, inside the run's networks.
+- **A gateway that checks each call** (D-01 §5.6). Not decided here (QUESTIONS #520): the register, G4 and the contract already decide which tools a run gets. The repository owner asked for research first: task X14 (ADR-M87) compares self-hosted open-source MCP gateways, one instance per run inside the run's networks, and decides before X04 whether the first tool goes through one. D-01 §5.6 says never to write our own gateway.
 
 ## 5. Consequences and open items
 
-- **Agent support for MCP (QUESTIONS #519, open).** The OpenHands adapter does not configure MCP servers today. X04 must confirm that the OpenHands Agent Server takes a per-run MCP server over HTTP with a header key, and add it to the adapter. X01 compares the MCP support of Aider and OpenCode. Until an adapter supports a transport, G4 refuses tools of that transport (`tool_transport_not_supported`).
+- **Agent support for MCP (QUESTIONS #519).** The OpenHands adapter does not configure MCP servers today. X04 starts by confirming (and stops and asks if it cannot) that the OpenHands Agent Server takes a per-run MCP server over HTTP with a header key, and add it to the adapter. X01 compares the MCP support of Aider and OpenCode. Until an adapter supports a transport, G4 refuses tools of that transport (`tool_transport_not_supported`).
 - The guard gets a new rule, the runner a new provisioning step, the contract a new schema version.
 - Each tool adds a container per run: A10 measures memory and CPU with a tool.
 - A tool's answers are untrusted input for the agent, like the repository's files. The agent's limits do not change: the same tools, the same network, the same diff check at G5 and review at G7 (ADR-M80, the tools section).
@@ -182,3 +182,4 @@ Built later, not in this pull request: handbook Ch.20 (registering a tool) and C
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-21 | Claude (task X02) | First version: tool codes, the register, G4 checks, one container per tool and run, contract v2, summary events, kill switch. QUESTIONS #516–#520 |
+| 0.2 | 2026-10-22 | Claude (task X02) | Answers to QUESTIONS #519 (X04 checks MCP in OpenHands first) and #520 (task X14 researches an MCP gateway before X04, ADR-M87) |

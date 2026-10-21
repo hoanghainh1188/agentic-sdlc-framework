@@ -578,14 +578,21 @@ t("X03","EXT","A second agent adapter and the agent register's adapter column","
   "The pilot suite (`pnpm test:pilot`) and `pnpm test:agent` pass with the new adapter on the stub model; the sandbox egress and hardening tests unchanged",
   "Handbook Ch.20: registering an agent with another adapter"],
  "QUESTIONS #361. Multi-agent (several agents in one intent) stays after X03")
-t("X04","EXT","The tool register and the first tool: search the project's documents","L",["X02"],"FR-33, FR-44, NFR-03",
+t("X14","EXT","Spike: an open-source MCP gateway in front of a run's tools","S",["X02"],"NFR-03, NFR-04, NFR-05, D-01 §5.6",
+ "platform/spikes/mcp-gateway/* (thrown away), design/ADR-M87, design/ADR-M69",
+ ["Compare at least three self-hosted open-source MCP gateways (pinned versions): licence, maintenance, image size and vulnerabilities (Trivy), and whether one instance per run fits inside the run's networks of ADR-M69 §2.4",
+  "Call-level policy: allow or refuse a call by tool name and argument rules, a per-run key, a call cap; refusals as codes; no query or answer in its logs (R031)",
+  "What it records and how the runner reads counts from it (in place of, or next to, the agent's event stream; ADR-M69 §2.7); its memory and CPU per run",
+  "ADR-M87: use a gateway from the first tool (X04), later, or not at all, with the changes to ADR-M69; never a gateway of our own (D-01 §5.6)"],
+ "QUESTIONS #520 (repository owner, 2026-10-22): research the gateway before X04")
+t("X04","EXT","The tool register and the first tool: search the project's documents","L",["X02","X14"],"FR-33, FR-44, NFR-03",
  "platform/packages/core (tools, retention), migrations, platform/deploy (profile knowledge), platform/apps/runner, platform/apps/worker (retention), platform/tests/*, handbook Ch.19, Ch.20, runbook T11",
  ["The tool register of ADR-M69 and one read-only tool: search the project's Markdown documents in its repository (bge-m3 embeddings and a plain vector search, as K01 measured; no WeKnora), through MCP",
   "The index is built from the run's `base_sha`, so a run reads the documents of its own commit; one index per project and tenant",
   "The embedding model follows the data class rules (D-07 §4): `client_restricted` only with a self-hosted model, `prohibited` never",
   "Retention (FR-44, ADR-M51): the index holds client content, so the retention loop deletes it by the evidence rules and when a project is archived (unless held); `knowledge.purged` audited",
   "A run event `knowledge_read` per search (document IDs, content hashes, counts; never queries or text); the egress probe from a sandbox; another project's index refused"],
- "QUESTIONS #361 (Harry, 2026-10-10). Supersedes K02. ADR-M59 §5 lists the limits learned from K01")
+ "QUESTIONS #361 (Harry, 2026-10-10). Supersedes K02. ADR-M59 §5 lists the limits learned from K01. QUESTIONS #519: first confirm that the OpenHands Agent Server takes a per-run MCP server over HTTP with a header key; if it does not, stop and ask. QUESTIONS #520: the gateway decision of X14 (ADR-M87) comes first")
 t("X07","EXT","A context snapshot for every run","M",["X04"],"FR-40, FR-41",
  "platform/apps/runner, platform/packages/core (run events, evidence), platform/tests/*, handbook Ch.15 §15.10.2",
  ["For every run, a record of what the agent read: repository files (paths hashed, never paths in clear in append-only tables), documents found by tools (IDs, content hashes), the plan and spec versions; counts and hashes only",
@@ -757,7 +764,7 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.54 |
+| Version | 1.55 |
 | Date | 2026-10-21 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -808,7 +815,7 @@ flowchart LR
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
     UX --> EV["EVAL L04–L10: evaluations, reports, recommendations for managers"]
-    EV --> EXT["EXT X09 done (v0.5.0), X01–X04, X07, X11, X12 (v0.6.0)"]
+    EV --> EXT["EXT X09 done (v0.5.0), X01–X04, X14, X07, X11, X12 (v0.6.0)"]
     EXT --> MO["Models L01 (early in v0.6.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
@@ -937,6 +944,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.52 | 2026-10-20 | Claude (task L07, PR 1), approved by the repository owner | L07 note and code areas: task cards in the project's repository, the check on the server, the reviewer rule (ADR-M85, QUESTIONS #485–#487) |
 | 1.53 | 2026-10-20 | Claude (task L08), approved by the repository owner | L08 design (ADR-M86, QUESTIONS #496–#500); new tasks L09 (evaluations in the agent approvals) and L10 (evaluations in the recertification) |
 | 1.54 | 2026-10-21 | Claude, approved by the repository owner | Release v0.5.0 with L06–L10 (EVAL complete), W01 and the X09 spike; EXT and Models move to v0.6.0 |
+| 1.55 | 2026-10-22 | Claude (task X02), approved by the repository owner | New task X14: spike of an open-source MCP gateway before X04 (QUESTIONS #520, ADR-M87); X04 depends on X14 and starts by checking MCP in OpenHands (QUESTIONS #519) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
