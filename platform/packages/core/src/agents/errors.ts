@@ -3,6 +3,8 @@
 // (`agent_register.error.<code>`).
 import { t, type MessageKey } from '@sdlc/messages';
 
+import type { AgentEvaluationRefusal } from './evaluation-check.js';
+
 export type AgentRegisterErrorCode =
   // --- register, update, status, owner, recertification (operator commands) ---
   /** A field does not have the expected format; `field` names it. */
@@ -44,7 +46,9 @@ export type AgentRegisterErrorCode =
   /** The agent's pinned model is not in the run's allowed models (QUESTIONS #79). */
   | 'model_not_allowed'
   /** The instructions file at the run's base commit differs from the registered hash. */
-  | 'instructions_mismatch';
+  | 'instructions_mismatch'
+  // --- evaluations in the approvals (L09, ADR-M86 §2.8): `required` mode refuses with these ---
+  | AgentEvaluationRefusal;
 
 export class AgentRegisterError extends Error {
   override readonly name = 'AgentRegisterError';
@@ -54,12 +58,17 @@ export class AgentRegisterError extends Error {
     message: string,
     /** The field that failed (`invalid_input` only). */
     readonly field?: string,
+    /** The numbers an evaluation refusal quotes (L09): codes, counts, rates as strings. */
+    readonly params: Readonly<Record<string, string>> = {},
   ) {
     super(message);
   }
 }
 
-/** Catalog keys of the refusals (NFR-08). Parameters: `key` (the agent key), `field`. */
+/**
+ * Catalog keys of the refusals (NFR-08). Parameters: `key` (the agent key), `field`, and for an
+ * evaluation refusal the numbers it quotes (`params`).
+ */
 export const AGENT_REGISTER_ERROR_MESSAGES = {
   invalid_input: 'agent_register.error.invalid_input',
   owner_not_active: 'agent_register.error.owner_not_active',
@@ -80,6 +89,21 @@ export const AGENT_REGISTER_ERROR_MESSAGES = {
   environment_not_approved: 'agent_register.error.environment_not_approved',
   model_not_allowed: 'agent_register.error.model_not_allowed',
   instructions_mismatch: 'agent_register.error.instructions_mismatch',
+  evaluation_missing: 'agent_register.error.evaluation_missing',
+  evaluation_not_found: 'agent_register.error.evaluation_not_found',
+  evaluation_not_completed: 'agent_register.error.evaluation_not_completed',
+  evaluation_other_project: 'agent_register.error.evaluation_other_project',
+  evaluation_not_matching: 'agent_register.error.evaluation_not_matching',
+  evaluation_task_set_partial: 'agent_register.error.evaluation_task_set_partial',
+  evaluation_too_few_tasks: 'agent_register.error.evaluation_too_few_tasks',
+  evaluation_below_threshold: 'agent_register.error.evaluation_below_threshold',
+  evaluation_scope_breach: 'agent_register.error.evaluation_scope_breach',
+  evaluation_no_baseline: 'agent_register.error.evaluation_no_baseline',
+  evaluation_worse_than_baseline: 'agent_register.error.evaluation_worse_than_baseline',
+  evaluation_too_old: 'agent_register.error.evaluation_too_old',
+  evaluation_not_latest: 'agent_register.error.evaluation_not_latest',
+  evaluation_round_mismatch: 'agent_register.error.evaluation_round_mismatch',
+  evaluation_quality_dropped: 'agent_register.error.evaluation_quality_dropped',
 } as const satisfies Record<AgentRegisterErrorCode, MessageKey>;
 
 /** The text of a refusal. `agentKey` names the agent in the text; missing values render as `-`. */
@@ -94,7 +118,7 @@ export function agentRegisterErrorMessage(
 ): string {
   return t(
     AGENT_REGISTER_ERROR_MESSAGES[error.code],
-    { key: agentKey, field: error.field ?? '-' },
+    { ...error.params, key: agentKey, field: error.field ?? '-' },
     locale,
   );
 }

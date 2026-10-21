@@ -7,12 +7,9 @@ import { DEFAULT_RECOMMENDATION_THRESHOLDS, renderRecommendation } from '@sdlc/e
 import { t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
 
-import {
-  buildEvaluationReport,
-  toRunResult,
-  type StoredResult,
-} from '../../apps/api/src/evaluations/report.js';
+import { buildEvaluationReport } from '../../apps/api/src/evaluations/report.js';
 import { EXIT } from '../../apps/cli/src/index.js';
+import { toRunResult, type StoredResult } from '../../packages/core/src/evaluation/report-rows.js';
 import { evaluationBody } from './fixtures.js';
 import { useHarness } from './harness.js';
 

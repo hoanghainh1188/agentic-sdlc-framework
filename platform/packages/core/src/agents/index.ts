@@ -8,6 +8,18 @@ export {
 } from './errors.js';
 export { toolsSha256 } from './fingerprint.js';
 export {
+  AGENT_EVALUATION_REFUSALS,
+  agentProjects,
+  checkAgentEvaluation,
+  lastActivatedVersion,
+  latestAgentEvaluation,
+  strictestMode,
+  type AgentEvaluationRefusal,
+  type AgentEvaluationResult,
+  type AgentEvaluationVerdict,
+  type CheckAgentEvaluation,
+} from './evaluation-check.js';
+export {
   checkAgentForRun,
   instructionsPath,
   recertificationMonths,

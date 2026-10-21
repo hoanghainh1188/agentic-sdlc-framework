@@ -395,6 +395,32 @@ export class EvaluationRepository extends TenantRepository {
   }
 
   /**
+   * The completed evaluations of a project, newest end first; with `after`, only those that ended
+   * later (L09, ADR-M86 §2.3: the latest evaluation of a fingerprint).
+   */
+  async listCompleted(filter: {
+    projectId: string;
+    after?: Date;
+    limit: number;
+  }): Promise<Evaluation[]> {
+    if (!isUuid(filter.projectId)) return [];
+    return this.run(
+      this.db
+        .selectFrom('evaluations')
+        .selectAll()
+        .where('tenant_id', '=', this.tenantId)
+        .where('project_id', '=', filter.projectId)
+        .where('status', '=', 'completed')
+        .where('finished_at', 'is not', null)
+        .$if(filter.after !== undefined, (qb) => qb.where('finished_at', '>', filter.after!))
+        .orderBy('finished_at', 'desc')
+        .orderBy('id')
+        .limit(filter.limit)
+        .execute(),
+    );
+  }
+
+  /**
    * Evaluations of the given projects that ended at or after `since`, newest first (the notice of
    * task L06, QUESTIONS #482). An empty project list gives none.
    */

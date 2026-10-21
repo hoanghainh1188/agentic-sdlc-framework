@@ -22,6 +22,7 @@ import {
   type ApprovalPurpose,
 } from './approval-rules.js';
 import { AgentRegisterError } from './errors.js';
+import { checkAgentEvaluation, type AgentEvaluationVerdict } from './evaluation-check.js';
 import {
   changeAgentOwner,
   changeAgentStatus,
@@ -170,12 +171,22 @@ export interface ApproveAgent {
   readonly capacity: ApprovalCapacity;
   /** Required to retire: the reason code (ADR-M31 §2.3), used when the set completes. */
   readonly reason?: string;
+  /**
+   * `activate` only (L09, ADR-M86 §2.5): the evaluation (`EVAL-…`) this approval rests on. Mandatory
+   * when the agent's projects use `agents.evaluation.mode: required`.
+   */
+  readonly evaluationCode?: string;
   readonly now?: Date;
 }
 
 export interface ApprovalResult extends AgentRound {
   /** True when this approval completed the set and the agent changed status. */
   readonly completed: boolean;
+  /**
+   * L09: the check of the evaluation (`activate` only). In `warn` mode a result other than
+   * `passed` is the warning; in `required` mode it was a refusal and there is no result.
+   */
+  readonly evaluation: AgentEvaluationVerdict | null;
 }
 
 /**
@@ -222,6 +233,10 @@ export async function approveAgent(
     if (round.approvals.some((approval) => approval.capacity === input.capacity)) {
       throw new AgentRegisterError('approval_duplicate', `${input.capacity} already approved`);
     }
+    const evaluation =
+      input.purpose === 'activate'
+        ? await checkEvaluationOfApproval(tx, locked, round, input, input.now ?? new Date())
+        : null;
     const approval = await tx.agentApprovals
       .record({
         agent_id: locked.id,
@@ -230,6 +245,8 @@ export async function approveAgent(
         capacity: input.capacity,
         approver_id: actor.userId,
         round_at: locked.updated_at,
+        evaluation_id: evaluation?.evaluation?.id ?? null,
+        evaluation_result: evaluation?.result ?? null,
       })
       .catch((error: unknown) => {
         throw error instanceof DbError && error.code === 'conflict'
@@ -246,12 +263,18 @@ export async function approveAgent(
         version: locked.version,
         purpose: input.purpose,
         capacity: input.capacity,
+        ...(evaluation?.result
+          ? {
+              ...(evaluation.evaluation ? { evaluation_id: evaluation.evaluation.id } : {}),
+              evaluation_result: evaluation.result,
+            }
+          : {}),
       },
     });
     const approvals = [...round.approvals, approval];
     const covered = new Set(approvals.map((a) => a.capacity));
     if (!round.required.every((capacity) => covered.has(capacity))) {
-      return { ...round, approvals, completed: false };
+      return { ...round, approvals, completed: false, evaluation };
     }
     const agent = await changeAgentStatus(tx, agentKey, {
       to: target,
@@ -259,6 +282,53 @@ export async function approveAgent(
       ...(input.reason === undefined ? {} : { reason: input.reason }),
       ...(input.now === undefined ? {} : { now: input.now }),
     });
-    return { ...round, agent, approvals, completed: true };
+    return { ...round, agent, approvals, completed: true, evaluation };
   });
+}
+
+/**
+ * The evaluation check of an `activate` approval (ADR-M86 §2.5): the conditions of §2.3 for the
+ * agent as it is now, one evaluation per round, then the mode: `required` refuses anything but
+ * `passed`; `warn` records the result and answers it as a warning; `off` checks nothing.
+ */
+async function checkEvaluationOfApproval(
+  scope: TenantScope,
+  agent: Agent,
+  round: AgentRound,
+  input: ApproveAgent,
+  now: Date,
+): Promise<AgentEvaluationVerdict> {
+  const verdict = await checkAgentEvaluation(scope, {
+    agent,
+    evaluationCode: input.evaluationCode ?? null,
+    purpose: 'approval',
+    // `proposed` → active is the first use (§20.7); from `suspended` it is a change (§20.11).
+    change: agent.status !== 'proposed',
+    now,
+  });
+  if (verdict.mode === 'off') return verdict;
+  // Every approver of a round confirms the same evidence (or, in `warn` mode, none).
+  const named = verdict.evaluation?.id ?? null;
+  const other = round.approvals.find((approval) => approval.evaluation_id !== named);
+  if (other) {
+    const otherCode = other.evaluation_id
+      ? ((await scope.evaluations.getById(other.evaluation_id))?.code ?? '-')
+      : '-';
+    throw new AgentRegisterError(
+      'evaluation_round_mismatch',
+      `agent ${agent.agent_key}: the round names another evaluation`,
+      undefined,
+      { ...verdict.params, other: otherCode },
+    );
+  }
+  if (verdict.mode === 'required' && verdict.result !== 'passed') {
+    const code = verdict.result === 'missing' ? 'evaluation_missing' : verdict.result!;
+    throw new AgentRegisterError(
+      code,
+      `agent ${agent.agent_key}: ${code}`,
+      undefined,
+      verdict.params,
+    );
+  }
+  return verdict;
 }

@@ -6,6 +6,7 @@ import {
   agentRound,
   approveAgent,
   changeOwnerAs,
+  latestAgentEvaluation,
   recertificationMonths,
   recertifyAgentAs,
   registerAgentAs,
@@ -19,7 +20,7 @@ import { agentApiError } from '../errors/api-error.js';
 import { CLOCK } from '../tokens.js';
 import { parseRequest } from '../validation.js';
 import { actorOf } from './actor.js';
-import { presentAgent, presentRound } from './agents.present.js';
+import { presentAgent, presentRound, presentVerdict } from './agents.present.js';
 import {
   agentKeySchema,
   approveAgentSchema,
@@ -55,6 +56,10 @@ export class AdminAgentsController {
       return {
         ...presentAgent(activate.agent, months, this.now()),
         rounds: [activate, retire].map((round) => presentRound(round, months, this.now())),
+        // L09 (ADR-M86 §2.5): the latest evaluation of the current fingerprint and its check.
+        evaluation: presentVerdict(
+          await latestAgentEvaluation(p.scope, activate.agent, this.now()),
+        ),
       };
     });
   }
@@ -129,6 +134,7 @@ export class AdminAgentsController {
         capacity: input.as,
         now: this.now(),
         ...(input.reason_code === undefined ? {} : { reason: input.reason_code }),
+        ...(input.evaluation_code === undefined ? {} : { evaluationCode: input.evaluation_code }),
       });
       return presentRound(result, await recertificationMonths(p.scope, null), this.now());
     });

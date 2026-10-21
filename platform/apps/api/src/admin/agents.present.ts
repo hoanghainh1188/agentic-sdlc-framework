@@ -1,6 +1,12 @@
 // Response bodies of the agent register endpoints (task B13 AC7). Codes, IDs, hashes and dates
 // only, like the register itself (ADR-M31 §2.1).
-import { recertificationStatus, type Agent, type AgentApproval, type AgentRound } from '@sdlc/core';
+import {
+  recertificationStatus,
+  type Agent,
+  type AgentApproval,
+  type AgentEvaluationVerdict,
+  type AgentRound,
+} from '@sdlc/core';
 
 export function presentAgent(agent: Agent, months: number, now: Date): Record<string, unknown> {
   const recert = recertificationStatus(agent.last_recertified_at, months, now);
@@ -31,13 +37,35 @@ export function presentApproval(approval: AgentApproval): Record<string, unknown
     purpose: approval.purpose,
     capacity: approval.capacity,
     approver_id: approval.approver_id,
+    evaluation_id: approval.evaluation_id,
+    evaluation_result: approval.evaluation_result,
     created_at: approval.created_at.toISOString(),
+  };
+}
+
+/**
+ * The check of an evaluation (L09, ADR-M86 §2.5): the mode, the evaluation code, the result code
+ * and the numbers its catalog text quotes. `qualifies` is true for `passed` only.
+ */
+export function presentVerdict(
+  verdict: AgentEvaluationVerdict | null,
+): Record<string, unknown> | null {
+  if (!verdict) return null;
+  return {
+    mode: verdict.mode,
+    code: verdict.evaluation?.code ?? null,
+    result: verdict.result,
+    qualifies: verdict.result === 'passed',
+    params: verdict.params,
   };
 }
 
 /** The approvals of a step so far, what it still needs, and the agent. */
 export function presentRound(
-  round: AgentRound & { readonly completed?: boolean },
+  round: AgentRound & {
+    readonly completed?: boolean;
+    readonly evaluation?: AgentEvaluationVerdict | null;
+  },
   months: number,
   now: Date,
 ): Record<string, unknown> {
@@ -49,5 +77,7 @@ export function presentRound(
     missing: round.required.filter((capacity) => !given.has(capacity)),
     approvals: round.approvals.map(presentApproval),
     completed: round.completed ?? false,
+    // The check of this approval's evaluation (L09); null for a retirement or a round read back.
+    evaluation: presentVerdict(round.evaluation ?? null),
   };
 }

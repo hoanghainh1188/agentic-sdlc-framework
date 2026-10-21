@@ -94,6 +94,111 @@ describe('sdlc admin agent', () => {
     );
   });
 
+  // L09 (ADR-M86 §2.5, §2.8): an activation names its evaluation; `warn` answers a warning.
+  describe('evaluations (L09)', () => {
+    const APPROVE = ['admin', 'agent', 'approve', '--key', 'coder', '--purpose', 'activate'];
+    const verdict = (result: string, params: Record<string, string>) => ({
+      mode: 'warn',
+      code: 'EVAL-2026-0007',
+      result,
+      qualifies: result === 'passed',
+      params: { key: 'coder', code: 'EVAL-2026-0007', ...params },
+    });
+
+    it('sends --evaluation and prints the numbers of a qualifying evaluation', async () => {
+      const params = { rate: '0.875', low: '0.625', high: '1.000', tasks: '8' };
+      const h = await harness({
+        routes: {
+          'POST /v1/admin/agents/coder/approvals': {
+            status: 200,
+            body: { ...roundBody(false), evaluation: verdict('passed', params) },
+          },
+        },
+      });
+      expect(await h.run([...APPROVE, '--as', 'owner', '--evaluation', 'EVAL-2026-0007'])).toBe(
+        EXIT.ok,
+      );
+      expect(h.requests[0]?.body).toEqual({
+        purpose: 'activate',
+        as: 'owner',
+        evaluation_code: 'EVAL-2026-0007',
+      });
+      expect(h.out.at(-1)).toBe(
+        t('cli.admin.agent.evaluation_passed', {
+          key: 'coder',
+          code: 'EVAL-2026-0007',
+          ...params,
+        }),
+      );
+    });
+
+    it('prints the warning of warn mode with the catalog text and its numbers', async () => {
+      const params = { rate: '0.375', low: '0.125', high: '0.750', min: '0.500' };
+      const h = await harness({
+        routes: {
+          'POST /v1/admin/agents/coder/approvals': {
+            status: 200,
+            body: {
+              ...roundBody(false),
+              evaluation: verdict('evaluation_below_threshold', params),
+            },
+          },
+        },
+      });
+      expect(await h.run([...APPROVE, '--as', 'owner', '--evaluation', 'EVAL-2026-0007'])).toBe(
+        EXIT.ok,
+      );
+      const text = t('agent_register.error.evaluation_below_threshold', {
+        key: 'coder',
+        code: 'EVAL-2026-0007',
+        ...params,
+      });
+      expect(text).toContain('0.375');
+      expect(h.out.at(-1)).toBe(t('cli.admin.agent.evaluation_warning', { text }));
+    });
+
+    it('a missing evaluation in warn mode names --evaluation', async () => {
+      const h = await harness({
+        routes: {
+          'POST /v1/admin/agents/coder/approvals': {
+            status: 200,
+            body: {
+              ...roundBody(false),
+              evaluation: { ...verdict('missing', {}), code: null },
+            },
+          },
+        },
+      });
+      expect(await h.run([...APPROVE, '--as', 'owner'])).toBe(EXIT.ok);
+      expect(h.out.at(-1)).toContain('--evaluation');
+    });
+
+    it('show prints the latest evaluation and whether it qualifies', async () => {
+      const detail = (evaluation: unknown) => ({ ...agentBody(), rounds: [], evaluation });
+      const h = await harness({
+        routes: {
+          'GET /v1/admin/agents/coder': {
+            status: 200,
+            body: detail(
+              verdict('passed', { rate: '1.000', low: '1.000', high: '1.000', tasks: '8' }),
+            ),
+          },
+          'GET /v1/admin/agents/other': { status: 200, body: detail(null) },
+        },
+      });
+      expect(await h.run(['admin', 'agent', 'show', '--key', 'coder'])).toBe(EXIT.ok);
+      expect(h.out.at(-1)).toBe(
+        t('cli.admin.agent.evaluation_line', {
+          code: 'EVAL-2026-0007',
+          mode: 'warn',
+          verdict: t('cli.admin.agent.evaluation_qualifies'),
+        }),
+      );
+      expect(await h.run(['admin', 'agent', 'show', '--key', 'other'])).toBe(EXIT.ok);
+      expect(h.out.at(-1)).toBe(t('cli.admin.agent.evaluation_none', { mode: '-' }));
+    });
+  });
+
   it('shows a refusal with the register text (exit 1)', async () => {
     const h = await harness({
       routes: {

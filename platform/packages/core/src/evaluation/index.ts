@@ -97,3 +97,4 @@ export {
   readProjectTaskSet,
   type ProjectTaskSet,
 } from './project-task-set.js';
+export { toRunResult, type StoredResult } from './report-rows.js';

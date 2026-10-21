@@ -433,7 +433,15 @@ export const AUDIT_ACTIONS = {
    */
   'agent.approval_recorded': {
     entityType: 'agent',
-    fields: { agent_key: 'code', version: 'code', purpose: 'code', capacity: 'code' },
+    fields: {
+      agent_key: 'code',
+      version: 'code',
+      purpose: 'code',
+      capacity: 'code',
+      // L09 (ADR-M86 §2.7): the evaluation an activation named, and the result of its check.
+      evaluation_id: 'uuid?',
+      evaluation_result: 'code?',
+    },
   },
   /** The agent's owner changed (the owner left, Ch.20 §20.8). Never who the owner is. */
   'agent.owner_changed': { entityType: 'agent', fields: { agent_key: 'code' } },

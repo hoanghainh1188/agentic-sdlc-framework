@@ -109,6 +109,11 @@ export const approveAgentSchema = z.strictObject({
   purpose: z.enum(['activate', 'retire']),
   as: z.enum(['owner', 'person_a', 'person_b', 'governance']),
   reason_code: z.string().max(64).optional(),
+  // L09 (ADR-M86 §2.5): the evaluation an activation rests on.
+  evaluation_code: z
+    .string()
+    .regex(/^EVAL-[0-9]{4}-[0-9]{4,9}$/)
+    .optional(),
 });
 
 export const stopAgentSchema = z.strictObject({ reason_code: z.string().max(64) });
