@@ -10,9 +10,6 @@
 // key, query or answer; the counts from its logs; the clean-up removes the gateway, the tool, the
 // tool network and the config volume.
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
 import type { ToolGrant } from '@sdlc/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -112,7 +109,6 @@ describe.skipIf(!liveEnabled)('X04 live: register tools behind the run MCP gatew
   let settings: RunnerSettings;
   let tool: FixtureImage | undefined;
   let sandboxImage: FixtureImage | undefined;
-  let dir: string;
   const run = crypto.randomUUID();
   const other = crypto.randomUUID();
   let grant: ToolGrant;
@@ -129,8 +125,6 @@ describe.skipIf(!liveEnabled)('X04 live: register tools behind the run MCP gatew
       SDLC_RUNNER_EGRESS_SERVICES: '',
     });
     client = new DockerClient({ socketPath: settings.dockerSocket, timeoutMs: 120_000 });
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'x04-client-'));
-    fs.writeFileSync(path.join(dir, 'client.mjs'), CLIENT);
     grant = {
       tool_key: 'project-docs',
       tool_version: '1.0.0',
@@ -149,7 +143,6 @@ describe.skipIf(!liveEnabled)('X04 live: register tools behind the run MCP gatew
     }
     tool?.cleanup();
     sandboxImage?.cleanup();
-    if (dir) fs.rmSync(dir, { recursive: true, force: true });
   }, 120_000);
 
   function clientRun(network: string, key: string): Record<string, unknown> {
@@ -161,8 +154,6 @@ describe.skipIf(!liveEnabled)('X04 live: register tools behind the run MCP gatew
       '--read-only',
       '--cap-drop',
       'ALL',
-      '-v',
-      `${dir}:/c:ro`,
       '-e',
       `KEY=${key}`,
       '-e',
@@ -170,8 +161,12 @@ describe.skipIf(!liveEnabled)('X04 live: register tools behind the run MCP gatew
       '-e',
       `TOOL_HOST=${toolObjectNames(run).tool('project-docs')}`,
       NODE,
+      // The script travels as an argument: in CI the tests run in a container whose files the
+      // Docker daemon cannot mount.
       'node',
-      '/c/client.mjs',
+      '--input-type=module',
+      '-e',
+      CLIENT,
     );
     return JSON.parse(text.trim().split('\n').at(-1)!) as Record<string, unknown>;
   }
