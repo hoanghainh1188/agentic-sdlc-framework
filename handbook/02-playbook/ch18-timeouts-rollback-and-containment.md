@@ -296,7 +296,7 @@ Use the kill switch when an agent run must stop **now**: it does something it sh
 |---|---|---|
 | `loop_detected` | The agent made the same tool call (same tool, same arguments) more than 3 times in a row | `run.loop_detection.identical_tool_calls_max` (default 3; never more than 3, rule M10) |
 | `no_progress` | The agent's log got no new entry of any kind for the whole window | `run.loop_detection.no_progress_window_minutes` (default 15; never more than 30, rule M27; under 5 gives a warning) |
-| `agent_stuck` | OpenHands' own stuck detector stopped the agent (it also counts repeats, with a fixed limit) | none |
+| `agent_stuck` | OpenHands' own stuck detector stopped the agent (it also counts repeats, with a fixed limit). Agents with the adapter `opencode` never give this reason | none |
 
 The runner interrupts the agent, the run ends `stopped_stalled`, and its diff is checked as for any run. Gate G5 then fails the run (`run_cap_reached`) and raises an escalation to Person A (route intent, level `pause` at least): the intent is frozen until a person decides (§18.8b). If the run was also over its budget in the same moment, the budget wins and the stop reason is `max_budget`.
 
@@ -307,6 +307,13 @@ The runner interrupts the agent, the run ends `stopped_stalled`, and its diff is
    - **A false stop:** the agent's last step was a long command that was still working, for example `pnpm install` on a cold package cache, a full test suite or a build. The last model call ended normally and asked for that command.
    - **A real stall:** the last model call never ended or failed again and again, or the agent was waiting with nothing running. The same happens when the model gateway or the package proxy was down: check §18.8c and the platform's health first.
 3. For a false stop: decide the escalation with `resume` (a new run after G4). If the same long command will run again, raise the window first. If it was a real stall, find the cause before you resume, or decide `terminate`.
+
+**A run that ends `agent_config_changed`** (agents with the adapter `opencode` only; Chapter 20 §20.5b). The agent changed OpenCode's configuration, its tool list or its list of sessions during the run, for example to raise its own iteration limit. The runner stopped the run, and the run ends `failed`. As for any failed run, the intent is paused at G4 with a technical escalation to Person B (§18.8b). Treat it as a possible attempt to get around the platform's controls:
+
+1. `sdlc run list <INT-…>` shows the stop reason. When the run has no event `agent_started`, the stop came before the agent's first step: the repository changed settings the run needs, for example with its own `opencode.json`.
+2. Read the run's last steps in the traces (§18.8c, filter by the run ID): which command changed the configuration, and why.
+3. If the task or the repository led the agent there (for example a file that tells the agent to change its settings), fix that first. Then decide `resume`, or `modify` to go back to G3.
+4. If the cause is not clear, decide `terminate`, and ask the agent owner and Person B to consider suspending or quarantining the agent (Chapter 20 §20.9).
 
 **Raising the window.** It is a project setting, changed by a tenant admin or the project admin (§19.8d):
 
@@ -388,3 +395,4 @@ Track:
 | 0.8 | 2026-10-03 | Claude (task C11, PR 1) | §18.8d platform usage: the kill switch (`/kill`, `sdlc run kill`, `sdlc ops run kill`, who, what happens, afterwards; ADR-M42) |
 | 0.9 | 2026-10-04 | Claude (task C11, PR 2) | §18.8d: loop detection (`loop_detected`, `no_progress`), telling a false `no_progress` from a real stall, raising the window (rule M27; ADR-M42 §2.7) |
 | 0.10 | 2026-10-04 | Claude (task B09, PR 2) | §18.8b: the decisions after a failed run (`modify` / `roll-back` → G3 HITL for every cause); §18.8d: the same after a kill (QUESTIONS #211) |
+| 0.11 | 2026-10-22 | Claude (task X03, PR 3) | §18.8d: `agent_stuck` comes from OpenHands only; a run that ends `agent_config_changed` (adapter `opencode`) and what Person B checks (ADR-M88) |

@@ -259,6 +259,12 @@ On a release checkout, skip the build: the release's published image is already 
 pnpm images get SANDBOX_NODE24   # ghcr.io/…/sandbox-node24@sha256:…, for sandbox.image
 ```
 
+Only for an agent with the adapter `opencode` (handbook Ch.20 §20.5b): build the OpenCode image on the `node24` image above, by digest, and put the printed reference in `sandbox.images.opencode`. The releases do not publish this image yet, so build it on a release checkout too (runbook T11 §5g).
+
+```bash
+NODE24=<the node24 image by digest> pnpm sandbox-image:build node24-opencode
+```
+
 **Register tools (X04, ADR-M69, ADR-M87).** A run with a register tool (`tool:<key>`) also gets one MCP gateway container, agentgateway, and one container per tool. The runner pulls both by digest: the gateway from `cr.agentgateway.dev` (project configuration `tools.gateway.image`), each tool from the image name in the tool register. A server that cannot reach `cr.agentgateway.dev` needs the image in a registry it can reach, and that name in `tools.gateway.image`. A tool image must run as user `10001`, serve MCP on port 8080 at `/mcp`, and have a health check. Runs without register tools start no extra container.
 
 ### 11. The agent
@@ -677,7 +683,7 @@ A tag (`0.2.0`, `sha-<commit>`) never moves, but use the digest anyway: the plat
 | `credentials.logs` | Event codes of the last 24 hours of the `sdlc-api`, `sdlc-worker` and `sdlc-runner` logs: `…_missing`, `worker.runs_off`, `worker.cost_sync_off`, `worker.cost_sync_gap`, a failed AppRole login, a sealed OpenBao. Only the event field is read; no line is printed |
 | `models.litellm` | The platform runs with the profile `models` (the LiteLLM sidecar) |
 | `valkey.memory` | Valkey's used memory against its limit (a warning at 90 %) |
-| `sandbox.image` | Each active project's effective `sandbox.image` is pinned by digest and present on this machine |
+| `sandbox.image` | Each active project's effective `sandbox.image`, and its `sandbox.images.opencode` when set (shown as `<project> (opencode)`), is pinned by digest and present on this machine |
 | `github.app` | The GitHub App's permissions and each project repository's installation against `platform/deploy/github-app/manifest.json`. The worker runs the check with its own AppRole (`docker compose exec -T sdlc-worker node /app/dist/doctor-github.js`, read only, codes only), so the App key never leaves OpenBao and the worker; skipped while OpenBao is sealed or the worker is stopped |
 | `images.mode` | `pnpm images mode` (`local` or `published`) |
 | `access.proxy`, `access.tls_files`, `access.tls_expiry`, `access.tls_names`, `access.ports`, `access.public_origin`, `access.trusted_proxy` | Team access (V09): `sdlc-access` runs and is healthy; its CA and certificate in `SDLC_ACCESS_TLS_DIR`, their end dates (a warning within 30 days) and whether the certificate names `SDLC_ACCESS_HOSTNAME` and `SDLC_ACCESS_IPS` (never the key file); every published port of the project on `127.0.0.1` except the proxy's on `SDLC_ACCESS_BIND_ADDR` (a warning on `0.0.0.0`); `SDLC_API_PUBLIC_ORIGIN` is the proxy's origin; `SDLC_API_TRUSTED_PROXY` is the proxy's address. Without team access: one line says it is off, and the ports are still checked |
@@ -732,7 +738,7 @@ This deletes every intent, the evidence, the audit log and the secrets. Keep a b
 | `pnpm test:openbao` | OpenBao bootstrap (A03): starts only `openbao` in a throw-away Compose project, runs `init`, `unseal`, `configure`, `root-token`, checks every AppRole's access, re-runs `configure`, then removes everything. Throw-away keys, kept in memory only. Also TLS (A10, `tls.test.ts`): a wrong CA, an address other than `openbao` and plain HTTP are refused, a renewal is read without a restart, a missing file stops OpenBao. A few minutes | Yes |
 | `pnpm test:runner` | The runner on the local Docker Engine: sandbox egress and hardening, the provisioning flow, the clean-up after a restart (throw-away PostgreSQL, fixture image) | Yes |
 | `pnpm test:runner-compose` | The `sdlc-runner` container in the profile `sandbox` on a throw-away Compose project: `runner-credentials`, socket proxy, clean-up at start, health check, no secret in the container. About 1 minute | Yes |
-| `pnpm test:sandbox-image` | Builds the sandbox image `node24` and runs it hardened with the real Verdaccio: Node 24, pnpm through corepack and the proxy, no other way out. Needs internet | Yes |
+| `pnpm test:sandbox-image` | Builds the sandbox images `node24` and `node24-opencode` and runs them hardened with the real Verdaccio: Node 24, pnpm through corepack and the proxy, no other way out. Needs internet | Yes |
 | `pnpm test:observability` | A08 AC3: `core + models + observability` on a throw-away Compose project (ports +27000) with a stub model and throw-away OpenBao keys. One model call through LiteLLM must give a Langfuse trace with all seven labels; a span of a platform process must reach Langfuse through the collector; the collector has no host port. About 2 minutes | Yes |
 | `pnpm test:fresh-deploy` | E07 AC3: follows the section [Fresh deployment](#fresh-deployment-operator) on a throw-away Compose project (ports +31000, throw-away keys): `compose:env`, OpenBao init, unseal and configure, the shared secrets, every credentials command, the migrations, `up.sh core models platform sandbox`, `ops bootstrap`, the team, the sandbox image, the agent, the configuration, the AI record and the first intent at G1, then `sdlc audit verify`. CI: weekly and manual runs only. Prints `e07:fresh_deploy_seconds` | Yes |
 | `pnpm test:access` | V09: the profile `access` on a throw-away Compose project (ports +36000, throw-away OpenBao keys and CA): from a container on another network only the proxy answers, TLS verified with the CA and refused without it, the routes (`/health/ready` included), plain HTTP `400`, another host `421`, a large body `413`, the headers and the dashboard's CSP unchanged, the proxy's rate limit, a forged `X-Forwarded-For` does not escape the api's limit, the proxy cannot reach PostgreSQL, OpenBao or SeaweedFS, `sdlc whoami` through it, a renewal without a restart. A few minutes | Yes |
