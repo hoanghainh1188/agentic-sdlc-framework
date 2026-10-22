@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.54 |
+| Version | 1.55 |
 | Date | 2026-10-21 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -47,11 +47,11 @@
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) | 14 | S×3 · M×9 · L×2 |
 | DEV | Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479) | 1 | M×1 |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 7 | S×2 · M×4 · L×1 |
-| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.6.0 (QUESTIONS #361, #420, #424; v0.4.0 and v0.5.0 are EVAL, v0.5.0 also has the X09 spike) | 8 | S×4 · M×2 · L×2 |
+| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.6.0 (QUESTIONS #361, #420, #424; v0.4.0 and v0.5.0 are EVAL, v0.5.0 also has the X09 spike) | 9 | S×5 · M×2 · L×2 |
 | Models | Self-hosted models: L01 early in v0.6.0 (QUESTIONS #362, #424) | 2 | S×1 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 11 | S×3 · M×8 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 16 | S×4 · M×6 · L×6 |
-| **Total** | | **114** | |
+| **Total** | | **115** | |
 
 ### Order and dependencies between milestones
 
@@ -65,7 +65,7 @@ flowchart LR
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
     UX --> EV["EVAL L04–L10: evaluations, reports, recommendations for managers"]
-    EV --> EXT["EXT X09 done (v0.5.0), X01–X04, X07, X11, X12 (v0.6.0)"]
+    EV --> EXT["EXT X09 done (v0.5.0), X01–X04, X14, X07, X11, X12 (v0.6.0)"]
     EXT --> MO["Models L01 (early in v0.6.0), L03"]
     MO --> SV["Server A10, O01–O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
@@ -1290,11 +1290,26 @@ flowchart LR
 
 > Note: QUESTIONS #361. Multi-agent (several agents in one intent) stays after X03
 
+#### X14. Spike: an open-source MCP gateway in front of a run's tools
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | X02 | NFR-03, NFR-04, NFR-05, D-01 §5.6 | platform/spikes/mcp-gateway/* (thrown away), design/ADR-M87, design/ADR-M69 |
+
+**Acceptance criteria**
+
+- [ ] AC1: Compare at least three self-hosted open-source MCP gateways (pinned versions): licence, maintenance, image size and vulnerabilities (Trivy), and whether one instance per run fits inside the run's networks of ADR-M69 §2.4
+- [ ] AC2: Call-level policy: allow or refuse a call by tool name and argument rules, a per-run key, a call cap; refusals as codes; no query or answer in its logs (R031)
+- [ ] AC3: What it records and how the runner reads counts from it (in place of, or next to, the agent's event stream; ADR-M69 §2.7); its memory and CPU per run
+- [ ] AC4: ADR-M87: use a gateway from the first tool (X04), later, or not at all, with the changes to ADR-M69; never a gateway of our own (D-01 §5.6)
+
+> Note: QUESTIONS #520 (repository owner, 2026-10-22): research the gateway before X04
+
 #### X04. The tool register and the first tool: search the project's documents
 
 | Size | Depends on | Requirements | Code area |
 |---|---|---|---|
-| L | X02 | FR-33, FR-44, NFR-03 | platform/packages/core (tools, retention), migrations, platform/deploy (profile knowledge), platform/apps/runner, platform/apps/worker (retention), platform/tests/*, handbook Ch.19, Ch.20, runbook T11 |
+| L | X02, X14 | FR-33, FR-44, NFR-03 | platform/packages/core (tools, retention), migrations, platform/deploy (profile knowledge), platform/apps/runner, platform/apps/worker (retention), platform/tests/*, handbook Ch.19, Ch.20, runbook T11 |
 
 **Acceptance criteria**
 
@@ -1304,7 +1319,7 @@ flowchart LR
 - [ ] AC4: Retention (FR-44, ADR-M51): the index holds client content, so the retention loop deletes it by the evidence rules and when a project is archived (unless held); `knowledge.purged` audited
 - [ ] AC5: A run event `knowledge_read` per search (document IDs, content hashes, counts; never queries or text); the egress probe from a sandbox; another project's index refused
 
-> Note: QUESTIONS #361 (Harry, 2026-10-10). Supersedes K02. ADR-M59 §5 lists the limits learned from K01
+> Note: QUESTIONS #361 (Harry, 2026-10-10). Supersedes K02. ADR-M59 §5 lists the limits learned from K01. QUESTIONS #519: first confirm that the OpenHands Agent Server takes a per-run MCP server over HTTP with a header key; if it does not, stop and ask. QUESTIONS #520: the gateway decision of X14 (ADR-M87) comes first
 
 #### X07. A context snapshot for every run
 
@@ -1873,6 +1888,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.52 | 2026-10-20 | Claude (task L07, PR 1), approved by the repository owner | L07 note and code areas: task cards in the project's repository, the check on the server, the reviewer rule (ADR-M85, QUESTIONS #485–#487) |
 | 1.53 | 2026-10-20 | Claude (task L08), approved by the repository owner | L08 design (ADR-M86, QUESTIONS #496–#500); new tasks L09 (evaluations in the agent approvals) and L10 (evaluations in the recertification) |
 | 1.54 | 2026-10-21 | Claude, approved by the repository owner | Release v0.5.0 with L06–L10 (EVAL complete), W01 and the X09 spike; EXT and Models move to v0.6.0 |
+| 1.55 | 2026-10-22 | Claude (task X02), approved by the repository owner | New task X14: spike of an open-source MCP gateway before X04 (QUESTIONS #520, ADR-M87); X04 depends on X14 and starts by checking MCP in OpenHands (QUESTIONS #519) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

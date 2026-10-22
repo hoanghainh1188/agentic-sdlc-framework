@@ -57,6 +57,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **X01** Spike: a second, open-source coding agent (Aider or OpenCode)
 - **X02** Design: a tool register and MCP tools for agents
 - **X03** A second agent adapter and the agent register's adapter column
+- **X14** Spike: an open-source MCP gateway in front of a run's tools
 - **X04** The tool register and the first tool: search the project's documents
 - **X07** A context snapshot for every run
 - **X11** Context condensing for agent runs
