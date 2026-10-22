@@ -2,11 +2,8 @@
 // SHA-256 of the RFC 8785 canonical arguments, volatile fields left out. The adapter's own
 // canonicaliser gives the same text as `@sdlc/config` for JSON data, and never throws on the
 // agent's input.
-import {
-  canonicalArguments,
-  toolCallKey,
-  trailingIdenticalCalls,
-} from '@sdlc/adapter-agent-openhands';
+import { toolCallKey, trailingIdenticalCalls } from '@sdlc/adapter-agent-openhands';
+import { canonicalArguments } from '@sdlc/agent-kit';
 import { canonicalJson } from '@sdlc/config';
 import { describe, expect, it } from 'vitest';
 

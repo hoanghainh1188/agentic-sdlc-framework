@@ -1,7 +1,8 @@
 // B09 PR 2 (ADR-M40 §2.7, QUESTIONS #169): the tasks' text of a plan read from a file sits in a
 // block delimited by markers with a nonce of its own, framed as data; it cannot close the block,
 // and the platform's rules and file list stay outside it.
-import { buildTaskMessage, checkTask, planTaskBlock } from '@sdlc/adapter-agent-openhands';
+import { taskMessage } from '@sdlc/adapter-agent-openhands';
+import { checkTask, planTaskBlock } from '@sdlc/agent-kit';
 import { AgentError, type AgentTask } from '@sdlc/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -14,16 +15,16 @@ const WITH_TEXT: AgentTask = { ...TASK, plan: { ...TASK.plan, summary: '', taskT
 
 describe('the plan task block (B09 PR 2)', () => {
   it('an old plan keeps its summary, or "(no summary)"', () => {
-    expect(buildTaskMessage(CONTRACT, TASK, '/workspace')).toContain(TASK.plan.summary);
+    expect(taskMessage(CONTRACT, TASK, '/workspace')).toContain(TASK.plan.summary);
     const empty = { ...TASK, plan: { ...TASK.plan, summary: '' } };
-    const message = buildTaskMessage(CONTRACT, empty, '/workspace');
+    const message = taskMessage(CONTRACT, empty, '/workspace');
     expect(message).toContain('(no summary)');
     expect(message).not.toContain('PLAN_TASKS');
   });
 
   it('puts the text between nonce markers, after "Approved plan:", before files and rules', () => {
     const nonce = 'feedfeedfeedfeedfeedfeed';
-    const message = buildTaskMessage(CONTRACT, WITH_TEXT, '/workspace', undefined, nonce);
+    const message = taskMessage(CONTRACT, WITH_TEXT, '/workspace', undefined, nonce);
     const begin = message.indexOf(`<<<PLAN_TASKS ${nonce}>>>`);
     const end = message.indexOf(`<<<END_PLAN_TASKS ${nonce}>>>`);
     expect(message.indexOf('Approved plan:')).toBeLessThan(begin);
@@ -43,7 +44,7 @@ describe('the plan task block (B09 PR 2)', () => {
     expect(one).toMatch(/^<<<PLAN_TASKS [0-9a-f]{24}>>>$/);
     expect(one).not.toBe(planTaskBlock(PLAN_TEXT)[1]);
     expect(() => planTaskBlock({ ...PLAN_TEXT, text: 'x n0nce y' }, 'n0nce')).toThrow(AgentError);
-    const both = buildTaskMessage(
+    const both = taskMessage(
       CONTRACT,
       { ...WITH_TEXT, reviewFeedback: { source: 'review', text: 'fix it', truncated: false } },
       '/workspace',

@@ -830,6 +830,7 @@
   "agent.error.invalid_response": "The Agent Server gave an answer the runner does not accept ({field}).",
   "agent.error.branch_changed": "The agent left the run's branch; the runner does not commit.",
   "agent.error.git_failed": "A Git command in the sandbox failed (exit code {exit_code}).",
+  "agent.error.config_changed": "The agent changed its own configuration, tools or MCP servers during the run. The runner stopped the run.",
   "runner.provisioning_failed": "The sandbox could not be created: {reason}.",
   "runner.workspace.clone_failed": "The runner could not prepare the workspace: {reason}.",
   "runner.workspace.too_large": "The repository is larger than the runner uploads into a sandbox (SDLC_RUNNER_WORKSPACE_MAX_MB).",

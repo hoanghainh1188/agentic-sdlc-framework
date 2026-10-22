@@ -23,6 +23,9 @@ importers:
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
+      '@sdlc/adapter-agent-opencode':
+        specifier: workspace:*
+        version: link:platform/packages/adapters/agent-opencode
       '@sdlc/adapter-agent-openhands':
         specifier: workspace:*
         version: link:platform/packages/adapters/agent-openhands
@@ -41,6 +44,9 @@ importers:
       '@sdlc/adapter-traces-langfuse':
         specifier: workspace:*
         version: link:platform/packages/adapters/traces-langfuse
+      '@sdlc/agent-kit':
+        specifier: workspace:*
+        version: link:platform/packages/agent-kit
       '@sdlc/api-schemas':
         specifier: workspace:*
         version: link:platform/packages/api-schemas
@@ -241,6 +247,9 @@ importers:
 
   platform/apps/runner:
     dependencies:
+      '@sdlc/adapter-agent-opencode':
+        specifier: workspace:*
+        version: link:../../packages/adapters/agent-opencode
       '@sdlc/adapter-agent-openhands':
         specifier: workspace:*
         version: link:../../packages/adapters/agent-openhands
@@ -347,8 +356,20 @@ importers:
         specifier: workspace:*
         version: link:../packages/messages
 
+  platform/packages/adapters/agent-opencode:
+    dependencies:
+      '@sdlc/agent-kit':
+        specifier: workspace:*
+        version: link:../../agent-kit
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+
   platform/packages/adapters/agent-openhands:
     dependencies:
+      '@sdlc/agent-kit':
+        specifier: workspace:*
+        version: link:../../agent-kit
       '@sdlc/contracts':
         specifier: workspace:*
         version: link:../../contracts
@@ -385,6 +406,12 @@ importers:
       '@sdlc/contracts':
         specifier: workspace:*
         version: link:../../contracts
+
+  platform/packages/agent-kit:
+    dependencies:
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   platform/packages/api-schemas:
     dependencies:

@@ -1,6 +1,7 @@
 // D-08 A01 AC3 and ADR-M16: lint fails when a package crosses a module boundary.
-//   - @sdlc/core must not import any @sdlc/adapter-*.
-//   - @sdlc/adapter-* may import @sdlc/contracts only.
+//   - @sdlc/core must not import any @sdlc/adapter-* or @sdlc/agent-kit.
+//   - @sdlc/adapter-* may import @sdlc/contracts only; @sdlc/adapter-agent-* also @sdlc/agent-kit
+//     (X03, ADR-M88 §2.3), which itself imports @sdlc/contracts only.
 import path from 'node:path';
 import { ESLint } from 'eslint';
 import tseslint from 'typescript-eslint';
@@ -36,6 +37,8 @@ const CORE_FILE = 'platform/packages/core/src/boundary-probe.ts';
 const DEEP_CORE_FILE = 'platform/packages/core/src/audit/deep/boundary-probe.ts';
 const ADAPTER_FILE = 'platform/packages/adapters/git-github/src/boundary-probe.ts';
 const APP_FILE = 'platform/apps/api/src/boundary-probe.ts';
+const AGENT_ADAPTER_FILE = 'platform/packages/adapters/agent-openhands/src/boundary-probe.ts';
+const AGENT_KIT_FILE = 'platform/packages/agent-kit/src/boundary-probe.ts';
 
 describe('core must not import adapters (AC3)', () => {
   it.each([
@@ -140,6 +143,42 @@ describe('adapters may import @sdlc/contracts only', () => {
   });
 });
 
+describe('X03: the agent adapters share @sdlc/agent-kit (ADR-M88 §2.3)', () => {
+  it('an agent adapter may import contracts and agent-kit', async () => {
+    const code = [`import '@sdlc/contracts';`, `import '@sdlc/agent-kit';`].join('\n');
+    expect(await boundaryErrors(AGENT_ADAPTER_FILE, code)).toEqual([]);
+  });
+
+  it.each([
+    ['another agent adapter', `import '@sdlc/adapter-agent-opencode';`],
+    ['another adapter', `import '@sdlc/adapter-model-litellm';`],
+    ['core', `import '@sdlc/core';`],
+  ])('an agent adapter may not import %s', async (_kind, code) => {
+    const errors = await boundaryErrors(AGENT_ADAPTER_FILE, code);
+    expect(errors).toEqual([
+      expect.stringContaining(
+        '@sdlc/adapter-agent-openhands may only import @sdlc/contracts, @sdlc/agent-kit',
+      ),
+    ]);
+  });
+
+  it('any other adapter may not import agent-kit', async () => {
+    expect(await boundaryErrors(ADAPTER_FILE, `import '@sdlc/agent-kit';`)).toEqual([
+      expect.stringContaining('@sdlc/adapter-git-github may only import @sdlc/contracts;'),
+    ]);
+  });
+
+  it('agent-kit imports contracts only, and core never imports agent-kit', async () => {
+    expect(await boundaryErrors(AGENT_KIT_FILE, `import '@sdlc/contracts';`)).toEqual([]);
+    expect(await boundaryErrors(AGENT_KIT_FILE, `import '@sdlc/adapter-agent-openhands';`)).toEqual(
+      [expect.stringContaining('@sdlc/agent-kit may only import @sdlc/contracts;')],
+    );
+    expect(await boundaryErrors(CORE_FILE, `import '@sdlc/agent-kit';`)).toEqual([
+      expect.stringContaining('@sdlc/core must not import @sdlc/agent-kit'),
+    ]);
+  });
+});
+
 describe('package manifests respect the same boundaries', () => {
   function workspaceDeps(dir: string): string[] {
     const manifest = readJson<PackageManifest>(path.join(root, dir, 'package.json'));
@@ -157,9 +196,17 @@ describe('package manifests respect the same boundaries', () => {
   });
 
   it.each(EXPECTED_PACKAGES.filter((p) => p.name.startsWith('@sdlc/adapter-')))(
-    '$name depends on no workspace package except @sdlc/contracts',
-    ({ dir }) => {
-      expect(workspaceDeps(dir).filter((d) => d !== '@sdlc/contracts')).toEqual([]);
+    '$name depends on no workspace package except @sdlc/contracts (and agent-kit for an agent)',
+    ({ dir, name }) => {
+      const allowed = name.startsWith('@sdlc/adapter-agent-')
+        ? ['@sdlc/contracts', '@sdlc/agent-kit']
+        : ['@sdlc/contracts'];
+      expect(workspaceDeps(dir).filter((d) => !allowed.includes(d))).toEqual([]);
     },
   );
+
+  it('agent-kit depends on @sdlc/contracts only, and core not on agent-kit', () => {
+    expect(workspaceDeps('platform/packages/agent-kit')).toEqual(['@sdlc/contracts']);
+    expect(workspaceDeps('platform/packages/core')).not.toContain('@sdlc/agent-kit');
+  });
 });

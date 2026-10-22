@@ -4,7 +4,7 @@
 // harmless text, hidden characters never reach the prompt, and the size stays bounded. Whether a
 // model obeys the text is not tested (nothing can promise that); the consequences are tested in
 // tests/integration/attack (`pnpm test:attack`).
-import { buildTaskMessage } from '@sdlc/adapter-agent-openhands';
+import { taskMessage } from '@sdlc/adapter-agent-openhands';
 import { AgentError } from '@sdlc/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -65,12 +65,12 @@ function planMessage(text: string, random = false): string {
     ...TASK,
     plan: { ...TASK.plan, summary: '', taskText: { ...rendered, tasks: 1 } },
   };
-  return buildTaskMessage(CONTRACT, task, '/workspace', undefined, random ? undefined : NONCE);
+  return taskMessage(CONTRACT, task, '/workspace', undefined, random ? undefined : NONCE);
 }
 
 function feedbackMessage(text: string, random = false): string {
   const task = { ...TASK, reviewFeedback: { source: 'review' as const, ...capFeedback(text) } };
-  return buildTaskMessage(CONTRACT, task, '/workspace', random ? undefined : NONCE, PLAN_NONCE);
+  return taskMessage(CONTRACT, task, '/workspace', random ? undefined : NONCE, PLAN_NONCE);
 }
 
 interface Flow {

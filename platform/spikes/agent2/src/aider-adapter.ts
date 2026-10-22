@@ -26,7 +26,7 @@ import {
   INSTRUCTIONS_FILE,
   parseCommitOutput,
   parseDiffOutput,
-} from '@sdlc/adapter-agent-openhands';
+} from '@sdlc/agent-kit';
 
 import { call, checkStart, taskMessage, type HttpOptions } from './common.js';
 

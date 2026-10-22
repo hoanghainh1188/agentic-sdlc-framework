@@ -1,17 +1,12 @@
 // X01 spike (design/ADR-M68): shared parts of the two spike adapters. Thrown away after X01.
-// They reuse the OpenHands adapter's pure helpers (task message, git commands, loop keys) read-only:
-// nothing in platform/packages changes.
+// They reuse the pure helpers (task message, git commands, loop keys), now in `@sdlc/agent-kit`
+// (X03 PR 2, ADR-M88 §2.3).
 import { AgentError, type RunContract, type StartAgentRun } from '@sdlc/contracts';
-import { buildTaskMessage, checkTask, toolsOf } from '@sdlc/adapter-agent-openhands';
-
-/** The OpenHands-specific last rule of the task message, and what replaces it per agent. */
-const FINISH_RULE = '- When the task is done, call the finish tool with a short summary.';
+import { buildTaskMessage, checkTask, toolsOf } from '@sdlc/agent-kit';
 
 /** The task message of ADR-M29 §2.2 with the agent's own way to say it is done. */
 export function taskMessage(input: StartAgentRun, finishRule: string): string {
-  const text = buildTaskMessage(input.contract, input.task, input.workingDir);
-  if (!text.includes(FINISH_RULE)) throw new Error('task message changed: update the spike');
-  return text.replace(FINISH_RULE, finishRule);
+  return buildTaskMessage(input.contract, input.task, input.workingDir, { finishRule });
 }
 
 /** The checks every adapter makes before it starts (ADR-M29 §2.2). */

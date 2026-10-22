@@ -143,7 +143,7 @@ jobs:
           # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
           decide_heavy run_sandbox_image "Sandbox image job" \
             "a sandbox image, the runner, the agent adapter, the package proxy or a live test" \
-            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/tests/integration/agent/ platform/tests/integration/attack/
+            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/packages/adapters/agent-opencode/ platform/packages/agent-kit/ platform/tests/integration/agent/ platform/tests/integration/attack/
 
           # U01 (design/ADR-M54 §2.6): the dashboard's browser smoke test (Playwright, Chromium)
           # runs in the sandbox image job, without the sandbox steps when only these paths changed.
@@ -349,7 +349,8 @@ jobs:
   sandbox-image:
     # C04 (design/ADR-M25 §2.9, QUESTIONS #54): build the sandbox image node24, scan it with Trivy
     # (vulnerabilities and licences, ADR-M10 §2.1) and run it hardened with the real package
-    # proxy. Nothing is pushed anywhere except a throw-away registry:2 on 127.0.0.1 inside the job:
+    # proxy. X03 (ADR-M88 §2.5): the same for node24-opencode, built FROM node24, plus the licence
+    # check of OpenCode's dependency tree (QUESTIONS #524) and the agent tests with OpenCode. Nothing is pushed anywhere except a throw-away registry:2 on 127.0.0.1 inside the job:
     # no GHCR, no GitHub secrets, no keys. U01: also the dashboard's browser smoke test; a pull
     # request that changes only the dashboard runs that step alone (Actions minutes).
     name: sandbox image (node24)
@@ -373,6 +374,9 @@ jobs:
           ref="$(sh platform/sandbox-images/build.sh node24 --no-push)"
           docker save "$ref" -o "$RUNNER_TEMP/node24.tar"
           echo "Built $ref" >> "$GITHUB_STEP_SUMMARY"
+          oc="$(NODE24="$ref" sh platform/sandbox-images/build.sh node24-opencode --no-push)"
+          docker save "$oc" -o "$RUNNER_TEMP/node24-opencode.tar"
+          echo "Built $oc" >> "$GITHUB_STEP_SUMMARY"
       - name: Install trivy
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
@@ -384,30 +388,41 @@ jobs:
       - name: Report (does not block)
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
-          "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/node24.tar" --scanners vuln \
-            --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" \
-            --ignorefile platform/sandbox-images/.trivyignore \
-            --disable-telemetry --skip-version-check --exit-code 0 \
-            --format table --output "$RUNNER_TEMP/trivy-image.txt"
-          {
-            echo "### trivy image node24: $TRIVY_REPORT_SEVERITY and $TRIVY_BLOCK_SEVERITY findings (only $TRIVY_BLOCK_SEVERITY blocks)"
-            echo '```text'
-            cat "$RUNNER_TEMP/trivy-image.txt"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          for image in node24 node24-opencode; do
+            "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/$image.tar" --scanners vuln \
+              --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" \
+              --ignorefile platform/sandbox-images/.trivyignore \
+              --disable-telemetry --skip-version-check --exit-code 0 \
+              --format table --output "$RUNNER_TEMP/trivy-image.txt"
+            {
+              echo "### trivy image $image: $TRIVY_REPORT_SEVERITY and $TRIVY_BLOCK_SEVERITY findings (only $TRIVY_BLOCK_SEVERITY blocks)"
+              echo '```text'
+              cat "$RUNNER_TEMP/trivy-image.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
       - name: Scan vulnerabilities (severity CRITICAL blocks)
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
-          "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/node24.tar" --scanners vuln \
-            --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile platform/sandbox-images/.trivyignore \
-            --disable-telemetry --skip-version-check --exit-code 1
+          for image in node24 node24-opencode; do
+            "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/$image.tar" --scanners vuln \
+              --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile platform/sandbox-images/.trivyignore \
+              --disable-telemetry --skip-version-check --exit-code 1
+          done
       # ADR-M10 §2.1: the CRITICAL licence category (AGPL, SSPL, commercial) blocks.
       - name: Scan licences (CRITICAL category blocks)
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
-          "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/node24.tar" --scanners license \
-            --severity "$TRIVY_BLOCK_SEVERITY" \
-            --disable-telemetry --skip-version-check --exit-code 1
+          for image in node24 node24-opencode; do
+            "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/$image.tar" --scanners license \
+              --severity "$TRIVY_BLOCK_SEVERITY" \
+              --disable-telemetry --skip-version-check --exit-code 1
+          done
+      # X03 (QUESTIONS #524): the OpenCode binary is opaque to Trivy, so the licences of its
+      # dependency tree are checked at the Git tag of the pinned version (GitHub, npm registry).
+      - name: Licences of OpenCode's dependency tree
+        if: needs.scan.outputs.run_sandbox_image == 'true'
+        run: node platform/sandbox-images/node24-opencode/licences.mjs
       # Hardened sandbox from the image by digest (throw-away registry:2), with Verdaccio: Node 24,
       # pnpm through corepack and the proxy, no other way out.
       - if: needs.scan.outputs.run_sandbox_image == 'true'
@@ -416,6 +431,11 @@ jobs:
       # with a scripted stub model (no provider, no key) and a throw-away PostgreSQL.
       - if: needs.scan.outputs.run_sandbox_image == 'true'
         run: pnpm test:agent
+      # X03 (ADR-M88): the same agent tests with the OpenCode adapter in node24-opencode.
+      - if: needs.scan.outputs.run_sandbox_image == 'true'
+        run: pnpm test:agent
+        env:
+          SDLC_AGENT_ADAPTER: opencode
       # H01 (design/ADR-M80): attacks from inside the sandbox with a stub model that obeys every
       # injection: the sandbox's environment, network, Docker, other runs, packages and instruction
       # files; every test also searches the records and logs for canary secrets.
@@ -445,7 +465,7 @@ jobs:
           if-no-files-found: ignore
       - name: Remove the image archive
         if: always()
-        run: rm -f "$RUNNER_TEMP/node24.tar"
+        run: rm -f "$RUNNER_TEMP/node24.tar" "$RUNNER_TEMP/node24-opencode.tar"
 
   fresh-deploy:
     # E07 (D-08 E07 AC3): follows the README section "Fresh deployment (operator)" on a throw-away

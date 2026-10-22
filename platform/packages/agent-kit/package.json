@@ -1,0 +1,15 @@
+{
+  "name": "@sdlc/agent-kit",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Shared helpers of the agent adapters: the task message, the git commands, the loop key. No I/O. See design/ADR-M88 §2.3.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@sdlc/contracts": "workspace:*"
+  }
+}

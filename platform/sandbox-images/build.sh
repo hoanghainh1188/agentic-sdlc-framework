@@ -6,6 +6,11 @@
 #   platform/sandbox-images/build.sh node24                     # registry localhost:5000
 #   SDLC_SANDBOX_REGISTRY=localhost:5123 platform/sandbox-images/build.sh node24
 #   platform/sandbox-images/build.sh node24 --no-push           # build only (CI scans it)
+#   NODE24=<node24 by digest> platform/sandbox-images/build.sh node24-opencode
+#
+# An image built on another one (`ARG NODE24` in its Dockerfile: node24-opencode, task X03) needs
+# NODE24, the node24 image pinned by digest. With --no-push NODE24 may also be a local tag (CI
+# builds node24 just before and does not push it); the build then uses the Engine's local copy.
 #
 # --no-push prints the local reference by digest when the Engine has one (containerd image store,
 # for example Docker Desktop, where the Engine cannot push to a port published on the host), and
@@ -30,7 +35,26 @@ registry="${SDLC_SANDBOX_REGISTRY:-localhost:${SDLC_REGISTRY_HOST_PORT:-5000}}"
 revision="$(git -C "$here" rev-parse --short=12 HEAD 2>/dev/null || echo local)"
 tag="$registry/sdlc/sandbox-$toolchain:$revision"
 
-docker build --pull --label "org.opencontainers.image.revision=$revision" -t "$tag" "$context" >&2
+set -- --pull
+if grep -q '^ARG NODE24$' "$context/Dockerfile"; then
+  : "${NODE24:?NODE24 must be the node24 image (pinned by digest) for $toolchain}"
+  case "$NODE24" in
+    *@sha256:*) ;;
+    *) [ "$push" -eq 0 ] || { echo "NODE24 must be pinned by digest" >&2; exit 2; } ;;
+  esac
+  if [ "$push" -eq 0 ]; then
+    # BuildKit resolves a reference by digest at its registry; a local build uses the Engine's
+    # copy through a local tag instead (the registry may not have it).
+    base="sdlc/sandbox-base-local:$revision"
+    docker tag "$NODE24" "$base"
+    set --
+  else
+    base="$NODE24"
+  fi
+  set -- "$@" --build-arg "NODE24=$base" --label "sdlc.sandbox.base=$NODE24"
+fi
+
+docker build "$@" --label "org.opencontainers.image.revision=$revision" -t "$tag" "$context" >&2
 if [ "$push" -eq 0 ]; then
   local_digest="$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tag" | head -n 1)"
   echo "${local_digest:-$tag}"

@@ -12,12 +12,14 @@ const SOURCE_PACKAGES = [
   'secrets',
   'workflow-client',
   'telemetry',
+  'agent-kit',
 ];
 const SOURCE_ADAPTERS = [
   'policy-simple',
   'git-github',
   'model-litellm',
   'agent-openhands',
+  'agent-opencode',
   'evidence-s3',
   'traces-langfuse',
 ];

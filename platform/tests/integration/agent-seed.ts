@@ -10,6 +10,8 @@ export interface SeedAgentOptions {
   readonly tools?: readonly string[];
   readonly instructionsSha256?: string;
   readonly model?: string;
+  /** X03: the adapter that drives the agent. Default `openhands`. */
+  readonly adapter?: string;
   /** When the agent is activated (its first certification date). Default: now. */
   readonly activatedAt?: Date;
 }
@@ -42,6 +44,7 @@ export async function seedAgent(
     allowedTools: tools,
     maxAutonomy: 'L2',
     approvedEnvironments: ['sandbox'],
+    ...(options.adapter === undefined ? {} : { adapter: options.adapter }),
   });
   await changeAgentStatus(scope, key, {
     to: 'active',
