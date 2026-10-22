@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- X01 (ADR-M68, QUESTIONS #521–#524): a spike on a second, open-source coding agent. Aider 0.86.2 and OpenCode 1.18.35 ran in the `node24` sandbox through the platform's own runner code (the guard, the run network, `driveAgent`, the Cost Controller's virtual key) and spike adapters for `AgentAdapter`, with the same local model as the OpenHands baseline (`pnpm eval`). Both stayed inside the egress rules (only LiteLLM and the package proxy; no Git push) and stopped at the iteration cap, the time cap and on request. On two pilot tasks OpenHands resolved 2 of 4, OpenCode 4 of 4, Aider 4 of 4 (Aider gets the plan's files directly). Trivy: OpenCode adds no finding over `node24`; Aider adds 6 CRITICAL findings in dependencies it pins. Proposal for X03: OpenCode, with an `agents.adapter` column and one sandbox image per adapter; open points for Harry in QUESTIONS #521–#524. The spike is `platform/spikes/agent2/` (may be thrown away); no product code changes.
 - Design of tools for agents (X02, ADR-M69, **proposed**): a tool register like the agent register, MCP tools in one hardened container per tool and run, a run gets a tool only when the plan, the agent, the register and the signed contract allow it, and one summary run event per tool and run. Proposed changes to D-03 §8–§9, D-05 and the threat model (ADR-M80 §4.2). Nothing is built yet: X04 builds the register and the first tool. New backlog task X14: a spike of open-source MCP gateways before X04 (QUESTIONS #520).
 
 ## [0.5.0] - 2026-10-21

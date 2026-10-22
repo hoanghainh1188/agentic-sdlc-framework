@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "autoupdate": false,
+  "share": "disabled",
+  "enabled_providers": ["litellm"],
+  "provider": {
+    "litellm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LiteLLM",
+      "options": { "baseURL": "http://litellm:4000/v1" },
+      "models": { "gpt-oss-20b": { "name": "gpt-oss-20b", "tool_call": true } }
+    }
+  },
+  "permission": { "edit": "allow", "bash": "allow", "webfetch": "deny" },
+  "lsp": false,
+  "formatter": false
+}
