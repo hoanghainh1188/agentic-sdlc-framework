@@ -12,7 +12,7 @@ reports and diffs stay in `$X01_OUT`, outside the repository.
 
 | File | Purpose |
 |---|---|
-| `images/aider/` | Aider 0.86.2 on the `node24` sandbox image: a pinned CPython 3.12 (uv), a hash-locked venv (`requirements.txt`), and `supervisor.mjs`, a small HTTP server on port 8000 that starts, watches and stops Aider (the runner's Docker client has no `exec`) |
+| `images/aider/` | Aider 0.86.2 on the `node24` sandbox image: a pinned CPython 3.12 (uv), a venv resolved at build time from `requirements.in` with a fixed cut-off date and hashes (the lock is not committed: the repository's Trivy scan would block on the findings Aider pins), and `supervisor.mjs`, a small HTTP server on port 8000 that starts, watches and stops Aider (the runner's Docker client has no `exec`) |
 | `images/opencode/` | OpenCode 1.18.35 on the `node24` sandbox image: the npm platform binary checked against its sha512 integrity, Debian's ripgrep, `entry.sh` (`opencode serve` on port 8000, the run's `SESSION_API_KEY` as the server password), `opencode.json` |
 | `build.sh` | Builds both images FROM `node24` by digest; prints both references by digest |
 | `src/opencode-adapter.ts`, `src/aider-adapter.ts`, `src/common.ts` | `AgentAdapter` for each agent. They reuse the OpenHands adapter's task message, git commands and loop keys |
