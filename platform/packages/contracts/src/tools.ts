@@ -45,15 +45,29 @@ export const TOOL_TRANSPORTS = ['http', 'stdio'] as const;
 export type ToolTransport = (typeof TOOL_TRANSPORTS)[number];
 
 /**
- * The transports each agent adapter can give a run (ADR-M69 §2.3 check 4, QUESTIONS #519). Empty
- * until the runner and the adapter wire the run's MCP gateway (X04 PR 2): until then G4 refuses
- * every register tool with `tool_transport_not_supported`.
+ * The transports each agent adapter can give a run (ADR-M69 §2.3 check 4, QUESTIONS #519). X04 PR 2:
+ * the OpenHands Agent Server takes the run's MCP gateway over HTTP with a header key (`mcp_config`,
+ * confirmed on 1.48.0). OpenCode: none yet, so G4 refuses its register tools
+ * (`tool_transport_not_supported`).
  */
 export const ADAPTER_TOOL_TRANSPORTS: Readonly<Record<AgentAdapterCode, readonly ToolTransport[]>> =
   {
-    openhands: [],
+    openhands: ['http'],
     opencode: [],
   };
+
+/**
+ * The run's MCP gateway as the sandbox sees it (ADR-M69 §2.4, ADR-M87 §5): the alias on the run
+ * network, the port and the path. The sandbox reaches register tools only there.
+ */
+export const TOOL_GATEWAY_ALIAS = 'tools';
+export const TOOL_GATEWAY_PORT = 3000;
+export const TOOL_GATEWAY_URL = `http://${TOOL_GATEWAY_ALIAS}:${String(TOOL_GATEWAY_PORT)}/mcp`;
+/** The header that carries the per-run key: `Authorization: Bearer <key>`. */
+export const TOOL_GATEWAY_KEY_HEADER = 'Authorization';
+/** The port and path every `http` tool image serves MCP on (Streamable HTTP). */
+export const TOOL_MCP_PORT = 8080;
+export const TOOL_MCP_PATH = '/mcp';
 
 /** The permission catalogue (ADR-M69 §2.2). The first one is `read_documents` (X04). */
 export const TOOL_PERMISSIONS = ['read_documents'] as const;

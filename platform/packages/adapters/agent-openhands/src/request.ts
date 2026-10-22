@@ -5,6 +5,9 @@
 // - LLM: `litellm_proxy/<model>` on LiteLLM with the run's virtual key (FR-50); the key travels in
 //   the request body only, never as a sandbox environment variable.
 // - Tools: the contract's `allowed_tools`, which must be in AGENT_TOOLS (ADR-M10 §4.1 item 4).
+//   X04 (ADR-M69 §2.4, QUESTIONS #519): register tools (`tool:<key>`) reach the agent only through
+//   the run's MCP gateway: one `mcp_config` entry, the gateway's URL with the per-run key in a
+//   header, only when the contract grants them (confirmed on Agent Server 1.48.0).
 // - Project instructions: `agent_context.load_project_skills` loads AGENTS.md (and
 //   `.openhands/skills/`) from the workspace. User, public and memory skills stay off: public skills
 //   would be fetched from GitHub, which the sandbox cannot and must not reach.
@@ -14,7 +17,13 @@
 // - The first user message: `buildTaskMessage` of `@sdlc/agent-kit` (the spec, the plan, the
 //   rules of the run and the delimited blocks) with the OpenHands last rule (`FINISH_RULE`).
 import { buildTaskMessage, checkTask, toolsOf } from '@sdlc/agent-kit';
-import { AgentError, type AgentTask, type RunContract } from '@sdlc/contracts';
+import {
+  AgentError,
+  TOOL_GATEWAY_KEY_HEADER,
+  TOOL_GATEWAY_URL,
+  type AgentTask,
+  type RunContract,
+} from '@sdlc/contracts';
 
 export interface ConversationRequestInput {
   readonly contract: RunContract;
@@ -24,6 +33,31 @@ export interface ConversationRequestInput {
   readonly virtualKey: string;
   readonly workingDir: string;
   readonly task: AgentTask;
+  /** X04: the run's MCP gateway and the per-run key, revealed only here; absent without grants. */
+  readonly tools?: { readonly url: string; readonly key: string };
+}
+
+/** The name of the run's MCP server in the agent's `mcp_config`. */
+export const MCP_SERVER_NAME = 'sdlc-tools';
+
+/**
+ * The agent's MCP servers: the run's gateway when the contract grants register tools. A contract
+ * with grants and no gateway, a gateway without grants, or another URL is refused: the agent gets
+ * exactly what the signed contract grants.
+ */
+function mcpConfigOf(input: ConversationRequestInput): Record<string, unknown> | undefined {
+  const grants = input.contract.tool_grants ?? [];
+  if (grants.length === 0 && input.tools === undefined) return undefined;
+  if (grants.length === 0 || input.tools?.url !== TOOL_GATEWAY_URL || input.tools.key === '') {
+    throw new AgentError('tool_not_allowed', { tool: 'mcp' });
+  }
+  return {
+    [MCP_SERVER_NAME]: {
+      url: input.tools.url,
+      transport: 'http',
+      headers: { [TOOL_GATEWAY_KEY_HEADER]: `Bearer ${input.tools.key}` },
+    },
+  };
 }
 
 /** The last rule of the OpenHands task message: the agent ends with its `finish` tool. */
@@ -51,10 +85,12 @@ export function buildConversationRequest(input: ConversationRequestInput): Recor
     throw new AgentError('model_not_allowed');
   }
   checkTask(contract, input.task);
-  const tools = toolsOf(contract);
+  const tools = toolsOf(contract, { registerTools: true });
+  const mcp = mcpConfigOf(input);
   return {
     agent: {
       kind: 'Agent',
+      ...(mcp === undefined ? {} : { mcp_config: mcp }),
       llm: {
         model: `litellm_proxy/${input.model}`,
         base_url: input.llmBaseUrl,

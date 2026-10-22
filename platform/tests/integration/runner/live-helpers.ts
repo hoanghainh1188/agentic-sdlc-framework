@@ -91,10 +91,13 @@ export interface FixtureImage {
  * - classic image store (Linux CI): push it to a throw-away `registry:2` on localhost, remove the
  *   local copy, so the runner must pull the image by digest itself.
  */
-export async function buildFixtureImage(suffix: string): Promise<FixtureImage> {
-  const context = path.join(repoRoot(), 'platform/tests/integration/runner/fixture');
-  const registry = `sdlc-c04-registry-${suffix}`;
-  const built = `sdlc-test/c04-probe:${suffix}`;
+export async function buildFixtureImage(
+  suffix: string,
+  fixture: { readonly dir: string; readonly name: string } = { dir: 'fixture', name: 'c04-probe' },
+): Promise<FixtureImage> {
+  const context = path.join(repoRoot(), 'platform/tests/integration/runner', fixture.dir);
+  const registry = `sdlc-${fixture.name}-registry-${suffix}`;
+  const built = `sdlc-test/${fixture.name}:${suffix}`;
   docker('build', '-q', '-t', built, context);
   const digests = JSON.parse(docker('inspect', '--format', '{{json .RepoDigests}}', built)) as
     string[] | null;
@@ -106,7 +109,7 @@ export async function buildFixtureImage(suffix: string): Promise<FixtureImage> {
   docker('pull', '-q', REGISTRY);
   docker('run', '-d', '--name', registry, '-p', '127.0.0.1::5000', REGISTRY);
   const port = docker('port', registry, '5000/tcp').split('\n')[0]!.split(':').pop()!;
-  const pushed = `localhost:${port}/sdlc-test/c04-probe:${suffix}`;
+  const pushed = `localhost:${port}/sdlc-test/${fixture.name}:${suffix}`;
   docker('tag', built, pushed);
   // The registry needs a moment after start; retry the push a few times.
   for (let i = 0; ; i++) {
@@ -120,7 +123,7 @@ export async function buildFixtureImage(suffix: string): Promise<FixtureImage> {
   }
   const digest = docker('inspect', '--format', '{{index .RepoDigests 0}}', pushed).split('@')[1]!;
   quietly('rmi', pushed, built);
-  const image = `localhost:${port}/sdlc-test/c04-probe@${digest}`;
+  const image = `localhost:${port}/sdlc-test/${fixture.name}@${digest}`;
   return {
     image,
     cleanup: () => {

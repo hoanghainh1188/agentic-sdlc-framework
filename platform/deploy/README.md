@@ -265,6 +265,8 @@ Only for an agent with the adapter `opencode` (handbook Ch.20 §20.5b): build th
 NODE24=<the node24 image by digest> pnpm sandbox-image:build node24-opencode
 ```
 
+**Register tools (X04, ADR-M69, ADR-M87).** A run with a register tool (`tool:<key>`) also gets one MCP gateway container, agentgateway, and one container per tool. The runner pulls both by digest: the gateway from `cr.agentgateway.dev` (project configuration `tools.gateway.image`), each tool from the image name in the tool register. A server that cannot reach `cr.agentgateway.dev` needs the image in a registry it can reach, and that name in `tools.gateway.image`. A tool image must run as user `10001`, serve MCP on port 8080 at `/mcp`, and have a health check. Runs without register tools start no extra container.
+
 ### 11. The agent
 
 ```bash

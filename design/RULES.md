@@ -146,7 +146,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R064a | Recompute diff outside sandbox, hardened git | runtime+test | tests/runner/proposal.test.ts:304 | partial | move:platform/apps/runner | platform/apps/runner/CLAUDE.md |
 | R064b | Never push sandbox commit / write working tree | runtime | apps/runner/src/workspace/export.ts:107 | partial | add-test | platform/apps/runner/CLAUDE.md |
 | R064c | No force-push; explicit refspec | runtime | apps/runner/src/workspace/git.ts:201 | partial | add-test | platform/apps/runner/CLAUDE.md |
-| R065a | Agent tools: 3 only | db+test | tests/agent/request.test.ts:58 | full | pointer-only | platform/apps/runner/CLAUDE.md |
+| R065a | Agent tools: 3 built-in; register tools only as granted, through the run's MCP gateway (X04) | db+test | tests/agent/request.test.ts:58; tests/agent/request-tools.test.ts; tests/runner/tools.test.ts; tests/integration/runner/tools.test.ts | full | pointer-only | platform/apps/runner/CLAUDE.md |
 | R065b | Model in allowed_models | test | tests/agent/request.test.ts:93 | full | pointer-only | platform/apps/runner/CLAUDE.md |
 | R065c | AGENTS.md from workspace only | test | tests/agent/request.test.ts:65 | full | pointer-only | platform/apps/runner/CLAUDE.md |
 | R065d | Instructions/model edit = new version | db+test | migrations/0008-agents.ts:101 | full | pointer-only | platform/apps/runner/CLAUDE.md |

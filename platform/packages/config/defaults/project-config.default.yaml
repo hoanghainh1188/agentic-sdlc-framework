@@ -327,10 +327,11 @@ tools:
     memory_mb: 512
     cpu_millis: 1000
     pids: 256
-  # ADR-M87: the run's MCP gateway (agentgateway), pinned by digest. Null: no gateway is set up,
-  # so no register tool runs (X04 PR 2 sets the default).
+  # ADR-M87: the run's MCP gateway, agentgateway 1.6.0 (Apache-2.0), pinned by the digest of its
+  # multi-platform index (R038). CI scans it with the sandbox images (CRITICAL blocks). Null: no
+  # register tool runs (`tool_unavailable`).
   gateway:
-    image: null
+    image: cr.agentgateway.dev/agentgateway:v1.6.0@sha256:9d3e6044ddcdc0878b1787f77bd401252b95e22684203fb5e874c4c42d2ed90c
 
 sandbox:
   # QUESTIONS #59 (A), ADR-M25: one sandbox image per project, built on the pinned OpenHands

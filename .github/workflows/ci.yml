@@ -143,7 +143,7 @@ jobs:
           # C04: the sandbox images, the runner and the package proxy (design/ADR-M25 §2.9).
           decide_heavy run_sandbox_image "Sandbox image job" \
             "a sandbox image, the runner, the agent adapter, the package proxy or a live test" \
-            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/packages/adapters/agent-opencode/ platform/packages/agent-kit/ platform/tests/integration/agent/ platform/tests/integration/attack/
+            platform/sandbox-images/ platform/apps/runner/ platform/deploy/verdaccio/ platform/tests/integration/sandbox-image/ platform/packages/adapters/agent-openhands/ platform/packages/adapters/agent-opencode/ platform/packages/agent-kit/ platform/tests/integration/agent/ platform/tests/integration/attack/ platform/packages/config/defaults/
 
           # U01 (design/ADR-M54 §2.6): the dashboard's browser smoke test (Playwright, Chromium)
           # runs in the sandbox image job, without the sandbox steps when only these paths changed.
@@ -377,6 +377,11 @@ jobs:
           oc="$(NODE24="$ref" sh platform/sandbox-images/build.sh node24-opencode --no-push)"
           docker save "$oc" -o "$RUNNER_TEMP/node24-opencode.tar"
           echo "Built $oc" >> "$GITHUB_STEP_SUMMARY"
+          # X04 (ADR-M87, R038): the run's MCP gateway, pinned by digest in the default configuration.
+          gw="$(sed -n '/^  gateway:/,/^[^ ]/s/^    image: //p' platform/packages/config/defaults/project-config.default.yaml)"
+          docker pull "$gw"
+          docker save "$gw" -o "$RUNNER_TEMP/gateway.tar"
+          echo "Pulled $gw" >> "$GITHUB_STEP_SUMMARY"
       - name: Install trivy
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
@@ -388,7 +393,7 @@ jobs:
       - name: Report (does not block)
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
-          for image in node24 node24-opencode; do
+          for image in node24 node24-opencode gateway; do
             "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/$image.tar" --scanners vuln \
               --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" \
               --ignorefile platform/sandbox-images/.trivyignore \
@@ -404,7 +409,7 @@ jobs:
       - name: Scan vulnerabilities (severity CRITICAL blocks)
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
-          for image in node24 node24-opencode; do
+          for image in node24 node24-opencode gateway; do
             "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/$image.tar" --scanners vuln \
               --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile platform/sandbox-images/.trivyignore \
               --disable-telemetry --skip-version-check --exit-code 1
@@ -413,7 +418,7 @@ jobs:
       - name: Scan licences (CRITICAL category blocks)
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
-          for image in node24 node24-opencode; do
+          for image in node24 node24-opencode gateway; do
             "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/$image.tar" --scanners license \
               --severity "$TRIVY_BLOCK_SEVERITY" \
               --disable-telemetry --skip-version-check --exit-code 1

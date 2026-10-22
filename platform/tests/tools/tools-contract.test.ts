@@ -62,8 +62,8 @@ describe('register tool codes (ADR-M69 §2.1)', () => {
     expect(toolKeyOf(registerToolCode('project-docs'))).toBe('project-docs');
   });
 
-  it('gives no adapter a transport until the runner has the gateway (X04 PR 2)', () => {
-    expect(Object.values(ADAPTER_TOOL_TRANSPORTS).every((list) => list.length === 0)).toBe(true);
+  it('X04 PR 2: OpenHands gives a run http tools through the gateway; OpenCode none yet', () => {
+    expect(ADAPTER_TOOL_TRANSPORTS).toEqual({ openhands: ['http'], opencode: [] });
   });
 });
 

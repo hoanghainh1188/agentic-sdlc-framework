@@ -25,6 +25,7 @@ import type { DockerClient } from './docker/client.js';
 import type { HeldRuns } from './held.js';
 import { LABELS, MANAGED_BY, runOfLabels, type LabelledRun } from './names.js';
 import { teardownSandbox, type TeardownReason } from './sandbox/lifecycle.js';
+import { recordToolUse } from './tools/record.js';
 import type { RunnerSettings } from './settings.js';
 
 export interface ReconcileDeps {
@@ -115,9 +116,11 @@ async function cleanUpRun(
   labelled: LabelledRun,
   why: { readonly teardown: TeardownReason; readonly stopReason: string },
 ): Promise<boolean> {
-  const result = await teardownSandbox(deps.docker, labelled.runId);
   const scope = deps.db.forTenant(parseTenantId(labelled.tenantId));
   const run = await scope.runs.getById(labelled.runId);
+  // X04 (ADR-M69 §2.7): the tool counts are read from the gateway before it is removed.
+  if (run) await recordToolUse(deps.docker, scope, run.id).catch(() => undefined);
+  const result = await teardownSandbox(deps.docker, labelled.runId);
   // Not a real run: maybe an evaluation run (its own tables, QUESTIONS #460).
   if (!run) return abandonEvaluationRun(scope, labelled.runId);
   // Still `queued` (a workspace reserved just before a crash; the claim never happened): the

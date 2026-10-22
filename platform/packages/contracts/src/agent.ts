@@ -133,6 +133,19 @@ export interface StartAgentRun {
   readonly task: AgentTask;
   /** The repository inside the sandbox (`/workspace`). */
   readonly workingDir: string;
+  /**
+   * X04 (ADR-M69 §2.4): the run's MCP gateway, when the contract grants register tools. The agent
+   * reaches every register tool there with the per-run key; absent: no register tool.
+   */
+  readonly tools?: AgentToolAccess;
+}
+
+/** The run's MCP gateway for the agent (X04, ADR-M87 §5). */
+export interface AgentToolAccess {
+  /** `TOOL_GATEWAY_URL`: the gateway's alias on the run network. */
+  readonly url: string;
+  /** Random per run; the gateway holds only its SHA-256. Revealed only into the agent's request. */
+  readonly key: RedactedSecret;
 }
 
 /** A started run. Holds no secret except the endpoint's session key (redacted). */

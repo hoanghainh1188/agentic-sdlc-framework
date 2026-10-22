@@ -20,6 +20,7 @@ export { toolCallKey, trailingIdenticalCalls } from './loop.js';
 export {
   buildConversationRequest,
   FINISH_RULE,
+  MCP_SERVER_NAME,
   taskMessage,
   type ConversationRequestInput,
 } from './request.js';

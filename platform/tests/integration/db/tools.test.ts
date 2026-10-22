@@ -197,8 +197,11 @@ describeDb('X04: the tool register on PostgreSQL', () => {
       ['tool_data_class_not_allowed', () => input({ dataClass: 'client_restricted' })],
       ['tool_data_class_not_allowed', () => input({ allowedModels: ['another-model-1'] })],
       ['tool_transport_not_supported', () => input({ transports: [] })],
-      // Until the runner has the gateway (X04 PR 2), no adapter supports a transport.
-      ['tool_transport_not_supported', () => ({ ...input(), transports: undefined })],
+      // X04 PR 2: OpenHands gives a run http tools; OpenCode none yet.
+      [
+        'tool_transport_not_supported',
+        () => ({ ...input(), adapter: 'opencode' as const, transports: undefined }),
+      ],
     ])('refuses %s', async (code, make) => {
       expect(await codeOf(checkToolsForRun(scope, make()))).toBe(code);
     });

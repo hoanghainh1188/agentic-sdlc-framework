@@ -36,6 +36,34 @@ export function runNames(runId: string): RunNames {
   };
 }
 
+/** Docker objects of one run's register tools (X04, ADR-M69 §2.4, ADR-M87 §5). */
+export interface ToolObjectNames {
+  /** The run's MCP gateway: on the tool network, and on the run network under `tools`. */
+  readonly gateway: string;
+  /** The internal network of the gateway and the tool containers; the sandbox is not on it. */
+  readonly toolNetwork: string;
+  /** The volume that holds the gateway's configuration file. */
+  readonly gatewayConfig: string;
+  /** The container of one tool; the gateway reaches it by this name on the tool network. */
+  tool(toolKey: string): string;
+}
+
+const TOOL_KEY = /^[a-z][a-z0-9-]{1,62}$/;
+
+/** Names of a run's tool objects. Throws for anything but a lowercase UUID or a tool key. */
+export function toolObjectNames(runId: string): ToolObjectNames {
+  if (!isRunId(runId)) throw new RunnerError('runner.invalid_run_id');
+  return {
+    gateway: `sdlc-gw-${runId}`,
+    toolNetwork: `sdlc-tool-${runId}`,
+    gatewayConfig: `sdlc-gwcfg-${runId}`,
+    tool(toolKey: string): string {
+      if (!TOOL_KEY.test(toolKey)) throw new RunnerError('runner.invalid_run_id');
+      return `sdlc-tool-${runId}-${toolKey}`;
+    },
+  };
+}
+
 /** Labels of one run's objects. `instance` separates runner deployments on one Docker host. */
 export function runLabels(
   instance: string,

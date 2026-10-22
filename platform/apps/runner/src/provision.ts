@@ -9,7 +9,8 @@
 // 6. clone at `base_sha`, create `agent/INT-…`, pack the workspace          → `workspace_prepared`;
 //    the GitHub token is revoked as soon as the clone ended (C11)           → `token_revoked`;
 //    a run killed meanwhile (`stopping`) stops here, before any sandbox;
-// 7. create the sandbox (network, services, container, archive)             → `sandbox_created`;
+// 7. create the sandbox (network, services, register tools and their MCP gateway (X04, ADR-M69
+//    §2.4) → `tool_started` each, container, archive)                      → `sandbox_created`;
 // 8. wait for the sandbox health check, then `provisioning → running`       → `sandbox_ready`.
 //
 // A failure after the claim removes everything created (the reserved volume included), records
@@ -31,6 +32,7 @@ import {
   type RunContractRejectReason,
   type RunContractVerifier,
   type SecretUnwrapper,
+  type ToolGrant,
 } from '@sdlc/contracts';
 import {
   loadEffectiveConfig,
@@ -55,6 +57,10 @@ import {
 } from './sandbox/lifecycle.js';
 import { planEgress } from './sandbox/network.js';
 import type { RunnerSettings } from './settings.js';
+import type { RunNames } from './names.js';
+import { startTools, toolGrantsEnforceable } from './tools/provision.js';
+import { recordToolUse } from './tools/record.js';
+import type { ToolLimits } from './tools/spec.js';
 import {
   isRefusedWrapToken,
   recordWrapTokenReused,
@@ -144,6 +150,8 @@ export async function provisionRun(
 ): Promise<ProvisionResult> {
   const verified = await verifyRunContract(deps.db, request.envelope, {
     verifier: deps.verifier,
+    // X04 (ADR-M69 §2.6): grants this runner can turn into the gateway's configuration.
+    toolGrantsEnforceable,
     ...(deps.now ? { now: deps.now } : {}),
   });
   if (!verified.ok) {
@@ -184,6 +192,7 @@ export async function provisionRun(
     );
     let repoDir: string;
     let image: string;
+    let tools: ToolSetup | undefined;
     let cloneStarted: number;
     try {
       if (!planEgress(contract.egress_allowlist, deps.settings.egressServices).ok) {
@@ -193,6 +202,7 @@ export async function provisionRun(
         throw new ProvisioningError('adapter_unavailable');
       }
       image = await projectImage(scope, contract.project_id, contract.agent_adapter);
+      tools = await toolSetup(scope, contract);
       cloneStarted = Date.now();
       repoDir = await cloneForRun(deps.settings.git, {
         repo: contract.repo,
@@ -225,6 +235,7 @@ export async function provisionRun(
       egressAllowlist: contract.egress_allowlist,
       workspaceTar,
       workspaceReserved: true,
+      ...(tools === undefined ? {} : { startTools: startToolsOf(deps, scope, runId, tools) }),
     });
     await scope.runEvents.append(runId, 'sandbox_created', {
       image_sha256: sandbox.imageSha256,
@@ -271,6 +282,9 @@ export async function releaseSandbox(
   reason: TeardownReason,
 ): Promise<void> {
   const scope = deps.db.forTenant(parseTenantId(tenantId));
+  // X04 (ADR-M69 §2.7): the tool counts are read from the gateway before it is removed. A failure
+  // to record them never keeps the sandbox.
+  await recordToolUse(deps.docker, scope, runId).catch(() => undefined);
   const result = await teardownSandbox(deps.docker, runId);
   await scope.runEvents.append(runId, 'sandbox_removed', {
     reason,
@@ -320,6 +334,88 @@ async function unwrapToken(
     // Unknown, expired or already used: maybe someone else unwrapped it (ADR-M25 §2.11).
     throw new ProvisioningError('token_unavailable');
   }
+}
+
+/** What the runner needs to start the register tools of a run (X04, ADR-M69 §2.4). */
+interface ToolSetup {
+  readonly grants: readonly ToolGrant[];
+  readonly images: ReadonlyMap<string, string>;
+  readonly gatewayImage: string;
+  readonly limits: ToolLimits;
+}
+
+/**
+ * The tool images and the gateway of a contract with grants, or undefined without grants. Each
+ * image is the register's name with the grant's digest, and the register must still hold the
+ * granted version (`tool_unavailable` otherwise: the contract and the register disagree).
+ */
+async function toolSetup(
+  scope: TenantScope,
+  contract: RunContract,
+): Promise<ToolSetup | undefined> {
+  const grants = contract.tool_grants ?? [];
+  if (grants.length === 0) return undefined;
+  let config: ProjectConfig;
+  try {
+    config = (await loadEffectiveConfig(scope.projectConfigs, contract.project_id)).config;
+  } catch {
+    throw new ProvisioningError('config_unavailable');
+  }
+  const gatewayImage = config.tools.gateway.image;
+  if (gatewayImage === null) throw new ProvisioningError('tool_unavailable');
+  const images = new Map<string, string>();
+  for (const grant of grants) {
+    const tool = await scope.tools.getByKey(grant.tool_key);
+    // A tool suspended, quarantined or retired after G4 never starts (ADR-M69 §2.9).
+    if (
+      tool?.status !== 'active' ||
+      tool.version !== grant.tool_version ||
+      tool.image_digest !== grant.image_digest ||
+      tool.image_ref === null
+    ) {
+      throw new ProvisioningError('tool_unavailable');
+    }
+    images.set(grant.tool_key, `${tool.image_ref}@${grant.image_digest}`);
+  }
+  const limits = config.tools.container_limits;
+  return {
+    grants,
+    images,
+    gatewayImage,
+    limits: {
+      memoryBytes: limits.memory_mb * 1024 * 1024,
+      nanoCpus: limits.cpu_millis * 1_000_000,
+      pids: limits.pids,
+    },
+  };
+}
+
+/** The hook `createSandbox` calls once the run network exists; records `tool_started`. */
+function startToolsOf(
+  deps: RunnerDeps,
+  scope: TenantScope,
+  runId: string,
+  setup: ToolSetup,
+): (names: RunNames, labels: Readonly<Record<string, string>>) => Promise<string> {
+  return async (names, labels) => {
+    const started = await startTools(deps.docker, {
+      run: names,
+      labels,
+      grants: setup.grants,
+      images: setup.images,
+      gatewayImage: setup.gatewayImage,
+      limits: setup.limits,
+      readyTimeoutMs: deps.settings.readyTimeoutMs,
+    });
+    for (const grant of started.started) {
+      await scope.runEvents.append(runId, 'tool_started', {
+        tool_key: grant.tool_key,
+        tool_version: grant.tool_version,
+        image_sha256: grant.image_digest.slice('sha256:'.length),
+      });
+    }
+    return started.key;
+  };
 }
 
 /** The project's image for the adapter (X03, QUESTIONS #522, #528). */
