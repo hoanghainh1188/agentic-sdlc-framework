@@ -5,7 +5,7 @@
 | Status | **Proposed** (the choice in §5 waits for Harry: QUESTIONS #521) |
 | Date | 2026-10-22 |
 | Decided by | Harry (plan approved 2026-10-21, with the OpenHands baseline through `pnpm eval`) |
-| Related | D-08 tasks X01, X03; D-02 NFR-04, NFR-05, FR-31, FR-32, FR-35, FR-36, FR-50; D-03 §7.2, §9; D-05 §6.1 (`agents`); ADR-M10, ADR-M25, ADR-M29, ADR-M31, ADR-M42 §2.7, ADR-M78; design/QUESTIONS.md #361, #521–#524 |
+| Related | D-08 tasks X01, X03; D-02 NFR-04, NFR-05, FR-31, FR-32, FR-35, FR-36, FR-50; D-03 §7.2, §9; D-05 §6.1 (`agents`); ADR-M10, ADR-M25, ADR-M29, ADR-M31, ADR-M42 §2.7, ADR-M69, ADR-M78; design/QUESTIONS.md #361, #519, #521–#524 |
 | Spike code | `platform/spikes/agent2/` (may be thrown away; numbers in `results/`) |
 
 ## 1. Context
@@ -106,6 +106,15 @@ Trivy 0.74.0 (the CI's version), HIGH and CRITICAL, with `platform/sandbox-image
 | Maintenance (2026-10-22) | active: releases every few days (1.18.32 → 1.19.3 in four weeks), last push 2026-10-21 | slow: last release 0.86.2 on 2026-02-12, last commit 2026-05-22 |
 
 No candidate brings a licence in the CRITICAL category (AGPL, SSPL, commercial; ADR-M10 §2.1).
+
+### 3.4. MCP support (for X02 and X04, QUESTIONS #519)
+
+| Agent | MCP | Per-run server over HTTP with a header key |
+|---|---|---|
+| OpenCode 1.18.35 | Yes. Configuration `mcp.<name>` and the API `POST /mcp` (`name`, `config`); remote servers (`type: remote`, `url`, `headers`, `oauth: false`, `timeout`) and local ones (`type: local`, a command) | **Yes, from the API description** (`McpRemoteConfig` has `headers`; `oauth: false` turns off OAuth detection). Not exercised in the spike: no MCP tool exists yet. X04 confirms it live |
+| Aider 0.86.2 | No (no MCP code in the package, no option) | No |
+
+A remote MCP server fits ADR-M69 (one container per tool and run on the run's network). X03 sets it through `PATCH /global/config` or `POST /mcp` at `startRun`, never from the agent's side; gap 1 (§6) applies, because the agent could add an MCP server of its own through the same API.
 
 ## 4. `AgentAdapter` mapping (AC4)
 
