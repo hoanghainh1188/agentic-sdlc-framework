@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (the choice in §5 waits for Harry: QUESTIONS #521) |
+| Status | **Accepted** (repository owner, 2026-10-22: OpenCode, and the answers to QUESTIONS #521–#524) |
 | Date | 2026-10-22 |
 | Decided by | Harry (plan approved 2026-10-21, with the OpenHands baseline through `pnpm eval`) |
 | Related | D-08 tasks X01, X03; D-02 NFR-04, NFR-05, FR-31, FR-32, FR-35, FR-36, FR-50; D-03 §7.2, §9; D-05 §6.1 (`agents`); ADR-M10, ADR-M25, ADR-M29, ADR-M31, ADR-M42 §2.7, ADR-M69, ADR-M78; design/QUESTIONS.md #361, #519, #521–#524 |
@@ -130,16 +130,20 @@ A remote MCP server fits ADR-M69 (one container per tool and run on the run's ne
 
 What stays the same for every agent: the task message (except its last rule), the git commands, the loop key, the runner's driver, the sandbox and the guard. `AgentAdapter` itself needed **no change** for either candidate.
 
-## 5. Decision (proposed; QUESTIONS #521)
+## 5. Decision (QUESTIONS #521)
 
-**OpenCode becomes the second adapter in X03** (proposal; Harry decides, QUESTIONS #521). Reasons:
+**OpenCode becomes the second adapter in X03** (repository owner, 2026-10-22; QUESTIONS #521). Reasons:
 
 1. **It fits `AgentAdapter` without code of our own in the sandbox.** `opencode serve` is an HTTP server with sessions, status, abort, a shell and an OpenAPI description, like the Agent Server. Aider needs a supervisor that the platform would write, harden and keep.
 2. **It is an agent of the same kind as OpenHands**: it reads the repository, picks files, runs the project's checks from `AGENTS.md`, and has its own step cap. This proves the interface for a second autonomous agent, which is the point of QUESTIONS #361. Aider is an editor of given files: it cannot be granted `terminal`.
 3. **Supply chain**: no finding added over `node24`; Aider adds 6 CRITICAL findings that cannot be fixed without a new Aider release, and Aider's releases have slowed.
 4. **Results on the two tasks**: 4 of 4 resolved, the fastest and with about a third of OpenHands' input tokens. On two tasks this shows behaviour only, not a ranking.
 
-Conditions for X03 (the gaps in §6, with QUESTIONS #522–#524).
+Conditions for X03 (the gaps in §6), as decided on 2026-10-22:
+
+- **Image per adapter** (QUESTIONS #522, option a): project configuration `sandbox.images.<adapter>`, each by digest; the runner checks the image's `sdlc.agent.adapter` label against the agent's `adapter`.
+- **Gaps 1 and 2** (QUESTIONS #523): in X03, the adapter enforces the caps itself and checks the configuration again on every status call, and fails the run on a change; the key file on the home tmpfs is accepted. Before OpenCode is used for real client work: an authenticating proxy in the image holds the server password, and OpenCode listens on 127.0.0.1 only.
+- **Supply chain** (QUESTIONS #524, option a): the npm binary pinned by sha512 integrity, and a CI check of the licences of the dependency tree at the same Git tag; a build from source only if a client asks for an SBOM.
 
 Aider is **not chosen**. Its one-reply edits were cheap and correct on small, well-scoped tasks. If a narrow "edit the planned files only" agent is wanted later, it comes back as its own task, with a supervisor and a dependency policy.
 
@@ -192,3 +196,4 @@ These are proposals for X03; D-05 and ADR-M31 change in X03's own PR, after the 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-22 | Claude (task X01) | First version: the spike's results and a proposal for Harry |
+| 0.2 | 2026-10-22 | Claude (docs) | Accepted by the repository owner: OpenCode; answers to QUESTIONS #521–#524 in §5 |
