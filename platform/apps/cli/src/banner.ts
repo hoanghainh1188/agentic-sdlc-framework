@@ -10,15 +10,16 @@ export const BANNER_LINES: readonly string[] = [
   '      /____/                                                    ',
 ];
 
-export const SUBTITLE_TAGLINE = 'Autonomous AI Agents • 8 Quality Gates • Cryptographic Audit Trail';
+export const SUBTITLE_TAGLINE =
+  'Autonomous AI Agents • 8 Quality Gates • Cryptographic Audit Trail';
 
 /** Sky Blue to Indigo gradient palette for an enterprise tech aesthetic. */
 const GRADIENT_COLORS: readonly string[] = [
   '\x1b[38;2;56;189;248m', // Sky Blue 400
   '\x1b[38;2;14;165;233m', // Sky Blue 500
-  '\x1b[38;2;2;132;199m',  // Sky Blue 600
-  '\x1b[38;2;37;99;235m',  // Royal Blue 600
-  '\x1b[38;2;79;70;229m',  // Electric Indigo 600
+  '\x1b[38;2;2;132;199m', // Sky Blue 600
+  '\x1b[38;2;37;99;235m', // Royal Blue 600
+  '\x1b[38;2;79;70;229m', // Electric Indigo 600
   '\x1b[38;2;99;102;241m', // Indigo 500
 ];
 
