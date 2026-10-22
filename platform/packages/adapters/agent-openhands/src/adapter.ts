@@ -1,5 +1,6 @@
 // `AgentAdapter` on the OpenHands Agent Server 1.48.0 (design/D-03 §7.2, D-08 C05, ADR-M10,
 // ADR-M29). One conversation per sandbox (ADR-M10 §4.1 item 5).
+import { commitCommand, diffCommand, parseCommitOutput, parseDiffOutput } from '@sdlc/agent-kit';
 import {
   AgentError,
   type AgentAdapter,
@@ -13,7 +14,6 @@ import {
 } from '@sdlc/contracts';
 
 import { AgentServerClient, type ClientOptions, type ExecutionStatus } from './client.js';
-import { commitCommand, diffCommand, parseCommitOutput, parseDiffOutput } from './git.js';
 import { trailingIdenticalCalls } from './loop.js';
 import { buildConversationRequest } from './request.js';
 

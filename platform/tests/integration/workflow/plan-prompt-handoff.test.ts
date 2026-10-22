@@ -24,7 +24,7 @@ import {
   type IntentActivityDeps,
 } from '../../../apps/worker/src/activities/intent-activities.js';
 import { startIntentWorker, type IntentWorkerHandle } from '../../../apps/worker/src/temporal.js';
-import { buildTaskMessage } from '../../../packages/adapters/agent-openhands/src/index.js';
+import { taskMessage } from '../../../packages/adapters/agent-openhands/src/index.js';
 import type { RunContract } from '../../../packages/contracts/src/index.js';
 import {
   intentWorkflowId,
@@ -137,7 +137,7 @@ describeWorkflow(
         {},
         planFileReader(cloneDir, 10_000),
       );
-      messages.push(buildTaskMessage(contract, task, '/workspace'));
+      messages.push(taskMessage(contract, task, '/workspace'));
       await scope.runEvents.append(input.runId, 'diff_stored', {
         sha256: 'd'.repeat(64),
         size_bytes: 64,

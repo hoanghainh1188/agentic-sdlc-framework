@@ -4,6 +4,9 @@
 //
 // `pnpm test:agent` (SDLC_AGENT_TEST=1, throw-away PostgreSQL from test-db.sh; CI job
 // `sandbox-image`, which builds node24). `SDLC_SANDBOX_IMAGE` (name@sha256:…) skips the build.
+// X03 (ADR-M88): `SDLC_AGENT_ADAPTER=opencode` runs the same tests with the OpenCode adapter in
+// the node24-opencode image (then `SDLC_SANDBOX_IMAGE` names that image), plus one test of its
+// own: the agent raises its own step cap through its server and the run fails (ADR-M68 §6 gap 1).
 //
 // Test infrastructure through the docker CLI: the stub model, and a relay container that stands in
 // for the runner's own container (the runner code attaches it to the run's network, and the test
@@ -15,7 +18,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
@@ -29,6 +31,8 @@ import { createTestDatabase, type TestDatabase } from '../db/helpers.js';
 import { docker, dockerSocket, quietly } from '../runner/live-helpers';
 import { buildSandboxImage } from '../sandbox-image/helpers';
 import {
+  ADAPTER,
+  agentAdapter,
   changesStep,
   here,
   NODE_IMAGE,
@@ -47,7 +51,7 @@ const names = {
   registry: `sdlc-c05-registry-${suffix}`,
 };
 
-describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Server', () => {
+describe.skipIf(!enabled)(`C05 live: the runner drives the agent (${ADAPTER})`, () => {
   let t: TestDatabase;
   let image: string;
   let client: DockerClient;
@@ -56,7 +60,12 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
 
   beforeAll(async () => {
     t = await createTestDatabase();
-    image = process.env.SDLC_SANDBOX_IMAGE || (await buildSandboxImage(names.registry));
+    image =
+      process.env.SDLC_SANDBOX_IMAGE ||
+      (await buildSandboxImage(
+        names.registry,
+        ADAPTER === 'opencode' ? 'node24-opencode' : 'node24',
+      ));
     client = new DockerClient({ socketPath: dockerSocket(), timeoutMs: 120_000 });
     docker('pull', '-q', NODE_IMAGE);
     docker('network', 'create', names.platformNet);
@@ -135,18 +144,27 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
       const r = await start('[stub:edit]', { maxIterations: 30, maxDurationMin: 10 });
       const runId = r.envelope.contract.run_id;
       try {
-        // The Agent Server API refuses callers without the session key: here LiteLLM's container,
-        // which is on the run's network (Harry's condition, ADR-M29).
-        const probe = (key: string) =>
-          docker(
+        // The agent's API refuses callers without the session key: here LiteLLM's container,
+        // which is on the run's network (Harry's condition, ADR-M29). OpenCode takes the key as
+        // the password of HTTP Basic (user `opencode`).
+        const probe = (key: string) => {
+          const headers =
+            key === ''
+              ? {}
+              : ADAPTER === 'opencode'
+                ? { authorization: `Basic ${Buffer.from(`opencode:${key}`).toString('base64')}` }
+                : { 'X-Session-API-Key': key };
+          const route = ADAPTER === 'opencode' ? '/session' : '/api/conversations/count';
+          return docker(
             'exec',
             names.stub,
             'node',
             '-e',
-            `fetch('http://sdlc-sandbox-${runId}:8000/api/conversations/count',{headers:${JSON.stringify(
-              key ? { 'X-Session-API-Key': key } : {},
+            `fetch('http://sdlc-sandbox-${runId}:8000${route}',{headers:${JSON.stringify(
+              headers,
             )}}).then(r=>console.log(r.status))`,
           );
+        };
         expect(probe('')).toBe('401');
         expect(probe('wrong-key-wrong-key-wrong-key-wrong-key')).toBe('401');
 
@@ -162,7 +180,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
             unwrapper: { unwrap: () => Promise.reject(new Error('unused')) },
           },
           {},
-          { adapters: { openhands: new OpenHandsAdapter() }, agentUrl: () => r.relayUrl },
+          { adapters: { [ADAPTER]: agentAdapter() }, agentUrl: () => r.relayUrl },
         );
         // The runner did not provision this fixture run, so it holds no clone: drive the agent
         // with the fixture's clone (C07), then release the run through the runner as runAgent does.
@@ -172,7 +190,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
             db: t.app as unknown as AgentDriveDeps['db'],
             docker: client,
             settings: r.settings,
-            adapter: new OpenHandsAdapter(),
+            adapter: agentAdapter(),
             agentUrl: () => r.relayUrl,
             ...changesStep(t, client, r, puts),
           },
@@ -211,7 +229,17 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
           expect(logs).toContain(`stub:check:${check}:yes`);
         }
         const tools = /stub:check:tools:(\S+)/.exec(logs)?.[1]?.split(',') ?? [];
-        expect(tools).toEqual(expect.arrayContaining(['file_editor', 'terminal', 'finish']));
+        if (ADAPTER === 'opencode') {
+          // The tool map of ADR-M68 §4: file_editor and terminal; webfetch, task and the rest off.
+          expect(tools).toEqual(expect.arrayContaining(['bash', 'read', 'edit', 'write']));
+          for (const off of ['webfetch', 'task', 'skill', 'todowrite']) {
+            expect(tools).not.toContain(off);
+          }
+          // Gap 5: no extra model call for a session title.
+          expect(logs).not.toContain(':notools');
+        } else {
+          expect(tools).toEqual(expect.arrayContaining(['file_editor', 'terminal', 'finish']));
+        }
         expect(tools).not.toContain('browser');
         expect(logs).not.toContain('stub:refused:wrong_key');
 
@@ -243,7 +271,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
             db: t.app as unknown as AgentDriveDeps['db'],
             docker: client,
             settings: r.settings,
-            adapter: new OpenHandsAdapter(),
+            adapter: agentAdapter(),
             agentUrl: () => r.relayUrl,
             ...changesStep(t, client, r, []),
           },
@@ -273,7 +301,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
             db: t.app as unknown as AgentDriveDeps['db'],
             docker: client,
             settings: r.settings,
-            adapter: new OpenHandsAdapter(),
+            adapter: agentAdapter(),
             agentUrl: () => r.relayUrl,
             clock: () => started + (Date.now() - started) * 60,
             ...changesStep(t, client, r, []),
@@ -286,6 +314,37 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
           { reason: 'max_duration', method: 'interrupt' },
         ]);
         expect(Date.now() - started).toBeLessThan(60_000);
+      } finally {
+        await teardownSandbox(client, runId).catch(() => undefined);
+        quietly('rm', '-f', r.relay);
+      }
+    },
+  );
+
+  it.skipIf(ADAPTER !== 'opencode')(
+    'X03 gap 1: the agent raises its own step cap through its server → the run fails, config_changed',
+    { timeout: 600_000 },
+    async () => {
+      const r = await start('[stub:selfconfig]', { maxIterations: 30, maxDurationMin: 10 });
+      const runId = r.envelope.contract.run_id;
+      try {
+        const result = await driveAgent(
+          {
+            db: t.app as unknown as AgentDriveDeps['db'],
+            docker: client,
+            settings: r.settings,
+            adapter: agentAdapter(),
+            agentUrl: () => r.relayUrl,
+            ...changesStep(t, client, r, []),
+          },
+          request(r),
+        );
+        // The agent's own call to its server goes through (the password is in its shell,
+        // QUESTIONS #523): the adapter, not OpenCode, stops the run.
+        expect(result.outcome).not.toBe('finished');
+        expect(await r.scope.runs.getById(runId)).toMatchObject({
+          stop_reason: 'agent_config_changed',
+        });
       } finally {
         await teardownSandbox(client, runId).catch(() => undefined);
         quietly('rm', '-f', r.relay);
@@ -316,7 +375,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
             db: t.app as unknown as AgentDriveDeps['db'],
             docker: client,
             settings: r.settings,
-            adapter: new OpenHandsAdapter(),
+            adapter: agentAdapter(),
             agentUrl: () => r.relayUrl,
             ...changesStep(t, client, r, []),
           },
@@ -363,7 +422,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
             db: t.app as unknown as AgentDriveDeps['db'],
             docker: client,
             settings: r.settings,
-            adapter: new OpenHandsAdapter(),
+            adapter: agentAdapter(),
             agentUrl: () => r.relayUrl,
             ...changesStep(t, client, r, []),
           },

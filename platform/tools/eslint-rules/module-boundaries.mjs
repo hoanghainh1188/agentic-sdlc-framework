@@ -5,8 +5,9 @@
 // - relative paths by resolving them against the importing file.
 // Imports of third-party packages and imports inside the same package are ignored.
 //
-// Options: { rules: [{ from, deny?, allowOnly? }] }
+// Options: { rules: [{ from, except?, deny?, allowOnly? }] }
 // - `from`: package name pattern of the importing package (`*` matches any characters).
+// - `except`: package name patterns of importing packages the rule does not apply to.
 // - `deny`: package name patterns that `from` must not import.
 // - `allowOnly`: the only workspace packages that `from` may import.
 
@@ -90,6 +91,7 @@ const moduleBoundaries = {
               type: 'object',
               properties: {
                 from: { type: 'string' },
+                except: { type: 'array', items: { type: 'string' } },
                 deny: { type: 'array', items: { type: 'string' } },
                 allowOnly: { type: 'array', items: { type: 'string' } },
               },
@@ -116,7 +118,9 @@ const moduleBoundaries = {
     const from = packageOfPath(packages, path.resolve(context.filename));
     if (!from) return {};
 
-    const rules = context.options[0].rules.filter((r) => patternToRegExp(r.from).test(from));
+    const rules = context.options[0].rules.filter(
+      (r) => patternToRegExp(r.from).test(from) && !(r.except && matchesAny(from, r.except)),
+    );
     if (rules.length === 0) return {};
 
     function check(sourceNode) {

@@ -9,10 +9,15 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { OpenCodeAdapter } from '@sdlc/adapter-agent-opencode';
+import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
 import { loadProjectConfig } from '@sdlc/config';
-import type {
-  EvidenceStore,
+import {
+  isAgentAdapterCode,
+  type AgentAdapter,
+  type AgentAdapterCode,
+  type EvidenceStore,
   RedactedSecret,
   RunContractEnvelope,
   StoredEvidence,
@@ -40,6 +45,23 @@ import { repoRoot } from '../../workspace/helpers';
 export const NODE_IMAGE =
   'node:24.21.0-alpine3.23@sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2';
 export const SPEC_PATH = 'docs/specs/T01-labels.md';
+
+/**
+ * X03 (ADR-M88): the adapter the live tests drive. `SDLC_AGENT_ADAPTER=opencode` runs the same
+ * tests with OpenCode in the node24-opencode image; the default is OpenHands in node24.
+ */
+export const ADAPTER: AgentAdapterCode = (() => {
+  const value = process.env.SDLC_AGENT_ADAPTER ?? 'openhands';
+  if (!isAgentAdapterCode(value)) throw new Error(`SDLC_AGENT_ADAPTER: unknown adapter ${value}`);
+  return value;
+})();
+
+/** A new adapter of the kind under test (one per run, like one runner process per test). */
+export function agentAdapter(): AgentAdapter {
+  return ADAPTER === 'opencode'
+    ? new OpenCodeAdapter({ requestTimeoutMs: 60_000 })
+    : new OpenHandsAdapter({ requestTimeoutMs: 60_000 });
+}
 export const here = path.join(repoRoot(), 'platform/tests/integration/agent');
 
 const registry = new Registry({ policyFactory: (config) => createSimplePolicyEngine({ config }) });
@@ -65,7 +87,7 @@ export interface AgentRunFixture {
 export interface StartAgentRun {
   readonly t: TestDatabase;
   readonly client: DockerClient;
-  /** node24 by digest. */
+  /** The sandbox image of the adapter under test, by digest (node24 or node24-opencode). */
   readonly image: string;
   readonly tmp: string;
   /** Unique per test file (runner instance label). */
@@ -176,7 +198,10 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
     actorType: 'human',
     actorId: person,
   });
-  const agent = await seedAgent(scope, person, { tools: ['file_editor', 'terminal'] });
+  const agent = await seedAgent(scope, person, {
+    tools: ['file_editor', 'terminal'],
+    adapter: ADAPTER,
+  });
   const { envelope } = await issueRunContract(
     scope,
     {
@@ -188,7 +213,7 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
         version: '1.0.0',
         instructionsSha256: input.instructionsSha256 ?? 'c'.repeat(64),
         tools: ['file_editor', 'terminal'],
-        adapter: 'openhands',
+        adapter: ADAPTER,
       },
       planTools: ['file_editor', 'terminal'],
       autonomyLevel: 'L2',

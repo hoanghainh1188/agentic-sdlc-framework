@@ -1,4 +1,4 @@
-// Git work inside the sandbox, through the Agent Server's bash endpoint (design/ADR-M29,
+// Git work inside the sandbox, through the agent server's shell endpoint (design/ADR-M29,
 // QUESTIONS #80). Pure builders and parsers, so tests can check every command and every answer.
 //
 // - Every value that goes into a command is checked against a strict pattern first and then put

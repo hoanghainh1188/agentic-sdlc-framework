@@ -11,7 +11,7 @@ import {
   parseCommitOutput,
   parseDiffOutput,
   unquoteGitPath,
-} from '@sdlc/adapter-agent-openhands';
+} from '@sdlc/agent-kit';
 import { AgentError } from '@sdlc/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 

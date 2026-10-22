@@ -1,6 +1,6 @@
 # CLAUDE.md — Runner, sandbox, agent
 
-Rules for `platform/apps/runner`, the agent and model adapters (`platform/packages/adapters/agent-openhands`, `model-litellm`), the sandbox images and their tests. The root `CLAUDE.md` still applies. Never break a rule here; the detail is in the linked ADR. Each rule ends with its IDs in `design/RULES.md` (ADR-M84).
+Rules for `platform/apps/runner`, the agent and model adapters (`platform/packages/adapters/agent-openhands`, `agent-opencode`, `model-litellm`), their shared helpers (`platform/packages/agent-kit`), the sandbox images and their tests. The root `CLAUDE.md` still applies. Never break a rule here; the detail is in the linked ADR. Each rule ends with its IDs in `design/RULES.md` (ADR-M84).
 
 ## Rules
 - Never add a sandbox environment variable, mount, capability or network outside `docker/guard.ts`. Sandbox egress = LiteLLM and the package proxy only; GitHub is reached by the runner, never by the sandbox (ADR-M25). The socket proxy allowlist equals `ALLOWED_ENDPOINTS`. [R061]
@@ -14,4 +14,4 @@ Rules for `platform/apps/runner`, the agent and model adapters (`platform/packag
 
 ## Commands
 Run from the repo root.
-- Sandbox images (ADR-M25, T11 §5g): `pnpm sandbox-image:build node24`.
+- Sandbox images (ADR-M25, T11 §5g): `pnpm sandbox-image:build node24`; OpenCode (X03, ADR-M88): `NODE24=<node24 by digest> pnpm sandbox-image:build node24-opencode`.

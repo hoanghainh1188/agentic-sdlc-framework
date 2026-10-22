@@ -11,13 +11,14 @@
 // - the real runner as a Temporal worker on `sdlc-runner`: `Runner` with Docker, the node24
 //   sandbox, the OpenHands Agent Server, the stub model as LiteLLM (no provider, no real key), its
 //   spend check, the run's diff and L1 proposals in an in-memory evidence store, the push.
+// X03: `SDLC_AGENT_ADAPTER=opencode` runs the suite with the OpenCode adapter in the
+// node24-opencode image (agent/helpers.ts `ADAPTER`).
 // The clock is the wall clock (the runner checks the Run Contract's times against it); the HOTL
 // block window is one minute in the pilot configuration.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { GitHubAdapter } from '@sdlc/adapter-git-github';
 import { LiteLLMKeySpendReader } from '@sdlc/adapter-model-litellm';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
@@ -40,6 +41,7 @@ import { StubGitHost } from '../../runner/stub-git.js';
 import { credentialFiles, StubOpenBao } from '../../secrets/stub-openbao.js';
 import { NODE_IMAGE } from '../agent/helpers.js';
 import { docker, dockerSocket, quietly } from '../runner/live-helpers.js';
+import { ADAPTER, agentAdapter } from '../agent/helpers.js';
 import { buildSandboxImage } from '../sandbox-image/helpers.js';
 import { repoRoot } from '../../workspace/helpers.js';
 import {
@@ -146,7 +148,12 @@ export class PilotStack extends Stack {
       this.repo = new BareRepo(this.git, pilotFiles());
     }
     this.#startDocker();
-    this.image = process.env.SDLC_SANDBOX_IMAGE || (await buildSandboxImage(this.#names.registry));
+    this.image =
+      process.env.SDLC_SANDBOX_IMAGE ||
+      (await buildSandboxImage(
+        this.#names.registry,
+        ADAPTER === 'opencode' ? 'node24-opencode' : 'node24',
+      ));
     this.#bao = await StubOpenBao.start();
     this.#baoFiles = credentialFiles();
     const bao = () => {
@@ -265,6 +272,7 @@ export class PilotStack extends Stack {
       '  required_checks: [ci-ok]',
       'sandbox:',
       `  image: ${this.image}`,
+      ...(ADAPTER === 'opencode' ? ['  images:', `    opencode: ${this.image}`] : []),
       extra,
     ].join('\n');
   }
@@ -401,7 +409,7 @@ export class PilotStack extends Stack {
       },
       {},
       {
-        adapters: { openhands: new OpenHandsAdapter() },
+        adapters: { [ADAPTER]: agentAdapter() },
         agentUrl: (runId) => `http://127.0.0.1:${relayPort}/run/${runId}`,
         evidence: this.bucket.store('proposals/'),
         diffEvidence: diffs,
@@ -452,6 +460,8 @@ export class PilotStack extends Stack {
       'L2',
       '--environments',
       'sandbox',
+      '--adapter',
+      ADAPTER,
     ]);
     await this.cliJson('a', [
       'admin',

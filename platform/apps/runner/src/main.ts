@@ -8,6 +8,7 @@
 // one activity slot per sandbox (`SDLC_RUNNER_MAX_SANDBOXES`), so extra runs wait in Temporal.
 import fs from 'node:fs';
 
+import { OpenCodeAdapter } from '@sdlc/adapter-agent-opencode';
 import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { S3EvidenceStore } from '@sdlc/adapter-evidence-s3';
 import { GitHubAdapter } from '@sdlc/adapter-git-github';
@@ -121,6 +122,9 @@ async function main(): Promise<void> {
   const evidence = await evidenceStores(openbao, proc.evidence);
   // The runner reads its runs' spend with each run's own key (C07, ADR-M34 §2.6).
   const spendReader = new LiteLLMKeySpendReader({ baseUrl: settings.agent.llmBaseUrl });
+  // The agent adapters of this process, by code (X03, ADR-M88): one instance each, shared by the
+  // runs and the evaluations, because the OpenCode adapter keeps each run's cap and fingerprint.
+  const adapters = { openhands: new OpenHandsAdapter(), opencode: new OpenCodeAdapter() };
   // Revokes the run's GitHub tokens right after their use (C11, ADR-M42 §2.4). Token-only: the
   // runner never reads the GitHub App key (QUESTIONS #44), so every App call is refused.
   const tokenRevoker = proc.githubApiUrl
@@ -170,7 +174,7 @@ async function main(): Promise<void> {
         ),
     },
     {
-      adapters: { openhands: new OpenHandsAdapter() },
+      adapters,
       spendReader,
       keyRevoked: (key) => spendReader.keyRevoked(key),
       ...(evidence ? { evidence: evidence.proposals, diffEvidence: evidence.diffs } : {}),
@@ -237,7 +241,7 @@ async function main(): Promise<void> {
               unwrapper: openbao.wrapping(),
               pool: runner.pool,
               held: runner.held,
-              adapters: { openhands: new OpenHandsAdapter() },
+              adapters,
               spendReader,
               ...(tokenRevoker ? { tokenRevoker } : {}),
             },

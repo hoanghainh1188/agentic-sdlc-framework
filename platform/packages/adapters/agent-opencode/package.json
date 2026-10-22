@@ -1,0 +1,16 @@
+{
+  "name": "@sdlc/adapter-agent-opencode",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Agent adapter: OpenCode's HTTP server (`opencode serve`). See design/D-08 X03, ADR-M68, ADR-M88.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@sdlc/agent-kit": "workspace:*",
+    "@sdlc/contracts": "workspace:*"
+  }
+}

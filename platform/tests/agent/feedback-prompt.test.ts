@@ -1,11 +1,8 @@
 // D-08 E01 AC4, design/ADR-M41 §2.7 (QUESTIONS #179): after a request for changes at G7 the agent's
 // first message holds the reviewer's feedback in a block delimited by markers with a random nonce,
 // framed as untrusted data; the text cannot close the block or change the rules that follow it.
-import {
-  buildConversationRequest,
-  buildTaskMessage,
-  feedbackBlock,
-} from '@sdlc/adapter-agent-openhands';
+import { buildConversationRequest, taskMessage } from '@sdlc/adapter-agent-openhands';
+import { feedbackBlock } from '@sdlc/agent-kit';
 import { AgentError } from '@sdlc/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -17,14 +14,12 @@ const FEEDBACK = { source: 'review' as const, text: INJECTION, truncated: false 
 
 describe('the feedback block (E01 PR 2)', () => {
   it('no feedback: the message is unchanged', () => {
-    expect(buildTaskMessage(CONTRACT, TASK, '/workspace', 'abc')).not.toContain(
-      'REVIEWER_FEEDBACK',
-    );
+    expect(taskMessage(CONTRACT, TASK, '/workspace', 'abc')).not.toContain('REVIEWER_FEEDBACK');
   });
 
   it('puts the text between nonce markers, before the rules, framed as untrusted data', () => {
     const nonce = 'a1b2c3d4e5f6a1b2c3d4e5f6';
-    const message = buildTaskMessage(
+    const message = taskMessage(
       CONTRACT,
       { ...TASK, reviewFeedback: FEEDBACK },
       '/workspace',

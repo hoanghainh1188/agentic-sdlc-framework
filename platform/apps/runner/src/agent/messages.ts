@@ -15,6 +15,7 @@ export const AGENT_ERROR_MESSAGES = {
   invalid_response: 'agent.error.invalid_response',
   branch_changed: 'agent.error.branch_changed',
   git_failed: 'agent.error.git_failed',
+  config_changed: 'agent.error.config_changed',
 } as const satisfies Record<AgentErrorCode, MessageKey>;
 
 /** The text of an agent error. Missing parameters render as empty text, never as `{name}`. */

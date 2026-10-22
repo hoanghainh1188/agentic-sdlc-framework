@@ -1,0 +1,12 @@
+{
+  "@openauthjs/openauth@0.0.0-20250322224806": {
+    "licence": "MIT",
+    "source": "https://github.com/anomalyco/openauth/blob/master/LICENSE",
+    "reviewed": "2026-10-22, X03: the npm package has no licence field; the repository is MIT"
+  },
+  "poe-oauth@0.0.8": {
+    "licence": "MIT",
+    "source": "https://github.com/poe-platform/poe-code/blob/main/LICENSE",
+    "reviewed": "2026-10-22, X03: the npm package has no licence field; the repository and its package.json are MIT"
+  }
+}

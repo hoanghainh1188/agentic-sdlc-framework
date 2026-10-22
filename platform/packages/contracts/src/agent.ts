@@ -240,6 +240,8 @@ export const AGENT_ERROR_CODES = [
   'invalid_response',
   'branch_changed',
   'git_failed',
+  // X03 (ADR-M68 §6 gap 1): the agent changed its own configuration, tools or MCP servers.
+  'config_changed',
 ] as const;
 export type AgentErrorCode = (typeof AGENT_ERROR_CODES)[number];
 

@@ -70,10 +70,18 @@ export default tseslint.config(
         'error',
         {
           rules: [
-            // Core depends on interfaces, never on a concrete adapter.
-            { from: '@sdlc/core', deny: ['@sdlc/adapter-*'] },
+            // Core depends on interfaces, never on a concrete adapter or the adapters' helpers.
+            { from: '@sdlc/core', deny: ['@sdlc/adapter-*', '@sdlc/agent-kit'] },
             // Adapters implement interfaces from contracts and depend on nothing else in the workspace.
-            { from: '@sdlc/adapter-*', allowOnly: ['@sdlc/contracts'] },
+            {
+              from: '@sdlc/adapter-*',
+              except: ['@sdlc/adapter-agent-*'],
+              allowOnly: ['@sdlc/contracts'],
+            },
+            // Agent adapters also share the helpers of @sdlc/agent-kit (ADR-M88 §2.3), which
+            // depends on contracts only.
+            { from: '@sdlc/adapter-agent-*', allowOnly: ['@sdlc/contracts', '@sdlc/agent-kit'] },
+            { from: '@sdlc/agent-kit', allowOnly: ['@sdlc/contracts'] },
             // The Temporal client wraps the intent workflow's names from contracts (ADR-M30).
             { from: '@sdlc/workflow-client', allowOnly: ['@sdlc/contracts'] },
             // Core never imports Temporal through the workflow client (ADR-M30).

@@ -37,7 +37,10 @@ export interface Infrastructure {
  * - classic image store (Linux CI, the server): push to a throw-away registry:2 on 127.0.0.1.
  * `SDLC_SANDBOX_IMAGE` (name@sha256:…) skips the build.
  */
-export async function startInfrastructure(suffix: string): Promise<Infrastructure> {
+export async function startInfrastructure(
+  suffix: string,
+  toolchain: 'node24' | 'node24-opencode' = 'node24',
+): Promise<Infrastructure> {
   const names = {
     registry: `sdlc-c04-img-registry-${suffix}`,
     platformNet: `sdlc-c04-img-platform-${suffix}`,
@@ -49,7 +52,12 @@ export async function startInfrastructure(suffix: string): Promise<Infrastructur
     quietly('network', 'rm', names.platformNet);
   };
   try {
-    const image = process.env.SDLC_SANDBOX_IMAGE || (await buildSandboxImage(names.registry));
+    // X03: SDLC_SANDBOX_IMAGE_OPENCODE skips the node24-opencode build.
+    const given =
+      toolchain === 'node24'
+        ? process.env.SDLC_SANDBOX_IMAGE
+        : process.env.SDLC_SANDBOX_IMAGE_OPENCODE;
+    const image = given || (await buildSandboxImage(names.registry, toolchain));
     docker('pull', '-q', VERDACCIO);
     docker('network', 'create', names.platformNet);
     startStub(names.litellm, names.platformNet, 4000);
@@ -87,7 +95,10 @@ export async function startInfrastructure(suffix: string): Promise<Infrastructur
  * Builds node24 and returns its reference by digest (see startInfrastructure). `registry` names a
  * throw-away registry:2 container, started only on the classic image store; the caller removes it.
  */
-export async function buildSandboxImage(registry: string): Promise<string> {
+export async function buildSandboxImage(
+  registry: string,
+  toolchain: 'node24' | 'node24-opencode' = 'node24',
+): Promise<string> {
   const script = path.join(repoRoot(), 'platform/sandbox-images/build.sh');
   const run = (args: string[], env: NodeJS.ProcessEnv = {}) =>
     execFileSync(script, args, {
@@ -96,12 +107,19 @@ export async function buildSandboxImage(registry: string): Promise<string> {
       stdio: ['ignore', 'pipe', 'inherit'],
       timeout: 900_000,
     }).trim();
+  // X03: node24-opencode is built FROM node24 by digest, so node24 always comes first.
   const local = run(['node24', '--no-push'], { SDLC_SANDBOX_REGISTRY: 'sdlc-test' });
-  if (local.includes('@sha256:')) return local;
+  if (local.includes('@sha256:')) {
+    if (toolchain === 'node24') return local;
+    return run([toolchain, '--no-push'], { SDLC_SANDBOX_REGISTRY: 'sdlc-test', NODE24: local });
+  }
   docker('pull', '-q', REGISTRY);
   docker('run', '-d', '--name', registry, '-p', '127.0.0.1::5000', REGISTRY);
   const port = docker('port', registry, '5000/tcp').split('\n')[0]!.split(':').pop()!;
-  return retry(() => run(['node24'], { SDLC_SANDBOX_REGISTRY: `localhost:${port}` }), 10);
+  const pushTo = { SDLC_SANDBOX_REGISTRY: `localhost:${port}` };
+  const node24 = await retry(() => run(['node24'], pushTo), 10);
+  if (toolchain === 'node24') return node24;
+  return retry(() => run([toolchain], { ...pushTo, NODE24: node24 }), 10);
 }
 
 /** Runs a shell command inside a sandbox (test harness only: the runner has no exec endpoint). */
