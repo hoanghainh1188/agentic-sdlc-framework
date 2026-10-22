@@ -167,7 +167,7 @@ Built later, not in this pull request: handbook Ch.20 (registering a tool) and C
 - **Every tool as `stdio` inside the sandbox.** Rejected: the credential would be inside the sandbox, which an agent controls.
 - **One run event per tool call.** Rejected (QUESTIONS #518): append-only rows kept for at least 2 years, for counts that a summary gives. The words of D-08 X02 AC3 ("a run event per tool use") are read as "per tool used by a run".
 - **The tool's version pinned in the agent's row.** Rejected: every tool update would need a new agent version and new approvals. The contract and the evaluation fingerprint record the exact version instead.
-- **A gateway that checks each call** (D-01 §5.6). Not decided here (QUESTIONS #520): the register, G4 and the contract already decide which tools a run gets. The repository owner asked for research first: task X14 (ADR-M87) compares self-hosted open-source MCP gateways, one instance per run inside the run's networks, and decides before X04 whether the first tool goes through one. D-01 §5.6 says never to write our own gateway.
+- **A gateway that checks each call** (D-01 §5.6). Not decided here (QUESTIONS #520): the register, G4 and the contract already decide which tools a run gets. The repository owner asked for research first: task X14 (ADR-M87) compares self-hosted open-source MCP gateways, one instance per run inside the run's networks, and decides before X04 whether the first tool goes through one. D-01 §5.6 says never to write our own gateway. The result is ADR-M87 (proposed): agentgateway, one instance per run, from X04; its §5 lists the changes to this ADR, made after the repository owner decides (QUESTIONS #529–#530).
 
 ## 5. Consequences and open items
 
@@ -183,3 +183,4 @@ Built later, not in this pull request: handbook Ch.20 (registering a tool) and C
 |---|---|---|---|
 | 0.1 | 2026-10-21 | Claude (task X02) | First version: tool codes, the register, G4 checks, one container per tool and run, contract v2, summary events, kill switch. QUESTIONS #516–#520 |
 | 0.2 | 2026-10-22 | Claude (task X02) | Answers to QUESTIONS #519 (X04 checks MCP in OpenHands first) and #520 (task X14 researches an MCP gateway before X04, ADR-M87) |
+| 0.3 | 2026-10-22 | Claude (task X14) | §4: reference to the result of X14 (ADR-M87, proposed). No change of meaning |

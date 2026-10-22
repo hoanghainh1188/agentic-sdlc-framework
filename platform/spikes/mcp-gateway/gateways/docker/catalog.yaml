@@ -1,0 +1,11 @@
+# X14 spike (design/ADR-M87): a catalog with one remote server, the stub tool on the tool network.
+name: x14
+displayName: x14
+registry:
+  docs:
+    title: docs
+    description: The stub tool of the X14 spike
+    type: remote
+    remote:
+      transport_type: streamable-http
+      url: http://tool:8080/mcp
