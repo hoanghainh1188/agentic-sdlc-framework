@@ -61,6 +61,7 @@
 | ADR-M65 | [The trial report: an anonymous summary built from the existing reads](ADR-M65-trial-report.md) (task V01) | Accepted (2026-10-16) | |
 | ADR-M66 | [The platform's images on GHCR for each release](ADR-M66-ghcr-images.md) (task V04) | Accepted (2026-10-16) | |
 | ADR-M67 | [Team access from other machines: a TLS reverse proxy](ADR-M67-team-access.md) (task V09) | Accepted | 2026-10-12 |
+| ADR-M68 | [A second, open-source coding agent (Aider, OpenCode): result of the X01 spike](ADR-M68-second-agent-spike.md) (task X01) | Proposed; OpenCode proposed for X03 (QUESTIONS #521–#524) | |
 | ADR-M70 | [Other Git hosts (GitLab.com, Bitbucket Cloud, Backlog): result of the X09 spike](ADR-M70-other-git-hosts.md) (task X09) | Accepted (2026-10-21); GitLab.com first, Premium or higher; Bitbucket Cloud and Backlog refused for agent runs (QUESTIONS #511–#513) | |
 | ADR-M72 | [The CLI on npm: one bundled file, published from a tag with provenance](ADR-M72-cli-npm-package.md) (task V05) | Accepted (2026-10-16) | |
 | ADR-M73 | [Actions in the web dashboard: GitHub sign-in, sessions, CSRF, passkey step-up](ADR-M73-dashboard-actions.md) (task V11; built by U05–U09) | Accepted | |

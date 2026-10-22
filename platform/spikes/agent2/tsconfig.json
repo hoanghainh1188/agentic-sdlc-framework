@@ -1,0 +1,13 @@
+{
+  "//": "X01 spike: type-check only (`pnpm exec tsc -p platform/spikes/agent2`); not in the root build.",
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "rootDir": "../.."
+  },
+  "include": ["agent2.spike.ts", "src/**/*.ts"]
+}
