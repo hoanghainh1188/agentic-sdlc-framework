@@ -1,0 +1,96 @@
+{
+  "gateway": "docker",
+  "image": {
+    "image": "docker/mcp-gateway@sha256:b0a3876ffbb352813d658cf25c137b8eae29bbe23db5944560a1c9059533bb16",
+    "bytes": 138640251
+  },
+  "start_ms": 408,
+  "idle_memory": "9.457MiB",
+  "scenarios": {
+    "no_key": {
+      "http": 401,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": false
+    },
+    "wrong_key": {
+      "http": 401,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": false
+    },
+    "initialize": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": true
+    },
+    "tools_list": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": true,
+      "tools": 1,
+      "delete_listed": false
+    },
+    "allowed_call": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": true
+    },
+    "refused_tool": {
+      "http": 200,
+      "rpc_error": -32602,
+      "is_error": null,
+      "ok": false
+    },
+    "refused_argument": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": true
+    },
+    "cap": {
+      "cap": 5,
+      "ok_calls_after_first": 7,
+      "first_refused_at": -1
+    },
+    "tool_direct": {
+      "http": 0,
+      "reachable": false,
+      "error": "TimeoutError"
+    }
+  },
+  "reached_tool": {
+    "search_docs": 9,
+    "delete_docs": 0
+  },
+  "logs": {
+    "start_ms": 408,
+    "log_lines": 97,
+    "log_query_canary": 0,
+    "log_answer_canary": 0,
+    "log_key": 0
+  },
+  "load": {
+    "load": {
+      "calls": 2000,
+      "ok": 2000,
+      "failures": {},
+      "p50_ms": 0.6,
+      "p95_ms": 1.4,
+      "total_ms": 1784
+    },
+    "load_resources": {
+      "cpu_ms": 864,
+      "peak_memory_bytes": 14712832
+    }
+  },
+  "trivy_high_critical": {
+    "CRITICAL": 1,
+    "HIGH": 42,
+    "fixable": 41,
+    "licences": 10
+  }
+}

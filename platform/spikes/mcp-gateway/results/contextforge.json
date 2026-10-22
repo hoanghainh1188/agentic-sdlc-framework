@@ -1,0 +1,98 @@
+{
+  "gateway": "contextforge",
+  "image": {
+    "image": "ghcr.io/ibm/mcp-context-forge@sha256:7eb21fb9a8070df59435c03c76c40d8c71230c55ba89f884f2482d2cc81cff1c",
+    "bytes": 590142786
+  },
+  "start_ms": 7550,
+  "idle_memory": "460.4MiB",
+  "scenarios": {
+    "no_key": {
+      "http": 401,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": false
+    },
+    "wrong_key": {
+      "http": 401,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": false
+    },
+    "initialize": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": true
+    },
+    "tools_list": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": true,
+      "tools": 1,
+      "delete_listed": false
+    },
+    "allowed_call": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": false,
+      "ok": true
+    },
+    "refused_tool": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": true,
+      "ok": false
+    },
+    "refused_argument": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": false,
+      "ok": true
+    },
+    "cap": {
+      "cap": 5,
+      "ok_calls_after_first": 3,
+      "first_refused_at": 3
+    },
+    "tool_direct": {
+      "http": 0,
+      "reachable": false,
+      "error": "TimeoutError"
+    }
+  },
+  "reached_tool": {
+    "search_docs": 5,
+    "delete_docs": 0
+  },
+  "logs": {
+    "start_ms": 7550,
+    "log_lines": 1005,
+    "log_query_canary": 0,
+    "log_answer_canary": 0,
+    "log_key": 0
+  },
+  "load": {
+    "load": {
+      "calls": 2000,
+      "ok": 94,
+      "failures": {
+        "429/-": 1906
+      },
+      "p50_ms": 9,
+      "p95_ms": 21.3,
+      "total_ms": 20596
+    },
+    "load_resources": {
+      "cpu_ms": 17530,
+      "peak_memory_bytes": 499920896
+    }
+  },
+  "trivy_high_critical": {
+    "CRITICAL": 1,
+    "HIGH": 0,
+    "fixable": 1,
+    "licences": 51
+  }
+}

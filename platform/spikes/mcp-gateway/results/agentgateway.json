@@ -1,0 +1,96 @@
+{
+  "gateway": "agentgateway",
+  "image": {
+    "image": "cr.agentgateway.dev/agentgateway@sha256:9d3e6044ddcdc0878b1787f77bd401252b95e22684203fb5e874c4c42d2ed90c",
+    "bytes": 146194717
+  },
+  "start_ms": 393,
+  "idle_memory": "7.77MiB",
+  "scenarios": {
+    "no_key": {
+      "http": 401,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": false
+    },
+    "wrong_key": {
+      "http": 401,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": false
+    },
+    "initialize": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": true
+    },
+    "tools_list": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": true,
+      "tools": 1,
+      "delete_listed": false
+    },
+    "allowed_call": {
+      "http": 200,
+      "rpc_error": null,
+      "is_error": false,
+      "ok": true
+    },
+    "refused_tool": {
+      "http": 400,
+      "rpc_error": -32602,
+      "is_error": null,
+      "ok": false
+    },
+    "refused_argument": {
+      "http": 403,
+      "rpc_error": null,
+      "is_error": null,
+      "ok": false
+    },
+    "cap": {
+      "cap": 5,
+      "ok_calls_after_first": 3,
+      "first_refused_at": 3
+    },
+    "tool_direct": {
+      "http": 0,
+      "reachable": false,
+      "error": "TimeoutError"
+    }
+  },
+  "reached_tool": {
+    "search_docs": 4,
+    "delete_docs": 0
+  },
+  "logs": {
+    "start_ms": 393,
+    "log_lines": 31,
+    "log_query_canary": 0,
+    "log_answer_canary": 0,
+    "log_key": 0
+  },
+  "load": {
+    "load": {
+      "calls": 2000,
+      "ok": 2000,
+      "failures": {},
+      "p50_ms": 0.5,
+      "p95_ms": 2.4,
+      "total_ms": 1791
+    },
+    "load_resources": {
+      "cpu_ms": 528,
+      "peak_memory_bytes": 10588160
+    }
+  },
+  "trivy_high_critical": {
+    "CRITICAL": 0,
+    "HIGH": 1,
+    "fixable": 1,
+    "licences": 3
+  }
+}
