@@ -63,6 +63,11 @@ export interface EvaluationConfigurationInput {
   readonly source?: EvaluationConfigurationSource;
   /** L09 (QUESTIONS #501): the tools the agent gets in the runs, its own `allowed_tools`. */
   readonly allowedTools?: readonly string[];
+  /**
+   * X04 (ADR-M69 §2.3): the fingerprint's `tools_sha256` when the tools hold register tools (with
+   * their versions and digests, `toolsForFingerprint`). Default: `toolsSha256(allowedTools)`.
+   */
+  readonly toolsSha256?: string;
   /** X03 (QUESTIONS #526): the adapter of the agent. Default `openhands` (operator evaluations). */
   readonly adapter?: AgentAdapterCode;
   /** L05: a prompt variant (path, commit, SHA-256 read at start); null: the repository's own. */
@@ -218,7 +223,11 @@ function fingerprintColumns(c: EvaluationConfigurationInput): {
     return { source: null, allowed_tools: null, tools_sha256: null };
   }
   const tools = [...c.allowedTools].sort();
-  return { source: c.source, allowed_tools: tools, tools_sha256: toolsSha256(tools) };
+  return {
+    source: c.source,
+    allowed_tools: tools,
+    tools_sha256: c.toolsSha256 ?? toolsSha256(tools),
+  };
 }
 
 export class EvaluationRepository extends TenantRepository {

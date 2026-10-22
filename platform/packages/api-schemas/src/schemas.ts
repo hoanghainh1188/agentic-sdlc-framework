@@ -577,6 +577,51 @@ export const agentDetailSchema = agentSchema.extend({
   evaluation: agentEvaluationSchema.nullable().optional(),
 });
 
+// The tool register (task X04, ADR-M69 §2.2).
+export const toolSchema = z.object({
+  id,
+  key: code,
+  code: z.string().max(80),
+  version: code,
+  status: code,
+  owner_id: id,
+  transport: code,
+  image_ref: z.string().max(255).nullable(),
+  image_digest: z.string().max(80).nullable(),
+  permissions: z.array(code).max(10),
+  allowed_data_classes: z.array(code).max(5),
+  backing_services: z.array(code).max(10),
+  model_ref: z.string().max(128).nullable(),
+  last_recertified_at: z.string().max(10).nullable(),
+  recertification_due_on: z.string().max(10).nullable(),
+  overdue: z.boolean(),
+  updated_at: time,
+});
+export type ToolView = z.infer<typeof toolSchema>;
+export const toolListSchema = z.object({ items: z.array(toolSchema).max(10_000) });
+export const toolRoundSchema = z.object({
+  tool: toolSchema,
+  purpose: code,
+  sets: z.array(z.array(code).max(4)).max(4),
+  approvers: z.array(code).max(4),
+  missing: z.array(z.array(code).max(4)).max(4),
+  approvals: z
+    .array(
+      z.object({
+        id,
+        tool_version: code,
+        purpose: code,
+        capacity: code,
+        approver_id: id,
+        created_at: time,
+      }),
+    )
+    .max(4),
+  completed: z.boolean().optional(),
+});
+export type ToolRoundView = z.infer<typeof toolRoundSchema>;
+export const toolDetailSchema = toolSchema.extend({ rounds: z.array(toolRoundSchema).max(2) });
+
 const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
 const packFileSchema = z.object({ uri: ref, sha256, size_bytes: z.number().int().min(0) });
 

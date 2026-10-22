@@ -315,6 +315,23 @@ agents:
     approval_max_age_days: 30
     recertification_max_age_days: 90
 
+tools:
+  # Task X04, ADR-M69 §2.2: register tools (`tool:<key>`) are recertified like agents. Mandatory
+  # rule M18: never more than 3 months. An overdue tool gives a warning; it does not block a run.
+  recertification_months: 3
+  # ADR-M69 §2.7: the run's MCP gateway refuses the calls of a tool after this many in one run
+  # (`tool_refused`, `max_calls`); the run goes on without the tool. [Proposal] number.
+  max_calls_per_run: 100
+  # ADR-M69 §2.4: limits of each tool container of a run. A10 measures the effect. [Proposal].
+  container_limits:
+    memory_mb: 512
+    cpu_millis: 1000
+    pids: 256
+  # ADR-M87: the run's MCP gateway (agentgateway), pinned by digest. Null: no gateway is set up,
+  # so no register tool runs (X04 PR 2 sets the default).
+  gateway:
+    image: null
+
 sandbox:
   # QUESTIONS #59 (A), ADR-M25: one sandbox image per project, built on the pinned OpenHands
   # agent-server base plus the project toolchain, referenced by digest (a tag alone is refused).

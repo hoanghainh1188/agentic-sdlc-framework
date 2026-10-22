@@ -19,6 +19,7 @@ import {
 import { NO_INTENT_SIGNALS } from '@sdlc/workflow-client';
 
 import { AdminAgentsController } from './admin/agents.controller.js';
+import { AdminToolsController } from './admin/tools.controller.js';
 import { AdminAuditController } from './admin/audit.controller.js';
 import { AdminProjectsController } from './admin/projects.controller.js';
 import { AdminTenantAdminsController } from './admin/tenant-admins.controller.js';
@@ -216,6 +217,7 @@ class ApiModule {
         AdminTenantAdminsController,
         AdminAuditController,
         AdminAgentsController,
+        AdminToolsController,
         MeTokensController,
       ],
       providers: [

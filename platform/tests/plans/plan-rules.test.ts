@@ -65,6 +65,37 @@ describe('parsePlanFile (schema version 1, template T13)', () => {
     });
   });
 
+  it('X04: keeps register tools (tool:<key>) next to the built-in tools', () => {
+    const text = plan({
+      tasks: [
+        '  - id: T1',
+        '    allowed_paths: [docs/**]',
+        '    tools: [file_editor, tool:project-docs]',
+      ],
+    });
+    const parsed = parsePlanFile(text, CODE);
+    expect(parsed).toMatchObject({
+      ok: true,
+      plan: { allowedTools: ['file_editor', 'tool:project-docs'] },
+    });
+  });
+
+  it('X04: refuses a plan whose tasks list more than 10 register tools together', () => {
+    const tools = (from: number) =>
+      Array.from({ length: 6 }, (_, i) => `tool:docs-${String(from + i)}`).join(', ');
+    const text = plan({
+      tasks: [
+        '  - id: T1',
+        '    allowed_paths: [a/**]',
+        `    tools: [file_editor, ${tools(0)}]`,
+        '  - id: T2',
+        '    allowed_paths: [b/**]',
+        `    tools: [terminal, ${tools(6)}]`,
+      ],
+    });
+    expect(parsePlanFile(text, CODE)).toEqual({ ok: false, reason: 'schema_invalid' });
+  });
+
   it('accepts the documentation fields of T13 without keeping them', () => {
     const parsed = parsePlanFile(plan(), CODE);
     expect(parsed.ok).toBe(true);
@@ -101,6 +132,17 @@ describe('parsePlanFile (schema version 1, template T13)', () => {
     ],
     [
       plan({ tasks: ['  - id: T1', '    allowed_paths: [a/**]', '    tools: [read_repo]'] }),
+      'unknown_tool',
+    ],
+    // X04 (ADR-M69 §2.1): a register tool is `tool:<key>`; a bad key or a tool listed twice is refused.
+    [
+      plan({ tasks: ['  - id: T1', '    allowed_paths: [a/**]', '    tools: [tool:Docs]'] }),
+      'unknown_tool',
+    ],
+    [
+      plan({
+        tasks: ['  - id: T1', '    allowed_paths: [a/**]', '    tools: [terminal, terminal]'],
+      }),
       'unknown_tool',
     ],
     [

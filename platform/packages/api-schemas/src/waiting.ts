@@ -56,6 +56,12 @@ export const WAITING_CAUSE_KEYS: Readonly<Record<string, string>> = {
   intent_budget_exhausted: 'intent.waiting_cause.intent_budget_exhausted',
   tenant_budget_exhausted: 'intent.waiting_cause.tenant_budget_exhausted',
   plan_tools_not_registered: 'intent.waiting_cause.plan_tools_not_registered',
+  // X04 (ADR-M69 §2.3): a register tool the plan asks for cannot be given to the run.
+  tool_not_found: 'intent.waiting_cause.tool_not_found',
+  tool_not_allowed_for_agent: 'intent.waiting_cause.tool_not_allowed_for_agent',
+  tool_not_active: 'intent.waiting_cause.tool_not_active',
+  tool_data_class_not_allowed: 'intent.waiting_cause.tool_data_class_not_allowed',
+  tool_transport_not_supported: 'intent.waiting_cause.tool_transport_not_supported',
 };
 
 /** The reason a person needs to see: `decision` is the normal wait, already shown elsewhere. */

@@ -56,4 +56,14 @@ describe('L09: the tools of the agent in an evaluation', () => {
     expect(view.allowed_tools).toEqual(['file_editor', 'task_tracker', 'terminal']);
     expect(view.instructions_sha256).toBe('c'.repeat(64));
   });
+
+  it('X04: leaves the register tools of the agent out, with no grant', () => {
+    const view = agentContractOf({
+      ...input,
+      instructionsSha256: 'c'.repeat(64),
+      allowedTools: ['file_editor', 'terminal', 'tool:project-docs'],
+    });
+    expect(view.allowed_tools).toEqual(['file_editor', 'terminal']);
+    expect(view.tool_grants).toEqual([]);
+  });
 });

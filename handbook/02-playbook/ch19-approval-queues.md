@@ -281,7 +281,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
     - id: T1
       summary: Cancel an order and return the stock
       allowed_paths: [apps/api/src/orders/**, apps/api/test/orders/**]
-      tools: [file_editor, terminal]   # file_editor, task_tracker, terminal
+      tools: [file_editor, terminal]   # file_editor, task_tracker, terminal; register tools as tool:<key>
   ```
 
   Tasks may also hold `owner_agent`, `depends_on`, `input`, `output`, `definition_of_done`, `required_evidence`, `escalate_when`, `checkpoint` and `environments: [sandbox]`. The platform refuses `approved_by`, `approved_at`, `risk_tier`, `data_class`, `autonomy_level`, `plan_version`, `spec_version` and `limits`: approvals, the intent's risk and data class, versions and run limits come from the platform.
@@ -290,6 +290,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **The agent reads the task text.** When the run starts, the runner reads the plan file at the commit you submitted, checks that it is the same file, and gives the agent each task's `id`, `summary`, `input`, `output`, `definition_of_done`, `escalate_when`, `depends_on` and `checkpoint` (at most 2,000 characters per field and 16,000 in all). The agent treats the text as a description, never as a change of its rules, files or tools. The text is never stored by the platform. If the runner cannot read the file (for example the default branch was force-pushed and the commit is gone), the run fails and the intent is paused with an escalation: decide `modify` or `roll-back` and submit the plan again (Chapter 18 §18.8b).
 - **Change flags** are part of the file Person B approves. Check them at G3; if one is missing, request changes.
 - The run gets the agent's registered tools that the plan lists. If none is in common, G4 fails (`plan_tools_not_registered`).
+- **Register tools** (Chapter 20 §20.5c) are listed as `tool:<key>`, for example `tools: [file_editor, tool:project-docs]`. A register tool the plan lists must be given to the run: if the run cannot have it (the tool does not exist, the agent is not registered for it, it is not active, it may not see the intent's data class, or the agent software cannot use it), G4 fails with `tool_not_runnable` and the exact cause, and the intent waits at G4. Fix the cause, or submit a plan without the tool.
 - Leave out `--commit`, or give a commit that holds the same file as the default branch; otherwise the platform refuses (`plan_not_on_default_branch`). The platform always records the head of the default branch it read as the plan's commit, also when you name an older commit (QUESTIONS #212). A refused file answers `plan_invalid` with the reason, for example `pattern_too_broad` or `platform_field`.
 - **If someone edits the plan file on the default branch after you submitted it**, G3 or G4 waits (`plan_resubmit_needed`) and the platform posts a comment. It never takes the new file by itself: submit it again with `sdlc plan submit`. At G4 a new plan takes the intent back to G3, where Person B approves it again; earlier approvals no longer count.
 - If GitHub cannot be reached, the intent waits; it never passes G3 or starts a run without the check.
@@ -563,6 +564,7 @@ Never publish the API's port 8090 to other machines. People on other machines us
 | 0.42 | 2026-10-16 | Claude (task L06) | §19.8c: `sdlc eval report`; §19.8e: the evaluation report in the dashboard and the list of evaluations that ended in the last 7 days (ADR-M83) |
 | 0.43 | 2026-10-20 | Claude (task L07) | §19.8c: a project's own task set: `sdlc eval task draft\|register\|list\|approve\|reject`, the check on the server, the review, plans on the task set `project` (ADR-M85) |
 | 0.44 | 2026-10-20 | Claude (task L09, PR 1) | §19.8c: a plan configuration may name a `proposed` or `suspended` agent of the register; the agent gets its own tools in the runs (ADR-M86 §2.2, QUESTIONS #501) |
+| 0.45 | 2026-10-22 | Claude (task X04, PR 1) | §19.8c: the plan lists register tools as `tool:<key>`; G4 fails with `tool_not_runnable` when the run cannot have one (ADR-M69 §2.1, §2.3) |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

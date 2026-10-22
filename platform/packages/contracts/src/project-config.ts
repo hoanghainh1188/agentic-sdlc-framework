@@ -282,6 +282,22 @@ export interface ProjectConfig {
       readonly recertification_max_age_days: number;
     };
   };
+  /** Register tools (task X04, ADR-M69 §2.2–§2.7, ADR-M87). */
+  readonly tools: {
+    /** Maximum age of a tool's last recertification before a warning (rule M18: at most 3). */
+    readonly recertification_months: number;
+    /** The run gateway's cap of calls per tool and run (ADR-M69 §2.7). */
+    readonly max_calls_per_run: number;
+    /** Limits of each tool container of a run (ADR-M69 §2.4). */
+    readonly container_limits: {
+      readonly memory_mb: number;
+      /** Thousandths of a CPU: 1000 is one CPU. */
+      readonly cpu_millis: number;
+      readonly pids: number;
+    };
+    /** The run's MCP gateway (agentgateway, ADR-M87): its image by digest, or null. */
+    readonly gateway: { readonly image: string | null };
+  };
   /**
    * Sandbox images of the project, pinned by digest (QUESTIONS #59, ADR-M25). `image` is the
    * OpenHands image; `images` gives one image per adapter (X03, QUESTIONS #522, #528).

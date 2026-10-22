@@ -53,7 +53,10 @@ export const PLAN_INVALID_REASONS = [
   'intent_mismatch',
   /** A key the platform owns: approvals, the intent's risk and data class, versions, limits. */
   'platform_field',
-  /** A tool that is not an agent tool (`file_editor`, `task_tracker`, `terminal`). */
+  /**
+   * A tool that is neither an agent tool (`file_editor`, `task_tracker`, `terminal`) nor a register
+   * tool (`tool:<key>`, X04), or a tool listed twice in one task.
+   */
   'unknown_tool',
   /** A path pattern that is not a safe relative path. */
   'invalid_pattern',

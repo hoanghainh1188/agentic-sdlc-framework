@@ -10,6 +10,10 @@
 // - C07 (QUESTIONS #126): an unpinned agent instruction file at the base commit, or a commit the
 //   Git host lists only in part, fails G4 (`instructions_unpinned`); the run events `key_issued`
 //   and (V13) `model_selected`.
+// - X04 (ADR-M69 §2.3): a register tool the plan asks for and the run cannot have fails G4
+//   (`tool_not_runnable`) with the exact cause; a plan without one keeps schema 3 with no grant.
+import crypto from 'node:crypto';
+
 import { sql } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -17,6 +21,7 @@ import type { Intent } from '../../../packages/core/src/db/schema.js';
 import { changeAgentStatus } from '../../../packages/core/src/agents/register.js';
 import { CostError } from '../../../packages/core/src/cost/errors.js';
 import { raiseEscalation } from '../../../packages/core/src/escalation/raise.js';
+import { changeToolStatus, registerTool } from '../../../packages/core/src/tools/register.js';
 import {
   prepareRun,
   type PrepareRunDeps,
@@ -706,6 +711,48 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       expect(await t.reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G4' });
       expect(await checksFailed(t, intent)).toEqual(['plan_tools_not_registered']);
       expect(await t.g4Decisions(intent)).toEqual([['fail', 'agent_not_runnable', 'POLICY']]);
+    });
+
+    // X04 (ADR-M69 §2.3): a register tool the plan asks for and the run cannot have fails G4 with
+    // `tool_not_runnable` and the exact cause; it is never dropped.
+    it('X04: a register tool that does not exist → G4 fails tool_not_runnable (tool_not_found), once', async () => {
+      const intent = await atG4WithPlanTools(['file_editor', 'tool:no-such-tool']);
+      expect(await t.settle(intent)).toMatchObject({
+        outcome: 'waiting',
+        reason: 'g4_check',
+        cause: 'tool_not_found',
+      });
+      expect(await t.settle(intent)).toMatchObject({ outcome: 'waiting' });
+      expect(await checksFailed(t, intent)).toEqual(['tool_not_found']);
+      expect(await t.g4Decisions(intent)).toEqual([['fail', 'tool_not_runnable', 'POLICY']]);
+    });
+
+    it('X04: an active tool the agent does not list → tool_not_allowed_for_agent', async () => {
+      const key = `docs-${crypto.randomBytes(3).toString('hex')}`;
+      await registerTool(t.f.scope, {
+        toolKey: key,
+        version: '1.0.0',
+        ownerId: t.f.users.a,
+        transport: 'http',
+        imageRef: 'ghcr.io/example/project-docs',
+        imageDigest: `sha256:${'d'.repeat(64)}`,
+        permissions: ['read_documents'],
+        allowedDataClasses: ['internal'],
+      });
+      await changeToolStatus(t.f.scope, key, { to: 'active' });
+      const intent = await atG4WithPlanTools(['file_editor', `tool:${key}`]);
+      expect(await t.settle(intent)).toMatchObject({ cause: 'tool_not_allowed_for_agent' });
+      expect(await checksFailed(t, intent)).toEqual(['tool_not_allowed_for_agent']);
+    });
+
+    it('X04: a plan without register tools keeps the same proposal hash and contract', async () => {
+      const intent = await atG4WithPlanTools(['file_editor']);
+      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'run_pending' });
+      const result = await prepareRun(t.f.scope, deps(), intent.id);
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) return;
+      const contract = (await t.f.scope.runContracts.getByRunId(result.run.runId))!.contract_json;
+      expect(contract).toMatchObject({ schema_version: 3, tool_grants: [] });
     });
   });
   describe('U02: the recorded waiting reason (migration 0025)', () => {

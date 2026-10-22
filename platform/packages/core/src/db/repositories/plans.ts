@@ -1,7 +1,7 @@
 // Plans of an intent (design/D-05 section 6.2). One row per version; rows never change. Reading
 // the plan file from the repository: `plans/` (B09, ADR-M40). `change_flags` drive forced HITL at
 // G3 and dual approval at G7 through the policy engine.
-import { AGENT_TOOLS, CHANGE_FLAGS, type ChangeFlag } from '@sdlc/contracts';
+import { AGENT_TOOLS, CHANGE_FLAGS, isRegisterToolCode, type ChangeFlag } from '@sdlc/contracts';
 import { sql, type Kysely } from 'kysely';
 
 import { RegistryError } from '../../registry/errors.js';
@@ -75,10 +75,15 @@ export class PlanRepository extends TenantRepository {
       if (!COMMIT_SHA.test(file.commitSha)) throw invalid('commitSha must be a 40-hex commit SHA');
       if (
         tools.length === 0 ||
-        tools.some((tool) => !(AGENT_TOOLS as readonly unknown[]).includes(tool)) ||
-        new Set(tools).size !== tools.length
+        tools.some(
+          (tool) =>
+            typeof tool !== 'string' ||
+            (!(AGENT_TOOLS as readonly unknown[]).includes(tool) && !isRegisterToolCode(tool)),
+        ) ||
+        new Set(tools).size !== tools.length ||
+        tools.filter((tool) => typeof tool === 'string' && isRegisterToolCode(tool)).length > 10
       ) {
-        throw invalid('allowedTools must hold unique agent tools');
+        throw invalid('allowedTools must hold unique agent or register tools');
       }
       if (input.actorType !== 'human' || input.actorId === null || (input.summary ?? '') !== '') {
         throw invalid('a plan file is submitted by a person and has no summary');

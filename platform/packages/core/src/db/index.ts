@@ -124,6 +124,8 @@ export type { SaveProjectAiRecord } from './repositories/project-ai-records.js';
 export type {
   Agent,
   AgentApproval,
+  Tool,
+  ToolApproval,
   ApiToken,
   AuditLogRow,
   CostRecordRow,

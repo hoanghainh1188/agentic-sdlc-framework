@@ -35,5 +35,6 @@
   "0034-evaluation-task-checks.ts": "bd1418595e1115288d56bb06eb2df122d78e82b66023b192232f36f27a3d2061",
   "0035-project-task-sets.ts": "21ba577f29a9d7a123d73a49f1bd045ba8d0eb1d7c5df067f7d75ea9138c2606",
   "0036-evaluation-fingerprints.ts": "9cc88052ea03639fa3dbc91edd005f32b31b9bf954f961d9999cd04a5d457929",
-  "0037-agent-adapter.ts": "daf231e352ce18ee9e6983771e7693f53da2a8d3ee8d0c2ee7ec17dfb084b595"
+  "0037-agent-adapter.ts": "daf231e352ce18ee9e6983771e7693f53da2a8d3ee8d0c2ee7ec17dfb084b595",
+  "0038-tool-register.ts": "47230dbd51428f5cda46a611c5eeef481996b205c3e75ba3852dc63230b11e03"
 }
