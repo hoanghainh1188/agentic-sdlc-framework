@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.40. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.41. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -456,7 +456,13 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
   # prints localhost:5050/sdlc/sandbox-node24@sha256:<digest>
   ```
 - On Docker Desktop (development) the Engine cannot push to a port published on the Mac. Use `platform/sandbox-images/build.sh node24 --no-push`: it prints the local reference by digest.
-- Old images: delete the manifest by digest (`curl -X DELETE http://127.0.0.1:5050/v2/sdlc/sandbox-node24/manifests/sha256:<digest>`), then run garbage collection: `docker compose … exec registry registry garbage-collect /etc/docker/registry/config.yml`. Keep every digest a project configuration still names.
+- **OpenCode image** (only for projects with an agent of the adapter `opencode`, handbook Ch.20 §20.5b). It is built on the `node24` image, so give that image by digest. Copy the printed reference into the project configuration as `sandbox.images.opencode`; `sandbox.image` stays the OpenHands image:
+  ```bash
+  NODE24=localhost:5050/sdlc/sandbox-node24@sha256:<digest> pnpm sandbox-image:build node24-opencode
+  # prints localhost:5050/sdlc/sandbox-node24-opencode@sha256:<digest>
+  ```
+  The releases do not publish this image yet: build it on a release checkout too. Build it again whenever you build a new `node24` image.
+- Old images: delete the manifest by digest (`curl -X DELETE http://127.0.0.1:5050/v2/sdlc/sandbox-node24/manifests/sha256:<digest>`; for OpenCode `sandbox-node24-opencode`), then run garbage collection: `docker compose … exec registry registry garbage-collect /etc/docker/registry/config.yml`. Keep every digest a project configuration still names.
 
 ### Rotation
 
@@ -897,6 +903,9 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | `sdlc evidence build` answers `evidence_hash_mismatch` or `evidence_missing` | A stored evidence file (a proposal or a diff) was changed or deleted in SeaweedFS after it was recorded. The audit log has an `evidence.check_failed` event | **Treat it as a possible security incident** (handbook Ch.18): do not "fix" the file; tell Person B. SeaweedFS keeps older versions of the bucket `evidence`: the original can be found by its SHA-256 |
 | `docker-socket-proxy` stays unhealthy, or the runner says it cannot reach the Docker socket (`EACCES`) | `SDLC_DOCKER_GID` is not the group of the host's Docker socket | Section 5g, step 2; then `pnpm compose:sandbox` again |
 | A run fails with `image_unavailable` | `sandbox.image` names a digest the local registry does not have, or the registry is down | Section 5g, sandbox images: push the image again and check the digest |
+| A run fails with `image_not_configured` | The agent's adapter is `opencode`, and the project configuration has no `sandbox.images.opencode` | Section 5g, sandbox images: build the OpenCode image and set it |
+| A run fails with `adapter_mismatch` | The image for the agent's adapter is built for another adapter (its label `sdlc.agent.adapter`; an image without the label counts as OpenHands). For example `sandbox.images.opencode` names the `node24` image | Section 5g, sandbox images: set the image built for that adapter |
+| A run fails with `adapter_unavailable` | The runner does not have the agent's adapter: it is older than the release that added it | Rebuild or pull `sdlc-runner` at the platform's version, then restart it |
 | A run fails with `agent_runner_not_attachable` or `agent_model_unreachable` | `SDLC_RUNNER_SELF_CONTAINER` is not the runner's container name, or `SDLC_RUNNER_AGENT_LLM_URL` (`alias:port`) is not in the run's egress list | Check the `sdlc-runner` environment in `platform/deploy/docker-compose.yml` (design/ADR-M29 §2.7) |
 | A model is missing in LiteLLM | Its provider has no key in `kv/litellm/providers/`, or LiteLLM was not restarted after the key was stored | Section 5d |
 | Compose says the network has a different configuration | `SDLC_NETWORK_SUBNET` or `SDLC_NETWORK_GATEWAY` changed | `pnpm compose:down`, then `pnpm compose:core`. Then run `configure` again (secret IDs are bound to the subnet without the gateway) |
@@ -947,6 +956,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.28 | 2026-10-07 | Claude Code (issue #177, PR 2) | New section 4b: upgrading the OpenBao image (a Raft snapshot first on a real server, no going back to an older version after the newer one ran, unseal, secret IDs end at their expiry since 2.7.1). Tested with throw-away keys (`pnpm test:openbao` on 2.7.1) |
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
 | 0.40 | 2026-10-12 | Claude Code (docs review for v0.2.0) | Sections 3c and 3d are subsections of section 3, like 3.1 and 3.2 (heading level only; the links stay the same) |
+| 0.41 | 2026-10-22 | Claude Code (task X03, PR 3) | Section 5g: the OpenCode sandbox image `node24-opencode` and `sandbox.images.opencode`; troubleshooting: `image_not_configured`, `adapter_mismatch`, `adapter_unavailable` (ADR-M88) |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |
 | 0.37 | 2026-10-12 | Claude Code (task V07, PR 2) | Sections 3c and 4: `pnpm doctor` shows the certificates' end dates and checks the platform after an unseal |

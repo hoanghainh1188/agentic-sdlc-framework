@@ -124,11 +124,31 @@ Rules the platform enforces:
 
 - **Statuses**: proposed → active or retired; active → suspended, quarantined or retired; suspended → active, quarantined or retired; quarantined → suspended or retired. A quarantined agent is suspended (reviewed) before it can run again. A retired agent never changes, and its key is never used again.
 - **A change is a new version** (§20.9). The model, instructions, tools, maximum autonomy, environments and adapter change only while the agent is proposed or suspended, and only with a new version label.
-- **Adapter**: the agent software that runs the agent in the sandbox: `openhands` (default) or `opencode`. Each adapter needs its own sandbox image in the project configuration: `sandbox.image` is the OpenHands image, `sandbox.images.opencode` the OpenCode image, both pinned by digest. A run fails before the sandbox starts when the runner has no such adapter (`adapter_unavailable`), when the project has no image for it (`image_not_configured`), or when the image is built for another adapter (`adapter_mismatch`). The OpenCode adapter is not available yet (task X03 builds it).
+- **Adapter**: the agent software that runs the agent in the sandbox: `openhands` (default) or `opencode`. Each adapter needs its own sandbox image in the project configuration: `sandbox.image` is the OpenHands image, `sandbox.images.opencode` the OpenCode image, both pinned by digest. A run fails before the sandbox starts when the runner has no such adapter (`adapter_unavailable`), when the project has no image for it (`image_not_configured`), or when the image is built for another adapter (`adapter_mismatch`). An image without the label `sdlc.agent.adapter` counts as an OpenHands image. How to use OpenCode: below.
 - **Model**: the model is the name of a model in the platform's model gateway, and the name includes the model version (for example `claude-haiku-4-5-20251001`). If the model behind a name changes, register a new agent version.
 - **Instructions**: the platform stores the SHA-256 of the instructions file (for example `AGENTS.md`) and compares it with the file in the repository before each run. **Every edit of `AGENTS.md` stops the agent's runs** (error "instructions differ") until you register a new agent version with the new file. Review the edit, then `suspend`, `update --version … --instructions-file AGENTS.md`, and approve the change.
 - **Autonomy**: at most L2 in v0.1.
 - **Recertification**: every 3 months (the project configuration may choose a shorter time). The first activation counts as the first certification. When the time has passed, the run still starts, and the agent owner gets a warning. `list --overdue` shows the agents to recertify.
+
+**Registering an agent with another adapter (OpenCode)** (`design/ADR-M68-second-agent-spike.md`, `design/ADR-M88-second-agent-adapter.md`). OpenCode 1.18.35 is the second adapter. It runs with the same caps, stops, kill switch and loop detection as OpenHands, and through the same model gateway.
+
+1. **The sandbox image.** The server operator builds the image `node24-opencode` on the project's `node24` image, pinned by digest: `NODE24=<node24 by digest> pnpm sandbox-image:build node24-opencode` (runbook T11 §5g). It prints the new image by digest. The release does not publish this image yet, so build it also on a release checkout.
+2. **The project configuration.** A project admin adds the image as `sandbox.images.opencode` (`sdlc admin config set`). `sandbox.image` stays the OpenHands image. `doctor` checks that both images are on the server.
+3. **The agent.** An adapter change is a new agent version, so choose one of these:
+   - A **new agent**: `sdlc admin agent register --key coder-opencode … --adapter opencode`, with the same options as above.
+   - A **new version** of an existing agent: suspend it, then `sdlc admin agent update --key <key> --version <next> --adapter opencode`.
+4. **The evaluation.** The adapter is part of the fingerprint (above), so an evaluation of the OpenHands version does not count for the OpenCode version. Make a plan with the agent's key, run it, and read the report (Chapter 19 §19.8c).
+5. **The approval.** Approve the agent with `--purpose activate --evaluation <code>`, as for any new agent or change.
+6. **The project.** Set `run.agent_key` to the agent's key if the project should run it.
+
+What is different with OpenCode:
+
+- **Tools.** The register's tools map to OpenCode's own tools. `file_editor` gives `read`, `edit`, `write`, `patch`, `multiedit`, `glob`, `grep`, `list` and `apply_patch`. `terminal` gives `bash`. `task_tracker` gives `todowrite` and `todoread`. Every other OpenCode tool is off, also a tool that a later OpenCode version adds.
+- **The agent cannot change its own configuration.** The platform checks OpenCode's configuration before the agent starts and on every status read. A repository's own `opencode.json` cannot change the settings the run needs. When the configuration, the tool list or the list of sessions changes during the run, the run fails with the stop reason `agent_config_changed`. Chapter 18 §18.8d says what to do then.
+- **No question that nobody would answer.** OpenCode can ask a person before some actions. In a run nobody answers, so the image denies those actions instead. Examples: a third identical tool call, a file outside the workspace, or a `.env` file (`.env.example` is allowed).
+- **OpenCode's own stuck detector is not used.** The platform's loop detection (Chapter 18 §18.8d) applies to both adapters. The stop reason `agent_stuck` comes from OpenHands only.
+
+**Before real client work with OpenCode.** The agent can reach OpenCode's own server from inside the sandbox. The checks above make a change of the agent's limits visible, but not every change: a change that the agent makes and undoes between two status reads, one second apart, is not seen. The time cap and the run's budget in the model gateway stop a run in every case. The full fix is an authenticating proxy in front of OpenCode's server. It comes before OpenCode is used for real client work (`design/QUESTIONS.md` #523). Until then, use OpenCode agents on pilot repositories and in evaluations only. The run's virtual key is in a file in the sandbox's home directory, which is in memory and is removed with the sandbox (accepted in #523).
 
 ### 20.5c. The tool register on the platform
 
@@ -325,3 +345,4 @@ Old context must not quietly come back through caches, indexes or copied instruc
 | 0.7 | 2026-10-21 | Claude (task L10) | §20.5b, §20.8: a recertification names its evaluation (`--evaluation`); the aging comparison with the last activation; the platform never suspends an agent by itself; `list --overdue` shows the latest evaluation (ADR-M86 §2.6, QUESTIONS #506, #507) |
 | 0.8 | 2026-10-22 | Claude (task X03, PR 1) | §20.5b: `--adapter`, the adapter in the fingerprint and in a new version, one sandbox image per adapter and the refusals (ADR-M88, QUESTIONS #526–#528) |
 | 0.9 | 2026-10-22 | Claude (task X04, PR 1) | §20.5c: the tool register on the platform (commands, approvals, enforced rules, the G4 refusals of a register tool) (ADR-M69, QUESTIONS #516–#535) |
+| 1.0 | 2026-10-22 | Claude (task X03, PR 3) | §20.5b: registering an agent with the adapter `opencode` (image, configuration, new version, evaluation, approval); OpenCode's tool map, the `agent_config_changed` stop, the limits before real client work (ADR-M68, ADR-M88, QUESTIONS #523) |

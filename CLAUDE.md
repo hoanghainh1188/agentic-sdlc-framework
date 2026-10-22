@@ -39,7 +39,7 @@ Always loaded:
 
 ## Repo layout
 - `platform/apps/` — api (NestJS), worker (Temporal, G1–G8 workflow + GitHub poller), runner (sandbox + OpenHands), cli, dashboard (Preact, served by the api)
-- `platform/packages/` — core modules, contracts, adapters (git-github, agent-openhands, model-litellm, evidence-s3, policy-simple, traces-langfuse), config (project configuration, ADR-M18), messages (message catalog), secrets, telemetry, api-schemas, workflow-client
+- `platform/packages/` — core modules, contracts, adapters (git-github, agent-openhands, agent-opencode, model-litellm, evidence-s3, policy-simple, traces-langfuse), agent-kit (helpers for agent adapters only), config (project configuration, ADR-M18), messages (message catalog), secrets, telemetry, api-schemas, workflow-client
 - The platform is a modular monolith: keep module boundaries; core must not import adapters directly (use interfaces).
 - `platform/deploy/` — docker-compose, OpenBao bootstrap, TLS, backups, `doctor`, `trial`, `github-app`. `platform/tests/` — unit tests; `platform/tests/integration/` — live and database tests, scenarios N1–N6, tasks T01–T10 (D-09). `platform/DEVELOPMENT.md` — tests and live checks.
 - `design/` — approved design docs (D-xx) + `README.md` (index, number history) + `QUESTIONS.md`. `handbook/` — process handbook for humans. `diagrams/` — Mermaid sources + SVG.
