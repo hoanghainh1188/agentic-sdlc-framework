@@ -267,6 +267,12 @@ export const CAUSE_RULES: Readonly<Record<string, Rule>> = {
   instructions_unpinned: setupAgent,
   tree_truncated: setupAgent,
   plan_tools_not_registered: setupAgent,
+  // X04: the tool register is set up by tenant admins, like the agent register.
+  tool_not_found: setupAgent,
+  tool_not_allowed_for_agent: setupAgent,
+  tool_not_active: setupAgent,
+  tool_data_class_not_allowed: setupAgent,
+  tool_transport_not_supported: setupAgent,
   intent_budget_exhausted: (facts) => advice('fix_setup', 'setup_budget', facts),
   tenant_budget_exhausted: (facts) => advice('fix_setup', 'setup_budget', facts),
 };

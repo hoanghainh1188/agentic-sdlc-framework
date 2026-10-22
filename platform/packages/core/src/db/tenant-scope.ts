@@ -6,6 +6,8 @@ import { TenantGuardPlugin } from './tenant-guard-plugin.js';
 import { parseTenantId, type TenantId } from './tenant-id.js';
 import { AgentApprovalRepository } from './repositories/agent-approvals.js';
 import { AgentRepository } from './repositories/agents.js';
+import { ToolApprovalRepository } from './repositories/tool-approvals.js';
+import { ToolRepository } from './repositories/tools.js';
 import { ApiTokenRepository } from './repositories/api-tokens.js';
 import { AuditLogRepository } from './repositories/audit-log.js';
 import { CostRecordRepository } from './repositories/cost-records.js';
@@ -87,6 +89,8 @@ export class TenantScope {
   readonly escalationNotices: EscalationNoticeRepository;
   readonly agents: AgentRepository;
   readonly agentApprovals: AgentApprovalRepository;
+  readonly tools: ToolRepository;
+  readonly toolApprovals: ToolApprovalRepository;
   readonly webSessions: WebSessionRepository;
   readonly webauthnCredentials: WebauthnCredentialRepository;
   readonly passkeyChallenges: PasskeyChallengeRepository;
@@ -139,6 +143,8 @@ export class TenantScope {
     this.escalationNotices = new EscalationNoticeRepository(this.db, this.tenantId);
     this.agents = new AgentRepository(this.db, this.tenantId);
     this.agentApprovals = new AgentApprovalRepository(this.db, this.tenantId);
+    this.tools = new ToolRepository(this.db, this.tenantId);
+    this.toolApprovals = new ToolApprovalRepository(this.db, this.tenantId);
     this.webSessions = new WebSessionRepository(this.db, this.tenantId);
     this.webauthnCredentials = new WebauthnCredentialRepository(this.db, this.tenantId);
     this.passkeyChallenges = new PasskeyChallengeRepository(this.db, this.tenantId);

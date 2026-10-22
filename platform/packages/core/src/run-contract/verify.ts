@@ -8,6 +8,7 @@
 import {
   parseRunContractEnvelope,
   type RunContract,
+  type ToolGrant,
   type RunContractRejectReason,
   type RunContractVerifier,
 } from '@sdlc/contracts';
@@ -22,6 +23,12 @@ import { runContractBytes, runContractSha256 } from './canonical.js';
 
 export interface VerifyDeps {
   readonly verifier: RunContractVerifier;
+  /**
+   * X04 (ADR-M69 §2.6): true when this runner can enforce every tool grant of the contract (the
+   * run's gateway and its configuration). Default: no runner can, so a contract with a grant is
+   * refused (`tool_not_enforceable`) until the runner wires the gateway (X04 PR 2).
+   */
+  readonly toolGrantsEnforceable?: (grants: readonly ToolGrant[]) => boolean;
   /** Default: `new Date()`. */
   readonly now?: () => Date;
 }
@@ -78,6 +85,12 @@ export async function verifyRunContract(
   const run = await scope.runs.getById(contract.run_id);
   if (run?.status !== 'queued') return reject('run_not_startable');
 
+  // The runner never opens more than the contract asks for, and never less (ADR-M69 §2.6).
+  const grants = contract.tool_grants ?? [];
+  if (grants.length > 0 && !(deps.toolGrantsEnforceable?.(grants) ?? false)) {
+    return reject('tool_not_enforceable');
+  }
+
   await scope.runEvents.append(run.id, 'contract_accepted', {
     contract_sha256: stored.contract_sha256,
     key_version: stored.key_version,
@@ -113,4 +126,5 @@ export const RUN_CONTRACT_REJECT_MESSAGES = {
   expired: 'run_contract.reject.expired',
   revoked: 'run_contract.reject.revoked',
   run_not_startable: 'run_contract.reject.run_not_startable',
+  tool_not_enforceable: 'run_contract.reject.tool_not_enforceable',
 } as const satisfies Record<RunContractRejectReason, MessageKey>;

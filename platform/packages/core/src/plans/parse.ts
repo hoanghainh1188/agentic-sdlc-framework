@@ -12,7 +12,22 @@
 // read with the configuration's safe reader (core schema, strict, no duplicate keys), with no
 // alias at all. Core uses no schema library (ADR-M09): the checks below are explicit.
 import { readYamlMapping } from '@sdlc/config';
-import { AGENT_TOOLS, CHANGE_FLAGS, type AgentTool, type ChangeFlag } from '@sdlc/contracts';
+import {
+  AGENT_TOOLS,
+  CHANGE_FLAGS,
+  isRegisterToolCode,
+  type AgentTool,
+  type ChangeFlag,
+} from '@sdlc/contracts';
+
+/** At most this many register tools (`tool:<key>`, ADR-M69 §2.1) in a task and in a plan. */
+export const MAX_REGISTER_TOOLS = 10;
+
+/** The plan's union of tools, refused when it holds more register tools than the database allows. */
+function registerToolsCapped(tools: string[]): string[] {
+  if (tools.filter(isRegisterToolCode).length > MAX_REGISTER_TOOLS) refuse('schema_invalid');
+  return tools;
+}
 
 import {
   PLAN_MAX_PATHS,
@@ -26,8 +41,11 @@ import {
 export interface ParsedPlan {
   /** Sorted, unique: the union of every task's `allowed_paths`. */
   readonly plannedFiles: readonly string[];
-  /** Sorted, unique: the union of every task's `tools`. */
-  readonly allowedTools: readonly AgentTool[];
+  /**
+   * Sorted, unique: the union of every task's `tools`: built-in agent tools and register tools
+   * (`tool:<key>`, X04).
+   */
+  readonly allowedTools: readonly string[];
   /** Sorted, unique. */
   readonly changeFlags: readonly ChangeFlag[];
 }
@@ -192,7 +210,7 @@ function readPlanBlock(value: unknown, intentCode: string): ChangeFlag[] {
 interface Task {
   readonly id: string;
   readonly paths: readonly string[];
-  readonly tools: readonly AgentTool[];
+  readonly tools: readonly string[];
   readonly texts: readonly PlanTaskTextField[];
   readonly skipped: number;
 }
@@ -221,10 +239,14 @@ function readTask(value: unknown, index: number, mode: TextMode): Task {
   if (!isMapping(value)) refuse('schema_invalid');
   if (Object.keys(value).some((key) => PLATFORM_TASK_KEYS.has(key))) refuse('platform_field');
   if (!onlyKeys(value, TASK_KEYS)) refuse('schema_invalid');
-  const tools = stringList(value.tools, 1, AGENT_TOOLS.length);
+  const tools = stringList(value.tools, 1, AGENT_TOOLS.length + MAX_REGISTER_TOOLS);
   if (
     Array.isArray(value.tools) &&
-    value.tools.some((t) => !AGENT_TOOLS.includes(t as AgentTool))
+    (value.tools.some(
+      (t) =>
+        typeof t !== 'string' || (!AGENT_TOOLS.includes(t as AgentTool) && !isRegisterToolCode(t)),
+    ) ||
+      new Set(value.tools).size !== value.tools.length)
   ) {
     refuse('unknown_tool');
   }
@@ -237,7 +259,7 @@ function readTask(value: unknown, index: number, mode: TextMode): Task {
     const envs = stringList(value.environments, 1, 1);
     if (envs?.[0] !== 'sandbox') refuse('schema_invalid');
   }
-  return { id: value.id, paths, tools: tools as AgentTool[], ...readTexts(value, index, mode) };
+  return { id: value.id, paths, tools, ...readTexts(value, index, mode) };
 }
 
 function readTasks(value: unknown, mode: TextMode): Task[] {
@@ -272,7 +294,7 @@ function parse(text: string, intentCode: string, mode: TextMode): FullParse {
       ok: true,
       plan: {
         plannedFiles: patterns,
-        allowedTools: [...new Set(tasks.flatMap((task) => task.tools))].sort(),
+        allowedTools: registerToolsCapped([...new Set(tasks.flatMap((task) => task.tools))].sort()),
         changeFlags,
       },
       tasks,

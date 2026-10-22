@@ -19,6 +19,7 @@ import type { Agent, Evaluation, EvaluationConfigurationRow } from '../db/schema
 import type { TenantScope } from '../db/tenant-scope.js';
 import { toRunResult, type StoredResult } from '../evaluation/report-rows.js';
 import { loadEffectiveConfig } from '../registry/effective-config.js';
+import { toolsForFingerprint } from '../tools/fingerprint.js';
 import { toolsSha256 } from './fingerprint.js';
 
 /** The refusal codes of ADR-M86 §2.8. `evaluation_quality_dropped` is used by L10. */
@@ -114,7 +115,7 @@ async function candidateOf(
     scope.evaluations.configurations(evaluationId),
     scope.evaluationRuns.resultsForEvaluation(evaluationId),
   ]);
-  const tools = toolsSha256(agent.allowed_tools);
+  const tools = toolsSha256(await toolsForFingerprint(scope, agent.allowed_tools));
   for (const configuration of configurations) {
     if (
       configuration.tools_sha256 !== tools ||

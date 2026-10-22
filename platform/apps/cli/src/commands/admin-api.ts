@@ -11,6 +11,7 @@ import { AGENT_COMMANDS } from './admin-agents.js';
 import { EVIDENCE_HOLD_COMMANDS } from './admin-evidence.js';
 import type { AdminApiCommand } from './admin-call.js';
 import { PROJECT_COMMANDS } from './admin-projects.js';
+import { TOOL_COMMANDS } from './admin-tools.js';
 import { USER_COMMANDS } from './admin-users.js';
 
 /** Groups of `sdlc admin` that go through the API. */
@@ -23,6 +24,7 @@ export const ADMIN_API_GROUPS = [
   'tenant-admin',
   'token',
   'agent',
+  'tool',
   'evidence',
   'passkey',
 ] as const;
@@ -31,6 +33,7 @@ const COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
   ...PROJECT_COMMANDS,
   ...USER_COMMANDS,
   ...AGENT_COMMANDS,
+  ...TOOL_COMMANDS,
   ...EVIDENCE_HOLD_COMMANDS,
 };
 

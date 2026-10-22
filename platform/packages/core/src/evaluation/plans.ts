@@ -25,6 +25,8 @@ import {
 } from '@sdlc/contracts';
 
 import { isTenantAdmin } from '../admin/actor.js';
+import { toolsSha256 } from '../agents/fingerprint.js';
+import { toolsForFingerprint } from '../tools/fingerprint.js';
 import { fromMicros, startOfUtcMonth, toMicros } from '../cost/money.js';
 import { DbError } from '../db/errors.js';
 import type {
@@ -380,6 +382,7 @@ export async function resolveConfigurations(
       instructions: c.prompt,
       source: c.agent_key !== null ? 'agent' : 'model',
       allowedTools: agent.allowed_tools,
+      toolsSha256: toolsSha256(await toolsForFingerprint(scope, agent.allowed_tools)),
       adapter: agent.adapter,
     });
   }

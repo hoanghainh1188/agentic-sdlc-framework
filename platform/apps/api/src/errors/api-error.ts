@@ -21,6 +21,8 @@ import {
   EvidencePackError,
   RegistryError,
   TenantGuardError,
+  TOOL_REGISTER_ERROR_MESSAGES,
+  ToolRegisterError,
   type AdminErrorCode,
   type CommandErrorCode,
   type KillErrorCode,
@@ -101,6 +103,8 @@ export const API_ERROR_CODES = [
   'token_not_found',
   'agent_not_found',
   'agent_refused',
+  'tool_not_found',
+  'tool_refused',
   'role_binding_not_found',
   'project_archived',
   'project_has_open_intents',
@@ -186,6 +190,8 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   token_not_found: 'api.error.token_not_found',
   agent_not_found: 'api.error.agent_not_found',
   agent_refused: 'api.error.agent_refused',
+  tool_not_found: 'api.error.tool_not_found',
+  tool_refused: 'api.error.tool_refused',
   role_binding_not_found: 'api.error.role_binding_not_found',
   project_archived: 'api.error.project_archived',
   project_has_open_intents: 'api.error.project_has_open_intents',
@@ -326,6 +332,33 @@ export function agentApiError(error: AgentRegisterError, agentKey: string): ApiE
   );
 }
 
+/**
+ * A tool register refusal (X04, ADR-M69 §2.2): the code is the `reason`, its text names the tool.
+ * `not_permitted` and `not_an_approver` are 403; an unknown tool is 404; a bad value 400.
+ */
+export function toolApiError(error: ToolRegisterError, toolKey: string): ApiError {
+  const text = (locale: string) =>
+    t(
+      TOOL_REGISTER_ERROR_MESSAGES[error.code],
+      { key: toolKey, field: error.field ?? '-' },
+      locale,
+    );
+  if (error.code === 'tool_not_found') return new ApiError(404, 'tool_not_found');
+  if (error.code === 'invalid_input') {
+    const details = [{ path: `body.${error.field ?? 'body'}`, issue: 'invalid' }];
+    return new ApiError(400, 'invalid_request', undefined, details);
+  }
+  const forbidden = error.code === 'not_permitted' || error.code === 'not_an_approver';
+  return new ApiError(
+    forbidden ? 403 : 409,
+    forbidden ? 'forbidden' : 'tool_refused',
+    error.code,
+    undefined,
+    undefined,
+    text,
+  );
+}
+
 /** Spec refusals (B08, ADR-M39 §2.2). The reason is the spec error code, or the unreadable cause. */
 const SPEC: Readonly<Record<SpecError['code'], [number, ApiErrorCode]>> = {
   invalid_path: [422, 'spec_invalid'],
@@ -420,6 +453,7 @@ export function toApiError(error: unknown): ApiError {
   if (error instanceof SpecError) return specApiError(error);
   if (error instanceof PlanError) return planApiError(error);
   if (error instanceof AgentRegisterError) return agentApiError(error, '-');
+  if (error instanceof ToolRegisterError) return toolApiError(error, '-');
   if (error instanceof AdminError) {
     const [status, code] = ADMIN[error.code];
     const details =

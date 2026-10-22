@@ -23,7 +23,7 @@
 //   M16 the viewer role never creates intents ........................ D-05 §5, QUESTIONS.md #66
 //   M17 escalation routing: policy → governance, no viewer, backup ≠ . Ch.6 §6.4, codes table §6.3,
 //       owner; notify lists contain the handbook's roles ............ QUESTIONS.md #74
-//   M18 agent recertification at least every 3 months ............... Ch.20 §20.8, ADR-M31
+//   M18 agent and tool recertification at least every 3 months ...... Ch.20 §20.8, ADR-M31, ADR-M69
 //   M19 the viewer role never writes the project AI record ........... ADR-M32, QUESTIONS.md #103
 //   M20 a failed or lost run freezes the intent (pause or higher) .... D-03 §6, ADR-M33 §2.7
 //   M21 Person A and Person B are never the same person on a project . codes table §5, ADR-M37,
@@ -507,13 +507,16 @@ const m17: Rule = (c) => [
 ];
 
 const m18: Rule = (c) =>
-  c.agents.recertification_months > MAX_RECERTIFICATION_MONTHS
-    ? [
-        issue('config.rule.recertification_max', 'agents.recertification_months', {
-          maximum: MAX_RECERTIFICATION_MONTHS,
-        }),
-      ]
-    : [];
+  // X04 (ADR-M69 §2.2): the same limit for register tools.
+  (['agents', 'tools'] as const).flatMap((section) =>
+    c[section].recertification_months > MAX_RECERTIFICATION_MONTHS
+      ? [
+          issue('config.rule.recertification_max', `${section}.recertification_months`, {
+            maximum: MAX_RECERTIFICATION_MONTHS,
+          }),
+        ]
+      : [],
+  );
 
 const m19: Rule = (c) =>
   c.access.ai_record_write_roles.includes('viewer')

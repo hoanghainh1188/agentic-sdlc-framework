@@ -122,6 +122,8 @@ interface Checked {
     readonly adapter: AgentAdapterCode;
   };
   readonly ownerWarning: boolean;
+  /** X04: register tools whose recertification is overdue (a warning, not a refusal). */
+  readonly overdueTools: readonly { readonly id: string; readonly key: string }[];
   readonly validityMinutes: number;
 }
 
@@ -150,6 +152,7 @@ export async function prepareRun(
       triggeredBy: decided.approverId,
       agent: ready.agent.agent,
       ownerWarning: ready.agent.warnings.includes('recertification_overdue'),
+      overdueTools: ready.tools.overdue,
       validityMinutes: policy.config.run.contract_validity_minutes,
     };
   });
@@ -171,6 +174,7 @@ export async function prepareRun(
       },
       // B09: the proposal's tools are already the agent's tools that the plan lists.
       planTools: proposal.allowedTools,
+      toolGrants: proposal.toolGrants,
       autonomyLevel: proposal.autonomyLevel,
       maxBudgetUsd: proposal.maxBudgetUsd,
       maxIterations: proposal.maxIterations,
@@ -202,6 +206,9 @@ export async function prepareRun(
     return { ok: false, reason: 'feedback_unavailable' };
   }
   if (checked.ownerWarning) await warnOwner(scope, deps.registry, intentId, checked.agent, runId);
+  if (checked.overdueTools.length > 0) {
+    await warnToolsOverdue(scope, deps.registry, checked.overdueTools, runId);
+  }
 
   let key;
   const keyIssuedAt = deps.registry.now();
@@ -278,6 +285,27 @@ function isAtG4(intent: { readonly status: string; readonly current_gate: string
 }
 
 /** FR-36: the run is not blocked; the owner is told, and the audit log records it with the run. */
+/** X04: an overdue tool gives a warning in the audit log; it does not block the run (ADR-M69). */
+async function warnToolsOverdue(
+  scope: TenantScope,
+  registry: Registry,
+  tools: Checked['overdueTools'],
+  runId: string,
+): Promise<void> {
+  await scope.transaction(async (tx) => {
+    for (const tool of tools) {
+      await tx.audit.append({
+        action: 'tool.recertification_overdue',
+        actorType: 'system',
+        actorId: null,
+        entityId: tool.id,
+        occurredAt: registry.now(),
+        payload: { tool_key: tool.key, run_id: runId },
+      });
+    }
+  });
+}
+
 async function warnOwner(
   scope: TenantScope,
   registry: Registry,

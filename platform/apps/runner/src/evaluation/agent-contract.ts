@@ -5,6 +5,7 @@
 // of the evaluation stand in for the intent and the plan; the branch is a fixed local name that
 // nothing pushes.
 import {
+  isRegisterToolCode,
   RUN_CONTRACT_SCHEMA_VERSION,
   validateRunContract,
   type EvaluationRunContract,
@@ -55,7 +56,12 @@ export function agentContractOf(input: AgentContractInput): RunContract {
     agent_version: contract.agent_version,
     agent_adapter: contract.agent_adapter,
     instructions_sha256: input.instructionsSha256,
-    allowed_tools: [...(input.allowedTools ?? EVALUATION_AGENT_TOOLS)],
+    // X04 (ADR-M69): an evaluation run gets no register tool. The configuration keeps the agent's
+    // `tool:` codes for the fingerprint; the run's contract leaves them out, with no grant.
+    allowed_tools: (input.allowedTools ?? EVALUATION_AGENT_TOOLS).filter(
+      (tool) => !isRegisterToolCode(tool),
+    ),
+    tool_grants: [],
     autonomy_level: 'L2',
     max_budget_usd: contract.max_budget_usd,
     max_iterations: contract.max_iterations,

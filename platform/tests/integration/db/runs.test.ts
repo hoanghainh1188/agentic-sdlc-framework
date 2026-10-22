@@ -187,7 +187,8 @@ describeDb('C02: Run Contracts on PostgreSQL', () => {
       const { contract, signature } = issued.envelope;
 
       expect(contract).toMatchObject({
-        schema_version: 2,
+        schema_version: 3,
+        tool_grants: [],
         agent_adapter: 'openhands',
         tenant_id: s.scope.tenantId,
         intent_id: s.intentId,

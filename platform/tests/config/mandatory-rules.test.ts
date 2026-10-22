@@ -388,6 +388,14 @@ const CASES: Case[] = [
     key: 'config.rule.recertification_max',
     path: 'agents.recertification_months',
   },
+  // X04 (ADR-M69 §2.2): the same limit for register tools.
+  {
+    name: 'tools recertified every 4 months',
+    rule: 'M18',
+    yaml: 'tools:\n  recertification_months: 4\n',
+    key: 'config.rule.recertification_max',
+    path: 'tools.recertification_months',
+  },
   // M19: the viewer role never writes the project AI record (B12, ADR-M32, QUESTIONS.md #103).
   {
     name: 'viewer may write the AI record',

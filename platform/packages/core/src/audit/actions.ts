@@ -460,6 +460,38 @@ export const AUDIT_ACTIONS = {
     fields: { agent_key: 'code', run_id: 'uuid?' },
   },
   /**
+   * A tool was registered in the tool register (X04, ADR-M69 §2.2). Keys, versions, codes and the
+   * image digest (`image_sha256`: the hex of `sha256:…`) only: never the image name (it may hold `/` and `:`) or the model name.
+   */
+  'tool.registered': {
+    entityType: 'tool',
+    fields: { tool_key: 'code', version: 'code', transport: 'code', image_sha256: 'sha256?' },
+  },
+  /** A tool got a new version: image, permissions, data classes, backing services or model. */
+  'tool.updated': {
+    entityType: 'tool',
+    fields: { tool_key: 'code', version: 'code', transport: 'code', image_sha256: 'sha256?' },
+  },
+  /** A tool's status changed. `reason_code` is set for suspend, quarantine and retire. */
+  'tool.status_changed': {
+    entityType: 'tool',
+    fields: { tool_key: 'code', from: 'code', to: 'code', reason_code: 'code?' },
+  },
+  /** A person approved a tool's activation or retirement, in a capacity (ADR-M69 §2.2). */
+  'tool.approval_recorded': {
+    entityType: 'tool',
+    fields: { tool_key: 'code', version: 'code', purpose: 'code', capacity: 'code' },
+  },
+  /** The tool's owner changed. Never who the owner is. */
+  'tool.owner_changed': { entityType: 'tool', fields: { tool_key: 'code' } },
+  /** A tool was recertified, or certified by its first activation. */
+  'tool.recertified': { entityType: 'tool', fields: { tool_key: 'code' } },
+  /** A run got a tool whose recertification is overdue (a warning, not a block). */
+  'tool.recertification_overdue': {
+    entityType: 'tool',
+    fields: { tool_key: 'code', run_id: 'uuid?' },
+  },
+  /**
    * An intent's Evidence Pack was built (E02, ADR-M48). The pack is the entity. Hashes and the
    * version only: never the pack's content, which names the approvers.
    */
