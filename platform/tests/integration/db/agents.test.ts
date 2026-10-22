@@ -134,6 +134,7 @@ describeDb('C10: the agent register on PostgreSQL', () => {
         allowed_tools: ['file_editor', 'terminal'],
         approved_environments: ['sandbox'],
         last_recertified_at: null,
+        adapter: 'openhands',
       });
       expect(await auditOf(s)).toEqual([
         {
@@ -143,9 +144,43 @@ describeDb('C10: the agent register on PostgreSQL', () => {
             agent_key: 'coder-openhands',
             version: '1.0.0',
             instructions_sha256: SHA('c'),
+            adapter: 'openhands',
           },
         },
       ]);
+    });
+
+    // X03 (ADR-M68 §7, QUESTIONS #526): every agent names its adapter; OpenHands by default.
+    it('registers an agent with another adapter and refuses an unknown one', async () => {
+      const s = await seed();
+      const agent = await registerAgent(
+        s.scope,
+        base(s, { agentKey: 'coder-oc', adapter: 'opencode' }),
+      );
+      expect(agent.adapter).toBe('opencode');
+      expect((await auditOf(s)).at(-1)?.payload).toMatchObject({ adapter: 'opencode' });
+      expect(
+        await codeOf(registerAgent(s.scope, base(s, { agentKey: 'coder-x', adapter: 'aider' }))),
+      ).toBe('invalid_input');
+    });
+
+    it('another adapter is a new version, only while proposed or suspended', async () => {
+      const s = await seed();
+      await active(s);
+      const key = 'coder-openhands';
+      expect(
+        await codeOf(updateAgent(s.scope, key, { version: '1.1.0', adapter: 'opencode' })),
+      ).toBe('config_change_not_allowed');
+      await changeAgentStatus(s.scope, key, { to: 'suspended', reason: 'quality' });
+      expect(
+        await codeOf(updateAgent(s.scope, key, { version: '1.0.0', adapter: 'opencode' })),
+      ).toBe('version_unchanged');
+      const updated = await updateAgent(s.scope, key, { version: '2.0.0', adapter: 'opencode' });
+      expect(updated).toMatchObject({ version: '2.0.0', adapter: 'opencode' });
+      expect((await auditOf(s)).at(-1)).toMatchObject({
+        action: 'agent.updated',
+        payload: { agent_key: key, version: '2.0.0', adapter: 'opencode' },
+      });
     });
 
     it('refuses a taken key, also of a retired agent (the identity is never reused)', async () => {
@@ -251,7 +286,12 @@ describeDb('C10: the agent register on PostgreSQL', () => {
       });
       expect((await auditOf(s)).at(-1)).toMatchObject({
         action: 'agent.updated',
-        payload: { agent_key: key, version: '1.1.0', instructions_sha256: SHA('d') },
+        payload: {
+          agent_key: key,
+          version: '1.1.0',
+          instructions_sha256: SHA('d'),
+          adapter: 'openhands',
+        },
       });
     });
 
@@ -302,6 +342,11 @@ describeDb('C10: the agent register on PostgreSQL', () => {
       expect(await run(sql`DELETE FROM agents ${where}`)).toBe('42501');
       await sql`UPDATE agents SET status = 'suspended' ${where}`.execute(t0.appRaw);
       expect(await run(sql`UPDATE agents SET model_ref = 'gpt-oss-20b' ${where}`)).toBe('SDA09');
+      // X03: the adapter is configuration too (migration 0037), and only a known code.
+      expect(await run(sql`UPDATE agents SET adapter = 'opencode' ${where}`)).toBe('SDA09');
+      expect(await run(sql`UPDATE agents SET adapter = 'aider', version = '3' ${where}`)).toBe(
+        '23514',
+      );
       expect(await run(sql`UPDATE agents SET status = 'active', version = '2' ${where}`)).toBe(
         'SDA09',
       );
@@ -380,6 +425,7 @@ describeDb('C10: the agent register on PostgreSQL', () => {
           version: '1.0.0',
           instructionsSha256: SHA('c'),
           tools: ['file_editor', 'terminal'],
+          adapter: 'openhands',
           modelRef: MODEL,
           ownerId: s.owner,
         },

@@ -162,7 +162,7 @@ describe.skipIf(!enabled)('C05 live: the runner drives the OpenHands Agent Serve
             unwrapper: { unwrap: () => Promise.reject(new Error('unused')) },
           },
           {},
-          { adapter: new OpenHandsAdapter(), agentUrl: () => r.relayUrl },
+          { adapters: { openhands: new OpenHandsAdapter() }, agentUrl: () => r.relayUrl },
         );
         // The runner did not provision this fixture run, so it holds no clone: drive the agent
         // with the fixture's clone (C07), then release the run through the runner as runAgent does.

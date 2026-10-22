@@ -22,12 +22,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type {
-  RedactedSecret,
-  RunContract,
-  RunContractRejectReason,
-  RunContractVerifier,
-  SecretUnwrapper,
+import {
+  sandboxImageFor,
+  type AgentAdapterCode,
+  type ProjectConfig,
+  type RedactedSecret,
+  type RunContract,
+  type RunContractRejectReason,
+  type RunContractVerifier,
+  type SecretUnwrapper,
 } from '@sdlc/contracts';
 import {
   loadEffectiveConfig,
@@ -86,6 +89,11 @@ export interface RunnerDeps {
    * token-only GitHub adapter, like `tokenRevoker`). Without it such a run fails.
    */
   readonly feedbackReader?: FeedbackReader;
+  /**
+   * X03: the codes of the agent adapters this runner has. A contract that names another adapter
+   * fails before the clone (`adapter_unavailable`). Undefined: not checked (provisioning tests).
+   */
+  readonly agentAdapters?: readonly AgentAdapterCode[];
 }
 
 export interface ProvisionRequest {
@@ -181,7 +189,10 @@ export async function provisionRun(
       if (!planEgress(contract.egress_allowlist, deps.settings.egressServices).ok) {
         throw new ProvisioningError('egress_not_enforceable');
       }
-      image = await projectImage(scope, contract.project_id);
+      if (deps.agentAdapters && !deps.agentAdapters.includes(contract.agent_adapter)) {
+        throw new ProvisioningError('adapter_unavailable');
+      }
+      image = await projectImage(scope, contract.project_id, contract.agent_adapter);
       cloneStarted = Date.now();
       repoDir = await cloneForRun(deps.settings.git, {
         repo: contract.repo,
@@ -210,6 +221,7 @@ export async function provisionRun(
       runId: runId,
       tenantId: contract.tenant_id,
       image,
+      adapter: contract.agent_adapter,
       egressAllowlist: contract.egress_allowlist,
       workspaceTar,
       workspaceReserved: true,
@@ -310,12 +322,21 @@ async function unwrapToken(
   }
 }
 
-async function projectImage(scope: TenantScope, projectId: string): Promise<string> {
+/** The project's image for the adapter (X03, QUESTIONS #522, #528). */
+async function projectImage(
+  scope: TenantScope,
+  projectId: string,
+  adapter: AgentAdapterCode,
+): Promise<string> {
+  let sandbox: ProjectConfig['sandbox'];
   try {
-    return (await loadEffectiveConfig(scope.projectConfigs, projectId)).config.sandbox.image;
+    sandbox = (await loadEffectiveConfig(scope.projectConfigs, projectId)).config.sandbox;
   } catch {
     throw new ProvisioningError('config_unavailable');
   }
+  const image = sandboxImageFor(sandbox, adapter);
+  if (image === undefined) throw new ProvisioningError('image_not_configured');
+  return image;
 }
 
 /** Waits for the image's health check (image contract, ADR-M25 §2.3). */

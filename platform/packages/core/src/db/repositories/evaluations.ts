@@ -7,7 +7,14 @@
 // - The status moves forward only (trigger SDA21). `finish` ends it once, with the counts of its
 //   runs and its cost in the audit event `evaluation.finished`.
 // - The budget is checked against the cost records of its runs (ADR-M81 §2.4): `spentUsd`.
-import { DATA_CLASSES, PROVIDER_TYPES, type DataClass, type ProviderType } from '@sdlc/contracts';
+import {
+  DATA_CLASSES,
+  isAgentAdapterCode,
+  PROVIDER_TYPES,
+  type AgentAdapterCode,
+  type DataClass,
+  type ProviderType,
+} from '@sdlc/contracts';
 import { sql, type Kysely } from 'kysely';
 
 import { toolsSha256 } from '../../agents/fingerprint.js';
@@ -56,6 +63,8 @@ export interface EvaluationConfigurationInput {
   readonly source?: EvaluationConfigurationSource;
   /** L09 (QUESTIONS #501): the tools the agent gets in the runs, its own `allowed_tools`. */
   readonly allowedTools?: readonly string[];
+  /** X03 (QUESTIONS #526): the adapter of the agent. Default `openhands` (operator evaluations). */
+  readonly adapter?: AgentAdapterCode;
   /** L05: a prompt variant (path, commit, SHA-256 read at start); null: the repository's own. */
   readonly instructions?: {
     readonly path: string;
@@ -165,6 +174,7 @@ export function checkNewEvaluation(input: NewEvaluation): void {
   for (const c of input.configurations) {
     if (!MODEL.test(c.model)) invalid('model');
     if (!(PROVIDER_TYPES as readonly string[]).includes(c.providerType)) invalid('providerType');
+    if (c.adapter !== undefined && !isAgentAdapterCode(c.adapter)) invalid('adapter');
     if (!VERSION.test(c.agentVersion)) invalid('agentVersion');
     if (!Number.isSafeInteger(c.maxIterations) || c.maxIterations < 1 || c.maxIterations > 200) {
       invalid('maxIterations');
@@ -270,6 +280,7 @@ export class EvaluationRepository extends TenantRepository {
               max_iterations: configuration.maxIterations,
               max_duration_min: configuration.maxDurationMin,
               base_sha: input.taskBaseShas?.[taskId] ?? null,
+              ...(configuration.adapter === undefined ? {} : { adapter: configuration.adapter }),
             })),
           ),
         );
@@ -297,6 +308,7 @@ export class EvaluationRepository extends TenantRepository {
                 instructions_commit: c.instructions?.commit ?? null,
                 instructions_sha256: c.instructions?.sha256 ?? null,
                 ...fingerprintColumns(c),
+                ...(c.adapter === undefined ? {} : { adapter: c.adapter }),
               })),
             )
             .execute();

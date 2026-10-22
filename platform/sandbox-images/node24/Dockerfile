@@ -46,6 +46,11 @@ ENV COREPACK_HOME=/tmp/corepack \
     CHROME_BIN= \
     PUPPETEER_EXECUTABLE_PATH=
 
+# X03 (ADR-M68 §7): the adapter that drives this image's agent server, and its version. The runner
+# refuses a run whose agent names another adapter (`adapter_mismatch`).
+LABEL sdlc.agent.adapter=openhands \
+      sdlc.agent.version=1.48.0
+
 USER 10001:10001
 # The Agent Server answers /ready once it can take a conversation (ADR-M10 §2.2: 4.5–6.8 s).
 HEALTHCHECK --interval=2s --timeout=3s --start-period=5s --retries=60 \

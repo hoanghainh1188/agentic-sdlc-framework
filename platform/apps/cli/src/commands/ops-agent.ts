@@ -170,6 +170,7 @@ interface DescribedAgent {
   readonly allowed_tools: readonly string[];
   readonly max_autonomy: string;
   readonly approved_environments: readonly string[];
+  readonly adapter: string;
   readonly last_recertified_at: string | null;
   readonly recertification_due_on: string | null;
   readonly overdue: boolean;
@@ -189,6 +190,7 @@ function describe(agent: Agent, months: number, now: Date = new Date()): Describ
     allowed_tools: agent.allowed_tools,
     max_autonomy: agent.max_autonomy,
     approved_environments: agent.approved_environments,
+    adapter: agent.adapter,
     last_recertified_at: agent.last_recertified_at,
     recertification_due_on: recert.dueOn,
     // Only an agent that may run needs a current certification.
@@ -210,6 +212,7 @@ function text(agent: DescribedAgent): Record<string, string> {
     tools: agent.allowed_tools.join(',') || '-',
     max_autonomy: agent.max_autonomy,
     environments: agent.approved_environments.join(',') || '-',
+    adapter: agent.adapter,
     recertified: agent.last_recertified_at ?? '-',
     due: agent.recertification_due_on ?? '-',
     overdue: agent.overdue ? t('cli.admin.agent.overdue_flag') : '',

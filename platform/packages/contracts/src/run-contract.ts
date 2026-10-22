@@ -7,6 +7,7 @@
 // bytes are the same after a round trip through PostgreSQL jsonb. Lists that act as sets
 // (`allowed_tools`, `allowed_models`, `egress_allowlist`) must be sorted and unique, so the same
 // set always gives the same bytes.
+import { isAgentAdapterCode, type AgentAdapterCode } from './agent.js';
 import type { AutonomyLevel } from './codes.js';
 import {
   budget,
@@ -25,7 +26,8 @@ import {
   type Check,
 } from './contract-checks.js';
 
-export const RUN_CONTRACT_SCHEMA_VERSION = 1;
+/** 2 (X03, QUESTIONS #526): `agent_adapter`. A contract of schema 1 is refused (`malformed`). */
+export const RUN_CONTRACT_SCHEMA_VERSION = 2;
 
 /** Autonomy levels a contract may grant: L0 never runs an agent (D-02 FR-03), L3+ not in the MVP. */
 export const RUN_CONTRACT_AUTONOMY_LEVELS = [
@@ -53,6 +55,8 @@ export interface RunContract {
   /** From the agent register (C10). */
   readonly agent_id: string;
   readonly agent_version: string;
+  /** The agent's adapter in the register (X03): the runner drives the run with it. */
+  readonly agent_adapter: AgentAdapterCode;
   readonly instructions_sha256: string;
   /**
    * Tools the agent may use in this run: the agent's registered tools that the plan task also
@@ -126,6 +130,7 @@ const FIELDS: Readonly<Record<keyof RunContract, Check>> = {
   planned_files: plannedFiles,
   agent_id: text(UUID),
   agent_version: text(VERSION_LABEL),
+  agent_adapter: isAgentAdapterCode,
   instructions_sha256: text(SHA256),
   allowed_tools: sortedSet(TOOL, 0),
   autonomy_level: (value) =>

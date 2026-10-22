@@ -12,6 +12,7 @@ import {
 import {
   addMonths,
   AGENT_CHANGEABLE_STATUSES,
+  checkAdapter,
   AGENT_STATUS_MOVES,
   checkEnvironments,
   checkMaxAutonomy,
@@ -99,6 +100,17 @@ describe('formats', () => {
       'terminal',
     ]);
     expect(field(() => checkTools(['rm -rf']))).toBe('allowed_tools');
+  });
+
+  it('the adapter is one the platform has (X03, ADR-M68 §7)', () => {
+    expect(checkAdapter('openhands')).toBe('openhands');
+    expect(checkAdapter('opencode')).toBe('opencode');
+    for (const value of ['aider', 'OpenCode', '', 'claude-code']) {
+      expect(
+        field(() => checkAdapter(value)),
+        value,
+      ).toBe('adapter');
+    }
   });
 
   it('autonomy at most L2 in the MVP (D-02 FR-03)', () => {

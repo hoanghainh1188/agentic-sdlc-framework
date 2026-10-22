@@ -280,7 +280,21 @@ export const projectConfigSchema = z.strictObject({
       recertification_max_age_days: positiveInt.max(365),
     }),
   }),
-  sandbox: z.strictObject({ image: pinnedImage }),
+  // X03 (QUESTIONS #522, #528): `image` is the OpenHands image; `images` gives one image per
+  // adapter, each by digest. An `images.openhands` entry must equal `image`.
+  sandbox: z
+    .strictObject({
+      image: pinnedImage,
+      images: z
+        .strictObject({ openhands: pinnedImage.optional(), opencode: pinnedImage.optional() })
+        .optional(),
+    })
+    .superRefine((sandbox, ctx) => {
+      const openhands = sandbox.images?.openhands;
+      if (openhands !== undefined && openhands !== sandbox.image) {
+        addIssue(ctx, 'config.schema.sandbox_images_conflict');
+      }
+    }),
   // L06 (ADR-M83 §2.3, QUESTIONS #481): thresholds of the evaluation recommendation rules.
   evaluation: z.strictObject({
     // L07 (ADR-M85 §2.4, QUESTIONS #485): how `sdlc eval task draft` finds the hidden tests of a

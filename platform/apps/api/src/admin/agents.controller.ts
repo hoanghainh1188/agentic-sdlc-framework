@@ -111,6 +111,7 @@ export class AdminAgentsController {
           allowedTools: input.allowed_tools,
           maxAutonomy: input.max_autonomy,
           approvedEnvironments: input.approved_environments,
+          ...(input.adapter === undefined ? {} : { adapter: input.adapter }),
           now: this.now(),
         }),
       ),
@@ -143,6 +144,7 @@ export class AdminAgentsController {
           ...(input.approved_environments === undefined
             ? {}
             : { approvedEnvironments: input.approved_environments }),
+          ...(input.adapter === undefined ? {} : { adapter: input.adapter }),
         }),
       ),
     );

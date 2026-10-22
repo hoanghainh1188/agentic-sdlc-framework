@@ -19,6 +19,7 @@ const input = {
   runId: RUN_ID,
   tenantId: TENANT_ID,
   image: IMAGE,
+  adapter: 'openhands' as const,
   egressAllowlist: ['litellm:4000', 'npm-proxy:4873'],
 };
 
@@ -38,6 +39,7 @@ describe('sandbox lifecycle (stub Docker)', () => {
     stub.networks.clear();
     stub.volumes.clear();
     stub.images.clear();
+    stub.imageLabels.clear();
   });
 
   const empty = () =>
@@ -138,6 +140,34 @@ describe('sandbox lifecycle (stub Docker)', () => {
     await expect(teardownSandbox(docker, RUN_ID)).rejects.toThrow(/HTTP 500/);
     expect(stub.volumes.size).toBe(0);
     stub.failures.clear();
+    await teardownSandbox(docker, RUN_ID);
+    empty();
+  });
+
+  // X03 (ADR-M68 §7): the image's `sdlc.agent.adapter` label must name the run's adapter.
+  it('refuses an image of another adapter before it creates anything (adapter_mismatch)', async () => {
+    stub.imageLabels.set(IMAGE, { 'sdlc.agent.adapter': 'opencode' });
+    const error = await createSandbox(docker, s, input).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ProvisioningError);
+    expect((error as ProvisioningError).reason).toBe('adapter_mismatch');
+    empty();
+    stub.imageLabels.clear();
+    const unlabelled = await createSandbox(docker, s, { ...input, adapter: 'opencode' }).catch(
+      (e: unknown) => e,
+    );
+    expect((unlabelled as ProvisioningError).reason).toBe('adapter_mismatch');
+    empty();
+  });
+
+  it('starts an image whose label names the adapter of the run, and an unlabelled one for OpenHands', async () => {
+    stub.imageLabels.set(IMAGE, {
+      'sdlc.agent.adapter': 'opencode',
+      'sdlc.agent.version': '1.18.35',
+    });
+    await createSandbox(docker, s, { ...input, adapter: 'opencode' });
+    await teardownSandbox(docker, RUN_ID);
+    stub.imageLabels.clear();
+    await createSandbox(docker, s, input);
     await teardownSandbox(docker, RUN_ID);
     empty();
   });

@@ -12,6 +12,7 @@ import {
   AUTONOMY_LEVELS,
   RUN_CONTRACT_SCHEMA_VERSION,
   signatureKeyVersion,
+  type AgentAdapterCode,
   validateRunContract,
   type IntentStatus,
   type RunContract,
@@ -32,6 +33,8 @@ export interface RunContractAgent {
   readonly instructionsSha256: string;
   /** The agent's allowed tools in the register (C10). */
   readonly tools: readonly string[];
+  /** The adapter that drives the agent (X03, QUESTIONS #526). */
+  readonly adapter: AgentAdapterCode;
 }
 
 export interface IssueRunContract {
@@ -137,6 +140,7 @@ export async function issueRunContract(
     planned_files: [...plan.planned_files],
     agent_id: input.agent.id,
     agent_version: input.agent.version,
+    agent_adapter: input.agent.adapter,
     instructions_sha256: input.agent.instructionsSha256,
     allowed_tools: allowedTools(input.agent.tools, input.planTools),
     autonomy_level: input.autonomyLevel,

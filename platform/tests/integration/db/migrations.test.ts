@@ -142,6 +142,8 @@ const UPDATABLE: Record<string, readonly string[]> = {
     'approved_environments',
     'last_recertified_at',
     'updated_at',
+    // X03 (migration 0037): configuration, changed only with a new version (trigger SDA09).
+    'adapter',
   ],
   // B07: the status comments; only the delivery moves (trigger: final once posted or abandoned).
   intent_notices: ['attempts', 'posted_at', 'abandoned_at'],

@@ -6,7 +6,7 @@
 //   with none, the default configuration. A named evaluation belongs to one of them (any project
 //   of the tenant when the agent has none); its thresholds come from the evaluation's project.
 // - The fingerprint (ADR-M86 §2.1, QUESTIONS #502): a configuration of the evaluation with the
-//   agent's model and `tools_sha256`, and every scored run of it read instructions with the
+//   agent's model, `tools_sha256` and adapter (X03, QUESTIONS #526), and every scored run of it read instructions with the
 //   agent's `instructions_sha256`. That configuration is the candidate.
 // - The conditions of §2.3 are checked in their order; the first that fails is the result, with
 //   the numbers its catalog text quotes. Numbers and codes only; the fingerprint is compared here
@@ -116,7 +116,13 @@ async function candidateOf(
   ]);
   const tools = toolsSha256(agent.allowed_tools);
   for (const configuration of configurations) {
-    if (configuration.tools_sha256 !== tools || configuration.model !== agent.model_ref) continue;
+    if (
+      configuration.tools_sha256 !== tools ||
+      configuration.model !== agent.model_ref ||
+      configuration.adapter !== agent.adapter
+    ) {
+      continue;
+    }
     const own = rows.filter((row) => row.configuration_id === configuration.configuration_id);
     if (own.length > 0 && own.every((r) => r.instructions_sha256 === agent.instructions_sha256)) {
       return { candidate: { configuration, rows: own }, rows };

@@ -223,6 +223,7 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
         version: '1.0.0',
         instructionsSha256: SHA('c'),
         tools: ['file_editor', 'terminal'],
+        adapter: 'openhands',
       },
       planTools: ['file_editor', 'terminal'],
       autonomyLevel: 'L2',
@@ -243,6 +244,7 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
       runId,
       tenantId: tenant.id,
       image: IMAGE,
+      adapter: 'openhands',
       egressAllowlist: envelope.contract.egress_allowlist,
     });
     return { scope, envelope, sandbox };
@@ -774,7 +776,7 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
         unwrapper: { unwrap: () => Promise.reject(new Error('unused')) },
       },
       {},
-      { adapter: agent },
+      { adapters: { openhands: agent } },
     );
     const result = await runner.runAgent(request(s));
     // This runner did not provision the run, so it holds no clone: no run reaches G5 unchecked.

@@ -5,6 +5,7 @@
 //
 // The kind is part of the signed bytes, so a Run Contract of a real run can never be taken for an
 // evaluation contract or the other way round: each schema refuses the other's fields.
+import { isAgentAdapterCode, type AgentAdapterCode } from './agent.js';
 import {
   budget,
   GIT_SHA,
@@ -21,8 +22,11 @@ import {
   type Check,
 } from './contract-checks.js';
 
-/** 2 (L07, ADR-M85 §2.10): the task set's kind and commit; the version only for a `folder` set. */
-export const EVALUATION_CONTRACT_SCHEMA_VERSION = 2;
+/**
+ * 2 (L07, ADR-M85 §2.10): the task set's kind and commit; the version only for a `folder` set.
+ * 3 (X03, QUESTIONS #526): `agent_adapter`.
+ */
+export const EVALUATION_CONTRACT_SCHEMA_VERSION = 3;
 export const EVALUATION_CONTRACT_KIND = 'evaluation';
 
 export interface EvaluationRunContract {
@@ -50,6 +54,8 @@ export interface EvaluationRunContract {
   /** Grows when a preempted run is queued again; one contract per attempt. */
   readonly attempt: number;
   readonly agent_version: string;
+  /** The adapter of the run's configuration (X03): the runner drives the run with it. */
+  readonly agent_adapter: AgentAdapterCode;
   /** The one model of the configuration; it is also the only entry of `allowed_models`. */
   readonly model: string;
   /** Cost cap in USD, a decimal string: never above what is left of the evaluation's budget. */
@@ -94,6 +100,7 @@ const FIELDS: Readonly<Record<keyof EvaluationRunContract, Check>> = {
   run_index: positiveInt,
   attempt: positiveInt,
   agent_version: text(VERSION_LABEL),
+  agent_adapter: isAgentAdapterCode,
   model: text(MODEL),
   max_budget_usd: budget,
   max_iterations: positiveInt,

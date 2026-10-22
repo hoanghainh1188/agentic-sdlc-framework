@@ -277,7 +277,7 @@ describeDb("L07 PR 4c: an evaluation run on a project's task (stub Docker, real 
     },
     pool: new SlotPool(2, 1),
     held: new HeldRuns(),
-    adapter: agent,
+    adapters: { openhands: agent },
     tokenRevoker: {
       revokeShortLivedToken: (token) => {
         revoked.push(token.reveal());

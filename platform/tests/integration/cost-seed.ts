@@ -114,6 +114,7 @@ export async function issueRun(
         version: '1.4.0',
         instructionsSha256: 'c'.repeat(64),
         tools: ['editor'],
+        adapter: 'openhands',
       },
       planTools: ['editor'],
       autonomyLevel: 'L2',

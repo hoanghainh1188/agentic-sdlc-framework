@@ -19,7 +19,7 @@ const text = (c: RunContract) => new TextDecoder().decode(runContractBytes(c));
 describe('canonical bytes (AC1)', () => {
   it('are the RFC 8785 canonical JSON of the contract', () => {
     expect(text(SAMPLE_CONTRACT)).toBe(canonicalJson(SAMPLE_CONTRACT));
-    expect(text(SAMPLE_CONTRACT)).toMatch(/^\{"agent_id":"6{8}-/);
+    expect(text(SAMPLE_CONTRACT)).toMatch(/^\{"agent_adapter":"openhands","agent_id":"6{8}-/);
     expect(text(SAMPLE_CONTRACT)).not.toMatch(/\s"/);
   });
 

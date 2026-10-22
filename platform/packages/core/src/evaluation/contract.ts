@@ -140,6 +140,7 @@ export async function issueEvaluationContract(
     run_index: run.run_index,
     attempt: run.attempt,
     agent_version: run.agent_version,
+    agent_adapter: run.adapter,
     model: run.model,
     max_budget_usd: budget.remainingUsd,
     max_iterations: run.max_iterations,

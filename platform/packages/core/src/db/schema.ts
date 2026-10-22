@@ -4,6 +4,7 @@
 // with the live schema, so the types cannot drift from the migrations.
 import type {
   ActorType,
+  AgentAdapterCode,
   AgentStatus,
   AutonomyLevel,
   ChangeFlag,
@@ -672,6 +673,8 @@ export interface EvaluationConfigurationsTable {
   /** The tools the agent gets in the runs (QUESTIONS #501) and their SHA-256; null before. */
   allowed_tools: ColumnType<string[] | null, string[] | null | undefined, never>;
   tools_sha256: ColumnType<string | null, string | null | undefined, never>;
+  /** X03 (migration 0037): the adapter of the configuration's agent; `openhands` before. */
+  adapter: ColumnType<AgentAdapterCode, AgentAdapterCode | undefined, never>;
 }
 
 export type EvaluationConfigurationSource = 'agent' | 'model';
@@ -753,6 +756,8 @@ export interface EvaluationRunsTable {
   max_duration_min: ColumnType<number, number | undefined, never>;
   /** L07 (migration 0035): the base commit of the run's task (`project` task sets only). */
   base_sha: ColumnType<string | null, string | null | undefined, never>;
+  /** X03 (migration 0037): the adapter of the run's configuration; `openhands` before. */
+  adapter: ColumnType<AgentAdapterCode, AgentAdapterCode | undefined, never>;
 }
 
 /**
@@ -975,6 +980,8 @@ export interface AgentsTable {
   last_recertified_at: MutableNullable<string>;
   updated_at: ColumnType<Date, never, Date>;
   created_at: CreatedAt;
+  /** X03 (migration 0037): the adapter that drives the agent; part of its configuration. */
+  adapter: Mutable<AgentAdapterCode>;
 }
 
 /** Outbox of the gate status comments (FR-22, B07, ADR-M30): codes and IDs only. */
@@ -1377,6 +1384,7 @@ export const TABLE_COLUMNS = {
     'last_recertified_at',
     'updated_at',
     'created_at',
+    'adapter',
   ]),
   intent_notices: columns<IntentNoticesTable>()([
     'id',
@@ -1513,6 +1521,7 @@ export const TABLE_COLUMNS = {
     'max_iterations',
     'max_duration_min',
     'base_sha',
+    'adapter',
   ]),
   evaluation_run_results: columns<EvaluationRunResultsTable>()([
     'id',
@@ -1619,6 +1628,7 @@ export const TABLE_COLUMNS = {
     'source',
     'allowed_tools',
     'tools_sha256',
+    'adapter',
   ]),
   evaluation_tasks: columns<EvaluationTasksTable>()([
     'id',

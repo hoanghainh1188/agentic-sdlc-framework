@@ -188,6 +188,7 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
         version: '1.0.0',
         instructionsSha256: input.instructionsSha256 ?? 'c'.repeat(64),
         tools: ['file_editor', 'terminal'],
+        adapter: 'openhands',
       },
       planTools: ['file_editor', 'terminal'],
       autonomyLevel: 'L2',
@@ -245,6 +246,7 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
     runId: contract.run_id,
     tenantId: tenant.id,
     image: input.image,
+    adapter: contract.agent_adapter,
     egressAllowlist: contract.egress_allowlist,
     workspaceTar: packDirectory(repo, 256 * 1024 * 1024),
   });

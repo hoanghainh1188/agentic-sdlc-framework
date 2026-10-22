@@ -12,12 +12,7 @@
 import fs from 'node:fs';
 
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type {
-  AgentAdapter,
-  EvidenceStore,
-  RedactedSecret,
-  RunKeySpendReader,
-} from '@sdlc/contracts';
+import type { EvidenceStore, RedactedSecret, RunKeySpendReader } from '@sdlc/contracts';
 import { loadEffectiveConfig, parseTenantId } from '@sdlc/core';
 
 import {
@@ -26,6 +21,7 @@ import {
   type AgentRunRequest,
   type AgentRunResult,
 } from './agent/drive.js';
+import { adapterCodes, adapterFor, type AgentAdapters } from './agent/adapters.js';
 import { discardFeedbackToken } from './agent/feedback.js';
 import { RunnerError } from './errors.js';
 import { HeldRuns } from './held.js';
@@ -51,8 +47,11 @@ export interface RunnerHooks {
 }
 
 export interface RunnerAgentOptions {
-  /** The agent adapter (OpenHands in the MVP). Needed for `runAgent`. */
-  readonly adapter?: AgentAdapter;
+  /**
+   * The agent adapters by code (X03): a run is driven by the adapter its contract names. Needed for
+   * `runAgent`; provisioning refuses a contract whose adapter is missing (`adapter_unavailable`).
+   */
+  readonly adapters?: AgentAdapters;
   /** Tests only: reach the Agent Server another way than on the run's network. */
   readonly agentUrl?: (runId: string) => string;
   /**
@@ -88,7 +87,11 @@ export class Runner {
     hooks: RunnerHooks = {},
     agent: RunnerAgentOptions = {},
   ) {
-    this.#deps = { ...deps, held: this.held };
+    this.#deps = {
+      ...(agent.adapters ? { agentAdapters: adapterCodes(agent.adapters) } : {}),
+      ...deps,
+      held: this.held,
+    };
     this.#hooks = hooks;
     this.#agent = agent;
     this.pool = new SlotPool(deps.settings.maxSandboxes, deps.settings.maxEvalSandboxes);
@@ -153,9 +156,9 @@ export class Runner {
   }
 
   async runAgent(request: AgentRunRequest): Promise<AgentRunResult> {
-    const adapter = this.#agent.adapter;
-    if (!adapter) throw new RunnerError('runner.agent_not_configured');
     const { contract } = request;
+    const adapter = adapterFor(this.#agent.adapters, contract.agent_adapter);
+    if (!adapter) throw new RunnerError('runner.agent_not_configured');
     let result: AgentRunResult | undefined;
     try {
       result = await driveAgent(

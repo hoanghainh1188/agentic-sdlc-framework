@@ -185,6 +185,7 @@ describe.skipIf(!enabled)(
             version: '1.0.0',
             instructionsSha256: 'c'.repeat(64),
             tools: ['editor'],
+            adapter: 'openhands',
           },
           planTools: ['editor'],
           autonomyLevel: 'L1',

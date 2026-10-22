@@ -203,6 +203,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
             version: '1.0.0',
             instructionsSha256: 'c'.repeat(64),
             tools: ['editor'],
+            adapter: 'openhands',
           },
           planTools: ['editor'],
           autonomyLevel,

@@ -282,8 +282,14 @@ export interface ProjectConfig {
       readonly recertification_max_age_days: number;
     };
   };
-  /** Sandbox image of the project, pinned by digest (QUESTIONS #59, ADR-M25). */
-  readonly sandbox: { readonly image: string };
+  /**
+   * Sandbox images of the project, pinned by digest (QUESTIONS #59, ADR-M25). `image` is the
+   * OpenHands image; `images` gives one image per adapter (X03, QUESTIONS #522, #528).
+   */
+  readonly sandbox: {
+    readonly image: string;
+    readonly images?: { readonly openhands?: string; readonly opencode?: string };
+  };
   /** Evaluation reports (task L06, ADR-M83 §2.3, QUESTIONS #481) and tasks (L07, ADR-M85). */
   readonly evaluation: {
     /** How a task card is drafted from a merged intent (task L07, ADR-M85 §2.4). */

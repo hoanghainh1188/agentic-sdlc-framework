@@ -39,6 +39,7 @@ const CONFIG = {
   tools: { type: 'string' },
   'max-autonomy': { type: 'string' },
   environments: { type: 'string' },
+  adapter: { type: 'string' },
 } as const;
 
 const agentPath = (call: AdminCall): string =>
@@ -76,6 +77,7 @@ function configBody(values: Values): Record<string, unknown> {
     allowed_tools: list(opt(values, 'tools')),
     max_autonomy: opt(values, 'max-autonomy'),
     approved_environments: list(opt(values, 'environments')),
+    adapter: opt(values, 'adapter'),
   };
   return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
 }
@@ -307,6 +309,7 @@ function text(agent: AgentView): Record<string, string> {
     tools: agent.allowed_tools.join(',') || '-',
     max_autonomy: agent.max_autonomy,
     environments: agent.approved_environments.join(',') || '-',
+    adapter: agent.adapter ?? 'openhands',
     recertified: show(agent.last_recertified_at),
     due: show(agent.recertification_due_on),
     overdue: agent.overdue ? t('cli.admin.agent.overdue_flag') : '',

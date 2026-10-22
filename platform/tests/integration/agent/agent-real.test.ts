@@ -277,7 +277,7 @@ describe.skipIf(!enabled)('C05 real-model run: gpt-oss:20b through LiteLLM (ADR-
           },
           {},
           {
-            adapter: new OpenHandsAdapter({ requestTimeoutMs: 60_000 }),
+            adapters: { openhands: new OpenHandsAdapter({ requestTimeoutMs: 60_000 }) },
             agentUrl: () => run.relayUrl,
           },
         );

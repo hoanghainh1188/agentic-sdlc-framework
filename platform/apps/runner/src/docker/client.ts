@@ -125,6 +125,13 @@ export interface VolumeSummary {
   readonly Labels: Readonly<Record<string, string>> | null;
 }
 
+/** What the runner reads of an image: its ID, digests and labels (X03: `sdlc.agent.adapter`). */
+export interface ImageInfo {
+  readonly Id: string;
+  readonly RepoDigests: string[];
+  readonly Config?: { readonly Labels?: Readonly<Record<string, string>> | null } | null;
+}
+
 export interface DockerClientOptions {
   readonly socketPath: string;
   readonly timeoutMs?: number;
@@ -168,11 +175,11 @@ export class DockerClient {
   }
 
   /** Image details, or undefined when the image is not on this host. */
-  async imageInspect(ref: string): Promise<{ Id: string; RepoDigests: string[] } | undefined> {
+  async imageInspect(ref: string): Promise<ImageInfo | undefined> {
     const res = await this.request('GET', `/images/${ref}/json`);
     if (res.status === 404) return undefined;
     this.#check(res, [200], 'GET');
-    return JSON.parse(res.body.toString('utf8')) as { Id: string; RepoDigests: string[] };
+    return JSON.parse(res.body.toString('utf8')) as ImageInfo;
   }
 
   /** Pulls an image by digest (`name@sha256:…`); tags alone are refused. */

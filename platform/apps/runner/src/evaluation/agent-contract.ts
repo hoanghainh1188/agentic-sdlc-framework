@@ -4,7 +4,12 @@
 // prepared base, in memory only: it is never stored, never signed and never sent anywhere. The IDs
 // of the evaluation stand in for the intent and the plan; the branch is a fixed local name that
 // nothing pushes.
-import { validateRunContract, type EvaluationRunContract, type RunContract } from '@sdlc/contracts';
+import {
+  RUN_CONTRACT_SCHEMA_VERSION,
+  validateRunContract,
+  type EvaluationRunContract,
+  type RunContract,
+} from '@sdlc/contracts';
 
 /** The local branch the agent works on in its sandbox; the runner never pushes it. */
 export const EVALUATION_AGENT_BRANCH = 'agent/INT-0000-0000';
@@ -35,7 +40,7 @@ export class AgentContractError extends Error {
 export function agentContractOf(input: AgentContractInput): RunContract {
   const { contract } = input;
   const draft: RunContract = {
-    schema_version: 1,
+    schema_version: RUN_CONTRACT_SCHEMA_VERSION,
     run_id: contract.evaluation_run_id,
     intent_id: contract.evaluation_id,
     tenant_id: contract.tenant_id,
@@ -48,6 +53,7 @@ export function agentContractOf(input: AgentContractInput): RunContract {
     planned_files: [...input.plannedFiles],
     agent_id: contract.evaluation_id,
     agent_version: contract.agent_version,
+    agent_adapter: contract.agent_adapter,
     instructions_sha256: input.instructionsSha256,
     allowed_tools: [...(input.allowedTools ?? EVALUATION_AGENT_TOOLS)],
     autonomy_level: 'L2',

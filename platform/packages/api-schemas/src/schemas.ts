@@ -512,6 +512,8 @@ export const agentSchema = z.object({
   allowed_tools: z.array(code).max(32),
   max_autonomy: code,
   approved_environments: z.array(code).max(3),
+  /** X03: absent from a server before X03 (every agent was OpenHands). */
+  adapter: code.optional(),
   last_recertified_at: z.string().max(10).nullable(),
   recertification_due_on: z.string().max(10).nullable(),
   overdue: z.boolean(),

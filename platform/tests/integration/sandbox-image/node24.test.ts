@@ -66,6 +66,7 @@ describe.skipIf(!enabled)('C04 live: sandbox image node24 with the package proxy
       runId: RUN_ID,
       tenantId: TENANT_ID,
       image,
+      adapter: 'openhands',
       egressAllowlist: ['litellm:4000', 'npm-proxy:4873'],
       workspaceTar: workspace,
     });

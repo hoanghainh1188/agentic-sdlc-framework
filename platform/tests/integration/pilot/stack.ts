@@ -401,7 +401,7 @@ export class PilotStack extends Stack {
       },
       {},
       {
-        adapter: new OpenHandsAdapter(),
+        adapters: { openhands: new OpenHandsAdapter() },
         agentUrl: (runId) => `http://127.0.0.1:${relayPort}/run/${runId}`,
         evidence: this.bucket.store('proposals/'),
         diffEvidence: diffs,

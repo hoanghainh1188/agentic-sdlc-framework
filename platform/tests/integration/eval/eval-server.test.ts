@@ -246,7 +246,7 @@ describe.skipIf(!enabled)(
               },
               pool: new SlotPool(1, 1),
               held: new HeldRuns(),
-              adapter: new OpenHandsAdapter({ requestTimeoutMs: 120_000 }),
+              adapters: { openhands: new OpenHandsAdapter({ requestTimeoutMs: 120_000 }) },
               clone: (input) => {
                 const repo = path.join(input.dir, 'repo');
                 execFileSync('git', ['clone', '-q', '--no-hardlinks', clone, repo]);

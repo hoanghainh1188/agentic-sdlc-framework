@@ -7,6 +7,8 @@ import { MVP_MAX_AUTONOMY } from '@sdlc/config';
 import {
   AGENT_KEY_PATTERN,
   AUTONOMY_LEVELS,
+  isAgentAdapterCode,
+  type AgentAdapterCode,
   type AgentStatus,
   type AutonomyLevel,
 } from '@sdlc/contracts';
@@ -102,6 +104,12 @@ export function checkSha256(value: string): void {
 /** SHA-256 (hex) of an instructions file's bytes. C06 hashes the file at the run's base commit. */
 export function instructionsSha256(content: string | Uint8Array): string {
   return createHash('sha256').update(content).digest('hex');
+}
+
+/** X03 (ADR-M68 §7): one of the adapters the platform has (`AGENT_ADAPTERS`). */
+export function checkAdapter(value: string): AgentAdapterCode {
+  if (!isAgentAdapterCode(value)) invalid('adapter');
+  return value;
 }
 
 export function checkTools(tools: readonly string[]): string[] {

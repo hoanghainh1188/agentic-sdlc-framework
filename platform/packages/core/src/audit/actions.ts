@@ -415,12 +415,12 @@ export const AUDIT_ACTIONS = {
    */
   'agent.registered': {
     entityType: 'agent',
-    fields: { agent_key: 'code', version: 'code', instructions_sha256: 'sha256' },
+    fields: { agent_key: 'code', version: 'code', instructions_sha256: 'sha256', adapter: 'code' },
   },
   /** An agent got a new version: model, instructions, tools, autonomy or environments (Ch.20 §20.9). */
   'agent.updated': {
     entityType: 'agent',
-    fields: { agent_key: 'code', version: 'code', instructions_sha256: 'sha256' },
+    fields: { agent_key: 'code', version: 'code', instructions_sha256: 'sha256', adapter: 'code' },
   },
   /** An agent's status changed. `reason_code` is set for suspend, quarantine and retire. */
   'agent.status_changed': {

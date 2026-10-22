@@ -171,6 +171,7 @@ describe.skipIf(!liveEnabled)('C04 live: sandbox egress and hardening on Docker'
       runId: runB,
       tenantId: TENANT_B,
       image,
+      adapter: 'openhands',
       egressAllowlist: ['litellm:4000'],
       workspaceTar: targets(['litellm_from_b litellm 4000', 'npm_from_b npm-proxy 4873']),
     });
@@ -185,6 +186,7 @@ describe.skipIf(!liveEnabled)('C04 live: sandbox egress and hardening on Docker'
       runId: runA,
       tenantId: TENANT_A,
       image,
+      adapter: 'openhands',
       egressAllowlist: ['litellm:4000', 'npm-proxy:4873'],
       workspaceTar: targets([
         'litellm litellm 4000',
