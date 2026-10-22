@@ -10,7 +10,7 @@ import type {
 } from '@sdlc/contracts';
 
 export const SAMPLE_CONTRACT: RunContract = {
-  schema_version: 1,
+  schema_version: 2,
   run_id: '11111111-1111-4111-8111-111111111111',
   intent_id: '22222222-2222-4222-8222-222222222222',
   tenant_id: '33333333-3333-4333-8333-333333333333',
@@ -23,6 +23,7 @@ export const SAMPLE_CONTRACT: RunContract = {
   planned_files: ['apps/web/src/products/**', 'apps/api/src/products/list.ts'],
   agent_id: '66666666-6666-4666-8666-666666666666',
   agent_version: '1.4.0',
+  agent_adapter: 'openhands',
   instructions_sha256: 'c'.repeat(64),
   allowed_tools: ['editor', 'git', 'shell:test'],
   autonomy_level: 'L2',

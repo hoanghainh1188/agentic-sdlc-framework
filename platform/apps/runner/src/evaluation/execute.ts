@@ -26,17 +26,17 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type {
-  AgentAdapter,
-  AgentTask,
-  EvaluationHardwareBlock,
-  EvaluationRunContract,
-  ExecuteEvaluationRunInput,
-  ExecuteEvaluationRunResult,
-  RunContractVerifier,
-  RedactedSecret,
-  RunKeySpendReader,
-  SecretUnwrapper,
+import {
+  sandboxImageFor,
+  type AgentTask,
+  type EvaluationHardwareBlock,
+  type EvaluationRunContract,
+  type ExecuteEvaluationRunInput,
+  type ExecuteEvaluationRunResult,
+  type RunContractVerifier,
+  type RedactedSecret,
+  type RunKeySpendReader,
+  type SecretUnwrapper,
 } from '@sdlc/contracts';
 import {
   loadEffectiveConfig,
@@ -64,6 +64,7 @@ import type { HeldRuns } from '../held.js';
 import { RunnerError } from '../errors.js';
 import type { SlotPool } from '../pool.js';
 import { waitUntilHealthy } from '../provision.js';
+import { adapterFor, type AgentAdapters } from '../agent/adapters.js';
 import { createSandbox, ProvisioningError, teardownSandbox } from '../sandbox/lifecycle.js';
 import type { RunnerSettings } from '../settings.js';
 import type { GitTokenRevoker } from '../tokens.js';
@@ -86,7 +87,8 @@ export interface ExecuteEvaluationDeps {
   readonly unwrapper: SecretUnwrapper;
   readonly pool: SlotPool;
   readonly held: HeldRuns;
-  readonly adapter: AgentAdapter;
+  /** The agent adapters by code (X03): the run uses the one its contract names. */
+  readonly adapters: AgentAdapters;
   readonly spendReader?: RunKeySpendReader;
   /** Revokes the clone token right after the clone. Without it the token expires by itself. */
   readonly tokenRevoker?: GitTokenRevoker;
@@ -251,8 +253,14 @@ export async function executeEvaluation(
       if (row.model !== contract.model) throw new TaskError('configuration', 'model');
       if (row.instructions_path !== null) variant = row;
       if (row.allowed_tools !== null) allowedTools = row.allowed_tools;
+      if (row.adapter !== contract.agent_adapter) throw new TaskError('configuration', 'adapter');
     }
     const { config } = await loadEffectiveConfig(scope.projectConfigs, contract.project_id);
+    // X03: the adapter the contract names, and the project's image for it.
+    const adapter = adapterFor(deps.adapters, contract.agent_adapter);
+    if (!adapter) throw new ProvisioningError('adapter_unavailable');
+    const agentImage = sandboxImageFor(config.sandbox, contract.agent_adapter);
+    if (agentImage === undefined) throw new ProvisioningError('image_not_configured');
 
     const token = (await deps.unwrapper.unwrap(new Redacted(input.wrappedGitToken))).token;
     if (!token) throw new ProvisioningError('token_unavailable');
@@ -341,7 +349,8 @@ export async function executeEvaluation(
     const sandbox = await createSandbox(deps.docker, settings, {
       runId,
       tenantId: input.tenantId,
-      image: config.sandbox.image,
+      image: agentImage,
+      adapter: contract.agent_adapter,
       egressAllowlist: contract.egress_allowlist,
       workspaceTar: packDirectory(repoDir, settings.workspaceMaxBytes),
     });
@@ -356,7 +365,7 @@ export async function executeEvaluation(
       {
         docker: deps.docker,
         settings,
-        adapter: deps.adapter,
+        adapter,
         config,
         ...(deps.spendReader ? { spendReader: deps.spendReader } : {}),
         ...(deps.agentUrl ? { agentUrl: deps.agentUrl } : {}),

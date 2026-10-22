@@ -493,6 +493,7 @@ function agentRow(overrides: Partial<Agent> = {}): Agent {
     last_recertified_at: null,
     created_at: AT,
     updated_at: AT,
+    adapter: 'openhands',
     ...overrides,
   };
 }

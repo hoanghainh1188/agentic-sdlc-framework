@@ -93,6 +93,8 @@ export const registerAgentSchema = z.strictObject({
   allowed_tools: tools.default([]),
   max_autonomy: autonomy,
   approved_environments: environments.default(['sandbox']),
+  // X03 (ADR-M68 §7): the register checks the code (`checkAdapter`).
+  adapter: z.string().max(32).optional(),
 });
 
 export const updateAgentSchema = z.strictObject({
@@ -103,6 +105,7 @@ export const updateAgentSchema = z.strictObject({
   allowed_tools: tools.optional(),
   max_autonomy: autonomy.optional(),
   approved_environments: environments.optional(),
+  adapter: z.string().max(32).optional(),
 });
 
 /** `GET /v1/admin/agents?overdue=true` (L10): only overdue agents, with their latest evaluation. */

@@ -11,7 +11,7 @@ export function secret(value: string): RedactedSecret {
 }
 
 export const CONTRACT: RunContract = {
-  schema_version: 1,
+  schema_version: 2,
   run_id: RUN_ID,
   intent_id: '22222222-2222-4222-8222-222222222222',
   tenant_id: '33333333-3333-4333-8333-333333333333',
@@ -24,6 +24,7 @@ export const CONTRACT: RunContract = {
   planned_files: ['apps/web/src/products/**', 'docs/CHANGELOG.md'],
   agent_id: '66666666-6666-4666-8666-666666666666',
   agent_version: '1.0.0',
+  agent_adapter: 'openhands',
   instructions_sha256: 'c'.repeat(64),
   allowed_tools: ['file_editor', 'terminal'],
   autonomy_level: 'L2',

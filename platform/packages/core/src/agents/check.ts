@@ -103,6 +103,7 @@ export async function checkAgentForRun(
       version: agent.version,
       instructionsSha256: agent.instructions_sha256,
       tools: [...agent.allowed_tools],
+      adapter: agent.adapter,
       modelRef,
       ownerId: agent.owner_id,
     },

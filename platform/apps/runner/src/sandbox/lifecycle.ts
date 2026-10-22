@@ -6,7 +6,9 @@
 // container → (workspace archive) → start. Any failure removes everything created so far.
 import crypto from 'node:crypto';
 
-import type { DockerClient } from '../docker/client.js';
+import { AGENT_ADAPTER_LABEL, type AgentAdapterCode } from '@sdlc/contracts';
+
+import type { DockerClient, ImageInfo } from '../docker/client.js';
 import { assertSafeNetworkConnect } from '../docker/guard.js';
 import { RunnerError } from '../errors.js';
 import { LABELS, runLabels, runNames, type RunNames } from '../names.js';
@@ -25,6 +27,9 @@ export type ProvisioningFailure =
   | 'workspace_too_large'
   | 'workspace_invalid' // a hard link, device, FIFO, socket or path escape in the repository
   | 'image_unavailable'
+  | 'image_not_configured' // X03: the project has no sandbox image for the agent's adapter
+  | 'adapter_unavailable' // X03: this runner has no adapter of the contract's `agent_adapter`
+  | 'adapter_mismatch' // X03: the image's `sdlc.agent.adapter` label names another adapter
   | 'image_has_no_healthcheck'
   | 'sandbox_unhealthy'
   | 'sandbox_not_ready'
@@ -41,8 +46,13 @@ export type TeardownReason =
 export interface CreateSandboxInput {
   readonly runId: string;
   readonly tenantId: string;
-  /** Project image pinned by digest (config `sandbox.image`). */
+  /** Project image pinned by digest (config `sandbox.image` or `sandbox.images.<adapter>`). */
   readonly image: string;
+  /**
+   * X03 (ADR-M68 §7): the adapter that will drive the agent. The image's `sdlc.agent.adapter`
+   * label must name it; an image without the label is an OpenHands image (built before X03).
+   */
+  readonly adapter: AgentAdapterCode;
   /** The contract's `egress_allowlist`. */
   readonly egressAllowlist: readonly string[];
   /** Tar archive extracted into `/workspace` before the sandbox starts (the cloned repository). */
@@ -77,13 +87,41 @@ function digestOf(image: string): string {
 }
 
 export async function ensureImage(docker: DockerClient, image: string): Promise<void> {
-  if (await docker.imageInspect(image)) return;
+  await inspectOrPull(docker, image);
+}
+
+async function inspectOrPull(docker: DockerClient, image: string): Promise<ImageInfo> {
+  const present = await docker.imageInspect(image);
+  if (present) return present;
   try {
     await docker.imagePull(image);
   } catch {
     throw new ProvisioningError('image_unavailable');
   }
-  if (!(await docker.imageInspect(image))) throw new ProvisioningError('image_unavailable');
+  const pulled = await docker.imageInspect(image);
+  if (!pulled) throw new ProvisioningError('image_unavailable');
+  return pulled;
+}
+
+/**
+ * The adapter an image names in its label `sdlc.agent.adapter` (ADR-M68 §7). An image without the
+ * label is an OpenHands image: the default base and the images built before X03 have none. The
+ * image is pinned by digest, so its labels are fixed with it.
+ */
+export function imageAdapter(labels: Readonly<Record<string, string>> | null | undefined): string {
+  return labels?.[AGENT_ADAPTER_LABEL] ?? 'openhands';
+}
+
+/** Pulls the image if needed and checks that it is an image of `adapter` (`adapter_mismatch`). */
+export async function ensureAdapterImage(
+  docker: DockerClient,
+  image: string,
+  adapter: AgentAdapterCode,
+): Promise<void> {
+  const info = await inspectOrPull(docker, image);
+  if (imageAdapter(info.Config?.Labels) !== adapter) {
+    throw new ProvisioningError('adapter_mismatch');
+  }
 }
 
 /** Creates and starts the sandbox of one run, or removes everything and throws. */
@@ -97,7 +135,7 @@ export async function createSandbox(
   const egress = planEgress(input.egressAllowlist, settings.egressServices);
   if (!egress.ok) throw new ProvisioningError(egress.reason);
   const imageSha256 = digestOf(input.image);
-  await ensureImage(docker, input.image);
+  await ensureAdapterImage(docker, input.image, input.adapter);
 
   const sessionApiKey = randomKey();
   try {

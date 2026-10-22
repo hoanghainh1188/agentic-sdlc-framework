@@ -20,7 +20,7 @@ import { runContractBytes } from '../../packages/core/src/run-contract/canonical
 
 const ID = '11111111-1111-4111-8111-111111111111';
 const contract = (over: Record<string, unknown> = {}): EvaluationRunContract => ({
-  schema_version: 2,
+  schema_version: 3,
   kind: 'evaluation',
   evaluation_run_id: '22222222-2222-4222-8222-222222222222',
   evaluation_id: '33333333-3333-4333-8333-333333333333',
@@ -37,6 +37,7 @@ const contract = (over: Record<string, unknown> = {}): EvaluationRunContract => 
   run_index: 1,
   attempt: 1,
   agent_version: '1.0.0',
+  agent_adapter: 'openhands',
   model: 'gpt-oss-20b',
   max_budget_usd: '0.4',
   max_iterations: 30,
@@ -70,6 +71,9 @@ describe('the evaluation contract schema', () => {
     ['a model other than the configuration', { allowed_models: ['qwen3-8b'] }],
     ['an expiry before the issue', { expires_at: '2026-10-14T07:00:00.000Z' }],
     ['schema 1 (before L07)', { schema_version: 1 }],
+    ['schema 2 (before X03, no adapter)', { schema_version: 2 }],
+    ['an unknown adapter', { agent_adapter: 'aider' }],
+    ['no adapter', { agent_adapter: undefined }],
     ['another task set kind', { task_set_kind: 'sample' }],
     ['a folder set without a version', { task_set_version: null }],
     ['a folder set with a commit', { task_set_commit: '7d5341d'.padEnd(40, '1') }],
@@ -106,7 +110,7 @@ describe('the evaluation contract schema', () => {
   });
 
   it('has a fixed list of fields', () => {
-    expect(EVALUATION_CONTRACT_FIELDS).toHaveLength(26);
+    expect(EVALUATION_CONTRACT_FIELDS).toHaveLength(27);
     expect(EVALUATION_CONTRACT_KIND).toBe('evaluation');
   });
 });
@@ -116,7 +120,7 @@ describe('the two kinds are never mistaken for each other', () => {
     const evaluation = contract();
     expect(validateRunContract(evaluation).ok).toBe(false);
     const run = {
-      schema_version: 1,
+      schema_version: 2,
       run_id: ID,
       intent_id: ID,
       tenant_id: ID,
@@ -129,6 +133,7 @@ describe('the two kinds are never mistaken for each other', () => {
       planned_files: ['src/**'],
       agent_id: ID,
       agent_version: '1.0.0',
+      agent_adapter: 'openhands',
       instructions_sha256: 'c'.repeat(64),
       allowed_tools: [],
       autonomy_level: 'L2',

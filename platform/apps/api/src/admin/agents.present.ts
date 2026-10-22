@@ -22,6 +22,7 @@ export function presentAgent(agent: Agent, months: number, now: Date): Record<st
     allowed_tools: agent.allowed_tools,
     max_autonomy: agent.max_autonomy,
     approved_environments: agent.approved_environments,
+    adapter: agent.adapter,
     last_recertified_at: agent.last_recertified_at,
     recertification_due_on: recert.dueOn,
     // Only an agent that may run needs a current certification.

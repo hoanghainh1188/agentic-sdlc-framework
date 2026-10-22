@@ -7,7 +7,7 @@
 //
 // Every change and its audit event are one transaction. Audit payloads hold keys, versions,
 // status codes and hashes only: never the model name or the owner.
-import type { AgentStatus } from '@sdlc/contracts';
+import type { AgentAdapterCode, AgentStatus } from '@sdlc/contracts';
 
 import { auditActor, SYSTEM_ACTOR, type AdminActor } from '../admin/actor.js';
 import { DbError } from '../db/errors.js';
@@ -18,6 +18,7 @@ import { AgentRegisterError } from './errors.js';
 import {
   AGENT_CHANGEABLE_STATUSES,
   AGENT_STATUS_MOVES,
+  checkAdapter,
   checkAgentKey,
   checkEnvironments,
   checkMaxAutonomy,
@@ -42,6 +43,8 @@ export interface RegisterAgent {
   readonly allowedTools: readonly string[];
   readonly maxAutonomy: string;
   readonly approvedEnvironments: readonly string[];
+  /** X03 (ADR-M68 §7): the adapter that drives the agent. Default `openhands`. */
+  readonly adapter?: string;
   readonly now?: Date; /** Who acts (B13). Default: the operator (`system`). */
   readonly actor?: AdminActor;
 }
@@ -55,6 +58,8 @@ export interface UpdateAgent {
   readonly allowedTools?: readonly string[];
   readonly maxAutonomy?: string;
   readonly approvedEnvironments?: readonly string[];
+  /** X03: another adapter is a new version too (Ch.20 §20.9). */
+  readonly adapter?: string;
   readonly now?: Date; /** Who acts (B13). Default: the operator (`system`). */
   readonly actor?: AdminActor;
 }
@@ -97,6 +102,7 @@ export async function registerAgent(scope: TenantScope, input: RegisterAgent): P
   const allowedTools = checkTools(input.allowedTools);
   const maxAutonomy = checkMaxAutonomy(input.maxAutonomy);
   const approvedEnvironments = checkEnvironments(input.approvedEnvironments);
+  const adapter: AgentAdapterCode = checkAdapter(input.adapter ?? 'openhands');
   return scope.transaction(async (tx) => {
     const ownerId = await activeOwner(tx, input.ownerId);
     if (await tx.agents.getByKey(input.agentKey)) {
@@ -113,6 +119,7 @@ export async function registerAgent(scope: TenantScope, input: RegisterAgent): P
         allowedTools,
         maxAutonomy,
         approvedEnvironments,
+        adapter,
       })
       .catch((error: unknown) => {
         // Two registrations of the same key at once: the unique index decides (ADR-M31 §2.1).
@@ -129,6 +136,7 @@ export async function registerAgent(scope: TenantScope, input: RegisterAgent): P
         agent_key: agent.agent_key,
         version: agent.version,
         instructions_sha256: agent.instructions_sha256,
+        adapter: agent.adapter,
       },
     });
     return agent;
@@ -162,6 +170,7 @@ export async function updateAgent(
     ...(input.approvedEnvironments === undefined
       ? {}
       : { approvedEnvironments: checkEnvironments(input.approvedEnvironments) }),
+    ...(input.adapter === undefined ? {} : { adapter: checkAdapter(input.adapter) }),
   };
   return scope.transaction(async (tx) => {
     const agent = await lockAgent(tx, agentKey);
@@ -183,6 +192,7 @@ export async function updateAgent(
         agent_key: updated.agent_key,
         version: updated.version,
         instructions_sha256: updated.instructions_sha256,
+        adapter: updated.adapter,
       },
     });
     return updated;

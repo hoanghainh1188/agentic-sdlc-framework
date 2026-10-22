@@ -27,6 +27,7 @@
 // (`prepare_failed`), so no run waits in `queued` with a live key.
 import {
   GitHostError,
+  type AgentAdapterCode,
   type GitHostAdapter,
   type RedactedSecret,
   type RunContractSigner,
@@ -114,7 +115,12 @@ interface Checked {
   readonly inputSha256: string;
   readonly proposal: RunProposal;
   readonly triggeredBy: string | null;
-  readonly agent: { readonly id: string; readonly key: string; readonly tools: readonly string[] };
+  readonly agent: {
+    readonly id: string;
+    readonly key: string;
+    readonly tools: readonly string[];
+    readonly adapter: AgentAdapterCode;
+  };
   readonly ownerWarning: boolean;
   readonly validityMinutes: number;
 }
@@ -161,6 +167,7 @@ export async function prepareRun(
         version: proposal.agentVersion,
         instructionsSha256: proposal.instructionsSha256,
         tools: checked.agent.tools,
+        adapter: checked.agent.adapter,
       },
       // B09: the proposal's tools are already the agent's tools that the plan lists.
       planTools: proposal.allowedTools,

@@ -11,6 +11,7 @@
 //   `max_duration_min` by the caller (interrupt, then remove the sandbox).
 // - Commits: the platform commits what the agent left, with a fixed author that names the agent,
 //   so G7 counts the agent as a producer (FR-11, QUESTIONS #80).
+import type { ProjectConfig } from './project-config.js';
 import type { RunContract } from './run-contract.js';
 import type { RedactedSecret } from './secrets.js';
 
@@ -20,6 +21,36 @@ import type { RedactedSecret } from './secrets.js';
  */
 export const AGENT_TOOLS = ['file_editor', 'task_tracker', 'terminal'] as const;
 export type AgentTool = (typeof AGENT_TOOLS)[number];
+
+/**
+ * Adapters that drive an agent (X03, ADR-M68 §7, ADR-M88). Every agent of the register names one
+ * (`agents.adapter`); the Run Contract carries it (`agent_adapter`), and the run's sandbox image
+ * names it in its label `sdlc.agent.adapter`.
+ */
+export const AGENT_ADAPTERS = ['openhands', 'opencode'] as const;
+export type AgentAdapterCode = (typeof AGENT_ADAPTERS)[number];
+
+/** Image label that names the adapter of a sandbox image (ADR-M68 §7). */
+export const AGENT_ADAPTER_LABEL = 'sdlc.agent.adapter';
+/** Image label that names the version of the agent in a sandbox image (ADR-M68 §7). */
+export const AGENT_VERSION_LABEL = 'sdlc.agent.version';
+
+export function isAgentAdapterCode(value: unknown): value is AgentAdapterCode {
+  return typeof value === 'string' && (AGENT_ADAPTERS as readonly string[]).includes(value);
+}
+
+/**
+ * The sandbox image of a project for an adapter (X03, QUESTIONS #522, #528): `images.<adapter>`,
+ * and for OpenHands `image` when `images.openhands` is not set. Undefined when the project has no
+ * image for the adapter: a run of such an agent cannot start.
+ */
+export function sandboxImageFor(
+  sandbox: ProjectConfig['sandbox'],
+  adapter: AgentAdapterCode,
+): string | undefined {
+  if (adapter === 'openhands') return sandbox.images?.openhands ?? sandbox.image;
+  return sandbox.images?.[adapter];
+}
 
 /** Where the runner reaches the agent, and the per-run key that authenticates the runner. */
 export interface AgentEndpoint {

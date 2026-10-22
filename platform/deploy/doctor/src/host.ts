@@ -432,11 +432,18 @@ async function projectImages(
     if (typeof project !== 'string') continue;
     const loaded = loadProjectConfig(typeof config === 'string' ? config : '');
     const image = loaded.ok ? loaded.config.sandbox.image : null;
-    let present: boolean | null = null;
-    if (image !== null && PINNED_IMAGE.test(image)) {
-      present = (await exec(commands.imageInspect(image))).status === 0;
+    out.push({ project, image, present: await imagePresent(exec, image) });
+    // X03 (QUESTIONS #528): an image for another adapter is checked too, named after it.
+    const opencode = loaded.ok ? loaded.config.sandbox.images?.opencode : undefined;
+    if (opencode !== undefined) {
+      const subject = `${project} (opencode)`;
+      out.push({ project: subject, image: opencode, present: await imagePresent(exec, opencode) });
     }
-    out.push({ project, image, present });
   }
   return out;
+}
+
+async function imagePresent(exec: Exec, image: string | null): Promise<boolean | null> {
+  if (image === null || !PINNED_IMAGE.test(image)) return null;
+  return (await exec(commands.imageInspect(image))).status === 0;
 }

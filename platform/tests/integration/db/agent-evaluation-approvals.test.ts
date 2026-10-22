@@ -174,6 +174,19 @@ describeDb('L09 AC3–AC5: evaluations in the agent approvals on PostgreSQL', ()
       });
     });
 
+    // X03 (QUESTIONS #526): the adapter is part of the fingerprint (ADR-M86 §2.1).
+    it('evaluation_not_matching: an evaluation of the same agent with another adapter', async () => {
+      const w = await world();
+      const evaluation = await evaluate(w, {});
+      expect(await check(w, evaluation.code)).toMatchObject({ result: 'passed' });
+      const configs = await w.scope.evaluations.configurations(evaluation.id);
+      expect(configs.map((c) => c.adapter)).toEqual(configs.map(() => 'openhands'));
+      await updateAgent(w.scope, 'coder', { version: '1.1.0', adapter: 'opencode' });
+      expect(await check(w, evaluation.code)).toMatchObject({
+        result: 'evaluation_not_matching',
+      });
+    });
+
     it('evaluation_task_set_partial: a plan that named task IDs', async () => {
       const w = await world();
       const evaluation = await evaluate(w, {}, { taskIds: TASKS.slice(0, 7) });

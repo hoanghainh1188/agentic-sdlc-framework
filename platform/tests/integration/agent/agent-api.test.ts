@@ -158,7 +158,7 @@ describe.skipIf(!enabled)(`E07 AC4: a real run with the API model ${MODEL} (QUES
           },
           {},
           {
-            adapter: new OpenHandsAdapter({ requestTimeoutMs: 60_000 }),
+            adapters: { openhands: new OpenHandsAdapter({ requestTimeoutMs: 60_000 }) },
             agentUrl: () => run.relayUrl,
           },
         );

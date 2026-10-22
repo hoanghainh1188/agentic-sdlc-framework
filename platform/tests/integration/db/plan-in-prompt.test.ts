@@ -156,6 +156,7 @@ describeDb('B09 PR 2: the runner reads the plan file for the prompt, on PostgreS
           version: '1.0.0',
           instructionsSha256: 'c'.repeat(64),
           tools: ['file_editor', 'terminal'],
+          adapter: 'openhands',
         },
         planTools: ['file_editor', 'terminal'],
         autonomyLevel: 'L2',

@@ -1,6 +1,6 @@
 // The agent register (design/D-05 section 6.1, D-08 C10, design/ADR-M31). Codes only. Rows are
 // never deleted; the checks and the audit events live in `agents/` (core), which calls this.
-import type { AgentStatus, AutonomyLevel } from '@sdlc/contracts';
+import type { AgentAdapterCode, AgentStatus, AutonomyLevel } from '@sdlc/contracts';
 
 import type { Agent } from '../schema.js';
 import { isUuid } from '../tenant-id.js';
@@ -17,6 +17,8 @@ export interface NewAgent {
   readonly allowedTools: readonly string[];
   readonly maxAutonomy: AutonomyLevel;
   readonly approvedEnvironments: readonly AgentEnvironment[];
+  /** X03: default `openhands` (the column default). */
+  readonly adapter?: AgentAdapterCode;
 }
 
 /** Columns a change may set. Left out: unchanged. The trigger decides what is allowed. */
@@ -30,6 +32,7 @@ export interface AgentUpdate {
   readonly allowedTools?: readonly string[];
   readonly maxAutonomy?: AutonomyLevel;
   readonly approvedEnvironments?: readonly AgentEnvironment[];
+  readonly adapter?: AgentAdapterCode;
   /** `YYYY-MM-DD`. */
   readonly lastRecertifiedAt?: string;
 }
@@ -54,6 +57,7 @@ export class AgentRepository extends TenantRepository {
           allowed_tools: [...input.allowedTools],
           max_autonomy: input.maxAutonomy,
           approved_environments: [...input.approvedEnvironments],
+          ...(input.adapter === undefined ? {} : { adapter: input.adapter }),
         })
         .returningAll()
         .executeTakeFirstOrThrow(),
@@ -120,6 +124,7 @@ export class AgentRepository extends TenantRepository {
       ...(update.approvedEnvironments === undefined
         ? {}
         : { approved_environments: [...update.approvedEnvironments] }),
+      ...(update.adapter === undefined ? {} : { adapter: update.adapter }),
       ...(update.lastRecertifiedAt === undefined
         ? {}
         : { last_recertified_at: update.lastRecertifiedAt }),

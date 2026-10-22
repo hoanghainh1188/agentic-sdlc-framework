@@ -101,6 +101,7 @@ describe('the runner on the run network (stub Docker)', () => {
     runId: RUN_ID,
     tenantId: TENANT_ID,
     image: IMAGE,
+    adapter: 'openhands' as const,
     egressAllowlist: ['litellm:4000'],
   };
 

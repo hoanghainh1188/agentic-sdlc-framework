@@ -380,6 +380,7 @@ export async function resolveConfigurations(
       instructions: c.prompt,
       source: c.agent_key !== null ? 'agent' : 'model',
       allowedTools: agent.allowed_tools,
+      adapter: agent.adapter,
     });
   }
   return resolved;

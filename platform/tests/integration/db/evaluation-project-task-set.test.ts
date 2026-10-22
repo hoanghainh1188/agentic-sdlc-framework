@@ -218,7 +218,8 @@ describeDb("L07 PR 4c: evaluations on a project's task set on PostgreSQL", () =>
         { signer, now: () => TASK_NOW },
       );
       expect(issued.envelope.contract).toMatchObject({
-        schema_version: 2,
+        schema_version: 3,
+        agent_adapter: 'openhands',
         repo: 'org/pilot-order-inventory',
         base_sha: TASK_BASE,
         task_id: 'tax-rule',

@@ -179,6 +179,7 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
             version: '1.4.0',
             instructionsSha256: SHA('c'),
             tools: ['editor', 'git'],
+            adapter: 'openhands',
           },
           planTools: ['editor', 'git'],
           autonomyLevel: 'L2',
@@ -327,6 +328,37 @@ describeDb('C04: runner provisioning flow on PostgreSQL', () => {
     });
     const types = (await events(s, envelope.contract.run_id)).map(([type]) => type);
     expect(types).toContain('provisioning_failed');
+    expect(leftovers()).toEqual([0, 0, 0]);
+    expect(workDirEmpty()).toBe(true);
+  });
+
+  // X03 (QUESTIONS #526, #528): the contract's adapter decides the image, before any clone.
+  it.each([
+    ['an adapter this runner does not have', ['openhands'] as const, 'adapter_unavailable'],
+    ['an adapter the project has no image for', undefined, 'image_not_configured'],
+  ])('fails cleanly on %s, before the clone', async (_label, adapters, reason) => {
+    const s = await seed();
+    const envelope = await issue(s, {
+      agent: {
+        id: s.agentId,
+        version: '1.4.0',
+        instructionsSha256: SHA('c'),
+        tools: ['editor', 'git'],
+        adapter: 'opencode',
+      },
+    });
+    expect(envelope.contract.agent_adapter).toBe('opencode');
+    const gitRequests = git.requests.length;
+    const result = await provisionRun(
+      { ...deps, ...(adapters ? { agentAdapters: adapters } : {}) },
+      { envelope, wrappedGitToken: await wrapToken() },
+    );
+    expect(result).toEqual({ ok: false, reason, runId: envelope.contract.run_id });
+    expect(await s.scope.runs.getById(envelope.contract.run_id)).toMatchObject({
+      status: 'failed',
+      stop_reason: reason,
+    });
+    expect(git.requests).toHaveLength(gitRequests); // no clone was attempted
     expect(leftovers()).toEqual([0, 0, 0]);
     expect(workDirEmpty()).toBe(true);
   });

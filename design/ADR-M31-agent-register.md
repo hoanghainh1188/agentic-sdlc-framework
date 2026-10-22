@@ -28,6 +28,7 @@ Four points were open in the C10 plan:
 - A CHECK refuses an `active` agent without a pinned model or a certification date.
 - `runs (tenant_id, agent_id) → agents (tenant_id, id)`, `ON DELETE RESTRICT` (QUESTIONS #32). There were no production rows.
 - `platform_app` may update the state, owner and configuration columns; never `agent_key` or `tenant_id`.
+- X03 (version 0.5, ADR-M68 §7, ADR-M88, QUESTIONS #526; migration `0037-agent-adapter`): `adapter` names the adapter that drives the agent (`openhands`, `opencode`; `AGENT_ADAPTERS`; default `openhands`). It is configuration: a change needs a new version while `proposed` or `suspended` (trigger `SDA09`). `agent.registered` and `agent.updated` record it. It is part of the evaluation fingerprint (ADR-M86 §2.1).
 
 ### 2.2. Operator commands on the server (D1 = A)
 
@@ -78,7 +79,8 @@ Four points were open in the C10 plan:
 | `model_not_allowed` | `model_ref` is not in `allowedModels` |
 | `instructions_mismatch` | The hash differs from `instructions_sha256` |
 
-- On success it returns the agent for `issueRunContract` (ID, version, instructions hash, tools) plus `modelRef` (the run's model, #79) and `ownerId`, and the warnings.
+- On success it returns the agent for `issueRunContract` (ID, version, instructions hash, tools, and since X03 the adapter, which the contract carries as `agent_adapter`) plus `modelRef` (the run's model, #79) and `ownerId`, and the warnings.
+- X03: the core does not know which adapters a runner has. The runner refuses a contract whose adapter it does not have (`adapter_unavailable`), a project without an image for it (`image_not_configured`) and an image whose label `sdlc.agent.adapter` names another adapter (`adapter_mismatch`), as provisioning failures (ADR-M88).
 - `instructionsPath(agent)` gives the path to read.
 
 ### 2.7. Recertification warning (D4)
@@ -127,3 +129,4 @@ Four points were open in the C10 plan:
 | 0.2 | 2026-10-03 | Claude (task B13, PR 2) | Note: §2.2's known gap is closed by ADR-M37 §2.8: the register through the API with handbook Ch.20's approvals; the operator keeps `sdlc ops agent show|list|suspend|quarantine` |
 | 0.3 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |
 | 0.4 | 2026-10-20 | Claude (task L08) | Note: ADR-M86 adds evaluation evidence to the approvals (§2.2 via ADR-M37 §2.8) and to the recertification (§2.7), built by L09 and L10; the check before a run (§2.6) does not change |
+| 0.5 | 2026-10-22 | Claude (task X03, PR 1), approved by the repository owner in the X03 plan | §2.1: `agents.adapter`; §2.6: the check returns the adapter, the runner refuses an adapter or image it cannot run (ADR-M68 §7, ADR-M88, QUESTIONS #526) |

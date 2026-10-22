@@ -237,7 +237,7 @@ describeDb('L04 PR 4c: executeEvaluation on PostgreSQL (stub Docker, scripted ag
       },
       pool: new SlotPool(2, 1),
       held: new HeldRuns(),
-      adapter: agent,
+      adapters: { openhands: agent },
       tokenRevoker: {
         revokeShortLivedToken: (token) => {
           revoked.push(token.reveal());

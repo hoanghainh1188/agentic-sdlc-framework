@@ -170,7 +170,7 @@ async function main(): Promise<void> {
         ),
     },
     {
-      adapter: new OpenHandsAdapter(),
+      adapters: { openhands: new OpenHandsAdapter() },
       spendReader,
       keyRevoked: (key) => spendReader.keyRevoked(key),
       ...(evidence ? { evidence: evidence.proposals, diffEvidence: evidence.diffs } : {}),
@@ -237,7 +237,7 @@ async function main(): Promise<void> {
               unwrapper: openbao.wrapping(),
               pool: runner.pool,
               held: runner.held,
-              adapter: new OpenHandsAdapter(),
+              adapters: { openhands: new OpenHandsAdapter() },
               spendReader,
               ...(tokenRevoker ? { tokenRevoker } : {}),
             },

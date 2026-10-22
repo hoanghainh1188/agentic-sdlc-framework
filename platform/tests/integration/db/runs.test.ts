@@ -145,6 +145,7 @@ describeDb('C02: Run Contracts on PostgreSQL', () => {
       version: '1.4.0',
       instructionsSha256: SHA('c'),
       tools: ['shell:test', 'git', 'editor', 'browser'],
+      adapter: 'openhands',
     },
     planTools: ['editor', 'git', 'deploy'],
     autonomyLevel: 'L2',
@@ -186,7 +187,8 @@ describeDb('C02: Run Contracts on PostgreSQL', () => {
       const { contract, signature } = issued.envelope;
 
       expect(contract).toMatchObject({
-        schema_version: 1,
+        schema_version: 2,
+        agent_adapter: 'openhands',
         tenant_id: s.scope.tenantId,
         intent_id: s.intentId,
         repo: 'org/pilot-order-inventory',

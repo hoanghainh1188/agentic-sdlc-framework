@@ -30,6 +30,7 @@ describe('Run Contract schema (AC1)', () => {
       'planned_files',
       'agent_id',
       'agent_version',
+      'agent_adapter',
       'instructions_sha256',
       'allowed_tools',
       'autonomy_level',
@@ -59,7 +60,11 @@ describe('Run Contract schema (AC1)', () => {
   });
 
   it.each([
-    ['schema_version', 2],
+    // X03 (QUESTIONS #526): a contract of schema 1 has no adapter and is refused.
+    ['schema_version', 1],
+    ['schema_version', 3],
+    ['agent_adapter', 'aider'],
+    ['agent_adapter', undefined],
     ['run_id', 'RUN-1'],
     ['run_id', '11111111-1111-4111-8111-11111111111A'],
     ['repo', 'org'],

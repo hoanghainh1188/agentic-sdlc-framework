@@ -10,7 +10,7 @@ import {
 } from '../../apps/runner/src/evaluation/agent-contract.js';
 
 const contract: EvaluationRunContract = {
-  schema_version: 2,
+  schema_version: 3,
   kind: 'evaluation',
   evaluation_run_id: '11111111-1111-4111-8111-111111111111',
   evaluation_id: '22222222-2222-4222-8222-222222222222',
@@ -27,6 +27,7 @@ const contract: EvaluationRunContract = {
   run_index: 1,
   attempt: 1,
   agent_version: '1.1.0',
+  agent_adapter: 'openhands',
   model: 'qwen3-8b',
   max_budget_usd: '2',
   max_iterations: 30,

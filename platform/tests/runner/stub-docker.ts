@@ -28,6 +28,8 @@ export class StubDocker {
   readonly networks = new Map<string, { labels: Record<string, string>; attached: Set<string> }>();
   readonly volumes = new Map<string, Record<string, string>>();
   readonly images = new Set<string>();
+  /** X03: the labels of an image (`sdlc.agent.adapter`); none by default, like a pre-X03 image. */
+  readonly imageLabels = new Map<string, Record<string, string>>();
   /** Health status reported for started containers; undefined = the image has no health check. */
   health: 'healthy' | 'unhealthy' | 'starting' | undefined = 'healthy';
   /**
@@ -123,7 +125,14 @@ export class StubDocker {
     if (m === 'GET' && p === '/_ping') return [200, 'OK'];
     if (m === 'GET' && (match = /^\/images\/(.+)\/json$/.exec(p))) {
       return this.images.has(match[1]!)
-        ? [200, { Id: 'sha256:img', RepoDigests: [match[1]] }]
+        ? [
+            200,
+            {
+              Id: 'sha256:img',
+              RepoDigests: [match[1]],
+              Config: { Labels: this.imageLabels.get(match[1]!) ?? null },
+            },
+          ]
         : [404, {}];
     }
     if (m === 'POST' && p === '/images/create') {
