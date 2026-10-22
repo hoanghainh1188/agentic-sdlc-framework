@@ -22,6 +22,7 @@ import {
   type ValidatedProjectConfig,
   type RepoRef,
   type RunContractAutonomy,
+  type ToolGrant,
 } from '@sdlc/contracts';
 
 import { instructionsPath } from '../agents/check.js';
@@ -175,6 +176,11 @@ export interface RunProposal {
   readonly autonomyLevel: RunContractAutonomy;
   /** Sorted, unique: the agent's registered tools that the plan lists (B09, QUESTIONS #108). */
   readonly allowedTools: readonly string[];
+  /**
+   * X04 (ADR-M69 §2.3, §2.6): one grant per register tool of `allowedTools`, sorted by key: the
+   * contract's `tool_grants`. Empty when the plan lists no register tool.
+   */
+  readonly toolGrants: readonly ToolGrant[];
   /** Sorted, unique. */
   readonly allowedModels: readonly string[];
   readonly maxBudgetUsd: string;
@@ -206,6 +212,9 @@ export function runProposalSha256(proposal: RunProposal): string {
         max_duration_min: proposal.maxDurationMin,
         base_sha: proposal.baseSha,
         data_class: proposal.dataClass,
+        // X04: only when the run gets register tools, so the hash of every other proposal (and
+        // the G4 approvals bound to it) stays the same.
+        ...(proposal.toolGrants.length > 0 ? { tool_grants: [...proposal.toolGrants] } : {}),
       }),
       'utf8',
     )

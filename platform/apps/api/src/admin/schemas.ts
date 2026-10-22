@@ -1,6 +1,6 @@
 // Request schemas of the admin endpoints (task B13, ADR-M37 §2.6). Shapes only; the core admin
 // services check the values again, so the operator commands follow the same rules.
-import { AGENT_KEY_PATTERN, PROJECT_ROLES } from '@sdlc/contracts';
+import { AGENT_KEY_PATTERN, PROJECT_ROLES, TOOL_KEY_PATTERN } from '@sdlc/contracts';
 import {
   API_TOKEN_MAX_LIFETIME_DAYS,
   API_TOKEN_NAME_PATTERN,
@@ -106,6 +106,40 @@ export const updateAgentSchema = z.strictObject({
   max_autonomy: autonomy.optional(),
   approved_environments: environments.optional(),
   adapter: z.string().max(32).optional(),
+});
+
+// The tool register (X04, ADR-M69 §2.2). The core rules (`tools/rules.ts`) check the formats again.
+export const toolKeySchema = z.string().regex(TOOL_KEY_PATTERN);
+const toolCodes = z.array(z.string().max(80)).max(10);
+
+export const registerToolSchema = z.strictObject({
+  key: toolKeySchema,
+  version: z.string().max(64),
+  owner_id: idSchema,
+  transport: z.enum(['http', 'stdio']),
+  image_ref: z.string().max(255).nullable().optional(),
+  image_digest: z.string().max(80).nullable().optional(),
+  permissions: toolCodes.min(1),
+  allowed_data_classes: toolCodes,
+  backing_services: toolCodes.default([]),
+  model_ref: z.string().max(128).nullable().optional(),
+});
+
+export const updateToolSchema = z.strictObject({
+  version: z.string().max(64),
+  transport: z.enum(['http', 'stdio']).optional(),
+  image_ref: z.string().max(255).nullable().optional(),
+  image_digest: z.string().max(80).nullable().optional(),
+  permissions: toolCodes.min(1).optional(),
+  allowed_data_classes: toolCodes.optional(),
+  backing_services: toolCodes.optional(),
+  model_ref: z.string().max(128).nullable().optional(),
+});
+
+export const approveToolSchema = z.strictObject({
+  purpose: z.enum(['activate', 'retire']),
+  as: z.enum(['owner', 'person_a', 'person_b', 'governance']),
+  reason_code: z.string().max(64).optional(),
 });
 
 /** `GET /v1/admin/agents?overdue=true` (L10): only overdue agents, with their latest evaluation. */

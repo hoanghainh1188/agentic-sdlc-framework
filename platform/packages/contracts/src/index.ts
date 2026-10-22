@@ -11,6 +11,7 @@ export * from './evaluation-contract.js';
 export * from './model-gateway.js';
 export type * from './secrets.js';
 export * from './agent.js';
+export * from './tools.js';
 export * from './agent-instructions.js';
 export * from './intent-workflow.js';
 export * from './run-activity.js';

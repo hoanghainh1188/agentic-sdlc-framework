@@ -280,6 +280,19 @@ export const projectConfigSchema = z.strictObject({
       recertification_max_age_days: positiveInt.max(365),
     }),
   }),
+  // X04 (ADR-M69 §2.2–§2.7, ADR-M87): register tools. Rule M18 keeps the recertification age at 3
+  // months or less, as for agents. `gateway.image`: the run's MCP gateway, by digest; null until a
+  // gateway is set up (no register tool runs without one).
+  tools: z.strictObject({
+    recertification_months: positiveInt,
+    max_calls_per_run: positiveInt.max(10_000),
+    container_limits: z.strictObject({
+      memory_mb: positiveInt.max(16_384),
+      cpu_millis: positiveInt.max(16_000),
+      pids: positiveInt.max(4096),
+    }),
+    gateway: z.strictObject({ image: pinnedImage.nullable() }),
+  }),
   // X03 (QUESTIONS #522, #528): `image` is the OpenHands image; `images` gives one image per
   // adapter, each by digest. An `images.openhands` entry must equal `image`.
   sandbox: z

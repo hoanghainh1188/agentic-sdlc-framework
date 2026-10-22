@@ -19,6 +19,7 @@ import {
   type RunContractAutonomy,
   type RunContractEnvelope,
   type RunContractSigner,
+  type ToolGrant,
 } from '@sdlc/contracts';
 
 import type { Run } from '../db/schema.js';
@@ -45,6 +46,11 @@ export interface IssueRunContract {
   readonly agent: RunContractAgent;
   /** Tools listed for the task in the plan (template T13). The contract gets the intersection. */
   readonly planTools: readonly string[];
+  /**
+   * X04 (ADR-M69 §2.6): one grant per register tool (`tool:<key>`) of the intersection, from G4's
+   * `checkToolsForRun`. Default: none. The schema check refuses a register tool without its grant.
+   */
+  readonly toolGrants?: readonly ToolGrant[];
   readonly autonomyLevel: RunContractAutonomy;
   /** Caps (D-02 FR-32): from the intent budget and the configuration, chosen by the caller (C06). */
   readonly maxBudgetUsd: string;
@@ -143,6 +149,9 @@ export async function issueRunContract(
     agent_adapter: input.agent.adapter,
     instructions_sha256: input.agent.instructionsSha256,
     allowed_tools: allowedTools(input.agent.tools, input.planTools),
+    tool_grants: [...(input.toolGrants ?? [])].sort((a, b) =>
+      a.tool_key < b.tool_key ? -1 : a.tool_key > b.tool_key ? 1 : 0,
+    ),
     autonomy_level: input.autonomyLevel,
     max_budget_usd: input.maxBudgetUsd,
     max_iterations: input.maxIterations,

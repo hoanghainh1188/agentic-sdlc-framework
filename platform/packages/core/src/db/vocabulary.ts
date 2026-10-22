@@ -8,6 +8,7 @@
 import {
   ACTOR_TYPES,
   AGENT_STATUSES,
+  TOOL_STATUSES,
   AUTONOMY_LEVELS,
   CHANGE_FLAGS,
   DATA_CLASSES,
@@ -91,6 +92,8 @@ export const DB_ENUMS = {
   escalation_step: ESCALATION_STEPS,
   agent_status: AGENT_STATUSES,
   tenant_role: TENANT_ROLES,
+  // X04 (migration 0038, ADR-M69 §2.2).
+  tool_status: TOOL_STATUSES,
 } as const;
 
 // Text columns with a CHECK constraint (D-05 section 6.1).

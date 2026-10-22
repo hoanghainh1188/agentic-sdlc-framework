@@ -17,6 +17,7 @@ const APPEND_ONLY = [
   'cost_records',
   'project_ai_record_versions',
   'agent_approvals',
+  'tool_approvals',
   'evaluation_run_contracts',
   'evaluation_run_results',
   'evaluation_plan_versions',

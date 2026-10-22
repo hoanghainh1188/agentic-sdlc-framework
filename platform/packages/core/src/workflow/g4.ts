@@ -39,6 +39,7 @@ import { createHash } from 'node:crypto';
 import { canonicalJson, MVP_MAX_AUTONOMY } from '@sdlc/config';
 import {
   AUTONOMY_LEVELS,
+  isRegisterToolCode,
   type AutonomyLevel,
   type OversightResolution,
   type GateCode,
@@ -54,6 +55,8 @@ import { aiRecordRefusal } from '../ai-record/rules.js';
 import { loadAiRecordFacts } from '../ai-record/service.js';
 import { checkAgentForRun, type CheckedAgent } from '../agents/check.js';
 import { AgentRegisterError } from '../agents/errors.js';
+import { checkToolsForRun, type CheckedTools } from '../tools/check.js';
+import { ToolRegisterError } from '../tools/errors.js';
 import { intentInputSha256 } from '../commands/gate-input.js';
 import { fromMicros, startOfUtcMonth, toMicros } from '../cost/money.js';
 import type { GateDecisionRow, Intent } from '../db/schema.js';
@@ -108,6 +111,8 @@ export type G4Evaluation =
       readonly proposal: RunProposal;
       readonly inputSha256: string;
       readonly agent: CheckedAgent;
+      /** X04: the register tools' grants and the overdue recertifications (a warning). */
+      readonly tools: CheckedTools;
     };
 
 const rank = (level: AutonomyLevel): number => AUTONOMY_LEVELS.indexOf(level);
@@ -233,6 +238,33 @@ export async function evaluateG4(
     throw error;
   }
 
+  // X04 (ADR-M69 §2.3): every register tool the plan asks for must be given to the run, or G4
+  // fails (`tool_not_runnable`) with the exact cause; the subject is the tool's key. A plan stored
+  // without a file lists no register tool.
+  let tools: CheckedTools;
+  try {
+    tools = await checkToolsForRun(tx, {
+      planTools: plan.allowed_tools ?? [],
+      agentTools: agent.agent.tools,
+      adapter: agent.agent.adapter,
+      dataClass: intent.data_class,
+      allowedModels: facts.allowedModels,
+      maxCallsPerRun: config.tools.max_calls_per_run,
+      recertificationMonths: config.tools.recertification_months,
+      now,
+    });
+  } catch (error) {
+    if (error instanceof ToolRegisterError) {
+      return {
+        kind: 'fail',
+        reason: 'tool_not_runnable',
+        check: error.code,
+        subject: error.toolKey ?? null,
+      };
+    }
+    throw error;
+  }
+
   // QUESTIONS #126 (C07): every other file the agent would read as instructions is unpinned. The
   // exact cause goes to the audit event; the subject is the hash of the paths, never the paths.
   const unpinned = facts.instructions.unpinned;
@@ -278,11 +310,11 @@ export async function evaluateG4(
 
   // B09 (ADR-M40 §2.5, QUESTIONS #34, #108): the run's tools are the agent's registered tools
   // that the plan's tasks also list. A plan stored without a file (before B09) lists none: the
-  // agent's registered tools.
+  // agent's registered tools, without its register tools (X04: those only when a plan asks).
   const agentTools = [...new Set(agent.agent.tools)].sort();
   const allowedTools =
     plan.allowed_tools === null
-      ? agentTools
+      ? agentTools.filter((tool) => !isRegisterToolCode(tool))
       : agentTools.filter((tool) => plan.allowed_tools!.includes(tool));
   if (allowedTools.length === 0) {
     return {
@@ -306,6 +338,7 @@ export async function evaluateG4(
     // effectiveAutonomy is at most L2 and not L0 here.
     autonomyLevel: autonomy as RunContractAutonomy,
     allowedTools,
+    toolGrants: tools.grants,
     allowedModels: facts.allowedModels,
     // C07 (QUESTIONS #133): after a G5 `resume` with a budget increase, the intent's run budget.
     maxBudgetUsd:
@@ -317,7 +350,7 @@ export async function evaluateG4(
     baseSha: facts.baseSha,
     dataClass: intent.data_class,
   };
-  return { kind: 'ready', proposal, inputSha256: runProposalSha256(proposal), agent };
+  return { kind: 'ready', proposal, inputSha256: runProposalSha256(proposal), agent, tools };
 }
 
 /** A configuration amount (a number of dollars) as a decimal string with at most 6 decimals. */

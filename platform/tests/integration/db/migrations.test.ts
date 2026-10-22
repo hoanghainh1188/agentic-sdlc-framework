@@ -163,6 +163,24 @@ const UPDATABLE: Record<string, readonly string[]> = {
   tenant_role_bindings: ['revoked_at'],
   // Append-only (B13 AC7): approvals of the agent register.
   agent_approvals: [],
+  // X04 (migration 0038): state, owner and configuration of the tool register (trigger SDA25:
+  // allowed moves, a new version for a configuration change); never the key.
+  tools: [
+    'version',
+    'status',
+    'owner_id',
+    'transport',
+    'image_ref',
+    'image_digest',
+    'permissions',
+    'allowed_data_classes',
+    'backing_services',
+    'model_ref',
+    'last_recertified_at',
+    'updated_at',
+  ],
+  // Append-only (X04): approvals of the tool register.
+  tool_approvals: [],
   // E08 (migration 0024, QUESTIONS #253): a request again until confirmed once (trigger SDA17).
   langfuse_purges: ['traces', 'attempts', 'last_requested_at', 'confirmed_at'],
   // L04 (migration 0029): the state of an evaluation and of its runs; the budget only goes up
@@ -363,7 +381,8 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // L07: evaluation_tasks → projects, intents, users; evaluation_task_decisions →
     // evaluation_tasks, users; evaluation_task_check_contracts → evaluation_tasks (0034).
     // L09: agent_approvals → evaluations (0036).
-    expect(fks).toHaveLength(87);
+    // X04: tools → users; tool_approvals → tools, users (0038).
+    expect(fks).toHaveLength(90);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

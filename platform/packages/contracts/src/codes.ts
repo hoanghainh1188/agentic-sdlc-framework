@@ -187,6 +187,9 @@ export const GATE_REASON_CODES = [
   // G7 (task E01, QUESTIONS #177, ADR-M41): the pull request was merged before G7 passed (not
   // enough valid approvals of the merged head), or by a bot or a producer of the change.
   'merged_before_approval',
+  // G4 (task X04, ADR-M69 §2.3): a register tool the plan asks for cannot be given to the run; the
+  // exact cause (`tool_not_found`, `tool_not_allowed_for_agent`, …) is in the audit event.
+  'tool_not_runnable',
   'other',
 ] as const;
 export type GateReasonCode = (typeof GATE_REASON_CODES)[number];

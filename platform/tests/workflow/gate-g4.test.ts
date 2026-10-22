@@ -23,6 +23,7 @@ const PROPOSAL: RunProposal = {
   modelRef: 'gpt-oss-20b',
   autonomyLevel: 'L2',
   allowedTools: ['file_editor', 'terminal'],
+  toolGrants: [],
   allowedModels: ['gpt-oss-20b'],
   maxBudgetUsd: '2',
   maxIterations: 30,

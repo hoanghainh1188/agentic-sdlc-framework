@@ -8,6 +8,14 @@
 // (`allowed_tools`, `allowed_models`, `egress_allowlist`) must be sorted and unique, so the same
 // set always gives the same bytes.
 import { isAgentAdapterCode, type AgentAdapterCode } from './agent.js';
+import {
+  BACKING_SERVICE_PATTERN,
+  IMAGE_DIGEST_PATTERN,
+  isToolPermission,
+  registerToolCode,
+  TOOL_KEY_PATTERN,
+  type ToolGrant,
+} from './tools.js';
 import type { AutonomyLevel } from './codes.js';
 import {
   budget,
@@ -26,8 +34,14 @@ import {
   type Check,
 } from './contract-checks.js';
 
-/** 2 (X03, QUESTIONS #526): `agent_adapter`. A contract of schema 1 is refused (`malformed`). */
-export const RUN_CONTRACT_SCHEMA_VERSION = 2;
+/**
+ * 3 (X04, ADR-M69 §2.6): `tool_grants`. The worker issues schema 3; the runner also accepts
+ * schema 2 (X03, `agent_adapter`), which has no `tool_grants` and so no register tools. A contract
+ * of schema 1 is refused (`malformed`).
+ */
+export const RUN_CONTRACT_SCHEMA_VERSION = 3;
+/** Schema versions the runner accepts. */
+export const RUN_CONTRACT_SCHEMA_VERSIONS = [2, 3] as const;
 
 /** Autonomy levels a contract may grant: L0 never runs an agent (D-02 FR-03), L3+ not in the MVP. */
 export const RUN_CONTRACT_AUTONOMY_LEVELS = [
@@ -37,7 +51,7 @@ export const RUN_CONTRACT_AUTONOMY_LEVELS = [
 export type RunContractAutonomy = (typeof RUN_CONTRACT_AUTONOMY_LEVELS)[number];
 
 export interface RunContract {
-  readonly schema_version: typeof RUN_CONTRACT_SCHEMA_VERSION;
+  readonly schema_version: (typeof RUN_CONTRACT_SCHEMA_VERSIONS)[number];
   readonly run_id: string;
   readonly intent_id: string;
   readonly tenant_id: string;
@@ -63,6 +77,11 @@ export interface RunContract {
    * lists (handbook Ch.13 G4, template T13; QUESTIONS.md #34). Sorted, unique; may be empty.
    */
   readonly allowed_tools: readonly string[];
+  /**
+   * Schema 3 (X04, ADR-M69 §2.6): one grant per register tool (`tool:<key>`) in `allowed_tools`,
+   * sorted by key; may be empty. Absent in schema 2.
+   */
+  readonly tool_grants?: readonly ToolGrant[];
   readonly autonomy_level: RunContractAutonomy;
   /** Cost cap in USD as a decimal string (`"2"`, `"0.5"`, at most 6 decimals). */
   readonly max_budget_usd: string;
@@ -96,6 +115,9 @@ export const RUN_CONTRACT_REJECT_REASONS = [
   'expired',
   'revoked',
   'run_not_startable',
+  // X04 (ADR-M69 §2.6): a tool grant the runner cannot enforce or turn into the gateway's
+  // configuration, or whose call rules differ from the runner's own catalogue.
+  'tool_not_enforceable',
 ] as const;
 export type RunContractRejectReason = (typeof RUN_CONTRACT_REJECT_REASONS)[number];
 
@@ -116,8 +138,51 @@ const plannedFiles: Check = (value) =>
     (f) => typeof f === 'string' && f.length >= 1 && f.length <= 1024 && !f.includes('\0'),
   );
 
+const MAX_TOOL_GRANTS = 20;
+const SHA256_HEX = SHA256;
+
+/** One grant: exactly its fields, each in its format (ADR-M69 §2.6). */
+function isToolGrant(value: unknown): value is ToolGrant {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const g = value as Record<string, unknown>;
+  const keys = Object.keys(g).sort();
+  const expected = [
+    'backing_services',
+    'call_rules_sha256',
+    'image_digest',
+    'max_calls',
+    'permissions',
+    'tool_key',
+    'tool_version',
+    'transport',
+  ];
+  return (
+    keys.length === expected.length &&
+    keys.every((k, i) => k === expected[i]) &&
+    text(TOOL_KEY_PATTERN)(g.tool_key) &&
+    text(VERSION_LABEL)(g.tool_version) &&
+    // Only `http` tools reach a run (ADR-M69 §2.4); `stdio` tools are not planned (§2.5).
+    g.transport === 'http' &&
+    text(IMAGE_DIGEST_PATTERN)(g.image_digest) &&
+    sortedSet(/^[a-z][a-z_]{0,62}$/, 1)(g.permissions) &&
+    (g.permissions as string[]).every(isToolPermission) &&
+    text(SHA256_HEX)(g.call_rules_sha256) &&
+    sortedSet(BACKING_SERVICE_PATTERN, 0)(g.backing_services) &&
+    positiveInt(g.max_calls)
+  );
+}
+
+/** Sorted by key, unique, each a valid grant. */
+const toolGrants: Check = (value) =>
+  Array.isArray(value) &&
+  value.length <= MAX_TOOL_GRANTS &&
+  value.every(
+    (grant, i) =>
+      isToolGrant(grant) && (i === 0 || (value[i - 1] as ToolGrant).tool_key < grant.tool_key),
+  );
+
 const FIELDS: Readonly<Record<keyof RunContract, Check>> = {
-  schema_version: (value) => value === RUN_CONTRACT_SCHEMA_VERSION,
+  schema_version: (value) => (RUN_CONTRACT_SCHEMA_VERSIONS as readonly unknown[]).includes(value),
   run_id: text(UUID),
   intent_id: text(UUID),
   tenant_id: text(UUID),
@@ -133,6 +198,7 @@ const FIELDS: Readonly<Record<keyof RunContract, Check>> = {
   agent_adapter: isAgentAdapterCode,
   instructions_sha256: text(SHA256),
   allowed_tools: sortedSet(TOOL, 0),
+  tool_grants: toolGrants,
   autonomy_level: (value) =>
     typeof value === 'string' &&
     (RUN_CONTRACT_AUTONOMY_LEVELS as readonly string[]).includes(value),
@@ -150,8 +216,10 @@ const FIELDS: Readonly<Record<keyof RunContract, Check>> = {
 export const RUN_CONTRACT_FIELDS = Object.keys(FIELDS) as readonly (keyof RunContract)[];
 
 /**
- * Checks a value against the Run Contract schema: every field present with the right format, no
- * other field, and `expires_at` after `issued_at`. Returns the first field that fails.
+ * Checks a value against the Run Contract schema: every field of its schema version present with
+ * the right format (`tool_grants` in schema 3 only), no other field, every register tool of
+ * `allowed_tools` with exactly one grant and every grant in `allowed_tools`, and `expires_at` after
+ * `issued_at`. Returns the first field that fails.
  */
 export function validateRunContract(value: unknown): RunContractValidation {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -160,8 +228,21 @@ export function validateRunContract(value: unknown): RunContractValidation {
   const record = value as Record<string, unknown>;
   const extra = Object.keys(record).find((key) => !Object.hasOwn(FIELDS, key));
   if (extra !== undefined) return { ok: false, field: extra };
+  const schema2 = record.schema_version === 2;
   for (const field of RUN_CONTRACT_FIELDS) {
+    if (field === 'tool_grants' && schema2) {
+      if (Object.hasOwn(record, 'tool_grants')) return { ok: false, field };
+      continue;
+    }
     if (!FIELDS[field](record[field])) return { ok: false, field };
+  }
+  const tools = record.allowed_tools as string[];
+  const registerTools = tools.filter((tool) => tool.startsWith('tool:'));
+  const granted = ((record.tool_grants ?? []) as ToolGrant[]).map((g) =>
+    registerToolCode(g.tool_key),
+  );
+  if (registerTools.length !== granted.length || granted.some((code) => !tools.includes(code))) {
+    return { ok: false, field: 'tool_grants' };
   }
   if (Date.parse(record.expires_at as string) <= Date.parse(record.issued_at as string)) {
     return { ok: false, field: 'expires_at' };

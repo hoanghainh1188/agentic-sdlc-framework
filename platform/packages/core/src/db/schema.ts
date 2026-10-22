@@ -26,6 +26,9 @@ import type {
   RiskTier,
   RunStatus,
   Severity,
+  ToolPermission,
+  ToolStatus,
+  ToolTransport,
 } from '@sdlc/contracts';
 import type { ColumnType, Generated, Insertable, Selectable } from 'kysely';
 
@@ -183,6 +186,20 @@ export interface AgentApprovalsTable {
   evaluation_id: ColumnType<string | null, string | null | undefined, never>;
   /** `passed`, `missing` or a refusal code of ADR-M86 §2.8; null when the check was off. */
   evaluation_result: ColumnType<string | null, string | null | undefined, never>;
+}
+
+/** Approvals of the tool register (task X04, migration 0038, ADR-M69 §2.2). Append-only. */
+export interface ToolApprovalsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  tool_id: Immutable<string>;
+  tool_version: Immutable<string>;
+  purpose: Immutable<'activate' | 'retire'>;
+  capacity: Immutable<'owner' | 'person_a' | 'person_b' | 'governance'>;
+  approver_id: Immutable<string>;
+  /** The tool's `updated_at` when the approval was given: its round. */
+  round_at: Immutable<Date>;
+  created_at: CreatedAt;
 }
 
 /** Tenant-level roles (task B13, QUESTIONS #150, ADR-M37). Withdrawn by `revoked_at`, never deleted. */
@@ -984,6 +1001,31 @@ export interface AgentsTable {
   adapter: Mutable<AgentAdapterCode>;
 }
 
+/**
+ * The tool register (D-05 section 6.1, task X04, ADR-M69 §2.2). Codes only; rows are never
+ * deleted. A trigger allows only the status moves of `agent_status` and configuration changes with
+ * a new version while `proposed` or `suspended`.
+ */
+export interface ToolsTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  tool_key: Immutable<string>;
+  version: string;
+  status: Mutable<ToolStatus>;
+  owner_id: string;
+  transport: ToolTransport;
+  image_ref: MutableNullable<string>;
+  image_digest: MutableNullable<string>;
+  permissions: ToolPermission[];
+  allowed_data_classes: Mutable<DataClass[]>;
+  backing_services: Mutable<string[]>;
+  model_ref: MutableNullable<string>;
+  /** SQL `date`, kept as a `YYYY-MM-DD` string (connection.ts). */
+  last_recertified_at: MutableNullable<string>;
+  updated_at: ColumnType<Date, never, Date>;
+  created_at: CreatedAt;
+}
+
 /** Outbox of the gate status comments (FR-22, B07, ADR-M30): codes and IDs only. */
 export interface IntentNoticesTable {
   /** bigint identity; `pg` returns int8 as a string. */
@@ -1047,6 +1089,8 @@ export interface Database {
   project_ai_record_versions: ProjectAiRecordVersionsTable;
   tenant_role_bindings: TenantRoleBindingsTable;
   agent_approvals: AgentApprovalsTable;
+  tools: ToolsTable;
+  tool_approvals: ToolApprovalsTable;
   web_sessions: WebSessionsTable;
   webauthn_credentials: WebauthnCredentialsTable;
   passkey_challenges: PasskeyChallengesTable;
@@ -1692,6 +1736,35 @@ export const TABLE_COLUMNS = {
     'evaluation_id',
     'evaluation_result',
   ]),
+  tools: columns<ToolsTable>()([
+    'id',
+    'tenant_id',
+    'tool_key',
+    'version',
+    'status',
+    'owner_id',
+    'transport',
+    'image_ref',
+    'image_digest',
+    'permissions',
+    'allowed_data_classes',
+    'backing_services',
+    'model_ref',
+    'last_recertified_at',
+    'updated_at',
+    'created_at',
+  ]),
+  tool_approvals: columns<ToolApprovalsTable>()([
+    'id',
+    'tenant_id',
+    'tool_id',
+    'tool_version',
+    'purpose',
+    'capacity',
+    'approver_id',
+    'round_at',
+    'created_at',
+  ]),
   web_sessions: columns<WebSessionsTable>()([
     'id',
     'tenant_id',
@@ -1784,6 +1857,8 @@ export const TENANT_COLUMN = {
   evaluation_task_check_contracts: 'tenant_id',
   tenant_role_bindings: 'tenant_id',
   agent_approvals: 'tenant_id',
+  tools: 'tenant_id',
+  tool_approvals: 'tenant_id',
   web_sessions: 'tenant_id',
   webauthn_credentials: 'tenant_id',
   passkey_challenges: 'tenant_id',
@@ -1831,6 +1906,8 @@ export type EvidencePack = Selectable<EvidencePacksTable>;
 export type EvidenceHold = Selectable<EvidenceHoldsTable>;
 export type TenantRoleBinding = Selectable<TenantRoleBindingsTable>;
 export type AgentApproval = Selectable<AgentApprovalsTable>;
+export type Tool = Selectable<ToolsTable>;
+export type ToolApproval = Selectable<ToolApprovalsTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

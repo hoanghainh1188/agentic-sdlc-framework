@@ -130,6 +130,32 @@ Rules the platform enforces:
 - **Autonomy**: at most L2 in v0.1.
 - **Recertification**: every 3 months (the project configuration may choose a shorter time). The first activation counts as the first certification. When the time has passed, the run still starts, and the agent owner gets a warning. `list --overdue` shows the agents to recertify.
 
+### 20.5c. The tool register on the platform
+
+A **register tool** is a tool for agents that is not part of the agent itself: an MCP server (a program the agent calls through the Model Context Protocol) in a container of its own. The first one searches the project's documents. Register tools have the code `tool:<key>`, for example `tool:project-docs`, next to the built-in tools `file_editor`, `task_tracker` and `terminal`. A tool belongs to the tenant, like an agent, and has the same lifecycle (§20.3–§20.10).
+
+| Step | Command | Who |
+|---|---|---|
+| Register | `sdlc admin tool register --key project-docs --version 1.0.0 --owner <email> --transport http --image <image name> --image-digest sha256:… --permissions read_documents --data-classes public,internal [--backing-services <alias:port,…>] [--model <gateway model with version>]` | A tenant admin, who names the technical owner |
+| Approve for use | `sdlc admin tool approve --key project-docs --purpose activate --as <owner\|person_b\|governance>` | The technical owner, and Person B or leadership |
+| Recertify | `sdlc admin tool recertify --key project-docs [--date YYYY-MM-DD]` | The technical owner |
+| Change | Suspend, then `sdlc admin tool update --key … --version 1.1.0 [--image-digest …] [--permissions …] [--data-classes …] [--backing-services …] [--model …]`, then approve again | The tool owner or a tenant admin changes; the owner and Person B or leadership approve |
+| Suspend or quarantine | `sdlc admin tool suspend\|quarantine --key <key> --reason <code>` | Person B or leadership, at any time |
+| Retire | `sdlc admin tool approve --key <key> --purpose retire --as <owner\|governance> --reason <code>` | Tool owner + leadership |
+| New tool owner | `sdlc admin tool owner --key <key> --owner <email>` | A tenant admin |
+| Look | `sdlc admin tool show --key <key>` (with the approvals still missing); `sdlc admin tool list [--json]` | Anyone in the tenant |
+
+Rules the platform enforces:
+
+- **The image is pinned by digest.** An `http` tool needs `--image` and, before it is activated, `--image-digest sha256:…`. A tag alone is refused. A new digest is a new version, so it needs new approvals.
+- **Permissions** come from a fixed list: today `read_documents` only. Each permission allows fixed tool names and argument limits, which the platform checks on every call. A new permission needs a design record (ADR).
+- **Data classes**: the tool may see only the data classes you list, never `prohibited`. If the tool calls a model (`--model`), that model must be allowed for the intent's data class (`client_restricted`: a self-hosted model only).
+- **Statuses, versions, approvals and recertification** work as for agents (§20.5b): the same moves, a change only while proposed or suspended and with a new version, approvers always different people, recertification every 3 months at most (`tools.recertification_months`). An overdue tool gives a warning; the run still starts.
+
+**When a run gets a register tool.** Only when all of these allow it: the plan lists `tool:<key>` for the task (Chapter 19 §19.8c), the agent's registered tools list it too (a change of that list is a new agent version), the tool is active and allows the intent's data class, and the agent software can give the run that kind of tool. Otherwise **G4 fails** with `tool_not_runnable` and the exact cause: `tool_not_found`, `tool_not_allowed_for_agent`, `tool_not_active`, `tool_data_class_not_allowed` or `tool_transport_not_supported`. The platform never drops a tool the plan asks for, because Person B approved the plan with that tool.
+
+**Not yet available.** The run's MCP gateway (the container that checks every tool call) comes with task X04 PR 2. Until then no agent software can give a run a register tool, and G4 refuses every plan that asks for one with `tool_transport_not_supported`. The first tool, the search of the project's documents, comes with X04 PR 3.
+
 Not yet on the platform (v0.1): agents with L3 or more (leadership and the security owner approve, §20.7), and suspension from a GitHub comment. In v0.1 the table of who approves what is fixed in the platform, not in a setting (`design/ADR-M37-admin-onboarding.md` §2.8); it moves into a tenant setting later.
 
 ---
@@ -298,3 +324,4 @@ Old context must not quietly come back through caches, indexes or copied instruc
 | 0.6 | 2026-10-21 | Claude (task L09, PR 2) | §20.5b: an activation names its evaluation (`--evaluation`); the fingerprint, the conditions, a change compared with the last approved version, one evaluation per round, `agents.evaluation.mode` of the agent's projects; `show` gives the latest evaluation (ADR-M86, QUESTIONS #496–#504) |
 | 0.7 | 2026-10-21 | Claude (task L10) | §20.5b, §20.8: a recertification names its evaluation (`--evaluation`); the aging comparison with the last activation; the platform never suspends an agent by itself; `list --overdue` shows the latest evaluation (ADR-M86 §2.6, QUESTIONS #506, #507) |
 | 0.8 | 2026-10-22 | Claude (task X03, PR 1) | §20.5b: `--adapter`, the adapter in the fingerprint and in a new version, one sandbox image per adapter and the refusals (ADR-M88, QUESTIONS #526–#528) |
+| 0.9 | 2026-10-22 | Claude (task X04, PR 1) | §20.5c: the tool register on the platform (commands, approvals, enforced rules, the G4 refusals of a register tool) (ADR-M69, QUESTIONS #516–#535) |
