@@ -1,0 +1,38 @@
+# X14 spike (design/ADR-M87): ContextForge v1.1.0 plugins for one run.
+# Tool names: the virtual server lists `search_docs` only. Arguments: SchemaGuard checks types and
+# required fields only (no maximum), so the `limit <= 20` rule has no built-in plugin. Cap: the
+# rate limiter's in-memory backend, per user, with a fixed window of one hour at most (units s, m, h): not a cap per run.
+plugins:
+  - name: 'SchemaGuardPlugin'
+    kind: 'plugins.schema_guard.schema_guard.SchemaGuardPlugin'
+    hooks: ['tool_pre_invoke']
+    mode: 'enforce'
+    priority: 10
+    conditions: []
+    config:
+      arg_schemas:
+        docs-search-docs:
+          type: object
+          required: [query]
+          properties:
+            query: { type: string }
+            limit: { type: integer }
+      result_schemas: {}
+      block_on_violation: true
+  - name: 'RateLimiterPlugin'
+    kind: 'cpex_rate_limiter.RateLimiterPlugin'
+    hooks: ['tool_pre_invoke']
+    mode: 'enforce'
+    priority: 20
+    conditions: []
+    config:
+      backend: 'memory'
+      algorithm: 'fixed_window'
+      by_user: '@CAP@/h'
+plugin_dirs: []
+plugin_settings:
+  parallel_execution_within_band: false
+  plugin_timeout: 30
+  fail_on_plugin_error: true
+  enable_plugin_api: true
+  plugin_health_check_interval: 60
