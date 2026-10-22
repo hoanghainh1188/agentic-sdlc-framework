@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task X14; for the repository owner's decision, QUESTIONS #529–#530) |
+| Status | **Accepted** (repository owner, 2026-10-22: agentgateway from X04, and argument rules per permission; QUESTIONS #529–#530) |
 | Date | 2026-10-22 |
 | Decided by | The repository owner (X14 plan approved on 2026-10-22: three gateways, one instance per run inside the run's networks, a stub tool, no product code) |
 | Related | D-08 tasks X14, X04, X02; D-02 NFR-03, NFR-04, NFR-05; D-01 §5.4 (policy engine), §5.6 (MCP gateway); ADR-M25 §2.2 (run networks), §2.4 (sandbox hardening); ADR-M69 (tool register, proposed); ADR-M80 (threat model); design/QUESTIONS.md #516–#520, #529–#530 |
@@ -93,9 +93,11 @@ Two more ContextForge findings:
 
 The agentgateway stats port answers on every address of the container, so the **sandbox can read the counters** too. They hold counts and tool names only, but the product turns the port off (`statsAddr: off`) and reads the logs.
 
-## 4. Decision (proposed)
+## 4. Decision
 
-**Use agentgateway as a per-run MCP gateway from the first tool (X04)** (QUESTIONS #529). Never a gateway of our own (D-01 §5.6).
+**Use agentgateway as a per-run MCP gateway from the first tool (X04)** (QUESTIONS #529, accepted).
+
+**A tool's argument rules are fixed rules per permission in `@sdlc/contracts`** (QUESTIONS #530, option a). The runner turns them into the gateway's rules; no expression from a tenant ever runs, and a new rule needs an ADR, like a new permission. X04 adds the rules of `read_documents`. Never a gateway of our own (D-01 §5.6).
 
 Why:
 
@@ -124,7 +126,7 @@ Limits to keep in mind:
 - **§2.8, kill switch.** Removing the gateway container cuts every tool at once; the runner removes it first.
 - **§5.** A10 measures the gateway on the server; ADR-M80 (tools section) gets the gateway as the control for ASI02 (tool misuse) at the call level.
 
-These edits are made in ADR-M69 by X04, or before it in a docs change, after the repository owner decides. This pull request adds only a reference in ADR-M69 §4.
+X04 makes these edits in ADR-M69 (with D-03 §8 and D-05 where they apply), before its code. The X14 pull request adds only a reference in ADR-M69 §4.
 
 ## 6. Consequences
 
@@ -137,3 +139,4 @@ These edits are made in ADR-M69 by X04, or before it in a docs change, after the
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-22 | Claude (task X14) | First version: agentgateway 1.6.0, ContextForge 1.1.0 and Docker MCP Gateway 0.44.1 compared inside the run's networks; proposal: agentgateway from X04. QUESTIONS #529–#530 |
+| 1.0 | 2026-10-22 | Repository owner | Accepted: agentgateway from X04 (#529); argument rules per permission in `@sdlc/contracts` (#530, option a) |

@@ -76,7 +76,7 @@
 | ADR-M84 | [Rules as checks: a rules register, hooks, lint and tests, a shorter CLAUDE.md](ADR-M84-rules-as-checks.md) (task W01) | Accepted (2026-10-20) | |
 | ADR-M85 | [A project's own task set from its merged intents](ADR-M85-project-task-sets.md) (task L07) | Accepted (2026-10-20) | |
 | ADR-M86 | [Evaluations in the agent register's approvals and recertification](ADR-M86-evaluations-in-agent-approvals.md) (task L08; built by L09, L10) | Accepted (2026-10-20) | |
-| ADR-M87 | [An open-source MCP gateway in front of a run's tools: result of the X14 spike](ADR-M87-mcp-gateway-spike.md) (task X14) | Proposed (2026-10-22); agentgateway per run from X04, argument rules per permission (QUESTIONS #529–#530) | |
+| ADR-M87 | [An open-source MCP gateway in front of a run's tools: result of the X14 spike](ADR-M87-mcp-gateway-spike.md) (task X14) | Accepted (2026-10-22); agentgateway per run from X04, argument rules per permission in `@sdlc/contracts` (QUESTIONS #529–#530) | |
 
 
 ## Number blocks (QUESTIONS and ADR numbers)
