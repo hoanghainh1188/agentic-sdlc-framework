@@ -2,10 +2,10 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task X02; for the repository owner's approval with the D-03 and D-05 changes of the same pull request) |
+| Status | **Accepted** (repository owner, 2026-10-22: version 0.4, aligned with ADR-M87, with the D-03, D-05 and ADR-M80 changes; QUESTIONS #531 = b, #532 = a) |
 | Date | 2026-10-21 |
 | Decided by | The repository owner (X02 plan approved on 2026-10-21 with three choices: one tool container per run, the `tool:` prefix, one summary event per tool and run; QUESTIONS #516–#518) |
-| Related | D-08 tasks X02, X04 (the first tool), X01, X03 (a second agent); D-02 FR-33, FR-36, NFR-03, NFR-05; D-01 §5.6 (MCP gateway); D-03 §8 (Run Contract), §9 (security); D-05 §5, §6.1, §6.4; D-07 §4 (data classes and models); ADR-M22 (contract), ADR-M25 (sandbox and egress), ADR-M29 (agent adapter), ADR-M31 (agent register), ADR-M33 (G4), ADR-M37 §2.8 (agent approvals), ADR-M40 (plan file and its tools), ADR-M42 (kill switch), ADR-M80 (threat model), ADR-M86 (evaluation fingerprints); design/QUESTIONS.md #361, #516–#520 |
+| Related | D-08 tasks X02, X04 (the first tool), X01, X03 (a second agent); D-02 FR-33, FR-36, NFR-03, NFR-05; D-01 §5.6 (MCP gateway); D-03 §8 (Run Contract), §9 (security); D-05 §5, §6.1, §6.4; D-07 §4 (data classes and models); ADR-M22 (contract), ADR-M25 (sandbox and egress), ADR-M29 (agent adapter), ADR-M31 (agent register), ADR-M33 (G4), ADR-M37 §2.8 (agent approvals), ADR-M40 (plan file and its tools), ADR-M42 (kill switch), ADR-M80 (threat model), ADR-M86 (evaluation fingerprints), ADR-M87 (the MCP gateway); design/QUESTIONS.md #361, #516–#520, #529–#532 |
 
 ## 1. Context
 
@@ -43,7 +43,7 @@ A tool belongs to the **tenant**, like an agent (ADR-M31). New table `tools` (D-
 | `owner_id` | Technical owner (a user of the tenant) |
 | `transport` | `http` (MCP over Streamable HTTP, a container of its own: §2.4) or `stdio` (a process inside the sandbox: §2.5) |
 | `image_ref`, `image_digest` | For `http`: the image name and its `sha256:` digest. Required; a tag alone is refused (R038) |
-| `permissions` | Codes from a fixed catalogue in `@sdlc/contracts`. The first one is `read_documents` (X04). A new permission needs an ADR |
+| `permissions` | Codes from a fixed catalogue in `@sdlc/contracts`. The first one is `read_documents` (X04). Each permission has fixed **call rules** in the same catalogue: the tool names it allows and the limits on their arguments, which the run's gateway enforces (§2.4; QUESTIONS #530). A new permission or a new rule needs an ADR. No rule comes from a tenant |
 | `allowed_data_classes` | The `data_class` values the tool may see. Never `prohibited`. `client_restricted` only when the tool sends nothing outside the server (D-07 §4) |
 | `backing_services` | `alias:port` entries the tool container may reach (§2.4), for example the index store. Empty for most tools |
 | `model_ref` | Null, or the gateway model name the tool calls (for example an embedding model). It must follow the data class rules of D-07 §4 |
@@ -86,18 +86,21 @@ G4 checks 1–4 as a new step after check 6 (`checkAgentForRun`), with one funct
 **One container per tool and per run.** Never one container shared by runs: a tool that reads documents reads client data, and a shared container would serve several projects and tenants at once.
 
 - **Name and image.** `sdlc-tool-<run_id>-<tool_key>`, from `image_ref@image_digest`. The runner creates it through the Docker socket proxy and a new guard rule `assertSafeToolSpec` in `docker/guard.ts`: the same hardening as a sandbox (non-root user, read-only root, no capability, no privileged mode, no bind mount, memory, CPU and process limits, the run's labels), an allowlist of environment names (no secret values), and one fixed command from the image.
-- **Two networks.**
-  - The **run network** `sdlc-run-<run_id>` (ADR-M25 §2.2), where the sandbox reaches the tool at the alias `tool-<tool_key>`. The tool is a server only; the sandbox cannot use it to go anywhere else.
-  - A **tool network** `sdlc-tool-<run_id>` (internal, no route out, no bridge address, like the run network), with only the tool container and its `backing_services`. The sandbox is not on it, so it never reaches the index store.
+- **One gateway per run** (ADR-M87; QUESTIONS #529). A run with at least one register tool gets one MCP gateway container, `sdlc-gw-<run_id>`, from agentgateway, pinned by digest in project configuration `tools.gateway.image`. A run with no register tool gets no gateway. The sandbox reaches **every** register tool only through this gateway. The gateway checks each call: the per-run key, the tool name, the argument rules of the tool's permissions, and the cap `max_calls`. A new guard rule `assertSafeGatewaySpec` gives it the sandbox hardening, one fixed command, an allowlist of environment names and its configuration file only. Never a gateway of our own (D-01 §5.6).
+- **The gateway's configuration** is **generated by the runner from the signed contract**, never written by hand: the targets (one per tool grant), the tool names and argument rules of each grant's permissions (CEL, from the catalogue in `@sdlc/contracts`), the caps, and the SHA-256 of the per-run key. Its stats port is off (`statsAddr: off`). The runner writes the file with the archive upload it already uses, before the gateway starts. A contract that the runner cannot turn into a gateway configuration is refused (§2.6).
+- **Networks.**
+  - The **run network** `sdlc-run-<run_id>` (ADR-M25 §2.2): the sandbox and the gateway, under the alias `tools`. No tool container is on the run network, so the sandbox cannot call a tool directly.
+  - A **tool network** `sdlc-tool-<run_id>` (internal, no route out, no bridge address, like the run network): the gateway and the run's tool containers only.
+  - A **service network** `sdlc-toolsvc-<run_id>-<tool_key>` (same settings) for each tool that has `backing_services`: that tool container and its backing services only. The gateway, the sandbox and the other tools are not on it, so only the tool reaches its index store (QUESTIONS #531).
   - A tool container never reaches the internet, OpenBao, Docker or LiteLLM's management API. If it calls a model (`model_ref`), LiteLLM is a backing service, and the tool uses its own capped virtual key with the run's labels (`agent` = `tool:<key>`); its cost counts for the run (R027).
 - **The credential.** A tool that reads a backing service gets a **short-lived, read-only credential, scoped to the tenant and project**, with a time to live of at most the run's `max_duration_min`:
   - The worker issues it (the worker holds the issuer's admin credential, as it does for virtual keys) and hands it to the runner as a **single-use OpenBao wrapping token** through Temporal (R031).
   - The runner unwraps it and writes it into the tool container as a **file** before the container starts (never an environment value, R034), with the archive upload the runner already uses for sandboxes.
   - The sandbox never sees it. A wrapping token that OpenBao refuses goes to the `security` route, as for GitHub tokens (ADR-M42 §2.5).
-- **The sandbox's access to the tool.** A random per-run key (like `SESSION_API_KEY`) goes to the tool container and to the agent's MCP configuration. The tool refuses a call without it. No other container on the run network has the key.
-- **Order.** Volume → run network → tool network → backing services attached → tool container (credential file) → start the tool and wait until it is healthy → sandbox → start the sandbox. A failure at any step removes everything created so far, and the run fails with `provisioning_failed`, reason `tool_unavailable`.
-- **Clean-up** removes the tool containers and the tool network with the sandbox, the run network and the volume (ADR-M25).
-- **Sizing.** A tool container uses memory and CPU while its run lives. Run slots stay the limit (`SDLC_RUNNER_MAX_SANDBOXES`); the container limits come from project configuration `tools.container_limits`. A10 measures the effect.
+- **The sandbox's access to the tools.** A random per-run key (32 bytes, like `SESSION_API_KEY`) goes to the agent's MCP configuration as a header. The **gateway** checks it: its configuration holds only the key's SHA-256, and a call without the key gets HTTP 401. The tool containers do not hold the key; only the gateway can reach them.
+- **Order.** Volume → run network → tool network → service networks with their backing services attached → tool containers (credential files) → start the tools and wait until they are healthy → gateway container (configuration file) → start the gateway and wait until it is healthy → sandbox → start the sandbox. A failure at any step removes everything created so far, and the run fails with `provisioning_failed`, reason `tool_unavailable`.
+- **Clean-up** removes the gateway, the tool containers, the service networks and the tool network with the sandbox, the run network and the volume (ADR-M25).
+- **Sizing.** A tool container and the gateway (about 10 MiB, ADR-M87 §3.3) use memory and CPU while their run lives. Run slots stay the limit (`SDLC_RUNNER_MAX_SANDBOXES`); the container limits come from project configuration `tools.container_limits`. A10 measures the effect.
 
 ### 2.5. `stdio` tools
 
@@ -109,9 +112,11 @@ G4 checks 1–4 as a new step after check 6 (`checkAgentForRun`), with one funct
 ### 2.6. The Run Contract (D-03 §8)
 
 - `allowed_tools` keeps its meaning (the run's tool codes), and may now hold `tool:` codes.
-- New field `tool_grants`: one entry per register tool, with `tool_key`, `tool_version`, `transport`, `image_digest`, `permissions`, `backing_services` and `max_calls`.
-- `schema_version` becomes `2`. The runner accepts versions 1 and 2. A version 1 contract has no register tools.
-- The runner **refuses** a contract when a grant is not in `allowed_tools`, an `http` grant has no digest, or a backing service is not one it can enforce (an unknown alias, a wrong port, an internet host): `contract_rejected` with reason `tool_not_enforceable`. The runner never opens more than the contract asks for.
+- New field `tool_grants`: one entry per register tool, with `tool_key`, `tool_version`, `transport`, `image_digest`, `permissions`, `call_rules_sha256`, `backing_services` and `max_calls`.
+  - `max_calls` is the gateway's cap for that tool in the run.
+  - `call_rules_sha256` is the SHA-256 of the canonical call rules of the grant's permissions (RFC 8785), from the catalogue in `@sdlc/contracts`. The runner computes it again from its own catalogue and refuses a contract where it differs, so the run gets exactly the rules that were signed (QUESTIONS #530).
+- `schema_version` becomes `3` (version `2` is the contract with `agent_adapter`, X03). The runner accepts versions 2 and 3. A version 2 contract has no register tools.
+- The runner **refuses** a contract when a grant is not in `allowed_tools`, an `http` grant has no digest, a backing service is not one it can enforce (an unknown alias, a wrong port, an internet host), `call_rules_sha256` differs from its catalogue, or it cannot generate the gateway's configuration from the grants: `contract_rejected` with reason `tool_not_enforceable`. The runner never opens more than the contract asks for.
 
 ### 2.7. What is recorded (D3, QUESTIONS #518; AC3)
 
@@ -122,42 +127,45 @@ New run event types (D-05 §6.4), codes, IDs, hashes and counts only:
 | Event | When | Payload |
 |---|---|---|
 | `tool_started` | The tool container is healthy | `tool_key`, `tool_version`, `image_digest` |
-| `tool_used` | Once per tool at the end of the run, also after a kill or a failure | `tool_key`, `calls`, `failed_calls`, `refused_calls`, `response_bytes`, `calls_sha256` |
-| `tool_refused` | The first call refused for a reason (for example `max_calls`), once per reason | `tool_key`, a code |
+| `tool_used` | Once per tool at the end of the run, also after a kill or a failure | `tool_key`, `calls`, `failed_calls`, `refused_calls` |
+| `tool_refused` | The first call refused by the gateway for a reason, once per reason | A code: `max_calls`, `tool_not_allowed`, `argument_refused` (with `tool_key`), or `key_refused` (no `tool_key`: the gateway refuses before it reads the tool) |
 | `tool_failed` | The container stopped or became unhealthy during the run | `tool_key`, a code |
 | `tool_credential_revoked`, `tool_credential_revoke_failed` | After the revocation at the end of the run or at a kill | `tool_key`, a code on failure |
 
-- `calls_sha256` is the SHA-256 of the ordered list of per-call hashes (tool name, canonical arguments, answer bytes). One combined hash for the run, never a hash per call: a hash of one short query could be guessed by trying likely queries.
 - **Never recorded**: the query, the arguments, the answer, a document name or path, the credential, the per-run key.
-- **Where the counts come from.** The runner counts tool calls from the agent's event stream, which it already reads for loop detection (ADR-M42 §2.7). Repeated identical tool calls count for loop detection like other tool calls. The tool's own counts are not trusted.
-- **Caps.** `max_calls` per tool and run, from project configuration `tools.max_calls_per_run` (default 100). Calls over the cap are refused (`tool_refused`, `max_calls`); the run goes on without the tool.
+- **Where the counts come from** (ADR-M87 §5). The gateway writes one JSON log line per request, with the MCP method, the target, the tool name, the status and a reason code, never arguments or answers. At the end of the run (also after a kill or a failure, before the gateway is removed) the runner reads these lines through the Docker logs endpoint it already uses and keeps only codes and counts: `calls` (calls that reached a tool), `refused_calls` (refused by the gateway), `failed_calls` (a tool error status). The gateway sits outside the sandbox, so these counts are better evidence than the agent's own events. The tool's own counts are not trusted.
+- **No hash of the calls** (QUESTIONS #532). The gateway's logs hold no arguments or answers, so the runner cannot compute a hash of the calls outside the sandbox. A hash computed from the agent's event stream would come from inside the sandbox, which the agent controls. `tool_used` therefore has counts only.
+- **Loop detection** still reads the agent's event stream (ADR-M42 §2.7). Repeated identical tool calls count like other tool calls.
+- **Caps.** `max_calls` per tool and run, from project configuration `tools.max_calls_per_run` (default 100), enforced by the gateway. Calls over the cap are refused (`tool_refused`, `max_calls`); the run goes on without the tool. A call refused by tool name also uses one call of the cap (ADR-M87 §4).
 - **The Evidence Pack** lists each tool the run used: key, version, digest and the counts of `tool_used`. It never holds answers.
 
 ### 2.8. Kill switch and the end of a run
 
 - The worker revokes the run's tool credentials **at the kill signal**, with the virtual key (`revokeKilledRunKey`), and again when the run ends (`finishRun`, `abandonRun`). Revoking twice is harmless.
-- The runner stops and removes the tool containers with the sandbox. A killed run therefore loses its tools within the same 5 minutes (FR-34).
-- A tool container never outlives its run. Tool containers and tool networks carry the same labels as sandboxes, so the runner's restart clean-up and orphan sweep (ADR-M25, `reconcileOnStart`, `sweepOrphans`) remove them too.
+- The runner removes the **gateway first**: that cuts every tool of the run at once. Then it stops and removes the tool containers with the sandbox. A killed run therefore loses its tools within the same 5 minutes (FR-34).
+- A tool container or a gateway never outlives its run. Gateways, tool containers, tool networks and service networks carry the same labels as sandboxes, so the runner's restart clean-up and orphan sweep (ADR-M25, `reconcileOnStart`, `sweepOrphans`) remove them too.
 
 ### 2.9. Where the rules live
 
 | Rule | Where |
 |---|---|
-| Only active, approved tools with a pinned digest run; plan ∩ agent ∩ register ∩ contract; a sandbox never holds a tool credential; one container per tool and run; never record queries or answers | Code: safety invariants, not tuning values |
+| Only active, approved tools with a pinned digest run; plan ∩ agent ∩ register ∩ contract; a sandbox never holds a tool credential; one container per tool and run; every call goes through the run's gateway; the gateway's configuration is generated from the contract; never record queries or answers | Code: safety invariants, not tuning values |
+| The call rules of each permission | `@sdlc/contracts`, beside the permission catalogue; a new rule needs an ADR |
+| The gateway image | Config `tools.gateway.image` (by digest) |
 | Recertification age (at most 3 months) | Config `tools.recertification_months` |
 | Calls per tool and run | Config `tools.max_calls_per_run` |
 | Container limits of a tool | Config `tools.container_limits` |
 | Who approves a tool | Code, from handbook Ch.20 (the same capacities as agents) |
 | The permission catalogue | `@sdlc/contracts`; a new permission needs an ADR |
 
-## 3. Changes proposed in other documents (AC4)
+## 3. Changes in other documents (AC4)
 
-In this pull request, for the repository owner's approval:
+Approved with this ADR (2026-10-22):
 
-- **D-03 §8**: the contract fields `allowed_tools` (may hold `tool:` codes) and `tool_grants`; `schema_version` 2.
+- **D-03 §8**: the contract fields `allowed_tools` (may hold `tool:` codes) and `tool_grants` (with `call_rules_sha256`); `schema_version` 3.
 - **D-03 §9**: a new row "Tools for agents".
 - **D-05 §5**: enums `tool_status` and the reason code `tool_not_runnable`. **D-05 §6.1**: tables `tools` and `tool_approvals`. **D-05 §6.4**: the run event types of §2.7.
-- **ADR-M80**: a section on tools for ASI01, ASI02, ASI03, ASI04, ASI06 and ASI07, as ADR-M80 asks of the EXT tasks.
+- **ADR-M80**: a section on tools for ASI01, ASI02, ASI03, ASI04, ASI06 and ASI07, as ADR-M80 asks of the EXT tasks; the gateway is the call-level control for ASI02 (ADR-M87 §5).
 
 Built later, not in this pull request: handbook Ch.20 (registering a tool) and Ch.19 (the plan's tools), with X04.
 
@@ -167,13 +175,17 @@ Built later, not in this pull request: handbook Ch.20 (registering a tool) and C
 - **Every tool as `stdio` inside the sandbox.** Rejected: the credential would be inside the sandbox, which an agent controls.
 - **One run event per tool call.** Rejected (QUESTIONS #518): append-only rows kept for at least 2 years, for counts that a summary gives. The words of D-08 X02 AC3 ("a run event per tool use") are read as "per tool used by a run".
 - **The tool's version pinned in the agent's row.** Rejected: every tool update would need a new agent version and new approvals. The contract and the evaluation fingerprint record the exact version instead.
-- **A gateway that checks each call** (D-01 §5.6). Not decided here (QUESTIONS #520): the register, G4 and the contract already decide which tools a run gets. The repository owner asked for research first: task X14 (ADR-M87) compares self-hosted open-source MCP gateways, one instance per run inside the run's networks, and decides before X04 whether the first tool goes through one. D-01 §5.6 says never to write our own gateway. The result is ADR-M87 (accepted 2026-10-22): agentgateway, one instance per run, from X04, with argument rules per permission (QUESTIONS #529–#530); X04 makes the changes to this ADR listed in ADR-M87 §5.
+- **No gateway: the register, G4 and the contract alone** (version 0.1 of this ADR). Replaced (QUESTIONS #520, #529): those decide which tools a run gets, but nothing checked each call. Task X14 compared self-hosted open-source MCP gateways (ADR-M87, accepted 2026-10-22); agentgateway, one instance per run, is used from X04 (§2.4).
+- **One tool network for the gateway, the tools and their backing services** (ADR-M87 §5 as written). Not chosen (QUESTIONS #531): the gateway is someone else's software and would reach every index store of the run, and one tool would reach another tool's backing services.
+- **A hash of the calls from the agent's event stream.** Not chosen (QUESTIONS #532): it comes from inside the sandbox, so it is not evidence.
 
 ## 5. Consequences and open items
 
-- **Agent support for MCP (QUESTIONS #519).** The OpenHands adapter does not configure MCP servers today. X04 starts by confirming (and stops and asks if it cannot) that the OpenHands Agent Server takes a per-run MCP server over HTTP with a header key, and add it to the adapter. X01 compares the MCP support of Aider and OpenCode. Until an adapter supports a transport, G4 refuses tools of that transport (`tool_transport_not_supported`).
-- The guard gets a new rule, the runner a new provisioning step, the contract a new schema version.
-- Each tool adds a container per run: A10 measures memory and CPU with a tool.
+- **Agent support for MCP (QUESTIONS #519).** The OpenHands adapter does not configure MCP servers today. X04 starts by confirming (and stops and asks if it cannot) that the OpenHands Agent Server takes a per-run MCP server over HTTP with a header key, and adds one entry to the adapter: the gateway at `http://tools:<port>/mcp` with the per-run key. X01 compares the MCP support of Aider and OpenCode. Until an adapter supports a transport, G4 refuses tools of that transport (`tool_transport_not_supported`).
+- The guard gets two new rules (`assertSafeToolSpec`, `assertSafeGatewaySpec`), the runner a new provisioning step, the contract a new schema version.
+- Each tool adds a container per run, and a run with tools adds one gateway: A10 measures memory and CPU with a tool and the gateway.
+- One more third-party image to pin, scan and follow (agentgateway; R038, R089). X04 pins a release whose image scan passes.
+- The gateway's argument rules read the JSON-RPC body (ADR-M87 §4). X04 tests them with batches, bodies over the buffer limit and bodies that do not parse: each is refused.
 - A tool's answers are untrusted input for the agent, like the repository's files. The agent's limits do not change: the same tools, the same network, the same diff check at G5 and review at G7 (ADR-M80, the tools section).
 - A tool that calls a model has its own virtual key and cost. Its data class rules are those of D-07 §4: `client_restricted` only with a self-hosted model.
 
@@ -184,3 +196,5 @@ Built later, not in this pull request: handbook Ch.20 (registering a tool) and C
 | 0.1 | 2026-10-21 | Claude (task X02) | First version: tool codes, the register, G4 checks, one container per tool and run, contract v2, summary events, kill switch. QUESTIONS #516–#520 |
 | 0.2 | 2026-10-22 | Claude (task X02) | Answers to QUESTIONS #519 (X04 checks MCP in OpenHands first) and #520 (task X14 researches an MCP gateway before X04, ADR-M87) |
 | 0.3 | 2026-10-22 | Claude (task X14) | §4: reference to the result of X14 (ADR-M87, accepted). No change of meaning |
+| 0.4 | 2026-10-22 | Claude (task X04) | Aligned with ADR-M87 §5: one agentgateway per run (§2.4), call rules per permission (§2.2), `call_rules_sha256` and `schema_version` 3 (§2.6), counts from the gateway's logs and no hash of the calls (§2.7), the gateway removed first at a kill (§2.8); a service network per tool (QUESTIONS #531, #532) |
+| 1.0 | 2026-10-22 | Repository owner | Accepted (version 0.4), with D-03 1.44 and 1.46, D-05 1.54 and 1.56, ADR-M80 0.5 and 0.6; QUESTIONS #531 (a service network per tool) and #532 (counts only, no hash of the calls) |
