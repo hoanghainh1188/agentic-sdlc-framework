@@ -5,6 +5,7 @@
 // `sdlc audit verify` through the API, and moves the operator commands to `sdlc ops` (ADR-M37).
 import { t } from '@sdlc/messages';
 
+import { renderBanner } from './banner.js';
 import { runAdminApi } from './commands/admin-api.js';
 import { runAiRecord } from './commands/ai-record.js';
 import { runEval } from './commands/eval.js';
@@ -30,6 +31,7 @@ import { clean } from './output.js';
 import { PLATFORM_VERSION } from './version.js';
 
 export { EXIT, processApiIo, processContext, type ApiIo, type CliContext } from './context.js';
+export { renderBanner } from './banner.js';
 export { InputAbortedError, readHiddenLine } from './credentials/prompt.js';
 
 /** User commands: through the API, with the login of `sdlc login` (task B04, ADR-M36). */
@@ -66,6 +68,11 @@ export async function runCli(argv: readonly string[], ctx: CliContext): Promise<
   // V05: the published package (`agentic-sdlc-cli`) and a checkout print the same version.
   if (argv.length === 1 && (group === '--version' || group === '-V')) {
     ctx.stdout(PLATFORM_VERSION);
+    return EXIT.ok;
+  }
+  // Print ASCII banner: `sdlc banner` or `sdlc --banner`.
+  if (argv.length === 1 && (group === 'banner' || group === '--banner')) {
+    ctx.stdout(renderBanner(ctx.env));
     return EXIT.ok;
   }
   // V10: `sdlc help …`, `sdlc --help`, and `sdlc <group> … --help` print help and do nothing else.

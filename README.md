@@ -1,3 +1,19 @@
+<div align="center">
+
+```text
+    ___                    __  _        _____ ____  __    ______
+   /   | ____ ____  ____  / /_(_)____  / ___// __ \/ /   / ____/
+  / /| |/ __ `/ _ \/ __ \/ __/ / ___/  \__ \/ / / / /   / /     
+ / ___ / /_/ /  __/ / / / /_/ / /__   ___/ / /_/ / /___/ /___   
+/_/  |_\__, /\___/_/ /_/\__/_/\___/  /____/_____/_____/\____/   
+      /____/                                                    
+```
+
+**Human-in-the-Loop AI Software Delivery Platform**  
+*Autonomous AI Agents • 8 Quality Gates • Cryptographic Audit Trail*
+
+</div>
+
 # Agentic SDLC Framework
 
 **A way to let AI coding agents take part in software delivery without giving up control.** The framework has two parts that work together:
