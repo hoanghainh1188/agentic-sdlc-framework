@@ -577,7 +577,7 @@ t("X03","EXT","A second agent adapter and the agent register's adapter column","
   "`agents.adapter` (migration, D-05, ADR-M31): every agent names its adapter; a project picks the agent by `run.agent_key` as today",
   "The pilot suite (`pnpm test:pilot`) and `pnpm test:agent` pass with the new adapter on the stub model; the sandbox egress and hardening tests unchanged",
   "Handbook Ch.20: registering an agent with another adapter"],
- "QUESTIONS #361. Multi-agent (several agents in one intent) stays after X03")
+ "QUESTIONS #361. Multi-agent (several agents in one intent) stays after X03. The adapter is OpenCode (QUESTIONS #521, repository owner 2026-10-22), with the conditions of ADR-M68 §5–§6: one image per adapter in `sandbox.images.<adapter>` (#522); the adapter enforces the caps and checks its configuration on every status call (#523; the authenticating proxy before real client work); the binary pinned by sha512 integrity and a licence check of its dependency tree (#524)")
 t("X14","EXT","Spike: an open-source MCP gateway in front of a run's tools","S",["X02"],"NFR-03, NFR-04, NFR-05, D-01 §5.6",
  "platform/spikes/mcp-gateway/* (thrown away), design/ADR-M87, design/ADR-M69",
  ["Compare at least three self-hosted open-source MCP gateways (pinned versions): licence, maintenance, image size and vulnerabilities (Trivy), and whether one instance per run fits inside the run's networks of ADR-M69 §2.4",
@@ -764,7 +764,7 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.55 |
+| Version | 1.56 |
 | Date | 2026-10-21 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -945,6 +945,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.53 | 2026-10-20 | Claude (task L08), approved by the repository owner | L08 design (ADR-M86, QUESTIONS #496–#500); new tasks L09 (evaluations in the agent approvals) and L10 (evaluations in the recertification) |
 | 1.54 | 2026-10-21 | Claude, approved by the repository owner | Release v0.5.0 with L06–L10 (EVAL complete), W01 and the X09 spike; EXT and Models move to v0.6.0 |
 | 1.55 | 2026-10-22 | Claude (task X02), approved by the repository owner | New task X14: spike of an open-source MCP gateway before X04 (QUESTIONS #520, ADR-M87); X04 depends on X14 and starts by checking MCP in OpenHands (QUESTIONS #519) |
+| 1.56 | 2026-10-22 | Claude (docs), approved by the repository owner | X03 note: OpenCode and the conditions of ADR-M68 (QUESTIONS #521–#524) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
