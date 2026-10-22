@@ -11,11 +11,14 @@ import http from 'node:http';
 import { RunnerError } from '../errors.js';
 import {
   assertSafeContainerSpec,
+  assertSafeGatewaySpec,
   assertSafeNetworkSpec,
   assertSafeScoringSpec,
+  assertSafeToolSpec,
   type ContainerSpec,
   type ScoringContainerSpec,
   type ScoringPhase,
+  type ToolContainerSpec,
 } from './guard.js';
 
 /** Docker Engine 25 or later (API 1.44). The server answers older versions for newer clients. */
@@ -223,6 +226,21 @@ export class DockerClient {
   }
 
   /**
+   * Creates a tool container or the MCP gateway of a run (X04, ADR-M69 §2.4) from a spec its guard
+   * accepts (guard.ts). Returns its ID.
+   */
+  async toolContainerCreate(
+    name: string,
+    spec: ToolContainerSpec,
+    kind: 'tool' | 'gateway',
+  ): Promise<string> {
+    if (kind === 'tool') assertSafeToolSpec(name, spec);
+    else assertSafeGatewaySpec(name, spec);
+    const res = await this.#expect('POST', '/containers/create', [201], spec, { name });
+    return (JSON.parse(res.body.toString('utf8')) as { Id: string }).Id;
+  }
+
+  /**
    * Extracts a tar archive into a created container before it starts (S2: the workspace). Docker
    * writes into the container's volumes, so the archive lands in the run's workspace volume.
    */
@@ -311,13 +329,16 @@ export class DockerClient {
     return (JSON.parse(res.body.toString('utf8')) as { StatusCode: number }).StatusCode;
   }
 
-  /** Standard output of a stopped container (multiplexed stream, headers removed). */
-  async containerLogs(id: string): Promise<string> {
+  /**
+   * Standard output of a container (multiplexed stream, headers removed). `stderr`: both streams
+   * (X04: the MCP gateway's log lines, wherever the gateway writes them).
+   */
+  async containerLogs(id: string, options: { readonly stderr?: boolean } = {}): Promise<string> {
     const res = await this.#expect('GET', `/containers/${id}/logs`, [200], undefined, {
       stdout: 'true',
-      stderr: 'false',
+      stderr: options.stderr === true ? 'true' : 'false',
     });
-    return demultiplex(res.body);
+    return demultiplex(res.body, options);
   }
 
   /** Removes a container and its anonymous volumes. Returns false when it did not exist. */
@@ -489,14 +510,19 @@ function unreachable(code: string): RunnerError {
   return new RunnerError('runner.docker.unreachable', { code });
 }
 
-/** Removes the 8-byte frame headers of Docker's multiplexed log stream (stdout frames only). */
-export function demultiplex(stream: Buffer): string {
+/**
+ * Removes the 8-byte frame headers of Docker's multiplexed log stream: stdout frames only, or
+ * stdout and stderr frames (X04) in the order Docker wrote them.
+ */
+export function demultiplex(stream: Buffer, options: { readonly stderr?: boolean } = {}): string {
   const parts: Buffer[] = [];
   let offset = 0;
   while (offset + 8 <= stream.length) {
     const type = stream[offset];
     const size = stream.readUInt32BE(offset + 4);
-    if (type === 1) parts.push(stream.subarray(offset + 8, offset + 8 + size));
+    if (type === 1 || (type === 2 && options.stderr === true)) {
+      parts.push(stream.subarray(offset + 8, offset + 8 + size));
+    }
     offset += 8 + size;
   }
   return Buffer.concat(parts).toString('utf8');

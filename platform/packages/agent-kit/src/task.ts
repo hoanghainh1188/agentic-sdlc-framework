@@ -12,6 +12,7 @@ import { randomBytes } from 'node:crypto';
 
 import {
   AGENT_TOOLS,
+  isRegisterToolCode,
   AgentError,
   type AgentTask,
   type AgentTool,
@@ -35,12 +36,21 @@ function isAgentTool(tool: string): tool is AgentTool {
   return (AGENT_TOOLS as readonly string[]).includes(tool);
 }
 
-/** The tools of the run. Refuses a tool the MVP never grants. */
-export function toolsOf(contract: RunContract): AgentTool[] {
+/**
+ * The built-in tools of the run. Refuses a tool the MVP never grants. X04 (ADR-M69 §2.4): register
+ * tools (`tool:<key>`) are not built-in tools; they reach the agent through the run's MCP gateway.
+ * Only an adapter that wires the gateway passes `registerTools`; any other refuses them.
+ */
+export function toolsOf(
+  contract: RunContract,
+  options: { readonly registerTools?: boolean } = {},
+): AgentTool[] {
   const tools: AgentTool[] = [];
   for (const tool of contract.allowed_tools) {
-    if (!isAgentTool(tool)) throw new AgentError('tool_not_allowed', { tool });
-    tools.push(tool);
+    if (isAgentTool(tool)) tools.push(tool);
+    else if (!(options.registerTools === true && isRegisterToolCode(tool))) {
+      throw new AgentError('tool_not_allowed', { tool });
+    }
   }
   return tools;
 }

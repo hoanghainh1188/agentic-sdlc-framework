@@ -52,6 +52,7 @@ import {
   type RunKeySpendReader,
   type RunStatus,
   type SecretUnwrapper,
+  TOOL_GATEWAY_URL,
 } from '@sdlc/contracts';
 import {
   KILLED,
@@ -61,6 +62,8 @@ import {
   type PlatformDatabase,
   type TenantScope,
 } from '@sdlc/core';
+
+import { Redacted } from '@sdlc/secrets';
 
 import type { DockerClient } from '../docker/client.js';
 import type { Sandbox } from '../sandbox/lifecycle.js';
@@ -432,6 +435,10 @@ export async function driveAgent(
       },
       task,
       workingDir: AGENT_WORKING_DIR,
+      // X04 (ADR-M69 §2.4): the run's MCP gateway, when the contract grants register tools.
+      ...(sandbox.toolKey === undefined
+        ? {}
+        : { tools: { url: TOOL_GATEWAY_URL, key: new Redacted(sandbox.toolKey) } }),
     });
   } catch (error) {
     if (!taskLoading) await discardFeedbackToken(scope, contract.run_id, feedback);

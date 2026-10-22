@@ -13,6 +13,7 @@ import { assertSafeNetworkConnect } from '../docker/guard.js';
 import { RunnerError } from '../errors.js';
 import { LABELS, runLabels, runNames, type RunNames } from '../names.js';
 import type { RunnerSettings } from '../settings.js';
+import { teardownTools } from '../tools/teardown.js';
 import { planEgress, runNetworkSpec } from './network.js';
 import { buildSandboxSpec } from './spec.js';
 
@@ -34,6 +35,7 @@ export type ProvisioningFailure =
   | 'sandbox_unhealthy'
   | 'sandbox_not_ready'
   | 'run_stopped' // the run left `provisioning` meanwhile (kill switch)
+  | 'tool_unavailable' // X04: a register tool or the run's MCP gateway did not start
   | 'docker_error';
 
 /**
@@ -59,6 +61,14 @@ export interface CreateSandboxInput {
   readonly workspaceTar?: Buffer;
   /** The workspace volume already exists: `reserveWorkspace` created it before the claim. */
   readonly workspaceReserved?: boolean;
+  /**
+   * X04 (ADR-M69 §2.4): starts the run's register tools and MCP gateway once the run network
+   * exists, before the sandbox. Returns the agent's per-run key to the gateway.
+   */
+  readonly startTools?: (
+    names: RunNames,
+    labels: Readonly<Record<string, string>>,
+  ) => Promise<string>;
 }
 
 export interface Sandbox {
@@ -68,6 +78,8 @@ export interface Sandbox {
   readonly imageSha256: string;
   /** Random per run; the runner uses it to call the Agent Server (C05). Never logged. */
   readonly sessionApiKey: string;
+  /** X04: random per run, the agent's key to the run's MCP gateway; absent without tools. */
+  readonly toolKey?: string;
 }
 
 export class ProvisioningError extends RunnerError {
@@ -146,6 +158,7 @@ export async function createSandbox(
       assertSafeNetworkConnect(names.network, service.container, attachable);
       await docker.networkConnect(names.network, service.container, [service.alias]);
     }
+    const toolKey = input.startTools ? await input.startTools(names, labels) : undefined;
     const spec = buildSandboxSpec(
       { names, labels, image: input.image, sessionApiKey, agentSecretKey: randomKey() },
       settings,
@@ -153,7 +166,13 @@ export async function createSandbox(
     const containerId = await docker.containerCreate(names.container, spec);
     if (input.workspaceTar) await docker.putArchive(containerId, '/workspace', input.workspaceTar);
     await docker.containerStart(containerId);
-    return { names, containerId, imageSha256, sessionApiKey };
+    return {
+      names,
+      containerId,
+      imageSha256,
+      sessionApiKey,
+      ...(toolKey === undefined ? {} : { toolKey }),
+    };
   } catch (error) {
     await teardownSandbox(docker, input.runId);
     if (error instanceof RunnerError) throw error;
@@ -209,6 +228,12 @@ export async function teardownSandbox(
   const started = Date.now();
   const names = runNames(runId);
   let firstError: Error | undefined;
+  // X04 (ADR-M69 §2.8): the gateway first, so every tool of the run is cut at once.
+  try {
+    await teardownTools(docker, runId, { [LABELS.runId]: runId });
+  } catch (error) {
+    firstError = error instanceof Error ? error : new ProvisioningError('docker_error');
+  }
   const attempt = async (step: () => Promise<boolean>): Promise<boolean> => {
     try {
       return await step();

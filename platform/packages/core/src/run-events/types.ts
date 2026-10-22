@@ -50,6 +50,20 @@ export const RUN_EVENT_TYPES = {
   sandbox_created: { image_sha256: 'sha256' },
   /** The sandbox passed its health check (C04). */
   sandbox_ready: { duration_ms: 'count' },
+  /**
+   * X04 (ADR-M69 §2.7, QUESTIONS #518, #532): register tools. Codes and counts only, never a
+   * query, an argument, an answer, a document name or path, a credential or a key.
+   * - `tool_started`: the tool container is healthy (`image_sha256`: the hex of its digest);
+   * - `tool_used`: once per tool at the end of the run, also after a kill or a failure, counted
+   *   from the run gateway's log lines;
+   * - `tool_refused`: the first call the gateway refused for a reason, once per reason
+   *   (`max_calls`, `tool_not_allowed`, `argument_refused` with the tool, `key_refused` without);
+   * - `tool_failed`: the tool stopped or became unhealthy during the run.
+   */
+  tool_started: { tool_key: 'code', tool_version: 'code', image_sha256: 'sha256' },
+  tool_used: { tool_key: 'code', calls: 'count', failed_calls: 'count', refused_calls: 'count' },
+  tool_refused: { reason: 'code', tool_key: 'code?' },
+  tool_failed: { tool_key: 'code', reason: 'code' },
   /** Provisioning stopped before the sandbox was ready; `reason` is a `ProvisioningFailure` (C04). */
   provisioning_failed: { reason: 'code' },
   /**

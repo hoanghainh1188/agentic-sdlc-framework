@@ -9,9 +9,9 @@ import { loadValid } from './helpers';
 
 /**
  * Pinned hash of the shipped default configuration. It changes only when a default value changes.
- * Update it in the same PR as the default change, after review (C06: `run.agent_key`; session 2: `run.contract_attempts_max`, `run.failed_run_escalation`; C07: `run.g5_breach_escalation`; B08: `access.spec_link_roles`; C08: `verification`; B09: `access.plan_submit_roles`; C11: `access.kill_roles`, `run.kill_escalation`; E04: `access.cost_read_roles`; E06: `access.metrics_read_roles`; E02: `access.evidence_build_roles`, `access.evidence_read_roles`; E05: `access.evidence_hold_roles`; L05: `access.eval_roles`; L06: `evaluation.recommendations`; L07: `evaluation.tasks`; X04: `tools`).
+ * Update it in the same PR as the default change, after review (C06: `run.agent_key`; session 2: `run.contract_attempts_max`, `run.failed_run_escalation`; C07: `run.g5_breach_escalation`; B08: `access.spec_link_roles`; C08: `verification`; B09: `access.plan_submit_roles`; C11: `access.kill_roles`, `run.kill_escalation`; E04: `access.cost_read_roles`; E06: `access.metrics_read_roles`; E02: `access.evidence_build_roles`, `access.evidence_read_roles`; E05: `access.evidence_hold_roles`; L05: `access.eval_roles`; L06: `evaluation.recommendations`; L07: `evaluation.tasks`; X04: `tools`; X04 PR 2: `tools.gateway.image`).
  */
-const DEFAULT_CONFIG_HASH = '89622ed58ca6aac4f7ffe1ea6e3fdee1a93debfd9b4c91f4191197bdc8a8870a';
+const DEFAULT_CONFIG_HASH = '0d66869f825d7d793636a9a98ff42124a6455cb5d95716f441bb3f633ee41ce4';
 
 describe('config_hash (AC3)', () => {
   it('is the pinned value for the default configuration', () => {

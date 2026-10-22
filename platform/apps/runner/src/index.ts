@@ -8,8 +8,13 @@ export type {
 } from './docker/client.js';
 export {
   assertSafeContainerSpec,
+  assertSafeGatewaySpec,
   assertSafeNetworkSpec,
   assertSafeScoringSpec,
+  assertSafeToolSpec,
+  GATEWAY_COMMAND,
+  GATEWAY_USER,
+  TOOL_USER,
   SANDBOX_ENV_ALLOWLIST,
   SCORING_COMMANDS,
   SCORING_ENV_ALLOWLIST,
@@ -17,6 +22,7 @@ export {
   type ContainerSpec,
   type ScoringContainerSpec,
   type ScoringPhase,
+  type ToolContainerSpec,
 } from './docker/guard.js';
 export { buildScoringSpec, type ScoringSpecInput } from './sandbox/scoring-spec.js';
 export {
@@ -82,8 +88,10 @@ export {
   runLabels,
   runNames,
   runOfLabels,
+  toolObjectNames,
   type LabelledRun,
   type RunNames,
+  type ToolObjectNames,
 } from './names.js';
 export { SlotPool, type Slot } from './pool.js';
 export {
@@ -116,6 +124,29 @@ export {
 } from './sandbox/lifecycle.js';
 export { planEgress, runNetworkSpec, type EgressPlan } from './sandbox/network.js';
 export { buildSandboxSpec, type SandboxSpecInput } from './sandbox/spec.js';
+export {
+  argumentRuleCel,
+  buildGatewayConfig,
+  exposedToolName,
+  GATEWAY_READY_MESSAGE,
+  type GatewayConfigInput,
+} from './tools/gateway-config.js';
+export {
+  startTools,
+  toolGrantsEnforceable,
+  type StartToolsInput,
+  type StartedTools,
+} from './tools/provision.js';
+export { recordToolUse } from './tools/record.js';
+export {
+  buildGatewaySpec,
+  buildToolSpec,
+  GATEWAY_LIMITS,
+  toolHost,
+  type ToolLimits,
+} from './tools/spec.js';
+export { teardownTools } from './tools/teardown.js';
+export { toolUsage, type ToolCounts, type ToolRefusal, type ToolUsage } from './tools/usage.js';
 export {
   releaseSandbox,
   provisionRun,

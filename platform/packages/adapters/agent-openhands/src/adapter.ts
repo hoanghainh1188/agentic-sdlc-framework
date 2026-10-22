@@ -86,6 +86,9 @@ export class OpenHandsAdapter implements AgentAdapter {
       virtualKey: input.model.virtualKey.reveal(),
       workingDir: input.workingDir,
       task: input.task,
+      ...(input.tools === undefined
+        ? {}
+        : { tools: { url: input.tools.url, key: input.tools.key.reveal() } }),
     });
     const conversationId = await this.#client(input).startConversation(body);
     return {

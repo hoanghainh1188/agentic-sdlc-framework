@@ -114,6 +114,7 @@ const HOST_KEYS = new Set([
 const PINNED = /@sha256:[0-9a-f]{64}$/;
 const SANDBOX_NAME = /^sdlc-sandbox-[0-9a-f-]{36}$/;
 const RUN_NETWORK = /^sdlc-run-[0-9a-f-]{36}$/;
+const TOOL_NETWORK = /^sdlc-tool-[0-9a-f-]{36}$/;
 const RUN_VOLUME = /^sdlc-ws-[0-9a-f-]{36}$/;
 const TMPFS_OPTIONS =
   /^(?:rw,)?(?:exec|noexec),nosuid,nodev,size=[0-9]+,mode=[0-7]{3,4}(?:,uid=10001,gid=10001)?$/;
@@ -255,11 +256,13 @@ export function assertSafeNetworkSpec(spec: {
     'Options',
   ]);
   if (Object.keys(spec).some((key) => !allowed.has(key))) refuse('unknown_network_option');
-  if (!RUN_NETWORK.test(spec.Name)) refuse('network_name');
+  // A run's network, or (X04, ADR-M69 §2.4) its tool network: the same internal bridge.
+  if (!RUN_NETWORK.test(spec.Name) && !TOOL_NETWORK.test(spec.Name)) refuse('network_name');
   if (spec.Driver !== 'bridge' || spec.Internal !== true) refuse('network_internal');
   if (spec.Attachable !== false || spec.EnableIPv6 !== false) refuse('network_options');
   if (spec.Labels[LABELS.managed] !== MANAGED_BY) refuse('labels');
-  if (`sdlc-run-${String(spec.Labels[LABELS.runId])}` !== spec.Name) refuse('labels');
+  const runId = String(spec.Labels[LABELS.runId]);
+  if (`sdlc-run-${runId}` !== spec.Name && `sdlc-tool-${runId}` !== spec.Name) refuse('labels');
   // Exactly one option: no IP address for the bridge, so the host is not reachable (ADR-M25 §2.2).
   const options = Object.entries(spec.Options);
   if (
@@ -283,4 +286,182 @@ export function assertSafeNetworkConnect(
 ): void {
   if (!RUN_NETWORK.test(network)) refuse('connect_network');
   if (!allowed.includes(container)) refuse('connect_container');
+}
+
+/** The user every `http` tool image runs as (ADR-M69 §2.4): never root. */
+export const TOOL_USER = '10001:10001';
+/** The user of the agentgateway image (`nonroot`). */
+export const GATEWAY_USER = '65532:65532';
+/** Where the gateway reads its configuration (the run's config volume). */
+export const GATEWAY_CONFIG_DIR = '/config';
+/** The gateway's one fixed command: its configuration file, nothing else. */
+export const GATEWAY_COMMAND = ['-f', `${GATEWAY_CONFIG_DIR}/config.yaml`] as const;
+/** tmpfs of a tool container: `/tmp` only, never executable. */
+export const TOOL_TMPFS_PATH = '/tmp';
+/**
+ * The bounded log of a tool or gateway container: one file of at most 4 MiB, so the host's disk
+ * stays safe and the runner can read the whole log (its responses are capped at 8 MiB). A sandbox
+ * that floods the gateway can only push older lines out: the counts are then a lower bound.
+ */
+export const TOOL_LOG_CONFIG = { 'max-size': '4m', 'max-file': '1' } as const;
+
+/** A tool or gateway container of one run (X04, ADR-M69 §2.4). Fields as `ContainerSpec`. */
+export interface ToolContainerSpec {
+  readonly Image: string;
+  readonly User: string;
+  readonly Env: readonly string[];
+  readonly Labels: Readonly<Record<string, string>>;
+  readonly Cmd?: readonly string[];
+  readonly NetworkDisabled: false;
+  /**
+   * Tools only: a short alias on the tool network (`t-<12 hex>`), the host the gateway calls. A
+   * container name (`sdlc-tool-<run>-<key>`) can be longer than a DNS label (63 characters).
+   */
+  readonly NetworkingConfig?: {
+    readonly EndpointsConfig: Readonly<Record<string, { readonly Aliases: readonly string[] }>>;
+  };
+  readonly HostConfig: {
+    readonly NetworkMode: string;
+    /** Bounded logs (X04): the gateway's log is evidence the sandbox could otherwise flood. */
+    readonly LogConfig: { readonly Type: 'json-file'; readonly Config: typeof TOOL_LOG_CONFIG };
+    readonly ReadonlyRootfs: true;
+    readonly CapDrop: readonly ['ALL'];
+    readonly SecurityOpt: readonly ['no-new-privileges:true'];
+    readonly Memory: number;
+    readonly MemorySwap: number;
+    readonly NanoCpus: number;
+    readonly PidsLimit: number;
+    readonly Tmpfs: Readonly<Record<string, string>>;
+    readonly Mounts: readonly {
+      readonly Type: 'volume';
+      readonly Source: string;
+      readonly Target: string;
+      readonly ReadOnly: false;
+    }[];
+    readonly RestartPolicy: { readonly Name: 'no' };
+    readonly AutoRemove: false;
+    readonly Init: true;
+  };
+}
+
+const TOOL_TOP_KEYS = new Set([
+  'Image',
+  'User',
+  'Env',
+  'Labels',
+  'Cmd',
+  'NetworkDisabled',
+  'NetworkingConfig',
+  'HostConfig',
+]);
+const TOOL_HOST_KEYS = new Set([...HOST_KEYS, 'LogConfig']);
+const TOOL_ALIAS = /^t-[0-9a-f]{12}$/;
+const TOOL_NAME = /^sdlc-tool-([0-9a-f-]{36})-[a-z][a-z0-9-]{1,62}$/;
+const GATEWAY_NAME = /^sdlc-gw-([0-9a-f-]{36})$/;
+const TOOL_TMPFS_OPTIONS = /^rw,noexec,nosuid,nodev,size=[0-9]+,mode=1777$/;
+
+/**
+ * The hardening of a tool or gateway container: a run's labels, the image by digest, a fixed
+ * non-root user, no environment value (none is allowed yet), no capability, a read-only root, the
+ * limits, the run's tool network only, no restart. The mounts and the command are checked by the
+ * caller.
+ */
+function checkToolHardening(
+  name: string,
+  spec: ToolContainerSpec,
+  runId: string,
+  user: string,
+): void {
+  const raw = spec as unknown as Record<string, unknown>;
+  const host = (raw.HostConfig ?? {}) as Record<string, unknown>;
+  if (Object.keys(raw).some((key) => !TOOL_TOP_KEYS.has(key))) refuse('unknown_option');
+  if (Object.keys(host).some((key) => !TOOL_HOST_KEYS.has(key))) refuse('unknown_host_option');
+  if (typeof spec.Image !== 'string' || !PINNED.test(spec.Image)) refuse('image_not_pinned');
+  if (spec.User !== user) refuse('user');
+  const log = host.LogConfig as Record<string, unknown> | undefined;
+  if (
+    log?.Type !== 'json-file' ||
+    JSON.stringify(log.Config) !== JSON.stringify(TOOL_LOG_CONFIG) ||
+    Object.keys(log).length !== 2
+  ) {
+    refuse('log_config');
+  }
+  if (spec.NetworkDisabled !== false) refuse('network_disabled');
+  // No environment value: a tool's credential is a file (ADR-M69 §2.4), never an environment value.
+  if (!Array.isArray(spec.Env) || spec.Env.length !== 0) refuse('env');
+  const labels = spec.Labels as Record<string, unknown> | undefined;
+  if (labels?.[LABELS.managed] !== MANAGED_BY || labels[LABELS.runId] !== runId) refuse('labels');
+  const hc = spec.HostConfig;
+  if (hc.NetworkMode !== `sdlc-tool-${runId}`) refuse('network');
+  if (hc.ReadonlyRootfs !== true) refuse('read_only');
+  if (!sameList(hc.CapDrop, ['ALL'])) refuse('capabilities');
+  if (!sameList(hc.SecurityOpt, ['no-new-privileges:true'])) refuse('security_opt');
+  if (!positiveInt(hc.Memory) || hc.MemorySwap !== hc.Memory) refuse('memory');
+  if (!positiveInt(hc.NanoCpus)) refuse('cpus');
+  if (!positiveInt(hc.PidsLimit)) refuse('pids');
+  if (hc.RestartPolicy?.Name !== 'no' || hc.AutoRemove !== false || hc.Init !== true) {
+    refuse('lifecycle');
+  }
+  void name;
+}
+
+/**
+ * Throws unless the container is a hardened tool container of one run (X04, ADR-M69 §2.4): the
+ * tool image by digest, its own command (none given), no mount, `/tmp` as a non-executable tmpfs,
+ * on the run's tool network only, never on the run network.
+ */
+export function assertSafeToolSpec(name: string, spec: ToolContainerSpec): void {
+  const runId = TOOL_NAME.exec(name)?.[1] ?? refuse('name');
+  checkToolHardening(name, spec, runId, TOOL_USER);
+  if (spec.Cmd !== undefined) refuse('command');
+  const endpoints = Object.entries(spec.NetworkingConfig?.EndpointsConfig ?? {});
+  const endpoint = endpoints[0];
+  if (
+    endpoints.length !== 1 ||
+    endpoint?.[0] !== `sdlc-tool-${runId}` ||
+    Object.keys(spec.NetworkingConfig ?? {}).length !== 1 ||
+    Object.keys(endpoint[1]).length !== 1 ||
+    !Array.isArray(endpoint[1].Aliases) ||
+    endpoint[1].Aliases.length !== 1 ||
+    !TOOL_ALIAS.test(String(endpoint[1].Aliases[0]))
+  ) {
+    refuse('network_alias');
+  }
+  const tmpfs = Object.entries(spec.HostConfig.Tmpfs ?? {});
+  if (
+    tmpfs.length !== 1 ||
+    tmpfs[0]?.[0] !== TOOL_TMPFS_PATH ||
+    !TOOL_TMPFS_OPTIONS.test(tmpfs[0][1])
+  ) {
+    refuse('tmpfs');
+  }
+  if (!Array.isArray(spec.HostConfig.Mounts) || spec.HostConfig.Mounts.length !== 0) {
+    refuse('mounts');
+  }
+}
+
+/**
+ * Throws unless the container is the hardened MCP gateway of one run (X04, ADR-M87 §5): the
+ * gateway image by digest, its one fixed command, no tmpfs, and one mount: the run's config volume.
+ */
+export function assertSafeGatewaySpec(name: string, spec: ToolContainerSpec): void {
+  const runId = GATEWAY_NAME.exec(name)?.[1] ?? refuse('name');
+  checkToolHardening(name, spec, runId, GATEWAY_USER);
+  if (spec.NetworkingConfig !== undefined) refuse('network_alias');
+  if (!sameList(spec.Cmd, GATEWAY_COMMAND)) refuse('command');
+  if (Object.keys(spec.HostConfig.Tmpfs ?? {}).length !== 0) refuse('tmpfs');
+  const mounts: readonly unknown[] = Array.isArray(spec.HostConfig.Mounts)
+    ? spec.HostConfig.Mounts
+    : refuse('mounts');
+  const mount = (mounts[0] ?? {}) as Readonly<Record<string, unknown>>;
+  if (
+    mounts.length !== 1 ||
+    mount.Type !== 'volume' ||
+    mount.Source !== `sdlc-gwcfg-${runId}` ||
+    mount.Target !== GATEWAY_CONFIG_DIR ||
+    mount.ReadOnly !== false ||
+    Object.keys(mount).length !== 4
+  ) {
+    refuse('mounts');
+  }
 }
