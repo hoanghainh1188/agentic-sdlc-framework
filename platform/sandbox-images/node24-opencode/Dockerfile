@@ -18,7 +18,9 @@
 #   from the environment: the adapter sets it through the server API.
 # - Auto-update, the models list fetch, LSP downloads, sharing, default plugins and the Claude
 #   Code compatibility (reading ~/.claude) are off. The configuration file below allows no
-#   provider except LiteLLM and denies web fetches; the adapter sets the rest per run.
+#   provider except LiteLLM, no MCP server, no web fetch or search, and no permission that asks
+#   (nobody answers in a run); entry.sh gives it the highest precedence. The adapter sets the rest
+#   per run and checks the configuration in effect before it starts the agent.
 ARG NODE24
 FROM ${NODE24}
 

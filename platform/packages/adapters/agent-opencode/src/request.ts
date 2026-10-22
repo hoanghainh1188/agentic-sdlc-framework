@@ -4,8 +4,11 @@
 // - Model: the provider `litellm` (OpenAI-compatible) at LiteLLM with the run's virtual key, set
 //   through `PUT /auth/litellm` (never an environment variable; R061).
 // - Global configuration (`PATCH /global/config`, never `PATCH /config`, gap 3): the provider, the
-//   run's model as `model` and `small_model`, the iteration cap as the `build` agent's `steps`, and
-//   the `title` agent switched off (gap 5: a session title would cost a model call).
+//   run's model as `model` and `small_model`, one step more than the iteration cap as the `build`
+//   agent's `steps` (the adapter stops the run at the cap itself, so OpenCode's own stop is only a
+//   backstop), and the `title` agent switched off (gap 5: a session title would cost a model call).
+// - A repository's own `opencode.json` ranks above the global configuration: before the agent
+//   starts, the adapter checks the configuration in effect (`effectiveConfigProblem`).
 // - Tools (gap 9): the platform's three tools map to OpenCode's own; every other tool ID the server
 //   lists, also one a new version adds, is off in the prompt.
 // - Task message: `buildTaskMessage` of `@sdlc/agent-kit` with OpenCode's last rule.
@@ -64,10 +67,51 @@ export function globalConfig(input: StartAgentRun): Record<string, unknown> {
     model: `${PROVIDER}/${model}`,
     small_model: `${PROVIDER}/${model}`,
     agent: {
-      [AGENT]: { steps: input.contract.max_iterations },
+      [AGENT]: { steps: input.contract.max_iterations + 1 },
       title: { disable: true },
     },
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** The value at `path` of a configuration, or undefined. */
+function at(config: unknown, ...path: string[]): unknown {
+  let value = config;
+  for (const key of path) value = isRecord(value) ? value[key] : undefined;
+  return value;
+}
+
+/**
+ * The first field of the configuration in effect (`GET /config`) that is not what the run needs,
+ * or undefined. A repository's `opencode.json` could otherwise point the provider elsewhere, raise
+ * the steps, add an MCP server or switch the title back on. Field names only, never values.
+ */
+export function effectiveConfigProblem(config: unknown, input: StartAgentRun): string | undefined {
+  const expected = globalConfig(input);
+  const model = `${PROVIDER}/${input.model.model}`;
+  const checks: [string, boolean][] = [
+    ['model', at(config, 'model') === model],
+    ['small_model', at(config, 'small_model') === model],
+    [
+      'enabled_providers',
+      JSON.stringify(at(config, 'enabled_providers')) === JSON.stringify([PROVIDER]),
+    ],
+    [
+      'provider',
+      at(config, 'provider', PROVIDER, 'options', 'baseURL') ===
+        at(expected, 'provider', PROVIDER, 'options', 'baseURL') &&
+        Object.keys(at(config, 'provider') ?? {}).every((id) => id === PROVIDER),
+    ],
+    ['steps', at(config, 'agent', AGENT, 'steps') === at(expected, 'agent', AGENT, 'steps')],
+    ['title', at(config, 'agent', 'title', 'disable') === true],
+    ['mcp', Object.keys(at(config, 'mcp') ?? {}).length === 0],
+    ['webfetch', at(config, 'permission', 'webfetch') === 'deny'],
+    ['doom_loop', at(config, 'permission', 'doom_loop') === 'deny'],
+  ];
+  return checks.find(([, ok]) => !ok)?.[0];
 }
 
 /** The tool switches of the prompt: on for the run's tools, off for every other ID. */

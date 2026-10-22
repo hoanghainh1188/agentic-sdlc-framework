@@ -3,7 +3,18 @@
   "autoupdate": false,
   "share": "disabled",
   "enabled_providers": ["litellm"],
-  "permission": { "edit": "allow", "bash": "allow", "webfetch": "deny" },
+  "mcp": {},
+  "permission": {
+    "*": "allow",
+    "edit": "allow",
+    "bash": "allow",
+    "read": { "*": "allow", "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow" },
+    "external_directory": { "*": "deny", "/workspace/*": "allow", "/tmp/*": "allow" },
+    "doom_loop": "deny",
+    "question": "deny",
+    "webfetch": "deny",
+    "websearch": "deny"
+  },
   "lsp": false,
   "formatter": false
 }

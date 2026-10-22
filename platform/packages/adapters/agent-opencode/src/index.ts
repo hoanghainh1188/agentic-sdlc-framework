@@ -12,6 +12,7 @@ export {
 export {
   AGENT,
   checkStart,
+  effectiveConfigProblem,
   EXIT_MARKER,
   exitCodeOf,
   FINISH_RULE,

@@ -44,8 +44,10 @@ export interface StateInput {
 
 /**
  * OpenCode session → agent state:
- * - busy or retrying, or idle before the first reply: `running`;
- * - idle after the adapter stopped it at the cap, or at the cap with no error: `max_iterations`;
+ * - busy or retrying, or idle before the first reply: `running` (also while an abort at the cap
+ *   is still in flight);
+ * - idle after the adapter stopped it at the cap, or past the cap with no error (OpenCode's own
+ *   stop at `steps` = cap + 1): `max_iterations`;
  * - idle after an abort: `stopped`; after any other error: `error`;
  * - idle otherwise: `finished` (OpenCode has no finish tool: the agent stops replying).
  */
@@ -55,5 +57,5 @@ export function stateOf(input: StateInput): AgentRunState {
   if (input.stoppedAtCap) return 'max_iterations';
   const error = assistant.at(-1)?.info.error;
   if (error !== undefined) return error.name === ABORTED_ERROR ? 'stopped' : 'error';
-  return input.iterations >= input.cap ? 'max_iterations' : 'finished';
+  return input.iterations > input.cap ? 'max_iterations' : 'finished';
 }

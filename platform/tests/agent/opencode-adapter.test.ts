@@ -26,6 +26,9 @@ type Reply = { status: number; body: unknown };
 function fakeServer() {
   const state = {
     global: {} as Record<string, unknown>,
+    /** What a repository's `opencode.json` adds on top (it ranks above the global file). */
+    repo: {} as Record<string, unknown>,
+    sessions: [] as string[],
     ids: [...IDS],
     session: 'busy' as string,
     messages: [] as unknown[],
@@ -43,10 +46,21 @@ function fakeServer() {
       return { status: 200, body: state.global };
     }
     if (key === 'GET /global/config') return { status: 200, body: state.global };
-    if (key === 'GET /config') return { status: 200, body: { ...state.global, share: 'disabled' } };
+    if (key === 'GET /config') {
+      const image = {
+        share: 'disabled',
+        mcp: {},
+        permission: { webfetch: 'deny', doom_loop: 'deny' },
+      };
+      return { status: 200, body: { ...state.global, ...image, ...state.repo } };
+    }
+    if (key === 'GET /session') return { status: 200, body: state.sessions.map((id) => ({ id })) };
     if (key === 'POST /instance/dispose') return { status: 200, body: true };
     if (key === 'GET /experimental/tool/ids') return { status: 200, body: state.ids };
-    if (key === 'POST /session') return { status: 200, body: { id: SESSION_ID } };
+    if (key === 'POST /session') {
+      state.sessions.push(SESSION_ID);
+      return { status: 200, body: { id: SESSION_ID } };
+    }
     if (key === `POST /session/${SESSION_ID}/prompt_async`) return { status: 204, body: '' };
     if (key === 'GET /session/status') {
       return {
@@ -91,7 +105,7 @@ function fakeServer() {
       new Response(reply.status === 204 ? null : text, { status: reply.status }),
     );
   }) as typeof fetch;
-  return { state, calls, adapter: new OpenCodeAdapter({ fetch: fetchFn }) };
+  return { state, calls, fetchFn, adapter: new OpenCodeAdapter({ fetch: fetchFn }) };
 }
 
 const INPUT: StartAgentRun = {
@@ -103,14 +117,14 @@ const INPUT: StartAgentRun = {
 };
 
 const user = { info: { role: 'user' }, parts: [{ type: 'text', text: 'task' }] };
-const step = (tool = 'read', input: unknown = { filePath: 'a' }, error?: string) => ({
+const step = (tool = 'read', input: unknown = { filePath: 'a' }, error?: string, output = 'x') => ({
   info: {
     role: 'assistant',
     ...(error ? { error: { name: error, data: { message: 'secret server text' } } } : {}),
   },
   parts: [
     { type: 'step-start' },
-    { type: 'tool', tool, state: { status: 'completed', input, output: 'x' } },
+    { type: 'tool', tool, state: { status: 'completed', input, output } },
     { type: 'step-finish' },
   ],
 });
@@ -147,9 +161,11 @@ describe('OpenCodeAdapter.startRun', () => {
       'PUT /auth/litellm',
       'PATCH /global/config',
       'POST /instance/dispose',
-      'GET /experimental/tool/ids',
+      'GET /config',
     ]);
-    expect(order.slice(-2)).toEqual(['POST /session', `POST /session/${SESSION_ID}/prompt_async`]);
+    expect(order.at(-1)).toBe(`POST /session/${SESSION_ID}/prompt_async`);
+    // The baseline fingerprint covers the run's own session, read after it was created.
+    expect(order.lastIndexOf('GET /session')).toBeGreaterThan(order.indexOf('POST /session'));
     const prompt = calls.at(-1)!.body as { tools: Record<string, boolean> };
     expect(
       Object.entries(prompt.tools)
@@ -183,6 +199,15 @@ describe('OpenCodeAdapter.startRun', () => {
     );
     expect(tool?.code).toBe('tool_not_allowed');
     expect(server.calls).toEqual([]);
+  });
+
+  it('refuses to start when a repository opencode.json changes what the run needs', async () => {
+    const server = fakeServer();
+    server.state.repo = { agent: { build: { steps: 999 } } };
+    const error = await errorOf(server.adapter.startRun(INPUT));
+    expect(error?.code).toBe('config_changed');
+    expect(error?.params).toEqual({ field: 'steps' });
+    expect(server.calls.some((c) => c.path.endsWith('/prompt_async'))).toBe(false);
   });
 
   it('refuses a session ID it does not know, and a short session key', async () => {
@@ -219,22 +244,53 @@ describe('OpenCodeAdapter.getStatus', () => {
     expect((await adapter.getStatus(handle)).state).toBe('finished');
   });
 
-  it('stops the run itself at the cap, whatever OpenCode does (gap 1)', async () => {
+  it('stops the run itself at the cap, whatever OpenCode does (gap 1); max_iterations once idle', async () => {
     const { state, calls, adapter, handle } = await started();
-    state.messages = [
-      user,
-      step('bash', { command: 'ls' }),
-      step('bash', { command: 'ls' }),
-      step('bash', { command: 'ls' }),
-    ];
-    const status = await adapter.getStatus(handle);
-    expect(status).toMatchObject({ state: 'max_iterations', iterations: 3, identicalCalls: 3 });
+    const ls = () => step('bash', { command: 'ls' });
+    state.messages = [user, ls(), ls(), ls()];
+    // At the cap and still busy: abort, wait for the session to go idle, then the cap.
+    expect(await adapter.getStatus(handle)).toMatchObject({
+      state: 'max_iterations',
+      iterations: 3,
+      identicalCalls: 3,
+    });
     expect(calls.filter((c) => c.path.endsWith('/abort'))).toHaveLength(1);
-    state.messages = [
-      ...state.messages.slice(0, -1),
-      step('bash', { command: 'ls' }, 'MessageAbortedError'),
-    ];
+    state.messages = [user, ls(), ls(), step('bash', { command: 'ls' }, 'MessageAbortedError')];
     expect((await adapter.getStatus(handle)).state).toBe('max_iterations');
+  });
+
+  it('at the cap: running while the abort has not settled; an abort that fails is tried again', async () => {
+    const server = fakeServer();
+    const adapter = new OpenCodeAdapter({ fetch: server.fetchFn, capSettleMs: 0 });
+    const handle = await adapter.startRun(INPUT);
+    server.state.messages = [user, step(), step(), step()];
+    server.state.override = (c) =>
+      c.path.endsWith('/abort') ? { status: 500, body: 'x' } : undefined;
+    expect((await errorOf(adapter.getStatus(handle)))?.code).toBe('server_error');
+    // The abort is accepted but the session stays busy for a while.
+    server.state.override = (c) =>
+      c.path.endsWith('/abort') ? { status: 200, body: true } : undefined;
+    expect((await adapter.getStatus(handle)).state).toBe('running');
+    server.state.override = undefined;
+    expect((await adapter.getStatus(handle)).state).toBe('max_iterations');
+    expect(server.calls.filter((c) => c.path.endsWith('/abort'))).toHaveLength(3);
+  });
+
+  it('a run that finishes on its last allowed step is finished, not stopped', async () => {
+    const { state, adapter, handle } = await started();
+    state.session = 'idle';
+    state.messages = [user, step(), step(), step()];
+    expect((await adapter.getStatus(handle)).state).toBe('finished');
+  });
+
+  it('the counts never go down: deleting messages through the server does not undo steps', async () => {
+    const { state, adapter, handle } = await started();
+    state.messages = [user, step(), step()];
+    expect(await adapter.getStatus(handle)).toMatchObject({ iterations: 2, events: 7 });
+    state.messages = [user];
+    expect(await adapter.getStatus(handle)).toMatchObject({ iterations: 2, events: 7 });
+    state.messages = [user, step()];
+    expect(await adapter.getStatus(handle)).toMatchObject({ state: 'running', iterations: 2 });
   });
 
   it('stopped after an abort; error after any other error', async () => {
@@ -254,6 +310,12 @@ describe('OpenCodeAdapter.getStatus', () => {
     expect(calls.filter((c) => c.path.endsWith('/abort'))).toHaveLength(1);
     // Sticky: also when the agent puts the configuration back.
     state.global = { ...state.global, agent: { build: { steps: 3 }, title: { disable: true } } };
+    expect((await errorOf(adapter.getStatus(handle)))?.code).toBe('config_changed');
+  });
+
+  it('a session the agent starts through its server fails the run with config_changed', async () => {
+    const { state, adapter, handle } = await started();
+    state.sessions.push('ses_agentOwnSession');
     expect((await errorOf(adapter.getStatus(handle)))?.code).toBe('config_changed');
   });
 
@@ -340,6 +402,14 @@ describe('OpenCodeAdapter.stop, commitWork, collectOutputs', () => {
     expect(outputs.headSha).toBe(head);
     expect(outputs.iterations).toBe(1);
     expect(outputs.events[0]).toMatchObject({ role: 'user', type: 'text' });
+    // The session key is the server password: an agent that prints it never puts it in evidence.
+    state.messages = [
+      user,
+      step('bash', { command: 'env' }, undefined, `OPENCODE_SERVER_PASSWORD=${SESSION_KEY}`),
+    ];
+    const printed = await adapter.collectOutputs(handle, CONTRACT.base_sha);
+    expect(JSON.stringify(printed.events)).not.toContain(SESSION_KEY);
+    expect(JSON.stringify(printed.events)).toContain('OPENCODE_SERVER_PASSWORD=[redacted]');
     expect(outputs.events).toHaveLength(4);
     const shell = calls.find((c) => c.path.endsWith('/shell'))!.body as { command: string };
     expect(decode(shell.command)).toContain(diffCommand('/workspace', CONTRACT.base_sha));

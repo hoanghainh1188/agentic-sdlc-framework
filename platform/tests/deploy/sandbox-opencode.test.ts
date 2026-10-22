@@ -29,6 +29,7 @@ interface LicenceModule {
     workspace: string,
   ): { packages: { name: string; version: string }[]; unresolved: string[] };
   licenceOf(manifest: unknown): string | undefined;
+  ancestors(key: string): string[];
 }
 let licences: LicenceModule;
 beforeAll(async () => {
@@ -84,6 +85,9 @@ describe('sandbox image node24-opencode', () => {
     const entry = read(`${DIR}/entry.sh`);
     expect(entry).toContain('export OPENCODE_SERVER_PASSWORD="$SESSION_API_KEY"');
     expect(entry).toMatch(/^unset SESSION_API_KEY OH_SECRET_KEY /m);
+    // The image's settings rank above a repository's opencode.json.
+    expect(entry).toContain('OPENCODE_CONFIG_CONTENT="$(cat /opt/sdlc/opencode.json)"');
+    expect(entry).toMatch(/^export OPENCODE_CONFIG_CONTENT$/m);
     expect(entry).toMatch(/^exec opencode serve --hostname 0\.0\.0\.0 --port 8000$/m);
     expect(entry).toMatch(/^cd \/workspace$/m);
   });
@@ -94,7 +98,20 @@ describe('sandbox image node24-opencode', () => {
     expect(config.provider).toBeUndefined();
     expect(config.autoupdate).toBe(false);
     expect(config.share).toBe('disabled');
-    expect(config.permission).toMatchObject({ webfetch: 'deny' });
+    expect(config.permission).toMatchObject({
+      webfetch: 'deny',
+      websearch: 'deny',
+      doom_loop: 'deny',
+    });
+    expect(config.mcp).toEqual({});
+  });
+
+  it('opencode.json: no permission asks (nobody answers a question in a run)', () => {
+    const config = JSON.parse(read(`${DIR}/opencode.json`)) as {
+      permission: Record<string, unknown>;
+    };
+    expect(JSON.stringify(config.permission)).not.toContain('"ask"');
+    expect(config.permission.external_directory).toMatchObject({ '*': 'deny' });
   });
 
   it('build.sh needs NODE24 for an image built on node24, pinned by digest when it pushes', () => {
@@ -166,6 +183,24 @@ describe('licences.mjs (QUESTIONS #524)', () => {
       'opt@1.0.0',
     ]);
     expect(tree.unresolved).toEqual([]);
+  });
+
+  it('walks up a scoped name as one step (review of X03 PR 2)', () => {
+    expect(licences.ancestors('a/@s/b')).toEqual(['a/@s/b', 'a', '']);
+    const lock = licences.parseBunLock(`{
+      "workspaces": { "w": { "name": "w", "dependencies": { "@s/p": "1" } } },
+      "packages": {
+        "@s/p": ["@s/p@1.0.0", "", { "dependencies": { "foo": "1" } }, "sha512-x"],
+        "@s/foo": ["@s/foo@9.0.0", "", {}, "sha512-x"],
+        "foo": ["foo@1.0.0", "", {}, "sha512-x"],
+      },
+    }`);
+    expect(
+      licences
+        .runtimeTree(lock, 'w')
+        .packages.map((p) => `${p.name}@${p.version}`)
+        .sort(),
+    ).toEqual(['@s/p@1.0.0', 'foo@1.0.0']);
   });
 
   it('keeps every reviewed exception documented with its source', () => {

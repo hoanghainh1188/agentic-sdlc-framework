@@ -95,6 +95,25 @@ export function parseBunLock(text) {
 }
 
 /**
+ * The keys a dependency of `key` may resolve under, nearest first, ending with '' (the top). A
+ * scoped name (`@scope/name`) is one step: `a/@s/b` → `a/@s/b`, `a`, ''.
+ */
+export function ancestors(key) {
+  const segments = [];
+  for (const part of key === '' ? [] : key.split('/')) {
+    const last = segments.at(-1);
+    if (last !== undefined && last.startsWith('@') && !last.includes('/')) {
+      segments[segments.length - 1] = `${last}/${part}`;
+    } else {
+      segments.push(part);
+    }
+  }
+  const scopes = [];
+  for (let i = segments.length; i > 0; i -= 1) scopes.push(segments.slice(0, i).join('/'));
+  return [...scopes, ''];
+}
+
+/**
  * The npm packages (`name@version`) the runtime of `workspace` needs. A dependency of the lock
  * entry at key `a/b` resolves to `a/b/<dep>`, then `a/<dep>`, then `<dep>` (Bun's nesting). Other
  * workspaces are followed through their own dependencies. Anything not from the registry is
@@ -117,17 +136,12 @@ export function runtimeTree(lock, workspace) {
   while (queue.length > 0) {
     const [parent, dep] = queue.shift();
     let key;
-    for (
-      let scope = parent;
-      ;
-      scope = scope.includes('/') ? scope.slice(0, scope.lastIndexOf('/')) : ''
-    ) {
+    for (const scope of ancestors(parent)) {
       const candidate = scope === '' ? dep : `${scope}/${dep}`;
       if (packages[candidate]) {
         key = candidate;
         break;
       }
-      if (scope === '') break;
     }
     if (key === undefined) {
       unresolved.add(dep);
@@ -206,8 +220,10 @@ async function main() {
       const url = `https://registry.npmjs.org/${pkg.name.replace('/', '%2F')}/${pkg.version}`;
       const licence = licenceOf(JSON.parse(await fetchText(url)));
       const exception = exceptions[`${pkg.name}@${pkg.version}`];
-      const effective =
-        licence !== undefined && licence !== 'UNLICENSED' ? licence : exception?.licence;
+      // A reviewed exception replaces a missing or unusable field (`UNLICENSED`, `SEE LICENSE IN …`).
+      const usable =
+        licence !== undefined && licence !== 'UNLICENSED' && !/^SEE LICEN[SC]E IN /i.test(licence);
+      const effective = usable ? licence : exception?.licence;
       results.push({
         ...pkg,
         licence: effective ?? 'none',

@@ -10,6 +10,12 @@
 set -eu
 [ -n "${SESSION_API_KEY:-}" ] || { echo "entry: SESSION_API_KEY missing" >&2; exit 1; }
 export OPENCODE_SERVER_PASSWORD="$SESSION_API_KEY"
+# The image's settings as the configuration of the highest precedence: a repository's own
+# `opencode.json` cannot loosen the permissions. No permission is `ask`, because nobody answers a
+# question in a run (OpenCode's own defaults ask before a third identical call, outside the
+# workspace and for `.env` files, and the session would wait for ever).
+OPENCODE_CONFIG_CONTENT="$(cat /opt/sdlc/opencode.json)"
+export OPENCODE_CONFIG_CONTENT
 unset SESSION_API_KEY OH_SECRET_KEY OH_ENABLE_VSCODE OH_TELEMETRY_EXPORTER OPENHANDS_SUPPRESS_BANNER
 cd /workspace
 exec opencode serve --hostname 0.0.0.0 --port 8000

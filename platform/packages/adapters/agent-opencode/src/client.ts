@@ -199,6 +199,19 @@ export class OpenCodeClient {
     return answer as string[];
   }
 
+  /** The IDs of every session of the server (the agent could start one of its own). */
+  async sessionIds(): Promise<string[]> {
+    const answer = await this.#request('GET', '/session');
+    const ids = Array.isArray(answer) ? answer.map((s) => (isRecord(s) ? s.id : undefined)) : [];
+    if (
+      !Array.isArray(answer) ||
+      !ids.every((id) => typeof id === 'string' && SESSION_ID.test(id))
+    ) {
+      throw new AgentError('invalid_response', { field: 'sessions' });
+    }
+    return ids as string[];
+  }
+
   async createSession(): Promise<string> {
     const answer = await this.#request('POST', '/session', {});
     const id = isRecord(answer) ? answer.id : undefined;

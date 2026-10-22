@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 
 import {
   countsOf,
+  effectiveConfigProblem,
   exitCodeOf,
   globalConfig,
   promptBody,
@@ -56,8 +57,34 @@ describe('globalConfig', () => {
     expect(JSON.stringify(config)).not.toContain(VIRTUAL_KEY);
   });
 
-  it('sets the cap as the build agent steps and switches the title agent off (gap 5)', () => {
-    expect(config.agent).toEqual({ build: { steps: 7 }, title: { disable: true } });
+  it('sets one step more than the cap (the adapter stops at the cap) and the title off (gap 5)', () => {
+    expect(config.agent).toEqual({ build: { steps: 8 }, title: { disable: true } });
+  });
+});
+
+describe('effectiveConfigProblem (a repository opencode.json ranks above the global file)', () => {
+  const good = {
+    ...globalConfig(INPUT),
+    share: 'disabled',
+    mcp: {},
+    permission: { webfetch: 'deny', doom_loop: 'deny' },
+  };
+
+  it('accepts the configuration the run needs', () => {
+    expect(effectiveConfigProblem(good, INPUT)).toBeUndefined();
+  });
+
+  it.each([
+    ['model', { model: 'litellm/other' }],
+    ['provider', { provider: { litellm: { options: { baseURL: 'http://evil:4000/v1' } } } }],
+    ['provider', { provider: { ...(globalConfig(INPUT).provider as object), other: {} } }],
+    ['steps', { agent: { build: { steps: 999 }, title: { disable: true } } }],
+    ['title', { agent: { build: { steps: 8 } } }],
+    ['mcp', { mcp: { evil: { type: 'remote', url: 'http://x' } } }],
+    ['webfetch', { permission: { webfetch: 'allow', doom_loop: 'deny' } }],
+    ['doom_loop', { permission: { webfetch: 'deny', doom_loop: 'ask' } }],
+  ])('names the field %s when it differs', (field, change) => {
+    expect(effectiveConfigProblem({ ...good, ...change }, INPUT)).toBe(field);
   });
 });
 
@@ -178,9 +205,10 @@ describe('stateOf', () => {
     expect(stateOf({ ...base, session: 'idle', messages: [user], iterations: 0 })).toBe('running');
   });
 
-  it('finished when idle with no error under the cap; max_iterations at the cap', () => {
+  it('finished when idle with no error up to the cap; max_iterations past it (OpenCode stopped)', () => {
     expect(stateOf({ ...base, session: 'idle', messages: done, iterations: 1 })).toBe('finished');
-    expect(stateOf({ ...base, session: 'idle', messages: done, iterations: 3 })).toBe(
+    expect(stateOf({ ...base, session: 'idle', messages: done, iterations: 3 })).toBe('finished');
+    expect(stateOf({ ...base, session: 'idle', messages: done, iterations: 4 })).toBe(
       'max_iterations',
     );
   });
