@@ -22,6 +22,7 @@ const SOURCE_ADAPTERS = [
   'agent-opencode',
   'evidence-s3',
   'traces-langfuse',
+  'knowledge-pgvector',
 ];
 
 export default defineConfig({
