@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Proposed** (task X04 PR 3a; for the repository owner's approval with the D-05 change of the same pull request) |
+| Status | **Accepted** (the repository owner, 2026-10-23, with D-05 1.58; task X04 PR 3a) |
 | Date | 2026-10-23 |
 | Decided by | The repository owner (X04 PR 3 plan approved on 2026-10-23: QUESTIONS #533–#539) |
 | Related | D-08 X04 AC1–AC5; D-02 FR-33, FR-44, NFR-03; D-05 §6.1, §6.4; D-07 §4–§5; ADR-M51 (retention), ADR-M59 §5 (K01 limits), ADR-M69 (tool register, accepted), ADR-M87 (MCP gateway, accepted); design/QUESTIONS.md #531–#539 |
@@ -79,3 +79,4 @@ A pass of the retention loop, after the evidence and the Langfuse passes, per pr
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 0.1 | 2026-10-23 | Claude (task X04 PR 3a) | First version: the store, the platform's record, the indexer, retention, `knowledge_read`, the gateway facts of PR 2 (QUESTIONS #533–#539) |
+| 1.0 | 2026-10-23 | Harry | Accepted, with D-05 1.58 |
