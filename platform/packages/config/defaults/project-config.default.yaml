@@ -315,6 +315,18 @@ agents:
     approval_max_age_days: 30
     recertification_max_age_days: 90
 
+knowledge:
+  # Task X04 PR 3a, ADR-M89 §2.3: the index of a project's Markdown documents for the tool
+  # permission `read_documents`, built in the run preparation (5 minutes): a repository over a
+  # limit fails the run (`tool_unavailable`), never a partial index. Later runs reuse their chunks.
+  # [Proposal] numbers, to be measured by A10 (bge-m3 on CPU).
+  max_files: 500
+  max_file_bytes: 262144
+  max_total_bytes: 8388608
+  max_chunks: 2000
+  chunk_chars: 2000
+  embed_batch: 32
+
 tools:
   # Task X04, ADR-M69 §2.2: register tools (`tool:<key>`) are recertified like agents. Mandatory
   # rule M18: never more than 3 months. An overdue tool gives a warning; it does not block a run.

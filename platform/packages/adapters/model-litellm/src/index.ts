@@ -10,4 +10,5 @@ export {
   tenantTeamId,
   usdFromNumber,
 } from './mapping.js';
+export { LiteLLMEmbedder, type LiteLLMEmbedderOptions } from './embed.js';
 export { LiteLLMKeySpendReader, type LiteLLMKeySpendReaderOptions } from './key-spend.js';

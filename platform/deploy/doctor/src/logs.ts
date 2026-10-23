@@ -32,6 +32,10 @@ export const LOG_EVENT_FIXES: Readonly<Record<string, Text>> = {
     key: 'doctor.fix.credentials',
     params: { command: 'worker-langfuse-credentials', section: 'T11 §5m' },
   },
+  'worker.knowledge_missing': {
+    key: 'doctor.fix.credentials',
+    params: { command: 'worker-knowledge-credentials', section: 'T11 §5o' },
+  },
   'worker.runs_off': {
     key: 'doctor.fix.credentials',
     params: { command: 'worker-credentials', section: 'T11 §5f' },

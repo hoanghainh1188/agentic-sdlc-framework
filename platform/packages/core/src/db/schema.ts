@@ -1026,6 +1026,36 @@ export interface ToolsTable {
   created_at: CreatedAt;
 }
 
+/**
+ * The platform's record of an index of a project's documents (X04 PR 3a, migration 0039,
+ * ADR-M89 §2.2). Codes, IDs, hashes and counts only; the texts live in `knowledge-db`.
+ */
+export interface KnowledgeIndexesTable {
+  /** Chosen by the indexer: `knowledge-db` stores the index version under the same ID. */
+  id: ColumnType<string, string, never>;
+  tenant_id: Immutable<string>;
+  project_id: Immutable<string>;
+  base_sha: Immutable<string>;
+  model: Immutable<string>;
+  documents: Immutable<number>;
+  chunks: Immutable<number>;
+  /** bigint; `pg` returns int8 as a string. */
+  bytes: ColumnType<string, number | string, never>;
+  created_at: CreatedAt;
+  last_used_at: ColumnType<Date, Date | undefined, Date>;
+  purged_at: ColumnType<Date | null, never, Date>;
+}
+
+/** Which run and intent used which index version (X04 PR 3a, migration 0039). Append-only. */
+export interface KnowledgeIndexUsesTable {
+  id: GeneratedId;
+  tenant_id: Immutable<string>;
+  index_id: Immutable<string>;
+  run_id: Immutable<string>;
+  intent_id: Immutable<string>;
+  created_at: CreatedAt;
+}
+
 /** Outbox of the gate status comments (FR-22, B07, ADR-M30): codes and IDs only. */
 export interface IntentNoticesTable {
   /** bigint identity; `pg` returns int8 as a string. */
@@ -1091,6 +1121,8 @@ export interface Database {
   agent_approvals: AgentApprovalsTable;
   tools: ToolsTable;
   tool_approvals: ToolApprovalsTable;
+  knowledge_indexes: KnowledgeIndexesTable;
+  knowledge_index_uses: KnowledgeIndexUsesTable;
   web_sessions: WebSessionsTable;
   webauthn_credentials: WebauthnCredentialsTable;
   passkey_challenges: PasskeyChallengesTable;
@@ -1754,6 +1786,27 @@ export const TABLE_COLUMNS = {
     'updated_at',
     'created_at',
   ]),
+  knowledge_indexes: columns<KnowledgeIndexesTable>()([
+    'id',
+    'tenant_id',
+    'project_id',
+    'base_sha',
+    'model',
+    'documents',
+    'chunks',
+    'bytes',
+    'created_at',
+    'last_used_at',
+    'purged_at',
+  ]),
+  knowledge_index_uses: columns<KnowledgeIndexUsesTable>()([
+    'id',
+    'tenant_id',
+    'index_id',
+    'run_id',
+    'intent_id',
+    'created_at',
+  ]),
   tool_approvals: columns<ToolApprovalsTable>()([
     'id',
     'tenant_id',
@@ -1859,6 +1912,8 @@ export const TENANT_COLUMN = {
   agent_approvals: 'tenant_id',
   tools: 'tenant_id',
   tool_approvals: 'tenant_id',
+  knowledge_indexes: 'tenant_id',
+  knowledge_index_uses: 'tenant_id',
   web_sessions: 'tenant_id',
   webauthn_credentials: 'tenant_id',
   passkey_challenges: 'tenant_id',
@@ -1908,6 +1963,8 @@ export type TenantRoleBinding = Selectable<TenantRoleBindingsTable>;
 export type AgentApproval = Selectable<AgentApprovalsTable>;
 export type Tool = Selectable<ToolsTable>;
 export type ToolApproval = Selectable<ToolApprovalsTable>;
+export type KnowledgeIndex = Selectable<KnowledgeIndexesTable>;
+export type KnowledgeIndexUse = Selectable<KnowledgeIndexUsesTable>;
 
 /** Insert input for a tenant table: the scope sets `tenant_id`, so callers never pass it. */
 export type TenantInsert<T extends Exclude<TableName, 'tenants'>> = Omit<

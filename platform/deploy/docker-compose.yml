@@ -16,6 +16,9 @@
 #   access         Team access (V09, design/ADR-M67): an nginx TLS reverse proxy that publishes
 #                  the API and the dashboard on one LAN port. Needs the profile platform and the
 #                  SDLC_ACCESS_* settings: pnpm compose:access
+#   knowledge      The index of project documents (X04 PR 3a, design/ADR-M89): knowledge-db, a
+#                  PostgreSQL with pgvector of its own, never the platform's database. Then
+#                  openbao:bootstrap worker-knowledge-credentials: pnpm compose:knowledge
 #
 # Usage (from the repo root; see platform/deploy/README.md):
 #   platform/deploy/scripts/init-env.sh           # once: creates platform/deploy/.env (mode 600)
@@ -63,6 +66,7 @@ networks:
 
 volumes:
   postgres-data:
+  knowledge-db-data:
   seaweedfs-data:
   openbao-data:
   openbao-audit:
@@ -143,6 +147,24 @@ services:
     healthcheck:
       <<: *healthcheck-defaults
       test: [CMD-SHELL, pg_isready -U postgres -d postgres]
+
+  # X04 PR 3a (ADR-M89 §2.1, QUESTIONS #534): the index of project documents. Its own PostgreSQL
+  # with pgvector, pinned by digest (R038), on `sdlc` only and without a host port. The worker
+  # connects as `knowledge` with the password from OpenBao (`kv/worker/knowledge-db`).
+  knowledge-db:
+    image: pgvector/pgvector:0.8.1-pg17@sha256:3e8b3adfd27b5707128f60956f62a793c3c9326ea8cfaf0eab7adccb5d700b21
+    profiles: [knowledge]
+    restart: unless-stopped
+    networks: [sdlc]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${KNOWLEDGE_DB_SUPERUSER_PASSWORD:?set KNOWLEDGE_DB_SUPERUSER_PASSWORD in .env}
+    volumes:
+      - knowledge-db-data:/var/lib/postgresql/data
+      - ./knowledge-db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD-SHELL, pg_isready -U postgres -d knowledge]
 
   temporal-schema:
     image: temporalio/admin-tools:1.32.0
@@ -743,6 +765,8 @@ services:
       # (`project.purged` records `not_deployed`); up.sh sets http://langfuse-web:3000 with the
       # profile observability, or when Langfuse's ClickHouse volume exists (data may be there).
       SDLC_WORKER_LANGFUSE_URL: ${SDLC_WORKER_LANGFUSE_URL:-off}
+      # X04 PR 3a (ADR-M89): the index of project documents (profile knowledge); off by default.
+      SDLC_WORKER_KNOWLEDGE_DB_URL: ${SDLC_WORKER_KNOWLEDGE_DB_URL:-off}
       # The Langfuse project the collector writes to: the worker's key must belong to it.
       SDLC_WORKER_LANGFUSE_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-sdlc-platform}
       SDLC_WORKER_LANGFUSE_CLICKHOUSE_URL: http://clickhouse:8123

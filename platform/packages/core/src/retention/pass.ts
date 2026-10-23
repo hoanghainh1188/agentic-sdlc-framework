@@ -25,6 +25,7 @@ import type { TenantScope } from '../db/tenant-scope.js';
 import type { PlatformLogger } from '../observability/logger.js';
 import { loadEffectiveConfig } from '../registry/effective-config.js';
 import { archiveDueFor } from './archive.js';
+import { knowledgeTenantPass, type KnowledgePurgeDeps } from './knowledge-pass.js';
 import {
   langfuseFinish,
   langfuseStart,
@@ -76,6 +77,8 @@ export interface RetentionPassDeps {
    * E08 (ADR-M53): the Langfuse purge. Absent: `not_deployed` (`project.purged` records it).
    */
   readonly langfuse?: LangfusePurgeDeps;
+  /** X04 PR 3a (ADR-M89 §2.4): the index of project documents. Absent: `knowledge-db` is off. */
+  readonly knowledge?: KnowledgePurgeDeps;
 }
 
 export interface RetentionCounts {
@@ -109,6 +112,12 @@ export interface RetentionCounts {
   langfuseRawSwept: number;
   /** E08: ClickHouse compactions (`APPLY DELETED MASK`). */
   langfuseCompacted: number;
+  /** X04: document index versions due for deletion (in `report` mode: what would be deleted). */
+  knowledgeDue: number;
+  /** X04: document index versions deleted from `knowledge-db` (`knowledge.purged`). */
+  knowledgePurged: number;
+  /** X04: leftover versions and chunks the sweep deleted from `knowledge-db`. */
+  knowledgeSwept: number;
 }
 
 export interface RetentionPassResult extends RetentionCounts {
@@ -145,6 +154,9 @@ const emptyCounts = (): RetentionCounts => ({
   langfuseRawFound: 0,
   langfuseRawSwept: 0,
   langfuseCompacted: 0,
+  knowledgeDue: 0,
+  knowledgePurged: 0,
+  knowledgeSwept: 0,
 });
 
 /** A code for logs, never an error message. */
@@ -250,6 +262,8 @@ async function tenantPass(
   }
   // E08 (ADR-M53): the intents' Langfuse traces, before an archived project can be complete.
   await langfuseTenantPass(deps, scope, tenantSlug, counts, guardTripped);
+  // X04 (ADR-M89 §2.4): the versions of the projects' document indexes, by the same rules.
+  await knowledgeTenantPass(deps, scope, counts);
   if (deps.settings.mode === 'purge') {
     for (const project of archived) await completeArchive(deps, scope, project.id, counts);
   }

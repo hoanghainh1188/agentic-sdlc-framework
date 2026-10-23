@@ -53,6 +53,8 @@ export const WORKER_ENV = {
   anchorUrl: 'SDLC_WORKER_ANCHOR_URL',
   anchorBucket: 'SDLC_WORKER_ANCHOR_BUCKET',
   anchorSecretPath: 'SDLC_WORKER_ANCHOR_SECRET_PATH',
+  knowledgeDbUrl: 'SDLC_WORKER_KNOWLEDGE_DB_URL',
+  knowledgeSecretPath: 'SDLC_WORKER_KNOWLEDGE_SECRET_PATH',
   langfuseUrl: 'SDLC_WORKER_LANGFUSE_URL',
   langfuseSecretPath: 'SDLC_WORKER_LANGFUSE_SECRET_PATH',
   langfuseProjectId: 'SDLC_WORKER_LANGFUSE_PROJECT_ID',
@@ -203,6 +205,17 @@ const schema = z.object({
   // worker's own Langfuse key, the ClickHouse user `sdlc_purge`, the SeaweedFS identity
   // `worker-langfuse`). `off` (default): Langfuse is not deployed; `project.purged` records
   // `not_deployed`. up.sh sets it with the profile observability.
+  // X04 PR 3a (ADR-M89 §2.1): `knowledge-db` (profile `knowledge`) as a URL without a password,
+  // for example `postgresql://knowledge@knowledge-db:5432/knowledge`; the password is in OpenBao
+  // (`kv/worker/knowledge-db`, field `password`). `off`: no index, so no `read_documents` tool runs.
+  [WORKER_ENV.knowledgeDbUrl]: z
+    .string()
+    .refine((v) => v === 'off' || isKnowledgeUrl(v))
+    .default('off'),
+  [WORKER_ENV.knowledgeSecretPath]: z
+    .string()
+    .regex(/^worker\/[A-Za-z0-9_.-]+$/)
+    .default('worker/knowledge-db'),
   [WORKER_ENV.langfuseUrl]: z
     .string()
     .refine((v) => v === 'off' || isOrigin(v))
@@ -239,6 +252,24 @@ const schema = z.object({
   [WORKER_ENV.devDbUrl]: z.string().optional(),
   NODE_ENV: z.string().optional(),
 });
+
+/** `postgresql://<user>@<host>:<port>/<database>`: a user, no password, no query. */
+function isKnowledgeUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === 'postgresql:' &&
+      url.hostname !== '' &&
+      /^[a-z][a-z0-9_]{0,62}$/.test(url.username) &&
+      url.password === '' &&
+      /^\/[a-z][a-z0-9_]{0,62}$/.test(url.pathname) &&
+      url.search === '' &&
+      url.hash === ''
+    );
+  } catch {
+    return false;
+  }
+}
 
 function isOrigin(value: string): boolean {
   try {
@@ -282,6 +313,14 @@ export interface WorkerAnchorSettings {
 }
 
 /** E08: the Langfuse purge in the retention loop (ADR-M53). */
+/** X04 PR 3a: `knowledge-db` (ADR-M89 §2.1); null when off. */
+export interface WorkerKnowledgeSettings {
+  /** Without the password. */
+  readonly url: string;
+  /** The KV entry with the field `password`. */
+  readonly secretPath: string;
+}
+
 export interface WorkerLangfuseSettings {
   readonly url: string;
   readonly secretPath: string;
@@ -379,6 +418,7 @@ export interface WorkerSettings {
   readonly anchor: WorkerAnchorSettings | null;
   /** E08: the Langfuse purge; null: `SDLC_WORKER_LANGFUSE_URL=off` (not deployed). */
   readonly langfuse: WorkerLangfuseSettings | null;
+  readonly knowledge: WorkerKnowledgeSettings | null;
 }
 
 export type WorkerSettingsKey =
@@ -525,6 +565,10 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
             secretPath: v[WORKER_ENV.anchorSecretPath],
             intervalMs: v[WORKER_ENV.retentionIntervalMinutes] * 60_000,
           },
+    knowledge:
+      v[WORKER_ENV.knowledgeDbUrl] === 'off'
+        ? null
+        : { url: v[WORKER_ENV.knowledgeDbUrl], secretPath: v[WORKER_ENV.knowledgeSecretPath] },
     langfuse:
       v[WORKER_ENV.langfuseUrl] === 'off'
         ? null

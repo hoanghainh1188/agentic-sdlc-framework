@@ -99,6 +99,13 @@ Commands:
                        Write:langfuse/events/otel/*, no read). Needs the profile observability. The
                        old ClickHouse password and S3 key stop working. Prints no secret. Run it
                        again to rotate, then restart sdlc-worker (runbook T11 section 5m).
+  worker-knowledge-credentials
+                       The worker's index of project documents (X04 PR 3a, ADR-M89): makes a new
+                       password of the knowledge-db role "knowledge" (owner of the database
+                       knowledge, CREATEROLE, no superuser), stores it at kv/worker/knowledge-db
+                       and sets it in knowledge-db. Needs the profile knowledge. The old password
+                       stops working. Prints no secret. Run it again to rotate, then restart
+                       sdlc-worker (runbook T11 section 5o).
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -147,7 +154,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | backup-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials | api-github-oauth-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | backup-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials | worker-knowledge-credentials | api-github-oauth-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -675,6 +682,50 @@ cmd_worker_langfuse_credentials() {
   say "kv/worker/langfuse stored (the worker's Langfuse key); SeaweedFS identity worker-langfuse ($LANGFUSE_RAW_ACTIONS) and ClickHouse user sdlc_purge (ALTER DELETE on events_full, events_core) applied; restart sdlc-worker to use them"
 }
 
+# The worker's index of project documents (X04 PR 3a, ADR-M89 §2.1). One entry,
+# kv/worker/knowledge-db, field `password`: made inside the openbao container, then set on the
+# role `knowledge` by psql in knowledge-db (local socket, as the superuser), the SQL on stdin.
+# The session never logs a statement, also not a failed one, so the password stays out of the logs.
+cmd_worker_knowledge_credentials() {
+  require_unsealed
+  token="$(read_secret 'Admin or root token (hidden)')"
+  [ -n "$token" ] || fail "no token given"
+  psql_admin='psql -v ON_ERROR_STOP=1 -X -q -U postgres -d knowledge'
+  compose exec -T knowledge-db sh -c "$psql_admin -c 'SELECT 1'" </dev/null >/dev/null 2>&1 ||
+    fail "knowledge-db is not reachable; start the profile knowledge first (pnpm compose:knowledge)"
+  kv_version() {
+    printf '%s\n' "$token" | bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
+      bao read -field=current_version kv/metadata/worker/knowledge-db 2>/dev/null || echo 0'
+  }
+  before="$(kv_version)"
+  printf '%s\n' "$token" |
+    bao_exec sh -c 'set -e
+      IFS= read -r BAO_TOKEN && export BAO_TOKEN
+      pw="$(od -An -N24 -tx1 /dev/urandom | tr -d " \n")"
+      [ "${#pw}" -eq 48 ] || exit 1
+      printf "{\"password\":\"%s\"}" "$pw" | bao kv put -mount=kv worker/knowledge-db - >/dev/null' ||
+    fail "could not store kv/worker/knowledge-db (token valid? OpenBao configured?)"
+  [ "$(kv_version)" = "$((before + 1))" ] ||
+    fail "kv/worker/knowledge-db was not stored (token valid? OpenBao configured?); run the command again"
+  # The SQL is made first, into a variable (never a file): without `pipefail`, a failed OpenBao
+  # step would otherwise give psql empty input, and psql would succeed.
+  sql="$(printf '%s\n' "$token" |
+    bao_exec sh -c 'set -e
+      IFS= read -r BAO_TOKEN && export BAO_TOKEN
+      pw="$(bao kv get -mount=kv -field=password worker/knowledge-db)"
+      case "$pw" in *[!0-9a-f]*|"") exit 1 ;; esac
+      [ "${#pw}" -eq 48 ] || exit 1
+      printf "SET log_statement = '"'"'none'"'"';\n"
+      printf "SET log_min_error_statement = '"'"'panic'"'"';\n"
+      printf "ALTER ROLE knowledge LOGIN NOSUPERUSER CREATEROLE PASSWORD '"'"'%s'"'"';\n" "$pw"')" ||
+    fail "could not read kv/worker/knowledge-db back (token valid?); run the command again"
+  case "$sql" in *"ALTER ROLE knowledge"*) ;; *) fail "could not read kv/worker/knowledge-db back; run the command again" ;; esac
+  printf '%s\n' "$sql" | compose exec -T knowledge-db sh -c "$psql_admin" >/dev/null 2>&1 ||
+    fail "could not set the password of the knowledge-db role knowledge (database made by knowledge-db/init?); run the command again"
+  unset sql
+  say "kv/worker/knowledge-db stored and set on the knowledge-db role knowledge; restart sdlc-worker to use it"
+}
+
 # The backup job's AppRole (A10 PR 2, ADR-M63 §5): into the volume backup-approle of the one-shot
 # service backup-agent, whose user is openbao.
 cmd_backup_credentials() {
@@ -705,5 +756,6 @@ case "$command" in
   worker-purge-credentials) cmd_worker_purge_credentials ;;
   worker-anchor-credentials) cmd_worker_anchor_credentials ;;
   worker-langfuse-credentials) cmd_worker_langfuse_credentials ;;
+  worker-knowledge-credentials) cmd_worker_knowledge_credentials ;;
   api-github-oauth-credentials) cmd_api_github_oauth_credentials ;;
 esac

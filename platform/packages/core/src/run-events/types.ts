@@ -64,6 +64,12 @@ export const RUN_EVENT_TYPES = {
   tool_used: { tool_key: 'code', calls: 'count', failed_calls: 'count', refused_calls: 'count' },
   tool_refused: { reason: 'code', tool_key: 'code?' },
   tool_failed: { tool_key: 'code', reason: 'code' },
+  /**
+   * X04 PR 3a (ADR-M89 §2.3): the index of the project's documents for a `read_documents` tool
+   * could not be built in the run preparation; `reason` is a `KnowledgeErrorCode`. The run ended
+   * `failed` with the stop reason `tool_unavailable`, before its sandbox.
+   */
+  knowledge_unavailable: { reason: 'code' },
   /** Provisioning stopped before the sandbox was ready; `reason` is a `ProvisioningFailure` (C04). */
   provisioning_failed: { reason: 'code' },
   /**

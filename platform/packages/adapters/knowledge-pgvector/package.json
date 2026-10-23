@@ -1,0 +1,19 @@
+{
+  "name": "@sdlc/adapter-knowledge-pgvector",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Knowledge store adapter: PostgreSQL with pgvector (knowledge-db). See design/ADR-M89.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@sdlc/contracts": "workspace:*",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
+}

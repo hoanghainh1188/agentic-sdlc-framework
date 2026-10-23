@@ -27,6 +27,7 @@ describe('run event payloads', () => {
       'tool_used',
       'tool_refused',
       'tool_failed',
+      'knowledge_unavailable',
       'provisioning_failed',
       'sandbox_removed',
       'run_abandoned',

@@ -74,6 +74,7 @@ const PG_ERROR_CODES: Record<string, DbErrorCode> = {
   SDA23: 'immutable', // an evaluation plan's fixed columns, an archived plan, or a version going down (0031)
   SDA24: 'immutable', // an evaluation task's identity, or a task that is gone (0033)
   SDA25: 'immutable', // a tool status move not allowed, a retired tool, or a config change (0038)
+  SDA26: 'immutable', // a knowledge index's fixed columns, or a purge set twice (0039)
 };
 
 /** Maps a PostgreSQL error to a DbError; anything else is rethrown unchanged. */

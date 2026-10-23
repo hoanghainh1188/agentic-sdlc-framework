@@ -31,7 +31,7 @@ const CODE = /^[a-z][a-z0-9_]{0,63}$/;
  * The gateway model names of `platform/deploy/litellm/config.ctmpl` (a test keeps them equal). Any
  * other name is `other`: an operator's own model name could name the company (ADR-M65 §2.3).
  */
-export const KNOWN_MODELS = ['claude-haiku-4-5-20251001', 'gpt-oss-20b'] as const;
+export const KNOWN_MODELS = ['bge-m3', 'claude-haiku-4-5-20251001', 'gpt-oss-20b'] as const;
 
 /** The run stop reasons of D-05 §6.4 (`runs.stop_reason`). Any other code is `other`. */
 export const KNOWN_STOP_REASONS = [
@@ -57,6 +57,7 @@ export const KNOWN_STOP_REASONS = [
   'runner_lost',
   'runner_restarted',
   'sandbox_lost',
+  'tool_unavailable',
 ] as const;
 
 export type Counts = Record<string, number>;

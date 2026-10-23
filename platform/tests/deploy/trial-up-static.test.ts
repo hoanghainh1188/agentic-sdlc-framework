@@ -45,9 +45,11 @@ describe('V02: pnpm trial:up follows the README "Fresh deployment"', () => {
   it('starts every profile of step 7 except observability (optional on a small machine)', () => {
     expect([...PROFILES]).toEqual(['core', 'models', 'platform', 'sandbox']);
     // The credentials commands it leaves out are optional: the Langfuse one needs the profile
-    // observability; the dashboard's GitHub sign-in stays off on a trial stack (U05, QUESTIONS #389).
+    // observability; the document index needs the profile knowledge (X04, ADR-M89); the dashboard's
+    // GitHub sign-in stays off on a trial stack (U05, QUESTIONS #389).
     expect(credentialsOfStep(7)).toEqual([
       'worker-langfuse-credentials',
+      'worker-knowledge-credentials',
       'api-github-oauth-credentials',
     ]);
   });

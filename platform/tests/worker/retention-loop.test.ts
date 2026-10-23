@@ -28,6 +28,9 @@ const counts = {
   langfuseRawFound: 3,
   langfuseRawSwept: 3,
   langfuseCompacted: 0,
+  knowledgeDue: 0,
+  knowledgePurged: 0,
+  knowledgeSwept: 0,
 };
 
 function harness() {
