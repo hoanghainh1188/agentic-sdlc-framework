@@ -12,9 +12,10 @@
 # NODE24, the node24 image pinned by digest. With --no-push NODE24 may also be a local tag (CI
 # builds node24 just before and does not push it); the build then uses the Engine's local copy.
 #
-# --no-push prints the local reference by digest when the Engine has one (containerd image store,
-# for example Docker Desktop, where the Engine cannot push to a port published on the host), and
-# the tag otherwise.
+# --no-push prints the local reference by digest when the Engine has one for this tag's repository
+# (containerd image store, for example Docker Desktop, where the Engine cannot push to a port
+# published on the host), and the tag otherwise. A digest of another repository (an earlier push of
+# the same image to another registry) is never printed: it names an image that may differ.
 #
 # The registry listens on 127.0.0.1 only and has no authentication (runbook T11 §7): run this on
 # the server as an operator. Images are always used by digest, never by tag.
@@ -56,7 +57,8 @@ fi
 
 docker build "$@" --label "org.opencontainers.image.revision=$revision" -t "$tag" "$context" >&2
 if [ "$push" -eq 0 ]; then
-  local_digest="$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tag" | head -n 1)"
+  local_digest="$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tag" |
+    grep "^$registry/sdlc/sandbox-$toolchain@sha256:" | head -n 1 || true)"
   echo "${local_digest:-$tag}"
   exit 0
 fi
