@@ -11,6 +11,7 @@ import {
   parseTenantId,
   type G4Deps,
   type G6Deps,
+  type KnowledgeDeps,
   type PlatformDatabase,
   type PublishDeps,
   type Registry,
@@ -47,6 +48,8 @@ export async function createWorkerRuns(options: {
   readonly signer: RunContractSigner;
   readonly wrapper: SecretWrapper;
   readonly logger?: SecretsLogger;
+  /** X04 PR 3a: the index of a project's documents; absent when `knowledge-db` is off. */
+  readonly knowledge?: KnowledgeDeps;
 }): Promise<WorkerRuns> {
   const { settings } = options;
   // Same OpenBao address and TLS settings as the worker's client; the cost-controller's files.
@@ -82,6 +85,7 @@ export async function createWorkerRuns(options: {
         gitHost: options.gitHost,
         wrapper: options.wrapper,
         egressAllowlist: settings.egressAllowlist,
+        ...(options.knowledge ? { knowledge: options.knowledge } : {}),
       },
       publish: { registry: options.registry, gitHost: options.gitHost, wrapper: options.wrapper },
       g6: { gitHost: options.gitHost },

@@ -280,6 +280,15 @@ export const projectConfigSchema = z.strictObject({
       recertification_max_age_days: positiveInt.max(365),
     }),
   }),
+  // X04 PR 3a (ADR-M89 §2.3): the limits of the index of a project's documents.
+  knowledge: z.strictObject({
+    max_files: positiveInt.max(100_000),
+    max_file_bytes: positiveInt.max(10 * 1024 * 1024),
+    max_total_bytes: positiveInt.max(1024 * 1024 * 1024),
+    max_chunks: positiveInt.max(1_000_000),
+    chunk_chars: positiveInt.min(200).max(20_000),
+    embed_batch: positiveInt.max(256),
+  }),
   // X04 (ADR-M69 §2.2–§2.7, ADR-M87): register tools. Rule M18 keeps the recertification age at 3
   // months or less, as for agents. `gateway.image`: the run's MCP gateway, by digest; null until a
   // gateway is set up (no register tool runs without one).

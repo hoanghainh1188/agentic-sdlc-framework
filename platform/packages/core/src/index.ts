@@ -15,6 +15,7 @@ export * from './git-events/index.js';
 export * from './escalation/index.js';
 export * from './agents/index.js';
 export * from './tools/index.js';
+export * from './knowledge/index.js';
 export * from './ai-record/index.js';
 export * from './workflow/index.js';
 export * from './observability/index.js';

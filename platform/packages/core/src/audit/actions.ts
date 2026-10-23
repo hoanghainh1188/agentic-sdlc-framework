@@ -594,6 +594,14 @@ export const AUDIT_ACTIONS = {
     entityType: 'intent',
     fields: { traces: 'count', attempts: 'count', cause: 'code' },
   },
+  /**
+   * One version of a project's document index was deleted from `knowledge-db` (X04 PR 3a,
+   * ADR-M89 §2.4): `cause` `retention` or `archive`. The platform's row keeps its counts.
+   */
+  'knowledge.purged': {
+    entityType: 'project',
+    fields: { index_id: 'uuid', documents: 'count', chunks: 'count', cause: 'code' },
+  },
   /** A person put an intent's evidence on hold (E05, QUESTIONS #235): never purged until released. */
   'evidence.hold_set': { entityType: 'intent', fields: { hold_id: 'uuid' } },
   /** A person released the hold on an intent's evidence (E05, QUESTIONS #235). */

@@ -971,6 +971,8 @@
   "worker.start.anchor_off": "SDLC_WORKER_ANCHOR_URL=off: no daily audit anchor is written or checked.",
   "worker.start.anchor_missing": "The worker's anchor credential is not in OpenBao (pnpm openbao:bootstrap worker-anchor-credentials): no daily audit anchor is written or checked.",
   "worker.start.langfuse_off": "SDLC_WORKER_LANGFUSE_URL=off: Langfuse is treated as not deployed. No model-call traces are purged, and project.purged records langfuse: not_deployed.",
+  "worker.start.knowledge_off": "SDLC_WORKER_KNOWLEDGE_DB_URL=off: the index of project documents is off. A run whose plan asks for a read_documents tool fails (tool_unavailable).",
+  "worker.start.knowledge_missing": "The knowledge-db password is missing in OpenBao (kv/worker/knowledge-db, field password): the index of project documents is off. A run whose plan asks for a read_documents tool fails (tool_unavailable).",
   "worker.start.langfuse_missing": "The worker's Langfuse credential is not in OpenBao (pnpm openbao:bootstrap worker-langfuse-credentials): no model-call traces are purged, and archived projects wait for it.",
   "worker.start.evidence_off": "SDLC_WORKER_EVIDENCE_URL=off: the worker builds no release packs. Intents wait at G8.",
   "worker.start.evidence_missing": "The worker's evidence credential is not in OpenBao: the worker builds no release packs, and intents wait at G8. Run: pnpm openbao:bootstrap worker-evidence-credentials.",

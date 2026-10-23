@@ -41,6 +41,10 @@ export const EXPECTED_PACKAGES: readonly WorkspacePackage[] = [
   { dir: 'platform/packages/adapters/agent-opencode', name: '@sdlc/adapter-agent-opencode' },
   { dir: 'platform/packages/adapters/model-litellm', name: '@sdlc/adapter-model-litellm' },
   { dir: 'platform/packages/adapters/evidence-s3', name: '@sdlc/adapter-evidence-s3' },
+  {
+    dir: 'platform/packages/adapters/knowledge-pgvector',
+    name: '@sdlc/adapter-knowledge-pgvector',
+  },
   { dir: 'platform/packages/adapters/traces-langfuse', name: '@sdlc/adapter-traces-langfuse' },
   { dir: 'platform/packages/adapters/policy-simple', name: '@sdlc/adapter-policy-simple' },
 ];

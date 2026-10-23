@@ -12,6 +12,9 @@
 //   and (V13) `model_selected`.
 // - X04 (ADR-M69 §2.3): a register tool the plan asks for and the run cannot have fails G4
 //   (`tool_not_runnable`) with the exact cause; a plan without one keeps schema 3 with no grant.
+// - X04 PR 3a (ADR-M89 §2.3): a `read_documents` tool gets the project's index, built with the
+//   run's key; without the index store the run fails `tool_unavailable`, the key is revoked and
+//   nothing is wrapped (`knowledge_unavailable`).
 import crypto from 'node:crypto';
 
 import { sql } from 'kysely';
@@ -743,6 +746,88 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
       const intent = await atG4WithPlanTools(['file_editor', `tool:${key}`]);
       expect(await t.settle(intent)).toMatchObject({ cause: 'tool_not_allowed_for_agent' });
       expect(await checksFailed(t, intent)).toEqual(['tool_not_allowed_for_agent']);
+    });
+
+    it('X04 PR 3a: a read_documents tool without the index store → run failed tool_unavailable; with it → indexed', async () => {
+      const key = `docs-${crypto.randomBytes(3).toString('hex')}`;
+      await registerTool(t.f.scope, {
+        toolKey: key,
+        version: '1.0.0',
+        ownerId: t.f.users.a,
+        transport: 'http',
+        imageRef: 'ghcr.io/example/project-docs',
+        imageDigest: `sha256:${'d'.repeat(64)}`,
+        permissions: ['read_documents'],
+        allowedDataClasses: ['internal', 'client_confidential', 'client_restricted'],
+        modelRef: MODEL,
+      });
+      await changeToolStatus(t.f.scope, key, { to: 'active' });
+      const agent = await seedAgent(t.f.scope, t.f.users.gov, {
+        model: MODEL,
+        instructionsSha256: sha256(AGENTS_MD),
+        tools: ['file_editor', `tool:${key}`],
+        activatedAt: T0,
+      });
+      await t.setConfig(`run:\n  agent_key: ${agent.key}\n`);
+      const intent = await atG4WithPlanTools(['file_editor', `tool:${key}`]);
+      expect(await t.settle(intent)).toEqual({ outcome: 'waiting', reason: 'run_pending' });
+
+      expect(await prepareRun(t.f.scope, deps(), intent.id)).toEqual({
+        ok: false,
+        reason: 'tool_unavailable',
+      });
+      const [failed] = await t.f.scope.runs.listForIntent(intent.id);
+      expect(failed).toMatchObject({ status: 'failed', stop_reason: 'tool_unavailable' });
+      const events = await t.f.scope.runEvents.list(failed!.id);
+      expect(
+        events.filter((e) => e.event_type === 'knowledge_unavailable').map((e) => e.payload),
+      ).toEqual([{ reason: 'store_unavailable' }]);
+      expect(calls.revoked).toEqual([`key-${failed!.id}`]);
+      expect(calls.wrapped).toEqual([]);
+
+      const embedded: string[] = [];
+      const versions: string[] = [];
+      const withIndex: PrepareRunDeps = {
+        ...deps(),
+        knowledge: {
+          gitHost: {
+            listPaths: () => Promise.resolve(['README.md', 'src/a.ts']),
+            getFileAtCommit: () => Promise.resolve('# Orders\n\nHow stock moves.'),
+          },
+          store: {
+            ensureProject: () => Promise.resolve(),
+            missingChunks: (_p, _m, keys) => Promise.resolve(keys),
+            putChunks: () => Promise.resolve(),
+            putIndexVersion: (input) => {
+              versions.push(input.indexId);
+              return Promise.resolve();
+            },
+            deleteIndexVersion: () => Promise.resolve({ chunks: 0 }),
+            listIndexVersions: () => Promise.resolve([]),
+            deleteOrphanChunks: () => Promise.resolve(0),
+            dropProject: () => Promise.resolve(),
+            close: () => Promise.resolve(),
+          },
+          embedder: {
+            embed: (runKey, model, inputs) => {
+              expect(runKey.reveal()).toBe('sk-virtual');
+              expect(model).toBe(MODEL);
+              embedded.push(...inputs);
+              return Promise.resolve(inputs.map(() => [1, 0]));
+            },
+          },
+        },
+      };
+      const retried = await prepareRun(t.f.scope, withIndex, intent.id);
+      expect(retried).toMatchObject({ ok: true });
+      expect(embedded).toEqual(['# Orders\n\nHow stock moves.']);
+      const row = await t.f.scope.knowledgeIndexes.findReady(
+        (await t.reload(intent)).project_id,
+        BASE_1,
+        MODEL,
+      );
+      expect(row).toMatchObject({ id: versions[0], documents: 1, chunks: 1 });
+      expect(await t.f.scope.knowledgeIndexes.intentsOf(row!.id)).toEqual([intent.id]);
     });
 
     it('X04: a plan without register tools keeps the same proposal hash and contract', async () => {

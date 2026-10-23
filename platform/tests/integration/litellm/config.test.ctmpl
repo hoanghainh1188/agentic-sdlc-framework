@@ -52,6 +52,18 @@ model_list:
       output_cost_per_token: 0.0000004
     model_info:
       provider_type: self_hosted
+  # X04 PR 3a (ADR-M89 §2.3): the embedding model of the tool `read_documents` (K01 measured
+  # bge-m3, MIT). Self-hosted, so the index may hold any data class but `prohibited` (D-07 §4).
+  - model_name: bge-m3
+    litellm_params:
+      model: ollama/bge-m3
+      api_base: {{ .Data.data.api_base | toJSON }}
+      input_cost_per_token: 0.00000001
+      # An embedding has no output tokens; the value only keeps the self-hosted rule (above 0).
+      output_cost_per_token: 0.00000001
+    model_info:
+      provider_type: self_hosted
+      mode: embedding
 {{- end }}
 {{- end }}
 general_settings:

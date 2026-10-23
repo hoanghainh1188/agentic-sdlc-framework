@@ -10,6 +10,7 @@ This folder runs the infrastructure that the platform reuses, on one server, wit
 | `observability` | Langfuse (web + worker), ClickHouse, the OpenTelemetry Collector (A08). Reuses PostgreSQL, Valkey and SeaweedFS | Optional. The heaviest part; enable it when the server has room (D-03 section 10.1) |
 | `models` | `litellm-agent`: a sidecar (a helper container next to LiteLLM) that reads LiteLLM's model provider keys, master key and salt key from OpenBao and writes its configuration ([ADR-M24](../../design/ADR-M24-litellm-cost-controller.md)) | **Always on the server** (`pnpm compose:models`). Needs OpenBao unsealed and configured and the sidecar's credentials (runbook T11 §5d). Without it, LiteLLM has no models and uses the development keys from `.env` |
 | `platform` | `sdlc-api`: the REST API and the dashboard ([ADR-M26](../../design/ADR-M26-api-app.md)); `sdlc-worker`: the GitHub poller, the intent workflow, the escalation clocks and the retention loop ([ADR-M27](../../design/ADR-M27-github-poller.md), [ADR-M30](../../design/ADR-M30-intent-workflow.md)). Both built from this repository | With `core` (`pnpm compose:platform`). Needs OpenBao unsealed and configured, `pnpm openbao:bootstrap api-credentials` and `worker-credentials` first, and the GitHub App key stored (runbook T11 §5b, §5e, §5f) |
+| `knowledge` | `knowledge-db`: a PostgreSQL with pgvector of its own for the index of project documents, the first register tool ([ADR-M89](../../design/ADR-M89-project-docs-index.md)). Never the platform's database; no host port | Optional (`pnpm compose:knowledge`). Needed only by plans with a `read_documents` tool. Then `pnpm openbao:bootstrap worker-knowledge-credentials` (runbook T11 §5o) and restart `sdlc-worker` |
 | `sandbox` | `sdlc-runner` (built from this repository; runs the agent sandboxes), `docker-socket-proxy` (the runner's only way to Docker), `npm-proxy` (Verdaccio: npm packages for the sandboxes), `registry` (sandbox images, 127.0.0.1 only) ([ADR-M25](../../design/ADR-M25-runner-sandbox.md)) | With `core` (`pnpm compose:sandbox`). Needs OpenBao unsealed and configured, `SDLC_DOCKER_GID` right and `pnpm openbao:bootstrap runner-credentials` first (runbook T11 §5g) |
 
 Three one-shot jobs run at every start and then exit: `temporal-schema` (creates or upgrades the Temporal schemas), `temporal-namespace` (creates the namespace) and `seaweedfs-init` (creates the `evidence` and `langfuse` buckets). All three are safe to re-run.
@@ -194,6 +195,14 @@ pnpm openbao:bootstrap worker-langfuse-credentials  # T11 §5m (needs the profil
 
 The worker's retention loop starts in `report` mode: it deletes nothing (runbook T11 §5j).
 
+Optional, the index of project documents (X04, [ADR-M89](../../design/ADR-M89-project-docs-index.md)), for plans with a `read_documents` tool: add `knowledge` to the `up.sh` call. `up.sh` then sets `SDLC_WORKER_KNOWLEDGE_DB_URL`. Deliver the worker's password of `knowledge-db` and start `sdlc-worker` again:
+
+```bash
+pnpm openbao:bootstrap worker-knowledge-credentials  # T11 §5o (needs the profile knowledge)
+```
+
+Without it, a run whose plan asks for a `read_documents` tool fails (`tool_unavailable`). The model `bge-m3` must be on LiteLLM (the `ollama` provider, `ollama pull bge-m3`).
+
 Optional, dashboard sign-in with GitHub (U05, [ADR-M73](../../design/ADR-M73-dashboard-actions.md)): the GitHub App needs a client secret and lists the callback URL `<public origin>/v1/auth/github/callback` (section [Create the GitHub App](#create-the-github-app-operator)). Store the client secret (`pnpm github-app:create` wrote it to `<key file>.client-secret`; delete the file afterwards), set `SDLC_API_WEB_SIGNIN=github` and `SDLC_API_PUBLIC_ORIGIN` (for example `http://localhost:8090`; plain `http://` only on `localhost`) in `platform/deploy/.env`, and start `sdlc-api` again:
 
 ```bash
@@ -322,6 +331,7 @@ pnpm compose:obs     # core + observability
 pnpm compose:models  # core + models: LiteLLM with keys from OpenBao (the server; runbook T11 §5d)
 pnpm compose:platform # core + platform: the API (sdlc-api) and the worker (sdlc-worker; runbook T11 §5e, §5f)
 pnpm compose:sandbox # core + sandbox: the runner, socket proxy, npm proxy, image registry (runbook T11 §5g)
+pnpm compose:knowledge # core + knowledge: knowledge-db, the index of project documents (runbook T11 §5o)
 pnpm compose:down    # stops everything; data volumes are kept
 ```
 
@@ -698,7 +708,7 @@ Run `pnpm doctor` first ([Doctor](#doctor-pnpm-doctor)): it checks the rows of t
 |---|---|---|
 | `sdlc-api`, `sdlc-worker` or `sdlc-runner` restart every minute; the log says "OpenBao at … is sealed" | OpenBao is sealed after a restart | `pnpm openbao:bootstrap status`, then two key holders unseal it (runbook T11 §4) |
 | `up.sh` times out with the `core`, `platform`, `models` or `sandbox` profile | OpenBao is sealed, or `up.sh core` was run alone on the server (LiteLLM has no keys without `models`) | Follow [Restart after a reboot](#restart-after-a-reboot) |
-| A log line ending in `_missing` (for example `worker.evidence_missing`) | A process has no credential for that feature | Run the credentials command the message names ([step 5](#5-credentials-of-every-process); `worker-langfuse-credentials`: [step 7](#7-start-the-platform)), then restart the service |
+| A log line ending in `_missing` (for example `worker.evidence_missing`) | A process has no credential for that feature | Run the credentials command the message names ([step 5](#5-credentials-of-every-process); `worker-langfuse-credentials` and `worker-knowledge-credentials`: [step 7](#7-start-the-platform)), then restart the service |
 | `openbao` does not start; `openbao-tls-init` says a file is missing in `SDLC_OPENBAO_TLS_DIR` | No TLS certificate for OpenBao (an `.env` from before A10, or a missing file) | Development: `pnpm openbao:tls dev`. Server: [T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal) |
 | `up.sh` warns that OpenBao's TLS certificate ends soon | Less than 30 days left | Renew: [T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal); OpenBao stays unsealed |
 | "AppRole login failed (HTTP status 400)" in a log | The AppRole secret ID expired (90 days) or was destroyed | That process's credentials command again, then restart it |
@@ -721,7 +731,7 @@ Problems with a gate or an intent (refused commands, held intents, escalations):
 
 This deletes every intent, the evidence, the audit log and the secrets. Keep a backup first if the records must be kept (the audit log at least 2 years, handbook Ch.3).
 
-1. Stop and remove the containers and their volumes: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox --profile access down -v`.
+1. Stop and remove the containers and their volumes: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile observability --profile models --profile platform --profile sandbox --profile access --profile knowledge down -v`.
 2. Remove the per-run objects the runner may have left after a crash: containers, networks and volumes whose name starts with `sdlc-sandbox-`, `sdlc-run-` or `sdlc-ws-` (`docker ps -a`, `docker network ls`, `docker volume ls`).
 3. Remove the images if you want the disk back (`docker image ls`).
 4. On GitHub: uninstall the GitHub App from the repositories, then delete the App and its private key.

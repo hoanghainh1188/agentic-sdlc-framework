@@ -53,6 +53,7 @@ import { openAnchorStore } from './anchor-store.js';
 import { openLangfusePurge } from './langfuse-store.js';
 import { RetentionLoop } from './retention-loop.js';
 import { openRetentionStore } from './retention-store.js';
+import { openKnowledge } from './knowledge-store.js';
 import { createWorkerRuns, type WorkerRuns } from './runs.js';
 import { loadSettings, SettingsError } from './settings.js';
 import { installTemporalLogging, startIntentWorker, type IntentWorkerHandle } from './temporal.js';
@@ -82,6 +83,10 @@ async function main(): Promise<void> {
   // Agent runs (C06 session 2, ADR-M33 §2.5): the cost-controller AppRole, the gateway and the
   // handoff. Without them a decided G4 waits.
   let workerRuns: WorkerRuns | undefined;
+  // X04 PR 3a (ADR-M89 §2.1): the index of a project's documents for a `read_documents` tool.
+  const knowledge = settings.runs
+    ? await openKnowledge(settings.knowledge, secrets, gitHost, settings.runs.litellmUrl, logger)
+    : undefined;
   // The Compose file always names the files; until `openbao:bootstrap worker-credentials` wrote
   // them, the worker starts with runs off instead of failing.
   if (settings.runs && fs.existsSync(settings.runs.costRoleIdFile)) {
@@ -94,6 +99,7 @@ async function main(): Promise<void> {
       signer: openbao.transit(),
       wrapper: openbao.wrapping(),
       logger,
+      ...(knowledge?.deps ? { knowledge: knowledge.deps } : {}),
     });
   } else if (settings.temporal) {
     logger.log('warn', 'worker.runs_off', { message: t('worker.start.runs_off') });
@@ -310,6 +316,10 @@ async function main(): Promise<void> {
                       now: () => new Date(),
                       orphanSuspects,
                       langfuse: langfuse.deps,
+                      // X04 PR 3a (ADR-M89 §2.4): the versions of the document indexes.
+                      ...(knowledge?.deps?.store
+                        ? { knowledge: { store: knowledge.deps.store } }
+                        : {}),
                       settings: {
                         mode: retentionSettings.mode,
                         bucket: retentionSettings.bucket,
@@ -370,6 +380,7 @@ async function main(): Promise<void> {
           openbao.close(),
           temporal?.close(),
           workerRuns?.close(),
+          knowledge?.close(),
           tracing?.shutdown(),
         ]),
       )

@@ -57,6 +57,25 @@ if [ "${langfuse_on:-no}" = yes ] && [ -z "${SDLC_WORKER_LANGFUSE_URL:-}" ] &&
   export SDLC_WORKER_LANGFUSE_URL
 fi
 
+# The index of project documents (X04 PR 3a, design/ADR-M89): with the profile knowledge, or when
+# knowledge-db's volume exists, the worker builds indexes there, unless the URL is set elsewhere.
+case " $* " in
+  *" knowledge "*) knowledge_on=yes ;;
+  *)
+    project="$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' "$env_file" | tail -n 1)"
+    if [ -n "$(docker volume ls -q \
+      --filter "label=com.docker.compose.project=${project:-deploy}" \
+      --filter label=com.docker.compose.volume=knowledge-db-data 2>/dev/null || true)" ]; then
+      knowledge_on=yes
+    fi
+    ;;
+esac
+if [ "${knowledge_on:-no}" = yes ] && [ -z "${SDLC_WORKER_KNOWLEDGE_DB_URL:-}" ] &&
+  ! grep -Eq '^SDLC_WORKER_KNOWLEDGE_DB_URL=.+' "$env_file"; then
+  SDLC_WORKER_KNOWLEDGE_DB_URL=postgresql://knowledge@knowledge-db:5432/knowledge
+  export SDLC_WORKER_KNOWLEDGE_DB_URL
+fi
+
 # OpenBao's TLS certificates (A10, design/ADR-M63): warn 30 days before they end; never block.
 if ! SDLC_ENV_FILE="$env_file" "$deploy_dir/openbao/tls.sh" check >/dev/null 2>&1; then
   SDLC_ENV_FILE="$env_file" "$deploy_dir/openbao/tls.sh" check >&2 || true

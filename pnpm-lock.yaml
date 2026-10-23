@@ -35,6 +35,9 @@ importers:
       '@sdlc/adapter-git-github':
         specifier: workspace:*
         version: link:platform/packages/adapters/git-github
+      '@sdlc/adapter-knowledge-pgvector':
+        specifier: workspace:*
+        version: link:platform/packages/adapters/knowledge-pgvector
       '@sdlc/adapter-model-litellm':
         specifier: workspace:*
         version: link:platform/packages/adapters/model-litellm
@@ -298,6 +301,9 @@ importers:
       '@sdlc/adapter-git-github':
         specifier: workspace:*
         version: link:../../packages/adapters/git-github
+      '@sdlc/adapter-knowledge-pgvector':
+        specifier: workspace:*
+        version: link:../../packages/adapters/knowledge-pgvector
       '@sdlc/adapter-model-litellm':
         specifier: workspace:*
         version: link:../../packages/adapters/model-litellm
@@ -388,6 +394,19 @@ importers:
       '@sdlc/contracts':
         specifier: workspace:*
         version: link:../../contracts
+
+  platform/packages/adapters/knowledge-pgvector:
+    dependencies:
+      '@sdlc/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      pg:
+        specifier: 8.23.0
+        version: 8.23.0
+    devDependencies:
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
 
   platform/packages/adapters/model-litellm:
     dependencies:

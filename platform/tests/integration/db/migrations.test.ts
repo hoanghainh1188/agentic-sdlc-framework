@@ -231,6 +231,10 @@ const UPDATABLE: Record<string, readonly string[]> = {
   ],
   evaluation_task_decisions: [],
   evaluation_task_check_contracts: [],
+  // X04 PR 3a (migration 0039): an index's use and purge dates (trigger SDA26); its uses are
+  // append-only.
+  knowledge_indexes: ['last_used_at', 'purged_at'],
+  knowledge_index_uses: [],
   // U05 (migration 0027): seen time only grows; the end is set once (trigger SDA18). No DELETE.
   web_sessions: ['last_seen_at', 'revoked_at', 'end_reason'],
   // U06 (migration 0028): the counter and the last use only grow; revoked once (SDA20). No DELETE.
@@ -382,7 +386,9 @@ describeDb('AC2: migrations on PostgreSQL', () => {
     // evaluation_tasks, users; evaluation_task_check_contracts → evaluation_tasks (0034).
     // L09: agent_approvals → evaluations (0036).
     // X04: tools → users; tool_approvals → tools, users (0038).
-    expect(fks).toHaveLength(90);
+    // X04 PR 3a: knowledge_indexes → projects; knowledge_index_uses → knowledge_indexes, runs,
+    // intents (0039).
+    expect(fks).toHaveLength(94);
     for (const fk of fks) {
       expect(fk.on_delete, fk.name).toBe('r'); // RESTRICT: no hard deletes (D-05 D7)
       if (fk.name === 'gate_decisions_voids_fkey') {

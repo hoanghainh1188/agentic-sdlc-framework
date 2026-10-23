@@ -59,6 +59,8 @@ describe('worker settings', () => {
       },
       // E08: off unless up.sh (profile observability) or .env sets it.
       langfuse: null,
+      // X04 PR 3a: off unless up.sh (profile knowledge) or .env sets it.
+      knowledge: null,
     });
   });
 

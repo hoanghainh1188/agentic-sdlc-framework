@@ -25,6 +25,9 @@
       "path": "../../packages/adapters/evidence-s3"
     },
     {
+      "path": "../../packages/adapters/knowledge-pgvector"
+    },
+    {
       "path": "../../packages/adapters/git-github"
     },
     {

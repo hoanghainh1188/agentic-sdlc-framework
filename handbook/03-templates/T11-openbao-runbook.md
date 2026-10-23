@@ -18,7 +18,7 @@ This runbook covers:
 - root tokens;
 - daily admin work and AppRole secret IDs (an AppRole is OpenBao's login for a machine process: a fixed role ID plus a secret ID that expires);
 - the keys of LiteLLM (model provider keys, master key, salt key);
-- the credentials of every platform process (sections 5c–5m) and the image upgrade (4b);
+- the credentials of every platform process (sections 5c–5o) and the image upgrade (4b);
 - snapshot backup and restore;
 - changing a key holder;
 - troubleshooting;
@@ -769,6 +769,33 @@ Needs `core` running and OpenBao unsealed.
 - The api revokes each person's GitHub token right after it read the account ID; the platform never acts on GitHub as the person.
 - WebKit (Safari) keeps no `Secure` cookie on `http://localhost`, so Safari cannot sign in with GitHub there; use Chrome or Firefox (ADR-M73 §4, tested 2026-10-12).
 
+## 5o. The worker's index of project documents (`knowledge-db`)
+
+A plan with a `read_documents` register tool (task X04, `design/ADR-M89-project-docs-index.md`) needs an index of the project's Markdown documents. The worker builds it in its run preparation, in `knowledge-db`: a PostgreSQL with pgvector of its own (Compose profile `knowledge`), never the platform's database. The worker connects as the role `knowledge` (owner of the database `knowledge`, may create roles, no superuser). Its password lives in OpenBao at `kv/worker/knowledge-db` (field `password`), read only by the `worker` AppRole. The superuser password of `knowledge-db` is `KNOWLEDGE_DB_SUPERUSER_PASSWORD` in `.env`, as for the platform's PostgreSQL.
+
+Without the index, a run whose plan asks for a `read_documents` tool fails (`tool_unavailable`, run event `knowledge_unavailable`). Other runs are not affected.
+
+### First set-up
+
+Needs the profiles `core` and `knowledge` running, and OpenBao unsealed. Run it in a terminal on the server, never through a chat tool.
+
+1. Start the profile: `pnpm compose:knowledge` (or add `knowledge` to your `up.sh` call). `up.sh` sets `SDLC_WORKER_KNOWLEDGE_DB_URL=postgresql://knowledge@knowledge-db:5432/knowledge` when the profile is in the same call or the volume of `knowledge-db` exists; set it in `.env` otherwise.
+2. Make and set the password:
+   ```bash
+   pnpm openbao:bootstrap worker-knowledge-credentials
+   ```
+   It asks for an admin token (hidden), makes a random password inside the OpenBao container, stores it at `kv/worker/knowledge-db` and sets it on the role `knowledge` through `psql` in `knowledge-db` (the SQL on standard input; the session logs no statement). It prints no secret.
+3. Restart `sdlc-worker`. The start log has no `worker.knowledge_missing` and no `worker.knowledge_off`.
+4. The embedding model `bge-m3` must be on LiteLLM: on a developer machine `ollama pull bge-m3` with the `ollama` provider stored (section 5d). Record the date in the operations log.
+
+### Rotation
+
+Run `pnpm openbao:bootstrap worker-knowledge-credentials` again (every 90 days, or when the password may have leaked), then restart `sdlc-worker`. The old password stops working at once.
+
+### Retention
+
+The retention loop (section 5j) deletes an index version from `knowledge-db` when every intent that used it is finished and not held and it was not used for the project's evidence retention (never under 180 days), and every version of an archived project after the archive grace. Each deletion appends `knowledge.purged`. A later pass also sweeps what a failed delete or a failed build left in `knowledge-db` after one hour (`knowledgeSwept`). In `report` mode it only counts (`knowledgeDue` in `worker.retention_pass`). A failure logs `retention.knowledge_failed` with a code; the next pass tries again.
+
 ## 6. Daily backup
 
 The whole platform is backed up by one command, `pnpm backup` (`platform/deploy/backup/backup.sh`, task A10, `design/ADR-M63-openbao-tls-and-backups.md` §5, QUESTIONS #326–#329). It writes one folder per run into `SDLC_BACKUP_DIR`:
@@ -957,6 +984,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
 | 0.40 | 2026-10-12 | Claude Code (docs review for v0.2.0) | Sections 3c and 3d are subsections of section 3, like 3.1 and 3.2 (heading level only; the links stay the same) |
 | 0.41 | 2026-10-22 | Claude Code (task X03, PR 3) | Section 5g: the OpenCode sandbox image `node24-opencode` and `sandbox.images.opencode`; troubleshooting: `image_not_configured`, `adapter_mismatch`, `adapter_unavailable` (ADR-M88) |
+| 0.42 | 2026-10-23 | Claude Code (task X04, PR 3a) | New section 5o: the worker's index of project documents in `knowledge-db` (profile `knowledge`), `kv/worker/knowledge-db`, `worker-knowledge-credentials`, rotation, retention and `knowledge.purged` (ADR-M89) |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |
 | 0.37 | 2026-10-12 | Claude Code (task V07, PR 2) | Sections 3c and 4: `pnpm doctor` shows the certificates' end dates and checks the platform after an unseal |

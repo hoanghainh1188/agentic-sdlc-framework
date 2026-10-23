@@ -282,6 +282,21 @@ export interface ProjectConfig {
       readonly recertification_max_age_days: number;
     };
   };
+  /** The index of a project's documents for the tool `read_documents` (X04 PR 3a, ADR-M89 §2.3). */
+  readonly knowledge: {
+    /** At most this many Markdown files per index. */
+    readonly max_files: number;
+    /** A larger file fails the index. */
+    readonly max_file_bytes: number;
+    /** At most this many bytes of Markdown per index. */
+    readonly max_total_bytes: number;
+    /** At most this many chunks per index. */
+    readonly max_chunks: number;
+    /** A chunk holds at most this many characters. */
+    readonly chunk_chars: number;
+    /** Chunks per embedding request. */
+    readonly embed_batch: number;
+  };
   /** Register tools (task X04, ADR-M69 §2.2–§2.7, ADR-M87). */
   readonly tools: {
     /** Maximum age of a tool's last recertification before a warning (rule M18: at most 3). */

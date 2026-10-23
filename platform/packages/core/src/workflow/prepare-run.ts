@@ -27,7 +27,9 @@
 // (`prepare_failed`), so no run waits in `queued` with a live key.
 import {
   GitHostError,
+  KnowledgeError,
   type AgentAdapterCode,
+  type KnowledgeErrorCode,
   type GitHostAdapter,
   type RedactedSecret,
   type RunContractSigner,
@@ -39,6 +41,8 @@ import type { CostController } from '../cost/controller.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import type { Registry } from '../registry/registry.js';
 import { issueRunContract } from '../run-contract/issue.js';
+import { buildProjectIndex, type KnowledgeDeps } from '../knowledge/indexer.js';
+import { loadEffectiveConfig } from '../registry/effective-config.js';
 import { isRecordableModel } from '../run-events/types.js';
 import { gatherG4Facts, projectRepoRef, type G4Deps, type RunProposal } from './g4-proposal.js';
 import { evaluateG4, g4Decided } from './g4.js';
@@ -60,6 +64,11 @@ export interface PrepareRunDeps {
   readonly wrapper: SecretWrapper;
   /** Services the sandbox may reach, as `alias:port` (deployment settings, ADR-M25 §2.2). */
   readonly egressAllowlist: readonly string[];
+  /**
+   * X04 PR 3a (ADR-M89 §2.3): the index of the project's documents for a `read_documents` tool.
+   * Without it a run with such a tool fails (`tool_unavailable`).
+   */
+  readonly knowledge?: KnowledgeDeps;
 }
 
 export type PrepareRunRefusal =
@@ -81,7 +90,13 @@ export type PrepareRunRefusal =
    * replaced, the decider unlinked) or cannot be checked. The run ended `failed` before any secret
    * was issued; the workflow finishes it like a failed run (paused, escalation).
    */
-  | 'feedback_unavailable';
+  | 'feedback_unavailable'
+  /**
+   * X04 PR 3a (ADR-M89 §2.3): the index of the project's documents for a `read_documents` tool
+   * could not be built. The run ended `failed` (`tool_unavailable`, run event
+   * `knowledge_unavailable`) and its key was revoked; the workflow finishes it like a failed run.
+   */
+  | 'tool_unavailable';
 
 export interface PreparedRun {
   readonly runId: string;
@@ -229,6 +244,23 @@ export async function prepareRun(
     }
     await cancel(scope, deps.registry, runId, 'prepare_failed');
     throw error;
+  }
+
+  // X04 PR 3a (ADR-M89 §2.3): the index of the documents, built with the run's own key before any
+  // other secret is issued. A failure ends the run `failed`; the key is revoked. Any other error:
+  // the key is revoked and the run cancelled, as below.
+  let indexed: Awaited<ReturnType<typeof indexForTools>>;
+  try {
+    indexed = await indexForTools(scope, deps, peek, proposal, runId, key.key.key);
+  } catch (error) {
+    await deps.costController.endRun({ keyId: key.key.keyId, syncFrom: keyIssuedAt });
+    await cancel(scope, deps.registry, runId, 'prepare_failed');
+    throw error;
+  }
+  if (indexed !== 'ok') {
+    await deps.costController.endRun({ keyId: key.key.keyId, syncFrom: keyIssuedAt });
+    await failForKnowledge(scope, deps.registry, runId, indexed);
+    return { ok: false, reason: 'tool_unavailable' };
   }
 
   try {
@@ -393,6 +425,74 @@ async function failForFeedback(
       finishedAt: now,
     });
     if (ended) await tx.runEvents.append(runId, 'feedback_unavailable', { reason });
+  });
+}
+
+/** The stop reason of a run whose register tool could not be prepared (X04 PR 3a). */
+export const TOOL_UNAVAILABLE = 'tool_unavailable';
+
+/**
+ * Builds or reuses the index of the project's documents for each grant with `read_documents`
+ * (ADR-M89 §2.3). The model is the tool's `model_ref` and must be one of the contract's allowed
+ * models (G4 checked it for the data class). Returns `ok` or the knowledge error code.
+ */
+async function indexForTools(
+  scope: TenantScope,
+  deps: PrepareRunDeps,
+  intent: { readonly id: string; readonly project_id: string },
+  proposal: RunProposal,
+  runId: string,
+  key: RedactedSecret,
+): Promise<'ok' | KnowledgeErrorCode> {
+  const grants = proposal.toolGrants.filter((g) => g.permissions.includes('read_documents'));
+  if (grants.length === 0) return 'ok';
+  try {
+    if (!deps.knowledge) throw new KnowledgeError('store_unavailable');
+    const project = await scope.projects.getById(intent.project_id);
+    const ref = project ? projectRepoRef(project) : undefined;
+    if (!ref) throw new KnowledgeError('file_unreadable');
+    const { config } = await loadEffectiveConfig(scope.projectConfigs, intent.project_id);
+    for (const grant of grants) {
+      const tool = await scope.tools.getByKey(grant.tool_key);
+      const model = tool?.model_ref ?? null;
+      if (model === null || !proposal.allowedModels.includes(model)) {
+        throw new KnowledgeError('model_not_allowed');
+      }
+      await buildProjectIndex(scope, deps.knowledge, {
+        ref,
+        projectId: intent.project_id,
+        baseSha: proposal.baseSha,
+        model,
+        key,
+        runId,
+        intentId: intent.id,
+        limits: config.knowledge,
+        now: deps.registry.now(),
+      });
+    }
+    return 'ok';
+  } catch (error) {
+    if (error instanceof KnowledgeError) return error.code;
+    throw error;
+  }
+}
+
+async function failForKnowledge(
+  scope: TenantScope,
+  registry: Registry,
+  runId: string,
+  reason: KnowledgeErrorCode,
+): Promise<void> {
+  const now = registry.now();
+  await scope.transaction(async (tx) => {
+    const ended = await tx.runs.transition(runId, {
+      from: ['queued'],
+      to: 'failed',
+      now,
+      stopReason: TOOL_UNAVAILABLE,
+      finishedAt: now,
+    });
+    if (ended) await tx.runEvents.append(runId, 'knowledge_unavailable', { reason });
   });
 }
 

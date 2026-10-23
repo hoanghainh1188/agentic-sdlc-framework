@@ -126,6 +126,8 @@ export type {
   AgentApproval,
   Tool,
   ToolApproval,
+  KnowledgeIndex,
+  KnowledgeIndexUse,
   ApiToken,
   AuditLogRow,
   CostRecordRow,
