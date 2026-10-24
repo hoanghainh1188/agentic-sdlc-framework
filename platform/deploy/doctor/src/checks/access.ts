@@ -2,12 +2,16 @@
 // one line says it is off and the published ports are still checked (every port on 127.0.0.1).
 import type { AccessFact, CheckResult, OperatorFacts, ServiceState } from '../types.js';
 import { ok, problem, skipped, text } from './result.js';
+import { LINK_SERVICES, linkAddress } from './runner.js';
 
 const DAY_MS = 86_400_000;
 export const ACCESS_TLS_WARNING_DAYS = 30;
 /** Host addresses that are this machine only. */
 const LOOPBACK = new Set(['127.0.0.1', '::1']);
 const PROXY = 'sdlc-access';
+/** A link port of the runner on its own Engine (O01, ADR-M91 §2.3); checked by `runner.engine`. */
+const onLink = (service: string, address: string, link: string | null) =>
+  link !== null && address === link && (LINK_SERVICES as readonly string[]).includes(service);
 
 const readme = () => text('doctor.fix.readme', { section: 'Team access (operator)' });
 const t11 = () => text('doctor.fix.runbook', { section: '§3d' });
@@ -18,7 +22,11 @@ export function expectedOrigin(a: AccessFact): string | null {
   return a.hostPort === '443' ? `https://${a.hostname}` : `https://${a.hostname}:${a.hostPort}`;
 }
 
-function portsCheck(a: AccessFact, services: readonly ServiceState[] | null | undefined) {
+function portsCheck(
+  a: AccessFact,
+  services: readonly ServiceState[] | null | undefined,
+  link: string | null,
+) {
   if (!services) return skipped('access.ports', 'doctor.skipped.stopped');
   const out: CheckResult[] = [];
   for (const s of services) {
@@ -48,7 +56,7 @@ function portsCheck(a: AccessFact, services: readonly ServiceState[] | null | un
             ),
           );
         }
-      } else if (!LOOPBACK.has(p.address)) {
+      } else if (!LOOPBACK.has(p.address) && !onLink(s.service, p.address, link)) {
         out.push(
           problem(
             'access.ports',
@@ -192,14 +200,14 @@ export function accessChecks(f: OperatorFacts): CheckResult[] {
     return [
       ok('access.proxy', text('doctor.access.off')),
       ...ids.slice(0, 3).map((id) => skipped(id, 'doctor.skipped.access_off')),
-      ...[portsCheck(a, services)].flat(),
+      ...[portsCheck(a, services, linkAddress(f))].flat(),
       ...ids.slice(3).map((id) => skipped(id, 'doctor.skipped.access_off')),
     ];
   }
   return [
     proxyCheck(services),
     ...tlsChecks(a, f.now),
-    ...[portsCheck(a, services)].flat(),
+    ...[portsCheck(a, services, linkAddress(f))].flat(),
     originCheck(a),
     trustedProxyCheck(a),
   ];

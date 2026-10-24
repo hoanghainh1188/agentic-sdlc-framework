@@ -22,9 +22,17 @@ export function service(name: string, extra: Partial<ServiceState> = {}): Servic
   return { service: name, state: 'running', health: 'healthy', exitCode: 0, ...extra };
 }
 
+/** The link address of a healthy server: the runner has its own Engine (O01, ADR-M91). */
+export const LINK = '10.66.0.1';
+const LINK_PORTS: Readonly<Record<string, number>> = { openbao: 8200, postgres: 5432 };
+
 export const RUNNING: ServiceState[] = [
-  ...CORE_SERVICES.map((s) => service(s)),
-  ...['sdlc-api', 'sdlc-worker', 'sdlc-runner', 'litellm-agent'].map((s) => service(s)),
+  ...CORE_SERVICES.map((s) =>
+    LINK_PORTS[s] === undefined
+      ? service(s)
+      : service(s, { published: [{ address: LINK, port: LINK_PORTS[s] }] }),
+  ),
+  ...['sdlc-api', 'sdlc-worker', 'litellm-agent'].map((s) => service(s)),
   // V09: team access on, the proxy on the LAN address, the api on 127.0.0.1.
   service('sdlc-access', { published: [{ address: '192.168.10.5', port: 8443 }] }),
   ...JOBS.filter((j) => j !== 'backup-agent').map((j) =>
@@ -40,7 +48,11 @@ export function healthyFacts(overrides: Partial<OperatorFacts> = {}): OperatorFa
       exists: true,
       mode: 0o100600,
       facts: {
-        values: { COMPOSE_PROJECT_NAME: 'sdlc', SDLC_OPENBAO_TLS_DIR: '/srv/sdlc/tls' },
+        values: {
+          COMPOSE_PROJECT_NAME: 'sdlc',
+          SDLC_OPENBAO_TLS_DIR: '/srv/sdlc/tls',
+          SDLC_RUNNER_LINK_ADDR: LINK,
+        },
         secrets: { PLATFORM_DB_PASSWORD: 'set', VALKEY_PASSWORD: 'set' },
       },
     },

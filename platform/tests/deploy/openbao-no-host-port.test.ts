@@ -1,6 +1,8 @@
 // D-08 task A11 AC4 (design/QUESTIONS.md #27): OpenBao is reachable only on the Compose network.
 // No compose file or override in the repo may publish 8200 (API) or 8210 (key-holder listener)
-// on the host again, and the openbao service publishes no port at all.
+// on the host again, and the openbao service publishes no port at all. One exception (O01,
+// design/ADR-M91 §2.3, QUESTIONS #577): the overlay docker-compose.runner-link.yml publishes 8200
+// on SDLC_RUNNER_LINK_ADDR only, for a runner on its own Docker Engine.
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -17,6 +19,8 @@ import { parseEnvFile, readDeployFile, root } from './compose';
 const OPENBAO_PORTS = [8200, 8210];
 const SKIP_DIRS = new Set(['node_modules', '.git', '.claude', 'dist', '.pnpm-store']);
 const COMPOSE_FILE = /(compose|override)[^/]*\.ya?ml$/i;
+const LINK_OVERLAY = 'platform/deploy/docker-compose.runner-link.yml';
+const LINK_OPENBAO_PORT = '${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in .env}:8200:8200';
 
 // Compose tags: `!override` keeps its value, so a port list under it is still checked.
 // `!reset` values are read as written (an empty list publishes nothing).
@@ -106,7 +110,12 @@ describe('A11: OpenBao publishes no port on the host (QUESTIONS #27)', () => {
       const doc = parse(fs.readFileSync(file, 'utf8'), COMPOSE_YAML) as {
         services?: Record<string, ServiceLike | null>;
       } | null;
+      const rel = path.relative(root, file).split(path.sep).join('/');
       for (const [name, service] of Object.entries(doc?.services ?? {})) {
+        if (rel === LINK_OVERLAY && name === 'openbao') {
+          expect(service?.ports).toEqual([LINK_OPENBAO_PORT]);
+          continue;
+        }
         for (const port of service?.ports ?? []) {
           expect(
             publishesOpenBaoPort(port),

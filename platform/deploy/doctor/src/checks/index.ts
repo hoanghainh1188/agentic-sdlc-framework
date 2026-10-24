@@ -5,6 +5,7 @@ import { accessChecks } from './access.js';
 import { githubChecks } from './github.js';
 import { hostChecks } from './host.js';
 import { ok, problem, skipped, text } from './result.js';
+import { runnerChecks } from './runner.js';
 import { stackChecks } from './stack.js';
 
 function imagesModeCheck(f: OperatorFacts): CheckResult {
@@ -27,5 +28,6 @@ export function evaluate(facts: OperatorFacts): CheckResult[] {
     ...githubChecks(facts),
     imagesModeCheck(facts),
     ...accessChecks(facts),
+    ...runnerChecks(facts),
   ];
 }

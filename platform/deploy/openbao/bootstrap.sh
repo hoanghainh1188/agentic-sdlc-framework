@@ -46,7 +46,8 @@ Commands:
                        Run it again to rotate, then restart sdlc-worker (runbook T11).
   runner-credentials   The same for the runner: kv/runner/database, AppRole "runner", volume of
                        sdlc-runner (Compose profile "sandbox"). Run it again to rotate, then
-                       restart sdlc-runner (runbook T11 §5g).
+                       restart sdlc-runner (runbook T11 §5g). With SDLC_RUNNER_DOCKER_HOST in the
+                       env file, the volume is the runner host's (its own Engine, ADR-M91).
   runner-evidence-credentials
                        Ask for an admin token (hidden). Create a new SeaweedFS key pair for the
                        runner's L1 proposals and run diffs, store it at kv/runner/evidence and
@@ -306,6 +307,15 @@ cmd_configure() {
   [ -n "$token" ] || fail "no root token given"
   set -- "$cidrs"
   [ "$keep_token" = yes ] && set -- "$@" --keep-token
+  # The runner on its own Engine (O01, ADR-M91 §2.7, QUESTIONS #596): its source address, for the
+  # AppRole "runner" only.
+  runner_cidr="$(sed -n 's/^SDLC_RUNNER_SOURCE_CIDR=//p' "$env_file" | tail -n 1)"
+  if [ -n "$runner_cidr" ]; then
+    printf '%s' "$runner_cidr" |
+      grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$' ||
+      fail "SDLC_RUNNER_SOURCE_CIDR must be one IPv4 block such as 10.66.0.2/32"
+    set -- "$@" --runner-cidr "$runner_cidr"
+  fi
   printf '%s\n' "$token" | bao_exec sh "$in_container/configure.sh" "$@"
 }
 
@@ -396,12 +406,30 @@ cmd_litellm_credentials() {
 # and print the build log on stdout, before the accessor (seen in CI on a fresh deployment). So
 # the image is built first, its log on stderr. An existing image is used as it is.
 # ensure_service_image <Compose service> <profile>
+# The Compose project a service's credentials go to: the platform's, or the runner host's when
+# runner-credentials runs with SDLC_RUNNER_DOCKER_HOST (O01, ADR-M91 §2.7, QUESTIONS #597). Then
+# the same `compose run` reaches the runner's own Engine (ssh:// or its socket); the secret ID still
+# travels on stdin only. The runner's Engine is rootless (ADR-M91 §2.4): its socket group inside the
+# Engine is 0, as in runner-host/.env.example, so the volumes it creates match the runner host's.
+delivery_host=""
+service_compose() {
+  if [ -n "$delivery_host" ]; then
+    DOCKER_HOST="$delivery_host" SDLC_DOCKER_GID=0 docker compose \
+      -f "$deploy_dir/runner-host/docker-compose.yml" --env-file "$env_file" "$@"
+  else
+    compose "$@"
+  fi
+}
+service_docker() {
+  if [ -n "$delivery_host" ]; then DOCKER_HOST="$delivery_host" docker "$@"; else docker "$@"; fi
+}
+
 ensure_service_image() {
-  image="$(compose --profile core --profile "$2" config --images "$1" 2>/dev/null | head -n 1)"
+  image="$(service_compose --profile core --profile "$2" config --images "$1" 2>/dev/null | head -n 1)"
   [ -n "$image" ] || fail "no image for the Compose service $1"
-  docker image inspect "$image" >/dev/null 2>&1 && return 0
+  service_docker image inspect "$image" >/dev/null 2>&1 && return 0
   say "building the image of $1 (first run on this machine; a few minutes)"
-  compose --profile core --profile "$2" build "$1" >&2 ||
+  service_compose --profile core --profile "$2" build "$1" >&2 ||
     fail "could not build the image of $1; run: docker compose … build $1"
 }
 # deliver_approle <AppRole> <Compose service> <directory in the service> <profile> [owner]
@@ -409,7 +437,7 @@ ensure_service_image() {
 deliver_approle() {
   ensure_service_image "$2" "$4"
   accessor="$(issue_secret_id "$1" |
-    compose --profile core --profile "$4" run --rm -T --no-deps --user root \
+    service_compose --profile core --profile "$4" run --rm -T --no-deps --user root \
       --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER --entrypoint sh "$2" -c '
       set -e
       umask 077
@@ -464,7 +492,19 @@ cmd_worker_credentials() {
   platform_credentials worker sdlc-worker
   cost_controller_credentials
 }
-cmd_runner_credentials() { platform_credentials runner sdlc-runner sandbox; }
+cmd_runner_credentials() {
+  delivery_host="$(sed -n 's/^SDLC_RUNNER_DOCKER_HOST=//p' "$env_file" | tail -n 1)"
+  case "$delivery_host" in
+    '' | ssh://?* | unix:///?*) ;;
+    *) fail "SDLC_RUNNER_DOCKER_HOST must be ssh://<user>@<host> or unix:///<socket>" ;;
+  esac
+  if [ -n "$delivery_host" ]; then
+    grep -Eq '^SDLC_RUNNER_LINK_ADDR=.+' "$env_file" ||
+      fail "SDLC_RUNNER_DOCKER_HOST needs SDLC_RUNNER_LINK_ADDR in $env_file"
+    say "the runner's credentials go to the runner host's Engine ($delivery_host)"
+  fi
+  platform_credentials runner sdlc-runner sandbox
+}
 
 # The GitHub App's client secret for the dashboard's sign-in (U05, ADR-M73 §2.2, runbook T11 §5n).
 # The admin token comes from the terminal (hidden); the client secret from a hidden prompt, or from

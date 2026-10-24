@@ -152,8 +152,24 @@ describe('AppRoles (configure.sh)', () => {
   const configure = readDeployFile('openbao/bootstrap/configure.sh');
 
   it('binds secret IDs and login tokens to the same CIDRs (A04, ADR-M21 §2.5)', () => {
-    expect(configure).toMatch(/^\s+secret_id_bound_cidrs="\$cidrs" \\$/m);
-    expect(configure).toMatch(/^\s+token_bound_cidrs="\$cidrs" \\$/m);
+    expect(configure).toMatch(/^\s+secret_id_bound_cidrs="\$role_cidrs" \\$/m);
+    expect(configure).toMatch(/^\s+token_bound_cidrs="\$role_cidrs" \\$/m);
+    expect(configure).toMatch(/^\s+role_cidrs="\$cidrs"$/m);
+  });
+
+  it('only the AppRole runner also accepts SDLC_RUNNER_SOURCE_CIDR (O01, QUESTIONS #596)', () => {
+    const assignments = configure.match(/^\s+(\[.*\] && )*role_cidrs=.*$/gm) ?? [];
+    expect(assignments.map((l) => l.trim())).toEqual([
+      'role_cidrs="$cidrs"',
+      '[ "$role" = runner ] && [ -n "$runner_cidr" ] && role_cidrs="$cidrs,$runner_cidr"',
+    ]);
+    const bootstrap = readDeployFile('openbao/bootstrap.sh');
+    expect(bootstrap).toContain('sed -n \'s/^SDLC_RUNNER_SOURCE_CIDR=//p\' "$env_file"');
+    // One IPv4 block, checked before it reaches OpenBao.
+    expect(bootstrap).toContain(
+      "grep -Eq '^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$'",
+    );
+    expect(bootstrap).toContain('set -- "$@" --runner-cidr "$runner_cidr"');
   });
 });
 

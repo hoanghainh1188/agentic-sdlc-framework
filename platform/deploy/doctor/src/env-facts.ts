@@ -18,6 +18,8 @@ export const ENV_ALLOWLIST = [
   'SDLC_API_TRUSTED_PROXY',
   'SDLC_API_PUBLIC_ORIGIN',
   'SDLC_API_WEB_SIGNIN',
+  // The runner on its own Engine (O01, design/ADR-M91): an address, not a secret.
+  'SDLC_RUNNER_LINK_ADDR',
 ] as const;
 
 export const PLACEHOLDER = 'CHANGEME';

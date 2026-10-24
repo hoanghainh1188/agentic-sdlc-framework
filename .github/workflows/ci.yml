@@ -48,6 +48,8 @@ env:
   DOCKER_ROOTLESS_VERSION: 29.8.2
   DOCKER_STATIC_SHA256: 995d1ef289677f74fd58d8d2c35727b6a4ee389c69db8638a3e42d0487aa5b0f
   DOCKER_ROOTLESS_EXTRAS_SHA256: 707ebf6a5afd88104086e7b6749997b2366e816aeaf2c3ef2305b08fde9ee007
+  # runner-rootless, test:runner-split: the link address between the two Engines (O01 PR 2).
+  RUNNER_LINK_ADDR: 10.203.0.1
   SEMGREP_IMAGE: semgrep/semgrep:1.178.0@sha256:32e459968daabe7ab86968184a29109b9564aa00392401156f9788452b42786b
   # Infrastructure owned by task A02. The compose job runs only when this file exists.
   COMPOSE_FILE_PATH: platform/deploy/docker-compose.yml
@@ -369,11 +371,12 @@ jobs:
     # O01 (design/ADR-M91 §2.4, D-08 O01 AC2): the runner's live tests on a rootless Docker Engine,
     # the Engine the runner gets on the server. Same tests as the compose job's `pnpm test:runner`;
     # the fixture sandbox also checks that the kernel applies the limits (cgroup delegation).
+    # Then `pnpm test:runner-split` (O01 AC1): the runner host's project on that Engine.
     name: runner on rootless Docker
     needs: [scan, checks]
     if: needs.scan.outputs.run_compose == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -405,6 +408,19 @@ jobs:
       - name: Start the rootless Engine (sets DOCKER_HOST for the next steps)
         run: sh platform/deploy/scripts/test-rootless-docker.sh "$RUNNER_TEMP/rootless"
       - run: pnpm test:runner
+      # O01 PR 2 (ADR-M91 §2.3, §2.7): the split set-up on one machine, as on a server without a
+      # second VM. The link address is a dummy interface that only the two Engines use; the
+      # platform runs on the machine's own Engine, the runner host's project on the rootless one.
+      - name: The link address (a dummy interface)
+        run: |
+          sudo ip link add sdlc-link type dummy
+          sudo ip addr add "$RUNNER_LINK_ADDR/32" dev sdlc-link
+          sudo ip link set sdlc-link up
+      - run: pnpm test:runner-split
+        env:
+          SDLC_RUNNER_SPLIT_LINK_ADDR: ${{ env.RUNNER_LINK_ADDR }}
+          SDLC_RUNNER_SPLIT_DOCKER_HOST: ${{ env.DOCKER_HOST }}
+          SDLC_RUNNER_SPLIT_PLATFORM_HOST: unix:///var/run/docker.sock
       - name: Show the rootless Engine's log
         if: failure()
         run: XDG_RUNTIME_DIR="/run/user/$(id -u)" journalctl --user -u docker.service --no-pager -n 300 || true

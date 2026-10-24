@@ -1,0 +1,33 @@
+# The link to a runner on its own Docker Engine (task O01, design/ADR-M91 §2.3, §2.7). An overlay of
+# docker-compose.yml, added by scripts/up.sh only when SDLC_RUNNER_LINK_ADDR is set in .env.
+# It publishes the services the runner host needs on the link address only: the WireGuard address
+# of the platform host (a separate VM) or a host address that only the two Engines use (the same
+# server). Never on 0.0.0.0 or a LAN address (static test platform/tests/deploy/runner-host.test.ts).
+#
+# OpenBao's port 8200 is published here only, on the link address, with TLS (QUESTIONS #577);
+# every other deployment publishes no OpenBao port (A11). knowledge-db uses 5433, because
+# PostgreSQL has 5432 on the same address. The registry also joins the profile runner-link: the
+# platform host keeps the sandbox images when the runner no longer runs there.
+services:
+  postgres:
+    ports:
+      - ${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in .env}:5432:5432
+  openbao:
+    ports:
+      - ${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in .env}:8200:8200
+  temporal:
+    ports:
+      - ${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in .env}:7233:7233
+  seaweedfs:
+    ports:
+      - ${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in .env}:8333:8333
+  litellm:
+    ports:
+      - ${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in .env}:4000:4000
+  knowledge-db:
+    ports:
+      - ${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in .env}:5433:5432
+  registry:
+    profiles: [sandbox, runner-link]
+    ports:
+      - ${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in .env}:5050:5000

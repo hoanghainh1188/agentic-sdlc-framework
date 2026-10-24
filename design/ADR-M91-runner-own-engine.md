@@ -2,10 +2,10 @@
 
 | Item | Value |
 |---|---|
-| Status | **Accepted** (Harry, 2026-10-24, in the O01 plan; QUESTIONS #576–#580) |
+| Status | **Accepted** (Harry, 2026-10-24, in the O01 plan; QUESTIONS #576–#580). Version 1.1: §2.7 (Harry, 2026-10-24, O01 PR 2 plan; QUESTIONS #596–#599) |
 | Date | 2026-10-24 |
 | Decided by | Harry (O01 plan approved on 2026-10-24) |
-| Related | D-08 O01 AC1–AC3, H07, A10; D-02 NFR-03; D-03 §10.1, §13; ADR-M25 §2.2, §2.4, §2.5; ADR-M80 §5 gap G-7; ADR-M19 (A11: no OpenBao host port); ADR-M63 (OpenBao TLS); ADR-M35 (telemetry); QUESTIONS #363, #455, #576–#580 |
+| Related | D-08 O01 AC1–AC3, H07, A10; D-02 NFR-03; D-03 §10.1, §13; ADR-M25 §2.2, §2.4, §2.5; ADR-M80 §5 gap G-7; ADR-M19 (A11: no OpenBao host port); ADR-M63 (OpenBao TLS); ADR-M35 (telemetry); QUESTIONS #363, #455, #576–#580, #596–#599 |
 
 ## 1. Context
 
@@ -77,6 +77,14 @@ The `otel-collector` has no host port and is never a sandbox egress service (R08
 | PR 1 | This ADR; QUESTIONS #576–#580; the limit and capability probes of the fixture sandbox; the CI job `runner-rootless` | `pnpm test:runner` on a rootless Engine (CI job `runner-rootless`) and on the usual Engine (job `compose`); static: `workspace/ci-workflow.test.ts` |
 | PR 2 | The runner-host Compose file, the relays, the link overlay of the platform, a `doctor` check that warns when the runner shares the platform's Engine, the deploy README section, CHANGELOG | Static: the runner-host file has the same proxy and runner definitions as `docker-compose.yml` and no platform service; live `pnpm test:runner-split`: two Engines on one CI machine (the platform's and a rootless one), the runner healthy, egress through the relays, and no platform volume or network on the runner's Engine |
 
+### 2.7. Details of the split set-up (version 1.1, QUESTIONS #596–#599)
+
+- **The runner's definition stays the same.** The runner-host Compose file (`platform/deploy/runner-host/docker-compose.yml`) copies the definitions of `sdlc-runner`, `docker-socket-proxy` and `npm-proxy` from `docker-compose.yml`, including the runner's environment. `extra_hosts` maps `postgres`, `openbao`, `temporal` and `seaweedfs` to `SDLC_RUNNER_LINK_ADDR`, so the link ports equal the ports inside the network (5432, 8200, 7233, 8333). OpenBao's certificate already names `openbao`, so the verification is unchanged. The relays are the services `litellm` and `knowledge-db`, so their container names, and so `SDLC_RUNNER_EGRESS_SERVICES` and `SDLC_RUNNER_TOOL_SERVICES`, stay the same. knowledge-db uses link port 5433, because PostgreSQL already uses 5432. The only differences: `depends_on`, `networks`, `extra_hosts`, `build`, and the proxy's socket path (`SDLC_DOCKER_SOCKET`: a rootless Engine's socket is under `$XDG_RUNTIME_DIR`).
+- **The runner's OpenBao login (#596).** `SDLC_RUNNER_SOURCE_CIDR` in the platform's `.env` is the runner host's address as OpenBao sees it: the VM's WireGuard address, or the link address on the same server. `openbao:bootstrap configure` adds it to the `runner` role only (`secret_id_bound_cidrs`, `token_bound_cidrs`). On the same server, any host process that connects from the link address looks like the runner: an accepted limit.
+- **The runner's credentials (#597).** With `SDLC_RUNNER_DOCKER_HOST` set, `openbao:bootstrap runner-credentials` runs the `compose run` of `sdlc-runner` from the runner-host file against that Engine. The secret ID goes over standard input, never to a host file; the command runs in the owner's terminal (R035).
+- **OpenBao's CA certificate (#598).** The job `openbao-ca-init` copies the CA certificate from `SDLC_OPENBAO_CA_FILE` on the runner host into the runner host's `openbao-ca` volume at every start.
+- **Images on a VM (#599).** A registry relay (profile `vm`) listens on the VM's `127.0.0.1:5050` and forwards to the platform's registry on the link address. HTTP mode, `GET` and `HEAD` only. On the same server the rootless Engine reaches `127.0.0.1:5050` directly.
+
 ## 3. Rules and where they live
 
 - The runner's Engine holds no platform service and no platform data; the relays have one fixed target each; the link ports are published only on `SDLC_RUNNER_LINK_ADDR` (PR 2, with its rule line in `platform/deploy/CLAUDE.md` and a row in `design/RULES.md`).
@@ -105,3 +113,4 @@ The `otel-collector` has no host port and is never a sandbox egress service (R08
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 1.0 | 2026-10-24 | Claude (task O01), accepted by Harry | First version (QUESTIONS #576–#580) |
+| 1.1 | 2026-10-24 | Claude (task O01 PR 2), accepted by Harry | §2.7: the runner's OpenBao login, credentials and CA certificate on its own Engine, the registry relay (QUESTIONS #596–#599) |

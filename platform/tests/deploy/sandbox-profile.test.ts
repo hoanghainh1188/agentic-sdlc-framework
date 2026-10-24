@@ -232,9 +232,15 @@ describe('sdlc-runner service', () => {
   it('bootstrap.sh delivers the runner credentials; the image runs as node with git', () => {
     const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
     expect(bootstrap).toMatch(/^ {2}runner-credentials\) cmd_runner_credentials ;;$/m);
+    const credentials = /^cmd_runner_credentials\(\) \{[\s\S]*?^\}$/m.exec(bootstrap)?.[0] ?? '';
+    expect(credentials).toMatch(/^ {2}platform_credentials runner sdlc-runner sandbox$/m);
+    // O01 (QUESTIONS #597): to the runner host's own Engine with SDLC_RUNNER_DOCKER_HOST, through
+    // the runner-host Compose file; the secret ID still goes on stdin (deliver_approle).
+    expect(credentials).toContain("'' | ssh://?* | unix:///?*) ;;");
     expect(bootstrap).toMatch(
-      /^cmd_runner_credentials\(\) \{ platform_credentials runner sdlc-runner sandbox; \}$/m,
+      /DOCKER_HOST="\$delivery_host" SDLC_DOCKER_GID=0 docker compose \\\n\s+-f "\$deploy_dir\/runner-host\/docker-compose\.yml"/,
     );
+    expect(bootstrap).toMatch(/issue_secret_id "\$1" \|\n\s+service_compose --profile core/);
     // C06 2b: the write-only evidence identity; its keys reach `weed shell` on stdin only and its
     // output (which prints secrets) is discarded.
     expect(bootstrap).toMatch(
