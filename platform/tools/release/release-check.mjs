@@ -11,7 +11,7 @@
 //
 // `tag` checks: the tag is `vX.Y.Z`; the root package.json and PLATFORM_VERSION hold X.Y.Z; the
 // CHANGELOG has a section `## [X.Y.Z] - YYYY-MM-DD` with non-empty "Upgrade notes";
-// platform/deploy/images.lock holds X.Y.Z and the five images pinned by digest (the images are
+// platform/deploy/images.lock holds X.Y.Z and the six images pinned by digest (the images are
 // built before the tag, QUESTIONS #370). Every problem is printed (one line each, a code first),
 // then the exit code is 1. Prints nothing secret: it reads tracked files only.
 import fs from 'node:fs';
@@ -25,6 +25,8 @@ const LOCK_IMAGES = {
   SDLC_IMAGE_RUNNER: 'sdlc-runner',
   SDLC_IMAGE_OTEL_COLLECTOR: 'sdlc-otel-collector',
   SDLC_IMAGE_SANDBOX_NODE24: 'sandbox-node24',
+  // X04 PR 3b (ADR-M89): the first register tool.
+  SDLC_IMAGE_TOOL_PROJECT_DOCS: 'tool-project-docs',
 };
 // 0.1.0 is the first release: there was nothing to upgrade from (Harry, V12 plan).
 const NOTES_EXEMPT = new Set(['0.1.0']);
@@ -99,7 +101,7 @@ function changelogSection(text, version, errors) {
   return body.join('\n').trim() + '\n';
 }
 
-/** The five references of a lock file, or an empty list with the problems in `errors`. */
+/** The six references of a lock file, or an empty list with the problems in `errors`. */
 function checkLock(text, version, errors) {
   const entries = new Map();
   for (const raw of text.split('\n')) {

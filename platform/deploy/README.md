@@ -692,7 +692,7 @@ Never run `docker volume prune` or `docker system prune --volumes`: they delete 
 
 ## Verify the published images
 
-Each release publishes five images on GHCR (D-08 V04, `design/ADR-M66-ghcr-images.md`), for `linux/amd64` and `linux/arm64`: `sdlc-api`, `sdlc-worker`, `sdlc-runner`, `sdlc-otel-collector` and `sandbox-node24`, under `ghcr.io/hoanghainh1188/agentic-sdlc-framework/`. `platform/deploy/images.lock` pins each one by digest. They are built by `.github/workflows/release-images.yml` and scanned with Trivy before the push and again by digest after it (no CRITICAL finding), signed with cosign keyless (GitHub OIDC, Sigstore's public transparency log), and carry an SPDX SBOM and SLSA build provenance.
+Each release publishes six images on GHCR (D-08 V04, `design/ADR-M66-ghcr-images.md`), for `linux/amd64` and `linux/arm64`: `sdlc-api`, `sdlc-worker`, `sdlc-runner`, `sdlc-otel-collector`, `sandbox-node24` and, from v0.6.0, `tool-project-docs`, under `ghcr.io/hoanghainh1188/agentic-sdlc-framework/`. `platform/deploy/images.lock` pins each one by digest. They are built by `.github/workflows/release-images.yml` and scanned with Trivy before the push and again by digest after it (no CRITICAL finding), signed with cosign keyless (GitHub OIDC, Sigstore's public transparency log), and carry an SPDX SBOM and SLSA build provenance.
 
 Check an image before you deploy it; `pnpm images get <NAME>` prints its reference (`API`, `WORKER`, `RUNNER`, `OTEL_COLLECTOR`, `SANDBOX_NODE24`). With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3.x:
 

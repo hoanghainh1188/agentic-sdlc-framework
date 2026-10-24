@@ -33,7 +33,7 @@ The images are built **before** the tag (QUESTIONS #370), so the tag holds the d
 | Step | Who | What |
 |---|---|---|
 | 1. Version pull request | Claude, merged by the owner | `package.json` and `PLATFORM_VERSION` set to `X.Y.Z`; the CHANGELOG's `[Unreleased]` becomes `## [X.Y.Z] - YYYY-MM-DD` with a short summary and its Upgrade notes; CLAUDE.md "Current constraints" if the state changes |
-| 2. The images | 🧑 owner | Actions → **release-images** → Run workflow on `main`, version `X.Y.Z`, `push: true`. Builds, scans, pushes by digest, signs and attests the five images, and writes the artifact `images-lock-X.Y.Z` |
+| 2. The images | 🧑 owner | Actions → **release-images** → Run workflow on `main`, version `X.Y.Z`, `push: true`. Builds, scans, pushes by digest, signs and attests the six images, and writes the artifact `images-lock-X.Y.Z` |
 | 3. The lock file pull request | Claude, merged by the owner | `pnpm release:lock <run-id>` copies that run's `images.lock` over `platform/deploy/images.lock`; it refuses a run that is not a successful `release-images` run on `main` or a lock file for another version |
 | 4. The tag | 🧑 owner | Tag **the merge commit of step 3** and push it: `git tag vX.Y.Z <commit> && git push origin vX.Y.Z` |
 | 5. The release | `release.yml` | Runs the release gate, checks that the commit is on `main`, verifies every image's cosign signature and build provenance attestation (signer: `release-images.yml` on `main`), then creates the GitHub Release from the CHANGELOG section |
@@ -44,7 +44,7 @@ The release gate is `platform/tools/release/release-check.mjs`. Both tag workflo
 
 - the tag is not `vX.Y.Z`, or differs from `package.json` or `PLATFORM_VERSION`;
 - the CHANGELOG has no `## [X.Y.Z] - YYYY-MM-DD` section, or its Upgrade notes are missing or empty;
-- `platform/deploy/images.lock` is for another version, or does not pin all five images by digest on `ghcr.io/hoanghainh1188/agentic-sdlc-framework`.
+- `platform/deploy/images.lock` is for another version, or does not pin all six images by digest on `ghcr.io/hoanghainh1188/agentic-sdlc-framework`.
 
 Both tag workflows also verify every image with `platform/tools/release/verify-images.sh`: a cosign signature and a build provenance attestation whose certificate names exactly `release-images.yml` on `refs/heads/main`. npm never publishes a release whose images fail this check.
 
@@ -67,7 +67,7 @@ Try the gate before you tag: `node platform/tools/release/release-check.mjs tag 
 
 - The environment `npm` with the owner as required reviewer, tags `v*` only (GETTING-STARTED, "Publishing the CLI on npm").
 - A **tag ruleset** for `v*`: only the owner may create tags; nobody may update or delete them. The owner is the ruleset's only **bypass actor**, used for one case only: deleting a refused tag before any GitHub Release or npm publish of it (§3).
-- The five GHCR packages are public.
+- The six GHCR packages are public. A new image's package starts private: after its first push the owner sets it to public once (v0.6.0: `tool-project-docs`).
 - Never rename `npm-publish.yml` or the environment `npm`: npm's trusted publisher names both (ADR-M72 §2.3).
 
 ## Version history
@@ -77,3 +77,4 @@ Try the gate before you tag: `node platform/tools/release/release-check.mjs tag 
 | 1.0 | 2026-10-10 | Claude (task V12), approved by Harry | First version: the versioning policy, the release steps, `release.yml`, the release gate, `pnpm release:lock` |
 | 1.1 | 2026-10-12 | Claude, approved by Harry | §3: what the v0.2.0 release taught: cosign installed by `install-cosign.sh` with retries, `ENEEDAUTH` (an expired npm trusted publisher), npm's "validating" state (#308, #309) |
 | 1.2 | 2026-10-12 | Claude (docs review for v0.2.0), approved by Harry | §1: the versioning rules in general terms (a patch when nothing must be done, the next minor when an upgrade step is needed); the line "v0.2.0 when the milestone UX is done" removed |
+| 1.3 | 2026-10-24 | Claude, for the owner's approval | Six images: `tool-project-docs` (X04 PR 3b, ADR-M89) is in the release gate and in `verify-images.sh`, not only in `release-images.yml`; §4: a new package is set to public after its first push |

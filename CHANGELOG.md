@@ -31,6 +31,7 @@
 - Design of tools for agents (X02, ADR-M69, **proposed**): a tool register like the agent register, MCP tools in one hardened container per tool and run, a run gets a tool only when the plan, the agent, the register and the signed contract allow it, and one summary run event per tool and run. Proposed changes to D-03 §8–§9, D-05 and the threat model (ADR-M80 §4.2). Nothing is built yet: X04 builds the register and the first tool. New backlog task X14: a spike of open-source MCP gateways before X04 (QUESTIONS #520).
 
 ### Fixed
+- The release gate knew only five images. X04 PR 3b added `tool-project-docs` to `release-images.yml` and to `images.sh`, but `release-check.mjs` refused its key in the lock file (`lock_unknown`), and `verify-images.sh` expected exactly five images. So `pnpm release:lock`, `release.yml` and `npm-publish.yml` would have refused v0.6.0. The gate now pins the six images and `verify-images.sh` checks six (RELEASING.md 1.3).
 - The OpenCode agent tests in the CI job `sandbox image (node24)` failed now and then with `image_unavailable`. `build.sh --no-push` printed the first digest the Engine had for the image, which on the classic image store was an earlier push to another throw-away registry. That stale reference became the label of the OpenCode image, so the image was sometimes built again without a digest, and the runner refused its tag. `--no-push` now prints only a digest of the tag's own repository, and the tag otherwise; the tests then push to their own registry.
 
 ## [0.5.0] - 2026-10-21
