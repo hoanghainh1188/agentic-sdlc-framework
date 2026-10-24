@@ -2,7 +2,7 @@
 // ADR-M18). They live in code on purpose, so that configuration cannot change them. Changing a
 // floor needs an approved handbook change, then the design doc, then a backlog task (CLAUDE.md).
 //
-// Rule ids M1–M34 and their sources:
+// Rule ids M1–M35 and their sources:
 //   M1  G1 HITL at every tier ........................................ codes table §4 row G1
 //   M2  G7 HITL at every tier, Person B; Critical needs 2 approvers .. codes table §4 row G7
 //   M3  G8 production HITL, Person B; Critical needs 2 approvers ..... codes table §4 row G8, D-02 §4.2
@@ -49,6 +49,8 @@
 //   M33 the viewer role never creates or runs evaluation plans ....... ADR-M82, QUESTIONS.md #470
 //   M34 an evaluation counts for a recertification ≤ 90 days ......... Ch.20 §20.8, ADR-M86 §2.4,
 //                                                                      QUESTIONS.md #499
+//   M35 context condensing only with a known context size ........... ADR-M29 §2.10, D-08 X11,
+//                                                                      QUESTIONS.md #395, #553
 import type {
   AutonomyLevel,
   EscalationRoute,
@@ -600,6 +602,32 @@ const m27: Rule = (c) =>
       ]
     : [];
 
+/**
+ * Rule M35 (X11, ADR-M29 §2.10): condensing is never on when the model's context size is unknown,
+ * so `summarize` needs at least one size, and keeps fewer events at the start than its maximum.
+ */
+const m35: Rule = (c) => {
+  const condensing = c.run.context_condensing;
+  if (condensing.mode === 'off') return [];
+  return [
+    ...(Object.keys(condensing.model_context_tokens).length === 0
+      ? [
+          issue(
+            'config.rule.condensing_context_unknown',
+            'run.context_condensing.model_context_tokens',
+          ),
+        ]
+      : []),
+    ...(condensing.keep_first >= condensing.max_events
+      ? [
+          issue('config.rule.condensing_keep_first', 'run.context_condensing.keep_first', {
+            maximum: condensing.max_events - 1,
+          }),
+        ]
+      : []),
+  ];
+};
+
 const m28: Rule = (c) =>
   c.access.cost_read_roles.includes('viewer')
     ? [issue('config.rule.viewer_never_reads_cost', 'access.cost_read_roles')]
@@ -690,6 +718,7 @@ export const MANDATORY_RULES: Readonly<Record<string, Rule>> = {
   M32: m32,
   M33: m33,
   M34: m34,
+  M35: m35,
 };
 
 /** All mandatory-rule violations; each issue carries its rule id as the `rule` parameter. */

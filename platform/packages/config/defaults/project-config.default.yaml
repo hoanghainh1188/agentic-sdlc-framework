@@ -196,6 +196,17 @@ run:
   # severity; mandatory rule M26: the response level is pause or higher, so the intent stays frozen
   # until a person decides.
   kill_escalation: { severity: high, response_level: contain }
+  # X11 (ADR-M29 §2.10, QUESTIONS #551–#554). Context condensing of OpenHands work runs: `off`, or
+  # `summarize` (old events in the model's view are replaced by a summary that the run's own model
+  # writes, with the run's key and budget). Default off until Harry chooses from the measured numbers
+  # (ADR-M29 §2.10, QUESTIONS #553). `summarize` needs the context size of the run's model in
+  # `model_context_tokens` (rule M35); a run whose model has none runs without condensing.
+  # [Proposal] max_events and keep_first: OpenHands' values for small models.
+  context_condensing:
+    mode: off
+    max_events: 120
+    keep_first: 2
+    model_context_tokens: {}
 
 budget:
   # D-07 §6; D-02 FR-52; handbook Ch.3 §3.6: warning at 80 %, stop at 100 %.

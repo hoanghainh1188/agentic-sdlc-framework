@@ -14,6 +14,8 @@
 // - `max_iterations` from the contract (FR-32); `autotitle: false` (one model call fewer,
 //   ADR-M10 §4.1 item 1); OpenHands' own stuck detector on (fixed thresholds; the platform's
 //   loop check with the configured limit comes in C11).
+// - X11 (ADR-M29 §2.10): with `condensing`, an `LLMSummarizingCondenser` on the run's own model,
+//   URL and key, and the agent's `max_input_tokens`. Without it the body has no condenser at all.
 // - The first user message: `buildTaskMessage` of `@sdlc/agent-kit` (the spec, the plan, the
 //   rules of the run and the delimited blocks) with the OpenHands last rule (`FINISH_RULE`).
 import { buildTaskMessage, checkTask, toolsOf } from '@sdlc/agent-kit';
@@ -21,9 +23,12 @@ import {
   AgentError,
   TOOL_GATEWAY_KEY_HEADER,
   TOOL_GATEWAY_URL,
+  type AgentCondensing,
   type AgentTask,
   type RunContract,
 } from '@sdlc/contracts';
+
+import { condenserOf } from './condensing.js';
 
 export interface ConversationRequestInput {
   readonly contract: RunContract;
@@ -35,6 +40,8 @@ export interface ConversationRequestInput {
   readonly task: AgentTask;
   /** X04: the run's MCP gateway and the per-run key, revealed only here; absent without grants. */
   readonly tools?: { readonly url: string; readonly key: string };
+  /** X11: context condensing of the run; absent: no condenser. */
+  readonly condensing?: AgentCondensing;
 }
 
 /** The name of the run's MCP server in the agent's `mcp_config`. */
@@ -87,16 +94,24 @@ export function buildConversationRequest(input: ConversationRequestInput): Recor
   checkTask(contract, input.task);
   const tools = toolsOf(contract, { registerTools: true });
   const mcp = mcpConfigOf(input);
+  const llm = {
+    model: `litellm_proxy/${input.model}`,
+    baseUrl: input.llmBaseUrl,
+    virtualKey: input.virtualKey,
+  };
+  const { condensing } = input;
   return {
     agent: {
       kind: 'Agent',
       ...(mcp === undefined ? {} : { mcp_config: mcp }),
       llm: {
-        model: `litellm_proxy/${input.model}`,
-        base_url: input.llmBaseUrl,
-        api_key: input.virtualKey,
+        model: llm.model,
+        base_url: llm.baseUrl,
+        api_key: llm.virtualKey,
         usage_id: 'agent',
+        ...(condensing === undefined ? {} : { max_input_tokens: condensing.contextTokens }),
       },
+      ...(condensing === undefined ? {} : { condenser: condenserOf(condensing, llm) }),
       tools: tools.map((name) => ({ name, params: {} })),
       agent_context: {
         load_project_skills: true,

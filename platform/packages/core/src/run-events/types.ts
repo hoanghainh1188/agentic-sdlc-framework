@@ -127,8 +127,9 @@ export const RUN_EVENT_TYPES = {
   /**
    * The runner started the agent in the sandbox with the contract's caps (C05, ADR-M29). The model
    * name is not repeated here: model names may hold `/` or `@`; `cost_records` has the model.
+   * X11 (ADR-M29 §2.10): `condensing` is `off`, `summarize`, `context_unknown` or `unsupported`.
    */
-  agent_started: { max_iterations: 'count', max_duration_min: 'count' },
+  agent_started: { max_iterations: 'count', max_duration_min: 'count', condensing: 'code?' },
   /**
    * The runner interrupted the agent (C05): `reason` `max_duration`, `max_budget` (C07), `killed`,
    * `cancelled` (C11), `loop_detected` or `no_progress` (C11 PR 2); `method` `interrupt` (the agent
@@ -147,6 +148,8 @@ export const RUN_EVENT_TYPES = {
    * `max_budget`, `stuck`, `loop_detected`, `no_progress`, `agent_error`, `killed`. `commit`: `committed` (the runner committed what the agent left, QUESTIONS
    * #80) or `nothing`; left out when the runner did not commit. `head_sha` is the final `HEAD`;
    * `changed_files` counts the files changed since `base_sha` (the paths are client data).
+   * X11 (ADR-M29 §2.10, QUESTIONS #552): with condensing on, `condensations` and the
+   * `events_forgotten` they removed from the model's view; counts only, never a summary.
    */
   agent_finished: {
     outcome: 'code',
@@ -154,6 +157,8 @@ export const RUN_EVENT_TYPES = {
     changed_files: 'count?',
     head_sha: 'code?',
     commit: 'code?',
+    condensations: 'count?',
+    events_forgotten: 'count?',
   },
   /** An agent call failed (C05); `reason` is an `AgentErrorCode` or `model_unreachable`. */
   agent_failed: { reason: 'code' },

@@ -20,13 +20,24 @@
 //   [stub:selfconfig]  X03 (OpenCode only): the agent's shell calls its own OpenCode server with
 //                the password from its environment and raises its step cap (ADR-M68 §6 gap 1),
 //                then keeps working, one reply every 2 s: the adapter must fail the run
-//   [stub:context]  X07: opens README.md and the spec with file_editor `view` (OpenCode: `read`),
+//   [stub:reads]  X07: opens README.md and the spec with file_editor `view` (OpenCode: `read`),
 //                runs one terminal command, creates hello.txt, then finishes: the run's context
 //                snapshot lists the two files (hashed) and one unattributed call
 //   [stub:attack=<name>:<params>]  H01 (ADR-M80): a model that obeys every injection. It runs one
 //                attack from the table PROBES below in the real sandbox with the terminal tool
 //                and finishes. <params> is base64url JSON (targets, urls, ...). The probe prints
 //                `PROBE <kind> <subject> <result>` lines; the test reads them from the agent's log.
+//   [stub:condense]  X11: a different terminal command at every step, 14 steps, then finish. The
+//                step count is kept per script, across condensations (the view loses old steps and
+//                its first user message), so each test uses its own script
+//   [stub:condensecap]  X11: the same as condense, for the iteration cap test
+//   [stub:context]  X11: like condense, but a request with more than STUB_CONTEXT_MESSAGES
+//                messages gets the context-window error of an OpenAI-compatible server
+//   [stub:condenseloop]  X11: 8 different commands, then the same command forever, one reply
+//                every 2 s (loop detection after a condensation)
+// X11: a request without tools from OpenHands is the condenser's summary request; with
+// STUB_SUMMARY_CANARY set its reply holds the canary, so the test can check that no summary text
+// reaches the run events or the log the adapter hands over.
 // C09: with STUB_ADMIN_KEY set, the test registers and revokes run keys (`POST`/`DELETE
 // /test/keys`, like the Cost Controller at LiteLLM), and `GET /key/info` answers a key's spend
 // (STUB_PRICE_USD per call) and cap, as LiteLLM does for the runner's spend check. A revoked or
@@ -50,6 +61,13 @@ const PRICE = Number(process.env.STUB_PRICE_USD ?? '0.01');
 const NOTES_FILE = '/workspace/apps/web/src/features/products/NOTES.md';
 const LIVE_FILE = '/workspace/docs/live-test/RUNS.md';
 const LIVE_LINE = 'One live test run of the SDLC platform (fictional text, no meaning).';
+const SUMMARY_CANARY = process.env.STUB_SUMMARY_CANARY ?? '';
+const CONTEXT_MESSAGES = Number(process.env.STUB_CONTEXT_MESSAGES ?? '14');
+/** X11: tool calls so far per script, across condensations (one test per script). */
+const progress = new Map();
+const CONDENSE_STEPS = 14;
+const CONDENSE_LOOP_AFTER = 8;
+const CONDENSE_SCRIPTS = ['condense', 'condensecap', 'context', 'condenseloop'];
 
 /** C09: the run keys the test registered: key → { maxBudget, calls, revoked }. */
 const keys = new Map();
@@ -367,9 +385,18 @@ function attackStep(request, first, step) {
 function reply(request) {
   const first = textOf(request.messages.find((m) => m.role === 'user')?.content);
   const script =
-    ['loop', 'slow', 'repeat', 'silent', 'append', 'count', 'live', 'selfconfig', 'context'].find(
-      (name) => first.includes(`[stub:${name}]`),
-    ) ?? 'edit';
+    [
+      'loop',
+      'slow',
+      'repeat',
+      'silent',
+      'append',
+      'count',
+      'live',
+      'selfconfig',
+      'reads',
+      ...CONDENSE_SCRIPTS,
+    ].find((name) => first.includes(`[stub:${name}]`)) ?? 'edit';
   const step = request.messages.filter((m) => m.role === 'assistant').length;
   if (first.includes('[stub:attack=')) return attackStep(request, first, step);
   const delayMs =
@@ -385,6 +412,22 @@ function reply(request) {
       delayMs: step === 0 ? 0 : delayMs,
       toolCalls: [call(request, step, 'terminal', { command })],
     };
+  }
+  if (CONDENSE_SCRIPTS.includes(script)) {
+    const n = progress.get(script) ?? 0;
+    progress.set(script, n + 1);
+    if (script === 'condenseloop') {
+      const same = n >= CONDENSE_LOOP_AFTER;
+      const command = same ? 'echo x11-same' : `echo x11-${n}`;
+      return { delayMs: same ? 2_000 : 0, toolCalls: [call(request, n, 'terminal', { command })] };
+    }
+    if (n >= CONDENSE_STEPS) {
+      return {
+        delayMs: 0,
+        toolCalls: [call(request, n, 'finish', { message: 'X11 stub: done.' })],
+      };
+    }
+    return { delayMs: 0, toolCalls: [call(request, n, 'terminal', { command: `echo x11-${n}` })] };
   }
   if (script === 'count') {
     return {
@@ -402,7 +445,7 @@ function reply(request) {
     const command = `mkdir -p ${dir} && printf '${LIVE_LINE}\\n' >> ${LIVE_FILE}`;
     return { delayMs, toolCalls: [call(request, step, 'terminal', { command })] };
   }
-  if (script === 'context' && step < 3) {
+  if (script === 'reads' && step < 3) {
     const steps = [
       call(request, step, 'file_editor', { command: 'view', path: '/workspace/README.md' }),
       call(request, step, 'file_editor', {
@@ -413,7 +456,7 @@ function reply(request) {
     ];
     return { delayMs, toolCalls: [steps[step]] };
   }
-  if (script === 'context' && step === 3) {
+  if (script === 'reads' && step === 3) {
     return {
       delayMs,
       toolCalls: [
@@ -487,9 +530,28 @@ const server = http.createServer((req, res) => {
     calls += 1;
     const request = JSON.parse(raw || '{}');
     check(request);
-    // A request without tools (OpenCode's title or summary) gets a plain text reply.
+    // A request without tools (OpenCode's title or summary, OpenHands' condenser) gets a plain
+    // text reply.
     const noTools = (request.tools ?? []).length === 0;
-    const planned = noTools ? { delayMs: 0, toolCalls: [{ text: 'Stub' }] } : reply(request);
+    const firstUser = textOf(request.messages?.find((m) => m.role === 'user')?.content);
+    if (
+      !noTools &&
+      firstUser.includes('[stub:context]') &&
+      request.messages.length > CONTEXT_MESSAGES
+    ) {
+      console.log('stub:refused:context');
+      return send(res, 400, {
+        error: {
+          message:
+            "This model's maximum context length is 8192 tokens. However, your messages resulted in 9000 tokens. Please reduce the length of the messages.",
+          type: 'invalid_request_error',
+          param: 'messages',
+          code: 'context_length_exceeded',
+        },
+      });
+    }
+    const summary = SUMMARY_CANARY === '' ? 'Stub' : `Stub summary ${SUMMARY_CANARY}`;
+    const planned = noTools ? { delayMs: 0, toolCalls: [{ text: summary }] } : reply(request);
     const { delayMs } = planned;
     const text = planned.toolCalls.find((c) => c.text !== undefined)?.text;
     const toolCalls = planned.toolCalls.filter((c) => c.text === undefined);

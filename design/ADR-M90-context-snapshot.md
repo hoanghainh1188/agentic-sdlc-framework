@@ -63,7 +63,7 @@ One JSON file per run, canonical (RFC 8785), stored with the run's diff credenti
 
 - Unit: the paths (`platform/tests/agent/file-reads.test.ts`), both adapters' `collectOutputs`, the snapshot and its recording (`platform/tests/runner/context-snapshot.test.ts`), the event type, the pack (`platform/tests/evidence/pack.test.ts`).
 - PostgreSQL (`pnpm test:db`): a run with a `knowledge_read` event and file reads gets one snapshot, the database accepts the kind and the event, and the Evidence Pack lists it (`platform/tests/integration/db/context-snapshot.test.ts`).
-- `pnpm test:agent` (both adapters): `[stub:context]` makes the real agent open two files and run one shell command; the snapshot lists the two path hashes and one unattributed call, and no path reaches a run event or a row.
+- `pnpm test:agent` (both adapters): `[stub:reads]` makes the real agent open two files and run one shell command; the snapshot lists the two path hashes and one unattributed call, and no path reaches a run event or a row.
 - `knowledge_read` from a real tool is proven by the X04 live test (`platform/tests/integration/runner/tool-docs.test.ts`). One live run with both a tool and file reads can come later in a pilot test.
 
 ## Version history

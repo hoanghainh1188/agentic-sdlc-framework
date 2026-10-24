@@ -1130,4 +1130,142 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
       stop_reason: 'killed',
     });
   });
+
+  // X11 (ADR-M29 §2.10, QUESTIONS #551–#554): context condensing from the project configuration.
+  const setCondensing = async (s: Seeded, sizes: string) => {
+    const yaml = `run:\n  context_condensing:\n    mode: summarize\n    max_events: 40\n    keep_first: 3\n    model_context_tokens:\n${sizes}`;
+    const loaded = loadProjectConfig(yaml);
+    if (!loaded.ok) throw new Error('test configuration refused');
+    await s.scope.projectConfigs.save(s.envelope.contract.project_id, {
+      configYaml: yaml,
+      configHash: loaded.configHash,
+      updatedBy: null,
+      expectedVersion: 0,
+    });
+  };
+
+  it('X11: condensing on gives the agent the configured condenser and records the counts', async () => {
+    const s = await seed();
+    await setCondensing(s, '      stub-model: 32768\n');
+    const agent = new FakeAgent();
+    agent.states = [
+      { state: 'running', iterations: 2, condensations: 1, eventsForgotten: 30 },
+      { state: 'finished', iterations: 3, condensations: 2, eventsForgotten: 55 },
+    ];
+    const result = await driveAgent(
+      deps(agent, () => 0),
+      request(s),
+    );
+    expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
+    expect(agent.started?.condensing).toEqual({
+      maxEvents: 40,
+      keepFirst: 3,
+      contextTokens: 32768,
+    });
+    expect(await events(s)).toEqual([
+      ['agent_started', { max_iterations: 30, max_duration_min: 60, condensing: 'summarize' }],
+      [
+        'agent_finished',
+        {
+          outcome: 'finished',
+          iterations: 3,
+          changed_files: 2,
+          head_sha: HEAD,
+          commit: 'committed',
+          condensations: 2,
+          events_forgotten: 55,
+        },
+      ],
+    ]);
+    await noClientData(s);
+  });
+
+  it('X11: a model without a context size runs without condensing (rule M35)', async () => {
+    const s = await seed();
+    await setCondensing(s, '      other-model: 8192\n');
+    const agent = new FakeAgent();
+    await driveAgent(
+      deps(agent, () => 0),
+      request(s),
+    );
+    expect(agent.started).toBeDefined();
+    expect(agent.started).not.toHaveProperty('condensing');
+    const [started, finished] = await events(s);
+    expect(started).toEqual([
+      'agent_started',
+      { max_iterations: 30, max_duration_min: 60, condensing: 'context_unknown' },
+    ]);
+    expect(finished?.[1]).not.toHaveProperty('condensations');
+  });
+
+  it('X11: without condensing the events are those before X11', async () => {
+    const s = await seed();
+    const agent = new FakeAgent();
+    await driveAgent(
+      deps(agent, () => 0),
+      request(s),
+    );
+    expect(agent.started).not.toHaveProperty('condensing');
+    expect((await events(s))[0]).toEqual([
+      'agent_started',
+      { max_iterations: 30, max_duration_min: 60 },
+    ]);
+  });
+
+  it('X11 AC4: loop detection still stops a run with condensing on; the counts are recorded', async () => {
+    const s = await seed();
+    await setCondensing(s, '      stub-model: 32768\n');
+    const agent = new FakeAgent();
+    agent.states = [1, 2, 3, 4].map((identicalCalls) => ({
+      state: 'running' as const,
+      iterations: identicalCalls,
+      identicalCalls,
+      condensations: 1,
+      eventsForgotten: 12,
+    }));
+    const result = await driveAgent(
+      deps(agent, () => 0),
+      request(s),
+    );
+    expect(result).toMatchObject({ outcome: 'loop_detected', status: 'stopped_stalled' });
+    expect(await loopEvents(s)).toEqual([
+      ['loop_detected', { identical_calls: 4, threshold: 3, idle_minutes: 0 }],
+      ['agent_stopped', { reason: 'loop_detected', method: 'interrupt' }],
+      [
+        'agent_finished',
+        expect.objectContaining({
+          outcome: 'loop_detected',
+          condensations: 1,
+          events_forgotten: 12,
+        }),
+      ],
+    ]);
+    await noClientData(s);
+  });
+
+  it('X11 AC4: a kill still ends a run with condensing on, with the counts', async () => {
+    const s = await seed();
+    await setCondensing(s, '      stub-model: 32768\n');
+    const agent = new FakeAgent();
+    agent.states = [{ state: 'running', iterations: 2, condensations: 3, eventsForgotten: 70 }];
+    const original = agent.getStatus.bind(agent);
+    agent.getStatus = async () => {
+      const status = await original();
+      await s.scope.runs.transition(s.envelope.contract.run_id, {
+        from: ['running'],
+        to: 'stopping',
+        now: new Date(),
+      });
+      return status;
+    };
+    const result = await driveAgent(
+      deps(agent, () => 0),
+      request(s),
+    );
+    expect(result).toMatchObject({ outcome: 'killed', status: 'stopped_killed' });
+    expect((await events(s)).at(-1)).toEqual([
+      'agent_finished',
+      { outcome: 'killed', iterations: 4, condensations: 3, events_forgotten: 70 },
+    ]);
+  });
 });

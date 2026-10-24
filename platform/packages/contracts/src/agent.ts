@@ -52,6 +52,48 @@ export function sandboxImageFor(
   return sandbox.images?.[adapter];
 }
 
+/**
+ * X11 (ADR-M29 §2.10): context condensing of one run, chosen by the runner from the project's
+ * `run.context_condensing`. Only the OpenHands adapter condenses; summaries are written by the
+ * run's own model with the run's key, and stay client data (never in events, logs or tables).
+ */
+export interface AgentCondensing {
+  /** Events in the model's view before a condensation. */
+  readonly maxEvents: number;
+  /** Events kept at the start of the view (the task message). */
+  readonly keepFirst: number;
+  /** Context size of the run's model, in tokens. */
+  readonly contextTokens: number;
+}
+
+/**
+ * How a run condenses its context (run event `agent_started`, field `condensing`):
+ * - `off`: the project does not condense;
+ * - `summarize`: the agent gets a condenser;
+ * - `context_unknown`: the project condenses, but the run's model has no context size (rule M35);
+ * - `unsupported`: the run's adapter does not take the platform's condenser (OpenCode).
+ */
+export const CONDENSING_STATES = ['off', 'summarize', 'context_unknown', 'unsupported'] as const;
+export type CondensingState = (typeof CONDENSING_STATES)[number];
+
+/** The condensing of a run of `adapter` with `model` under the project's configuration. */
+export function condensingFor(
+  config: ProjectConfig['run']['context_condensing'],
+  adapter: AgentAdapterCode,
+  model: string,
+): { readonly state: CondensingState; readonly condensing?: AgentCondensing } {
+  if (config.mode === 'off') return { state: 'off' };
+  if (adapter !== 'openhands') return { state: 'unsupported' };
+  const contextTokens = Object.hasOwn(config.model_context_tokens, model)
+    ? config.model_context_tokens[model]
+    : undefined;
+  if (contextTokens === undefined) return { state: 'context_unknown' };
+  return {
+    state: 'summarize',
+    condensing: { maxEvents: config.max_events, keepFirst: config.keep_first, contextTokens },
+  };
+}
+
 /** Where the runner reaches the agent, and the per-run key that authenticates the runner. */
 export interface AgentEndpoint {
   /** Base URL of the Agent Server as the runner sees it, for example `http://sdlc-sandbox-<id>:8000`. */
@@ -138,6 +180,8 @@ export interface StartAgentRun {
    * reaches every register tool there with the per-run key; absent: no register tool.
    */
   readonly tools?: AgentToolAccess;
+  /** X11 (ADR-M29 §2.10): context condensing; absent: none (the agent's view is never cut). */
+  readonly condensing?: AgentCondensing;
 }
 
 /** The run's MCP gateway for the agent (X04, ADR-M87 §5). */
@@ -174,7 +218,8 @@ export interface AgentRunStatus {
   readonly iterations: number;
   /**
    * Loop detection (C11, D-02 FR-35, ADR-M42 §2.7): the number of events of any kind in the
-   * agent's log. The runner sees no progress when it stops growing for the configured window.
+   * agent's log, except the events of a context condensing (X11), which are not progress. The
+   * runner sees no progress when it stops growing for the configured window.
    */
   readonly events: number;
   /**
@@ -182,6 +227,10 @@ export interface AgentRunStatus {
    * the canonical arguments. Counts only; the arguments are client data.
    */
   readonly identicalCalls: number;
+  /** X11: condensations so far (counts only; the summaries are client data). */
+  readonly condensations?: number;
+  /** X11: events removed from the model's view by those condensations (they stay in the log). */
+  readonly eventsForgotten?: number;
 }
 
 /** What `commitWork` found and did (QUESTIONS #80). */

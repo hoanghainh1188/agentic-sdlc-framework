@@ -16,6 +16,15 @@ export {
   type ClientOptions,
   type ExecutionStatus,
 } from './client.js';
+export {
+  CONDENSER_USAGE_ID,
+  CONDENSING_EVENTS,
+  condenserOf,
+  condensingCounts,
+  CONTEXT_SHARE,
+  progressEvents,
+  withoutSummaries,
+} from './condensing.js';
 export { toolCallKey, trailingIdenticalCalls } from './loop.js';
 export { fileReads } from './reads.js';
 export {
