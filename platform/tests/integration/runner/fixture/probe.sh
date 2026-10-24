@@ -11,6 +11,15 @@ echo "probe:default_route:${route:-none}"
 if touch /rootfs-write-test 2>/dev/null; then echo "probe:rootfs:writable"; else echo "probe:rootfs:readonly"; fi
 if touch /workspace/.write-test 2>/dev/null; then echo "probe:workspace:writable"; else echo "probe:workspace:readonly"; fi
 echo "probe:uid:$(id -u)"
+# O01 (ADR-M91): the limits and the dropped capabilities as the kernel applies them, so a Docker
+# Engine that accepts a limit but cannot enforce it (rootless Docker without cgroup delegation)
+# fails the test. cgroup v2 files of the container's own cgroup; "none" when a file is missing.
+for limit in memory.max memory.swap.max pids.max cpu.max; do
+  value=$(tr ' ' '/' < "/sys/fs/cgroup/$limit" 2>/dev/null)
+  echo "probe:$(echo "$limit" | tr . _):${value:-none}"
+done
+echo "probe:cap_eff:$(awk '/^CapEff:/ {print $2}' /proc/self/status)"
+echo "probe:no_new_privs:$(awk '/^NoNewPrivs:/ {print $2}' /proc/self/status)"
 branch=$(sed 's#^ref: refs/heads/##' /workspace/.git/HEAD 2>/dev/null)
 echo "probe:branch:${branch:-none}"
 if grep -qiE 'extraheader|authorization' /workspace/.git/config 2>/dev/null; then echo "probe:git_auth:present"; else echo "probe:git_auth:absent"; fi

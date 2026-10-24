@@ -292,6 +292,27 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(job('ci-ok').needs).toContain('trial-up');
   });
 
+  it('O01: the runner tests also run on a rootless Engine from pinned archives, like compose (ADR-M91 §2.4)', () => {
+    const rootless = job('runner-rootless');
+    expect(rootless.needs).toEqual(['scan', 'checks']);
+    expect(rootless.if).toBe("needs.scan.outputs.run_compose == 'true'");
+    for (const pin of ['DOCKER_STATIC_SHA256', 'DOCKER_ROOTLESS_EXTRAS_SHA256'])
+      expect(ciEnv[pin]).toMatch(/^[0-9a-f]{64}$/);
+    expect(ciEnv.DOCKER_ROOTLESS_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    const text = runText('runner-rootless');
+    expect(text).toContain('$DOCKER_STATIC_SHA256  $RUNNER_TEMP/docker.tgz" | sha256sum -c -');
+    expect(text).toContain(
+      '$DOCKER_ROOTLESS_EXTRAS_SHA256  $RUNNER_TEMP/extras.tgz" | sha256sum -c -',
+    );
+    // The Engine starts before the tests, and the tests are the same as in the compose job.
+    const order = runs('runner-rootless');
+    const start = order.findIndex((r) => r.includes('test-rootless-docker.sh'));
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf('pnpm test:runner')).toBeGreaterThan(start);
+    expect(runs('compose')).toContain('pnpm test:runner');
+    expect(job('ci-ok').needs).toContain('runner-rootless');
+  });
+
   it('heavy jobs run on the weekly schedule and on demand, never on the daily run or a draft (ADR-M25 §2.9)', () => {
     const scan = runText('scan');
     expect(scan).toMatch(/workflow_dispatch \]; then\s*all=true/);

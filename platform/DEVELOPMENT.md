@@ -40,7 +40,7 @@ Then run the suites of section 2 that cover the code you changed (section 5 list
 | `pnpm test:litellm` | LiteLLM with keys from OpenBao (profile `models`) and the Cost Controller, stub model; L01: a second stub in place of vLLM on the network `models` (a `client_restricted` intent, the `self_hosted` cost and budget) | Docker | CI job `compose` |
 | `pnpm test:api` | The `sdlc-api` container with OpenBao | Docker | CI job `compose` |
 | `pnpm test:access` | Team access through the TLS proxy (V09), ports +36000; the api-port check runs on Linux only | Docker | CI job `compose` |
-| `pnpm test:runner` | Runner on the local Docker Engine and a throw-away PostgreSQL: egress and hardening probed inside fixture sandboxes, provisioning, clean-up, clean-up after a restart, the kill measurement | Docker | CI job `compose` |
+| `pnpm test:runner` | Runner on the local Docker Engine and a throw-away PostgreSQL: egress and hardening probed inside fixture sandboxes (the limits and capabilities as the kernel applies them), provisioning, clean-up, clean-up after a restart, the kill measurement | Docker | CI jobs `compose` and `runner-rootless` (a rootless Engine, ADR-M91) |
 | `pnpm test:runner-compose` | The `sdlc-runner` container in the profile `sandbox` (throw-away OpenBao keys) | Docker | CI job `compose` |
 | `pnpm test:observability` | One model call → a Langfuse trace with the seven labels; a platform span through the collector; no host port; the Langfuse purge (E08 AC4). Ports +27000, stub model | Docker | Developer machine |
 | `pnpm test:sandbox-image` | The `node24` and `node24-opencode` sandbox images, hardened, with the real Verdaccio. `SDLC_SANDBOX_IMAGE` and `SDLC_SANDBOX_IMAGE_OPENCODE` use built images | Docker, internet | CI job `sandbox-image` |
@@ -98,6 +98,7 @@ The test App is `harryforge-sdlc-dev` (Client ID `Iv23liQtMQBwNyVYZuJt`), instal
 |---|---|
 | `integration/throwaway-compose.ts` | Throw-away Compose projects; `baoClientArgs` and `openbaoCaMount` reach OpenBao over TLS; from the host network use `--add-host openbao:<ip>` |
 | `platform/deploy/scripts/test-db.sh` | The throw-away PostgreSQL behind `test:db`, `test:runner`, `test:agent` |
+| `platform/deploy/scripts/test-rootless-docker.sh` | CI only (job `runner-rootless`): a rootless Docker Engine next to the machine's own one, with the server's steps (subordinate IDs, AppArmor profile for RootlessKit, cgroup delegation, systemd user service); sets `DOCKER_HOST` (ADR-M91 §2.4) |
 | `platform/deploy/scripts/temporal-test-server.sh` | The Temporal test server: the sdk-java release pinned by version and SHA-256, the cached archive checked again on every run; never the SDK's own download |
 | `integration/g4-harness.ts` | Shared set-up for G4 and the run after it |
 | `integration/g7-world.ts` | Shared world for the G7 request-for-changes tests |
@@ -175,7 +176,7 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 | LiteLLM and the Cost Controller | C03; ADR-M24 | unit: `cost/litellm-gateway.test.ts`; `pnpm test:litellm` (also: revoke by run; the key ID is not a key) |
 | Self-hosted model (vLLM, profile `models-local`) | L01; ADR-M71 | static: `deploy/models-local-static.test.ts`; `pnpm test:litellm` (L01 AC4, a stub in place of vLLM); owner only: `pnpm test:agent-api` with `SDLC_AGENT_API_MODEL` and `SDLC_AGENT_API_DATA_CLASS` (section 3). vLLM itself needs a GPU: never in CI |
 | Scheduled spend sync | C12; ADR-M24 §2.5 | unit: `worker/cost-sync-loop.test.ts`, `worker/settings.test.ts`; db: `cost-sync.test.ts` |
-| Runner and sandboxes | C04; ADR-M25 | unit: `deploy/sandbox-profile.test.ts` (the socket proxy allowlist equals `ALLOWED_ENDPOINTS`); `pnpm test:runner`, `pnpm test:runner-compose`, `pnpm test:sandbox-image` |
+| Runner and sandboxes | C04, O01; ADR-M25, ADR-M91 | unit: `deploy/sandbox-profile.test.ts` (the socket proxy allowlist equals `ALLOWED_ENDPOINTS`), `workspace/ci-workflow.test.ts` (job `runner-rootless`); `pnpm test:runner` (also on a rootless Engine), `pnpm test:runner-compose`, `pnpm test:sandbox-image` |
 | Threat model of a run, attack tests | H01; ADR-M80 | unit: `attack/prompt-injection.test.ts`, `attack/comment-commands.test.ts`; `pnpm test:attack` |
 | OpenHands adapter | C05; ADR-M29 | unit; `pnpm test:agent`; `pnpm test:agent-real` (section 3) |
 | OpenCode adapter, `@sdlc/agent-kit`, image `node24-opencode` | X03; ADR-M68, ADR-M88 | unit: `agent/opencode-adapter.test.ts`, `agent/opencode-request.test.ts`, `agent/agent-kit.test.ts`, `deploy/sandbox-opencode.test.ts`; `SDLC_AGENT_ADAPTER=opencode pnpm test:agent` (`[stub:selfconfig]`: the agent raises its own cap, the run fails `agent_config_changed`); `pnpm test:sandbox-image` (`node24-opencode.test.ts`); CI step: `node platform/sandbox-images/node24-opencode/licences.mjs` |

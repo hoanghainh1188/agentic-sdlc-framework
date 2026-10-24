@@ -145,6 +145,9 @@ describe.skipIf(!liveEnabled)('C04 live: sandbox egress and hardening on Docker'
   it('confines each sandbox to LiteLLM and the package proxy (AC1, AC4), then removes it (AC5)', async () => {
     // Positive control: from an ordinary (non-internal) network, the host listener IS reachable,
     // so "blocked" below means the sandbox network stops it, not that the listener is missing.
+    // A rootful Engine reaches it through the bridge gateway. A rootless Engine (O01, ADR-M91)
+    // keeps its bridges in RootlessKit's own namespace, and `--network host` is the real host:
+    // there it is reachable on a host address, through RootlessKit's outbound network.
     expect(hostAddresses).toContain('127.0.0.1');
     const platformGateway = docker(
       'network',
@@ -153,18 +156,20 @@ describe.skipIf(!liveEnabled)('C04 live: sandbox egress and hardening on Docker'
       '--format',
       '{{(index .IPAM.Config 0).Gateway}}',
     );
-    expect(
-      docker(
-        'run',
-        '--rm',
-        '--network',
-        names.platformNet,
-        BUSYBOX,
-        'sh',
-        '-c',
-        `nc -z -w 3 ${platformGateway} ${String(HOST_NS_PORT)} && echo open || echo blocked`,
-      ),
-    ).toBe('open');
+    const reachable = docker(
+      'run',
+      '--rm',
+      '--network',
+      names.platformNet,
+      BUSYBOX,
+      'sh',
+      '-c',
+      [platformGateway, ...hostAddresses]
+        .map((ip) => `nc -z -w 3 ${ip} ${String(HOST_NS_PORT)} && echo open:${ip}`)
+        .concat('true')
+        .join('; '),
+    );
+    expect(reachable).toContain('open:');
 
     // Run B first: run A tries to reach it.
     const b = await createSandbox(client, settings, {
@@ -229,6 +234,14 @@ describe.skipIf(!liveEnabled)('C04 live: sandbox egress and hardening on Docker'
       rootfs: 'readonly',
       workspace: 'writable',
       uid: '10001',
+      // O01 (ADR-M91): the limits are enforced by the kernel, also on rootless Docker (256 MiB,
+      // swap = memory so no extra swap, 512 processes, 1.5 CPUs), and no capability is left.
+      memory_max: String(256 * 1024 * 1024),
+      memory_swap_max: '0',
+      pids_max: '512',
+      cpu_max: '150000/100000',
+      cap_eff: '0000000000000000',
+      no_new_privs: '1',
       branch: 'none', // no repository in this test (see provision.test.ts)
       git_auth: 'absent',
       readme: 'none',
