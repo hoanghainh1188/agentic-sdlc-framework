@@ -7,6 +7,10 @@
 //   1. instruction files: the run added, changed or removed a file the agent reads as
 //      instructions (QUESTIONS #126, #132)       → `fail instructions_unpinned`, paused at G5,
 //      `security` escalation;
+//   1b. secrets (H04, ADR-M93 §2.4): the runner's scan found a secret in the run's added lines
+//      → `fail secret_in_diff`, paused at G5, `security` escalation; the scan failed or was not
+//      recorded (QUESTIONS #587, #590) → `fail secret_scan_failed`, paused, `technical` escalation.
+//      Nothing is pushed before G5 passes, so no pull request carries the secret;
 //   2. scope: a changed path outside the plan, or a run stopped for its scope (N1, QUESTIONS #131)
 //      → `fail out_of_scope`, back to `in_gate G3`: G3 is HITL from then on and needs a new plan;
 //      no escalation (the G3 approver decides);
@@ -75,6 +79,8 @@ export interface G5Breach {
   readonly reason: GateReasonCode;
   readonly check:
     | 'instructions_changed'
+    | 'secret_found'
+    | 'secret_scan_failed'
     | 'out_of_scope'
     | 'max_budget'
     | 'spend_at_stop'
@@ -104,6 +110,20 @@ export function g5Breach(facts: G5Facts, config: ValidatedProjectConfig): G5Brea
       reason: 'instructions_unpinned',
       check: 'instructions_changed',
       escalation: { route: 'security', trigger: 'risky_action' },
+    };
+  }
+  if (facts.secrets?.result === 'found') {
+    return {
+      reason: 'secret_in_diff',
+      check: 'secret_found',
+      escalation: { route: 'security', trigger: 'risky_action' },
+    };
+  }
+  if (facts.secrets === null || facts.secrets.result !== 'clean') {
+    return {
+      reason: 'secret_scan_failed',
+      check: 'secret_scan_failed',
+      escalation: { route: 'technical', trigger: 'unusual_behaviour' },
     };
   }
   if (changes.outOfScope > 0 || run.status === 'stopped_scope') {

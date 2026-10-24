@@ -196,10 +196,21 @@ export {
 } from './workspace/export.js';
 export {
   checkChangedPaths,
+  secretsScannedPayload,
   storeChanges,
   type ChangesDeps,
   type CheckedChanges,
 } from './workspace/changes.js';
+export {
+  addedLines,
+  configExtendsFile,
+  reportRuleIds,
+  ruleCodes,
+  scanDiffForSecrets,
+  scanFilePath,
+  type SecretScan,
+  type SecretScanCause,
+} from './workspace/secrets.js';
 export { IgnoreChecker } from './workspace/ignore.js';
 export {
   planFileReader,

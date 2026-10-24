@@ -54,6 +54,8 @@ type RunEnd =
 interface Changes {
   readonly outOfScope?: number;
   readonly instructionFiles?: number;
+  /** H04: the runner's secret scan; `none` records no `secrets_scanned` event. */
+  readonly secrets?: 'clean' | 'found' | 'failed' | 'none';
 }
 
 describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
@@ -113,6 +115,16 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
       instruction_files: changes.instructionFiles ?? 0,
       paths_sha256: PATHS,
     });
+    const secrets = changes.secrets ?? 'clean';
+    if (secrets !== 'none') {
+      await t.f.scope.runEvents.append(runId, 'secrets_scanned', {
+        result: secrets,
+        findings: secrets === 'found' ? 2 : 0,
+        rules: 'built_in',
+        ...(secrets === 'found' ? { rule_ids: 'aws-access-token:private-key' } : {}),
+        ...(secrets === 'failed' ? { cause: 'scanner_missing' } : {}),
+      });
+    }
     await t.f.scope.runs.transition(runId, {
       from: ['running'],
       to: end.status,
@@ -224,6 +236,41 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
       await t.settleRuns(intent);
       expect(await g5(intent)).toHaveLength(1);
     });
+
+    it('H04 AC2: a secret in the diff: fail secret_in_diff, paused, a security escalation; never G6', async () => {
+      const intent = await atG4(t, 'medium');
+      // Also out of scope: the secret is checked before the scope.
+      await runToG5(intent, { status: 'succeeded' }, { secrets: 'found', outOfScope: 1 });
+      expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'g5_review' });
+      expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G5' });
+      expect(await g5(intent)).toEqual([['fail', 'secret_in_diff', 'HOTL']]);
+      expect(await checks(intent)).toEqual(['secret_found']);
+      expect(await g5Escalation(intent)).toMatchObject({
+        route: 'security',
+        trigger: 'risky_action',
+        packet: { subject_kind: 'g5_input', gate: 'G5', reason_code: 'secret_in_diff' },
+      });
+      // A person decides; nothing moves on by itself (G6 publishes the branch: never reached).
+      await t.settleRuns(intent);
+      expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G5' });
+      expect(await g5(intent)).toHaveLength(1);
+    });
+
+    it.each(['failed', 'none'] as const)(
+      'H04 (QUESTIONS #587, #590): a scan %s: fail secret_scan_failed, paused, a technical escalation',
+      async (secrets) => {
+        const intent = await atG4(t, 'medium');
+        await runToG5(intent, { status: 'succeeded' }, { secrets });
+        expect(await t.settleRuns(intent)).toEqual({ outcome: 'waiting', reason: 'g5_review' });
+        expect(await reload(intent)).toMatchObject({ status: 'paused', current_gate: 'G5' });
+        expect(await g5(intent)).toEqual([['fail', 'secret_scan_failed', 'HOTL']]);
+        expect(await checks(intent)).toEqual(['secret_scan_failed']);
+        expect(await g5Escalation(intent)).toMatchObject({
+          route: 'technical',
+          packet: { reason_code: 'secret_scan_failed' },
+        });
+      },
+    );
 
     it.each([
       [

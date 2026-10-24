@@ -33,6 +33,8 @@ export const EVIDENCE_PACK_SCHEMA_VERSION = 1;
 /** Run events copied into the pack (their payloads are coded values only, D-05 §6.4). */
 export const PACK_RUN_EVENTS = [
   'changes_checked',
+  // H04 (ADR-M93 §2.3): the secret scan of the run's added lines (codes and counts).
+  'secrets_scanned',
   'branch_pushed',
   'ci_checked',
   'g7_checked',
