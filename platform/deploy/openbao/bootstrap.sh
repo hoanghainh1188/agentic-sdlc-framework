@@ -408,13 +408,12 @@ cmd_litellm_credentials() {
 # ensure_service_image <Compose service> <profile>
 # The Compose project a service's credentials go to: the platform's, or the runner host's when
 # runner-credentials runs with SDLC_RUNNER_DOCKER_HOST (O01, ADR-M91 §2.7, QUESTIONS #597). Then
-# the same `compose run` reaches the runner's own Engine (ssh:// or its socket); the secret ID still
-# travels on stdin only. The runner's Engine is rootless (ADR-M91 §2.4): its socket group inside the
-# Engine is 0, as in runner-host/.env.example, so the volumes it creates match the runner host's.
+# the same `compose run`, of the job runner-approle-init, reaches the runner's own Engine (ssh:// or
+# its socket); the secret ID still travels on stdin only.
 delivery_host=""
 service_compose() {
   if [ -n "$delivery_host" ]; then
-    DOCKER_HOST="$delivery_host" SDLC_DOCKER_GID=0 docker compose \
+    DOCKER_HOST="$delivery_host" docker compose \
       -f "$deploy_dir/runner-host/docker-compose.yml" --env-file "$env_file" "$@"
   else
     compose "$@"
@@ -428,6 +427,10 @@ ensure_service_image() {
   image="$(service_compose --profile core --profile "$2" config --images "$1" 2>/dev/null | head -n 1)"
   [ -n "$image" ] || fail "no image for the Compose service $1"
   service_docker image inspect "$image" >/dev/null 2>&1 && return 0
+  if [ -n "$delivery_host" ]; then
+    service_compose --profile "$2" pull "$1" >&2 || fail "could not pull the image of $1"
+    return 0
+  fi
   say "building the image of $1 (first run on this machine; a few minutes)"
   service_compose --profile core --profile "$2" build "$1" >&2 ||
     fail "could not build the image of $1; run: docker compose … build $1"
@@ -460,7 +463,9 @@ deliver_approle() {
 # The database password goes from the env file to the openbao container on stdin, after the admin
 # token; the AppRole credentials go into the service's volume (deliver_approle).
 # platform_credentials <AppRole and KV prefix: api | worker | runner> <Compose service> [profile]
-# The profile is "platform" by default; the runner lives in the profile "sandbox" (C04).
+#   [owner]
+# The profile is "platform" by default; the runner lives in the profile "sandbox" (C04). The owner
+# of the files is node:node unless given (the runner host's job: 1000:1000, the runner's node).
 platform_credentials() {
   role="$1"
   service="$2"
@@ -475,7 +480,7 @@ platform_credentials() {
     bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
       bao kv put -mount=kv "$1/database" password=- >/dev/null' sh "$role" ||
     fail "could not store kv/$role/database (token valid? OpenBao configured?)"
-  deliver_approle "$role" "$service" /run/sdlc/approle "${3:-platform}"
+  deliver_approle "$role" "$service" /run/sdlc/approle "${3:-platform}" "${4:-node:node}"
   say "kv/$role/database stored; $role AppRole credentials written to the $role-approle volume, old secret IDs revoked; restart $service to use them"
 }
 
@@ -502,6 +507,8 @@ cmd_runner_credentials() {
     grep -Eq '^SDLC_RUNNER_LINK_ADDR=.+' "$env_file" ||
       fail "SDLC_RUNNER_DOCKER_HOST needs SDLC_RUNNER_LINK_ADDR in $env_file"
     say "the runner's credentials go to the runner host's Engine ($delivery_host)"
+    platform_credentials runner runner-approle-init credentials 1000:1000
+    return 0
   fi
   platform_credentials runner sdlc-runner sandbox
 }

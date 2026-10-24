@@ -9,6 +9,7 @@
 #              openbao-ca-init: pnpm runner-host:up
 #   knowledge  The knowledge-db relay, when the platform runs the profile knowledge
 #   vm         The registry relay, on a separate VM only (ADR-M91 §2.7, QUESTIONS #599)
+#   credentials  The job runner-approle-init of `openbao:bootstrap runner-credentials` (#597)
 #
 # Rules (static test platform/tests/deploy/runner-host.test.ts):
 #   - sdlc-runner, docker-socket-proxy and npm-proxy have the same definitions as in
@@ -65,7 +66,8 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: size=64k,uid=65534,gid=${SDLC_DOCKER_GID:-0},mode=0770
-  # Written by `openbao:bootstrap runner-credentials` with SDLC_RUNNER_DOCKER_HOST (QUESTIONS #597).
+  # Written by `openbao:bootstrap runner-credentials` with SDLC_RUNNER_DOCKER_HOST, through the job
+  # runner-approle-init (QUESTIONS #597).
   runner-approle:
   runner-work:
   npm-proxy-storage:
@@ -97,6 +99,20 @@ services:
     volumes:
       - ${SDLC_OPENBAO_CA_FILE:-/etc/sdlc/openbao-ca.pem}:/src/ca.pem:ro
       - openbao-ca:/ca
+
+  # Only for `openbao:bootstrap runner-credentials` with SDLC_RUNNER_DOCKER_HOST (QUESTIONS #597):
+  # writes the role ID and the secret ID it reads on stdin into the volume runner-approle, owned by
+  # the runner's user (node, 1000). It mounts nothing else, so the delivery creates no other volume.
+  runner-approle-init:
+    image: haproxy:3.2.26-alpine@sha256:dfba86f031bd4c9039f10f8cc5de75991d1b6766d5460f0335b980408503baad
+    profiles: [credentials]
+    restart: 'no'
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - runner-approle:/run/sdlc/approle
 
   # The same as in ../docker-compose.yml; the socket is the runner Engine's own
   # (rootless: $XDG_RUNTIME_DIR/docker.sock).

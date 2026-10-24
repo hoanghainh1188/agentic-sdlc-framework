@@ -7,6 +7,7 @@
 #        platform/deploy/scripts/runner-host.sh up [knowledge] [vm]
 #        platform/deploy/scripts/runner-host.sh down
 #        platform/deploy/scripts/runner-host.sh ps
+#        platform/deploy/scripts/runner-host.sh restart   # the runner, after runner-credentials
 #   knowledge  also the knowledge-db relay (the platform runs the profile knowledge)
 #   vm         also the registry relay (a separate VM only)
 #
@@ -26,7 +27,7 @@ fail() {
 }
 
 command="${1:-}"
-[ -n "$command" ] || fail "usage: runner-host.sh env | up [knowledge] [vm] | down | ps"
+[ -n "$command" ] || fail "usage: runner-host.sh env | up [knowledge] [vm] | down | ps | restart"
 shift
 
 if [ "$command" = env ]; then
@@ -68,6 +69,20 @@ if [ -n "$(docker volume ls -q --filter "label=com.docker.compose.project=${proj
 fi
 
 # shellcheck disable=SC2086
+# The group of the Engine's socket as the Engine's containers see it: the socket proxy reads the
+# socket with it, and the runner reaches the proxy with it. A rootless Engine maps the host's
+# `docker` group, when one exists, into its namespace. Empty SDLC_DOCKER_GID in the env file: read
+# it here, with a throw-away container of the pinned relay image (no network, read-only socket).
+RELAY_IMAGE="haproxy:3.2.26-alpine@sha256:dfba86f031bd4c9039f10f8cc5de75991d1b6766d5460f0335b980408503baad"
+if [ "$command" = up ] && [ -z "$(sed -n 's/^SDLC_DOCKER_GID=//p' "$env_file" | tail -n 1)" ]; then
+  socket="$(sed -n 's/^SDLC_DOCKER_SOCKET=//p' "$env_file" | tail -n 1)"
+  SDLC_DOCKER_GID="$(docker run --rm --network none --read-only --cap-drop ALL \
+    -v "${socket:-/var/run/docker.sock}:/s:ro" --entrypoint stat "$RELAY_IMAGE" -c %g /s)" ||
+    fail "cannot read the group of the Docker socket ${socket:-/var/run/docker.sock}"
+  export SDLC_DOCKER_GID
+  echo "runner-host: the Docker socket's group is $SDLC_DOCKER_GID"
+fi
+
 compose() {
   if [ "$images_mode" = published ]; then
     set -- -f "$host_dir/docker-compose.images.yml" --env-file "$env_file" $profiles "$@"
@@ -92,5 +107,6 @@ case "$command" in
     echo "runner-host: all services healthy"
     ;;
   down | ps) compose "$command" ;;
+  restart) compose restart sdlc-runner ;;
   *) fail "unknown command: $command" ;;
 esac

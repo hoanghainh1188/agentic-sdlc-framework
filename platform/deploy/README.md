@@ -13,6 +13,7 @@ This folder runs the infrastructure that the platform reuses, on one server, wit
 | `knowledge` | `knowledge-db`: a PostgreSQL with pgvector of its own for the index of project documents, the first register tool ([ADR-M89](../../design/ADR-M89-project-docs-index.md)). Never the platform's database; no host port | Optional (`pnpm compose:knowledge`). Needed only by plans with a `read_documents` tool. Then `pnpm openbao:bootstrap worker-knowledge-credentials` (runbook T11 §5o) and restart `sdlc-worker` |
 | `models-local` | `vllm`: a self-hosted model service (vLLM) on the server's GPU, reached only by LiteLLM ([ADR-M71](../../design/ADR-M71-self-hosted-model-vllm.md)). One-shot `vllm-pull` (profile `models-local-pull`) downloads the weights once | Optional, **only on a server with an NVIDIA GPU** (`pnpm compose:models-local`). Needs the profile `models`, the weights (`pnpm models-local:pull`) and the provider entry `vllm` (runbook T11 §5d.1). See [Self-hosted model](#self-hosted-model-operator) |
 | `sandbox` | `sdlc-runner` (built from this repository; runs the agent sandboxes), `docker-socket-proxy` (the runner's only way to Docker), `npm-proxy` (Verdaccio: npm packages for the sandboxes), `registry` (sandbox images, 127.0.0.1 only) ([ADR-M25](../../design/ADR-M25-runner-sandbox.md)) | With `core` (`pnpm compose:sandbox`). Needs OpenBao unsealed and configured, `SDLC_DOCKER_GID` right and `pnpm openbao:bootstrap runner-credentials` first (runbook T11 §5g) |
+| `runner-link` | `registry` only, with the overlay `docker-compose.runner-link.yml` that publishes the runner's link ports on `SDLC_RUNNER_LINK_ADDR` (O01, [ADR-M91](../../design/ADR-M91-runner-own-engine.md)) | On the server, instead of `sandbox`, when the runner runs on its own Engine (`pnpm compose:runner-link`). See [The runner on its own Docker Engine](#the-runner-on-its-own-docker-engine-operator) |
 
 Three one-shot jobs run at every start and then exit: `temporal-schema` (creates or upgrades the Temporal schemas), `temporal-namespace` (creates the namespace) and `seaweedfs-init` (creates the `evidence` and `langfuse` buckets). All three are safe to re-run.
 
@@ -33,7 +34,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 | Size | See [Resource estimate](#resource-estimate): about 3 GiB RAM and 2 vCPU for `core`, 6 GiB and 4 vCPU with `observability`, plus up to 2 GiB per running sandbox. Estimates only, not measured on a server yet (A10) |
 | GPU | Not needed with API models. Only for a self-hosted model on the same machine (D-07 §3): the profile `models-local`, an NVIDIA GPU with the NVIDIA Container Toolkit ([Self-hosted model](#self-hosted-model-operator)) |
 | Sandboxes | 1 by default (`SDLC_RUNNER_MAX_SANDBOXES`); 2 on a larger server. Evaluation runs use free slots only, at most `SDLC_RUNNER_MAX_EVAL_SANDBOXES` (default 1, never above the line before; 0 turns them off) and give a slot back to a real run that waits |
-| The runner | In its own VM or with rootless Docker, because it controls Docker (ADR-M25 §2.5). Not yet done (A10) |
+| The runner | On its own Docker Engine, rootless: a separate VM or a second Engine of the user `sdlc-runner`, because it controls Docker (ADR-M91). See [The runner on its own Docker Engine](#the-runner-on-its-own-docker-engine-operator) |
 | OpenBao | TLS on port 8200 runs everywhere (A10); on the server the certificate comes from the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Three named key holders before any real secret or client data (runbook T11 §3.2): not yet done (A10) |
 | Backups | Off the server, encrypted ([Backup and restore](#backup-and-restore)) |
 
@@ -401,6 +402,71 @@ People on other machines of the company LAN use the CLI and the dashboard throug
 
 **Turn it off:** stop the proxy (`docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile access stop sdlc-access`), empty `SDLC_ACCESS_BIND_ADDR`, `SDLC_ACCESS_HOSTNAME` and `SDLC_API_TRUSTED_PROXY`, and set `SDLC_API_PUBLIC_ORIGIN` back if the sign-in is on.
 
+## The runner on its own Docker Engine (operator)
+
+The runner controls Docker. On the server it runs with its sandboxes on **its own Docker Engine**, which holds no platform service and no platform data (task O01, [ADR-M91](../../design/ADR-M91-runner-own-engine.md)). Do this before the first real agent run on the company server (QUESTIONS #455). Developer machines and the trial keep the single Engine; there `pnpm doctor` only warns.
+
+**Why.** The socket proxy limits the Docker endpoints the runner may call, not the body of a request (ADR-M25 §2.5). On the platform's Engine, a taken-over runner could create a container that mounts the platform's volumes (PostgreSQL, OpenBao, SeaweedFS) or joins the network `sdlc`. On an Engine of its own, it reaches only sandboxes.
+
+| Way | Where the runner's Engine runs | The link between the two Engines |
+|---|---|---|
+| A separate VM (recommended) | A Linux VM next to the platform's server | A WireGuard tunnel (set up by the infrastructure operator) |
+| The same server | A second, rootless Engine of the user `sdlc-runner` | A host address that only the two Engines use (a dummy interface) |
+
+**What runs where.**
+
+| On the runner's Engine (`platform/deploy/runner-host/docker-compose.yml`) | On the platform's Engine |
+|---|---|
+| `sdlc-runner`, `docker-socket-proxy`, `npm-proxy`; the sandboxes and the tool containers of a run | Everything else: api, worker, PostgreSQL, OpenBao, Temporal, SeaweedFS, Valkey, LiteLLM, knowledge-db, the registry, observability |
+| `litellm` and `knowledge-db`: **relays** (HAProxy, pinned by digest), each with one fixed target on the link address. The sandboxes still reach `litellm:4000`, and nothing else | The link ports, published **only on `SDLC_RUNNER_LINK_ADDR`** (overlay `docker-compose.runner-link.yml`): PostgreSQL 5432, OpenBao 8200 (TLS), Temporal 7233, SeaweedFS S3 8333, LiteLLM 4000, knowledge-db 5433, registry 5050 |
+| `openbao-ca-init` (a job): OpenBao's CA certificate into the volume `openbao-ca`; on a VM also `registry` (a relay, `GET` and `HEAD` only) | |
+
+The runner's settings do not change: it reaches `postgres`, `openbao`, `temporal` and `seaweedfs` by name, through `extra_hosts` on the link address, and still verifies OpenBao's certificate. The runner host's `.env` holds no secret. A runner on its own Engine sends no traces (ADR-M91 §2.5); its logs stay on its Engine.
+
+### Set it up
+
+1. **The runner's Engine, rootless.** On the VM, or on the same server for the user `sdlc-runner` (`sudo useradd --create-home --shell /bin/bash sdlc-runner`). The steps are those of the CI job `runner-rootless` (`platform/deploy/scripts/test-rootless-docker.sh`), with Docker's packages (`docker-ce`, `docker-ce-rootless-extras`, `uidmap`, `dbus-user-session`):
+   1. Subordinate IDs: `sudo usermod --add-subuids 200000-265535 --add-subgids 200000-265535 sdlc-runner`.
+   2. On Ubuntu 23.10 and later, an AppArmor profile that allows user namespaces for `rootlesskit` only (the profile in `test-rootless-docker.sh`, with the path `/usr/bin/rootlesskit`). Never set `kernel.apparmor_restrict_unprivileged_userns=0` for the whole machine.
+   3. cgroup v2 delegation: `/etc/systemd/system/user@.service.d/delegate.conf` with `[Service]` and `Delegate=cpu cpuset io memory pids`, then `sudo systemctl daemon-reload`. Without `cpu`, the sandbox's CPU limit is accepted but not applied.
+   4. `sudo loginctl enable-linger sdlc-runner`; then, as `sdlc-runner`, `dockerd-rootless-setuptool.sh install`.
+   5. Check, as `sdlc-runner`: `docker info --format '{{.SecurityOptions}} {{.CgroupVersion}} {{.CgroupDriver}}'` shows `rootless`, `2` and `systemd`. The socket is `/run/user/<uid>/docker.sock`.
+2. **The link.**
+   - A separate VM: the infrastructure operator sets up a WireGuard tunnel between the two machines, for example `10.66.0.1` (the platform host) and `10.66.0.2` (the VM). Generate the WireGuard private keys on each machine, in the owner's terminal; never put them in the repository, a chat or a log. Let the platform host accept the link ports from the VM's tunnel address only.
+   - The same server: a dummy interface with one address, for example `10.203.0.1/32` (systemd-networkd: a `.netdev` file with `Kind=dummy` and a `.network` file with `Address=10.203.0.1/32`).
+3. **The platform host's settings** in `platform/deploy/.env`:
+
+   ```bash
+   SDLC_RUNNER_LINK_ADDR=10.66.0.1          # the same server: 10.203.0.1
+   SDLC_RUNNER_SOURCE_CIDR=10.66.0.2/32     # the runner host as OpenBao sees it; the same server: 10.203.0.1/32
+   SDLC_RUNNER_DOCKER_HOST=ssh://sdlc-runner@10.66.0.2   # the same server: unix:///run/user/<uid>/docker.sock
+   ```
+
+   Then, in the owner's terminal: `pnpm openbao:bootstrap configure` (a root token; only the AppRole `runner` also accepts `SDLC_RUNNER_SOURCE_CIDR`). On the same server, any process of the host that connects from the link address looks like the runner to OpenBao: keep the link address for the two Engines only.
+4. **Move the runner off the platform's Engine.** Stop and remove the old runner, then start the platform with the profile `runner-link` instead of `sandbox`; `up.sh` refuses `sandbox` while `SDLC_RUNNER_LINK_ADDR` is set:
+
+   ```bash
+   docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile sandbox rm --stop --force sdlc-runner docker-socket-proxy npm-proxy
+   platform/deploy/scripts/up.sh core models platform runner-link   # add knowledge if you use it
+   ```
+
+5. **The runner host's checkout and settings.** A checkout of the **same release tag** as the platform (Docker and Compose are enough there; no Node.js). As the user that runs the runner's Engine:
+
+   ```bash
+   platform/deploy/scripts/runner-host.sh env   # once: platform/deploy/runner-host/.env, never overwritten
+   ```
+
+   Set `COMPOSE_PROJECT_NAME` (the platform's), `SDLC_RUNNER_LINK_ADDR` (the platform host's link address), `SDLC_DOCKER_SOCKET` (`/run/user/<uid>/docker.sock`) and `SDLC_OPENBAO_CA_FILE`. Copy `ca.pem` of the platform's `SDLC_OPENBAO_TLS_DIR` there (a public certificate; never the folder's key).
+6. **The runner's credentials**, on the platform host, in the owner's terminal: `pnpm openbao:bootstrap runner-credentials`. With `SDLC_RUNNER_DOCKER_HOST` set, the credentials go into the runner host's volume, over the Docker connection (stdin only, no file). `runner-evidence-credentials` is unchanged (OpenBao only).
+7. **Start**, on the runner host: `platform/deploy/scripts/runner-host.sh up` (add `knowledge` for the knowledge-db relay, `vm` on a separate VM for the registry relay). It refuses an Engine that holds the platform's data. Stop: `runner-host.sh down` (volumes kept).
+8. **Check** on the platform host: `pnpm doctor` shows `runner.engine` ok. On the runner host: `runner-host.sh ps`, and `docker compose -f platform/deploy/runner-host/docker-compose.yml --env-file platform/deploy/runner-host/.env --profile sandbox logs sdlc-runner`.
+
+**Sandbox images.** Push them on the platform host as before (`pnpm sandbox-image:build`, [step 10](#10-the-sandbox-image)). The runner's Engine pulls them from `127.0.0.1:5050` by digest: on the same server directly, on a VM through the registry relay.
+
+**Rotation.** `runner-credentials` every 90 days, as for every process (runbook T11 §8); restart the runner on the runner host afterwards (`runner-host.sh restart`).
+
+**Tested.** `pnpm test:runner` runs on a rootless Engine, and `pnpm test:runner-split` runs the same-server set-up with two Engines in CI. The VM with WireGuard is not tested in CI.
+
 ## Secrets and `.env`
 
 - `.env` holds every password and key. It is ignored by Git and has mode 600. **Never commit it and never paste it into chat, issues or email.**
@@ -424,10 +490,11 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`), except th
 | API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI. Also serves the read-only dashboard at `/dashboard/` (U01, `SDLC_API_DASHBOARD_DIR`, built into the image; `off` turns it off). Keep it on `127.0.0.1`: other machines use the proxy of the profile `access` (ADR-M54 §2.2, ADR-M67; how people use it: [handbook Ch.19 §19.8e](../../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) |
 | Team access proxy (`sdlc-access`) | 8443 | `access` profile only. **The only port on another address**: `SDLC_ACCESS_BIND_ADDR`, the server's LAN address ([Team access](#team-access-operator)); without it the profile does not start |
 | Sandbox image registry | 5050 | `sandbox` profile only. **Always 127.0.0.1** (not `SDLC_BIND_ADDR`): it has no authentication. Not 5000: macOS uses it |
+| The runner's link | 5432, 8200, 7233, 8333, 4000, 5433, 5050 | Only with `SDLC_RUNNER_LINK_ADDR` (profile `runner-link`, overlay `docker-compose.runner-link.yml`): PostgreSQL, OpenBao (TLS), Temporal, SeaweedFS S3, LiteLLM, knowledge-db and the registry, **on the link address only**, for a runner on its own Engine ([The runner on its own Docker Engine](#the-runner-on-its-own-docker-engine-operator)) |
 
 Valkey, ClickHouse, the Langfuse worker, the OpenTelemetry Collector, **OpenBao**, the runner, the socket proxy, the npm proxy and `vllm` publish no port.
 
-OpenBao is reachable only on the Compose network (`design/QUESTIONS.md` #27, task A11). The platform processes run in Compose and use `https://openbao:8200`, verified with the CA of the volume `openbao-ca` (TLS since A10, [T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Key holders and admins work inside the container with `pnpm openbao:bootstrap …` or `docker compose … exec openbao …` (runbook T11). There is no host port for `curl`.
+OpenBao is reachable only on the Compose network (`design/QUESTIONS.md` #27, task A11), except on the link address of a runner on its own Engine (ADR-M91 §2.3). The platform processes run in Compose and use `https://openbao:8200`, verified with the CA of the volume `openbao-ca` (TLS since A10, [T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Key holders and admins work inside the container with `pnpm openbao:bootstrap …` or `docker compose … exec openbao …` (runbook T11). There is no host port for `curl`.
 
 SeaweedFS (task A12, `design/ADR-M52-seaweedfs-internal-access.md`): only the S3 API (8333) listens on the Compose network; every platform process uses it with its own identity. The master, volume server and filer listen on `127.0.0.1` inside the container and need JWT keys that `seaweedfs/start.sh` makes at every start (kept nowhere else; no keys, no start). Admin work: `docker compose … exec seaweedfs weed shell -master=127.0.0.1:9333` (runbook T11 §5l). `seaweedfs-init` runs in the container's network namespace.
 

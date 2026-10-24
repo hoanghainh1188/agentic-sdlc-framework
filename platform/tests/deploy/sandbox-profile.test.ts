@@ -237,8 +237,11 @@ describe('sdlc-runner service', () => {
     // O01 (QUESTIONS #597): to the runner host's own Engine with SDLC_RUNNER_DOCKER_HOST, through
     // the runner-host Compose file; the secret ID still goes on stdin (deliver_approle).
     expect(credentials).toContain("'' | ssh://?* | unix:///?*) ;;");
+    expect(credentials).toMatch(
+      /^ {4}platform_credentials runner runner-approle-init credentials 1000:1000$/m,
+    );
     expect(bootstrap).toMatch(
-      /DOCKER_HOST="\$delivery_host" SDLC_DOCKER_GID=0 docker compose \\\n\s+-f "\$deploy_dir\/runner-host\/docker-compose\.yml"/,
+      /DOCKER_HOST="\$delivery_host" docker compose \\\n\s+-f "\$deploy_dir\/runner-host\/docker-compose\.yml"/,
     );
     expect(bootstrap).toMatch(/issue_secret_id "\$1" \|\n\s+service_compose --profile core/);
     // C06 2b: the write-only evidence identity; its keys reach `weed shell` on stdin only and its

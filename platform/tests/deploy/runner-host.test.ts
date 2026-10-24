@@ -88,6 +88,7 @@ describe('O01: the runner host Compose file', () => {
       'npm-proxy',
       'openbao-ca-init',
       'registry',
+      'runner-approle-init',
       'sdlc-runner',
     ]);
   });
@@ -194,6 +195,26 @@ describe('O01: the runner host Compose file', () => {
       'openbao-ca:/ca',
     ]);
     expect(JSON.stringify(s)).toContain('PRIVATE KEY');
+  });
+
+  it('runner-approle-init mounts the runner credentials volume only, on no network (QUESTIONS #597)', () => {
+    const s = svc(host, 'runner-approle-init');
+    expect(s.image).toBe(HAPROXY);
+    expect(s.profiles).toEqual(['credentials']);
+    expect(s.network_mode).toBe('none');
+    expect(s.read_only).toBe(true);
+    expect(s.cap_drop).toEqual(['ALL']);
+    expect(s.volumes).toEqual(['runner-approle:/run/sdlc/approle']);
+    // The same volume and path as the runner's.
+    expect(svc(host, 'sdlc-runner').volumes).toContain('runner-approle:/run/sdlc/approle');
+  });
+
+  it('runner-host.sh reads the socket group with the pinned relay image when it is not set', () => {
+    const script = fs.readFileSync(path.join(deployDir, 'scripts/runner-host.sh'), 'utf8');
+    expect(script).toContain(`RELAY_IMAGE="${HAPROXY}"`);
+    expect(script).toContain('docker run --rm --network none --read-only --cap-drop ALL');
+    expect(script).toContain(':/s:ro" --entrypoint stat "$RELAY_IMAGE" -c %g /s');
+    expect(readDeployFile('runner-host/.env.example')).toMatch(/^SDLC_DOCKER_GID=$/m);
   });
 
   it('no telemetry and no secret: no OTEL setting, no password, token or key variable', () => {

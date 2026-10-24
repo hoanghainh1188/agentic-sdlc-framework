@@ -453,6 +453,7 @@ The runner (service `sdlc-runner`, task C04) creates one hardened sandbox per ag
    pnpm openbao:bootstrap runner-credentials
    ```
    Record it in the operations log (role `runner`, date, reason; not the secret ID).
+   - On the server the runner runs on **its own Docker Engine** (`design/ADR-M91-runner-own-engine.md`; deploy README "The runner on its own Docker Engine"). Then set `SDLC_RUNNER_DOCKER_HOST` (the runner's Engine) and `SDLC_RUNNER_SOURCE_CIDR` (the runner host's address as OpenBao sees it) in `platform/deploy/.env`, and run `configure` again first. The same command then writes the credentials into the runner host's volume, over the Docker connection; the secret ID still goes on standard input only. Only the AppRole `runner` accepts `SDLC_RUNNER_SOURCE_CIDR`. Restart the runner on the runner host: `platform/deploy/scripts/runner-host.sh restart`.
 3b. Give the runner its SeaweedFS identity `runner-evidence`. SeaweedFS must run. The command asks for an admin token (hidden) and prints no secret:
    ```bash
    pnpm openbao:bootstrap runner-evidence-credentials
@@ -1014,6 +1015,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.43 | 2026-10-24 | Claude Code (task X04, PR 3b) | Section 5o: the tools' short-lived logins to `knowledge-db` (database secrets engine, one role per run `kdocs-<run_id>`, the issuer `kdocs_issuer`, `knowledge-issuer-credentials`, revocation by prefix), restart of `sdlc-runner`, building the tool image (ADR-M89 §2.7, QUESTIONS #540) |
 | 0.42 | 2026-10-23 | Claude Code (task X04, PR 3a) | New section 5o: the worker's index of project documents in `knowledge-db` (profile `knowledge`), `kv/worker/knowledge-db`, `worker-knowledge-credentials`, rotation, retention and `knowledge.purged` (ADR-M89) |
 | 0.43 | 2026-10-24 | Claude Code (task L01, PR 1) | New section 5d.1: the provider entry `vllm` of the self-hosted model (profile `models-local`, ADR-M71); no key, two values that are not secrets |
+| 0.44 | 2026-10-24 | Claude Code (task O01, PR 2) | Section 5g step 3: the runner on its own Docker Engine (`SDLC_RUNNER_DOCKER_HOST`, `SDLC_RUNNER_SOURCE_CIDR`, `runner-host.sh restart`; ADR-M91) |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |
 | 0.37 | 2026-10-12 | Claude Code (task V07, PR 2) | Sections 3c and 4: `pnpm doctor` shows the certificates' end dates and checks the platform after an unseal |

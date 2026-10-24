@@ -88,4 +88,3 @@ jobs:
       - name: Show the rootless Engine's log
         if: failure()
         run: XDG_RUNTIME_DIR="/run/user/$(id -u)" journalctl --user -u docker.service --no-pager -n 300 || true
-
