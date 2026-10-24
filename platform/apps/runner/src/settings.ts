@@ -41,6 +41,8 @@ export const RUNNER_ENV = {
   evalTasksDir: 'SDLC_EVAL_TASKS_DIR',
   evalConfigDir: 'SDLC_EVAL_CONFIG_DIR',
   gpu: 'SDLC_RUNNER_GPU',
+  gitleaksPath: 'SDLC_RUNNER_GITLEAKS_PATH',
+  secretScanTimeoutSeconds: 'SDLC_RUNNER_SECRET_SCAN_TIMEOUT_SECONDS',
 } as const;
 
 /**
@@ -146,6 +148,14 @@ export interface RunnerSettings {
   readonly sweepIntervalMs: number;
   readonly agent: AgentSettings;
   readonly evaluation: EvaluationSettings;
+  /** The secret scan of every run's diff (task H04, ADR-M93): always on, never configurable off. */
+  readonly secretScan: SecretScanSettings;
+}
+
+export interface SecretScanSettings {
+  /** The Gitleaks executable (the runner image: `/usr/local/bin/gitleaks`; else found on PATH). */
+  readonly gitleaksPath: string;
+  readonly timeoutMs: number;
 }
 
 export const DEFAULT_DOCKER_SOCKET = '/var/run/docker.sock';
@@ -165,6 +175,8 @@ export const DEFAULTS = {
   exportMaxMb: 8192,
   readyTimeoutSeconds: 120,
   sweepIntervalSeconds: 300,
+  gitleaksPath: 'gitleaks',
+  secretScanTimeoutSeconds: 120,
   agentPort: 8000,
   agentLlmUrl: 'http://litellm:4000',
   agentPollMs: 1000,
@@ -405,5 +417,25 @@ export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Run
       1000,
     agent: agentSettings(env),
     evaluation: evaluationSettings(env),
+    secretScan: secretScanSettings(env),
+  };
+}
+
+function secretScanSettings(env: NodeJS.ProcessEnv): SecretScanSettings {
+  const gitleaksPath = env[RUNNER_ENV.gitleaksPath] || DEFAULTS.gitleaksPath;
+  // A bare name is looked up on PATH; anything else must be an absolute path.
+  if (gitleaksPath !== DEFAULTS.gitleaksPath && !path.isAbsolute(gitleaksPath)) {
+    throw invalid(RUNNER_ENV.gitleaksPath);
+  }
+  return {
+    gitleaksPath,
+    timeoutMs:
+      intSetting(
+        env,
+        RUNNER_ENV.secretScanTimeoutSeconds,
+        DEFAULTS.secretScanTimeoutSeconds,
+        5,
+        1800,
+      ) * 1000,
   };
 }

@@ -281,6 +281,11 @@ export function g7World() {
       instruction_files: 0,
       paths_sha256: PATHS,
     });
+    await t.f.scope.runEvents.append(runId, 'secrets_scanned', {
+      result: 'clean',
+      findings: 0,
+      rules: 'built_in',
+    });
     await t.f.scope.runs.transition(runId, {
       from: ['running'],
       to: 'succeeded',

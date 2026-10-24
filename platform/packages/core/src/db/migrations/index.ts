@@ -41,6 +41,7 @@ import { migration0038ToolRegister } from './0038-tool-register.js';
 import { migration0039KnowledgeIndexes } from './0039-knowledge-indexes.js';
 import { migration0040KnowledgeReadEvidence } from './0040-knowledge-read-evidence.js';
 import { migration0041ContextSnapshotEvidence } from './0041-context-snapshot-evidence.js';
+import { migration0042DiffScan } from './0042-diff-scan.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -85,4 +86,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0039-knowledge-indexes': migration0039KnowledgeIndexes,
   '0040-knowledge-read-evidence': migration0040KnowledgeReadEvidence,
   '0041-context-snapshot-evidence': migration0041ContextSnapshotEvidence,
+  '0042-diff-scan': migration0042DiffScan,
 };

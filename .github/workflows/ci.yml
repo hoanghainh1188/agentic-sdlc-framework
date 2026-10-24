@@ -267,6 +267,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # H04 (ADR-M93): the pinned Gitleaks of the runner's secret scan, on PATH (the in-process
+      # runners of the tests find it there) and named for the scanner tests; a missing scanner
+      # holds every run at G5.
+      - run: |
+          gitleaks="$(sh platform/deploy/scripts/gitleaks.sh)"
+          dirname "$gitleaks" >> "$GITHUB_PATH"
+          echo "SDLC_RUNNER_GITLEAKS_PATH=$gitleaks" >> "$GITHUB_ENV"
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm lint
@@ -301,6 +308,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # H04 (ADR-M93): the pinned Gitleaks of the runner's secret scan, on PATH (the in-process
+      # runners of the tests find it there) and named for the scanner tests; a missing scanner
+      # holds every run at G5.
+      - run: |
+          gitleaks="$(sh platform/deploy/scripts/gitleaks.sh)"
+          dirname "$gitleaks" >> "$GITHUB_PATH"
+          echo "SDLC_RUNNER_GITLEAKS_PATH=$gitleaks" >> "$GITHUB_ENV"
       - name: Create a random .env (A02 script, no GitHub secrets)
         run: |
           for script in platform/deploy/scripts/init-env.sh platform/deploy/scripts/up.sh; do
@@ -370,6 +384,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # H04 (ADR-M93): the pinned Gitleaks of the runner's secret scan, on PATH (the in-process
+      # runners of the tests find it there) and named for the scanner tests; a missing scanner
+      # holds every run at G5.
+      - run: |
+          gitleaks="$(sh platform/deploy/scripts/gitleaks.sh)"
+          dirname "$gitleaks" >> "$GITHUB_PATH"
+          echo "SDLC_RUNNER_GITLEAKS_PATH=$gitleaks" >> "$GITHUB_ENV"
       - name: Install the rootless Docker Engine (static archives, pinned by SHA-256)
         run: |
           sudo apt-get install -y --no-install-recommends uidmap slirp4netns dbus-user-session
@@ -410,6 +431,13 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # H04 (ADR-M93): the pinned Gitleaks of the runner's secret scan, on PATH (the in-process
+      # runners of the tests find it there) and named for the scanner tests; a missing scanner
+      # holds every run at G5.
+      - run: |
+          gitleaks="$(sh platform/deploy/scripts/gitleaks.sh)"
+          dirname "$gitleaks" >> "$GITHUB_PATH"
+          echo "SDLC_RUNNER_GITLEAKS_PATH=$gitleaks" >> "$GITHUB_ENV"
       - name: Build (no push)
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
