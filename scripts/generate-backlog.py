@@ -703,7 +703,7 @@ t("L01","Models","A self-hosted model service (vLLM) on an optional GPU host","M
   "A LiteLLM entry `provider_type: self_hosted` with an internal cost per token above 0 (budgets keep working)",
   "D-03 §10.1 and D-07 changed and ADR-M71 written first (today: \"API models only, no GPU\"); runbook T11 and the deploy README",
   "A `client_restricted` project runs an agent end to end with the self-hosted model (stub or real)"],
- "QUESTIONS #362 (Harry, 2026-10-10): milestone Models after EXT; earlier when the company has a GPU")
+ "QUESTIONS #362 (Harry, 2026-10-10): milestone Models after EXT; earlier when the company has a GPU. QUESTIONS #546 (Harry, 2026-10-24): two PRs; PR 1 the GPU in the platform server (internal network `models`, no port; AC1 for the server, AC2–AC4); PR 2 a separate GPU host with mutual TLS through a pinned nginx link (vLLM's `--api-key` leaves `/invocations` open; LiteLLM cannot present a client certificate). QUESTIONS #547–#550: ADR-M71")
 t("L03","Models","GPU sizing note for leadership","S",["L02"],"D-07",
  "design/ (a short note)",
  ["From the L02 numbers: which model size meets the quality bar, the GPU memory and count it needs, buy or rent (with the legal question of rented hardware for `client_restricted` data), the cost per month"],
