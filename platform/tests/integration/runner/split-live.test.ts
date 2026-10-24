@@ -177,6 +177,10 @@ describe.skipIf(!enabled)(
         ),
         'platform up',
       );
+      // One-shot jobs that the runner's services wait for on the platform's Engine (depends_on):
+      // the Temporal namespace and the bucket `evidence`.
+      ok(platform('--profile', 'core', 'run', '--rm', 'temporal-namespace'), 'temporal-namespace');
+      ok(platform('--profile', 'core', 'run', '--rm', 'seaweedfs-init'), 'seaweedfs-init');
       const init = ok(bootstrapCmd(['init', '--stdout-not-tty']), 'init');
       const shares = [...init.stdout.matchAll(/^Unseal Key \d+: (\S+)$/gm)].map((m) => keep(m[1]!));
       const rootToken = keep(/^Initial Root Token: (\S+)$/m.exec(init.stdout)?.[1] ?? '');
@@ -196,6 +200,11 @@ describe.skipIf(!enabled)(
         'runner-credentials',
       );
       expect(delivered.stdout).toContain("the runner's credentials go to the runner host's Engine");
+      // OpenBao and SeaweedFS only: unchanged by the split set-up.
+      ok(
+        bootstrapCmd(['runner-evidence-credentials'], `${rootToken}\n`),
+        'runner-evidence-credentials',
+      );
 
       const up = run(
         path.join(deployDir, 'scripts/runner-host.sh'),
@@ -228,7 +237,10 @@ describe.skipIf(!enabled)(
 
     it('the runner starts healthy on its own Engine: OpenBao login, database and Temporal over the link', () => {
       const logs = hostLogs();
+      expect(logs).toContain('"event":"openbao.login"');
       expect(logs).toContain('"event":"runner.started"');
+      expect(logs).not.toContain('runner.start_failed');
+      expect(logs).not.toContain('runner.evidence_missing');
       expect(logs).toContain('openbao-ca-init: CA certificate in place');
       const state = ok(
         onRunnerEngine('inspect', '-f', '{{.State.Health.Status}}', `${project}-sdlc-runner-1`),
