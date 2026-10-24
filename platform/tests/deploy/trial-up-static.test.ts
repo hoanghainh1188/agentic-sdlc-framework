@@ -37,8 +37,8 @@ function credentialsOfStep(n: number): string[] {
 describe('V02: pnpm trial:up follows the README "Fresh deployment"', () => {
   it('runs every credentials command of step 5, in the README order', () => {
     expect([...CREDENTIALS_COMMANDS]).toEqual(credentialsOfStep(5));
-    // The live test of the README runs the same list.
-    const live = read('platform/tests/integration/deploy/fresh-deploy.test.ts');
+    // The live test of the README runs the same list (its steps: deploy-steps.ts, O02).
+    const live = read('platform/tests/integration/deploy/deploy-steps.ts');
     for (const c of CREDENTIALS_COMMANDS) expect(live).toContain(`'${c}'`);
   });
 

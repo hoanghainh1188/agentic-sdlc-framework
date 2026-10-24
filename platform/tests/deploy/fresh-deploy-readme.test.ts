@@ -23,10 +23,10 @@ const catalog = fs.readFileSync(
   path.join(root, 'platform/packages/messages/src/locales/en.json'),
   'utf8',
 );
-const liveTest = fs.readFileSync(
-  path.join(root, 'platform/tests/integration/deploy/fresh-deploy.test.ts'),
-  'utf8',
-);
+// The live test and its steps (shared with `pnpm test:upgrade`, O02).
+const liveTest = ['fresh-deploy.test.ts', 'deploy-steps.ts']
+  .map((f) => fs.readFileSync(path.join(root, 'platform/tests/integration/deploy', f), 'utf8'))
+  .join('\n');
 
 /** The command lines of the code blocks of `text` (default: the section), `\` lines joined. */
 function commandLines(text = section): string[] {
@@ -87,7 +87,10 @@ describe('E07: README "Fresh deployment (operator)"', () => {
     const step3 = section.slice(section.indexOf('### 3.'), section.indexOf('### 4.'));
     expect(step3).toContain('--profile core up -d --wait openbao postgres seaweedfs');
     expect(step3).not.toContain('pnpm compose:core');
-    expect(liveTest).toContain("'up', '-d', '--wait', 'openbao', 'postgres', 'seaweedfs'");
+    // Without white space: Prettier may wrap the arguments.
+    expect(liveTest.replace(/\s+/g, '')).toContain(
+      "'up','-d','--wait','openbao','postgres','seaweedfs'",
+    );
   });
 
   it('the live test runs every credentials command of step 5 (step 7 adds the optional Langfuse one)', () => {

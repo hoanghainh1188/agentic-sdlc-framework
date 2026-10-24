@@ -33,6 +33,7 @@ The images are built **before** the tag (QUESTIONS #370), so the tag holds the d
 | Step | Who | What |
 |---|---|---|
 | 1. Version pull request | Claude, merged by the owner | `package.json` and `PLATFORM_VERSION` set to `X.Y.Z`; the CHANGELOG's `[Unreleased]` becomes `## [X.Y.Z] - YYYY-MM-DD` with a short summary and its Upgrade notes; CLAUDE.md "Current constraints" if the state changes |
+| 1b. The upgrade test | 🧑 owner | Actions → **ci** → Run workflow on the version pull request's branch. Its job `upgrade` deploys the last release and upgrades it to this branch with the README "Upgrade" steps and the new Upgrade notes (`pnpm test:upgrade`, QUESTIONS #585). Go on only when it is green |
 | 2. The images | 🧑 owner | Actions → **release-images** → Run workflow on `main`, version `X.Y.Z`, `push: true`. Builds, scans, pushes by digest, signs and attests the six images, and writes the artifact `images-lock-X.Y.Z` |
 | 3. The lock file pull request | Claude, merged by the owner | `pnpm release:lock <run-id>` copies that run's `images.lock` over `platform/deploy/images.lock`; it refuses a run that is not a successful `release-images` run on `main` or a lock file for another version |
 | 4. The tag | 🧑 owner | Tag **the merge commit of step 3** and push it: `git tag vX.Y.Z <commit> && git push origin vX.Y.Z` |
@@ -78,3 +79,4 @@ Try the gate before you tag: `node platform/tools/release/release-check.mjs tag 
 | 1.1 | 2026-10-12 | Claude, approved by Harry | §3: what the v0.2.0 release taught: cosign installed by `install-cosign.sh` with retries, `ENEEDAUTH` (an expired npm trusted publisher), npm's "validating" state (#308, #309) |
 | 1.2 | 2026-10-12 | Claude (docs review for v0.2.0), approved by Harry | §1: the versioning rules in general terms (a patch when nothing must be done, the next minor when an upgrade step is needed); the line "v0.2.0 when the milestone UX is done" removed |
 | 1.3 | 2026-10-24 | Claude, for the owner's approval | Six images: `tool-project-docs` (X04 PR 3b, ADR-M89) is in the release gate and in `verify-images.sh`, not only in `release-images.yml`; §4: a new package is set to public after its first push |
+| 1.4 | 2026-10-24 | Claude (task O02), approved by Harry | §2 step 1b: the upgrade test from the last release on the version branch before the images (QUESTIONS #585) |

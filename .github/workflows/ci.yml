@@ -553,6 +553,40 @@ jobs:
             docker compose -p "$p" down --volumes --remove-orphans || true
           done
 
+  upgrade:
+    # O02 (D-08 O02 AC1, QUESTIONS #581): follows the README section "Upgrade" on a throw-away
+    # Compose project: the newest release tag before this commit (a git worktree, its published
+    # images by digest) deployed with an intent at G1, then upgraded to this commit (images built
+    # here) with the credentials commands of the CHANGELOG Upgrade notes; the intent goes on and the
+    # audit chain verifies. Same trigger as fresh-deploy (weekly and on demand); before a release
+    # the owner runs it by hand on the version pull request's branch (RELEASING.md §2). Throw-away
+    # keys only, never printed; the images on GHCR are public, so no secret.
+    name: upgrade from the last release (README)
+    needs: [scan, checks]
+    if: needs.scan.outputs.run_fresh_deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40 # the cap of every job (ci-workflow.test.ts)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the release tags: the test checks out the last one as a git worktree
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (reads packageManager)
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install age (the backup step)
+        run: sudo apt-get install -y --no-install-recommends age
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:upgrade
+      - name: Stop and remove every throw-away Compose project
+        if: always()
+        run: |
+          for p in $(docker compose ls -a -q | grep '^sdlcupgrade' || true); do
+            docker compose -p "$p" down --volumes --remove-orphans || true
+          done
+
   trial-up:
     # V02 (D-08 V02 AC5): `pnpm trial:up`, the same README steps for the community trial, on a
     # throw-away Compose project to the first intent at G1, then `pnpm trial:down --wipe`. Same
@@ -618,7 +652,8 @@ jobs:
 
   ci-ok:
     name: ci-ok
-    needs: [scan, checks, compose, runner-rootless, sandbox-image, fresh-deploy, trial-up, db]
+    needs:
+      [scan, checks, compose, runner-rootless, sandbox-image, fresh-deploy, upgrade, trial-up, db]
     # The summary for pull requests (the future required check). Scheduled runs need no summary:
     # a failed job there already marks the run red.
     if: ${{ always() && github.event_name != 'schedule' }}

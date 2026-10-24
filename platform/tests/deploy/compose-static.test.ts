@@ -359,4 +359,42 @@ describe('init-env.sh', () => {
     expect(() => execFileSync(script, [output], { stdio: 'pipe' })).toThrow();
     expect(fs.readFileSync(output, 'utf8')).toBe('KEEP=me\n');
   });
+
+  // O02 (QUESTIONS #582): the upgrade's README step 3, `pnpm compose:env --add-missing`.
+  describe('--add-missing', () => {
+    const missing = 'KNOWLEDGE_DB_SUPERUSER_PASSWORD';
+
+    it('appends only the keys the file lacks, with random secrets, and changes no line that is there', () => {
+      const output = path.join(tmp, 'upgrade.env');
+      execFileSync(script, [output]);
+      const before = fs
+        .readFileSync(output, 'utf8')
+        .split('\n')
+        .filter((line) => !line.startsWith(`${missing}=`) && !line.startsWith('SDLC_VLLM_'))
+        .join('\n')
+        .replace(/\n$/, ''); // a last line without its newline
+      fs.writeFileSync(output, before, { mode: 0o644 });
+
+      const stdout = execFileSync(script, ['--add-missing', output], { encoding: 'utf8' });
+      const after = fs.readFileSync(output, 'utf8');
+      expect(after.startsWith(`${before}\n`)).toBe(true);
+      expect(fs.statSync(output).mode & 0o777).toBe(0o600);
+      const env = parseEnvFile(after);
+      expect([...env.keys()].sort()).toEqual([...envExample.keys()].sort());
+      expect(env.get(missing)).toMatch(/^[a-f0-9]{48}$/);
+      expect(env.get('SDLC_VLLM_MODEL')).toBe(envExample.get('SDLC_VLLM_MODEL'));
+      expect(stdout).toContain(missing);
+      expect(stdout).not.toContain(env.get(missing));
+
+      const again = execFileSync(script, ['--add-missing', output], { encoding: 'utf8' });
+      expect(again).toContain('nothing added');
+      expect(fs.readFileSync(output, 'utf8')).toBe(after);
+    });
+
+    it('refuses a file that does not exist, and makes none', () => {
+      const output = path.join(tmp, 'absent.env');
+      expect(() => execFileSync(script, ['--add-missing', output], { stdio: 'pipe' })).toThrow();
+      expect(fs.existsSync(output)).toBe(false);
+    });
+  });
 });

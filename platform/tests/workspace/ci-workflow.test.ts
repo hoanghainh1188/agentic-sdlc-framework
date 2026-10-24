@@ -283,6 +283,17 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(job('ci-ok').needs).toContain('fresh-deploy');
   });
 
+  it('O02: the upgrade job has the same trigger as the fresh deployment, the release tags, and cleans up', () => {
+    const upgrade = job('upgrade');
+    expect(upgrade.needs).toEqual(['scan', 'checks']);
+    expect(upgrade.if).toBe("needs.scan.outputs.run_fresh_deploy == 'true'");
+    expect(upgrade['timeout-minutes']).toBeGreaterThan(0);
+    expect(upgrade.steps[0]?.with?.['fetch-depth']).toBe(0);
+    expect(upgrade.steps.map((s) => s.run ?? '')).toContain('pnpm test:upgrade');
+    expect(upgrade.steps.at(-1)).toMatchObject({ if: 'always()' });
+    expect(job('ci-ok').needs).toContain('upgrade');
+  });
+
   it('V02: the trial set-up job has the same trigger as the fresh deployment, and cleans up', () => {
     expect(job('trial-up').needs).toEqual(['scan', 'checks']);
     expect(job('trial-up').if).toBe("needs.scan.outputs.run_fresh_deploy == 'true'");
