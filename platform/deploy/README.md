@@ -680,15 +680,33 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 
 ## Upgrade
 
-Upgrade to a **release tag** (`vX.Y.Z`), and follow the "Upgrade notes" of every release between yours and the new one in the [CHANGELOG](../../CHANGELOG.md): they list the migrations, the credentials commands to run again and the changed settings ([RELEASING.md](../../RELEASING.md)). `main` is for developers: it may hold changes that are not released yet.
+Upgrade to a **release tag** (`vX.Y.Z`), and follow the "Upgrade notes" of every release between yours and the new one in the [CHANGELOG](../../CHANGELOG.md): they list the migrations, the credentials commands to run again and the changed settings ([RELEASING.md](../../RELEASING.md)). The first bullet of each release's notes says what every running stack must do; the other bullets are optional or explain one change. `main` is for developers: it may hold changes that are not released yet.
 
-1. Take a backup: `pnpm backup` ([above](#backup-and-restore)); it holds OpenBao's snapshot, the way back after an OpenBao image change ([T11 §4b](../../handbook/03-templates/T11-openbao-runbook.md#4b-upgrading-the-openbao-image)).
-2. `git fetch --tags`, then `git checkout vX.Y.Z` (the new release), then `pnpm install && pnpm build`. Update the `sdlc` command of each person to the same version: `npm install -g agentic-sdlc-cli@<version>`.
-3. Add any new `.env` variables (`.env.example` lists them; `init-env.sh` never overwrites `.env`). After the A10 update (TLS on OpenBao): `pnpm openbao:tls dev` on a development machine; on the server, the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)).
-4. The images. On a release tag (step 2) there is nothing to build: `up.sh` in step 5 pulls the release's images, and `sandbox.image` takes `pnpm images get SANDBOX_NODE24` ([Verify the published images](#verify-the-published-images) first). Developers on a branch pull the pinned images and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`): `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull`, then the same with `build` (add `--profile observability` when you use it).
-5. Start only OpenBao, PostgreSQL and SeaweedFS, unseal OpenBao ([Restart after a reboot](#restart-after-a-reboot), first three commands), apply new migrations ([step 6](#6-database)), then start everything ([step 7](#7-start-the-platform)).
-6. Run a credentials command only when the release's Upgrade notes say an update added one or gave one new rights ([Fresh deployment, step 5](#5-credentials-of-every-process)).
-7. Check: `curl -s http://127.0.0.1:8090/health/ready`, and no `…_missing` line in the logs ([Troubleshooting](#troubleshooting)).
+Before you start, let the running intents reach a gate: an intent that waits at a gate goes on after the upgrade, while a run that is going on may be refused by the new release (the Upgrade notes say when). `pnpm test:upgrade` runs these steps on a throw-away stack, from the previous release to the new one (section [Tests](#tests)).
+
+1. **Backup.** `pnpm backup` ([above](#backup-and-restore)), still on the old release. It holds OpenBao's snapshot, the way back after an OpenBao image change ([T11 §4b](../../handbook/03-templates/T11-openbao-runbook.md#4b-upgrading-the-openbao-image)).
+2. **The new release.** `git fetch --tags`, then `git checkout vX.Y.Z`, then `pnpm install && pnpm build`. Update the `sdlc` command of each person to the same version: `npm install -g agentic-sdlc-cli@<version>`.
+3. **New settings.** Add the keys that are new in `.env.example`; a line that is already in `.env` is never changed:
+
+   ```bash
+   pnpm compose:env --add-missing
+   ```
+
+   It prints the names of the keys it added, with a random value for each new secret, never a value. Check the new lines against the Upgrade notes (a host port, a path). After the A10 update (TLS on OpenBao): `pnpm openbao:tls dev` on a development machine; on the server, the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)).
+4. **The images.** On a release tag (step 2) there is nothing to build: `up.sh` in step 9 pulls the release's images, and `sandbox.image` takes `pnpm images get SANDBOX_NODE24` ([Verify the published images](#verify-the-published-images) first). Developers on a branch pull the pinned images and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`):
+
+   ```bash
+   docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull
+   docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox build
+   ```
+
+   Add `--profile observability` (or another optional profile) when you use it.
+5. **Stop.** `pnpm compose:down` stops and removes the containers; the volumes, and so the data, are kept.
+6. **Unseal.** Start only OpenBao, PostgreSQL and SeaweedFS, and two key holders unseal OpenBao ([Restart after a reboot](#restart-after-a-reboot), the first three commands).
+7. **Migrations.** `pnpm db:migrate` ([Fresh deployment, step 6](#6-database)); `pnpm db:status` lists no pending migration afterwards.
+8. **Credentials.** Run the `pnpm openbao:bootstrap …` commands that the first bullet of the Upgrade notes names, release by release, in their order (none when it says so). `configure` needs a root token: make one from two key shares with `pnpm openbao:bootstrap root-token` (`configure` revokes it again). The credentials commands take the admin token of [Fresh deployment, step 3](#3-openbao).
+9. **Start.** `platform/deploy/scripts/up.sh core models platform sandbox` ([step 7](#7-start-the-platform); add your optional profiles). It starts `sdlc-worker` and `sdlc-runner` together, from the same release.
+10. **Check.** `curl -s http://127.0.0.1:8090/health/ready`, no `…_missing` line in the logs ([Troubleshooting](#troubleshooting)), `pnpm sdlc ops audit verify` (the audit chain is intact), and the intents that waited at a gate go on (`pnpm sdlc intent show <INT-…>`). `pnpm doctor` checks the rest.
 
 Never run `docker volume prune` or `docker system prune --volumes`: they delete the platform's data.
 
@@ -790,5 +808,6 @@ This deletes every intent, the evidence, the audit log and the secrets. Keep a b
 | `pnpm test:sandbox-image` | Builds the sandbox images `node24` and `node24-opencode` and runs them hardened with the real Verdaccio: Node 24, pnpm through corepack and the proxy, no other way out. Needs internet | Yes |
 | `pnpm test:observability` | A08 AC3: `core + models + observability` on a throw-away Compose project (ports +27000) with a stub model and throw-away OpenBao keys. One model call through LiteLLM must give a Langfuse trace with all seven labels; a span of a platform process must reach Langfuse through the collector; the collector has no host port. About 2 minutes | Yes |
 | `pnpm test:fresh-deploy` | E07 AC3: follows the section [Fresh deployment](#fresh-deployment-operator) on a throw-away Compose project (ports +31000, throw-away keys): `compose:env`, OpenBao init, unseal and configure, the shared secrets, every credentials command, the migrations, `up.sh core models platform sandbox`, `ops bootstrap`, the team, the sandbox image, the agent, the configuration, the AI record and the first intent at G1, then `sdlc audit verify`. CI: weekly and manual runs only. Prints `e07:fresh_deploy_seconds` | Yes |
+| `pnpm test:upgrade` | O02: follows the section [Upgrade](#upgrade) on a throw-away Compose project (ports +34000, throw-away keys): the previous release (a git worktree of its tag, its published images by digest) deployed like [Fresh deployment](#fresh-deployment-operator) with an intent waiting at G1, then the ten steps to this checkout (or `SDLC_UPGRADE_TO=<tag>`) with the credentials commands of the Upgrade notes; the intent goes on to G2, a new intent reaches G1, and the audit chain verifies. Needs `age` and the release tags. About 15 minutes between two releases with published images. CI: weekly and manual runs only. Prints `o02:upgrade_seconds` | Yes |
 | `pnpm test:access` | V09: the profile `access` on a throw-away Compose project (ports +36000, throw-away OpenBao keys and CA): from a container on another network only the proxy answers, TLS verified with the CA and refused without it, the routes (`/health/ready` included), plain HTTP `400`, another host `421`, a large body `413`, the headers and the dashboard's CSP unchanged, the proxy's rate limit, a forged `X-Forwarded-For` does not escape the api's limit, the proxy cannot reach PostgreSQL, OpenBao or SeaweedFS, `sdlc whoami` through it, a renewal without a restart. A few minutes | Yes |
 | `pnpm test:compose` | Starts `core`, then `core + observability`, with a throw-away env file, its own project name and ports shifted by 20000. Checks health, databases, namespace, buckets, Valkey policy, OpenBao state, Langfuse sign-up and trace upload. Removes everything afterwards. Takes about 2–5 minutes | Yes |

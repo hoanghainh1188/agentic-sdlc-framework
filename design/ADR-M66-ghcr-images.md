@@ -84,5 +84,5 @@ The first scan (2026-10-10) found CRITICAL findings in `node:24.13.0-bookworm-sl
 ## 5. Open items
 
 - ~~V12: the tag-driven release workflow calls this one before the tag (§2.5) and writes the lock file pull request.~~ Done differently in V12 (QUESTIONS #390): the tag workflow verifies the images instead of calling this one; `pnpm release:lock` prepares the lock file pull request, which a person opens (a pull request opened by a workflow token would not start CI).
-- O02 (Server): the upgrade test between two releases uses the published images.
+- ~~O02 (Server): the upgrade test between two releases uses the published images.~~ Done in O02 (QUESTIONS #581): `pnpm test:upgrade` checks out the last release tag as a git worktree, which as a release checkout pulls its images by digest from its own `images.lock`, and upgrades it to this checkout (or to another tag, with its published images).
 - After the first real push: Harry sets the five packages to public and runs `cosign verify` once from a clean machine.

@@ -203,6 +203,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R081c | No inherited COMPOSE_PROJECT_NAME | runtime+test | platform/deploy/trial/src/host.ts:20; tests/trial/compose-project-name.test.ts | full | pointer-only | platform/deploy/CLAUDE.md |
 | R081d | Passphrase never from arg/env | test | tests/deploy/trial-up-static.test.ts:204 | full | pointer-only | platform/deploy/CLAUDE.md |
 | R081e | Fresh deployment ↔ up.ts ↔ test:fresh-deploy | test+ci | tests/deploy/trial-up-static.test.ts:38 | partial | keep-root | platform/deploy/CLAUDE.md |
+| R081f | README "Upgrade" ↔ test:upgrade; `--add-missing` only appends (added by O02) | test+ci | tests/deploy/upgrade-readme.test.ts; tests/deploy/compose-static.test.ts ("--add-missing") | full | pointer-only | platform/deploy/CLAUDE.md |
 | R082a–f | Access proxy rules | test | tests/deploy/access-static.test.ts; tests/trial/trial-up.test.ts:307 | full | pointer-only | platform/deploy/CLAUDE.md |
 | R137 | vLLM (profile `models-local`) only on the internal network `models` with LiteLLM, no host port; weights read-only, offline; no prompt logging, no remote code; the profile optional (added by L01) | test | tests/deploy/models-local-static.test.ts | full | pointer-only | platform/deploy/CLAUDE.md |
 | R083a,b | GitHub App manifest; secrets dropped | test | tests/deploy/github-app.test.ts:58 | full | pointer-only | platform/deploy/CLAUDE.md |
@@ -269,3 +270,4 @@ Some rows group several rules with the same check (for example R082a–f).
 | 0.8 | 2026-10-24 | Claude (task X04, PR 3b) | New row R138 (a tool's backing services, credential file and `knowledge_read`, `platform/apps/runner/CLAUDE.md`) |
 | 0.9 | 2026-10-24 | Claude (task X11) | New row R139 (context condensing: the run's own model and key, summaries never as text, `platform/apps/runner/CLAUDE.md`) |
 | 0.10 | 2026-10-24 | Claude (task H04) | New row R140 (the secret scan of every run's diff, `platform/apps/runner/CLAUDE.md`) |
+| 0.11 | 2026-10-24 | Claude (task O02) | New row R081f (the README "Upgrade" and `pnpm test:upgrade` in step; `compose:env --add-missing` only appends) |
