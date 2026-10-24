@@ -237,6 +237,8 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 | # | Check | When it fails | What happens next |
 |---|---|---|---|
 | 1 | The run added, changed or removed no file the agent reads as instructions (§13.10.2 check 6b, `AGENTS.md` included) | G5 fails: `instructions_unpinned` | The intent is **paused** at G5. A **security** escalation goes to Person B (Chapter 18) |
+| 1b | No secret in the lines the run added (§13.10.5a) | G5 fails: `secret_in_diff` | The intent is **paused** at G5. A **security** escalation goes to Person B |
+| 1c | The secret scan ran (§13.10.5a) | G5 fails: `secret_scan_failed` | The intent is **paused** at G5. A **technical** escalation goes to Person B |
 | 2 | Every changed file is in the plan G3 approved | G5 fails: `out_of_scope` | The intent goes back to **G3**. No escalation: the G3 approver decides |
 | 3 | The run did not reach its cost limit (the runner's stop, or a spend at the stop share found after the run) | G5 fails: `budget_exceeded` | The intent is **paused** at G5. An **intent** escalation goes to Person A |
 | 4 | The run did not stop at its iteration limit, its time limit, or because it made no progress | G5 fails: `run_cap_reached` | The intent is **paused** at G5. An **intent** escalation goes to Person A |
@@ -254,6 +256,27 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 | `resume` | The intent goes back to **G4**, and a new run starts after G4 **from the latest commit of the default branch**, or, once a run of the intent was pushed (Chapter 14 §14.10.1), from the commit the platform pushed. The stopped run's diff stays as evidence. To give the next runs more budget, decide through the API with a budget increase (Chapter 18 §18.8b); a comment never raises a budget |
 | `modify` or `roll-back` | The intent goes back to **G3**, which is HITL from now on. The earlier G3 approval no longer counts; the approver may approve the same plan again, or Person A submits a changed plan |
 | `terminate` | The intent is closed (`cancelled`). The run's diff stays as evidence |
+
+### 13.10.5a. The secret scan of the run's diff
+
+> Written by Claude Code together with the platform code (task H04, `design/ADR-M93-diff-secret-scan.md`).
+
+The agent can copy a secret it finds in the repository (a key in a test file, a token in a configuration file) into its change. So before G5, the platform's runner scans the run's diff for secrets, outside the sandbox, with **Gitleaks** (an open-source secret scanner).
+
+- **What it scans:** only the lines the run **added**. A secret the run only removes is not a new leak.
+- **Which rules:** the repository's own `.gitleaks.toml` **as it is on the run's start commit**. A `.gitleaks.toml` that the run itself adds or changes is never used, so the agent cannot allowlist its own change. Without the file, Gitleaks' built-in rules apply. A configuration that extends another file (`[extend] path = …`) is refused. `.gitleaksignore` files and `gitleaks:allow` comments are ignored.
+- **What the platform records:** the result (`clean`, `found` or `failed`), the number of findings and the rule codes (for example `aws-access-token`) in the run event `secrets_scanned`. Never the secret, the line or the file name.
+- **The scan cannot be turned off.**
+
+**When the scan finds a secret** (`secret_in_diff`), nothing is pushed: the pull request is opened only after G5 passes (Chapter 14 §14.10.1). Person B decides the security escalation as in the table above. There is no decision that pushes the change anyway.
+
+1. **Rotate the secret** (create a new one and revoke the old one), even if nothing was pushed. The stored diff keeps it as evidence until the retention period ends.
+2. To see where it came from: the platform shows only the rule codes, never the place. The agent usually copied a secret that is already in the repository, so run `gitleaks dir` in your own clone at the run's start commit and look for findings of the same rules. Remove that secret from the repository too.
+3. Then decide: usually `resume` (a new run; tell the agent in the plan not to copy secrets) or `modify` (a changed plan).
+
+**A false positive** (a test value that only looks like a secret): add an allowlist to `.gitleaks.toml` on the default branch, through a reviewed pull request. Then decide `resume`: the new run is scanned with the new rules.
+
+**When the scan fails** (`secret_scan_failed`): the runner has no Gitleaks, the scan took longer than its limit (`SDLC_RUNNER_SECRET_SCAN_TIMEOUT_SECONDS`, default 120), or Gitleaks refused the repository's `.gitleaks.toml`. A run recorded by a runner older than this platform version is held the same way. The cause code is in the run event. The platform operator fixes the cause (the runner image ships Gitleaks; a developer runner uses `SDLC_RUNNER_GITLEAKS_PATH`), or Person A fixes the configuration; then decide `resume`.
 
 ### 13.10.6. Recertification warning
 
@@ -309,3 +332,4 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 | 0.12 | 2026-10-09 | Claude (docs review fixes) | `roll-back` is the decision's spelling (comments accept `roll_back` too; the CLI only `roll-back`); the header note points to Chapter 18 for the kill switch |
 | 0.11 | 2026-10-09 | Claude (docs review PR C2) | §13.10.2 check 6b: the one list of agent instruction files (only the exact pinned path is left out); §13.10.4: "The budgets", the one description with the default amounts (moved from ROLLOUT-GUIDE) |
 | 0.14 | 2026-10-24 | Claude (task X11) | §13.10.4: long runs and small models, context condensing (`run.context_condensing`, rule M35; ADR-M29 §2.10) |
+| 0.15 | 2026-10-24 | Claude (task H04) | §13.10.5: G5 checks the secret scan (`secret_in_diff`, `secret_scan_failed`); new §13.10.5a: the secret scan of the run's diff (ADR-M93, QUESTIONS #586–#590) |

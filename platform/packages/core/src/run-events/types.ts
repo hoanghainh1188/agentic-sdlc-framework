@@ -23,9 +23,11 @@ import { isUuid } from '../db/tenant-id.js';
  *   float (D-05 D6; C07)
  * - `model`: a model gateway name, which may hold `/` and be 128 characters long (V13,
  *   QUESTIONS #434); still no space and no `@`, as the database CHECK requires
+ * - `codes`: codes joined by `:` (each letters, digits, `_ . -`; max 128 in all), for a short list
+ *   such as the rule codes of a secret scan (H04, ADR-M93 §2.3)
  */
 export type RunEventFieldKind =
-  'uuid' | 'sha256' | 'version' | 'count' | 'code' | 'decimal' | 'model';
+  'uuid' | 'sha256' | 'version' | 'count' | 'code' | 'decimal' | 'model' | 'codes';
 export type RunEventFieldSpec = RunEventFieldKind | `${RunEventFieldKind}?`;
 
 export const RUN_EVENT_TYPES = {
@@ -196,6 +198,23 @@ export const RUN_EVENT_TYPES = {
     paths_sha256: 'sha256',
   },
   /**
+   * The runner's secret scan of the run's added lines, outside the sandbox (H04, ADR-M93 §2.3):
+   * `result` is `clean`, `found` or `failed`; `findings` the number of findings; `rules` where the
+   * rules came from (`repository`: the base commit's `.gitleaks.toml`, or `built_in`); `rule_ids`
+   * the distinct rule codes found (a rule ID that is not a code is `custom`); `cause` why a scan
+   * failed. Never a match, a line, a path or a fingerprint. G5 holds the run on `found` and
+   * `failed` (QUESTIONS #587).
+   */
+  secrets_scanned: {
+    result: 'code',
+    findings: 'count',
+    rules: 'code',
+    rule_ids: 'codes?',
+    config_sha256: 'sha256?',
+    scanner_version: 'code?',
+    cause: 'code?',
+  },
+  /**
    * The runner pushed the run's checked changes as one commit on `agent/INT-…` (C08, ADR-M38
    * §2.2): `head_sha` is the commit the runner made from the stored diff (never what the sandbox
    * reported) and that the Git host now shows for the branch; `diff_sha256` and `paths_sha256` are
@@ -326,6 +345,8 @@ type FieldValue<K> = K extends
   | 'decimal?'
   | 'model'
   | 'model?'
+  | 'codes'
+  | 'codes?'
   ? string
   : number;
 type Fields<T extends RunEventType> = (typeof RUN_EVENT_TYPES)[T];
@@ -345,6 +366,7 @@ export const MAX_RUN_EVENT_PAYLOAD_BYTES = 2048;
 const SHA256 = /^[0-9a-f]{64}$/;
 // No spaces (no sentences) and no '@' (no e-mail addresses).
 const CODE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
+const CODES = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}(?::[A-Za-z0-9][A-Za-z0-9_.-]{0,63})*$/;
 // A gateway model name as the database CHECK accepts it: no space, no '@', no '+'.
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 
@@ -369,6 +391,8 @@ function isValidField(kind: RunEventFieldKind, value: unknown): boolean {
       return isUsd(value);
     case 'model':
       return isRecordableModel(value);
+    case 'codes':
+      return typeof value === 'string' && value.length <= 128 && CODES.test(value);
   }
 }
 

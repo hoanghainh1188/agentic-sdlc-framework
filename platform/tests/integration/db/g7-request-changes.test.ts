@@ -101,6 +101,11 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
       instruction_files: 0,
       paths_sha256: PATHS,
     });
+    await w.t.f.scope.runEvents.append(runId, 'secrets_scanned', {
+      result: 'clean',
+      findings: 0,
+      rules: 'built_in',
+    });
     await w.t.f.scope.runs.transition(runId, {
       from: ['running'],
       to: 'succeeded',

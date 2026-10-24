@@ -13,6 +13,7 @@ Rules for `platform/apps/runner`, the agent and model adapters (`platform/packag
 - GitHub tokens are single-repository and revoked by the runner right after use (ADR-M42 §2.4). [R068]
 - A register tool reaches only the backing services of `SDLC_RUNNER_TOOL_SERVICES`, on its own service network (the tool and its services, never the gateway, the sandbox or another tool); its credential is a file in its own runtime volume, never an environment value; `knowledge_read` comes from the tool's own log, IDs and hashes only (ADR-M69 §2.4, ADR-M89). [R138]
 - Context condensing only for OpenHands work runs whose model has a known context size, and only with the run's own model, LiteLLM URL and virtual key; a summary never leaves the adapter as text: counts in run events, its SHA-256 and length in the log (ADR-M29 §2.10). [R139]
+- Every run's added lines are scanned for secrets outside the sandbox, with the Gitleaks pinned in `platform/deploy/scripts/gitleaks.sh` and only the base commit's `.gitleaks.toml`; `secrets_scanned` holds codes and counts, never a match or a path; G5 holds a run on a finding, a failed scan or no scan (ADR-M93). [R140]
 
 ## Commands
 Run from the repo root.

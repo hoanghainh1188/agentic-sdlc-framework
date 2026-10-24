@@ -9,6 +9,14 @@
 FROM node:24.13.0-bookworm-slim AS build
 WORKDIR /repo
 RUN corepack enable
+# Gitleaks for the secret scan of every run's diff (H04, ADR-M93 §2.1): the version and SHA-256
+# pinned in the script (the same as the CI `scan` job), for the build machine's own architecture.
+COPY platform/deploy/scripts/gitleaks.sh /tmp/gitleaks.sh
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl ca-certificates \
+  && rm -rf /var/lib/apt/lists/* \
+  && cp "$(SDLC_GITLEAKS_DIR=/tmp/gitleaks sh /tmp/gitleaks.sh)" /usr/local/bin/gitleaks \
+  && rm -rf /tmp/gitleaks /tmp/gitleaks.sh
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json tsconfig.json .npmrc ./
 COPY platform/apps platform/apps
 COPY platform/packages platform/packages
@@ -40,5 +48,6 @@ RUN apt-get update \
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build --chown=root:root /out /app
+COPY --from=build --chown=root:root --chmod=0755 /usr/local/bin/gitleaks /usr/local/bin/gitleaks
 USER node
 CMD ["node", "/app/dist/main.js"]

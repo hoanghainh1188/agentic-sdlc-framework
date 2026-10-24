@@ -190,6 +190,10 @@ export const GATE_REASON_CODES = [
   // G4 (task X04, ADR-M69 §2.3): a register tool the plan asks for cannot be given to the run; the
   // exact cause (`tool_not_found`, `tool_not_allowed_for_agent`, …) is in the audit event.
   'tool_not_runnable',
+  // G5 (task H04, ADR-M93 §2.4, QUESTIONS #587): the runner's secret scan found a secret in the
+  // run's added lines, or the scan failed (or was not recorded). Codes and counts only.
+  'secret_in_diff',
+  'secret_scan_failed',
   'other',
 ] as const;
 export type GateReasonCode = (typeof GATE_REASON_CODES)[number];

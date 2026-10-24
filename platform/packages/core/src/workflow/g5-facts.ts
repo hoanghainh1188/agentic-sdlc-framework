@@ -1,7 +1,8 @@
 // What G5 reads about the intent's last run (task C07 PR 2, design/ADR-M34 §2.8): the run's final
 // status and stop reason, the runner's records of its changes (`diff_stored`, `changes_checked`,
 // PR 1), the key's cap (`key_issued`), the run's synced spend
-// (`cost_records`), and the intent's synced spend. The G5 input hash binds every G5 decision and the G5 escalation to exactly this
+// (`cost_records`), and the intent's synced spend; the runner's secret scan of the added lines
+// (`secrets_scanned`, H04, ADR-M93). The G5 input hash binds every G5 decision and the G5 escalation to exactly this
 // result of exactly this run (FR-17). Codes, counts and hashes only: never a path.
 import { createHash } from 'node:crypto';
 
@@ -28,12 +29,20 @@ export interface G5Changes {
   readonly pathsSha256: string;
 }
 
+/** The runner's secret scan (`secrets_scanned`, H04): its result and the number of findings. */
+export interface G5SecretScan {
+  readonly result: 'clean' | 'found' | 'failed';
+  readonly findings: number;
+}
+
 export interface G5Facts {
   readonly run: Run;
   /** SHA-256 of the stored diff (`diff_stored`); null when the runner recorded none. */
   readonly diffSha256: string | null;
   /** The runner's check of the changed paths (`changes_checked`); null when missing. */
   readonly changes: G5Changes | null;
+  /** The runner's secret scan (`secrets_scanned`); null when missing (QUESTIONS #590). */
+  readonly secrets: G5SecretScan | null;
   /** The cap of the run's key (`key_issued`); null when unknown. */
   readonly keyCapUsd: string | null;
   /** The run's synced spend (`cost_records`), as a decimal string. */
@@ -65,6 +74,12 @@ export async function gatherG5Facts(scope: TenantScope, intentId: string): Promi
   const diff = last('diff_stored');
   const checked = last('changes_checked');
   const key = last('key_issued');
+  const scanned = last('secrets_scanned');
+  const result = scanned?.result;
+  const secrets: G5SecretScan | null =
+    result === 'clean' || result === 'found' || result === 'failed'
+      ? { result, findings: num(scanned?.findings) }
+      : null;
   const changes: G5Changes | null =
     checked && typeof checked.paths_sha256 === 'string'
       ? {
@@ -83,6 +98,7 @@ export async function gatherG5Facts(scope: TenantScope, intentId: string): Promi
     run,
     diffSha256,
     changes,
+    secrets,
     keyCapUsd: str(key?.max_budget_usd),
     spentUsd: fromMicros(spent),
     intentSpentUsd,

@@ -10,8 +10,12 @@
 //    `planned_files`) and against the paths the agent reads as instructions
 //    (`isAgentInstructionPath`, the pinned file included: editing it changes the agent). The run
 //    event `changes_checked` holds counts and the SHA-256 of the sorted paths, never a path.
-// G5 (PR 2) decides from `changes_checked`; the runner only records. Any failure throws: the caller
-// fails the run (`agent_changes_unavailable`), so no run reaches G5 without its checked changes.
+// 4. The added lines are scanned for secrets (`secrets.ts`, H04, ADR-M93): the run event
+//    `secrets_scanned` holds the result, counts and rule codes, never a match or a path. A failed
+//    scan is recorded, never thrown: G5 holds the run on it (QUESTIONS #587).
+// G5 (PR 2) decides from `changes_checked` and `secrets_scanned`; the runner only records. Any other
+// failure throws: the caller fails the run (`agent_changes_unavailable`), so no run reaches G5
+// without its checked changes.
 import crypto from 'node:crypto';
 
 import {
@@ -20,11 +24,12 @@ import {
   type PolicyEngine,
   type RunContract,
 } from '@sdlc/contracts';
-import { parseTenantId, type PlatformDatabase } from '@sdlc/core';
+import { parseTenantId, type PlatformDatabase, type RunEventPayload } from '@sdlc/core';
 
 import type { DockerClient } from '../docker/client.js';
 import type { RunnerSettings } from '../settings.js';
 import { computeRunPatch } from './export.js';
+import { scanDiffForSecrets, type SecretScan } from './secrets.js';
 
 export interface ChangesDeps {
   readonly db: PlatformDatabase;
@@ -43,6 +48,7 @@ export interface CheckedChanges {
   /** SHA-256 of the RFC 8785 JSON of the sorted changed paths (an array of strings). */
   readonly pathsSha256: string;
   readonly diffSha256: string;
+  readonly secrets: SecretScan;
 }
 
 /** Counts of the changed paths; the paths stay in memory. */
@@ -50,7 +56,7 @@ export function checkChangedPaths(
   policy: Pick<PolicyEngine, 'checkScope'>,
   plannedFiles: readonly string[],
   changedFiles: readonly string[],
-): Omit<CheckedChanges, 'diffSha256'> {
+): Omit<CheckedChanges, 'diffSha256' | 'secrets'> {
   const sorted = [...changedFiles].sort();
   const scope = policy.checkScope({ plannedFiles, changedFiles: sorted });
   return {
@@ -76,6 +82,13 @@ export async function storeChanges(
     patch.patch,
     'text/x-diff',
   );
+  const secrets = await scanDiffForSecrets({
+    settings: deps.settings.secretScan,
+    cloneDir,
+    baseSha: contract.base_sha,
+    gitTimeoutMs: deps.settings.git.timeoutMs,
+    patch: patch.patch,
+  });
   const scope = deps.db.forTenant(parseTenantId(contract.tenant_id));
   await scope.transaction(async (tx) => {
     await tx.evidenceItems.record({
@@ -97,6 +110,20 @@ export async function storeChanges(
       instruction_files: checked.instructionFiles,
       paths_sha256: checked.pathsSha256,
     });
+    await tx.runEvents.append(contract.run_id, 'secrets_scanned', secretsScannedPayload(secrets));
   });
-  return { ...checked, diffSha256: stored.sha256 };
+  return { ...checked, diffSha256: stored.sha256, secrets };
+}
+
+/** The payload of the run event `secrets_scanned`: codes and counts only (ADR-M93 §2.3). */
+export function secretsScannedPayload(scan: SecretScan): RunEventPayload<'secrets_scanned'> {
+  return {
+    result: scan.result,
+    findings: scan.findings,
+    rules: scan.rules,
+    ...(scan.ruleIds.length > 0 ? { rule_ids: scan.ruleIds.join(':') } : {}),
+    ...(scan.configSha256 !== null ? { config_sha256: scan.configSha256 } : {}),
+    ...(scan.scannerVersion !== null ? { scanner_version: scan.scannerVersion } : {}),
+    ...(scan.cause !== undefined ? { cause: scan.cause } : {}),
+  };
 }

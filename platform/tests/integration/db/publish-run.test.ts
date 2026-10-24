@@ -199,6 +199,11 @@ describeDb('C08: the runner pushes the checked changes (stub Git host, PostgreSQ
         instruction_files: 0,
         paths_sha256: options.pathsSha256 ?? diff.pathsSha256,
       });
+      await tx.runEvents.append(runId, 'secrets_scanned', {
+        result: 'clean',
+        findings: 0,
+        rules: 'built_in',
+      });
     });
     await t.f.scope.runs.transition(runId, {
       from: ['running'],
