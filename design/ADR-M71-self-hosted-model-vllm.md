@@ -54,7 +54,7 @@ L02 measured local models on a laptop (D-07 §9): a 20B model resolves about two
 - D-03 §10.1 no longer says "API models only, no GPU": the GPU is optional, the profile is off by default, and the server without a GPU runs as before.
 - The `.env` of an existing stack needs nothing: every new setting has a default. LiteLLM joins the new network `models` at the next `up`.
 - The GPU host needs the NVIDIA driver and the NVIDIA Container Toolkit (deploy README "Self-hosted model").
-- The internal cost is a placeholder until L03.
+- The internal cost is a placeholder until L03. The [GPU sizing note](L03-gpu-sizing-note.md) §7 estimates that the real cost per token is probably several times higher at low use; it needs a measurement on a GPU before the template changes.
 
 ## 4. Later: a separate GPU host (L01 PR 2, QUESTIONS #546)
 
