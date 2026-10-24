@@ -1,0 +1,44 @@
+# TEMPORARY (O01 PR 1): iterate on the rootless job; removed before review.
+name: o01-scratch
+on:
+  push:
+    branches:
+      - task/O01-runner-isolation
+permissions:
+  contents: read
+env:
+  DOCKER_ROOTLESS_VERSION: 29.8.2
+  DOCKER_STATIC_SHA256: 995d1ef289677f74fd58d8d2c35727b6a4ee389c69db8638a3e42d0487aa5b0f
+  DOCKER_ROOTLESS_EXTRAS_SHA256: 707ebf6a5afd88104086e7b6749997b2366e816aeaf2c3ef2305b08fde9ee007
+jobs:
+  runner-rootless:
+    name: runner on rootless Docker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install the rootless Docker Engine (static archives, pinned by SHA-256)
+        run: |
+          sudo apt-get install -y --no-install-recommends uidmap slirp4netns dbus-user-session
+          base="https://download.docker.com/linux/static/stable/x86_64"
+          curl -fsSLo "$RUNNER_TEMP/docker.tgz" "$base/docker-${DOCKER_ROOTLESS_VERSION}.tgz"
+          echo "$DOCKER_STATIC_SHA256  $RUNNER_TEMP/docker.tgz" | sha256sum -c -
+          curl -fsSLo "$RUNNER_TEMP/extras.tgz" "$base/docker-rootless-extras-${DOCKER_ROOTLESS_VERSION}.tgz"
+          echo "$DOCKER_ROOTLESS_EXTRAS_SHA256  $RUNNER_TEMP/extras.tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/rootless"
+          tar -xzf "$RUNNER_TEMP/docker.tgz" -C "$RUNNER_TEMP/rootless" --strip-components=1
+          tar -xzf "$RUNNER_TEMP/extras.tgz" -C "$RUNNER_TEMP/rootless" --strip-components=1
+      - name: Start the rootless Engine (sets DOCKER_HOST for the next steps)
+        run: sh platform/deploy/scripts/test-rootless-docker.sh "$RUNNER_TEMP/rootless"
+      - run: pnpm test:runner
+      - name: Show the rootless Engine's log
+        if: failure()
+        run: XDG_RUNTIME_DIR="/run/user/$(id -u)" journalctl --user -u docker.service --no-pager -n 300 || true
