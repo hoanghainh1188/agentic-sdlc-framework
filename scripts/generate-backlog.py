@@ -708,6 +708,13 @@ t("L03","Models","GPU sizing note for leadership","S",["L02"],"D-07",
  "design/ (a short note)",
  ["From the L02 numbers: which model size meets the quality bar, the GPU memory and count it needs, buy or rent (with the legal question of rented hardware for `client_restricted` data), the cost per month"],
  "QUESTIONS #362")
+t("L03b","Models","Measure a 30B-class model on a rented GPU","S",["L01","L03"],"D-07 §9",
+ "platform/eval (provider vllm, configs/gpu.yaml, gpu/), design/L03b-gpu-measurement-runbook.md, design/D-07 §9, design/L03-gpu-sizing-note.md",
+ ["`pnpm eval` runs a configuration whose model is served by the `vllm` service of the profile `models-local` (provider `vllm`), with unit tests",
+  "A runbook the owner follows: what to rent, set-up, commands, expected cost, how to delete the machine",
+  "After the owner's run: a results table in D-07 §9 (resolved, pass^5 and scope breaches against the bar of the L03 note, real GPU memory, tokens per second with 4 requests, time per run) for `Qwen3-Coder-30B-A3B-Instruct` (FP8) and `gpt-oss-20b`; L03 note 1.0 with a real cost per token",
+  "The internal cost in `litellm/config.ctmpl` changes in a separate small task after the design docs (R092)"],
+ "QUESTIONS #566, #567 (Harry, 2026-10-24): the harness gets a `vllm` provider; only the model service runs on the rented machine; fictional sample repository only, never client data; the owner runs it (R035)")
 t("O01","Server","The runner in its own VM or with rootless Docker","M",["C04"],"NFR-03",
  "platform/deploy/*, platform/apps/runner, platform/deploy/README.md, design/ADR-M25, platform/tests/*",
  ["The runner, which controls Docker, runs isolated from the other services: a separate VM, or rootless Docker (ADR-M25 §2.5)",

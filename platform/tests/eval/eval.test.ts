@@ -211,6 +211,11 @@ describe('configurations (AC2, AC6)', () => {
       ['gpt-oss-20b', 'ollama', 'gpt-oss:20b'],
       ['qwen3-8b', 'ollama', 'qwen3:8b'],
     ]);
+    const gpu = loadConfigurations(path.join(CONFIGS, 'gpu.yaml'));
+    expect(gpu.map((c) => [c.id, c.model.provider, c.model.tag, c.model.numCtx])).toEqual([
+      ['qwen3-coder-30b-fp8', 'vllm', 'qwen3-coder-30b-a3b-instruct-fp8', null],
+      ['gpt-oss-20b-gpu', 'vllm', 'gpt-oss-20b', null],
+    ]);
     expect(loadConfigurations(path.join(CONFIGS, 'stub.yaml'))[0]!.model).toMatchObject({
       provider: 'stub',
       tag: null,
@@ -230,6 +235,8 @@ describe('configurations (AC2, AC6)', () => {
   it.each([
     ['a cloud model', "{ provider: ollama, name: m, tag: 'gpt-oss:120b-cloud' }", /cloud/],
     ['a :cloud tag', "{ provider: ollama, name: m, tag: 'kimi-k2.5:cloud' }", /cloud/],
+    ['a vLLM model with num_ctx', '{ provider: vllm, name: m, tag: x, num_ctx: 4096 }', /num_ctx/],
+    ['a vLLM model with an Ollama tag', "{ provider: vllm, name: m, tag: 'a:b' }", /vLLM serves/],
     ['an unknown provider', '{ provider: openai, name: m }', /provider/],
     ['a stub with a tag', "{ provider: stub, name: m, tag: 'x:1' }", /only a name/],
     ['an unknown field', '{ provider: stub, name: m, key: secret }', /unknown field/],
@@ -255,6 +262,33 @@ describe('configurations (AC2, AC6)', () => {
     expect(() =>
       loadConfigurations(write(one('{ provider: stub, name: m }', '    instructions: gone.md\n'))),
     ).toThrow(/missing/);
+  });
+
+  it('writes the LiteLLM entries of vLLM models with the vLLM address, self-hosted with a cost', () => {
+    const text = litellmModelList(
+      loadConfigurations(path.join(CONFIGS, 'gpu.yaml')),
+      'http://ollama:11434',
+      'http://h:8000/v1',
+    );
+    expect(text.match(/model_name:/g)).toHaveLength(2);
+    expect(text).toContain('model: hosted_vllm/qwen3-coder-30b-a3b-instruct-fp8');
+    expect(text).toContain('api_base: "http://h:8000/v1"');
+    expect(text).not.toContain('ollama');
+    expect(text).toContain('reasoning_effort: low');
+    expect(text.match(/provider_type: self_hosted/g)).toHaveLength(2);
+    expect(text.match(/input_cost_per_token: 0.0000001/g)).toHaveLength(2);
+  });
+
+  it('keeps vLLM published only by the L03b override, on the bridge address', () => {
+    const root = path.resolve(CONFIGS, '..', '..', '..');
+    const main = fs.readFileSync(path.join(root, 'platform/deploy/docker-compose.yml'), 'utf8');
+    expect(main).not.toMatch(/8000:8000/);
+    const override = fs.readFileSync(
+      path.join(CONFIGS, '..', 'gpu', 'compose.vllm-port.yml'),
+      'utf8',
+    );
+    expect(override).toContain('${SDLC_VLLM_EVAL_BIND:-172.17.0.1}:8000:8000');
+    expect(override).not.toMatch(/'0\.0\.0\.0/);
   });
 
   it('writes the LiteLLM model list for Ollama models only, once each, self-hosted with a cost', () => {

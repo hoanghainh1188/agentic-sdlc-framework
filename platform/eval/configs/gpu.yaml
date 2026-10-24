@@ -1,0 +1,21 @@
+# GPU configurations for the measurement of task L03b (design/L03b-gpu-measurement-runbook.md).
+# Each model is served by vLLM of the profile `models-local` (ADR-M71), one at a time: `tag` is
+# the name in SDLC_VLLM_SERVED_NAME. Run one configuration per vLLM start:
+#   pnpm eval --out <folder> --config platform/eval/configs/gpu.yaml --configurations <id>
+# The context length is vLLM's (SDLC_VLLM_MAX_MODEL_LEN, 32768), the same as num_ctx in local.yaml.
+schema: 1
+configurations:
+  # Qwen3-Coder-30B-A3B-Instruct in 8-bit (FP8): about 31 GB of weights (L03 note section 4).
+  - id: qwen3-coder-30b-fp8
+    agent_version: 1.0.0
+    model: { provider: vllm, name: qwen3-coder-30b-fp8, tag: qwen3-coder-30b-a3b-instruct-fp8 }
+    instructions: repo
+    max_iterations: 30
+    max_duration_min: 20
+  # The model of L02 on the laptop, here on the GPU, so the two models and the laptop compare.
+  - id: gpt-oss-20b-gpu
+    agent_version: 1.0.0
+    model: { provider: vllm, name: gpt-oss-20b-gpu, tag: gpt-oss-20b, reasoning_effort: low }
+    instructions: repo
+    max_iterations: 30
+    max_duration_min: 20
