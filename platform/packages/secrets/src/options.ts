@@ -18,7 +18,12 @@ export const ENV = {
 } as const;
 
 /** Mount paths and the Transit key name set by the bootstrap (A03, bootstrap.conf, ADR-M19). */
-export const DEFAULT_MOUNTS = { kv: 'kv', transit: 'transit', approle: 'approle' } as const;
+export const DEFAULT_MOUNTS = {
+  kv: 'kv',
+  transit: 'transit',
+  approle: 'approle',
+  database: 'database',
+} as const;
 export const RUN_CONTRACT_KEY = 'run-contract';
 export const DEFAULT_TIMEOUT_MS = 10_000;
 

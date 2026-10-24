@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.41. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.43. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -792,6 +792,8 @@ A plan with a `read_documents` register tool (task X04, `design/ADR-M89-project-
 
 Without the index, a run whose plan asks for a `read_documents` tool fails (`tool_unavailable`, run event `knowledge_unavailable`). Other runs are not affected.
 
+The tool itself reads the index with a **short-lived login of its run** (task X04 PR 3b). OpenBao's database secrets engine (mount `database/`) makes it: the worker writes one OpenBao role per run, `kdocs-<run_id>`, whose only grant is the project's read role, reads one login that lives as long as the run may, and revokes it at the end of the run or at a kill. OpenBao logs in to `knowledge-db` as the role `kdocs_issuer` (may create and drop roles, holds each project's read role with the admin option only, cannot read an index itself). Its password is rotated inside OpenBao: nobody knows it, and it is never stored in a KV entry. Without this set-up, a run with a `read_documents` tool fails with `tool_unavailable` (code `credentials_unavailable`).
+
 ### First set-up
 
 Needs the profiles `core` and `knowledge` running, and OpenBao unsealed. Run it in a terminal on the server, never through a chat tool.
@@ -802,12 +804,20 @@ Needs the profiles `core` and `knowledge` running, and OpenBao unsealed. Run it 
    pnpm openbao:bootstrap worker-knowledge-credentials
    ```
    It asks for an admin token (hidden), makes a random password inside the OpenBao container, stores it at `kv/worker/knowledge-db` and sets it on the role `knowledge` through `psql` in `knowledge-db` (the SQL on standard input; the session logs no statement). It prints no secret.
-3. Restart `sdlc-worker`. The start log has no `worker.knowledge_missing` and no `worker.knowledge_off`.
-4. The embedding model `bge-m3` must be on LiteLLM: on a developer machine `ollama pull bge-m3` with the `ollama` provider stored (section 5d). Record the date in the operations log.
+3. Set up the tools' logins (needs `pnpm openbao:bootstrap configure` first, which mounts `database/`):
+   ```bash
+   pnpm openbao:bootstrap knowledge-issuer-credentials
+   ```
+   It asks for an admin token (hidden). It makes a random password inside the OpenBao container, writes the connection `knowledge-db` of the database engine with it (roles `kdocs-*` only), sets up the role `kdocs_issuer` in `knowledge-db` through `psql` (the SQL on standard input; the session logs no statement), then has OpenBao rotate the password (`rotate-root`). It prints no secret. The worker's policy allows `database/roles/kdocs-*`, `database/creds/kdocs-*` and the revocation of those leases only.
+4. Restart `sdlc-worker` and `sdlc-runner`. The start log has no `worker.knowledge_missing` and no `worker.knowledge_off`.
+5. The embedding model `bge-m3` must be on LiteLLM: on a developer machine `ollama pull bge-m3` with the `ollama` provider stored (section 5d). Record the date in the operations log.
+6. Register the tool (handbook Ch.20 §20.5c): build its image with `pnpm tool-image:build project-docs` (or take `pnpm images get TOOL_PROJECT_DOCS` on a release checkout).
 
 ### Rotation
 
 Run `pnpm openbao:bootstrap worker-knowledge-credentials` again (every 90 days, or when the password may have leaked), then restart `sdlc-worker`. The old password stops working at once.
+
+Run `pnpm openbao:bootstrap knowledge-issuer-credentials` again to repair the issuer (for example after a restore of `knowledge-db`); it ends with a new password that only OpenBao knows. The tools' own logins need no rotation: each lives one run. To end every login of one run by hand (for example when the worker was down at a kill), revoke its prefix with an admin token: `bao lease revoke -prefix database/creds/kdocs-<run_id>`. A login also ends by itself at its `VALID UNTIL` time.
 
 ### Retention
 
@@ -1001,6 +1011,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.29 | 2026-10-08 | Claude Code (docs fix PR A) | Status line shows the current version; section 5b: the GitHub App permissions as in GETTING-STARTED Step 11, the runner never reads the App key (QUESTIONS #44); section 5j: `ops retention report --tenant <slug>` |
 | 0.40 | 2026-10-12 | Claude Code (docs review for v0.2.0) | Sections 3c and 3d are subsections of section 3, like 3.1 and 3.2 (heading level only; the links stay the same) |
 | 0.41 | 2026-10-22 | Claude Code (task X03, PR 3) | Section 5g: the OpenCode sandbox image `node24-opencode` and `sandbox.images.opencode`; troubleshooting: `image_not_configured`, `adapter_mismatch`, `adapter_unavailable` (ADR-M88) |
+| 0.43 | 2026-10-24 | Claude Code (task X04, PR 3b) | Section 5o: the tools' short-lived logins to `knowledge-db` (database secrets engine, one role per run `kdocs-<run_id>`, the issuer `kdocs_issuer`, `knowledge-issuer-credentials`, revocation by prefix), restart of `sdlc-runner`, building the tool image (ADR-M89 §2.7, QUESTIONS #540) |
 | 0.42 | 2026-10-23 | Claude Code (task X04, PR 3a) | New section 5o: the worker's index of project documents in `knowledge-db` (profile `knowledge`), `kv/worker/knowledge-db`, `worker-knowledge-credentials`, rotation, retention and `knowledge.purged` (ADR-M89) |
 | 0.43 | 2026-10-24 | Claude Code (task L01, PR 1) | New section 5d.1: the provider entry `vllm` of the self-hosted model (profile `models-local`, ADR-M71); no key, two values that are not secrets |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |

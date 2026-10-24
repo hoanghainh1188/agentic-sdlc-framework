@@ -50,6 +50,7 @@ describe('V02: pnpm trial:up follows the README "Fresh deployment"', () => {
     expect(credentialsOfStep(7)).toEqual([
       'worker-langfuse-credentials',
       'worker-knowledge-credentials',
+      'knowledge-issuer-credentials',
       'api-github-oauth-credentials',
     ]);
   });

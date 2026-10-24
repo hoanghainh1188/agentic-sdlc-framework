@@ -172,6 +172,17 @@ describe('OpenBao policies', () => {
           expect(rule.capabilities).toEqual(['update']);
           continue;
         }
+        // X04 PR 3b (QUESTIONS #540): the worker revokes the database logins of one run's tools,
+        // `kdocs-<run_id>` only; revoke-prefix needs `sudo`.
+        if (name === 'worker' && rule.path === 'sys/leases/revoke-prefix/database/creds/kdocs-*') {
+          expect(rule.capabilities).toEqual(['update', 'sudo']);
+          continue;
+        }
+        // The worker makes and deletes the database role of one run only (`kdocs-<run_id>`).
+        if (name === 'worker' && rule.path === 'database/roles/kdocs-*') {
+          expect(rule.capabilities).toEqual(['create', 'update', 'delete']);
+          continue;
+        }
         // The other (A10, ADR-M63 §5, QUESTIONS #328): the backup job reads the Raft snapshot only.
         if (name === 'backup') {
           expect(rule).toEqual({ path: 'sys/storage/raft/snapshot', capabilities: ['read'] });

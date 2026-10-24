@@ -24,8 +24,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import {
+  KNOWLEDGE_DATABASE,
+  knowledgeSchema,
   sandboxImageFor,
   type AgentAdapterCode,
+  type EvidenceStore,
   type ProjectConfig,
   type RedactedSecret,
   type RunContract,
@@ -58,7 +61,8 @@ import {
 import { planEgress } from './sandbox/network.js';
 import type { RunnerSettings } from './settings.js';
 import type { RunNames } from './names.js';
-import { startTools, toolGrantsEnforceable } from './tools/provision.js';
+import { startTools, toolGrantsEnforceable, type ToolRuntime } from './tools/provision.js';
+import { recordKnowledgeRead } from './tools/knowledge-read.js';
 import { recordToolUse } from './tools/record.js';
 import type { ToolLimits } from './tools/spec.js';
 import {
@@ -100,6 +104,8 @@ export interface RunnerDeps {
    * fails before the clone (`adapter_unavailable`). Undefined: not checked (provisioning tests).
    */
   readonly agentAdapters?: readonly AgentAdapterCode[];
+  /** X04 PR 3b: where the `knowledge_read` lists go (the runner's diff evidence store). */
+  readonly knowledgeEvidence?: EvidenceStore;
 }
 
 export interface ProvisionRequest {
@@ -107,6 +113,14 @@ export interface ProvisionRequest {
   readonly envelope: unknown;
   /** Single-use OpenBao wrapping token around `{ token }` (QUESTIONS #44). */
   readonly wrappedGitToken: RedactedSecret;
+  /**
+   * X04 PR 3b: by tool key, the single-use wrapping token around a `read_documents` tool's
+   * `{ db_username, db_password, llm_key }` and the index version it reads.
+   */
+  readonly toolSecrets?: ReadonlyMap<
+    string,
+    { readonly wrapped: RedactedSecret; readonly indexId: string }
+  >;
 }
 
 export type ProvisionResult =
@@ -150,8 +164,9 @@ export async function provisionRun(
 ): Promise<ProvisionResult> {
   const verified = await verifyRunContract(deps.db, request.envelope, {
     verifier: deps.verifier,
-    // X04 (ADR-M69 §2.6): grants this runner can turn into the gateway's configuration.
-    toolGrantsEnforceable,
+    // X04 (ADR-M69 §2.6): grants this runner can turn into the gateway's configuration, with only
+    // the backing services it was configured with (X04 PR 3b).
+    toolGrantsEnforceable: (grants) => toolGrantsEnforceable(grants, deps.settings.toolServices),
     ...(deps.now ? { now: deps.now } : {}),
   });
   if (!verified.ok) {
@@ -202,7 +217,7 @@ export async function provisionRun(
         throw new ProvisioningError('adapter_unavailable');
       }
       image = await projectImage(scope, contract.project_id, contract.agent_adapter);
-      tools = await toolSetup(scope, contract);
+      tools = await toolSetup(scope, contract, deps, request);
       cloneStarted = Date.now();
       repoDir = await cloneForRun(deps.settings.git, {
         repo: contract.repo,
@@ -285,6 +300,10 @@ export async function releaseSandbox(
   // X04 (ADR-M69 §2.7): the tool counts are read from the gateway before it is removed. A failure
   // to record them never keeps the sandbox.
   await recordToolUse(deps.docker, scope, runId).catch(() => undefined);
+  // X04 PR 3b (ADR-M89 §2.5): what the `read_documents` tools returned, from their own logs.
+  await recordKnowledgeRead(deps.docker, scope, deps.knowledgeEvidence, runId).catch(
+    () => undefined,
+  );
   const result = await teardownSandbox(deps.docker, runId);
   await scope.runEvents.append(runId, 'sandbox_removed', {
     reason,
@@ -342,6 +361,8 @@ interface ToolSetup {
   readonly images: ReadonlyMap<string, string>;
   readonly gatewayImage: string;
   readonly limits: ToolLimits;
+  /** X04 PR 3b: the files of each tool with backing services, by tool key. */
+  readonly runtime: ReadonlyMap<string, ToolRuntime>;
 }
 
 /**
@@ -352,6 +373,8 @@ interface ToolSetup {
 async function toolSetup(
   scope: TenantScope,
   contract: RunContract,
+  deps: RunnerDeps,
+  request: ProvisionRequest,
 ): Promise<ToolSetup | undefined> {
   const grants = contract.tool_grants ?? [];
   if (grants.length === 0) return undefined;
@@ -377,16 +400,86 @@ async function toolSetup(
     }
     images.set(grant.tool_key, `${tool.image_ref}@${grant.image_digest}`);
   }
+  const runtime = new Map<string, ToolRuntime>();
+  for (const grant of grants) {
+    if (grant.backing_services.length === 0) continue;
+    const tool = await scope.tools.getByKey(grant.tool_key);
+    runtime.set(
+      grant.tool_key,
+      await toolRuntime(deps, scope, contract, grant, tool?.model_ref ?? null, request),
+    );
+  }
   const limits = config.tools.container_limits;
   return {
     grants,
     images,
+    runtime,
     gatewayImage,
     limits: {
       memoryBytes: limits.memory_mb * 1024 * 1024,
       nanoCpus: limits.cpu_millis * 1_000_000,
       pids: limits.pids,
     },
+  };
+}
+
+const INDEX_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * The settings and credential of a `read_documents` tool (X04 PR 3b, ADR-M89): its index version
+ * of the run, the project's schema, the model, the services on its service network, and the
+ * unwrapped login and key. A wrapping token that OpenBao refuses was opened by someone else: the
+ * run event `wrap_token_reused` (the `security` route, ADR-M42 §2.5), and the tool is unavailable.
+ */
+async function toolRuntime(
+  deps: RunnerDeps,
+  scope: TenantScope,
+  contract: RunContract,
+  grant: ToolGrant,
+  model: string | null,
+  request: ProvisionRequest,
+): Promise<ToolRuntime> {
+  const handoff = request.toolSecrets?.get(grant.tool_key);
+  const database = deps.settings.toolServices.find((s) => s.alias === 'knowledge-db');
+  const gateway = deps.settings.toolServices.find((s) => s.alias === 'litellm');
+  if (
+    handoff === undefined ||
+    !INDEX_ID.test(handoff.indexId) ||
+    model === null ||
+    !grant.permissions.includes('read_documents') ||
+    database === undefined ||
+    gateway === undefined
+  ) {
+    throw new ProvisioningError('tool_unavailable');
+  }
+  // The index must be the one this run's preparation recorded, in the run's own project.
+  const index = await scope.knowledgeIndexes.usedByRun(
+    handoff.indexId,
+    contract.run_id,
+    contract.project_id,
+  );
+  if (index?.model !== model) throw new ProvisioningError('tool_unavailable');
+  let fields: Readonly<Record<string, RedactedSecret>>;
+  try {
+    fields = await deps.unwrapper.unwrap(handoff.wrapped);
+  } catch (error) {
+    if (isRefusedWrapToken(error)) {
+      await recordWrapTokenReused(scope, contract.run_id, 'tool_secrets');
+    }
+    throw new ProvisioningError('tool_unavailable');
+  }
+  const { db_username, db_password, llm_key } = fields;
+  if (!db_username || !db_password || !llm_key) throw new ProvisioningError('tool_unavailable');
+  return {
+    config: {
+      schema_version: 1,
+      index_id: handoff.indexId,
+      schema: knowledgeSchema(contract.project_id),
+      model,
+      database: { host: database.alias, port: database.port, name: KNOWLEDGE_DATABASE },
+      model_gateway_url: `http://${gateway.alias}:${String(gateway.port)}`,
+    },
+    credentials: { db_username, db_password, llm_key },
   };
 }
 
@@ -406,6 +499,8 @@ function startToolsOf(
       gatewayImage: setup.gatewayImage,
       limits: setup.limits,
       readyTimeoutMs: deps.settings.readyTimeoutMs,
+      services: deps.settings.toolServices,
+      runtime: setup.runtime,
     });
     for (const grant of started.started) {
       await scope.runEvents.append(runId, 'tool_started', {

@@ -89,6 +89,8 @@ export class Runner {
   ) {
     this.#deps = {
       ...(agent.adapters ? { agentAdapters: adapterCodes(agent.adapters) } : {}),
+      // X04 PR 3b: the `knowledge_read` lists go with the run's diffs (same credential).
+      ...(agent.diffEvidence ? { knowledgeEvidence: agent.diffEvidence } : {}),
       ...deps,
       held: this.held,
     };

@@ -99,7 +99,13 @@ async function main(): Promise<void> {
       signer: openbao.transit(),
       wrapper: openbao.wrapping(),
       logger,
-      ...(knowledge?.deps ? { knowledge: knowledge.deps } : {}),
+      ...(knowledge?.deps
+        ? {
+            knowledge: knowledge.deps,
+            // X04 PR 3b (QUESTIONS #540): the tools' logins, through the worker's own AppRole.
+            databaseCredentials: openbao.databaseCredentials(),
+          }
+        : {}),
     });
   } else if (settings.temporal) {
     logger.log('warn', 'worker.runs_off', { message: t('worker.start.runs_off') });

@@ -39,6 +39,7 @@ import { migration0036EvaluationFingerprints } from './0036-evaluation-fingerpri
 import { migration0037AgentAdapter } from './0037-agent-adapter.js';
 import { migration0038ToolRegister } from './0038-tool-register.js';
 import { migration0039KnowledgeIndexes } from './0039-knowledge-indexes.js';
+import { migration0040KnowledgeReadEvidence } from './0040-knowledge-read-evidence.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -81,4 +82,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0037-agent-adapter': migration0037AgentAdapter,
   '0038-tool-register': migration0038ToolRegister,
   '0039-knowledge-indexes': migration0039KnowledgeIndexes,
+  '0040-knowledge-read-evidence': migration0040KnowledgeReadEvidence,
 };

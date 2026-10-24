@@ -301,6 +301,7 @@ export const projectConfigSchema = z.strictObject({
       pids: positiveInt.max(4096),
     }),
     gateway: z.strictObject({ image: pinnedImage.nullable() }),
+    model_budget_usd: usd,
   }),
   // X03 (QUESTIONS #522, #528): `image` is the OpenHands image; `images` gives one image per
   // adapter, each by digest. An `images.openhands` entry must equal `image`.

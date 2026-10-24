@@ -303,6 +303,13 @@ export function fakeRunDeps(f: WorkflowFixture, g4: G4Deps, calls: RunCalls): Ru
         calls.revoked.push(input.runId);
         return Promise.resolve({} as never);
       },
+      // X04 PR 3b: a tool's own model key (only for `read_documents` tools).
+      issueToolKey: (input) =>
+        Promise.resolve({
+          keyId: `tool-key-${input.runId}-${input.toolKey}`,
+          key: new Secret('sk-tool'),
+          expiresAt: T0,
+        }),
     },
     gitHost: {
       issueShortLivedToken: (repo, scope) => {

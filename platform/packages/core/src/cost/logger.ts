@@ -4,6 +4,7 @@
 export type CostLogEvent =
   | 'cost.tenant_budget_unset'
   | 'cost.run_key_issued'
+  | 'cost.tool_key_issued'
   | 'cost.run_key_revoked'
   | 'cost.sync_done'
   | 'cost.sync_skipped';

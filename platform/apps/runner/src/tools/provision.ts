@@ -1,23 +1,37 @@
 // Starting and removing a run's register tools and its MCP gateway (task X04, design/ADR-M69 §2.4,
 // §2.8, ADR-M87 §5). Called by `createSandbox` after the run network exists and before the sandbox:
 //
-//   tool network → each tool container (by digest) → tools healthy (their image's health check)
-//   → gateway config volume and file (archive upload) → gateway container → joined to the run
-//   network under the alias `tools` → started → ready (its log line)
+//   tool network → for a tool with backing services (X04 PR 3b): its service network and its
+//   runtime volume → each tool container (by digest) → its settings and credential written as files
+//   (archive upload) → the tool and its backing services joined to the service network → started
+//   → tools healthy (their image's health check) → gateway config volume and file → gateway
+//   container → joined to the run network under the alias `tools` → started → ready (its log line)
 //
 // A failure at any step throws `ProvisioningError('tool_unavailable')`; `createSandbox` then removes
-// everything. No
-// backing service and no credential yet (X04 PR 3): a grant with `backing_services` is refused
-// before this point (`toolGrantsEnforceable`).
+// everything. The credential never reaches the sandbox, the gateway or another tool.
 import crypto from 'node:crypto';
 
-import { TOOL_GATEWAY_ALIAS, toolCallRulesJson, type ToolGrant } from '@sdlc/contracts';
+import {
+  TOOL_CONFIG_FILE,
+  TOOL_CREDENTIALS_FILE,
+  TOOL_GATEWAY_ALIAS,
+  TOOL_RUNTIME_DIR,
+  toolCallRulesJson,
+  type ToolGrant,
+  type ToolRuntimeConfig,
+  type ToolRuntimeCredentials,
+} from '@sdlc/contracts';
 
 import type { DockerClient } from '../docker/client.js';
-import { assertSafeNetworkConnect, GATEWAY_CONFIG_DIR } from '../docker/guard.js';
+import {
+  assertSafeNetworkConnect,
+  assertSafeServiceConnect,
+  GATEWAY_CONFIG_DIR,
+} from '../docker/guard.js';
 import { toolObjectNames, type RunNames, type ToolObjectNames } from '../names.js';
 import { ProvisioningError } from '../sandbox/lifecycle.js';
 import { INHIBIT_IPV4 } from '../sandbox/network.js';
+import type { EgressService } from '../settings.js';
 import { packTar } from '../workspace/tar.js';
 import { buildGatewayConfig, GATEWAY_READY_MESSAGE } from './gateway-config.js';
 import { buildGatewaySpec, buildToolSpec, toolHost, type ToolLimits } from './spec.js';
@@ -28,16 +42,28 @@ function unavailable(): ProvisioningError {
 }
 
 /**
- * True when this runner can enforce every grant (ADR-M69 §2.6): an `http` tool with a digest, no
- * backing service yet (X04 PR 3), and call rules equal to the runner's own catalogue.
+ * True when this runner can enforce every grant (ADR-M69 §2.6): an `http` tool with a digest,
+ * call rules equal to the runner's own catalogue, and (X04 PR 3b) only backing services this
+ * runner was configured with, by alias and port (`SDLC_RUNNER_TOOL_SERVICES`).
  */
-export function toolGrantsEnforceable(grants: readonly ToolGrant[]): boolean {
+export function toolGrantsEnforceable(
+  grants: readonly ToolGrant[],
+  services: readonly EgressService[] = [],
+): boolean {
+  const known = new Set(services.map((s) => `${s.alias}:${String(s.port)}`));
   return grants.every(
     (grant) =>
       grant.transport === 'http' &&
-      grant.backing_services.length === 0 &&
+      grant.backing_services.every((entry) => known.has(entry)) &&
       callRulesSha256(grant) === grant.call_rules_sha256,
   );
+}
+
+/** X04 PR 3b: what a tool with backing services gets as files before it starts. */
+export interface ToolRuntime {
+  readonly config: ToolRuntimeConfig;
+  /** Revealed only into the file. */
+  readonly credentials: { readonly [K in keyof ToolRuntimeCredentials]: { reveal(): string } };
 }
 
 function callRulesSha256(grant: ToolGrant): string {
@@ -57,6 +83,10 @@ export interface StartToolsInput {
   readonly gatewayImage: string;
   readonly limits: ToolLimits;
   readonly readyTimeoutMs: number;
+  /** X04 PR 3b: the backing services this runner may attach (`SDLC_RUNNER_TOOL_SERVICES`). */
+  readonly services?: readonly EgressService[];
+  /** X04 PR 3b: the settings and credential of each tool with backing services, by tool key. */
+  readonly runtime?: ReadonlyMap<string, ToolRuntime>;
 }
 
 export interface StartedTools {
@@ -88,6 +118,8 @@ export async function startTools(
     const image = input.images.get(grant.tool_key);
     if (image === undefined) throw unavailable();
     await ensure(docker, image);
+    const withServices = grant.backing_services.length > 0;
+    if (withServices) await prepareServices(docker, names, input, grant);
     const id = await docker.toolContainerCreate(
       names.tool(grant.tool_key),
       buildToolSpec({
@@ -96,9 +128,11 @@ export async function startTools(
         toolKey: grant.tool_key,
         image,
         limits: input.limits,
+        runtime: withServices,
       }),
       'tool',
     );
+    if (withServices) await attachServices(docker, names, input, grant, id);
     await docker.containerStart(id);
   }
   for (const grant of grants) await waitHealthy(docker, names.tool(grant.tool_key), input);
@@ -126,6 +160,79 @@ export async function startTools(
   await docker.containerStart(gatewayId);
   await waitGatewayReady(docker, names, input.readyTimeoutMs);
   return { key, started: grants };
+}
+
+/** The service network and the runtime volume of a tool with backing services (X04 PR 3b). */
+async function prepareServices(
+  docker: DockerClient,
+  names: ToolObjectNames,
+  input: StartToolsInput,
+  grant: ToolGrant,
+): Promise<void> {
+  if (!input.runtime?.has(grant.tool_key)) throw unavailable();
+  await docker.networkCreate({
+    Name: names.serviceNetwork(grant.tool_key),
+    Driver: 'bridge',
+    Internal: true,
+    Attachable: false,
+    EnableIPv6: false,
+    Labels: input.labels,
+    Options: { [INHIBIT_IPV4]: 'true' },
+  });
+  await docker.volumeCreate(names.toolRuntime(grant.tool_key), input.labels);
+}
+
+/**
+ * Writes the tool's settings and credential into its runtime volume (the container is created,
+ * not started), then joins the tool and each of its backing services to its service network.
+ */
+async function attachServices(
+  docker: DockerClient,
+  names: ToolObjectNames,
+  input: StartToolsInput,
+  grant: ToolGrant,
+  containerId: string,
+): Promise<void> {
+  const runtime = input.runtime?.get(grant.tool_key);
+  if (runtime === undefined) throw unavailable();
+  const credentials: ToolRuntimeCredentials = {
+    db_username: runtime.credentials.db_username.reveal(),
+    db_password: runtime.credentials.db_password.reveal(),
+    llm_key: runtime.credentials.llm_key.reveal(),
+  };
+  await docker.putArchive(
+    containerId,
+    TOOL_RUNTIME_DIR,
+    packTar([
+      {
+        type: 'file',
+        path: TOOL_CONFIG_FILE,
+        content: Buffer.from(JSON.stringify(runtime.config), 'utf8'),
+      },
+      {
+        type: 'file',
+        path: TOOL_CREDENTIALS_FILE,
+        content: Buffer.from(JSON.stringify(credentials), 'utf8'),
+      },
+    ]),
+  );
+  const network = names.serviceNetwork(grant.tool_key);
+  const tool = names.tool(grant.tool_key);
+  const services = input.services ?? [];
+  const attachable = services.map((service) => service.container);
+  assertSafeServiceConnect(network, tool, tool, attachable);
+  await docker.networkConnect(network, tool, []);
+  for (const entry of grant.backing_services) {
+    const service = services.find((s) => `${s.alias}:${String(s.port)}` === entry);
+    if (service === undefined) throw unavailable();
+    assertSafeServiceConnect(network, service.container, tool, attachable);
+    try {
+      await docker.networkConnect(network, service.container, [service.alias]);
+    } catch {
+      // The service is not running (for example the profile `knowledge` is off).
+      throw unavailable();
+    }
+  }
 }
 
 async function ensure(docker: DockerClient, image: string): Promise<void> {

@@ -49,6 +49,28 @@ export interface SecretUnwrapper {
   unwrap(wrappingToken: RedactedSecret): Promise<Readonly<Record<string, RedactedSecret>>>;
 }
 
+/** A database login of one run, made by OpenBao's database secrets engine (X04 PR 3b). */
+export interface RunDatabaseLogin {
+  readonly username: RedactedSecret;
+  readonly password: RedactedSecret;
+}
+
+/**
+ * Short-lived database logins for a run's tools (X04 PR 3b, ADR-M69 §2.4, QUESTIONS #535, #537,
+ * #540): one OpenBao database role per run, `kdocs-<run_id>`, whose only grant is `grantRole`.
+ * Everything is found again from the run ID, so no lease ID ever travels or is stored (R031).
+ */
+export interface RunDatabaseCredentials {
+  /** Creates (or replaces) the run's role and issues one login that lives `ttlSeconds`. */
+  issueRunLogin(input: {
+    readonly runId: string;
+    readonly grantRole: string;
+    readonly ttlSeconds: number;
+  }): Promise<RunDatabaseLogin>;
+  /** Revokes every login of the run and deletes its role. Revoking twice is harmless. */
+  revokeRunLogins(runId: string): Promise<void>;
+}
+
 /** A signature and the version of the signing key that made it. */
 export interface SignatureResult {
   /** The signature as returned by the signing service, including its version prefix. */

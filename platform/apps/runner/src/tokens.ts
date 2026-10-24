@@ -53,7 +53,7 @@ export function isRefusedWrapToken(error: unknown): boolean {
 export async function recordWrapTokenReused(
   scope: TenantScope,
   runId: string,
-  which: RunToken | 'virtual_key',
+  which: RunToken | 'virtual_key' | 'tool_secrets',
 ): Promise<void> {
   await scope.runEvents.append(runId, 'wrap_token_reused', { token: which }).catch(() => undefined);
 }

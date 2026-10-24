@@ -196,10 +196,11 @@ pnpm openbao:bootstrap worker-langfuse-credentials  # T11 §5m (needs the profil
 
 The worker's retention loop starts in `report` mode: it deletes nothing (runbook T11 §5j).
 
-Optional, the index of project documents (X04, [ADR-M89](../../design/ADR-M89-project-docs-index.md)), for plans with a `read_documents` tool: add `knowledge` to the `up.sh` call. `up.sh` then sets `SDLC_WORKER_KNOWLEDGE_DB_URL`. Deliver the worker's password of `knowledge-db` and start `sdlc-worker` again:
+Optional, the index of project documents (X04, [ADR-M89](../../design/ADR-M89-project-docs-index.md)), for plans with a `read_documents` tool: add `knowledge` to the `up.sh` call. `up.sh` then sets `SDLC_WORKER_KNOWLEDGE_DB_URL`. Deliver the worker's password of `knowledge-db` and the issuer of the tools' short-lived logins (X04 PR 3b), then start `sdlc-worker` and `sdlc-runner` again:
 
 ```bash
 pnpm openbao:bootstrap worker-knowledge-credentials  # T11 §5o (needs the profile knowledge)
+pnpm openbao:bootstrap knowledge-issuer-credentials  # T11 §5o (after configure)
 ```
 
 Without it, a run whose plan asks for a `read_documents` tool fails (`tool_unavailable`). The model `bge-m3` must be on LiteLLM (the `ollama` provider, `ollama pull bge-m3`).

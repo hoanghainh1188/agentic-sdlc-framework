@@ -46,6 +46,13 @@ export interface ToolObjectNames {
   readonly gatewayConfig: string;
   /** The container of one tool; the gateway reaches it by this name on the tool network. */
   tool(toolKey: string): string;
+  /**
+   * X04 PR 3b (ADR-M69 §2.4, QUESTIONS #531): the service network of one tool with backing
+   * services: that tool and its services only (never the gateway, the sandbox or another tool).
+   */
+  serviceNetwork(toolKey: string): string;
+  /** X04 PR 3b: the volume with the tool's `config.json` and `credentials.json`. */
+  toolRuntime(toolKey: string): string;
 }
 
 const TOOL_KEY = /^[a-z][a-z0-9-]{1,62}$/;
@@ -60,6 +67,14 @@ export function toolObjectNames(runId: string): ToolObjectNames {
     tool(toolKey: string): string {
       if (!TOOL_KEY.test(toolKey)) throw new RunnerError('runner.invalid_run_id');
       return `sdlc-tool-${runId}-${toolKey}`;
+    },
+    serviceNetwork(toolKey: string): string {
+      if (!TOOL_KEY.test(toolKey)) throw new RunnerError('runner.invalid_run_id');
+      return `sdlc-toolsvc-${runId}-${toolKey}`;
+    },
+    toolRuntime(toolKey: string): string {
+      if (!TOOL_KEY.test(toolKey)) throw new RunnerError('runner.invalid_run_id');
+      return `sdlc-toolrt-${runId}-${toolKey}`;
     },
   };
 }

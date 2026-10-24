@@ -16,7 +16,7 @@
 #                 `published` is the way to use the images from a release's source archive
 set -eu
 
-NAMES="API WORKER RUNNER OTEL_COLLECTOR SANDBOX_NODE24"
+NAMES="API WORKER RUNNER OTEL_COLLECTOR SANDBOX_NODE24 TOOL_PROJECT_DOCS"
 PREFIX="ghcr.io/hoanghainh1188/agentic-sdlc-framework"
 
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -29,6 +29,7 @@ value() { sed -n "s/^$1=//p" "$lock" | tail -n 1; }
 image_of() {
   case "$1" in
     SANDBOX_NODE24) echo sandbox-node24 ;;
+    TOOL_PROJECT_DOCS) echo tool-project-docs ;;
     OTEL_COLLECTOR) echo sdlc-otel-collector ;;
     *) echo "sdlc-$(echo "$1" | tr '[:upper:]' '[:lower:]')" ;;
   esac

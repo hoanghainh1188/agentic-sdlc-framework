@@ -520,6 +520,19 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
             calls.revoked.push(input.keyId);
             return Promise.resolve({} as never);
           },
+          // X04 PR 3b: the run's key by run, with its tools' keys.
+          endRunKey: (input) => {
+            calls.revoked.push(`run:${input.runId}:${(input.toolKeys ?? []).join(',')}`);
+            return Promise.resolve({} as never);
+          },
+          issueToolKey: (input) => {
+            calls.keys.push(`tool:${input.toolKey}:${input.maxBudgetUsd}`);
+            return Promise.resolve({
+              keyId: `tool-key-${input.runId}`,
+              key: new Secret('sk-tool'),
+              expiresAt: T0,
+            });
+          },
         },
         gitHost: {
           issueShortLivedToken: (repo, scope) =>
@@ -818,16 +831,56 @@ describeDb('C06 session 1: gate G4 on PostgreSQL', () => {
           },
         },
       };
-      const retried = await prepareRun(t.f.scope, withIndex, intent.id);
-      expect(retried).toMatchObject({ ok: true });
+      // X04 PR 3b: the index alone is not enough; without OpenBao's database engine the tool
+      // cannot get its login: the run fails, and its key and its tools' keys are revoked.
+      const noLogin = await prepareRun(t.f.scope, withIndex, intent.id);
+      expect(noLogin).toEqual({ ok: false, reason: 'tool_unavailable' });
       expect(embedded).toEqual(['# Orders\n\nHow stock moves.']);
-      const row = await t.f.scope.knowledgeIndexes.findReady(
-        (await t.reload(intent)).project_id,
-        BASE_1,
-        MODEL,
-      );
+      const second = (await t.f.scope.runs.listForIntent(intent.id)).at(-1)!;
+      expect(second).toMatchObject({ status: 'failed', stop_reason: 'tool_unavailable' });
+      expect(
+        (await t.f.scope.runEvents.list(second.id))
+          .filter((e) => e.event_type.startsWith('knowledge_') || e.event_type.startsWith('tool_'))
+          .map((e) => [e.event_type, e.payload]),
+      ).toEqual([
+        ['tool_credential_revoke_failed', { tool_key: key, reason: 'credentials_unavailable' }],
+        ['knowledge_unavailable', { reason: 'credentials_unavailable' }],
+      ]);
+      expect(calls.revoked).toContain(`run:${second.id}:${key}`);
+      expect(calls.wrapped).toEqual([]);
+
+      const logins: string[] = [];
+      const withLogin: PrepareRunDeps = {
+        ...withIndex,
+        databaseCredentials: {
+          issueRunLogin: (input) => {
+            logins.push(`${input.runId} ${input.grantRole} ${String(input.ttlSeconds)}`);
+            return Promise.resolve({ username: new Secret('v-login'), password: new Secret('pw') });
+          },
+          revokeRunLogins: () => Promise.resolve(),
+        },
+      };
+      const retried = await prepareRun(t.f.scope, withLogin, intent.id);
+      expect(retried).toMatchObject({ ok: true });
+      if (!retried.ok) return;
+      const project = (await t.reload(intent)).project_id;
+      const row = await t.f.scope.knowledgeIndexes.findReady(project, BASE_1, MODEL);
       expect(row).toMatchObject({ id: versions[0], documents: 1, chunks: 1 });
       expect(await t.f.scope.knowledgeIndexes.intentsOf(row!.id)).toEqual([intent.id]);
+      // The index was reused (no new embedding); the login lives as long as the run may.
+      expect(embedded).toHaveLength(1);
+      const stored = (await t.f.scope.runContracts.getByRunId(retried.run.runId))!.contract_json;
+      const ttl = ((stored as { max_duration_min: number }).max_duration_min + 15) * 60;
+      expect(logins).toEqual([
+        `${retried.run.runId} kdocs_p${project.replaceAll('-', '')}_read ${String(ttl)}`,
+      ]);
+      // The tool's own key: capped at tools.model_budget_usd (0.5), below the run's 2.
+      expect(calls.keys).toContain(`tool:${key}:0.5`);
+      // One wrapping token per tool, with the login and the key; only it and the index ID go on.
+      expect(calls.wrapped).toContainEqual(['db_username', 'db_password', 'llm_key', '900']);
+      expect([...retried.run.toolSecrets.entries()].map(([k, v]) => [k, v.indexId])).toEqual([
+        [key, row!.id],
+      ]);
     });
 
     it('X04: a plan without register tools keeps the same proposal hash and contract', async () => {

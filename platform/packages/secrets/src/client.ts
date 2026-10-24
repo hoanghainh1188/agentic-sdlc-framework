@@ -11,6 +11,7 @@
 import type { SecretReader } from '@sdlc/contracts';
 import { t } from '@sdlc/messages';
 
+import { DatabaseCredentials } from './database.js';
 import { SecretsError } from './errors.js';
 import { KvReader } from './kv.js';
 import { silentLogger, type SecretsLogger } from './logger.js';
@@ -30,7 +31,7 @@ import { Wrapping } from './wrapping.js';
 export interface CallRequest {
   /** Short name of the operation, used in error messages (for example `read`, `sign`). */
   readonly operation: string;
-  readonly method: 'GET' | 'POST';
+  readonly method: 'GET' | 'POST' | 'DELETE';
   readonly path: string;
   readonly body?: unknown;
   /** Status codes the caller handles itself, besides 2xx. */
@@ -164,6 +165,14 @@ export class OpenBaoClient {
       (request) => this.#call(request),
       (method, path, input) => this.#transport.request(method, path, input),
     );
+  }
+
+  /**
+   * Short-lived database logins of a run's tools (X04 PR 3b): needs the worker's policy on
+   * `database/roles/kdocs-*`, `database/creds/kdocs-*` and the revocation of those leases.
+   */
+  databaseCredentials(): DatabaseCredentials {
+    return new DatabaseCredentials(this.#options.mounts.database, (request) => this.#call(request));
   }
 
   /** Stops renewal and revokes the token. The client cannot be used afterwards. */

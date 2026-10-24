@@ -777,6 +777,7 @@
   "secrets.transit.unknown_key_version": "The Transit key {key} has no version {version}.",
   "secrets.transit.rejected": "OpenBao refused to {operation} with the Transit key {key}.",
   "secrets.transit.not_ed25519": "The Transit key {key} is not an Ed25519 key.",
+  "secrets.database.invalid_input": "A database login needs a run ID, a project's read role and a lifetime between 1 minute and 1 day.",
   "secrets.wrapping.invalid_input": "Wrapping needs at least one field with a lower-case name and a lifetime between 1 second and 1 hour.",
   "secrets.wrapping.invalid_token": "The wrapping token is unknown, expired or already used. If this run did not use it, someone else did: treat it as a security incident.",
   "secrets.wrapping.wrong_origin": "The wrapping token was not made by the platform (sys/wrapping/wrap). It is refused.",

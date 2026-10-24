@@ -20,6 +20,7 @@ export const RUNNER_ENV = {
   pids: 'SDLC_RUNNER_SANDBOX_PIDS',
   tmpMb: 'SDLC_RUNNER_SANDBOX_TMP_MB',
   egressServices: 'SDLC_RUNNER_EGRESS_SERVICES',
+  toolServices: 'SDLC_RUNNER_TOOL_SERVICES',
   npmRegistry: 'SDLC_RUNNER_NPM_REGISTRY',
   gitBaseUrl: 'SDLC_RUNNER_GIT_BASE_URL',
   gitAllowPlaintext: 'SDLC_RUNNER_GIT_ALLOW_PLAINTEXT',
@@ -119,6 +120,12 @@ export interface RunnerSettings {
   readonly maxEvalSandboxes: number;
   readonly limits: SandboxLimits;
   readonly egressServices: readonly EgressService[];
+  /**
+   * X04 PR 3b (ADR-M69 §2.4): the backing services a register tool may reach on its own service
+   * network (`alias=container:port`, for example `knowledge-db` and `litellm`). A grant that names
+   * another `alias:port` is refused (`tool_not_enforceable`).
+   */
+  readonly toolServices: readonly EgressService[];
   /** npm registry URL given to the sandbox; its host must be an egress service alias. */
   readonly npmRegistry: string | undefined;
   /** How the runner clones (never the sandbox, QUESTIONS #52). */
@@ -202,7 +209,10 @@ function workDir(raw: string | undefined): string {
 }
 
 /** Parses `alias=container:port,alias=container:port`. */
-export function parseEgressServices(raw: string | undefined): EgressService[] {
+export function parseEgressServices(
+  raw: string | undefined,
+  name: string = RUNNER_ENV.egressServices,
+): EgressService[] {
   if (raw === undefined || raw.trim() === '') return [];
   const services = raw.split(',').map((entry) => {
     const match = /^([^=]+)=([^:]+):([0-9]{1,5})$/.exec(entry.trim());
@@ -210,12 +220,12 @@ export function parseEgressServices(raw: string | undefined): EgressService[] {
     const container = match?.[2] ?? '';
     const port = Number(match?.[3]);
     if (!ALIAS.test(alias) || !NAME.test(container) || port < 1 || port > 65535) {
-      throw invalid(RUNNER_ENV.egressServices);
+      throw invalid(name);
     }
     return { alias, container, port };
   });
   const aliases = services.map((s) => s.alias);
-  if (new Set(aliases).size !== aliases.length) throw invalid(RUNNER_ENV.egressServices);
+  if (new Set(aliases).size !== aliases.length) throw invalid(name);
   return services;
 }
 
@@ -381,6 +391,7 @@ export function runnerSettingsFromEnv(env: NodeJS.ProcessEnv = process.env): Run
       tmpBytes: intSetting(env, RUNNER_ENV.tmpMb, DEFAULTS.tmpMb, 64, 16_384) * MIB,
     },
     egressServices,
+    toolServices: parseEgressServices(env[RUNNER_ENV.toolServices], RUNNER_ENV.toolServices),
     npmRegistry: npmRegistry(env[RUNNER_ENV.npmRegistry], egressServices),
     git: gitSettings(env),
     workDir: workDir(env[RUNNER_ENV.workDir]),
