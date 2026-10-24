@@ -75,3 +75,17 @@ condition = "AND"
 paths = ['''^platform/tests/trial/trial-up\.test\.ts$''']
 regexTarget = "match"
 regexes = ['''BEGIN RSA PRIVATE KEY-----\\nMIIE\\n-----END RSA PRIVATE KEY''']
+
+# To be approved by: Harry (Person B), in PR #424 (task L01).
+# False positive: generic-api-key reads the line below of the agent-api live test (commit 3c69cac)
+# as a key: the name SDLC_AGENT_API_MODEL contains "API", and the default value is a long model
+# name. It is in the history, which CI scans, so it cannot be removed without rewriting history
+# (CLAUDE.md R125). The next commit keeps the model name in its own constant. Only this exact line
+# in that one file is skipped; any other value on it, or in any other file, is still reported.
+[[allowlists]]
+description = "The SDLC_AGENT_API_MODEL default line in agent-api.test.ts is not a key (PR #424)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^platform/tests/integration/agent/agent-api\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''^const MODEL = process\.env\.SDLC_AGENT_API_MODEL \|\| 'claude-haiku-4-5-20251001';$''']
