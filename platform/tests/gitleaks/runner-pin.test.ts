@@ -37,10 +37,12 @@ describe('H04: the Gitleaks pin of the runner', () => {
   });
 
   it.each(['checks', 'compose', 'runner-rootless', 'sandbox-image'])(
-    'CI job %s sets SDLC_RUNNER_GITLEAKS_PATH from the script',
+    "CI job %s puts the script's Gitleaks on PATH and in SDLC_RUNNER_GITLEAKS_PATH",
     (job) => {
       const runs = ci.jobs[job]!.steps.map((s) => s.run ?? '').join('\n');
-      expect(runs).toContain('SDLC_RUNNER_GITLEAKS_PATH=$(sh platform/deploy/scripts/gitleaks.sh)');
+      expect(runs).toContain('gitleaks="$(sh platform/deploy/scripts/gitleaks.sh)"');
+      expect(runs).toContain('dirname "$gitleaks" >> "$GITHUB_PATH"');
+      expect(runs).toContain('SDLC_RUNNER_GITLEAKS_PATH=$gitleaks');
     },
   );
 });
