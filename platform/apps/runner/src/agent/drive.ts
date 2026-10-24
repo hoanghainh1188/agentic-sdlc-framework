@@ -41,11 +41,13 @@
 // Paths, the log and texts are returned to the caller only; run events hold codes and counts.
 import {
   AgentError,
+  condensingFor,
   type AgentAdapter,
   type AgentOutputs,
   type AgentRunHandle,
   type AgentRunState,
   type AgentRunStatus,
+  type CondensingState,
   type ProjectConfig,
   type RedactedSecret,
   type RunContract,
@@ -181,6 +183,21 @@ export function agentCommitAuthor(contract: RunContract): { name: string; email:
 
 export type EndOutcome = Exclude<AgentOutcome, 'failed' | 'killed'>;
 
+/**
+ * X11 (ADR-M29 §2.10, QUESTIONS #552): the fields of `agent_finished` for a run with condensing on.
+ * Counts only, from the agent's last status; nothing when condensing is not on.
+ */
+export function condensingFields(
+  state: CondensingState,
+  status: Pick<AgentRunStatus, 'condensations' | 'eventsForgotten'> | undefined,
+): { condensations?: number; events_forgotten?: number } {
+  if (state !== 'summarize') return {};
+  return {
+    condensations: status?.condensations ?? 0,
+    events_forgotten: status?.eventsForgotten ?? 0,
+  };
+}
+
 export const STATUS_OF: Readonly<Record<EndOutcome, RunStatus>> = {
   finished: 'succeeded',
   // An iteration cap is a budget of agent steps (D-07 §6: "token cap and a maximum number of
@@ -253,6 +270,9 @@ export interface Polled {
   readonly killed?: boolean;
   /** Loop detection stopped the run (C11 PR 2). */
   readonly loop?: LoopStop;
+  /** X11: condensing counts of the agent's last status. */
+  readonly condensations?: number;
+  readonly eventsForgotten?: number;
 }
 
 export async function pollUntilDone(
@@ -334,6 +354,8 @@ async function endRun(
     readonly commit: 'committed' | 'nothing' | undefined;
     /** L1: the changed paths of the proposal, computed by the runner. */
     readonly changedFiles?: number;
+    /** X11: the condensing counts (`condensingFields`). */
+    readonly condensed?: ReturnType<typeof condensingFields>;
   },
 ): Promise<RunStatus | undefined> {
   const now = nowOf(deps);
@@ -355,6 +377,7 @@ async function endRun(
         ? {}
         : { changed_files: change.changedFiles }),
     ...(change.commit ? { commit: change.commit } : {}),
+    ...change.condensed,
   });
   return ended;
 }
@@ -409,6 +432,7 @@ export async function driveAgent(
   let handle: AgentRunHandle;
   let watch: SpendWatch | undefined;
   let config: ProjectConfig;
+  let condensing: CondensingState;
   let taskLoading = false;
   try {
     if (!llmReachable(contract, deps.settings.agent.llmBaseUrl)) {
@@ -417,6 +441,13 @@ export async function driveAgent(
     // The effective configuration when the run starts: budget shares and the loop window.
     ({ config } = await loadEffectiveConfig(scope.projectConfigs, contract.project_id));
     watch = spendWatchFor(deps, scope, contract, request.virtualKey, config);
+    // X11 (ADR-M29 §2.10): the project's condensing, for this run's adapter and model.
+    const condenser = condensingFor(
+      config.run.context_condensing,
+      contract.agent_adapter,
+      request.model,
+    );
+    condensing = condenser.state;
     taskLoading = true; // from here `readRunFeedback` uses or revokes the token
     const task = await loadAgentTask(scope, contract, feedback, deps.planFile);
     const endpoint = await attachRunner(
@@ -439,6 +470,7 @@ export async function driveAgent(
       ...(sandbox.toolKey === undefined
         ? {}
         : { tools: { url: TOOL_GATEWAY_URL, key: new Redacted(sandbox.toolKey) } }),
+      ...(condenser.condensing === undefined ? {} : { condensing: condenser.condensing }),
     });
   } catch (error) {
     if (!taskLoading) await discardFeedbackToken(scope, contract.run_id, feedback);
@@ -447,6 +479,8 @@ export async function driveAgent(
   await scope.runEvents.append(contract.run_id, 'agent_started', {
     max_iterations: contract.max_iterations,
     max_duration_min: contract.max_duration_min,
+    // Left out when off, so a run without condensing has the same event as before X11.
+    ...(condensing === 'off' ? {} : { condensing }),
   });
 
   const deadline = clockOf(deps)() + contract.max_duration_min * 60_000;
@@ -478,7 +512,13 @@ export async function driveAgent(
       reason: 'killed',
       method: stopped.method,
     });
-    const result = await endKilled(deps, scope, contract, stopped.iterations ?? polled.iterations);
+    const result = await endKilled(
+      deps,
+      scope,
+      contract,
+      stopped.iterations ?? polled.iterations,
+      condensingFields(condensing, polled),
+    );
     if (result.status === 'stopped_killed') await storeKilledEvidence(deps, scope, request);
     return result;
   }
@@ -573,6 +613,7 @@ export async function driveAgent(
     outputs: proposalOnly ? undefined : outputs,
     commit,
     ...(proposed ? { changedFiles: proposed.changedFiles } : {}),
+    condensed: condensingFields(condensing, polled),
   });
   if (set === 'stopped_killed') {
     return { outcome: 'killed', status: set, stopReason: KILLED, outputs: undefined };
@@ -595,6 +636,7 @@ async function endKilled(
   scope: TenantScope,
   contract: RunContract,
   iterations: number | undefined,
+  condensed: ReturnType<typeof condensingFields> = {},
 ): Promise<AgentRunResult> {
   const now = nowOf(deps);
   const moved = await scope.runs.transition(contract.run_id, {
@@ -608,6 +650,7 @@ async function endKilled(
   await scope.runEvents.append(contract.run_id, 'agent_finished', {
     outcome: 'killed',
     iterations: iterations ?? 0,
+    ...condensed,
   });
   return {
     outcome: 'killed',

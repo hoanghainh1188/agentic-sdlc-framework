@@ -75,6 +75,27 @@ describe('run event payloads', () => {
     expect(refused('model_selected', { model: 'gpt-oss-20b', run: 'x' })).toThrow(/undeclared/);
   });
 
+  it('X11: agent_started and agent_finished hold the condensing state and counts, never a summary', () => {
+    const started = { max_iterations: 30, max_duration_min: 60, condensing: 'summarize' };
+    expect(checkRunEvent('agent_started', started)).toEqual(started);
+    expect(checkRunEvent('agent_started', { max_iterations: 30, max_duration_min: 60 })).toEqual({
+      max_iterations: 30,
+      max_duration_min: 60,
+    });
+    const finished = {
+      outcome: 'finished',
+      iterations: 12,
+      condensations: 2,
+      events_forgotten: 40,
+    };
+    expect(checkRunEvent('agent_finished', finished)).toEqual(finished);
+    expect(
+      refused('agent_started', { ...started, condensing: 'The agent edited src/a.ts' }),
+    ).toThrow(DbError);
+    expect(refused('agent_finished', { ...finished, events_forgotten: -1 })).toThrow(DbError);
+    expect(refused('agent_finished', { ...finished, summary: 'text' })).toThrow(/undeclared/);
+  });
+
   it('E01: g7_checked and pr_merged hold codes, counts and a hash, never a login', () => {
     const checked = {
       pr_number: 7,

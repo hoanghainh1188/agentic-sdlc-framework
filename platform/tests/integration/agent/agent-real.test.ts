@@ -7,7 +7,8 @@
 // PostgreSQL from test-db.sh). Needs Ollama on this machine with the local tag `gpt-oss:20b`
 // (`ollama pull gpt-oss:20b`), reachable from Docker at host.docker.internal:11434.
 // `SDLC_SANDBOX_IMAGE` (name@sha256:…) skips the node24 build. `SDLC_AGENT_REAL_REPORT` names a
-// file that receives the numbers as JSON (time, calls, tokens, cost, peak memory).
+// file that receives the numbers of every run as JSON (time, calls, tokens, cost, peak memory).
+// X11 (ADR-M29 §2.10): a longer task runs twice, without and with context condensing (AC4).
 //
 // No secret is involved: Ollama has no key; the LiteLLM master and salt keys are random values of
 // this test. The model entry is taken from the production template (config.ctmpl), so the run
@@ -220,6 +221,168 @@ describe.skipIf(!enabled)('C05 real-model run: gpt-oss:20b through LiteLLM (ADR-
     await t?.drop();
   }, 120_000);
 
+  interface RealRun {
+    readonly slug: string;
+    readonly label: string;
+    readonly planSummary: string;
+    readonly specText: string;
+    readonly maxIterations: number;
+    readonly configYaml?: string;
+  }
+
+  /**
+   * One real run: the Cost Controller's key, the runner driving the agent, then the key revoked and
+   * the spend synced into `cost_records`. Returns the result, the records and the numbers.
+   */
+  async function realRun(spec: RealRun) {
+    let keyId = '';
+    let virtualKey: Redacted | undefined;
+    let cap = '';
+    const run = await startAgentRun({
+      t,
+      client,
+      image,
+      tmp,
+      suffix,
+      slug: spec.slug,
+      litellmContainer: names.litellm,
+      model: MODEL,
+      planSummary: spec.planSummary,
+      specText: spec.specText,
+      agentsMd:
+        '# Agent instructions\n\n- Keep changes small. Do not install dependencies for this task.\n',
+      caps: { maxIterations: spec.maxIterations, maxDurationMin: 20 },
+      ...(spec.configYaml === undefined ? {} : { configYaml: spec.configYaml }),
+      afterClaim: async (scope, envelope) => {
+        // Budget: min(budget.default_run_usd, 1.00) = the contract's max_budget_usd (1).
+        const issued = await controller.issueRunKey({
+          tenantId: scope.tenantId,
+          runId: envelope.contract.run_id,
+          gate: 'G4',
+          agent: 'coder-openhands',
+        });
+        keyId = issued.key.keyId;
+        virtualKey = new Redacted(issued.key.key.reveal());
+        cap = issued.maxBudgetUsd;
+      },
+    });
+    const runId = run.envelope.contract.run_id;
+    const sampler = startSampler(run.sandbox.names.container);
+    const started = Date.now();
+    try {
+      const runner = new Runner(
+        {
+          db: t.app as unknown as AgentDriveDeps['db'],
+          docker: client,
+          settings: run.settings,
+          verifier: {
+            verify: () => Promise.resolve(false),
+            publicKey: () => Promise.reject(new Error('unused')),
+          },
+          unwrapper: { unwrap: () => Promise.reject(new Error('unused')) },
+        },
+        {},
+        {
+          adapters: { openhands: new OpenHandsAdapter({ requestTimeoutMs: 60_000 }) },
+          agentUrl: () => run.relayUrl,
+        },
+      );
+      // The runner did not provision this fixture run, so it holds no clone: drive the agent
+      // with the fixture's clone (C07 changes step), then release the run through the runner.
+      const result = await driveAgent(
+        {
+          db: t.app as unknown as AgentDriveDeps['db'],
+          docker: client,
+          settings: run.settings,
+          adapter: new OpenHandsAdapter({ requestTimeoutMs: 60_000 }),
+          agentUrl: () => run.relayUrl,
+          ...changesStep(t, client, run, []),
+        },
+        {
+          contract: run.envelope.contract,
+          sandbox: run.sandbox,
+          model: MODEL,
+          virtualKey: virtualKey!,
+        },
+      ).finally(() => runner.release(run.envelope.contract.tenant_id, runId, 'finished'));
+      const seconds = Math.round((Date.now() - started) / 1000);
+      const peaks = sampler.stop();
+
+      // End of run: revoke the key, then sync spend until the calls are in cost_records.
+      await controller.endRun({ keyId, syncFrom: new Date(started - 60_000) });
+      let records = await run.scope.costRecords.listForRun(runId);
+      for (let i = 0; i < 30 && records.length === 0; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        await controller.syncSpend({
+          from: new Date(started - 60_000),
+          to: new Date(Date.now() + 60_000),
+        });
+        records = await run.scope.costRecords.listForRun(runId);
+      }
+      const tokensIn = records.reduce((sum, r) => sum + Number(r.input_tokens), 0);
+      const tokensOut = records.reduce((sum, r) => sum + Number(r.output_tokens), 0);
+      const cost = records.reduce((sum, r) => sum + Number(r.cost_usd), 0);
+      const events = result.outputs?.events ?? [];
+      const runEvents = await run.scope.runEvents.list(runId);
+      const finished = runEvents.find((e) => e.event_type === 'agent_finished')?.payload;
+      const report = {
+        label: spec.label,
+        model: 'gpt-oss:20b (Ollama, local, reasoning_effort low, num_ctx 32768)',
+        outcome: result.outcome,
+        status: result.status,
+        seconds,
+        iterations: result.outputs?.iterations,
+        model_calls: records.length,
+        tokens_in: tokensIn,
+        tokens_out: tokensOut,
+        max_tokens_in_one_call: Math.max(0, ...records.map((r) => Number(r.input_tokens))),
+        cost_usd: cost.toFixed(6),
+        cap_usd: cap,
+        condensations: finished?.condensations ?? 0,
+        events_forgotten: finished?.events_forgotten ?? 0,
+        changed_files: result.outputs?.changedFiles.length,
+        agent_messages: events.filter((e) => e.kind === 'MessageEvent').length,
+        errors: events.filter((e) => e.kind === 'ConversationErrorEvent').map((e) => e.code),
+        peak_ollama_rss_mb: peaks.ollamaRssMb,
+        ollama_loaded: peaks.ollamaLoaded,
+        peak_sandbox_mb: peaks.sandboxMb,
+        peak_litellm_mb: peaks.litellmMb,
+        min_free_memory_percent: peaks.minFreePercent,
+      };
+      process.stderr.write(`AGENT REAL RUN ${JSON.stringify(report)}\n`);
+
+      // Spend within the cap, every call on the run's model (agent and condenser alike).
+      expect(records.length).toBeGreaterThan(0);
+      expect(cost).toBeLessThanOrEqual(Number(cap));
+      for (const r of records) expect(r.model).toBe(MODEL);
+      // The key is revoked: LiteLLM refuses it now.
+      const after = await fetch(
+        `${new URL(docker('port', names.litellm, '4000/tcp').split('\n')[0]!.replace(/^/, 'http://')).origin}/v1/chat/completions`,
+        {
+          method: 'POST',
+          headers: {
+            authorization: `Bearer ${virtualKey!.reveal()}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ model: MODEL, messages: [{ role: 'user', content: 'hi' }] }),
+        },
+      );
+      expect(after.status).toBe(401);
+      return { result, report, runEvents };
+    } finally {
+      sampler.stop();
+      await teardownSandbox(client, runId).catch(() => undefined);
+      quietly('rm', '-f', run.relay);
+    }
+  }
+
+  const reports: unknown[] = [];
+  afterAll(() => {
+    if (process.env.SDLC_AGENT_REAL_REPORT && reports.length > 0) {
+      fs.writeFileSync(process.env.SDLC_AGENT_REAL_REPORT, JSON.stringify(reports, null, 2));
+    }
+  });
+
   it(
     'the agent writes hello.txt with gpt-oss:20b and finishes; spend within the cap',
     { timeout: RUN_TIMEOUT_MS + 10 * 60_000 },
@@ -228,143 +391,65 @@ describe.skipIf(!enabled)('C05 real-model run: gpt-oss:20b through LiteLLM (ADR-
         model: MODEL,
         providerType: 'self_hosted',
       });
-
-      let keyId = '';
-      let virtualKey: Redacted | undefined;
-      let cap = '';
-      const run = await startAgentRun({
-        t,
-        client,
-        image,
-        tmp,
-        suffix,
+      const { result, report } = await realRun({
         slug: 'c05-real',
-        litellmContainer: names.litellm,
-        model: MODEL,
+        label: 'hello',
         planSummary: 'Create the file hello.txt in the repository root, as the specification says.',
         specText:
           '# T01 Hello file\n\n## Acceptance criteria\n\n- AC1: the file `hello.txt` exists in the repository root.\n- AC2: its content is exactly one line: `Hello from the platform.`\n',
-        agentsMd:
-          '# Agent instructions\n\n- Keep changes small. Do not install dependencies for this task.\n',
-        caps: { maxIterations: 30, maxDurationMin: 20 },
-        afterClaim: async (scope, envelope) => {
-          // Budget: min(budget.default_run_usd, 1.00) = the contract's max_budget_usd (1).
-          const issued = await controller.issueRunKey({
-            tenantId: scope.tenantId,
-            runId: envelope.contract.run_id,
-            gate: 'G4',
-            agent: 'coder-openhands',
-          });
-          keyId = issued.key.keyId;
-          virtualKey = new Redacted(issued.key.key.reveal());
-          cap = issued.maxBudgetUsd;
-        },
+        maxIterations: 30,
       });
-      const runId = run.envelope.contract.run_id;
-      const sampler = startSampler(run.sandbox.names.container);
-      const started = Date.now();
-      try {
-        const runner = new Runner(
-          {
-            db: t.app as unknown as AgentDriveDeps['db'],
-            docker: client,
-            settings: run.settings,
-            verifier: {
-              verify: () => Promise.resolve(false),
-              publicKey: () => Promise.reject(new Error('unused')),
-            },
-            unwrapper: { unwrap: () => Promise.reject(new Error('unused')) },
-          },
-          {},
-          {
-            adapters: { openhands: new OpenHandsAdapter({ requestTimeoutMs: 60_000 }) },
-            agentUrl: () => run.relayUrl,
-          },
-        );
-        // The runner did not provision this fixture run, so it holds no clone: drive the agent
-        // with the fixture's clone (C07 changes step), then release the run through the runner.
-        const result = await driveAgent(
-          {
-            db: t.app as unknown as AgentDriveDeps['db'],
-            docker: client,
-            settings: run.settings,
-            adapter: new OpenHandsAdapter({ requestTimeoutMs: 60_000 }),
-            agentUrl: () => run.relayUrl,
-            ...changesStep(t, client, run, []),
-          },
-          {
-            contract: run.envelope.contract,
-            sandbox: run.sandbox,
-            model: MODEL,
-            virtualKey: virtualKey!,
-          },
-        ).finally(() => runner.release(run.envelope.contract.tenant_id, runId, 'finished'));
-        const seconds = Math.round((Date.now() - started) / 1000);
-        const peaks = sampler.stop();
+      reports.push(report);
+      // Pass criteria (ADR-M10 §3).
+      expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
+      expect(result.outputs?.changedFiles).toContainEqual({ path: 'hello.txt', status: 'added' });
+    },
+  );
 
-        // End of run: revoke the key, then sync spend until the calls are in cost_records.
-        await controller.endRun({ keyId, syncFrom: new Date(started - 60_000) });
-        let records = await run.scope.costRecords.listForRun(runId);
-        for (let i = 0; i < 30 && records.length === 0; i++) {
-          await new Promise((r) => setTimeout(r, 2000));
-          await controller.syncSpend({
-            from: new Date(started - 60_000),
-            to: new Date(Date.now() + 60_000),
-          });
-          records = await run.scope.costRecords.listForRun(runId);
-        }
-        const tokensIn = records.reduce((s, r) => s + Number(r.input_tokens), 0);
-        const tokensOut = records.reduce((s, r) => s + Number(r.output_tokens), 0);
-        const cost = records.reduce((s, r) => s + Number(r.cost_usd), 0);
-        const events = result.outputs?.events ?? [];
-        const report = {
-          model: 'gpt-oss:20b (Ollama 0.34.4, local, reasoning_effort low, num_ctx 32768)',
-          outcome: result.outcome,
-          status: result.status,
-          seconds,
-          iterations: result.outputs?.iterations,
-          model_calls: records.length,
-          tokens_in: tokensIn,
-          tokens_out: tokensOut,
-          cost_usd: cost.toFixed(6),
-          cap_usd: cap,
-          changed_files: result.outputs?.changedFiles,
-          agent_messages: events.filter((e) => e.kind === 'MessageEvent').length,
-          errors: events.filter((e) => e.kind === 'ConversationErrorEvent').map((e) => e.code),
-          peak_ollama_rss_mb: peaks.ollamaRssMb,
-          ollama_loaded: peaks.ollamaLoaded,
-          peak_sandbox_mb: peaks.sandboxMb,
-          peak_litellm_mb: peaks.litellmMb,
-          min_free_memory_percent: peaks.minFreePercent,
-        };
-        process.stderr.write(`C05 REAL RUN ${JSON.stringify(report)}\n`);
-        if (process.env.SDLC_AGENT_REAL_REPORT) {
-          fs.writeFileSync(process.env.SDLC_AGENT_REAL_REPORT, JSON.stringify(report, null, 2));
-        }
+  // X11 AC4 (ADR-M29 §2.10): the same longer task without and with context condensing. The
+  // numbers (time, calls, tokens, result) are recorded in ADR-M29; the default of
+  // `run.context_condensing` is chosen from them (QUESTIONS #553).
+  const LONG_TASK = {
+    planSummary:
+      'Create the files notes/n01.txt to notes/n12.txt, one at a time, as the specification says.',
+    specText:
+      '# T02 Twelve note files\n\n## Acceptance criteria\n\n' +
+      '- AC1: the folder `notes/` holds the files `n01.txt` to `n12.txt`.\n' +
+      '- AC2: each file holds exactly one line: `Note <number>.` (for example `Note 7.`).\n' +
+      '- AC3: create one file per step, then list the folder with `ls notes` before the next file.\n',
+    maxIterations: 60,
+  };
+  const CONDENSING_YAML =
+    'run:\n  context_condensing:\n    mode: summarize\n    max_events: 24\n    keep_first: 2\n    model_context_tokens:\n      gpt-oss-20b: 32768\n';
 
-        // Pass criteria (ADR-M10 §3).
-        expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
-        expect(result.outputs?.changedFiles).toContainEqual({ path: 'hello.txt', status: 'added' });
-        expect(records.length).toBeGreaterThan(0);
-        expect(cost).toBeLessThanOrEqual(Number(cap));
-        for (const r of records) expect(r.model).toBe(MODEL);
-        // The key is revoked: LiteLLM refuses it now.
-        const after = await fetch(
-          `${new URL(docker('port', names.litellm, '4000/tcp').split('\n')[0]!.replace(/^/, 'http://')).origin}/v1/chat/completions`,
-          {
-            method: 'POST',
-            headers: {
-              authorization: `Bearer ${virtualKey!.reveal()}`,
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({ model: MODEL, messages: [{ role: 'user', content: 'hi' }] }),
-          },
+  it.each([
+    ['off', undefined],
+    ['summarize', CONDENSING_YAML],
+  ] as const)(
+    'X11: a longer task with condensing %s (AC4 numbers)',
+    { timeout: RUN_TIMEOUT_MS + 10 * 60_000 },
+    async (mode, configYaml) => {
+      const { result, report, runEvents } = await realRun({
+        slug: `x11-real-${mode}`,
+        label: `x11-${mode}`,
+        ...LONG_TASK,
+        ...(configYaml === undefined ? {} : { configYaml }),
+      });
+      reports.push(report);
+      expect(result.status).toBeDefined();
+      const started = runEvents.find((e) => e.event_type === 'agent_started')?.payload;
+      if (mode === 'summarize') {
+        expect(started).toMatchObject({ condensing: 'summarize' });
+        // Summaries never reach the run events: counts only.
+        const finished = runEvents.find((e) => e.event_type === 'agent_finished')?.payload;
+        expect(Object.keys(finished ?? {})).toEqual(
+          expect.arrayContaining(['condensations', 'events_forgotten']),
         );
-        expect(after.status).toBe(401);
-      } finally {
-        sampler.stop();
-        await teardownSandbox(client, runId).catch(() => undefined);
-        quietly('rm', '-f', run.relay);
+        for (const e of result.outputs?.events ?? []) {
+          if (e.kind === 'Condensation') expect(e.summary).toBeNull();
+        }
+      } else {
+        expect(started).not.toHaveProperty('condensing');
       }
     },
   );

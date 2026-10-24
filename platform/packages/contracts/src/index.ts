@@ -6,6 +6,7 @@ export * from './forbidden-actions.js';
 export * from './git-host.js';
 export type * from './policy.js';
 export type * from './project-config.js';
+export { CONTEXT_CONDENSING_MODES } from './project-config.js';
 export * from './run-contract.js';
 export * from './evaluation-contract.js';
 export * from './model-gateway.js';

@@ -45,6 +45,8 @@ const enabled = process.env.SDLC_AGENT_TEST === '1' && !!process.env.SDLC_TEST_D
 const suffix = crypto.randomBytes(4).toString('hex');
 const VIRTUAL_KEY = `sk-c05-live-${crypto.randomBytes(12).toString('hex')}`;
 const CANARY = `agents-md-canary-${crypto.randomBytes(6).toString('hex')}`;
+// X11: the stub's summaries hold this; it must never reach run events or the handed-over log.
+const SUMMARY_CANARY = `summary-canary-${crypto.randomBytes(6).toString('hex')}`;
 const names = {
   platformNet: `sdlc-c05-platform-${suffix}`,
   stub: `sdlc-c05-litellm-${suffix}`,
@@ -85,6 +87,8 @@ describe.skipIf(!enabled)(`C05 live: the runner drives the agent (${ADAPTER})`, 
       `STUB_EXPECTED_KEY=${VIRTUAL_KEY}`,
       '-e',
       `STUB_AGENTS_CANARY=${CANARY}`,
+      '-e',
+      `STUB_SUMMARY_CANARY=${SUMMARY_CANARY}`,
       '-v',
       `${path.join(here, 'stub-model.mjs')}:/stub/stub-model.mjs:ro`,
       NODE_IMAGE,
@@ -442,6 +446,159 @@ describe.skipIf(!enabled)(`C05 live: the runner drives the agent (${ADAPTER})`, 
         // At least the whole window passed in real time, well before the time cap.
         expect(elapsed).toBeGreaterThanOrEqual(60_000);
         expect(elapsed).toBeLessThan(3 * 60_000);
+      } finally {
+        await teardownSandbox(client, runId).catch(() => undefined);
+        quietly('rm', '-f', r.relay);
+      }
+    },
+  );
+
+  // X11 (ADR-M29 §2.10, QUESTIONS #551–#554): context condensing, OpenHands only (OpenCode keeps its
+  // own behaviour, `unsupported`). The stub's summary request has no tools; it answers with the
+  // summary canary, and only with the run's virtual key.
+  const condensingConfig = (maxEvents: number, extra = '') =>
+    `run:\n${extra}  context_condensing:\n    mode: summarize\n    max_events: ${String(maxEvents)}\n    keep_first: 2\n    model_context_tokens:\n      stub-model: 32768\n`;
+
+  const drive = (r: Run) =>
+    driveAgent(
+      {
+        db: t.app as unknown as AgentDriveDeps['db'],
+        docker: client,
+        settings: r.settings,
+        adapter: agentAdapter(),
+        agentUrl: () => r.relayUrl,
+        ...changesStep(t, client, r, []),
+      },
+      request(r),
+    );
+
+  const finishedCounts = async (r: Run) =>
+    (await agentEvents(r)).find(([type]) => type === 'agent_finished')?.[1] as
+      { condensations?: number; events_forgotten?: number } | undefined;
+
+  const noSummary = async (r: Run, outputs?: { events: readonly unknown[] }) => {
+    const recorded = JSON.stringify(await r.scope.runEvents.list(r.envelope.contract.run_id));
+    expect(recorded).not.toContain(SUMMARY_CANARY);
+    expect(recorded).not.toContain(VIRTUAL_KEY);
+    if (outputs) expect(JSON.stringify(outputs.events)).not.toContain(SUMMARY_CANARY);
+  };
+
+  it.skipIf(ADAPTER !== 'openhands')(
+    'X11: past max_events the run model summarizes old events with the run key; the run finishes (AC1–AC3)',
+    { timeout: 600_000 },
+    async () => {
+      const r = await start(
+        '[stub:condense]',
+        { maxIterations: 30, maxDurationMin: 10 },
+        condensingConfig(10),
+      );
+      const runId = r.envelope.contract.run_id;
+      try {
+        const result = await drive(r);
+        expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
+        expect((await agentEvents(r))[0]).toEqual([
+          'agent_started',
+          { max_iterations: 30, max_duration_min: 10, condensing: 'summarize' },
+        ]);
+        const counts = await finishedCounts(r);
+        expect(counts?.condensations).toBeGreaterThanOrEqual(1);
+        expect(counts?.events_forgotten).toBeGreaterThanOrEqual(1);
+        // The forgotten events stay in the log, so every step is still counted: the run's
+        // iterations are all the tool calls of the log, at least the stub's 14 commands and finish.
+        const log = result.outputs?.events ?? [];
+        const ids = new Set(log.map((e) => e.id));
+        const condensations = log.filter((e) => e.kind === 'Condensation');
+        // A later condensation also forgets the summary of the one before (`<id>-summary`), which is
+        // in the model's view only, never in the log.
+        const forgotten = condensations
+          .flatMap((e) => e.forgotten_event_ids as string[])
+          .filter((id) => !id.endsWith('-summary'));
+        expect(forgotten.length).toBeGreaterThan(0);
+        expect(forgotten.every((id) => ids.has(id))).toBe(true);
+        const steps = log.filter((e) => e.kind === 'ActionEvent').length;
+        expect(steps).toBe(15);
+        expect(await r.scope.runs.getById(runId)).toMatchObject({ iterations: steps });
+        process.stderr.write(
+          `X11 LIVE condense: steps ${String(steps)}, condensations ${String(condensations.length)}, forgotten ${String(forgotten.length)}, stub calls ${String((stubLogs().match(new RegExp(`stub:call:`, 'g')) ?? []).length)}\n`,
+        );
+        expect(condensations.length).toBe(counts?.condensations);
+        expect(condensations[0]).toMatchObject({ summary: null });
+        expect(condensations[0]?.summary_sha256).toMatch(/^[0-9a-f]{64}$/);
+        const logs = stubLogs();
+        expect(logs).toContain(':notools');
+        expect(logs).not.toContain('stub:refused:wrong_key');
+        await noSummary(r, result.outputs);
+      } finally {
+        await teardownSandbox(client, runId).catch(() => undefined);
+        quietly('rm', '-f', r.relay);
+      }
+    },
+  );
+
+  it.skipIf(ADAPTER !== 'openhands')(
+    'X11: a model past its context window → the agent condenses and goes on (AC4)',
+    { timeout: 600_000 },
+    async () => {
+      const r = await start(
+        '[stub:context]',
+        { maxIterations: 30, maxDurationMin: 10 },
+        condensingConfig(1000),
+      );
+      const runId = r.envelope.contract.run_id;
+      try {
+        const result = await drive(r);
+        expect(stubLogs()).toContain('stub:refused:context');
+        expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
+        expect((await finishedCounts(r))?.condensations).toBeGreaterThanOrEqual(1);
+        await noSummary(r, result.outputs);
+      } finally {
+        await teardownSandbox(client, runId).catch(() => undefined);
+        quietly('rm', '-f', r.relay);
+      }
+    },
+  );
+
+  it.skipIf(ADAPTER !== 'openhands')(
+    'X11: the iteration cap still stops a run with condensing on (AC4)',
+    { timeout: 600_000 },
+    async () => {
+      const r = await start(
+        '[stub:condensecap]',
+        { maxIterations: 10, maxDurationMin: 10 },
+        condensingConfig(10),
+      );
+      const runId = r.envelope.contract.run_id;
+      try {
+        const result = await drive(r);
+        expect(result).toMatchObject({ outcome: 'max_iterations', status: 'stopped_budget' });
+        const run = await r.scope.runs.getById(runId);
+        expect(run?.iterations).toBeLessThanOrEqual(10);
+        await noSummary(r);
+      } finally {
+        await teardownSandbox(client, runId).catch(() => undefined);
+        quietly('rm', '-f', r.relay);
+      }
+    },
+  );
+
+  it.skipIf(ADAPTER !== 'openhands')(
+    'X11: loop detection still sees identical calls after a condensation (AC4)',
+    { timeout: 600_000 },
+    async () => {
+      const r = await start(
+        '[stub:condenseloop]',
+        { maxIterations: 30, maxDurationMin: 10 },
+        condensingConfig(
+          10,
+          '  loop_detection:\n    identical_tool_calls_max: 2\n    no_progress_window_minutes: 15\n',
+        ),
+      );
+      const runId = r.envelope.contract.run_id;
+      try {
+        const result = await drive(r);
+        expect(result).toMatchObject({ outcome: 'loop_detected', status: 'stopped_stalled' });
+        expect((await finishedCounts(r))?.condensations).toBeGreaterThanOrEqual(1);
+        await noSummary(r);
       } finally {
         await teardownSandbox(client, runId).catch(() => undefined);
         quietly('rm', '-f', r.relay);
