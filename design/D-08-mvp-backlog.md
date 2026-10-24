@@ -48,10 +48,10 @@
 | DEV | Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479) | 1 | M×1 |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 7 | S×2 · M×4 · L×1 |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.6.0 (QUESTIONS #361, #420, #424; v0.4.0 and v0.5.0 are EVAL, v0.5.0 also has the X09 spike) | 9 | S×5 · M×2 · L×2 |
-| Models | Self-hosted models: L01 early in v0.6.0 (QUESTIONS #362, #424) | 2 | S×1 · M×1 |
+| Models | Self-hosted models: L01 early in v0.6.0 (QUESTIONS #362, #424) | 3 | S×2 · M×1 |
 | Server | A team on a server: toward v1.0 (QUESTIONS #363) | 11 | S×3 · M×8 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 16 | S×4 · M×6 · L×6 |
-| **Total** | | **115** | |
+| **Total** | | **116** | |
 
 ### Order and dependencies between milestones
 
@@ -1396,6 +1396,21 @@ flowchart LR
 - [ ] AC1: From the L02 numbers: which model size meets the quality bar, the GPU memory and count it needs, buy or rent (with the legal question of rented hardware for `client_restricted` data), the cost per month
 
 > Note: QUESTIONS #362
+
+#### L03b. Measure a 30B-class model on a rented GPU
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | L01, L03 | D-07 §9 | platform/eval (provider vllm, configs/gpu.yaml, gpu/), design/L03b-gpu-measurement-runbook.md, design/D-07 §9, design/L03-gpu-sizing-note.md |
+
+**Acceptance criteria**
+
+- [ ] AC1: `pnpm eval` runs a configuration whose model is served by the `vllm` service of the profile `models-local` (provider `vllm`), with unit tests
+- [ ] AC2: A runbook the owner follows: what to rent, set-up, commands, expected cost, how to delete the machine
+- [ ] AC3: After the owner's run: a results table in D-07 §9 (resolved, pass^5 and scope breaches against the bar of the L03 note, real GPU memory, tokens per second with 4 requests, time per run) for `Qwen3-Coder-30B-A3B-Instruct` (FP8) and `gpt-oss-20b`; L03 note 1.0 with a real cost per token
+- [ ] AC4: The internal cost in `litellm/config.ctmpl` changes in a separate small task after the design docs (R092)
+
+> Note: QUESTIONS #566, #567 (Harry, 2026-10-24): the harness gets a `vllm` provider; only the model service runs on the rented machine; fictional sample repository only, never client data; the owner runs it (R035)
 
 
 ### Server — A team on a server: toward v1.0 (QUESTIONS #363)

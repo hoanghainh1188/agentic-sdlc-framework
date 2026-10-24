@@ -1,0 +1,12 @@
+# Task L03b (design/L03b-gpu-measurement-runbook.md): lets `pnpm eval` on the same machine reach the
+# `vllm` service of the profile `models-local` (ADR-M71). Use it ONLY on a rented, throw-away GPU
+# machine with fictional data. The real stack never uses it: there `vllm` has no host port.
+#
+# `models` is an internal network, and Docker does not publish ports of such a network. So the
+# service also joins `sdlc`, and the port is bound to the Docker bridge address only (default
+# 172.17.0.1), never to 0.0.0.0, so the machine's public address does not reach vLLM (it has no key).
+services:
+  vllm:
+    networks: [sdlc]
+    ports:
+      - '${SDLC_VLLM_EVAL_BIND:-172.17.0.1}:8000:8000'

@@ -58,6 +58,8 @@ import { repoRoot } from '../../workspace/helpers';
 const enabled = process.env.SDLC_EVAL === '1' && !!process.env.SDLC_TEST_DATABASE_URL;
 const MODE = process.env.SDLC_EVAL_MODE === 'check' ? 'check' : 'evaluate';
 const OLLAMA_URL = process.env.SDLC_OLLAMA_URL ?? 'http://host.docker.internal:11434';
+// vLLM of the profile `models-local`, published by platform/eval/gpu/compose.vllm-port.yml (L03b).
+const VLLM_URL = process.env.SDLC_VLLM_URL ?? 'http://host.docker.internal:8000/v1';
 const STUB_KEY = `sk-eval-stub-${crypto.randomBytes(12).toString('hex')}`;
 const suffix = crypto.randomBytes(4).toString('hex');
 const names = {
@@ -239,7 +241,7 @@ describe.skipIf(!enabled || MODE !== 'evaluate')(
       const config = path.join(tmp, 'litellm.yaml');
       fs.writeFileSync(
         config,
-        `${litellmModelList(configurations, OLLAMA_URL)}general_settings:\n  master_key: os.environ/LITELLM_MASTER_KEY\n  database_url: os.environ/DATABASE_URL\n`,
+        `${litellmModelList(configurations, OLLAMA_URL, VLLM_URL)}general_settings:\n  master_key: os.environ/LITELLM_MASTER_KEY\n  database_url: os.environ/DATABASE_URL\n`,
         { mode: 0o644 },
       );
       docker(
@@ -321,7 +323,7 @@ describe.skipIf(!enabled || MODE !== 'evaluate')(
           '/stub/stub-model.mjs',
         );
       }
-      if (configurations.some((c) => c.model.provider === 'ollama')) await startLiteLLM();
+      if (configurations.some((c) => c.model.provider !== 'stub')) await startLiteLLM();
     }, 3_600_000);
 
     afterAll(async () => {
