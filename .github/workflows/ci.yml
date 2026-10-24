@@ -398,9 +398,13 @@ jobs:
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
           for image in node24 node24-opencode gateway tool-project-docs; do
+            # X04 PR 3b: the tool image has the Node base of sdlc-api, so the repo's ignore file
+            # (as in release-images.yml); the sandbox images and the gateway keep theirs.
+            ignore=platform/sandbox-images/.trivyignore
+            [ "$image" = tool-project-docs ] && ignore=.trivyignore
             "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/$image.tar" --scanners vuln \
               --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" \
-              --ignorefile platform/sandbox-images/.trivyignore \
+              --ignorefile "$ignore" \
               --disable-telemetry --skip-version-check --exit-code 0 \
               --format table --output "$RUNNER_TEMP/trivy-image.txt"
             {
@@ -414,8 +418,12 @@ jobs:
         if: needs.scan.outputs.run_sandbox_image == 'true'
         run: |
           for image in node24 node24-opencode gateway tool-project-docs; do
+            # X04 PR 3b: the tool image has the Node base of sdlc-api, so the repo's ignore file
+            # (as in release-images.yml); the sandbox images and the gateway keep theirs.
+            ignore=platform/sandbox-images/.trivyignore
+            [ "$image" = tool-project-docs ] && ignore=.trivyignore
             "$RUNNER_TEMP/trivy" image --input "$RUNNER_TEMP/$image.tar" --scanners vuln \
-              --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile platform/sandbox-images/.trivyignore \
+              --severity "$TRIVY_BLOCK_SEVERITY" --ignorefile "$ignore" \
               --disable-telemetry --skip-version-check --exit-code 1
           done
       # ADR-M10 §2.1: the CRITICAL licence category (AGPL, SSPL, commercial) blocks.
