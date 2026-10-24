@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- X12 (design only; ADR-M74 proposed; QUESTIONS #571–#575): agent memory across runs. Memory is Markdown in the project repository (`.sdlc/memory/*.md`); a run reads it only when a person who is not a producer approved that set, in its own nonce block framed as data; an agent proposes memory in a separate pull request after the code merge, never blocking a release; `sdlc memory revoke` for an emergency. Proposed changes: D-03 1.49, D-05 1.62, ADR-M80 0.7. X13 builds it.
+
 ## [0.6.0] - 2026-10-24
 
 The release of the milestone EXT (except the design X12): **a second coding agent, tools for agents through one MCP gateway per run, and a record of what each agent read.** The agent register names each agent's adapter, and OpenCode is the second adapter beside OpenHands (X01, X03; ADR-M68, ADR-M88). A tool register like the agent register gives a run only the tools that the plan, the agent and Person B allow; each run gets one agentgateway and one hardened container per tool (X02, X14, X04; ADR-M69, ADR-M87). The first tool, `read_documents`, searches the project's Markdown documents at the run's base commit (X04; ADR-M89). Every run records a context snapshot of what its agent read, in the Evidence Pack (X07; ADR-M90), and a project may turn on context condensing for long runs (X11). Also: an optional self-hosted model service (vLLM) on the server's GPU (L01 PR 1, ADR-M71; not yet run on a GPU), the GPU sizing note for leadership (L03) and the tools to measure a 30B-class model on a rented GPU (L03b). A minor release: five migrations, a new Run Contract schema, rebuilt images, a sixth published image (`tool-project-docs`), new project configuration sections.

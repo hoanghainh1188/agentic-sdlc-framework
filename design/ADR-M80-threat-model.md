@@ -129,6 +129,8 @@ Test names: **U-n** = unit test without Docker (`pnpm test`, PR 2, `platform/tes
 
 *Proof:* Exists: `platform/tests/contracts/agent-instructions.test.ts`, `platform/tests/workflow/gate-g5.test.ts`, `platform/tests/integration/db/gate-g4.test.ts` and `gate-g5.test.ts`. PR 2: A-9 the stub model edits `AGENTS.md`, adds a second spelling (`agents.md`), writes `.openhands/skills/x.md`, and edits `.sdlc/` plan and spec files; asserts the changes are in the diff outside the sandbox, G5 stops the run with `instructions_unpinned` (or out of scope for `.sdlc/`), nothing is pushed to the default branch and no later run sees the file.
 
+*Agent memory (version 0.7, **proposed** by X12, ADR-M74):* when a project turns memory on, approved notes in `.sdlc/memory/*.md` reach later runs. This is a second path to later runs, and the control for it is: a memory set is read only when its hash equals a version that a person who is not a producer approved (`project_memory_versions`); a revoked version is never read; the runner reads it at `base_sha` from its own clone, caps it and puts it in a nonce block framed as data; memory changes leave the run only in their own branch and pull request, after the code merge, and never in the code change. Proof (X13): the tests of ADR-M74 §5, among them an attack test like A-9 with a poisoned memory file, and the canary scan for memory text.
+
 *Gaps:* G-8 (instruction files under paths the base commit's ignore rules hide are not seen, ADR-M34 §2.3; they cannot reach Git, so they cannot persist: Low). G-5 (cache).
 
 ### ASI07. Insecure inter-agent communication
@@ -259,3 +261,4 @@ Optional, once, outside CI: one run with `gpt-oss:20b` (Ollama on the owner's ma
 | 0.4 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |
 | 0.5 | 2026-10-21 | Claude (task X02) | §4.2 **proposed**: tools for agents (ADR-M69) against ASI01–ASI08, the planned tests for X04, gap G-11 (QUESTIONS #519) |
 | 0.6 | 2026-10-22 | Claude (task X04), approved by the repository owner with ADR-M69 | §4.2: the run's MCP gateway as the call-level control for ASI02, the key checked by the gateway, the gateway image under ASI04 (ADR-M87 §5) |
+| 0.7 | 2026-10-24 | Claude (task X12) | ASI06 **proposed**: the control and proof for agent memory (ADR-M74, QUESTIONS #571–#575) |
