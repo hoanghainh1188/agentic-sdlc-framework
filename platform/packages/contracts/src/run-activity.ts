@@ -5,7 +5,8 @@
 //
 // Activity inputs and results stay in the Temporal history, so they hold IDs, codes and single-use
 // OpenBao wrapping tokens only (their time to live is the contract's validity): the run's GitHub
-// token, its virtual key and, after a request for changes at G7, the feedback token (E01 PR 2).
+// token, its virtual key, after a request for changes at G7 the feedback token (E01 PR 2) and the
+// secrets of its `read_documents` tools (X04 PR 3b).
 // Never a raw token, a virtual key, a key ID, feedback text or other client data.
 
 /** Temporal task queue of the runner (ADR-M25 §2.7). */
@@ -27,6 +28,19 @@ export interface ExecuteRunInput {
    * the recorded review or comment with it, in memory only, then revokes it.
    */
   readonly wrappedFeedbackToken?: string;
+  /**
+   * X04 PR 3b (ADR-M69 §2.4, QUESTIONS #535, #542): by tool key, the single-use wrapping token
+   * around a `read_documents` tool's `{ db_username, db_password, llm_key }` and the ID of the
+   * index version it reads. The runner unwraps it and writes it into the tool's container as a
+   * file; the sandbox never sees it.
+   */
+  readonly toolSecrets?: Readonly<Record<string, ToolSecretsHandoff>>;
+}
+
+/** One tool's handoff (X04 PR 3b): a wrapping token and an ID, nothing else. */
+export interface ToolSecretsHandoff {
+  readonly wrapped: string;
+  readonly indexId: string;
 }
 
 export type ExecuteRunResult =

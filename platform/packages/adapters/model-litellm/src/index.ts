@@ -8,6 +8,7 @@ export {
   runKeyAlias,
   spendRecordFromRow,
   tenantTeamId,
+  toolKeyAlias,
   usdFromNumber,
 } from './mapping.js';
 export { LiteLLMEmbedder, type LiteLLMEmbedderOptions } from './embed.js';

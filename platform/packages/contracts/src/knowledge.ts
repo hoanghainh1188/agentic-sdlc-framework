@@ -4,6 +4,30 @@
 // implements the store on the `knowledge-db` PostgreSQL with pgvector (QUESTIONS #534).
 import type { RedactedSecret } from './secrets.js';
 
+const PROJECT_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** The project's schema in `knowledge-db`: an identifier from its UUID only (ADR-M89 §2.1). */
+export function knowledgeSchema(projectId: string): string {
+  if (!PROJECT_UUID.test(projectId)) throw new KnowledgeError('store_unavailable');
+  return `kdocs_p${projectId.replaceAll('-', '')}`;
+}
+
+/**
+ * The project's read role (no login). A run's tool logs in as a member of it only (X04 PR 3b,
+ * QUESTIONS #537, #541): the OpenBao database role of the run grants this role and nothing else.
+ */
+export function knowledgeReadRole(projectId: string): string {
+  return `${knowledgeSchema(projectId)}_read`;
+}
+
+/**
+ * The role OpenBao's database secrets engine logs in as (X04 PR 3b): it creates and drops the
+ * per-run logins, and holds each project's read role with the admin option only.
+ */
+export const KNOWLEDGE_ISSUER_ROLE = 'kdocs_issuer';
+/** The database of the index in `knowledge-db`. */
+export const KNOWLEDGE_DATABASE = 'knowledge';
+
 /** One chunk of a document, keyed by the SHA-256 of its model and text (ADR-M89 §2.3). */
 export interface KnowledgeChunk {
   readonly sha256: string;
@@ -84,6 +108,8 @@ export const KNOWLEDGE_ERROR_CODES = [
   'file_unreadable',
   'model_not_allowed',
   'embedding_failed',
+  /** X04 PR 3b: the tool's database login or model key could not be issued (OpenBao, LiteLLM). */
+  'credentials_unavailable',
 ] as const;
 export type KnowledgeErrorCode = (typeof KNOWLEDGE_ERROR_CODES)[number];
 
@@ -93,4 +119,19 @@ export class KnowledgeError extends Error {
   constructor(readonly code: KnowledgeErrorCode) {
     super(`knowledge.${code}`);
   }
+}
+
+/**
+ * The line a `read_documents` tool writes to its own log for each answer (X04 PR 3b, ADR-M89
+ * §2.5, QUESTIONS #533, #536): the document IDs and content hashes it returned, and the number of
+ * chunks. Never a query, a path or a text. The runner reads these lines from outside the sandbox at
+ * the end of the run and records `knowledge_read`.
+ */
+export const KNOWLEDGE_READ_LOG_EVENT = 'sdlc.knowledge_read';
+
+export interface KnowledgeReadLogLine {
+  readonly event: typeof KNOWLEDGE_READ_LOG_EVENT;
+  /** `[doc_id, content_sha256]` of each document of the answer. */
+  readonly documents: readonly (readonly [string, string])[];
+  readonly chunks: number;
 }

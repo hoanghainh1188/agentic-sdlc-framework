@@ -23,6 +23,10 @@
 //    the intent is paused with a `technical` escalation like any failed run (Harry, E01 PR 2
 //    plan). When it holds, a third token that may only read pull requests (or issues, for a
 //    command on the intent's issue) is wrapped for the runner, which reads the text with it.
+// 7. (X04 PR 3a, 3b; ADR-M89) for a `read_documents` tool: the index of the project's documents at
+//    the base commit, then the tool's database login and model key, wrapped for the runner
+//    (`tools/credentials.ts`). A failure ends the run `failed` (`tool_unavailable`, run event
+//    `knowledge_unavailable`) and revokes what was issued.
 // If anything fails after the contract, the key is revoked and the run is cancelled
 // (`prepare_failed`), so no run waits in `queued` with a live key.
 import {
@@ -33,6 +37,7 @@ import {
   type GitHostAdapter,
   type RedactedSecret,
   type RunContractSigner,
+  type RunDatabaseCredentials,
   type SecretWrapper,
 } from '@sdlc/contracts';
 
@@ -54,12 +59,19 @@ import {
   type FeedbackUnavailable,
 } from './g7-feedback.js';
 import { isFinalRun, roundRuns } from './run-round.js';
+import {
+  endRunCredentials,
+  issueToolSecrets,
+  smallerUsd,
+  type PreparedToolSecrets,
+} from '../tools/credentials.js';
 
 export interface PrepareRunDeps {
   readonly registry: Registry;
   readonly g4: G4Deps;
   readonly signer: RunContractSigner;
-  readonly costController: Pick<CostController, 'issueRunKey' | 'endRun'>;
+  readonly costController: Pick<CostController, 'issueRunKey' | 'issueToolKey' | 'endRun'> &
+    Pick<CostController, 'endRunKey'>;
   readonly gitHost: Pick<GitHostAdapter, 'issueShortLivedToken' | 'getReviews'>;
   readonly wrapper: SecretWrapper;
   /** Services the sandbox may reach, as `alias:port` (deployment settings, ADR-M25 §2.2). */
@@ -69,6 +81,11 @@ export interface PrepareRunDeps {
    * Without it a run with such a tool fails (`tool_unavailable`).
    */
   readonly knowledge?: KnowledgeDeps;
+  /**
+   * X04 PR 3b (QUESTIONS #535, #541): OpenBao's database engine, for the database login of a
+   * `read_documents` tool. Without it a run with such a tool fails (`tool_unavailable`).
+   */
+  readonly databaseCredentials?: RunDatabaseCredentials;
 }
 
 export type PrepareRunRefusal =
@@ -116,6 +133,11 @@ export interface PreparedRun {
    * requests (or issues), when the run answers a request for changes at G7.
    */
   readonly wrappedFeedbackToken?: RedactedSecret;
+  /**
+   * X04 PR 3b: by tool key, the single-use wrapping token around a `read_documents` tool's
+   * `{ db_username, db_password, llm_key }` and the index version it reads. Empty without one.
+   */
+  readonly toolSecrets: ReadonlyMap<string, PreparedToolSecrets>;
   readonly warnings: readonly 'recertification_overdue'[];
 }
 
@@ -257,9 +279,36 @@ export async function prepareRun(
     await cancel(scope, deps.registry, runId, 'prepare_failed');
     throw error;
   }
-  if (indexed !== 'ok') {
+  if (typeof indexed === 'string') {
     await deps.costController.endRun({ keyId: key.key.keyId, syncFrom: keyIssuedAt });
     await failForKnowledge(scope, deps.registry, runId, indexed);
+    return { ok: false, reason: 'tool_unavailable' };
+  }
+  const startWindowSeconds = checked.validityMinutes * SECONDS_PER_MINUTE;
+  let toolSecrets: ReadonlyMap<string, PreparedToolSecrets>;
+  try {
+    toolSecrets = await issueToolSecrets(
+      scope,
+      {
+        databaseCredentials: deps.databaseCredentials,
+        wrapper: deps.wrapper,
+        costController: deps.costController,
+      },
+      {
+        runId,
+        projectId: peek.project_id,
+        grants: proposal.toolGrants,
+        indexIds: indexed.indexIds,
+        models: indexed.models,
+        ttlSeconds: proposal.maxDurationMin * SECONDS_PER_MINUTE + startWindowSeconds,
+        wrapTtlSeconds: startWindowSeconds,
+        toolBudgetUsd: smallerUsd(indexed.toolBudgetUsd, key.maxBudgetUsd),
+      },
+    );
+  } catch {
+    // The run's key, the tools' keys and logins: everything issued so far, found by the run.
+    await endRunCredentials(scope, deps, runId, keyIssuedAt);
+    await failForKnowledge(scope, deps.registry, runId, 'credentials_unavailable');
     return { ok: false, reason: 'tool_unavailable' };
   }
 
@@ -300,11 +349,13 @@ export async function prepareRun(
         wrappedGitToken,
         wrappedVirtualKey,
         ...(wrappedFeedbackToken ? { wrappedFeedbackToken } : {}),
+        toolSecrets,
         warnings: checked.ownerWarning ? ['recertification_overdue'] : [],
       },
     };
   } catch (error) {
     await deps.costController.endRun({ keyId: key.key.keyId, syncFrom: keyIssuedAt });
+    if (toolSecrets.size > 0) await endRunCredentials(scope, deps, runId, keyIssuedAt);
     await cancel(scope, deps.registry, runId, 'prepare_failed');
     throw error;
   }
@@ -431,10 +482,18 @@ async function failForFeedback(
 /** The stop reason of a run whose register tool could not be prepared (X04 PR 3a). */
 export const TOOL_UNAVAILABLE = 'tool_unavailable';
 
+/** The index version and the model of each `read_documents` grant, by tool key. */
+interface IndexedTools {
+  readonly indexIds: ReadonlyMap<string, string>;
+  readonly models: ReadonlyMap<string, string>;
+  /** `tools.model_budget_usd` of the project (decimal USD). */
+  readonly toolBudgetUsd: string;
+}
+
 /**
  * Builds or reuses the index of the project's documents for each grant with `read_documents`
  * (ADR-M89 §2.3). The model is the tool's `model_ref` and must be one of the contract's allowed
- * models (G4 checked it for the data class). Returns `ok` or the knowledge error code.
+ * models (G4 checked it for the data class). Returns the index versions or the error code.
  */
 async function indexForTools(
   scope: TenantScope,
@@ -443,9 +502,11 @@ async function indexForTools(
   proposal: RunProposal,
   runId: string,
   key: RedactedSecret,
-): Promise<'ok' | KnowledgeErrorCode> {
+): Promise<IndexedTools | KnowledgeErrorCode> {
   const grants = proposal.toolGrants.filter((g) => g.permissions.includes('read_documents'));
-  if (grants.length === 0) return 'ok';
+  const indexIds = new Map<string, string>();
+  const models = new Map<string, string>();
+  if (grants.length === 0) return { indexIds, models, toolBudgetUsd: '0' };
   try {
     if (!deps.knowledge) throw new KnowledgeError('store_unavailable');
     const project = await scope.projects.getById(intent.project_id);
@@ -458,7 +519,7 @@ async function indexForTools(
       if (model === null || !proposal.allowedModels.includes(model)) {
         throw new KnowledgeError('model_not_allowed');
       }
-      await buildProjectIndex(scope, deps.knowledge, {
+      const built = await buildProjectIndex(scope, deps.knowledge, {
         ref,
         projectId: intent.project_id,
         baseSha: proposal.baseSha,
@@ -469,8 +530,10 @@ async function indexForTools(
         limits: config.knowledge,
         now: deps.registry.now(),
       });
+      indexIds.set(grant.tool_key, built.indexId);
+      models.set(grant.tool_key, model);
     }
-    return 'ok';
+    return { indexIds, models, toolBudgetUsd: String(config.tools.model_budget_usd) };
   } catch (error) {
     if (error instanceof KnowledgeError) return error.code;
     throw error;

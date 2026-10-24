@@ -233,6 +233,8 @@ async function executeKillable(
       ...(prepared.wrappedFeedbackToken === undefined
         ? {}
         : { wrappedFeedbackToken: prepared.wrappedFeedbackToken }),
+      // X04 PR 3b: wrapping tokens and index IDs only.
+      ...(prepared.toolSecrets === undefined ? {} : { toolSecrets: prepared.toolSecrets }),
     }),
   );
   const markSettled = () => {

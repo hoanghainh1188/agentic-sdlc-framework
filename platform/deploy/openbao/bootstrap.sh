@@ -106,6 +106,14 @@ Commands:
                        and sets it in knowledge-db. Needs the profile knowledge. The old password
                        stops working. Prints no secret. Run it again to rotate, then restart
                        sdlc-worker (runbook T11 section 5o).
+  knowledge-issuer-credentials
+                       The tools' short-lived logins to knowledge-db (X04 PR 3b, ADR-M89): makes
+                       the knowledge-db role "kdocs_issuer" (CREATEROLE, no superuser, the admin
+                       option on each project's read role only) with a new password, writes the
+                       connection knowledge-db of the database engine (roles kdocs-* only) and
+                       rotates the password inside OpenBao, so nobody knows it. Needs the profile
+                       knowledge and "configure" first. Prints no secret. Run it again to repair or
+                       rotate (runbook T11 section 5o).
 
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
@@ -154,7 +162,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | backup-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials | worker-knowledge-credentials | api-github-oauth-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | backup-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials | worker-knowledge-credentials | knowledge-issuer-credentials | api-github-oauth-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -726,6 +734,48 @@ cmd_worker_knowledge_credentials() {
   say "kv/worker/knowledge-db stored and set on the knowledge-db role knowledge; restart sdlc-worker to use it"
 }
 
+# The issuer of the tools' database logins (X04 PR 3b, ADR-M89, QUESTIONS #535, #537, #541). The
+# password is made inside the openbao container, written into the database engine's connection
+# (not verified yet) and printed as SQL into a variable, never a file or an argument; psql sets it
+# on the role in knowledge-db (the session logs no statement); then `rotate-root` replaces it with
+# a password only OpenBao knows. The role may create and drop roles and end their sessions; it
+# holds each project's read role with the admin option only (it cannot read the indexes itself).
+cmd_knowledge_issuer_credentials() {
+  require_unsealed
+  token="$(read_secret 'Admin or root token (hidden)')"
+  [ -n "$token" ] || fail "no token given"
+  psql_admin='psql -v ON_ERROR_STOP=1 -X -q -U postgres -d knowledge'
+  compose exec -T knowledge-db sh -c "$psql_admin -c 'SELECT 1'" </dev/null >/dev/null 2>&1 ||
+    fail "knowledge-db is not reachable; start the profile knowledge first (pnpm compose:knowledge)"
+  printf '%s\n' "$token" | bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN &&
+    bao read -field=type sys/mounts/database' 2>/dev/null | grep -qx database ||
+    fail "the mount database/ is missing; run pnpm openbao:bootstrap configure first"
+  sql="$(printf '%s\n' "$token" |
+    bao_exec sh -c 'set -e
+      IFS= read -r BAO_TOKEN && export BAO_TOKEN
+      pw="$(od -An -N24 -tx1 /dev/urandom | tr -d " \n")"
+      [ "${#pw}" -eq 48 ] || exit 1
+      printf "{\"plugin_name\":\"postgresql-database-plugin\",\"connection_url\":\"postgresql://{{username}}:{{password}}@knowledge-db:5432/knowledge?sslmode=disable\",\"username\":\"kdocs_issuer\",\"password\":\"%s\",\"allowed_roles\":\"kdocs-*\",\"verify_connection\":false,\"password_authentication\":\"scram-sha-256\"}" "$pw" |
+        bao write database/config/knowledge-db - >/dev/null
+      printf "SET log_statement = '"'"'none'"'"';\n"
+      printf "SET log_min_error_statement = '"'"'panic'"'"';\n"
+      printf "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '"'"'kdocs_issuer'"'"') THEN CREATE ROLE kdocs_issuer; END IF; END \$\$;\n"
+      printf "ALTER ROLE kdocs_issuer LOGIN NOSUPERUSER NOCREATEDB CREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '"'"'%s'"'"';\n" "$pw"
+      printf "GRANT CONNECT ON DATABASE knowledge TO kdocs_issuer;\n"
+      printf "GRANT pg_signal_backend TO kdocs_issuer;\n"
+      printf "DO \$\$ DECLARE r text; BEGIN FOR r IN SELECT rolname FROM pg_roles WHERE rolname ~ '"'"'^kdocs_p[0-9a-f]{32}_read\$'"'"' LOOP EXECUTE format('"'"'GRANT %%I TO kdocs_issuer WITH ADMIN OPTION, INHERIT FALSE, SET FALSE'"'"', r); END LOOP; END \$\$;\n"')" ||
+    fail "could not write the connection knowledge-db (token valid? OpenBao configured?)"
+  case "$sql" in *"ALTER ROLE kdocs_issuer"*) ;; *) fail "could not write the connection knowledge-db; run the command again" ;; esac
+  printf '%s\n' "$sql" | compose exec -T knowledge-db sh -c "$psql_admin" >/dev/null 2>&1 ||
+    fail "could not set up the knowledge-db role kdocs_issuer (database made by knowledge-db/init?); run the command again"
+  unset sql
+  printf '%s\n' "$token" | bao_exec sh -c 'set -e
+    IFS= read -r BAO_TOKEN && export BAO_TOKEN
+    bao write -f database/rotate-root/knowledge-db >/dev/null' ||
+    fail "OpenBao could not log in to knowledge-db as kdocs_issuer; run the command again"
+  say "knowledge-db role kdocs_issuer set up; connection knowledge-db written (roles kdocs-* only) and its password rotated inside OpenBao"
+}
+
 # The backup job's AppRole (A10 PR 2, ADR-M63 §5): into the volume backup-approle of the one-shot
 # service backup-agent, whose user is openbao.
 cmd_backup_credentials() {
@@ -757,5 +807,6 @@ case "$command" in
   worker-anchor-credentials) cmd_worker_anchor_credentials ;;
   worker-langfuse-credentials) cmd_worker_langfuse_credentials ;;
   worker-knowledge-credentials) cmd_worker_knowledge_credentials ;;
+  knowledge-issuer-credentials) cmd_knowledge_issuer_credentials ;;
   api-github-oauth-credentials) cmd_api_github_oauth_credentials ;;
 esac

@@ -24,6 +24,8 @@ export const EVIDENCE_KINDS = [
   'review',
   'cost_summary',
   'disclosure_note',
+  /** X04 PR 3b (ADR-M89 §2.5): the document IDs and content hashes a run's tool returned. */
+  'knowledge_read',
 ] as const;
 export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
 

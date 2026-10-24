@@ -134,7 +134,7 @@ describe('the runner enforces only what it can (ADR-M69 §2.6)', () => {
 
   it.each<[string, Partial<ToolGrant>]>([
     ['other call rules', { call_rules_sha256: 'a'.repeat(64) }],
-    ['a backing service (X04 PR 3)', { backing_services: ['knowledge-db:5432'] }],
+    ['a backing service this runner was not given', { backing_services: ['knowledge-db:5432'] }],
   ])('refuses %s', (_name, extra) => {
     expect(toolGrantsEnforceable([grant('project-docs', extra)])).toBe(false);
   });

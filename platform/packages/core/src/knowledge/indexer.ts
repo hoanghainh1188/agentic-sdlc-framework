@@ -113,6 +113,9 @@ export async function buildProjectIndex(
       intentId: input.intentId,
       at: input.now,
     });
+  // X04 PR 3b: also for a reused index, so a project indexed before the issuer role existed gets
+  // the grants a run's login needs (idempotent).
+  await store.ensureProject({ tenantId: scope.tenantId, projectId: input.projectId });
   const ready = await scope.knowledgeIndexes.findReady(input.projectId, input.baseSha, input.model);
   // A ready index the retention pass purges meanwhile is built again.
   if (ready && (await use(ready.id))) {
@@ -120,7 +123,6 @@ export async function buildProjectIndex(
   }
 
   const { documents, bytes } = await readDocuments(deps, input);
-  await store.ensureProject({ tenantId: scope.tenantId, projectId: input.projectId });
   const texts = new Map<string, string>();
   for (const document of documents) {
     document.chunks.forEach((key, i) => texts.set(key, document.texts[i]!));

@@ -34,6 +34,16 @@ export function runKeyAlias(runId: string): string {
   return `run-${runId}`;
 }
 
+const TOOL_KEY = /^[a-z][a-z0-9-]{1,62}$/;
+
+/** X04 PR 3b (QUESTIONS #542): the alias of a register tool's own key in one run. */
+export function toolKeyAlias(runId: string, toolKey: string): string {
+  if (!UUID.test(runId) || !TOOL_KEY.test(toolKey)) {
+    throw new GatewayError('invalid_input', 'tool key is not valid', undefined, 'toolKey');
+  }
+  return `tool-${runId}-${toolKey}`;
+}
+
 /**
  * Labels as LiteLLM tags (`<label>:<value>`). LiteLLM copies the key's `metadata.tags` onto every
  * spend row (`request_tags`); the key's other metadata is not copied (ADR-M24 §2.2).
@@ -115,12 +125,16 @@ export function keyGenerateBody(input: CreateRunKey): Record<string, unknown> {
       'durationMinutes',
     );
   }
+  const alias =
+    input.toolKey === undefined
+      ? runKeyAlias(input.runId)
+      : toolKeyAlias(input.runId, input.toolKey);
   return {
-    key_alias: runKeyAlias(input.runId),
+    key_alias: alias,
     // C07 (ADR-M34 §2.6): LiteLLM lets a key read another key's info when both have the same
-    // `user_id`, and two keys without one compare equal. Each run key gets its own owner, so a
-    // run key reads only its own info.
-    user_id: runKeyAlias(input.runId),
+    // `user_id`, and two keys without one compare equal. Each run key (and each tool key, X04 PR
+    // 3b) gets its own owner, so a key reads only its own info.
+    user_id: alias,
     team_id: input.tenantGroupId,
     models: [...input.models],
     max_budget: budget,

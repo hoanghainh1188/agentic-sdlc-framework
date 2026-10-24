@@ -70,6 +70,28 @@ export const RUN_EVENT_TYPES = {
    * `failed` with the stop reason `tool_unavailable`, before its sandbox.
    */
   knowledge_unavailable: { reason: 'code' },
+  /**
+   * X04 PR 3b (ADR-M89 §2.5, QUESTIONS #533, #536, #544): once per run and `read_documents` tool,
+   * at the end of the run (also after a kill or a failure), from the tool's own log lines read by
+   * the runner outside the sandbox. `list_sha256`: the SHA-256 of the evidence item `knowledge_read`
+   * (the sorted list of document ID and content hash the tool returned); `documents`: how many
+   * distinct documents; `chunks`: how many chunks it returned in all. Never a query, a path or a
+   * text.
+   */
+  knowledge_read: {
+    tool_key: 'code',
+    index_id: 'uuid',
+    list_sha256: 'sha256',
+    documents: 'count',
+    chunks: 'count',
+  },
+  /**
+   * X04 PR 3b (ADR-M69 §2.7–§2.8, QUESTIONS #541, #542): the run's tool credentials (the database
+   * logins and the tools' model keys) were revoked at the end of the run or at a kill;
+   * `tool_credential_revoke_failed` with a code when it failed (the time to live still ends them).
+   */
+  tool_credential_revoked: { tool_key: 'code' },
+  tool_credential_revoke_failed: { tool_key: 'code', reason: 'code' },
   /** Provisioning stopped before the sandbox was ready; `reason` is a `ProvisioningFailure` (C04). */
   provisioning_failed: { reason: 'code' },
   /**

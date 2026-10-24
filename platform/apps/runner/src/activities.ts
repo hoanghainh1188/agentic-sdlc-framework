@@ -139,6 +139,16 @@ async function execute(
     {
       envelope: { contract: stored.contract_json, signature: stored.signature },
       wrappedGitToken: new Redacted(input.wrappedGitToken),
+      ...(input.toolSecrets === undefined
+        ? {}
+        : {
+            toolSecrets: new Map(
+              Object.entries(input.toolSecrets).map(([toolKey, handoff]) => [
+                toolKey,
+                { wrapped: new Redacted(handoff.wrapped), indexId: handoff.indexId },
+              ]),
+            ),
+          }),
     },
     ctx.cancellationSignal,
   );

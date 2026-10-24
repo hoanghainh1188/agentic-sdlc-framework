@@ -45,3 +45,14 @@ export {
   TOOL_STATUS_MOVES,
   TOOL_STATUS_REASONS,
 } from './rules.js';
+export {
+  credentialGrants,
+  endRunCredentials,
+  issueToolSecrets,
+  revokeToolCredentials,
+  runToolGrants,
+  smallerUsd,
+  type IssueToolSecretsInput,
+  type PreparedToolSecrets,
+  type ToolCredentialDeps,
+} from './credentials.js';

@@ -5,6 +5,9 @@
 //   and a budget cap = the smallest of the run budget (contract), what is left of the intent
 //   budget and what is left of the tenant's budget for this UTC month (both from `cost_records`).
 //   A zero or negative remainder is refused, never turned into a zero-budget key.
+// - `issueToolKey` (X04 PR 3b, ADR-M69 §2.4, QUESTIONS #542): the own key of a register tool that
+//   calls a model, with the run's labels (`agent` = `tool:<tool_key>`), one model of the contract
+//   and a small cap; revoked with the run's key by alias.
 // - `endRun`: revokes the key first, then syncs spend once.
 // - `syncSpend`: gateway spend rows → `cost_records` (never twice: unique source_ref). The worker
 //   schedules it with `CostSyncLoop` (C12, ADR-M24 §2.5).
@@ -24,6 +27,7 @@ import {
   type RunContract,
   type RunStatus,
   type VirtualKey,
+  toolCostAgent,
 } from '@sdlc/contracts';
 
 import type { PlatformDatabase } from '../db/platform-database.js';
@@ -50,6 +54,18 @@ export interface IssueRunKey {
   readonly gate: GateCode;
   /** Agent key from the agent register (label `agent`), for example `coder-openhands`. */
   readonly agent: string;
+}
+
+export interface IssueToolKey {
+  readonly tenantId: TenantId;
+  readonly runId: string;
+  readonly gate: GateCode;
+  /** The register tool (label `agent` = `tool:<tool_key>`). */
+  readonly toolKey: string;
+  /** The tool's `model_ref`: one of the contract's `allowed_models`. */
+  readonly model: string;
+  /** The key's cap (decimal USD): the caller takes the smaller of the configuration and the run's. */
+  readonly maxBudgetUsd: string;
 }
 
 export interface IssuedRunKey {
@@ -180,6 +196,61 @@ export class CostController {
     return { key, labels, maxBudgetUsd, limitedBy };
   }
 
+  /** The own key of a register tool of the run (see the header; QUESTIONS #542). */
+  async issueToolKey(input: IssueToolKey): Promise<VirtualKey> {
+    const scope = this.db.forTenant(input.tenantId);
+    const run = await scope.runs.getById(input.runId);
+    const stored = run ? await scope.runContracts.getByRunId(run.id) : undefined;
+    const intent = run ? await scope.intents.getById(run.intent_id) : undefined;
+    const project = intent ? await scope.projects.getById(intent.project_id) : undefined;
+    const tenant = await this.db.system.getTenant(input.tenantId);
+    if (!run || !stored || !intent || !project || !tenant) {
+      throw new CostError('run_not_found', 'run, contract, intent, project or tenant not found');
+    }
+    if (!STARTABLE.includes(run.status)) {
+      throw new CostError('run_not_startable', `run status ${run.status} does not take a new key`);
+    }
+    const checked = validateRunContract(stored.contract_json);
+    if (!checked.ok) throw new CostError('run_not_found', 'the stored Run Contract is not valid');
+    const contract: RunContract = checked.contract;
+    if (!contract.allowed_models.includes(input.model)) {
+      throw new CostError('no_models', 'the Run Contract does not allow the tool model');
+    }
+    const labels = checkLabels({
+      tenant: tenant.slug,
+      project: project.slug,
+      intent_id: intent.code,
+      run_id: run.id,
+      gate: input.gate,
+      agent: toolCostAgent(input.toolKey),
+      data_class: intent.data_class,
+    });
+    const monthly = tenant.monthly_budget_usd;
+    const { tenantGroupId } = await this.gateway.ensureTenantBudget({
+      tenantSlug: tenant.slug,
+      monthlyBudgetUsd: monthly === null ? null : fromMicros(toMicros(monthly)),
+    });
+    const startWindowMin = Math.ceil(
+      (Date.parse(contract.expires_at) - Date.parse(contract.issued_at)) / 60_000,
+    );
+    const key = await this.gateway.createRunKey({
+      runId: run.id,
+      labels,
+      maxBudgetUsd: input.maxBudgetUsd,
+      models: [input.model],
+      durationMinutes: contract.max_duration_min + startWindowMin,
+      tenantGroupId,
+      toolKey: input.toolKey,
+    });
+    this.logger.log('info', 'cost.tool_key_issued', {
+      tenant_id: input.tenantId,
+      run_id: run.id,
+      tool_key: input.toolKey,
+      max_budget_usd: input.maxBudgetUsd,
+    });
+    return key;
+  }
+
   /**
    * The virtual key of one evaluation run (task L04, ADR-M81 §2.4, QUESTIONS #462). The seven labels
    * stay: `intent_id` is the evaluation code, `run_id` the evaluation run, `gate` is `EVAL`, `agent`
@@ -280,8 +351,13 @@ export class CostController {
    * Used when the run ends through the workflow, which never holds the key's ID. Revoking a key
    * that is already gone is not an error.
    */
-  async endRunKey(input: { readonly runId: string; readonly syncFrom: Date }): Promise<SyncResult> {
-    await this.gateway.revokeRunKey(input.runId);
+  async endRunKey(input: {
+    readonly runId: string;
+    readonly syncFrom: Date;
+    /** X04 PR 3b: the register tools of the run whose own keys go too. */
+    readonly toolKeys?: readonly string[];
+  }): Promise<SyncResult> {
+    await this.gateway.revokeRunKey(input.runId, input.toolKeys ?? []);
     this.logger.log('info', 'cost.run_key_revoked', {});
     return this.syncSpend({ from: input.syncFrom, to: this.now() });
   }

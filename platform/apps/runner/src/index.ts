@@ -72,7 +72,7 @@ export {
   type FeedbackAccess,
   type FeedbackReader,
 } from './agent/feedback.js';
-export { assertSafeNetworkConnect } from './docker/guard.js';
+export { assertSafeNetworkConnect, assertSafeServiceConnect } from './docker/guard.js';
 export { RunnerError, type RunnerErrorKey } from './errors.js';
 export { HeldRuns } from './held.js';
 export {
@@ -136,7 +136,13 @@ export {
   toolGrantsEnforceable,
   type StartToolsInput,
   type StartedTools,
+  type ToolRuntime,
 } from './tools/provision.js';
+export {
+  knowledgeReadOf,
+  recordKnowledgeRead,
+  type KnowledgeRead,
+} from './tools/knowledge-read.js';
 export { recordToolUse } from './tools/record.js';
 export {
   buildGatewaySpec,

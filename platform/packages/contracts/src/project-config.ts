@@ -312,6 +312,11 @@ export interface ProjectConfig {
     };
     /** The run's MCP gateway (agentgateway, ADR-M87): its image by digest, or null. */
     readonly gateway: { readonly image: string | null };
+    /**
+     * The cap of a tool's own model key in one run (X04 PR 3b, ADR-M69 §2.4, QUESTIONS #542): the
+     * tool embeds its queries with it. Its spend counts for the run.
+     */
+    readonly model_budget_usd: number;
   };
   /**
    * Sandbox images of the project, pinned by digest (QUESTIONS #59, ADR-M25). `image` is the

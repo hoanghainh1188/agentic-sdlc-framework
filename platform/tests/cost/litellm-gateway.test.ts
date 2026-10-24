@@ -10,9 +10,15 @@ import {
   labelTags,
   LiteLLMGateway,
   spendRecordFromRow,
+  toolKeyAlias,
   usdFromNumber,
 } from '@sdlc/adapter-model-litellm';
-import { COST_LABEL_NAMES, type CostLabels, type CreateRunKey } from '@sdlc/contracts';
+import {
+  COST_LABEL_NAMES,
+  toolCostAgent,
+  type CostLabels,
+  type CreateRunKey,
+} from '@sdlc/contracts';
 import { Redacted } from '@sdlc/secrets';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -178,6 +184,34 @@ describe('C06 session 2: revokeRunKey (the key ID never travels)', () => {
   it('refuses a run ID that is not a UUID', async () => {
     expect((await failure(() => gateway.revokeRunKey('run-1'))).code).toBe('invalid_input');
     expect(stub.requests).toEqual([]);
+  });
+
+  it("X04 PR 3b: also the run's tool keys, one alias per call (a missing one never keeps the others)", async () => {
+    stub.on('POST', '/key/delete', () => ({ status: 404, body: { error: { code: '404' } } }));
+    await gateway.revokeRunKey(RUN, ['project-docs']);
+    expect(stub.requests.map((r) => r.body)).toEqual([
+      { key_aliases: [`run-${RUN}`] },
+      { key_aliases: [`tool-${RUN}-project-docs`] },
+    ]);
+    expect((await failure(() => gateway.revokeRunKey(RUN, ['Bad Key']))).code).toBe(
+      'invalid_input',
+    );
+  });
+});
+
+describe("X04 PR 3b: a register tool's own key (QUESTIONS #542)", () => {
+  it('has its own alias and owner, with the labels given (agent `tool:<key>`)', async () => {
+    stub.on('POST', '/key/generate', () => ({
+      body: { key: 'sk-tool', token: HASH, expires: '2026-09-26T10:15:00Z' },
+    }));
+    const labels = { ...LABELS, agent: toolCostAgent('project-docs') };
+    await gateway.createRunKey({ ...KEY_INPUT, labels, toolKey: 'project-docs' });
+    expect(stub.requests[0]!.body).toMatchObject({
+      key_alias: `tool-${RUN_ID}-project-docs`,
+      user_id: `tool-${RUN_ID}-project-docs`,
+      metadata: { agent: 'tool:project-docs' },
+    });
+    expect(toolKeyAlias(RUN_ID, 'project-docs')).toBe(`tool-${RUN_ID}-project-docs`);
   });
 });
 

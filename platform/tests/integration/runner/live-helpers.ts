@@ -93,12 +93,27 @@ export interface FixtureImage {
  */
 export async function buildFixtureImage(
   suffix: string,
-  fixture: { readonly dir: string; readonly name: string } = { dir: 'fixture', name: 'c04-probe' },
+  fixture: {
+    readonly dir: string;
+    readonly name: string;
+    /** X04 PR 3b: a Dockerfile of the repository (repo-relative), built with the repo as context. */
+    readonly dockerfile?: string;
+  } = { dir: 'fixture', name: 'c04-probe' },
 ): Promise<FixtureImage> {
-  const context = path.join(repoRoot(), 'platform/tests/integration/runner', fixture.dir);
+  const context =
+    fixture.dockerfile === undefined
+      ? path.join(repoRoot(), 'platform/tests/integration/runner', fixture.dir)
+      : repoRoot();
   const registry = `sdlc-${fixture.name}-registry-${suffix}`;
   const built = `sdlc-test/${fixture.name}:${suffix}`;
-  docker('build', '-q', '-t', built, context);
+  docker(
+    'build',
+    '-q',
+    '-t',
+    built,
+    ...(fixture.dockerfile === undefined ? [] : ['-f', path.join(repoRoot(), fixture.dockerfile)]),
+    context,
+  );
   const digests = JSON.parse(docker('inspect', '--format', '{{json .RepoDigests}}', built)) as
     string[] | null;
   if (digests && digests.length > 0) {

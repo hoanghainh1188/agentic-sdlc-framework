@@ -74,7 +74,8 @@ interface RunContext {
   readonly project: Project;
 }
 
-const AGENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+// An agent key, or (X04 PR 3b, migration 0040) a register tool's code `tool:<key>`.
+const AGENT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 
 /** Looks up tenants and runs once per sync. */
 class Resolver {

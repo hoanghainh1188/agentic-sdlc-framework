@@ -1,8 +1,10 @@
 // The index of a project's documents in `knowledge-db` (task X04 PR 3a, design/ADR-M89 §2.1).
 //
 // - One schema per project, `kdocs_p<project ID without dashes>`, and one read role per project
-//   (no login), `kdocs_p<…>_read`, that may read that schema only (PR 3b gives a run's tool a login
-//   in it, QUESTIONS #537). Names are built from the project's UUID only, never from input text.
+//   (no login), `kdocs_p<…>_read`, that may read that schema only. A run's tool logs in as a member
+//   of it (PR 3b, QUESTIONS #537, #541): OpenBao's database engine creates that login as
+//   `kdocs_issuer`, which holds the read role with the admin option only. Names are built from the
+//   project's UUID only, never from input text.
 // - Chunks are keyed by the SHA-256 of their model and text and reused by every index version of
 //   the project; never across projects or tenants.
 // - The embedding column has no fixed size and no approximate index: a plain search (K01).
@@ -11,7 +13,11 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  KNOWLEDGE_DATABASE,
+  KNOWLEDGE_ISSUER_ROLE,
   KnowledgeError,
+  knowledgeReadRole,
+  knowledgeSchema,
   type KnowledgeChunk,
   type KnowledgeIndexInput,
   type KnowledgeStore,
@@ -29,14 +35,10 @@ function checked(value: string, pattern: RegExp): string {
 }
 
 /** The project's schema: an identifier from its UUID only. */
-export function projectSchema(projectId: string): string {
-  return `kdocs_p${checked(projectId, UUID).replaceAll('-', '')}`;
-}
+export const projectSchema = knowledgeSchema;
 
-/** The project's read role (no login): PR 3b's per-run logins are members of it. */
-export function projectRole(projectId: string): string {
-  return `${projectSchema(projectId)}_read`;
-}
+/** The project's read role (no login): the per-run logins of PR 3b are members of it. */
+export const projectRole = knowledgeReadRole;
 
 const vectorLiteral = (embedding: readonly number[]): string => {
   if (embedding.length === 0 || embedding.some((v) => !Number.isFinite(v))) {
@@ -147,6 +149,19 @@ export class PgVectorKnowledgeStore implements KnowledgeStore {
       await client.query(`REVOKE ALL ON SCHEMA ${schema} FROM PUBLIC`);
       await client.query(`GRANT USAGE ON SCHEMA ${schema} TO ${role}`);
       await client.query(`GRANT SELECT ON ALL TABLES IN SCHEMA ${schema} TO ${role}`);
+      // X04 PR 3b: the database is closed to PUBLIC; the read role opens it to its logins. The
+      // issuer (OpenBao) may grant the read role to a run's login, and may not use it itself.
+      await client.query(`GRANT CONNECT ON DATABASE ${KNOWLEDGE_DATABASE} TO ${role}`);
+      // pgvector's type and operators live in `public`, which holds nothing else (init script).
+      await client.query(`GRANT USAGE ON SCHEMA public TO ${role}`);
+      const issuer = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [
+        KNOWLEDGE_ISSUER_ROLE,
+      ]);
+      if ((issuer.rowCount ?? 0) > 0) {
+        await client.query(
+          `GRANT ${role} TO ${KNOWLEDGE_ISSUER_ROLE} WITH ADMIN OPTION, INHERIT FALSE, SET FALSE`,
+        );
+      }
     });
   }
 
@@ -282,7 +297,12 @@ export class PgVectorKnowledgeStore implements KnowledgeStore {
     await this.#transaction(async (client) => {
       await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
       const exists = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [role]);
-      if ((exists.rowCount ?? 0) > 0) await client.query(`DROP ROLE ${role}`);
+      if ((exists.rowCount ?? 0) > 0) {
+        // X04 PR 3b: its grants outside the schema go first, or the role cannot be dropped.
+        await client.query(`REVOKE ALL ON DATABASE ${KNOWLEDGE_DATABASE} FROM ${role}`);
+        await client.query(`REVOKE ALL ON SCHEMA public FROM ${role}`);
+        await client.query(`DROP ROLE ${role}`);
+      }
     });
   }
 

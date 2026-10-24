@@ -7,6 +7,7 @@ import type {
   EvidenceStore,
   IntentStepResult,
   IntentWorkflowRef,
+  ToolSecretsHandoff,
 } from '@sdlc/contracts';
 import {
   abandonPublish,
@@ -44,6 +45,8 @@ export type PrepareRunActivityResult =
       readonly wrappedVirtualKey: string;
       /** E01 PR 2: the single-use wrapping token of the feedback token (never the token). */
       readonly wrappedFeedbackToken?: string;
+      /** X04 PR 3b: by tool key, a wrapping token and an index ID (never the secrets). */
+      readonly toolSecrets?: Readonly<Record<string, ToolSecretsHandoff>>;
     }
   | { readonly ok: false; readonly reason: string };
 
@@ -190,6 +193,16 @@ export function createIntentActivities(deps: IntentActivityDeps): IntentActiviti
         wrappedVirtualKey: result.run.wrappedVirtualKey.reveal(),
         ...(result.run.wrappedFeedbackToken
           ? { wrappedFeedbackToken: result.run.wrappedFeedbackToken.reveal() }
+          : {}),
+        ...(result.run.toolSecrets.size > 0
+          ? {
+              toolSecrets: Object.fromEntries(
+                [...result.run.toolSecrets].map(([toolKey, secrets]) => [
+                  toolKey,
+                  { wrapped: secrets.wrapped.reveal(), indexId: secrets.indexId },
+                ]),
+              ),
+            }
           : {}),
       };
     },

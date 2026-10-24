@@ -11,7 +11,8 @@ Rules for `platform/apps/runner`, the agent and model adapters (`platform/packag
 - Plan text and review feedback go to the agent only in nonce-delimited blocks, framed as data, cleaned and capped (ADR-M40 §2.7, ADR-M41 §2.7). [R066]
 - Recognise a LiteLLM budget block by 422 **and** error type `budget_exceeded`, never by 429 alone (ADR-M24). Money is a decimal string, never a float. `listSpend` never returns part of a range as all of it. [R067]
 - GitHub tokens are single-repository and revoked by the runner right after use (ADR-M42 §2.4). [R068]
+- A register tool reaches only the backing services of `SDLC_RUNNER_TOOL_SERVICES`, on its own service network (the tool and its services, never the gateway, the sandbox or another tool); its credential is a file in its own runtime volume, never an environment value; `knowledge_read` comes from the tool's own log, IDs and hashes only (ADR-M69 §2.4, ADR-M89). [R137]
 
 ## Commands
 Run from the repo root.
-- Sandbox images (ADR-M25, T11 §5g): `pnpm sandbox-image:build node24`; OpenCode (X03, ADR-M88): `NODE24=<node24 by digest> pnpm sandbox-image:build node24-opencode`.
+- Sandbox images (ADR-M25, T11 §5g): `pnpm sandbox-image:build node24`; OpenCode (X03, ADR-M88): `NODE24=<node24 by digest> pnpm sandbox-image:build node24-opencode`. The first tool (X04 PR 3b, ADR-M89): `pnpm tool-image:build project-docs`.

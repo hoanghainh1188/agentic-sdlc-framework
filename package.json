@@ -71,6 +71,7 @@
     "compose:access": "platform/deploy/scripts/up.sh core platform access",
     "compose:knowledge": "platform/deploy/scripts/up.sh core knowledge",
     "sandbox-image:build": "platform/sandbox-images/build.sh",
+    "tool-image:build": "platform/deploy/scripts/tool-image.sh",
     "images": "platform/deploy/scripts/images.sh",
     "release:lock": "node platform/tools/release/lock.mjs",
     "diagrams:render": "python3 scripts/diagrams.py render",

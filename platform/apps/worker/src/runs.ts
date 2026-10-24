@@ -5,7 +5,13 @@
 // single-use wrapping token).
 import { LiteLLMGateway } from '@sdlc/adapter-model-litellm';
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type { GitHostAdapter, ModelRef, RunContractSigner, SecretWrapper } from '@sdlc/contracts';
+import type {
+  GitHostAdapter,
+  ModelRef,
+  RunContractSigner,
+  RunDatabaseCredentials,
+  SecretWrapper,
+} from '@sdlc/contracts';
 import {
   CostController,
   parseTenantId,
@@ -50,6 +56,8 @@ export async function createWorkerRuns(options: {
   readonly logger?: SecretsLogger;
   /** X04 PR 3a: the index of a project's documents; absent when `knowledge-db` is off. */
   readonly knowledge?: KnowledgeDeps;
+  /** X04 PR 3b: OpenBao's database engine, for the database login of a `read_documents` tool. */
+  readonly databaseCredentials?: RunDatabaseCredentials;
 }): Promise<WorkerRuns> {
   const { settings } = options;
   // Same OpenBao address and TLS settings as the worker's client; the cost-controller's files.
@@ -86,6 +94,9 @@ export async function createWorkerRuns(options: {
         wrapper: options.wrapper,
         egressAllowlist: settings.egressAllowlist,
         ...(options.knowledge ? { knowledge: options.knowledge } : {}),
+        ...(options.databaseCredentials
+          ? { databaseCredentials: options.databaseCredentials }
+          : {}),
       },
       publish: { registry: options.registry, gitHost: options.gitHost, wrapper: options.wrapper },
       g6: { gitHost: options.gitHost },

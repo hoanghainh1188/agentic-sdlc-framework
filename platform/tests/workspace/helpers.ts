@@ -24,6 +24,7 @@ export const EXPECTED_PACKAGES: readonly WorkspacePackage[] = [
   { dir: 'platform/apps/api', name: '@sdlc/api' },
   { dir: 'platform/apps/worker', name: '@sdlc/worker' },
   { dir: 'platform/apps/runner', name: '@sdlc/runner' },
+  { dir: 'platform/apps/tool-project-docs', name: '@sdlc/tool-project-docs' },
   { dir: 'platform/apps/cli', name: '@sdlc/cli' },
   { dir: 'platform/apps/dashboard', name: '@sdlc/dashboard' },
   { dir: 'platform/eval', name: '@sdlc/eval' },

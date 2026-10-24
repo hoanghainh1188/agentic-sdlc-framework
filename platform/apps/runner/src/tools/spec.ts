@@ -2,6 +2,8 @@
 // ADR-M87 §5). The guard (docker/guard.ts) checks each again before Docker sees it.
 import crypto from 'node:crypto';
 
+import { TOOL_RUNTIME_DIR } from '@sdlc/contracts';
+
 import {
   GATEWAY_COMMAND,
   GATEWAY_CONFIG_DIR,
@@ -66,6 +68,11 @@ export function buildToolSpec(input: {
   /** `<image_ref>@sha256:…` from the register and the contract's grant. */
   readonly image: string;
   readonly limits: ToolLimits;
+  /**
+   * X04 PR 3b: a tool with backing services gets its runtime volume at `TOOL_RUNTIME_DIR`, where
+   * the runner wrote its settings and its credential before the start.
+   */
+  readonly runtime?: boolean;
 }): ToolContainerSpec {
   return {
     Image: input.image,
@@ -79,7 +86,16 @@ export function buildToolSpec(input: {
     HostConfig: {
       ...hardened(input.names.toolNetwork, input.limits),
       Tmpfs: { [TOOL_TMPFS_PATH]: TOOL_TMPFS },
-      Mounts: [],
+      Mounts: input.runtime
+        ? [
+            {
+              Type: 'volume',
+              Source: input.names.toolRuntime(input.toolKey),
+              Target: TOOL_RUNTIME_DIR,
+              ReadOnly: false,
+            },
+          ]
+        : [],
     },
   };
 }
