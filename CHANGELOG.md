@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Upgrade notes
+- O01 PR 1: nothing to do. No image, setting or migration changes. The runner on its own Docker Engine (ADR-M91) comes with O01 PR 2, with its own upgrade notes.
+
+### Added
+- O01 PR 1 (ADR-M91, accepted; QUESTIONS #576–#580): the decision to run the runner and the sandboxes on their own Docker Engine (a separate VM, or a second rootless Engine on the same server), because rootless Docker on the platform's one Engine still lets a taken-over runner mount the platform's volumes (ADR-M80 gap G-7). CI job `runner-rootless`: `pnpm test:runner` on a rootless Engine (static Docker 29.8.2, pinned by SHA-256; `platform/deploy/scripts/test-rootless-docker.sh`). The fixture sandbox now reads its memory, swap, process and CPU limits, its capabilities and `NoNewPrivs` from the kernel, so an Engine that accepts a limit but does not enforce it fails `pnpm test:runner`.
+
 ## [0.6.0] - 2026-10-24
 
 The release of the milestone EXT (except the design X12): **a second coding agent, tools for agents through one MCP gateway per run, and a record of what each agent read.** The agent register names each agent's adapter, and OpenCode is the second adapter beside OpenHands (X01, X03; ADR-M68, ADR-M88). A tool register like the agent register gives a run only the tools that the plan, the agent and Person B allow; each run gets one agentgateway and one hardened container per tool (X02, X14, X04; ADR-M69, ADR-M87). The first tool, `read_documents`, searches the project's Markdown documents at the run's base commit (X04; ADR-M89). Every run records a context snapshot of what its agent read, in the Evidence Pack (X07; ADR-M90), and a project may turn on context condensing for long runs (X11). Also: an optional self-hosted model service (vLLM) on the server's GPU (L01 PR 1, ADR-M71; not yet run on a GPU), the GPU sizing note for leadership (L03) and the tools to measure a 30B-class model on a rented GPU (L03b). A minor release: five migrations, a new Run Contract schema, rebuilt images, a sixth published image (`tool-project-docs`), new project configuration sections.
