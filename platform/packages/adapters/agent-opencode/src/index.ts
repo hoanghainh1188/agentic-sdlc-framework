@@ -23,4 +23,11 @@ export {
   toolSwitches,
   wrapped,
 } from './request.js';
-export { ABORTED_ERROR, countsOf, stateOf, type RunCounts, type StateInput } from './status.js';
+export {
+  ABORTED_ERROR,
+  countsOf,
+  fileReadsOfMessages,
+  stateOf,
+  type RunCounts,
+  type StateInput,
+} from './status.js';

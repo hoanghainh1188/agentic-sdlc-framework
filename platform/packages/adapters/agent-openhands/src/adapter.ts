@@ -16,6 +16,7 @@ import {
 import { AgentServerClient, type ClientOptions, type ExecutionStatus } from './client.js';
 import { condensingCounts, progressEvents, withoutSummaries } from './condensing.js';
 import { trailingIdenticalCalls } from './loop.js';
+import { fileReads } from './reads.js';
 import { buildConversationRequest } from './request.js';
 
 export interface OpenHandsAdapterOptions {
@@ -162,8 +163,9 @@ export class OpenHandsAdapter implements AgentAdapter {
     const { headSha, changedFiles } = parseDiffOutput(diff.stdout);
     const events = await client.listEvents(handle.conversationId);
     const iterations = events.filter((event) => event.kind === STEP_EVENT).length;
+    const reads = fileReads(events, handle.workingDir);
     // X11 (QUESTIONS #551): the log leaves the adapter without summary text.
-    return { changedFiles, headSha, iterations, events: withoutSummaries(events) };
+    return { changedFiles, headSha, iterations, events: withoutSummaries(events), reads };
   }
 
   #gitTimeout(): number {

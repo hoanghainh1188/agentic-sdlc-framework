@@ -13,11 +13,13 @@
 // process on the host reaches the Agent Server through its port on 127.0.0.1). The sandboxes, the
 // network attachment, the agent calls and the clean-up are the runner code under test.
 // C07: every run that goes to G5 has its changes computed from the real sandbox (`changesStep`).
+// X07: `[stub:reads]` opens two files; the run's context snapshot lists their hashes (ADR-M90).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import type { EvidenceStore } from '@sdlc/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
@@ -256,6 +258,109 @@ describe.skipIf(!enabled)(`C05 live: the runner drives the agent (${ADAPTER})`, 
         const recorded = JSON.stringify(await r.scope.runEvents.list(runId));
         expect(recorded).not.toContain(VIRTUAL_KEY);
         expect(recorded).not.toContain('hello.txt');
+      } finally {
+        await teardownSandbox(client, runId).catch(() => undefined);
+        quietly('rm', '-f', r.relay);
+      }
+    },
+  );
+
+  it(
+    'X07 context: the agent opens files; the snapshot lists their hashes, never the paths (AC1, AC3, AC4)',
+    { timeout: 600_000 },
+    async () => {
+      const r = await start('[stub:reads]', { maxIterations: 30, maxDurationMin: 10 });
+      const runId = r.envelope.contract.run_id;
+      const stored: { path: string; content: Buffer }[] = [];
+      const evidence: EvidenceStore = {
+        put: (_tenant, file, content) => {
+          stored.push({ path: file, content });
+          return Promise.resolve({
+            uri: `s3://evidence/diffs/${file}`,
+            sha256: crypto.createHash('sha256').update(content).digest('hex'),
+            sizeBytes: content.length,
+          });
+        },
+        get: () => Promise.reject(new Error('unused')),
+      };
+      try {
+        const runner = new Runner(
+          {
+            db: t.app as unknown as AgentDriveDeps['db'],
+            docker: client,
+            settings: r.settings,
+            verifier: {
+              verify: () => Promise.resolve(false),
+              publicKey: () => Promise.reject(new Error('unused')),
+            },
+            unwrapper: { unwrap: () => Promise.reject(new Error('unused')) },
+          },
+          {},
+          {
+            adapters: { [ADAPTER]: agentAdapter() },
+            agentUrl: () => r.relayUrl,
+            diffEvidence: evidence,
+          },
+        );
+        // As in the edit test: drive with the fixture's clone, then release as runAgent does,
+        // with the files the agent's log shows (X07).
+        let result: Awaited<ReturnType<typeof driveAgent>> | undefined;
+        try {
+          result = await driveAgent(
+            {
+              db: t.app as unknown as AgentDriveDeps['db'],
+              docker: client,
+              settings: r.settings,
+              adapter: agentAdapter(),
+              agentUrl: () => r.relayUrl,
+              ...changesStep(t, client, r, []),
+            },
+            request(r),
+          );
+        } finally {
+          await runner.release(r.envelope.contract.tenant_id, runId, 'finished', result?.reads);
+        }
+        expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
+        expect(result?.reads).toEqual({
+          paths: ['README.md', 'docs/specs/T01-labels.md'],
+          outside: 0,
+          unattributed: 1,
+        });
+
+        const sha = (text: string | Buffer) =>
+          crypto.createHash('sha256').update(text).digest('hex');
+        const snapshot = stored.find((s) => s.path.endsWith(`${runId}.context-snapshot.json`));
+        expect(snapshot).toBeDefined();
+        const event = (await r.scope.runEvents.list(runId)).find(
+          (e) => e.event_type === 'context_snapshot',
+        );
+        expect(event?.payload).toEqual({
+          snapshot_sha256: sha(snapshot!.content),
+          source: 'agent_log',
+          files: 2,
+          files_outside: 0,
+          unattributed_calls: 1,
+          document_tools: 0,
+          documents: 0,
+        });
+        const parsed = JSON.parse(snapshot!.content.toString('utf8')) as {
+          files: { path_sha256: string[] };
+          base_sha: string;
+        };
+        expect(parsed.files.path_sha256).toEqual(
+          [sha('README.md'), sha('docs/specs/T01-labels.md')].sort(),
+        );
+        expect(parsed.base_sha).toBe(r.envelope.contract.base_sha);
+        const items = (
+          await r.scope.evidenceItems.listForIntent(r.envelope.contract.intent_id)
+        ).filter((i) => i.kind === 'context_snapshot');
+        expect(items).toHaveLength(1);
+        // AC3: no path in the snapshot, the run events or the evidence rows.
+        const recorded = JSON.stringify([await r.scope.runEvents.list(runId), items]);
+        for (const text of [snapshot!.content.toString('utf8'), recorded]) {
+          expect(text).not.toContain('README');
+          expect(text).not.toContain('T01-labels');
+        }
       } finally {
         await teardownSandbox(client, runId).catch(() => undefined);
         quietly('rm', '-f', r.relay);

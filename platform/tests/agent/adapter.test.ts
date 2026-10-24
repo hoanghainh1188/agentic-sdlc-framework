@@ -254,6 +254,8 @@ describe('OpenHandsAdapter', () => {
     ]);
     expect(outputs.events).toHaveLength(3);
     expect(outputs.iterations).toBe(2);
+    // X07: no file_editor view in this log.
+    expect(outputs.reads).toEqual({ paths: [], outside: 0, unattributed: 0 });
   });
 
   it('stops reading an answer above the size limit, as a stream (bounded memory)', async () => {

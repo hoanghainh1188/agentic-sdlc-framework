@@ -93,6 +93,7 @@ class FinishingAgent implements AgentAdapter {
       headSha: 'a'.repeat(40),
       iterations: 2,
       events: [],
+      reads: { paths: [], outside: 0, unattributed: 0 },
     });
   }
 }

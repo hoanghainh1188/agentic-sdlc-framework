@@ -12,7 +12,12 @@
 import fs from 'node:fs';
 
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type { EvidenceStore, RedactedSecret, RunKeySpendReader } from '@sdlc/contracts';
+import type {
+  AgentFileReads,
+  EvidenceStore,
+  RedactedSecret,
+  RunKeySpendReader,
+} from '@sdlc/contracts';
 import { loadEffectiveConfig, parseTenantId } from '@sdlc/core';
 
 import {
@@ -192,6 +197,7 @@ export class Runner {
           : result?.outcome === 'killed'
             ? 'killed'
             : 'failed',
+        result?.reads,
       );
     }
   }
@@ -242,9 +248,15 @@ export class Runner {
   }
 
   /** Removes the sandbox of a run (end of run, kill) and frees its slot. */
-  async release(tenantId: string, runId: string, reason: TeardownReason): Promise<void> {
+  async release(
+    tenantId: string,
+    runId: string,
+    reason: TeardownReason,
+    reads?: AgentFileReads,
+  ): Promise<void> {
     try {
-      await releaseSandbox(this.#deps, tenantId, runId, reason);
+      // X07: `reads` (the files the agent's log shows) go to the run's context snapshot.
+      await releaseSandbox(this.#deps, tenantId, runId, reason, reads);
     } finally {
       // Also after a failed clean-up: the sweep then retries the objects.
       this.held.release(runId);

@@ -25,6 +25,7 @@ import type { DockerClient } from './docker/client.js';
 import type { HeldRuns } from './held.js';
 import { LABELS, MANAGED_BY, runOfLabels, type LabelledRun } from './names.js';
 import { teardownSandbox, type TeardownReason } from './sandbox/lifecycle.js';
+import { recordContextSnapshot } from './snapshot/context.js';
 import { recordKnowledgeRead } from './tools/knowledge-read.js';
 import { recordToolUse } from './tools/record.js';
 import type { RunnerSettings } from './settings.js';
@@ -128,6 +129,10 @@ async function cleanUpRun(
   if (run) {
     await recordToolUse(deps.docker, scope, run.id).catch(() => undefined);
     await recordKnowledgeRead(deps.docker, scope, deps.knowledgeEvidence, run.id).catch(
+      () => undefined,
+    );
+    // X07 (ADR-M90): the agent's log is gone with the restart: the file list is `unavailable`.
+    await recordContextSnapshot(scope, deps.knowledgeEvidence, run.id, undefined).catch(
       () => undefined,
     );
   }

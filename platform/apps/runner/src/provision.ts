@@ -28,6 +28,7 @@ import {
   knowledgeSchema,
   sandboxImageFor,
   type AgentAdapterCode,
+  type AgentFileReads,
   type EvidenceStore,
   type ProjectConfig,
   type RedactedSecret,
@@ -62,6 +63,7 @@ import { planEgress } from './sandbox/network.js';
 import type { RunnerSettings } from './settings.js';
 import type { RunNames } from './names.js';
 import { startTools, toolGrantsEnforceable, type ToolRuntime } from './tools/provision.js';
+import { recordContextSnapshot } from './snapshot/context.js';
 import { recordKnowledgeRead } from './tools/knowledge-read.js';
 import { recordToolUse } from './tools/record.js';
 import type { ToolLimits } from './tools/spec.js';
@@ -295,6 +297,7 @@ export async function releaseSandbox(
   tenantId: string,
   runId: string,
   reason: TeardownReason,
+  reads?: AgentFileReads,
 ): Promise<void> {
   const scope = deps.db.forTenant(parseTenantId(tenantId));
   // X04 (ADR-M69 §2.7): the tool counts are read from the gateway before it is removed. A failure
@@ -304,6 +307,8 @@ export async function releaseSandbox(
   await recordKnowledgeRead(deps.docker, scope, deps.knowledgeEvidence, runId).catch(
     () => undefined,
   );
+  // X07 (ADR-M90): what the agent read, after `knowledge_read` (the snapshot lists its hashes).
+  await recordContextSnapshot(scope, deps.knowledgeEvidence, runId, reads).catch(() => undefined);
   const result = await teardownSandbox(deps.docker, runId);
   await scope.runEvents.append(runId, 'sandbox_removed', {
     reason,

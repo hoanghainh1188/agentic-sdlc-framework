@@ -39,6 +39,8 @@ export const PACK_RUN_EVENTS = [
   'pr_merged',
   'loop_detected',
   'kill_requested',
+  // X07 (ADR-M90 §2.4): the hash and counts of what the run's agent read.
+  'context_snapshot',
 ] as const;
 export type PackRunEvent = (typeof PACK_RUN_EVENTS)[number];
 

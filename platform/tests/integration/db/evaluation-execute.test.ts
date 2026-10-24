@@ -127,6 +127,7 @@ class ScriptedAgent implements AgentAdapter {
       headSha: 'a'.repeat(40),
       iterations: 3,
       events: [],
+      reads: { paths: [], outside: 0, unattributed: 0 },
     });
   }
 }

@@ -86,6 +86,25 @@ export const RUN_EVENT_TYPES = {
     chunks: 'count',
   },
   /**
+   * X07 (ADR-M90 §2.3, QUESTIONS #556): once per run, after `knowledge_read`, at the end of the run
+   * (also after a kill, a failure or a restart's clean-up). `snapshot_sha256`: the SHA-256 of the
+   * evidence item `context_snapshot`; `source`: where the file list comes from (`agent_log`, or
+   * `unavailable` when the runner could not read the agent's log); `files`: distinct repository
+   * files the agent opened; `files_outside`: opens outside the workspace; `unattributed_calls`:
+   * tool calls that can read files without naming them (a shell command, a search);
+   * `document_tools`: `knowledge_read` events of the run; `documents`: their documents in all.
+   * Never a path, a query or a text.
+   */
+  context_snapshot: {
+    snapshot_sha256: 'sha256',
+    source: 'code',
+    files: 'count',
+    files_outside: 'count',
+    unattributed_calls: 'count',
+    document_tools: 'count',
+    documents: 'count',
+  },
+  /**
    * X04 PR 3b (ADR-M69 §2.7–§2.8, QUESTIONS #540, #541): the run's tool credentials (the database
    * logins and the tools' model keys) were revoked at the end of the run or at a kill;
    * `tool_credential_revoke_failed` with a code when it failed (the time to live still ends them).
