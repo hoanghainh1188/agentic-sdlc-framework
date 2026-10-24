@@ -75,6 +75,9 @@ case "$options" in
   *) fail "mount kv/ is not KV version 2 ($options); not changed" ;;
 esac
 ensure_mount transit transit
+# The tools' short-lived database logins (X04 PR 3b, ADR-M89, QUESTIONS #535): the connection to
+# knowledge-db is written by `knowledge-issuer-credentials`.
+ensure_mount database database
 
 # --- Transit key for Run Contracts ---------------------------------------------------------
 key_path="transit/keys/$transit_key"

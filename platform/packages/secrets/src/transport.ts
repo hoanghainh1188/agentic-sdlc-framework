@@ -44,7 +44,11 @@ export class Transport {
     return this.#options.origin.origin;
   }
 
-  request(method: 'GET' | 'POST', path: string, input: RequestInput = {}): Promise<HttpResponse> {
+  request(
+    method: 'GET' | 'POST' | 'DELETE',
+    path: string,
+    input: RequestInput = {},
+  ): Promise<HttpResponse> {
     const payload = input.body === undefined ? undefined : JSON.stringify(input.body);
     const headers: Record<string, string> = { ...input.headers, 'X-Vault-Request': 'true' };
     if (input.token) headers['X-Vault-Token'] = input.token;

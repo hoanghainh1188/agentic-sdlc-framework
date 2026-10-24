@@ -21,6 +21,7 @@ import {
   keyGenerateBody,
   modelsFromInfo,
   runKeyAlias,
+  toolKeyAlias,
   spendLogTime,
   spendRecordFromRow,
   teamBody,
@@ -195,14 +196,19 @@ export class LiteLLMGateway implements ModelGateway {
     await this.#request('POST', '/key/delete', { body: { keys: [keyId] }, allow404: true });
   }
 
-  async revokeRunKey(runId: string): Promise<void> {
+  async revokeRunKey(runId: string, toolKeys: readonly string[] = []): Promise<void> {
     if (!UUID.test(runId))
       throw new GatewayError('invalid_input', 'runId is not a UUID', undefined, 'runId');
-    // The key alias is `run-<run_id>` (keyGenerateBody); LiteLLM deletes by alias.
-    await this.#request('POST', '/key/delete', {
-      body: { key_aliases: [runKeyAlias(runId)] },
-      allow404: true,
-    });
+    // The key alias is `run-<run_id>` (keyGenerateBody); LiteLLM deletes by alias. X04 PR 3b: the
+    // tools' keys of the run are `tool-<run_id>-<tool_key>`, one call each: a missing alias is a
+    // 404 for the whole call, which would leave the others.
+    const aliases = [runKeyAlias(runId), ...toolKeys.map((key) => toolKeyAlias(runId, key))];
+    for (const alias of aliases) {
+      await this.#request('POST', '/key/delete', {
+        body: { key_aliases: [alias] },
+        allow404: true,
+      });
+    }
   }
 
   async getSpend(keyId: string): Promise<SpendInfo> {

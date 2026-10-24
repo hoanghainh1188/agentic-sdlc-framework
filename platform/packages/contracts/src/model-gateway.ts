@@ -7,6 +7,14 @@
 import type { ModelRef } from './policy.js';
 import type { RedactedSecret } from './secrets.js';
 
+/**
+ * The `agent` label of a register tool's own key (X04 PR 3b, ADR-M69 §2.4, QUESTIONS #541): the
+ * tool's code, `tool:<tool_key>`. An agent key never holds a colon, so the two never collide.
+ */
+export function toolCostAgent(toolKey: string): string {
+  return `tool:${toolKey}`;
+}
+
 /** The seven labels every model call carries (D-07 section 5, CLAUDE.md). */
 export const COST_LABEL_NAMES = [
   'tenant',
@@ -47,6 +55,11 @@ export interface CreateRunKey {
   readonly durationMinutes: number;
   /** The tenant's budget group (`ensureTenantBudget`); its spend counts against the tenant cap. */
   readonly tenantGroupId: string;
+  /**
+   * X04 PR 3b (ADR-M69 §2.4, QUESTIONS #541): the key of one register tool of the run, not of the
+   * agent. Its alias is `tool-<run_id>-<tool_key>`, so it is revoked with the run's key by alias.
+   */
+  readonly toolKey?: string;
 }
 
 export interface TenantBudget {
@@ -95,9 +108,9 @@ export interface ModelGateway {
   /**
    * Revokes the key of one run, found by the run (task C06 session 2, ADR-M33 §2.6), so the key's
    * ID never has to travel with the run (for example through the Temporal history). No key is not
-   * an error.
+   * an error. X04 PR 3b: with `toolKeys`, also the keys of those register tools of the run.
    */
-  revokeRunKey(runId: string): Promise<void>;
+  revokeRunKey(runId: string, toolKeys?: readonly string[]): Promise<void>;
   /** Spend of one key so far, as the gateway counts it. */
   getSpend(keyId: string): Promise<SpendInfo>;
   /** Models the gateway serves and where each runs (D-07 section 4; input of the policy engine). */

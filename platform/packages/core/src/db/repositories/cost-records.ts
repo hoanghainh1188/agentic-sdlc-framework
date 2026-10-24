@@ -56,9 +56,9 @@ export interface NewCostRecord {
   readonly evaluationRunId?: string | null;
 }
 
-// Same formats as the CHECKs of migration 0005.
+// Same formats as the CHECKs of migration 0005 (`agent`: migration 0040, a tool's `tool:<key>`).
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}$/;
-const AGENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const AGENT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 const SOURCE_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const USD = /^(0|[1-9][0-9]{0,11})(\.[0-9]{1,6})?$/;
 

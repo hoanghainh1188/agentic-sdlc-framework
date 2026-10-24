@@ -4,6 +4,8 @@
 //
 // Allowlist, not blocklist: a key that is not listed here is refused, so a new Docker option
 // (privileged, host mounts, devices, host namespaces…) never slips through unnoticed.
+import { TOOL_RUNTIME_DIR } from '@sdlc/contracts';
+
 import { RunnerError } from '../errors.js';
 import { LABELS, MANAGED_BY } from '../names.js';
 
@@ -115,6 +117,8 @@ const PINNED = /@sha256:[0-9a-f]{64}$/;
 const SANDBOX_NAME = /^sdlc-sandbox-[0-9a-f-]{36}$/;
 const RUN_NETWORK = /^sdlc-run-[0-9a-f-]{36}$/;
 const TOOL_NETWORK = /^sdlc-tool-[0-9a-f-]{36}$/;
+/** X04 PR 3b (QUESTIONS #531): a tool's service network, `sdlc-toolsvc-<run_id>-<tool_key>`. */
+const SERVICE_NETWORK = /^sdlc-toolsvc-([0-9a-f-]{36})-[a-z][a-z0-9-]{1,62}$/;
 const RUN_VOLUME = /^sdlc-ws-[0-9a-f-]{36}$/;
 const TMPFS_OPTIONS =
   /^(?:rw,)?(?:exec|noexec),nosuid,nodev,size=[0-9]+,mode=[0-7]{3,4}(?:,uid=10001,gid=10001)?$/;
@@ -256,13 +260,26 @@ export function assertSafeNetworkSpec(spec: {
     'Options',
   ]);
   if (Object.keys(spec).some((key) => !allowed.has(key))) refuse('unknown_network_option');
-  // A run's network, or (X04, ADR-M69 §2.4) its tool network: the same internal bridge.
-  if (!RUN_NETWORK.test(spec.Name) && !TOOL_NETWORK.test(spec.Name)) refuse('network_name');
+  // A run's network, or (X04, ADR-M69 §2.4) its tool network or a tool's service network: the
+  // same internal bridge.
+  if (
+    !RUN_NETWORK.test(spec.Name) &&
+    !TOOL_NETWORK.test(spec.Name) &&
+    !SERVICE_NETWORK.test(spec.Name)
+  ) {
+    refuse('network_name');
+  }
   if (spec.Driver !== 'bridge' || spec.Internal !== true) refuse('network_internal');
   if (spec.Attachable !== false || spec.EnableIPv6 !== false) refuse('network_options');
   if (spec.Labels[LABELS.managed] !== MANAGED_BY) refuse('labels');
   const runId = String(spec.Labels[LABELS.runId]);
-  if (`sdlc-run-${runId}` !== spec.Name && `sdlc-tool-${runId}` !== spec.Name) refuse('labels');
+  if (
+    `sdlc-run-${runId}` !== spec.Name &&
+    `sdlc-tool-${runId}` !== spec.Name &&
+    SERVICE_NETWORK.exec(spec.Name)?.[1] !== runId
+  ) {
+    refuse('labels');
+  }
   // Exactly one option: no IP address for the bridge, so the host is not reachable (ADR-M25 §2.2).
   const options = Object.entries(spec.Options);
   if (
@@ -286,6 +303,26 @@ export function assertSafeNetworkConnect(
 ): void {
   if (!RUN_NETWORK.test(network)) refuse('connect_network');
   if (!allowed.includes(container)) refuse('connect_container');
+}
+
+/**
+ * Throws unless `container` may join a tool's service network (X04 PR 3b, ADR-M69 §2.4, QUESTIONS
+ * #531): only a service network of `toolContainer`'s own run and tool, and only the tool itself or
+ * one of the backing services the runner was configured with (`SDLC_RUNNER_TOOL_SERVICES`). Never
+ * the gateway, the sandbox or another tool.
+ */
+export function assertSafeServiceConnect(
+  network: string,
+  container: string,
+  toolContainer: string,
+  services: readonly string[],
+): void {
+  const match = SERVICE_NETWORK.exec(network);
+  if (!match || `sdlc-toolsvc-${toolContainer.slice('sdlc-tool-'.length)}` !== network) {
+    refuse('connect_network');
+  }
+  if (!TOOL_NAME.test(toolContainer)) refuse('connect_network');
+  if (container !== toolContainer && !services.includes(container)) refuse('connect_container');
 }
 
 /** The user every `http` tool image runs as (ADR-M69 §2.4): never root. */
@@ -435,8 +472,22 @@ export function assertSafeToolSpec(name: string, spec: ToolContainerSpec): void 
   ) {
     refuse('tmpfs');
   }
-  if (!Array.isArray(spec.HostConfig.Mounts) || spec.HostConfig.Mounts.length !== 0) {
-    refuse('mounts');
+  // X04 PR 3b: no mount, or one: the tool's own runtime volume (its settings and credential).
+  const mounts: readonly unknown[] = Array.isArray(spec.HostConfig.Mounts)
+    ? spec.HostConfig.Mounts
+    : refuse('mounts');
+  if (mounts.length > 1) refuse('mounts');
+  if (mounts.length === 1) {
+    const mount = mounts[0] as Readonly<Record<string, unknown>>;
+    if (
+      mount.Type !== 'volume' ||
+      mount.Source !== `sdlc-toolrt-${name.slice('sdlc-tool-'.length)}` ||
+      mount.Target !== TOOL_RUNTIME_DIR ||
+      mount.ReadOnly !== false ||
+      Object.keys(mount).length !== 4
+    ) {
+      refuse('mounts');
+    }
   }
 }
 

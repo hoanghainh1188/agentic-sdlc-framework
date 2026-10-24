@@ -2,10 +2,10 @@
 
 | Item | Value |
 |---|---|
-| Status | **Accepted** (the repository owner, 2026-10-23, with D-05 1.58; task X04 PR 3a) |
+| Status | **Accepted** (the repository owner, 2026-10-23, with D-05 1.58; task X04 PR 3a). Version 1.1 (§2.7, task X04 PR 3b) records the answers to QUESTIONS #540–#544 (the repository owner, 2026-10-24) |
 | Date | 2026-10-23 |
 | Decided by | The repository owner (X04 PR 3 plan approved on 2026-10-23: QUESTIONS #533–#539) |
-| Related | D-08 X04 AC1–AC5; D-02 FR-33, FR-44, NFR-03; D-05 §6.1, §6.4; D-07 §4–§5; ADR-M51 (retention), ADR-M59 §5 (K01 limits), ADR-M69 (tool register, accepted), ADR-M87 (MCP gateway, accepted); design/QUESTIONS.md #531–#539 |
+| Related | D-08 X04 AC1–AC5; D-02 FR-33, FR-44, NFR-03; D-05 §6.1, §6.4, §6.5, §6.6; D-07 §4–§5; ADR-M51 (retention), ADR-M59 §5 (K01 limits), ADR-M69 (tool register, accepted), ADR-M87 (MCP gateway, accepted); runbook T11 §5o; design/QUESTIONS.md #531–#544 |
 
 ## 1. Context
 
@@ -61,6 +61,16 @@ A pass of the retention loop, after the evidence and the Langfuse passes, per pr
 - A refusal by the argument rule, the cap or the key is logged without a target: with more than one tool these refusals count for the run only.
 - A call refused by the argument rule does not use the cap; over the cap the gateway answers 200 with a tool result marked as an error.
 
+### 2.7. The tool, its login and `knowledge_read` (PR 3b, QUESTIONS #540–#544)
+
+- **The image** (QUESTIONS #542). The repository builds the first tool: `platform/apps/tool-project-docs` (`@sdlc/tool-project-docs`), a small MCP server over Streamable HTTP with one tool, `search_project_docs` (the call rules of `read_documents`). It checks its arguments again, frames the passages as data, and answers with the paths and texts of the best chunks of the run's index version (a plain cosine search, `PgVectorKnowledgeReader`). Image `tool-project-docs`: `pnpm tool-image:build project-docs` locally, the release matrix, `images.sh` and the lock file for a release; CI scans it with the sandbox images. A tenant registers it by digest with the backing services `knowledge-db:5432,litellm:4000` and `--model bge-m3`.
+- **The login** (QUESTIONS #535, #537, #540). OpenBao's database engine (mount `database/`, connection `knowledge-db`, `allowed_roles` `kdocs-*`) logs in as the role `kdocs_issuer`: it may create and drop roles and end their sessions, and holds each project's read role with the admin option only (`INHERIT FALSE, SET FALSE`), so it cannot read an index itself. Its password is rotated inside OpenBao (`rotate-root`); nobody knows it. For each run with a `read_documents` tool the worker writes **one OpenBao role per run**, `kdocs-<run_id>`, whose creation statement grants only the project's read role (`@sdlc/secrets` builds it from checked names), and reads one login with a time to live of the run's time cap plus the contract's validity (`VALID UNTIL` too). At the end of the run, at a kill and for an abandoned run, it revokes `sys/leases/revoke-prefix/database/creds/kdocs-<run_id>` and deletes the role: the run ID alone finds them, so no lease ID is kept or travels (R031). Run events `tool_credential_revoked` / `tool_credential_revoke_failed`, once per tool.
+- **The tool's model key** (QUESTIONS #541). A second virtual key per tool grant, alias `tool-<run_id>-<tool_key>`, with the run's labels and `agent` = `tool:<tool_key>` (`cost_records.agent` takes the colon from migration 0040), the tool's `model_ref` only, and the cap `tools.model_budget_usd` (default 0.5, never above the run key's cap). It is revoked with the run's key, by alias.
+- **The handoff.** The worker wraps `{ db_username, db_password, llm_key }` into one single-use wrapping token per tool; only the token and the index version's ID travel through Temporal (`ExecuteRunInput.toolSecrets`). The runner checks that the index is the one this run's preparation recorded in the run's project (`knowledge_index_uses`), unwraps the token, and writes `config.json` (the index ID, the project's schema, the model, the service host names) and `credentials.json` into the tool's own runtime volume (`sdlc-toolrt-<run_id>-<tool_key>`, at `/run/sdlc-tool`) with the archive upload, before the tool starts. Never an environment value. A token OpenBao refuses records `wrap_token_reused` (`tool_secrets`).
+- **The service network** (QUESTIONS #531). `sdlc-toolsvc-<run_id>-<tool_key>`, internal like the run network, holds the tool and the backing services the runner was configured with (`SDLC_RUNNER_TOOL_SERVICES`, by alias and port); a grant that names another service is refused (`tool_not_enforceable`). The gateway, the sandbox and other tools are never on it. The teardown detaches the services and removes the network and the runtime volume.
+- **`knowledge_read`** (QUESTIONS #533, #536, #543). The tool writes one log line per answer with the document IDs and content hashes it returned and a chunk count, nothing else. At the end of the run (also after a kill, a failure or a restart's clean-up) the runner reads the tool's log, keeps only lines of that exact shape, and records the sorted list of distinct `[doc_id, content_sha256]` as the evidence item `knowledge_read` (with the run's diff credential, under `diffs/`) and the run event `knowledge_read` with its SHA-256, the index ID and the counts.
+- **Failures.** A login or key that cannot be issued (no database engine, OpenBao or LiteLLM down) ends the run `failed` with `tool_unavailable` (run event `knowledge_unavailable`, code `credentials_unavailable`) and revokes what was issued.
+
 ## 3. Alternatives not chosen
 
 - **pgvector in the platform's PostgreSQL** (ADR-M59 §6): a tool's service network would reach the platform's database (QUESTIONS #534).
@@ -71,7 +81,7 @@ A pass of the retention loop, after the evidence and the Langfuse passes, per pr
 ## 4. Consequences
 
 - One more service and image to pin, scan and back up: `knowledge-db` is optional (profile `knowledge`); A10 measures bge-m3 on CPU (about 1.2 GB) and the store.
-- The OpenBao database secrets engine comes in PR 3b, with runbook T11.
+- The OpenBao database secrets engine came with PR 3b (§2.7), with runbook T11 §5o; it needs `pnpm openbao:bootstrap knowledge-issuer-credentials` once per server.
 - A large documentation set may not fit the limits of a first run: the operator raises them, or the run fails with a clear code.
 
 ## Version history
@@ -80,3 +90,4 @@ A pass of the retention loop, after the evidence and the Langfuse passes, per pr
 |---|---|---|---|
 | 0.1 | 2026-10-23 | Claude (task X04 PR 3a) | First version: the store, the platform's record, the indexer, retention, `knowledge_read`, the gateway facts of PR 2 (QUESTIONS #533–#539) |
 | 1.0 | 2026-10-23 | Harry | Accepted, with D-05 1.58 |
+| 1.1 | 2026-10-24 | Claude (task X04 PR 3b) | §2.7: the tool, its per-run login (one OpenBao role per run), its model key, the handoff, the service network and `knowledge_read`, as answered in QUESTIONS #540–#544 (the repository owner, 2026-10-24); with D-05 1.59 |

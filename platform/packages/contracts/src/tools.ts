@@ -69,6 +69,38 @@ export const TOOL_GATEWAY_KEY_HEADER = 'Authorization';
 export const TOOL_MCP_PORT = 8080;
 export const TOOL_MCP_PATH = '/mcp';
 
+/**
+ * X04 PR 3b (ADR-M69 §2.4): where a tool with backing services finds its run's settings and its
+ * credential, written by the runner before the container starts (never an environment value).
+ */
+export const TOOL_RUNTIME_DIR = '/run/sdlc-tool';
+/** Settings of the run: IDs, codes and host names only (`ToolRuntimeConfig`). */
+export const TOOL_CONFIG_FILE = 'config.json';
+/** The run's credential of the tool (`ToolRuntimeCredentials`). */
+export const TOOL_CREDENTIALS_FILE = 'credentials.json';
+
+/** `config.json` of a `read_documents` tool (X04 PR 3b, ADR-M89). */
+export interface ToolRuntimeConfig {
+  readonly schema_version: 1;
+  /** The index version of the run's base commit. */
+  readonly index_id: string;
+  /** The project's schema in `knowledge-db` (`kdocs_p<…>`). */
+  readonly schema: string;
+  /** The embedding model (the tool's `model_ref`). */
+  readonly model: string;
+  /** `knowledge-db:5432` on the tool's service network, database `knowledge`. */
+  readonly database: { readonly host: string; readonly port: number; readonly name: string };
+  /** `http://litellm:4000` on the tool's service network. */
+  readonly model_gateway_url: string;
+}
+
+/** `credentials.json` of a `read_documents` tool: the run's login and the tool's own model key. */
+export interface ToolRuntimeCredentials {
+  readonly db_username: string;
+  readonly db_password: string;
+  readonly llm_key: string;
+}
+
 /** The permission catalogue (ADR-M69 §2.2). The first one is `read_documents` (X04). */
 export const TOOL_PERMISSIONS = ['read_documents'] as const;
 export type ToolPermission = (typeof TOOL_PERMISSIONS)[number];

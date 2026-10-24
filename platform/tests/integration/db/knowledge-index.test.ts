@@ -232,6 +232,54 @@ describeDb('X04 PR 3a: the document index on PostgreSQL', () => {
     expect(store.versions.has(first.indexId)).toBe(true);
   });
 
+  it("X04 PR 3b: the runner's check — only this run's use, in this run's project; the run's uses by model", async () => {
+    const w = await world();
+    const built = await index(w);
+    const other = crypto.randomUUID();
+    expect(
+      await w.scope.knowledgeIndexes.usedByRun(built.indexId, w.runId, w.projectId),
+    ).toMatchObject({ id: built.indexId, model: 'bge-m3' });
+    // Another run, another project, an unknown index: refused (the tool never gets it).
+    expect(await w.scope.knowledgeIndexes.usedByRun(built.indexId, other, w.projectId)).toBe(
+      undefined,
+    );
+    expect(await w.scope.knowledgeIndexes.usedByRun(built.indexId, w.runId, other)).toBe(undefined);
+    expect(await w.scope.knowledgeIndexes.usedByRun(other, w.runId, w.projectId)).toBe(undefined);
+    expect(await w.scope.knowledgeIndexes.usesOfRun(w.runId)).toEqual([
+      { indexId: built.indexId, model: 'bge-m3' },
+    ]);
+    // Migration 0040: the evidence kind of the list a tool returned (IDs and hashes only).
+    await w.scope.evidenceItems.record({
+      intentId: w.intentId,
+      runId: w.runId,
+      kind: 'knowledge_read',
+      storageUri: `s3://sdlc-evidence/diffs/${w.intentId}/${w.runId}.knowledge-project-docs.json`,
+      sha256: 'e'.repeat(64),
+      sizeBytes: 2,
+    });
+    expect((await w.scope.evidenceItems.listForIntent(w.intentId)).map((i) => i.kind)).toContain(
+      'knowledge_read',
+    );
+    // Migration 0040: a tool's own model key has the label `agent` = `tool:<key>` (QUESTIONS #541).
+    expect(
+      await w.scope.costRecords.insertIfNew({
+        projectId: w.projectId,
+        intentId: w.intentId,
+        runId: w.runId,
+        gate: 'G4',
+        agent: 'tool:project-docs',
+        model: 'bge-m3',
+        providerType: 'self_hosted',
+        inputTokens: 8,
+        outputTokens: 0,
+        cachedInputTokens: 0,
+        costUsd: '0',
+        sourceRef: `x04b-${w.runId}`,
+        occurredAt: new Date(),
+      }),
+    ).toBe(true);
+  });
+
   it('keeps a version at day 179, deletes it at day 181 with knowledge.purged; report mode counts only', async () => {
     const w = await world();
     const built = await index(w);

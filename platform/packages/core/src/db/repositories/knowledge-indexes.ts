@@ -91,6 +91,52 @@ export class KnowledgeIndexRepository extends TenantRepository {
     return true;
   }
 
+  /**
+   * X04 PR 3b: the ready index version a run recorded a use of, in the run's own project; else
+   * undefined. The runner checks the index ID it was handed before a tool reads it, so a tool never
+   * gets another project's (or another run's) index.
+   */
+  usedByRun(
+    indexId: string,
+    runId: string,
+    projectId: string,
+  ): Promise<KnowledgeIndex | undefined> {
+    return this.run(
+      this.db
+        .selectFrom('knowledge_indexes as k')
+        .innerJoin('knowledge_index_uses as u', (join) =>
+          join.onRef('u.tenant_id', '=', 'k.tenant_id').onRef('u.index_id', '=', 'k.id'),
+        )
+        .selectAll('k')
+        .where('k.tenant_id', '=', this.tenantId)
+        .where('k.id', '=', indexId)
+        .where('k.project_id', '=', projectId)
+        .where('k.purged_at', 'is', null)
+        .where('u.tenant_id', '=', this.tenantId)
+        .where('u.run_id', '=', runId)
+        .executeTakeFirst(),
+    );
+  }
+
+  /** The index versions a run recorded a use of (X04 PR 3b: its `knowledge_read`). */
+  async usesOfRun(
+    runId: string,
+  ): Promise<readonly { readonly indexId: string; readonly model: string }[]> {
+    const rows = await this.run(
+      this.db
+        .selectFrom('knowledge_index_uses as u')
+        .innerJoin('knowledge_indexes as k', (join) =>
+          join.onRef('k.tenant_id', '=', 'u.tenant_id').onRef('k.id', '=', 'u.index_id'),
+        )
+        .select(['k.id as id', 'k.model as model'])
+        .where('u.tenant_id', '=', this.tenantId)
+        .where('k.tenant_id', '=', this.tenantId)
+        .where('u.run_id', '=', runId)
+        .execute(),
+    );
+    return rows.map((row) => ({ indexId: row.id, model: row.model }));
+  }
+
   /** Locks a ready index for the retention decision (inside a transaction); undefined if purged. */
   lockReady(indexId: string): Promise<KnowledgeIndex | undefined> {
     return this.run(

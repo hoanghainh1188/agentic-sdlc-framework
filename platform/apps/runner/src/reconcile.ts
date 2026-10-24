@@ -13,7 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { RunStatus } from '@sdlc/contracts';
+import type { EvidenceStore, RunStatus } from '@sdlc/contracts';
 import {
   MAX_EVALUATION_ATTEMPTS,
   parseTenantId,
@@ -25,6 +25,7 @@ import type { DockerClient } from './docker/client.js';
 import type { HeldRuns } from './held.js';
 import { LABELS, MANAGED_BY, runOfLabels, type LabelledRun } from './names.js';
 import { teardownSandbox, type TeardownReason } from './sandbox/lifecycle.js';
+import { recordKnowledgeRead } from './tools/knowledge-read.js';
 import { recordToolUse } from './tools/record.js';
 import type { RunnerSettings } from './settings.js';
 
@@ -34,6 +35,11 @@ export interface ReconcileDeps {
   readonly settings: RunnerSettings;
   /** Default: `new Date()`. */
   readonly now?: () => Date;
+  /**
+   * X04 PR 3b: where the list of a `read_documents` tool's documents goes (`knowledge_read`): the
+   * runner's evidence credential, key prefix `diffs/`. Without it the run event still records it.
+   */
+  readonly knowledgeEvidence?: EvidenceStore;
 }
 
 export interface ReconcileResult {
@@ -119,7 +125,12 @@ async function cleanUpRun(
   const scope = deps.db.forTenant(parseTenantId(labelled.tenantId));
   const run = await scope.runs.getById(labelled.runId);
   // X04 (ADR-M69 §2.7): the tool counts are read from the gateway before it is removed.
-  if (run) await recordToolUse(deps.docker, scope, run.id).catch(() => undefined);
+  if (run) {
+    await recordToolUse(deps.docker, scope, run.id).catch(() => undefined);
+    await recordKnowledgeRead(deps.docker, scope, deps.knowledgeEvidence, run.id).catch(
+      () => undefined,
+    );
+  }
   const result = await teardownSandbox(deps.docker, labelled.runId);
   // Not a real run: maybe an evaluation run (its own tables, QUESTIONS #460).
   if (!run) return abandonEvaluationRun(scope, labelled.runId);

@@ -43,14 +43,29 @@ interface MatrixEntry {
 }
 
 const PREFIX = 'ghcr.io/hoanghainh1188/agentic-sdlc-framework';
-const IMAGES = ['sdlc-api', 'sdlc-worker', 'sdlc-runner', 'sdlc-otel-collector', 'sandbox-node24'];
+const IMAGES = [
+  'sdlc-api',
+  'sdlc-worker',
+  'sdlc-runner',
+  'sdlc-otel-collector',
+  'sandbox-node24',
+  'tool-project-docs',
+];
 const LOCK_NAMES: Record<string, string> = {
   API: 'sdlc-api',
   WORKER: 'sdlc-worker',
   RUNNER: 'sdlc-runner',
   OTEL_COLLECTOR: 'sdlc-otel-collector',
   SANDBOX_NODE24: 'sandbox-node24',
+  TOOL_PROJECT_DOCS: 'tool-project-docs',
 };
+/**
+ * Images added to the release since the lock file was last written (X04 PR 3b, the repository
+ * owner, 2026-10-24): the lock is never edited by hand (R089), so a new image may be missing from
+ * it until the next release's lock pull request (`pnpm release:lock`) writes it. Only a name listed
+ * here may be missing, and only as a whole (never an empty value).
+ */
+const NEW_SINCE_LOCK = new Set(['TOOL_PROJECT_DOCS']);
 
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 const wf = parse(read('.github/workflows/release-images.yml')) as Workflow;
@@ -99,7 +114,7 @@ describe('V04: the release workflow', () => {
     expect(run).toContain('refs/heads/main | "refs/tags/v$VERSION"');
   });
 
-  it('builds the five images for amd64 and arm64, each on a native runner', () => {
+  it('builds the six images for amd64 and arm64, each on a native runner', () => {
     const build = job('build');
     expect(build.strategy?.matrix.arch).toEqual(['amd64', 'arm64']);
     expect(build.strategy?.matrix.image).toEqual(IMAGES);
@@ -198,9 +213,11 @@ describe('V04: the release workflow', () => {
     const run = job('lock')
       .steps.map((s) => s.run ?? '')
       .join('\n');
-    const written = [...run.matchAll(/echo "(SDLC_IMAGE[A-Z0-9_]*)=/g)].map((m) => m[1]);
+    const written = [...run.matchAll(/echo "(SDLC_IMAGE[A-Z0-9_]*)=/g)].map((m) => m[1]!);
     const lock = [...parseEnvFile(readDeployFile('images.lock')).keys()];
-    expect(written).toEqual(lock);
+    const notYet = (name: string) =>
+      NEW_SINCE_LOCK.has(name.replace(/^SDLC_IMAGE_/, '')) && !lock.includes(name);
+    expect(written.filter((name) => !notYet(name))).toEqual(lock);
   });
 });
 
@@ -214,9 +231,12 @@ describe('V04: Compose uses the published images on a release checkout only', ()
   });
 
   it('the lock file is empty, or complete and pinned by digest, never ahead of package.json', () => {
+    const expected = Object.keys(LOCK_NAMES).filter(
+      (n) => !NEW_SINCE_LOCK.has(n) || lock.has(`SDLC_IMAGE_${n}`),
+    );
     expect([...lock.keys()]).toEqual([
       'SDLC_IMAGES_VERSION',
-      ...Object.keys(LOCK_NAMES).map((n) => `SDLC_IMAGE_${n}`),
+      ...expected.map((n) => `SDLC_IMAGE_${n}`),
     ]);
     const values = [...lock.values()];
     if (values.every((v) => v === '')) return;
@@ -226,7 +246,7 @@ describe('V04: Compose uses the published images on a release checkout only', ()
     const [a, b] = [num(version), num(pkgVersion)];
     const cmp = a[0]! - b[0]! || a[1]! - b[1]! || a[2]! - b[2]!;
     expect(cmp).toBeLessThanOrEqual(0);
-    for (const [name, image] of Object.entries(LOCK_NAMES))
+    for (const [name, image] of Object.entries(LOCK_NAMES).filter(([n]) => expected.includes(n)))
       expect(lock.get(`SDLC_IMAGE_${name}`)).toMatch(
         new RegExp(`^${PREFIX.replace(/\./g, '\\.')}/${image}@sha256:[0-9a-f]{64}$`),
       );
@@ -273,7 +293,7 @@ describe('V04: scripts/images.sh', () => {
     [
       `SDLC_IMAGES_VERSION=${version}`,
       ...Object.entries(LOCK_NAMES).map(
-        ([n, image], i) => `SDLC_IMAGE_${n}=${prefix}/${image}@${digest('abcde'[i]!)}`,
+        ([n, image], i) => `SDLC_IMAGE_${n}=${prefix}/${image}@${digest('abcdef'[i]!)}`,
       ),
     ].join('\n') + '\n';
 

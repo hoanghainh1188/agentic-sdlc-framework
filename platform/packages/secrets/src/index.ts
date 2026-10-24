@@ -4,6 +4,14 @@
 export { OpenBaoClient, type SealStatus } from './client.js';
 export { parseSignature, verifyEd25519, type ParsedSignature } from './ed25519.js';
 export { SecretsError, type SecretsErrorKey } from './errors.js';
+export {
+  creationStatements,
+  DatabaseCredentials,
+  KNOWLEDGE_DB_CONNECTION,
+  MAX_LOGIN_TTL_SECONDS,
+  REVOCATION_STATEMENTS,
+  runDatabaseRole,
+} from './database.js';
 export { checkSecretPath } from './kv.js';
 export type { SecretsLogEvent, SecretsLogFields, SecretsLogger } from './logger.js';
 export {

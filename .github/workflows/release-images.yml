@@ -104,7 +104,15 @@ jobs:
       fail-fast: false
       matrix:
         arch: [amd64, arm64]
-        image: [sdlc-api, sdlc-worker, sdlc-runner, sdlc-otel-collector, sandbox-node24]
+        image:
+          [
+            sdlc-api,
+            sdlc-worker,
+            sdlc-runner,
+            sdlc-otel-collector,
+            sandbox-node24,
+            tool-project-docs,
+          ]
         include:
           - image: sdlc-api
             context: .
@@ -126,6 +134,11 @@ jobs:
             context: platform/sandbox-images/node24
             dockerfile: platform/sandbox-images/node24/Dockerfile
             ignorefile: platform/sandbox-images/.trivyignore
+          # X04 PR 3b (ADR-M89): the first register tool, registered by its digest.
+          - image: tool-project-docs
+            context: .
+            dockerfile: platform/apps/tool-project-docs/Dockerfile
+            ignorefile: .trivyignore
     env:
       SOURCE_DATE_EPOCH: ${{ needs.check.outputs.epoch }}
     steps:
@@ -262,7 +275,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [sdlc-api, sdlc-worker, sdlc-runner, sdlc-otel-collector, sandbox-node24]
+        image:
+          [
+            sdlc-api,
+            sdlc-worker,
+            sdlc-runner,
+            sdlc-otel-collector,
+            sandbox-node24,
+            tool-project-docs,
+          ]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -354,6 +375,7 @@ jobs:
             echo "SDLC_IMAGE_RUNNER=$(cat "$refs/sdlc-runner")"
             echo "SDLC_IMAGE_OTEL_COLLECTOR=$(cat "$refs/sdlc-otel-collector")"
             echo "SDLC_IMAGE_SANDBOX_NODE24=$(cat "$refs/sandbox-node24")"
+            echo "SDLC_IMAGE_TOOL_PROJECT_DOCS=$(cat "$refs/tool-project-docs")"
           } > "$out"
           {
             echo "### images.lock for v$VERSION"

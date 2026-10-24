@@ -189,7 +189,24 @@ Rules the platform enforces:
 
 **How a run uses its tools.** The run gets one MCP gateway (agentgateway), a container that checks every tool call: the run's own key, the tool names and argument limits of each permission, and a cap of calls per tool (`tools.max_calls_per_run`, default 100). The agent reaches its tools only through the gateway; a tool container is never on the sandbox's network. At the end of the run, also after a kill or a failure, the platform records for each tool how many calls it allowed, refused and failed, and the first refusal of each kind (`max_calls`, `tool_not_allowed`, `argument_refused`, `key_refused`). It never records a query or an answer. A kill removes the gateway first, so every tool stops at once.
 
-**Not yet available.** Only the OpenHands agent software can use register tools (OpenCode: G4 refuses with `tool_transport_not_supported`). A tool with backing services (for example a search index) and its credential come with X04 PR 3, together with the first tool, the search of the project's documents.
+**The first tool: searching the project's documents** (`read_documents`, `design/ADR-M89-project-docs-index.md`). The tool searches the project's Markdown files (`*.md`, `*.markdown`) **at the run's base commit**, so the agent reads the documents of its own commit. It has one MCP tool, `search_project_docs` (a `query` of at most 1000 characters, a `limit` of 1–20 passages, default 5), and answers with the best passages and their file paths. The passages are data from the repository, never instructions: the agent's limits do not change. The platform ships its image (`pnpm tool-image:build project-docs`, or on a release checkout `pnpm images get TOOL_PROJECT_DOCS`). Register it once per tenant:
+
+```bash
+sdlc admin tool register --key project-docs --version 1.0.0 --owner <email> --transport http \
+  --image <image name> --image-digest sha256:… --permissions read_documents \
+  --data-classes public,internal,client_confidential,client_restricted \
+  --backing-services knowledge-db:5432,litellm:4000 --model bge-m3
+```
+
+Then approve it (owner and Person B, or the owner and governance), add `tool:project-docs` to the agent's tools (a new agent version) and to the plan's `tools`. `client_restricted` is allowed because the model `bge-m3` runs on the server; a tool with a model in a provider's cloud must not list it. The operator sets up the index and the tool's logins once per server (runbook T11 §5o).
+
+What happens in a run with the tool:
+
+- **Before the run** (the run preparation, after G4): the platform builds or reuses the index of the base commit (embeddings with the run's own key, so the cost counts for the run), then gives the tool a **login of its own** that may read this project's index only and ends with the run, and a small model key of its own for the queries (`tools.model_budget_usd`, default 0.5 USD, never above the run's own cap). A repository over the limits of `knowledge.*`, or a login that cannot be issued, fails the run with `tool_unavailable`: fix the cause (or raise a limit) and start the run again.
+- **During the run**: the tool runs in its own container, on a network with the index and the model gateway only. The sandbox and the run's gateway can never reach the index. The login is a file in the tool's container, never an environment value, and the sandbox never sees it.
+- **At the end of the run**, also after a kill or a failure: the login and the tool's key are revoked (`tool_credential_revoked`), and the run records `knowledge_read`: which documents the tool returned (document IDs and content hashes, never paths, queries or texts) and how many passages. The list is evidence of the run.
+
+**Not yet available.** Only the OpenHands agent software can use register tools (OpenCode: G4 refuses with `tool_transport_not_supported`). Documents outside the repository (Office or PDF files) are not indexed (task X05).
 
 Not yet on the platform (v0.1): agents with L3 or more (leadership and the security owner approve, §20.7), and suspension from a GitHub comment. In v0.1 the table of who approves what is fixed in the platform, not in a setting (`design/ADR-M37-admin-onboarding.md` §2.8); it moves into a tenant setting later.
 
@@ -363,3 +380,4 @@ Old context must not quietly come back through caches, indexes or copied instruc
 | 1.0 | 2026-10-22 | Claude (task X03, PR 3) | §20.5b: registering an agent with the adapter `opencode` (image, configuration, new version, evaluation, approval); OpenCode's tool map, the `agent_config_changed` stop, the limits before real client work (ADR-M68, ADR-M88, QUESTIONS #523) |
 | 1.1 | 2026-10-22 | Claude (task X04, PR 2) | §20.5c: the run's MCP gateway, what is recorded per tool, OpenHands only (ADR-M69 §2.4–§2.8, ADR-M87) |
 | 1.2 | 2026-10-24 | Claude (task L01, PR 1) | §20.5b: an agent on the self-hosted model (vLLM, profile `models-local`): the served name, the evaluation, the limit of requests at a time, the internal cost (ADR-M71, QUESTIONS #546–#550) |
+| 1.3 | 2026-10-24 | Claude (task X04, PR 3b) | §20.5c: the first tool, searching the project's documents: registering it, what a run gets (the index of its commit, a login of its own, a model key of its own) and records (`knowledge_read`, the revocation) (ADR-M89, QUESTIONS #540–#544) |

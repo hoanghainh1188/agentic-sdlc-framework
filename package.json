@@ -73,6 +73,7 @@
     "compose:models-local": "platform/deploy/scripts/up.sh core models models-local",
     "models-local:pull": "docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile models-local-pull run --rm vllm-pull",
     "sandbox-image:build": "platform/sandbox-images/build.sh",
+    "tool-image:build": "platform/deploy/scripts/tool-image.sh",
     "images": "platform/deploy/scripts/images.sh",
     "release:lock": "node platform/tools/release/lock.mjs",
     "diagrams:render": "python3 scripts/diagrams.py render",

@@ -213,6 +213,10 @@ describe('sdlc-runner service', () => {
       'litellm=${COMPOSE_PROJECT_NAME:-sdlc}-litellm-1:4000,npm-proxy=${COMPOSE_PROJECT_NAME:-sdlc}-npm-proxy-1:4873',
     );
     expect(env.SDLC_RUNNER_NPM_REGISTRY).toBe('http://npm-proxy:4873/');
+    // X04 PR 3b (ADR-M69 §2.4): never on the run network; a tool's own service network only.
+    expect(env.SDLC_RUNNER_TOOL_SERVICES).toBe(
+      'knowledge-db=${COMPOSE_PROJECT_NAME:-sdlc}-knowledge-db-1:5432,litellm=${COMPOSE_PROJECT_NAME:-sdlc}-litellm-1:4000',
+    );
     expect(env.SDLC_RUNNER_MAX_SANDBOXES).toBe('${SDLC_RUNNER_MAX_SANDBOXES:-1}');
     expect(env.SDLC_RUNNER_MAX_EVAL_SANDBOXES).toBe('${SDLC_RUNNER_MAX_EVAL_SANDBOXES:-1}');
     expect(env.SDLC_RUNNER_SWEEP_INTERVAL_SECONDS).toBe(

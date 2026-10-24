@@ -39,6 +39,7 @@
 import {
   type IntentStepResult,
   type PolicyEngine,
+  type RunDatabaseCredentials,
   type RunStatus,
   type ValidatedProjectConfig,
 } from '@sdlc/contracts';
@@ -54,6 +55,7 @@ import {
 } from '../escalation/decide.js';
 import { raiseEscalation } from '../escalation/raise.js';
 import { failedRunRoute } from '../kill/kill-run.js';
+import { endRunCredentials } from '../tools/credentials.js';
 import { G5_RETURN_DECISIONS } from './g5-scope.js';
 import type { Registry } from '../registry/registry.js';
 import { G4_OPERATOR_ROLES } from './g4.js';
@@ -347,19 +349,29 @@ export async function startRun(
 }
 
 /**
+ * What ending a run needs: the run's key and (X04 PR 3b) its tools' keys and database logins are
+ * revoked (`endRunCredentials`).
+ */
+export interface RunEndDeps {
+  readonly registry: Registry;
+  readonly costController: Pick<CostController, 'endRunKey'>;
+  readonly databaseCredentials?: RunDatabaseCredentials | undefined;
+}
+
+/**
  * The runner's activity for this run was lost (heartbeat timeout, the runner stopped). Revokes the
  * run's key at once (Harry, C06 session 2 plan), then ends the run `failed` with `reason` if it is
  * not final yet. The workflow then finishes it (`run_ended` → `finishRun`).
  */
 export async function abandonRun(
   scope: TenantScope,
-  deps: { readonly registry: Registry; readonly costController: Pick<CostController, 'endRunKey'> },
+  deps: RunEndDeps,
   runId: string,
   reason: string = RUNNER_LOST,
 ): Promise<void> {
   const run = await scope.runs.getById(runId);
   if (!run) return;
-  await deps.costController.endRunKey({ runId, syncFrom: new Date(run.created_at) });
+  await endRunCredentials(scope, deps, runId, new Date(run.created_at));
   if (isFinal(run.status)) return;
   const now = deps.registry.now();
   await scope.transaction(async (tx) => {
@@ -383,13 +395,13 @@ export async function abandonRun(
  */
 export async function finishRun(
   scope: TenantScope,
-  deps: { readonly registry: Registry; readonly costController: Pick<CostController, 'endRunKey'> },
+  deps: RunEndDeps,
   intentId: string,
   runId: string,
 ): Promise<void> {
   const run = await scope.runs.getById(runId);
   if (!run || run.intent_id !== intentId || !isFinal(run.status)) return;
-  await deps.costController.endRunKey({ runId, syncFrom: new Date(run.created_at) });
+  await endRunCredentials(scope, deps, runId, new Date(run.created_at));
   await scope.transaction(async (tx) => {
     const intent = await tx.intents.lockAndGet(intentId);
     if (intent?.status !== 'running' || intent.current_gate !== 'G4') return;

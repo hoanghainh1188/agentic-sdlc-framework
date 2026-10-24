@@ -37,5 +37,6 @@
   "0036-evaluation-fingerprints.ts": "9cc88052ea03639fa3dbc91edd005f32b31b9bf954f961d9999cd04a5d457929",
   "0037-agent-adapter.ts": "daf231e352ce18ee9e6983771e7693f53da2a8d3ee8d0c2ee7ec17dfb084b595",
   "0038-tool-register.ts": "47230dbd51428f5cda46a611c5eeef481996b205c3e75ba3852dc63230b11e03",
-  "0039-knowledge-indexes.ts": "7b7c3b9c3cdb1f294fb96e9a3b17ecc92e342a1b02cc9e486b01fce48e61ec1c"
+  "0039-knowledge-indexes.ts": "7b7c3b9c3cdb1f294fb96e9a3b17ecc92e342a1b02cc9e486b01fce48e61ec1c",
+  "0040-knowledge-read-evidence.ts": "251d46a4f29717f23d6c1ce579eadddefc61f1fc750a95e39ac9cf220494c001"
 }

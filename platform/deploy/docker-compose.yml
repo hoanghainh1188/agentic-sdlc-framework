@@ -1006,6 +1006,9 @@ services:
       SDLC_RUNNER_SWEEP_INTERVAL_SECONDS: ${SDLC_RUNNER_SWEEP_INTERVAL_SECONDS:-300}
       SDLC_RUNNER_EGRESS_SERVICES: litellm=${COMPOSE_PROJECT_NAME:-sdlc}-litellm-1:4000,npm-proxy=${COMPOSE_PROJECT_NAME:-sdlc}-npm-proxy-1:4873
       SDLC_RUNNER_NPM_REGISTRY: http://npm-proxy:4873/
+      # X04 PR 3b (ADR-M69 §2.4, ADR-M89): the backing services a register tool may reach on its
+      # own service network: the index (profile knowledge) and LiteLLM for its query embeddings.
+      SDLC_RUNNER_TOOL_SERVICES: knowledge-db=${COMPOSE_PROJECT_NAME:-sdlc}-knowledge-db-1:5432,litellm=${COMPOSE_PROJECT_NAME:-sdlc}-litellm-1:4000
       # C05 (ADR-M29): the runner joins each run's network with its own container to call the
       # Agent Server, and leaves at clean-up. LiteLLM as the sandbox sees it.
       SDLC_RUNNER_SELF_CONTAINER: ${COMPOSE_PROJECT_NAME:-sdlc}-sdlc-runner-1

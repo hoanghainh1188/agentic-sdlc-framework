@@ -18,13 +18,14 @@
 //   ended otherwise is refused (`run_not_active`).
 // The caller then signals the intent's workflow (`kill`, `wake`): the workflow cancels the run's
 // activity, which also covers a run that waits for a runner slot in Temporal.
-import type { ProjectRole, RunStatus } from '@sdlc/contracts';
+import type { ProjectRole, RunDatabaseCredentials, RunStatus } from '@sdlc/contracts';
 
 import type { CostController } from '../cost/controller.js';
 import type { Intent, Run } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { raiseEscalation } from '../escalation/raise.js';
 import { loadEffectiveConfig } from '../registry/effective-config.js';
+import { endRunCredentials } from '../tools/credentials.js';
 import { isFinalRun } from '../workflow/run-round.js';
 import { KillError } from './errors.js';
 
@@ -134,12 +135,16 @@ export async function requestRunKill(
  */
 export async function revokeKilledRunKey(
   scope: TenantScope,
-  deps: { readonly costController: Pick<CostController, 'endRunKey'> },
+  deps: {
+    readonly costController: Pick<CostController, 'endRunKey'>;
+    /** X04 PR 3b: the database logins of the run's tools go at the kill too (ADR-M69 §2.8). */
+    readonly databaseCredentials?: RunDatabaseCredentials | undefined;
+  },
   runId: string,
 ): Promise<boolean> {
   const run = await scope.runs.getById(runId);
   if (!run || !KILLED_STATUSES.includes(run.status)) return false;
-  await deps.costController.endRunKey({ runId, syncFrom: new Date(run.created_at) });
+  await endRunCredentials(scope, deps, runId, new Date(run.created_at));
   return true;
 }
 
