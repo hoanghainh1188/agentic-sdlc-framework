@@ -67,6 +67,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 
 - **L01** A self-hosted model service (vLLM) on an optional GPU host
 - **L03** GPU sizing note for leadership
+- **L03b** Measure a 30B-class model on a rented GPU
 
 ## Server: A team on a server: toward v1.0 (QUESTIONS #363)
 
