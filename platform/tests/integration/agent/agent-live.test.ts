@@ -645,7 +645,7 @@ describe.skipIf(!enabled)(`C05 live: the runner drives the agent (${ADAPTER})`, 
     { timeout: 600_000 },
     async () => {
       const r = await start(
-        '[stub:reads]',
+        '[stub:context]',
         { maxIterations: 30, maxDurationMin: 10 },
         condensingConfig(1000),
       );
