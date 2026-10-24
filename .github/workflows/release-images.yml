@@ -7,7 +7,7 @@
 #   and `sha-<commit>`, and refuses a version tag that already exists (tags never move);
 # - signs every index with cosign keyless (GitHub OIDC, Fulcio, Rekor) and records a GitHub build
 #   provenance attestation; BuildKit attaches an SPDX SBOM and SLSA provenance to every image;
-# - writes `images.lock` (an artifact and the job summary): the five references pinned by
+# - writes `images.lock` (an artifact and the job summary): the six references pinned by
 #   digest, for platform/deploy/images.lock in the release pull request (ADR-M66 §2.5).
 #
 # Run by a person only (Harry): Actions → release-images → Run workflow, from `main`, with the

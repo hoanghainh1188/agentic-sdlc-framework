@@ -5,7 +5,7 @@
 # release-images.yml on main (ADR-M66 §2.5), so this workflow builds nothing:
 # - check: platform/tools/release/release-check.mjs (the tag equals package.json and
 #   PLATFORM_VERSION, the CHANGELOG section with its Upgrade notes, images.lock for this version
-#   with five digests), and the tagged commit is on main;
+#   with six digests), and the tagged commit is on main;
 # - verify-images: every digest of images.lock carries a cosign signature and a build provenance
 #   attestation made by release-images.yml on refs/heads/main (platform/tools/release/
 #   verify-images.sh, read only);

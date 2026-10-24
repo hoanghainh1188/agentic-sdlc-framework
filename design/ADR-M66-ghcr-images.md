@@ -15,7 +15,7 @@ Until v0.1.0 every platform image is built on the user's machine: `sdlc-api`, `s
 
 ### 2.1 Registry and names
 
-`ghcr.io/hoanghainh1188/agentic-sdlc-framework/<image>`, five images: `sdlc-api`, `sdlc-worker`, `sdlc-runner`, `sdlc-otel-collector`, `sandbox-node24`. The path under the repository links each package to it (`org.opencontainers.image.source` is set too). GHCR is free for public packages and needs no secret: the workflow logs in with `GITHUB_TOKEN`.
+`ghcr.io/hoanghainh1188/agentic-sdlc-framework/<image>`, five images: `sdlc-api`, `sdlc-worker`, `sdlc-runner`, `sdlc-otel-collector`, `sandbox-node24`. From v0.6.0 a sixth: `tool-project-docs`, the first register tool (X04 PR 3b, ADR-M89); the counts below then read six. The path under the repository links each package to it (`org.opencontainers.image.source` is set too). GHCR is free for public packages and needs no secret: the workflow logs in with `GITHUB_TOKEN`.
 
 Tags: the version (`0.1.1`) and `sha-<12 characters of the commit>`. **A version tag never moves**: the workflow refuses a version that is already on GHCR. Every consumer uses the **digest**, never a tag (as for every other image of the platform).
 

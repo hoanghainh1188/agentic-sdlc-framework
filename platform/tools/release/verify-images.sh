@@ -26,8 +26,8 @@ while read -r ref; do
   echo "::endgroup::"
   count=$((count + 1))
 done < "$file"
-if [ "$count" != 5 ]; then
-  echo "::error::expected five images, verified $count"
+if [ "$count" != 6 ]; then
+  echo "::error::expected six images, verified $count"
   exit 1
 fi
-echo "verify-images: five images signed and attested by release-images.yml on main"
+echo "verify-images: six images signed and attested by release-images.yml on main"

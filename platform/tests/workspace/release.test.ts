@@ -48,6 +48,7 @@ const IMAGES: Record<string, string> = {
   RUNNER: 'sdlc-runner',
   OTEL_COLLECTOR: 'sdlc-otel-collector',
   SANDBOX_NODE24: 'sandbox-node24',
+  TOOL_PROJECT_DOCS: 'tool-project-docs',
 };
 
 const temps: string[] = [];
@@ -101,7 +102,7 @@ const tagCheck = (dir: string, tag: string, extra: string[] = []) =>
   check(['tag', tag, '--root', dir, ...extra]);
 
 describe('V12: release-check.mjs, the release gate', () => {
-  it('accepts a complete release and writes the notes and the five image references', () => {
+  it('accepts a complete release and writes the notes and the six image references', () => {
     const dir = fixture('0.1.2');
     const notes = path.join(dir, 'notes.md');
     const images = path.join(dir, 'images.txt');
@@ -115,7 +116,7 @@ describe('V12: release-check.mjs, the release gate', () => {
     expect(body).not.toContain('## [');
     expect(body).not.toContain('first');
     const refs = fs.readFileSync(images, 'utf8').trim().split('\n');
-    expect(refs).toHaveLength(5);
+    expect(refs).toHaveLength(6);
     for (const ref of refs)
       expect(ref).toMatch(new RegExp(`^${PREFIX}/[a-z0-9-]+@sha256:[0-9a-f]{64}$`));
   });
@@ -334,9 +335,9 @@ describe('V12: verify-images.sh, the image check of both tag workflows', () => {
     expect(script).not.toMatch(/regexp|--signer-workflow/);
   });
 
-  it('fails on an error and unless it verified five images', () => {
+  it('fails on an error and unless it verified six images', () => {
     expect(script).toContain('set -euo pipefail');
-    expect(script).toContain('if [ "$count" != 5 ]; then');
+    expect(script).toContain('if [ "$count" != 6 ]; then');
     expect(
       fs.statSync(path.join(root, 'platform/tools/release/verify-images.sh')).mode & 0o111,
     ).not.toBe(0);
