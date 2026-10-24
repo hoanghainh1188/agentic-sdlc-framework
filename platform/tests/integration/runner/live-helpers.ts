@@ -114,9 +114,14 @@ export async function buildFixtureImage(
     ...(fixture.dockerfile === undefined ? [] : ['-f', path.join(repoRoot(), fixture.dockerfile)]),
     context,
   );
-  const digests = JSON.parse(docker('inspect', '--format', '{{json .RepoDigests}}', built)) as
-    string[] | null;
-  if (digests && digests.length > 0) {
+  // Only a digest of the built repository itself: on the classic store RepoDigests belong to the
+  // image ID, so they also list another test file's push of the same image to its own throw-away
+  // registry, which may already be gone (the runner then gets a 404 on container create).
+  const digests = (
+    (JSON.parse(docker('inspect', '--format', '{{json .RepoDigests}}', built)) as
+      string[] | null) ?? []
+  ).filter((ref) => ref.startsWith(`sdlc-test/${fixture.name}@`));
+  if (digests.length > 0) {
     const image = digests[0]!;
     return { image, cleanup: () => quietly('rmi', built) };
   }
