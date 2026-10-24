@@ -76,7 +76,7 @@ paths = ['''^platform/tests/trial/trial-up\.test\.ts$''']
 regexTarget = "match"
 regexes = ['''BEGIN RSA PRIVATE KEY-----\\nMIIE\\n-----END RSA PRIVATE KEY''']
 
-# To be approved by: Harry (Person B), in PR #424 (task L01).
+# Approved by: Harry (Person B), 2026-10-24, PR #424 (task L01).
 # False positive: generic-api-key reads the line below of the agent-api live test (commit 3c69cac)
 # as a key: the name SDLC_AGENT_API_MODEL contains "API", and the default value is a long model
 # name. It is in the history, which CI scans, so it cannot be removed without rewriting history
