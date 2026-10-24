@@ -96,6 +96,8 @@ describe('OpenHandsAdapter', () => {
       iterations: 2,
       events: 4,
       identicalCalls: 2,
+      condensations: 0,
+      eventsForgotten: 0,
     });
     // The kind filter matches nothing in Agent Server 1.48.0 (C05 live test): never used.
     expect(calls.some((c) => c.url.searchParams.has('kind'))).toBe(false);
@@ -114,6 +116,8 @@ describe('OpenHandsAdapter', () => {
       iterations: 3,
       events: 4,
       identicalCalls: 3,
+      condensations: 0,
+      eventsForgotten: 0,
     });
   });
 
@@ -127,6 +131,8 @@ describe('OpenHandsAdapter', () => {
       iterations: 1,
       events: 2,
       identicalCalls: 1,
+      condensations: 0,
+      eventsForgotten: 0,
     });
   });
 
@@ -145,7 +151,14 @@ describe('OpenHandsAdapter', () => {
       ls('c'),
     ]);
     const status = await adapter.getStatus(handle);
-    expect(status).toEqual({ state: 'running', iterations: 4, events: 5, identicalCalls: 3 });
+    expect(status).toEqual({
+      state: 'running',
+      iterations: 4,
+      events: 5,
+      identicalCalls: 3,
+      condensations: 0,
+      eventsForgotten: 0,
+    });
     expect(JSON.stringify(status)).not.toContain('secret');
   });
 

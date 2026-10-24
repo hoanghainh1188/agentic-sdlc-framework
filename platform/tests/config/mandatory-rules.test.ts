@@ -514,6 +514,14 @@ const CASES: Case[] = [
     key: 'config.rule.recertification_evaluation_max_age',
     path: 'agents.evaluation.recertification_max_age_days',
   },
+  // M35: context condensing only with a known context size (X11, ADR-M29 §2.10).
+  {
+    name: 'context condensing on without any context size',
+    rule: 'M35',
+    yaml: 'run:\n  context_condensing:\n    mode: summarize\n',
+    key: 'config.rule.condensing_context_unknown',
+    path: 'run.context_condensing.model_context_tokens',
+  },
   // M30: the viewer never builds or reads an Evidence Pack (E02, ADR-M48, QUESTIONS #218).
   {
     name: 'viewer may build evidence packs',

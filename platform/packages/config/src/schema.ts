@@ -5,6 +5,7 @@ import {
   AGENT_KEY_PATTERN,
   AUTONOMY_LEVELS,
   CHANGE_FLAGS,
+  CONTEXT_CONDENSING_MODES,
   OVERSIGHT_MODES,
   PROJECT_ROLES,
   PROVIDER_TYPES,
@@ -54,6 +55,11 @@ function isValidIsoDate(value: string): boolean {
 }
 
 const positiveInt = z.number().int().positive();
+/** Same as the Run Contract's `allowed_models` entries. */
+const MODEL_REF = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$/;
+/** X11: bounds of a model's context size in `run.context_condensing.model_context_tokens`. */
+export const MIN_CONTEXT_TOKENS = 4096;
+export const MAX_CONTEXT_TOKENS = 2_000_000;
 /** A share strictly between 0 and 1 (L06 thresholds). */
 const share = z.number().gt(0).lt(1);
 const nonNegativeInt = z.number().int().nonnegative();
@@ -222,6 +228,18 @@ export const projectConfigSchema = z.strictObject({
     kill_escalation: z.strictObject({
       severity: z.enum(SEVERITIES),
       response_level: z.enum(RESPONSE_LEVELS),
+    }),
+    // X11 (ADR-M29 §2.10, QUESTIONS #551–#554): context condensing of OpenHands work runs. Rule
+    // M35: `summarize` needs a context size for at least one model and fewer kept events than the
+    // maximum. Model names are `allowed_models` entries.
+    context_condensing: z.strictObject({
+      mode: z.enum(CONTEXT_CONDENSING_MODES),
+      max_events: positiveInt.min(10).max(1000),
+      keep_first: nonNegativeInt.max(50),
+      model_context_tokens: z.record(
+        z.string().regex(MODEL_REF),
+        positiveInt.min(MIN_CONTEXT_TOKENS).max(MAX_CONTEXT_TOKENS),
+      ),
     }),
   }),
   budget: z.strictObject({

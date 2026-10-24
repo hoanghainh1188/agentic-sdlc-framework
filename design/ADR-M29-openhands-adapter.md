@@ -5,7 +5,7 @@
 | Status | **Accepted** (Harry, 2026-10-16; built by task C05) |
 | Date | 2026-09-27 |
 | Decided by | Harry (C05 plan approved 2026-09-27, with conditions; QUESTIONS #13, #78–#80) |
-| Related | D-02 FR-11, FR-30…FR-33, FR-35, FR-50; D-03 sections 7.2, 8, 9; D-05 section 6.4; D-07 sections 3, 4, 6; D-08 tasks C05, C06, C07, C08, C11; ADR-M04, ADR-M10, ADR-M22, ADR-M24, ADR-M25 |
+| Related | D-02 FR-11, FR-30…FR-33, FR-35, FR-50; D-03 sections 7.2, 8, 9; D-05 section 6.4; D-07 sections 3, 4, 6, 7; D-08 tasks C05, C06, C07, C08, C11, X11; ADR-M04, ADR-M10, ADR-M22, ADR-M24, ADR-M25 |
 
 ## 1. Context
 
@@ -128,6 +128,47 @@ These are technical settings, not handbook rules.
 - **Network:** Ollama runs on the machine (in Docker on macOS it has no GPU). LiteLLM reaches it at `http://host.docker.internal:11434`; the sandbox cannot (its run network has no route out, ADR-M25 §2.2). Docker Desktop reaches an Ollama bound to the host's 127.0.0.1 (checked).
 - **Test:** `pnpm test:agent-real` (developer machines only, never in CI). A throw-away LiteLLM with the template's Ollama entry and its own database, the Cost Controller's virtual key (seven labels, cap `min(budget.default_run_usd, 1.00)`), a node24 sandbox, the runner driving the agent, then `endRun` (revoke, sync into `cost_records`). No secret is involved. It samples memory every 2 s (Ollama processes, sandbox, LiteLLM, free memory).
 
+### 2.10. Context condensing (X11, QUESTIONS #395, #551–#555)
+
+Small local models have small context windows (`num_ctx` 32768, §2.9). The model reads the whole run at every step, so a long run fills the context and fails. X11 adds context condensing, off by default.
+
+**What the pinned Agent Server 1.48.0 offers (AC1).** Checked on the running image (its OpenAPI description) and in `pnpm test:agent`:
+
+| Item | Finding |
+|---|---|
+| How it is set | One condenser per conversation, in `agent.condenser` of `POST /api/conversations`. Not set (before X11): none |
+| Condensers | `LLMSummarizingCondenser`, `NoOpCondenser` (for tests), `PipelineCondenser` (a chain) |
+| `LLMSummarizingCondenser` | Its own `llm` object (model, URL, key, `usage_id`); `max_size` (events in the view, default 240); `max_tokens` (optional); `keep_first` (events kept at the start, default 2); `minimum_progress` 0.1; `hard_context_reset_max_retries` 5; `hard_context_reset_context_scaling` 0.8 |
+| The agent's context size | `agent.llm.max_input_tokens` |
+| Events in the log | `Condensation` (`forgotten_event_ids`, `summary`, `summary_offset`, `llm_response_id`); `CondensationRequest` (no text; written when the model reports a full context); `CondensationSummaryEvent` (`summary`; not seen in the log in our runs) |
+| Forced condensing | `POST /api/conversations/{id}/condense` (not used) |
+| The log | Forgotten events **stay in the log**; only the model's view drops them. A later condensation also forgets the summary of the one before, as the ID `<condensation id>-summary`: that ID is in the view only, never an event of the log |
+| The summary request | One user message (the condenser's prompt and the forgotten events), **no tools**, on the condenser's `llm` |
+| Steps | A condensation is not a step: `max_iterations` counts tool calls only (`ActionEvent`). With condensing on, a run of 14 commands and `finish` had 15 steps and 4 condensations |
+| A full context | The model's HTTP 400 with `context_length_exceeded` (as LiteLLM forwards it) makes the agent write a `CondensationRequest`, condense and go on |
+
+**Decisions.**
+
+- **Configuration** (`run.context_condensing`, @sdlc/config): `mode` `off` or `summarize`, `max_events` (10–1000, default 120), `keep_first` (0–50, default 2), `model_context_tokens` (the context size per model name, 4 096–2 000 000). Rule **M35**: `summarize` needs at least one context size and `keep_first` below `max_events`. The runner reads the setting from the effective configuration when the run starts, like the loop window (ADR-M42 §2.7).
+- **Which runs** (QUESTIONS #554): `condensingFor` (contracts) returns `summarize` with the limits only for the OpenHands adapter and a model with a size; `context_unknown` when the model has none (the run runs without a condenser: the platform never condenses with an unknown context size); `unsupported` for OpenCode, which keeps its own behaviour. Evaluation runs never condense, so their results stay comparable.
+- **The request** (AC3): `agent.condenser` is an `LLMSummarizingCondenser` whose `llm` is the agent's own `litellm_proxy/<model>`, LiteLLM URL and run virtual key, with `usage_id: condenser`. So the summary calls carry the key's seven labels, count against the run's budget and use a model in `allowed_models`, by construction. `max_size` = `max_events`, `keep_first`, and `max_tokens` = 75 % of the context size ([Proposal]: room for the system prompt, the tools and the reply). `agent.llm.max_input_tokens` = the context size. Without condensing, the body has neither field: it is the body before X11.
+- **Counts, never text** (AC3, QUESTIONS #551, #552): the condenser's three event kinds are not steps and not progress for loop detection (`events` leaves them out); `identicalCalls` counts only tool calls, so a condensation between two identical calls does not hide a loop. `getStatus` adds `condensations` and `eventsForgotten` (forgotten log events, without the `-summary` IDs). The log that `collectOutputs` hands over has each summary replaced by `summary: null`, `summary_sha256` and `summary_chars`. Run events: `agent_started.condensing` (left out when off) and `agent_finished.condensations`, `agent_finished.events_forgotten` (only when on). D-05 1.60.
+- **Default** (QUESTIONS #553): `off`, until Harry chooses from the numbers below.
+
+**Numbers (AC4).** `pnpm test:agent-real`, local Ollama `gpt-oss:20b` (`reasoning_effort` low, `num_ctx` 32768), the same task without and with condensing (`max_events` 24, `keep_first` 2, context 32768):
+
+| Run (2026-10-24, one run each) | Result | Time | Steps | Model calls | Input tokens | Output tokens | Largest call (input tokens) | Condensations (events forgotten) | Changed files | Cost (internal) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Without condensing | `finished` | 197 s | 24 | 25 | 172 504 | 1 044 | 7 829 | 0 | 9 of the 12 asked for | USD 0.017667 |
+| With condensing | `finished` | 292 s | 34 | 40 | 238 881 | 2 841 | 6 889 | 4 (58) | 12 | USD 0.025026 |
+
+- The short task (`hello.txt`) is unchanged: `finished`, 110 s, 3 steps, 17 862 input tokens, no condensation.
+- On this task the context never filled: the largest call without condensing was 7 829 tokens of 32 768. Condensing then costs more (+60 % model calls, +38 % input tokens, +48 % time: the summaries and the steps after them), and lowers the largest call by 12 %.
+- The run without condensing finished early (9 files of 12); the run with condensing did all 12. One run each, so this is not a measure of quality.
+- [Proposal] for the default (QUESTIONS #553): keep `off`, and turn on `summarize` per project for small local models on long tasks, with `max_events` well above 24 (for example the default 120), so that condensing starts only when a run is really long. Harry decides in the PR.
+
+**Tests.** `pnpm test`: `tests/agent/condensing.test.ts` (the request with and without condensing, `condensingFor`, counts, loop key through condensations, the log without summaries), `tests/config/context-condensing-config.test.ts` (rule M35, schema), `tests/run-contract/run-events.test.ts`. `pnpm test:db`: `agent-drive.test.ts` ("X11": the condenser from the configuration, `context_unknown`, no change when off, loop detection and the kill switch with condensing on). `pnpm test:agent` (`[stub:condense]`, `[stub:context]`, `[stub:condensecap]`, `[stub:condenseloop]`): condensing past `max_events` with the run key and a finished run; a stub model that answers `context_length_exceeded` past its context, and the run condenses and finishes; the iteration cap; loop detection after a condensation; no summary in run events or the handed-over log.
+
 ## 3. Rules and where they live
 
 | Rule | Source | Where |
@@ -141,6 +182,8 @@ These are technical settings, not handbook rules.
 | No public or user skills; AGENTS.md from the workspace | ADR-M29 §2.2 | Code (request builder). Not configurable |
 | Commit author names the agent | FR-11, QUESTIONS #80 | Code (`agentCommitAuthor`) |
 | Poll interval, stop grace period, runner container | Deployment | Runner settings §2.7 |
+| Context condensing: off or summarize, limits, context size per model; never with an unknown size | D-08 X11, QUESTIONS #395, #551–#554 | Config `run.context_condensing` (rule M35) → `condensingFor` → the request (§2.10). Default off |
+| The condenser uses the run's own model, URL and key; summaries never leave the adapter as text | X11 AC3, QUESTIONS #551 | Code (`condenserOf`, `withoutSummaries`). Not configurable |
 
 ## 4. Tests
 
@@ -185,3 +228,4 @@ These are technical settings, not handbook rules.
 | 0.3 | 2026-09-27 | Claude (task C05, session 2) | §2.9: the real-model run with a local Ollama model, the LiteLLM entry, reasoning effort and context at the gateway, `pnpm test:agent-real`; open items done |
 | 0.4 | 2026-10-06 | Claude (coordinator), approved by Harry | Open items: the API-model run before M-F (QUESTIONS #81) |
 | 0.5 | 2026-10-16 | Harry | Accepted (the design is built and merged; open items stay follow-ups) |
+| 0.6 | 2026-10-24 | Claude (task X11), approved by Harry in the X11 plan (QUESTIONS #551–#555) | §2.10: context condensing (what Agent Server 1.48.0 offers, the configuration, rule M35, the request, counts and summaries, the numbers); §3: two rows |

@@ -18,6 +18,10 @@ import type { EscalationRoute, ResponseLevel, SafeAction } from './escalation.js
  * How a gate is checked for one risk tier. `POLICY` = automatic policy check with no human
  * decision; allowed at G4 only (codes table §4 "Policy check", design/QUESTIONS.md #6).
  */
+/** X11 (ADR-M29 §2.10): `run.context_condensing.mode`. */
+export const CONTEXT_CONDENSING_MODES = ['off', 'summarize'] as const;
+export type ContextCondensingMode = (typeof CONTEXT_CONDENSING_MODES)[number];
+
 export type GateCheckMode = OversightMode | 'POLICY';
 
 export interface OversightCell {
@@ -169,6 +173,20 @@ export interface ProjectConfig {
     readonly kill_escalation: {
       readonly severity: Severity;
       readonly response_level: ResponseLevel;
+    };
+    /**
+     * X11 (ADR-M29 §2.10, QUESTIONS #551–#554): how an agent's context is condensed in a long run.
+     * `summarize`: the OpenHands condenser replaces old events with a summary made by the run's own
+     * model. Only for a model with a known context size (rule M35); otherwise the run has none.
+     */
+    readonly context_condensing: {
+      readonly mode: ContextCondensingMode;
+      /** Events in the model's view before a condensation (the condenser's `max_size`). */
+      readonly max_events: number;
+      /** Events kept at the start of the view (the task message). */
+      readonly keep_first: number;
+      /** Context size in tokens per model (`allowed_models` entries). */
+      readonly model_context_tokens: Readonly<Record<string, number>>;
     };
   };
   readonly budget: {

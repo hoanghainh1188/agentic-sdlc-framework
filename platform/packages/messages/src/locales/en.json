@@ -43,6 +43,8 @@
   "config.rule.budget_stop_max": "{path}: runs must stop at {maximum} % of the budget or earlier (rule {rule}, D-07 §6).",
   "config.rule.budget_warn_before_stop": "{path}: the budget warning must come before the stop (rule {rule}, D-07 §6).",
   "config.rule.loop_max": "{path}: loop detection must stop a run after at most {maximum} identical tool calls (rule {rule}, D-02 FR-35).",
+  "config.rule.condensing_context_unknown": "{path}: context condensing needs the context size of the run's model; without one it is never on (rule {rule}, D-08 X11).",
+  "config.rule.condensing_keep_first": "{path}: context condensing must keep at most {maximum} events at the start, fewer than run.context_condensing.max_events (rule {rule}).",
   "config.rule.loop_window_max": "{path}: loop detection must stop a run that makes no progress after at most {maximum} minutes (rule {rule}, D-02 FR-35).",
   "config.rule.recertification_max": "{path}: agents must be recertified at least every {maximum} months (rule {rule}, handbook Ch.20 §20.8).",
   "config.rule.calendar_min_working_days": "{path}: the calendar needs at least {minimum} working days per week; found {found}. Fewer days would stretch SLA clocks (rule {rule}, codes table §6.3).",

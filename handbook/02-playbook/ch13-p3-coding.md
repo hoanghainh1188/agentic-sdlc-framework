@@ -212,6 +212,24 @@ The platform checks G4 by itself when the intent reaches it, in this order:
 - <a id="budgets"></a>**The budgets** (this is the one description; other documents link here). An intent's budget is the `--budget` of `sdlc intent create`, otherwise the project setting `budget.default_intent_usd` (USD 10 by default). A run's budget is `budget.default_run_usd` (USD 2 by default), or the amount a G5 `resume` decision raised it to (§13.10.5). The tenant's month has its own budget too. Budgets only go up. The cost report shows what was spent (Chapter 19 §19.8c).
 - **The budget during a run.** The platform reads what the run has spent, about every 30 seconds. At the warning share of the run's limit (80 % by default, `budget.warn_percent`) it records a warning; at the stop share (100 %, `budget.stop_percent`) it stops the agent, and the run ends as stopped at its budget. The limit is the smallest of the run budget, what is left of the intent budget and what is left of the tenant's month. When the agent ends with an error, the platform reads the spend once more after about 25 seconds (LiteLLM shows the spend about 10 seconds late), so a run that ran out of budget is not reported as a technical failure.
 
+- <a id="context-condensing"></a>**Long runs and small models: context condensing** (task X11, `design/ADR-M29-openhands-adapter.md` §2.10). A model reads the whole run so far at every step. A long run can fill a small model's context (for example 32 768 tokens for a local model) and then fail. A project can turn on context condensing: when the run has more than a set number of events, fills 75 % of the model's context, or the model reports that its context is full, the agent replaces the older events with a short summary and continues. The setting is `run.context_condensing` in the project configuration:
+
+  ```yaml
+  run:
+    context_condensing:
+      mode: summarize          # default: off
+      max_events: 120          # events the model sees before a summary
+      keep_first: 2            # events always kept at the start (the task)
+      model_context_tokens:    # the context size of each model, in tokens
+        gpt-oss-20b: 32768
+  ```
+
+  - The summary is written by the run's own model, with the run's key: it counts against the run's budget, like every other call of the agent.
+  - The platform never condenses when it does not know the model's context size. Without a size for the run's model, the run runs without condensing (rule M35); `summarize` with no size at all is refused.
+  - Only OpenHands work runs condense. OpenCode agents keep their own behaviour; evaluation runs never condense, so their results stay comparable.
+  - The summaries contain the client's code and data. The platform records only counts: how many summaries, and how many events they replaced (the run event `agent_finished`). It never stores a summary's text.
+  - The limits stay the same: the iteration and time limits, the budget, loop detection and the kill switch work as without condensing. A summary is not a step.
+
 ### 13.10.5. Gate G5: scope and budget
 
 When the run ends at G5, the platform checks the run's result by itself, in this order. It uses what it computed outside the sandbox (the diff and the counts of §13.10.4) and the run's spend after the last cost check, never what the agent reports.
@@ -290,3 +308,4 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 | 0.13 | 2026-10-09 | Claude (task C13) | §13.10.4: taking an L1 proposal forward: `sdlc evidence proposal`, then the intent ends with a G4 rejection (ADR-M64) |
 | 0.12 | 2026-10-09 | Claude (docs review fixes) | `roll-back` is the decision's spelling (comments accept `roll_back` too; the CLI only `roll-back`); the header note points to Chapter 18 for the kill switch |
 | 0.11 | 2026-10-09 | Claude (docs review PR C2) | §13.10.2 check 6b: the one list of agent instruction files (only the exact pinned path is left out); §13.10.4: "The budgets", the one description with the default amounts (moved from ROLLOUT-GUIDE) |
+| 0.14 | 2026-10-24 | Claude (task X11) | §13.10.4: long runs and small models, context condensing (`run.context_condensing`, rule M35; ADR-M29 §2.10) |

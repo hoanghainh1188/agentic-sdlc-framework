@@ -14,6 +14,7 @@ import {
 } from '@sdlc/contracts';
 
 import { AgentServerClient, type ClientOptions, type ExecutionStatus } from './client.js';
+import { condensingCounts, progressEvents, withoutSummaries } from './condensing.js';
 import { trailingIdenticalCalls } from './loop.js';
 import { buildConversationRequest } from './request.js';
 
@@ -89,6 +90,7 @@ export class OpenHandsAdapter implements AgentAdapter {
       ...(input.tools === undefined
         ? {}
         : { tools: { url: input.tools.url, key: input.tools.key.reveal() } }),
+      ...(input.condensing === undefined ? {} : { condensing: input.condensing }),
     });
     const conversationId = await this.#client(input).startConversation(body);
     return {
@@ -106,8 +108,13 @@ export class OpenHandsAdapter implements AgentAdapter {
     // test), so the adapter reads the whole log and filters here.
     const events = await client.listEvents(handle.conversationId);
     const iterations = events.filter((event) => event.kind === STEP_EVENT).length;
-    // Loop detection (C11, ADR-M42 §2.7): counts only; the arguments never leave the adapter.
-    const progress = { events: events.length, identicalCalls: trailingIdenticalCalls(events) };
+    // Loop detection (C11, ADR-M42 §2.7): counts only; the arguments never leave the adapter. The
+    // condenser's events are not progress, and are not tool calls (X11, ADR-M29 §2.10).
+    const progress = {
+      events: progressEvents(events),
+      identicalCalls: trailingIdenticalCalls(events),
+      ...condensingCounts(events),
+    };
     const state = toAgentState(status, iterations);
     if (
       (state === 'error' || state === 'stopped') &&
@@ -155,7 +162,8 @@ export class OpenHandsAdapter implements AgentAdapter {
     const { headSha, changedFiles } = parseDiffOutput(diff.stdout);
     const events = await client.listEvents(handle.conversationId);
     const iterations = events.filter((event) => event.kind === STEP_EVENT).length;
-    return { changedFiles, headSha, iterations, events };
+    // X11 (QUESTIONS #551): the log leaves the adapter without summary text.
+    return { changedFiles, headSha, iterations, events: withoutSummaries(events) };
   }
 
   #gitTimeout(): number {
