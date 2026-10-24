@@ -367,6 +367,23 @@ Pull the model first on the machine (`ollama pull gpt-oss:20b`, a local tag, nev
 
 A model appears in LiteLLM only when its provider has a key in `kv/litellm/providers/`. The list of models is in `platform/deploy/litellm/config.ctmpl`. To add a model, change that file in a reviewed pull request: every model declares `provider_type` (`api` or `self_hosted`), and a self-hosted model declares a cost per token above 0, because LiteLLM skips budget checks for a model that costs 0 (`design/D-07-model-and-token-management.md` section 3). Then restart LiteLLM.
 
+### 5d.1. The self-hosted model (vLLM, Compose profile `models-local`)
+
+On a server with an NVIDIA GPU, the profile `models-local` runs vLLM (`design/ADR-M71-self-hosted-model-vllm.md`, task L01). Set-up of the host, the model settings and the weights: `platform/deploy/README.md` "Self-hosted model". vLLM has no key: it is on the internal network `models`, which only LiteLLM joins. Its provider entry holds two values, and neither is a secret:
+
+- `api_base`: `http://vllm:8000/v1`;
+- `model`: the served name, equal to `SDLC_VLLM_SERVED_NAME` in `.env` (for example `qwen3-coder-30b-a3b-instruct`). It is the name agents use as their model.
+
+Store it with an admin token, then restart the sidecar and LiteLLM:
+```bash
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env exec openbao \
+  sh -c 'read -rs BAO_TOKEN && export BAO_TOKEN && bao kv put -mount=kv litellm/providers/vllm api_base=http://vllm:8000/v1 model=qwen3-coder-30b-a3b-instruct'
+docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile models-local restart litellm-agent litellm
+```
+LiteLLM then serves the model as `self_hosted`, with an internal cost per token above 0 (a placeholder until task L03) and at most `SDLC_VLLM_MAX_NUM_SEQS` requests at a time. A `client_restricted` intent can use only this kind of model (`design/D-07-model-and-token-management.md` §4).
+
+To stop using the model, first suspend the agents whose model is the served name (handbook Ch.20 §20.9). Then delete the entry (`bao kv metadata delete -mount=kv litellm/providers/vllm`) and restart `litellm-agent` and `litellm`.
+
 ### Rotation
 
 | What | Steps |
@@ -985,6 +1002,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.40 | 2026-10-12 | Claude Code (docs review for v0.2.0) | Sections 3c and 3d are subsections of section 3, like 3.1 and 3.2 (heading level only; the links stay the same) |
 | 0.41 | 2026-10-22 | Claude Code (task X03, PR 3) | Section 5g: the OpenCode sandbox image `node24-opencode` and `sandbox.images.opencode`; troubleshooting: `image_not_configured`, `adapter_mismatch`, `adapter_unavailable` (ADR-M88) |
 | 0.42 | 2026-10-23 | Claude Code (task X04, PR 3a) | New section 5o: the worker's index of project documents in `knowledge-db` (profile `knowledge`), `kv/worker/knowledge-db`, `worker-knowledge-credentials`, rotation, retention and `knowledge.purged` (ADR-M89) |
+| 0.43 | 2026-10-24 | Claude Code (task L01, PR 1) | New section 5d.1: the provider entry `vllm` of the self-hosted model (profile `models-local`, ADR-M71); no key, two values that are not secrets |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |
 | 0.37 | 2026-10-12 | Claude Code (task V07, PR 2) | Sections 3c and 4: `pnpm doctor` shows the certificates' end dates and checks the platform after an unseal |

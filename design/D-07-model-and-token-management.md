@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Version | 0.7 |
-| Date | 2026-10-13 |
-| Status | **Approved** (Harry, 2026-09-24); 0.4 approved by Harry on 2026-09-27 in the C05 session 2 plan (Ollama on developer machines; QUESTIONS #78); 0.5 approved by Harry on 2026-10-06 (the trial M-E on the local model; QUESTIONS #81); 0.6 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); **0.7 proposed** in L02 PR 4 (§9: the first measurement of local models), for Harry's approval |
+| Version | 0.8 |
+| Date | 2026-10-24 |
+| Status | **Approved** (Harry, 2026-09-24); 0.4 approved by Harry on 2026-09-27 in the C05 session 2 plan (Ollama on developer machines; QUESTIONS #78); 0.5 approved by Harry on 2026-10-06 (the trial M-E on the local model; QUESTIONS #81); 0.6 approved by Harry on 2026-10-08 (citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged); **0.7 proposed** in L02 PR 4 (§9: the first measurement of local models), for Harry's approval; 0.8 approved by Harry on 2026-10-24 in the L01 plan (§3, §4, §9: vLLM in the profile `models-local`; QUESTIONS #546–#550; ADR-M71) |
 | Readers | Leadership (sections 1, 2, 7, 9), tech lead / architect (all) |
 | Related decisions | Fully self-hosted. Models: **both API and self-hosted** |
 
@@ -65,7 +65,7 @@ SVG version: [d9-token-flow-gateway.svg](../diagrams/svg/d9-token-flow-gateway.s
 |---|---|---|---|
 | LLM gateway | **LiteLLM Proxy** | Reuse (open source) | OpenAI-compatible gateway in front of 100+ providers. Virtual keys, spend tracking and budgets per key/team, rate limits, routing and fallback |
 | Self-hosted models (developer machines only) | **Ollama** (MIT), local tags only | Reuse | A local model on a developer's machine (for example `gpt-oss:20b`, Apache-2.0) proves the agent path without an API key (C05, QUESTIONS #78) and runs the trial M-E on the fictional sample repo (QUESTIONS #81). Never on the internal server (no GPU) and never an Ollama `:cloud` model (those send data to ollama.com). Same rules as any self-hosted model: through LiteLLM, `provider_type: self_hosted`, an internal cost above 0 |
-| Self-hosted models | **vLLM** | Reuse (Apache 2.0) | The most widely used serving engine, with an OpenAI-compatible API. Has prefix caching (reuses identical prompt prefixes) |
+| Self-hosted models | **vLLM** | Reuse (Apache 2.0) | The most widely used serving engine, with an OpenAI-compatible API. Has prefix caching (reuses identical prompt prefixes). Version 0.8 (L01, ADR-M71): the optional Compose profile `models-local` on the server's GPU, only reachable by LiteLLM; the model is a setting (`SDLC_VLLM_MODEL`, default a 30B-class Apache-2.0 coding model); LiteLLM entry `provider_type: self_hosted` with the same [Proposal] internal cost as the Ollama entry until L03; at most `SDLC_VLLM_MAX_NUM_SEQS` requests at a time (default 4) |
 | Observability | Langfuse + OpenTelemetry | Reuse | Chosen in D-01. WeKnora also integrates with Langfuse |
 | Cost Controller | **Build** (inside the Run Manager) | Build | Links cost to intent, run and gate G1–G8. The gateway does not know these concepts |
 | Cost reports | **Build** | Build | Reports per client, for selling the product later |
@@ -88,7 +88,7 @@ SVG version: [d9-token-flow-gateway.svg](../diagrams/svg/d9-token-flow-gateway.s
 |---|---|
 | `public`, `internal` | API or self-hosted |
 | `client_confidential` (client **allows** API use) | API (business account, data not used for training) or self-hosted |
-| `client_restricted` (client **does not allow** data to leave) | **Self-hosted only** (vLLM on company infrastructure; a developer's Ollama model is for fixtures, proofs and the trial M-E on the fictional sample repo only, never for client data) |
+| `client_restricted` (client **does not allow** data to leave) | **Self-hosted only** (vLLM on company infrastructure, the profile `models-local`, ADR-M71; a developer's Ollama model is for fixtures, proofs and the trial M-E on the fictional sample repo only, never for client data) |
 | `prohibited` | No model |
 
 Within the allowed set, route by difficulty:
@@ -227,7 +227,7 @@ What it shows, and what it does not:
 - A 20B model on a laptop resolves about two of three small, well-specified tasks, but not reliably: only one task in four is resolved every time. The easiest tasks (`feat-paging`, `feat-tax`) resolved 5 of 5; the hardest (`bug-order-number`) 1 of 5.
 - An 8B model of the `qwen3` family could not finish these tasks through OpenHands: it called the tools but got stuck. An earlier 7B coder model (`qwen2.5-coder`) made no tool call at all and ended after one reply. On 13 paired runs the difference to the 20B model is clear (McNemar p = 0.016), but the data of the 8B model covers 3 tasks only.
 - **Not measured, so no conclusion yet:** any model of about 30B or more (it does not fit this laptop), any API model, any GPU server, bigger tasks (screens, migrations, database tests), the effect of the prompt (`AGENTS.md`), and blind human preference. Eight tasks and 5 runs per task are few: the intervals are wide.
-- **For the GPU decision (task L03):** the first number is that a 20B-class model is usable for small tasks. Whether a larger model resolves more, and how much GPU memory and speed that needs, must still be measured on a larger machine (task L01 and a rented GPU are the way). The harness is ready for it: `pnpm eval` with a configuration file.
+- **For the GPU decision (task L03):** the first number is that a 20B-class model is usable for small tasks. Whether a larger model resolves more, and how much GPU memory and speed that needs, must still be measured on a larger machine (task L01 and a rented GPU are the way). The harness is ready for it: `pnpm eval` with a configuration file. Version 0.8: L01 (ADR-M71) gives the vLLM service for that measurement; L03 turns the numbers into the GPU decision.
 
 ### Questions for leadership
 
@@ -267,3 +267,4 @@ Note: prices and features change often. Check again before budgeting.
 | 0.5 | 2026-10-06 | Claude (coordinator), approved by Harry | §3, §4: the trial M-E runs with the local Ollama model on the fictional sample repo; the API-model run moves to before M-F (QUESTIONS #81) |
 | 0.6 | 2026-10-08 | Claude (coordinator), approved by Harry | Sources: citations of an unpublished earlier draft removed before the repository goes public; meaning unchanged |
 | 0.7 | 2026-10-13 | Claude (task L02, PR 4), for Harry's approval | §9: the first measurement of local models (`gpt-oss:20b` 68% resolved on 40 runs; `qwen3:8b` 0% on 13 runs, evaluation stopped) from the harness of ADR-M78 (QUESTIONS #447) |
+| 0.8 | 2026-10-24 | Claude (task L01, PR 1), approved by Harry in the L01 plan | §3: vLLM in the optional profile `models-local` (ADR-M71); §4: `client_restricted` uses it; §9: L01 is the way to measure larger models (QUESTIONS #546–#550) |

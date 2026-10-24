@@ -6,7 +6,8 @@
 // OpenBao is initialised, unsealed and configured with the bootstrap script; the LiteLLM sidecar
 // gets its AppRole credentials from `bootstrap.sh litellm-credentials`. A stub model
 // (stub-model.mjs) stands in for a provider and answers only with the throw-away provider key the
-// test stores in OpenBao. Key shares, tokens and keys are THROW-AWAY TEST KEYS: kept in variables
+// test stores in OpenBao. L01 (ADR-M71 §2.4): a second stub stands in for vLLM on the internal
+// network `models` (alias `vllm`, no key), behind the production `vllm` entry. Key shares, tokens and keys are THROW-AWAY TEST KEYS: kept in variables
 // of this process, never printed, never part of an assertion message (errors go through redact()).
 import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -15,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { LiteLLMGateway, LiteLLMKeySpendReader } from '@sdlc/adapter-model-litellm';
-import { COST_LABEL_NAMES } from '@sdlc/contracts';
+import { COST_LABEL_NAMES, type DataClass } from '@sdlc/contracts';
 import { Redacted } from '@sdlc/secrets';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -25,7 +26,9 @@ import { migrateToLatest } from '../../../packages/core/src/db/migrator.js';
 import { PlatformDatabase } from '../../../packages/core/src/db/platform-database.js';
 import { deployDir, parseEnvFile, root } from '../../deploy/compose';
 import { issueRun, seedRun, type SeededRun } from '../cost-seed';
+import { engineFor } from '../../policy/helpers';
 import { isolateEnv } from '../throwaway-compose';
+import { vllmStubArgs } from './vllm-stub';
 
 const enabled = process.env.SDLC_LITELLM_TEST === '1';
 const HERE = path.join(root, 'platform/tests/integration/litellm');
@@ -36,6 +39,8 @@ const TEST_TIMEOUT_MS = 3 * 60 * 1000;
 const NODE_IMAGE =
   'node:24.21.0-alpine3.23@sha256:9ec4a2e289874ed0d722e1772ec2de45d2801541db8612f3638b26f128c69ac2';
 const MODEL = 'stub-model';
+// L01: the served name of the stub that stands in for vLLM (the field `model` of the vllm entry).
+const SELF_HOSTED = 'stub-vllm-model-v1';
 // stub-model.mjs: 1000 input tokens (200 of them cached) and 100 output tokens per call, at the
 // stub's prices in config.test.ctmpl. The stub has no cache price, so since LiteLLM v1.104.0 the
 // cached tokens cost the normal input price (ADR-M24 §2.2): 1000 × 0.000001 + 100 × 0.000002.
@@ -62,6 +67,7 @@ describe.skipIf(!enabled)(
     const subnet = `172.30.${200 + (process.pid % 25)}.0/24`;
     const gatewayIp = subnet.replace(/0\/24$/, '1');
     const stubName = `${project}-stub`;
+    const vllmStubName = `${project}-vllm-stub`;
     const bootstrap = path.join(deployDir, 'openbao/bootstrap.sh');
     const litellmUrl = `http://127.0.0.1:${4000 + PORT_OFFSET}`;
     const now = new Date();
@@ -166,10 +172,11 @@ describe.skipIf(!enabled)(
     async function callUntilBlocked(
       key: string,
       max: number,
+      model = MODEL,
     ): Promise<(number | typeof BUDGET_BLOCKED)[]> {
       const statuses: (number | typeof BUDGET_BLOCKED)[] = [];
       for (let i = 0; i < max; i++) {
-        const status = await chat(key);
+        const status = await chat(key, model);
         statuses.push(status);
         if (status === BUDGET_BLOCKED) break;
         // LiteLLM updates spend asynchronously; give it a moment between calls (QUESTIONS #14).
@@ -179,8 +186,14 @@ describe.skipIf(!enabled)(
     }
 
     const seed = (
-      options: { monthly?: string | null; intentBudget?: string; runBudget?: string } = {},
-    ) => seedRun(db, { ...options, slug: `lit-${String(++tenantCount)}`, models: [MODEL], now });
+      options: {
+        monthly?: string | null;
+        intentBudget?: string;
+        runBudget?: string;
+        models?: string[];
+        dataClass?: DataClass;
+      } = {},
+    ) => seedRun(db, { models: [MODEL], ...options, slug: `lit-${String(++tenantCount)}`, now });
 
     const issue = (s: SeededRun, runId = s.runId) =>
       controller.issueRunKey({
@@ -237,7 +250,9 @@ describe.skipIf(!enabled)(
         'IFS= read -r m; IFS= read -r s; IFS= read -r p; ' +
           'printf %s "$m" | bao kv put -mount=kv cost-controller/litellm-master-key value=- >/dev/null && ' +
           'printf %s "$s" | bao kv put -mount=kv litellm/salt-key value=- >/dev/null && ' +
-          'printf %s "$p" | bao kv put -mount=kv litellm/providers/stub api_key=- >/dev/null',
+          'printf %s "$p" | bao kv put -mount=kv litellm/providers/stub api_key=- >/dev/null && ' +
+          // L01: the vllm entry as on a server (runbook T11 §5d.1); no key.
+          `bao kv put -mount=kv litellm/providers/vllm api_base=http://vllm:8000/v1 model=${SELF_HOSTED} >/dev/null`,
         `${masterKey}\n${saltKey}\n${providerKey}\n`,
       );
       ok(bootstrapCmd(['litellm-credentials'], `${rootToken}\n`), 'litellm-credentials');
@@ -288,6 +303,20 @@ describe.skipIf(!enabled)(
         ),
         'compose up litellm with the profile models',
       );
+      // L01: the stub for vLLM, on the internal network `models` that LiteLLM joined (alias vllm,
+      // port 8000, no key). Started after LiteLLM, as vllm may start after it on a server.
+      ok(
+        run(
+          'docker',
+          vllmStubArgs(
+            vllmStubName,
+            `${project}-models`,
+            path.join(HERE, 'stub-model.mjs'),
+            NODE_IMAGE,
+          ),
+        ),
+        'start the vllm stub',
+      );
 
       // Platform database: migrate as the owner, work as platform_app.
       const pgUrl = (user: string, password: string) =>
@@ -309,7 +338,7 @@ describe.skipIf(!enabled)(
 
     afterAll(async () => {
       await db?.close();
-      run('docker', ['rm', '-f', stubName]);
+      run('docker', ['rm', '-f', stubName, vllmStubName]);
       compose(
         '',
         '--profile',
@@ -326,7 +355,11 @@ describe.skipIf(!enabled)(
     describe('AC1: provider keys, master key and salt key come from OpenBao only', () => {
       it('LiteLLM serves the stub model, whose provider key exists only in OpenBao', async () => {
         const models = await gateway.listModels();
-        expect(models).toEqual([{ model: MODEL, providerType: 'api' }]);
+        expect(models).toEqual([
+          { model: MODEL, providerType: 'api' },
+          // L01: the vllm entry (ADR-M71 §2.3).
+          { model: SELF_HOSTED, providerType: 'self_hosted' },
+        ]);
         // A call succeeds only when LiteLLM sends the provider key it got from the sidecar.
         const s = await seed();
         const issued = await issue(s);
@@ -680,6 +713,43 @@ describe.skipIf(!enabled)(
         expect(again.inserted).toBe(0);
         expect(await s.scope.costRecords.listForRun(s.runId)).toHaveLength(2);
         expect(await s.scope.costRecords.totalForIntent(s.intentId)).toBe('0.002400');
+      });
+    });
+
+    describe('L01 AC4: a client_restricted intent runs on the self-hosted model (ADR-M71 §2.4)', () => {
+      it('routing gives it only the self-hosted model; a labelled call works and is costed', async () => {
+        const listed = await gateway.listModels();
+        const allowed = engineFor('', listed).allowedModels({ dataClass: 'client_restricted' });
+        expect(allowed).toEqual([SELF_HOSTED]);
+
+        const s = await seed({ models: allowed, dataClass: 'client_restricted' });
+        const issued = await issue(s);
+        expect(issued.labels.data_class).toBe('client_restricted');
+        // The API model is not on the key: refused (D-07 §4).
+        expect(await chat(issued.key.key.reveal(), MODEL)).not.toBe(200);
+        expect(await chat(issued.key.key.reveal(), SELF_HOSTED)).toBe(200);
+        const [row] = await syncUntil(s, s.runId, 1);
+        expect(row).toMatchObject({
+          run_id: s.runId,
+          model: SELF_HOSTED,
+          provider_type: 'self_hosted',
+          input_tokens: '1000',
+          output_tokens: '100',
+        });
+        // The internal cost: 1000 × 0.0000001 + 100 × 0.0000004 (QUESTIONS #548).
+        expect(Number(row!.cost_usd)).toBeCloseTo(0.00014, 6);
+      });
+
+      it('the run budget still stops the self-hosted model (cost above 0, D-07 §3)', async () => {
+        const s = await seed({
+          models: [SELF_HOSTED],
+          dataClass: 'client_restricted',
+          runBudget: '0.0003',
+        });
+        const issued = await issue(s);
+        const statuses = await callUntilBlocked(issued.key.key.reveal(), 12, SELF_HOSTED);
+        expect(statuses.at(-1)).toBe(BUDGET_BLOCKED);
+        expect(statuses.filter((x) => x === 200).length).toBeLessThanOrEqual(4);
       });
     });
 

@@ -66,6 +66,25 @@ model_list:
       mode: embedding
 {{- end }}
 {{- end }}
+{{- if in $providers "vllm" }}
+{{- with secret "kv/data/litellm/providers/vllm" }}
+  # L01 (ADR-M71 §2.3): the self-hosted vLLM of the Compose profile models-local, on the server's
+  # GPU. Not a secret: field api_base (http://vllm:8000/v1, the internal network `models`) and
+  # field model (= SDLC_VLLM_SERVED_NAME, the agent register's model_ref, with its version). No key:
+  # only LiteLLM can reach vllm. At most SDLC_VLLM_MAX_NUM_SEQS requests at a time, the same limit
+  # as vLLM's --max-num-seqs; rendering fails if it is not a number. Internal cost above 0 so
+  # budgets still apply (D-07 section 3); [Proposal] the Ollama placeholder until L03.
+  - model_name: {{ .Data.data.model | toJSON }}
+    litellm_params:
+      model: {{ printf "hosted_vllm/%s" .Data.data.model | toJSON }}
+      api_base: {{ .Data.data.api_base | toJSON }}
+      max_parallel_requests: {{ or (env "SDLC_VLLM_MAX_NUM_SEQS") "4" | parseInt }}
+      input_cost_per_token: 0.0000001
+      output_cost_per_token: 0.0000004
+    model_info:
+      provider_type: self_hosted
+{{- end }}
+{{- end }}
 general_settings:
 {{- with secret "kv/data/cost-controller/litellm-master-key" }}
   master_key: {{ .Data.data.value | toJSON }}

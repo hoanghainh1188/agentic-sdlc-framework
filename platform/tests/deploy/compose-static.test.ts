@@ -54,6 +54,7 @@ const JOBS = [
   'seaweedfs-init',
   'temporal-namespace',
   'temporal-schema',
+  'vllm-pull',
 ];
 
 function createdDatabases(): string[] {
@@ -180,10 +181,12 @@ describe('AC3: healthchecks and pinned images', () => {
       expect(tag, `${name}: ${full}`).toMatch(exact);
       // ADR-M17 pins by tag until Dependabot keeps digests current. The runner's services are
       // pinned by tag AND digest (ADR-M25 §2.5, §2.9, §2.10; QUESTIONS #54).
-      // The team access proxy (V09, ADR-M67 §2.1) and knowledge-db (X04 PR 3a, ADR-M89 §2.1) too.
+      // The team access proxy (V09, ADR-M67 §2.1), knowledge-db (X04 PR 3a, ADR-M89 §2.1) and vLLM
+      // (L01, ADR-M71 §2.1) too.
       const byDigest =
-        ['sandbox', 'access', 'knowledge'].some((p) => (s.profiles ?? []).includes(p)) &&
-        !built.includes(name);
+        ['sandbox', 'access', 'knowledge', 'models-local', 'models-local-pull'].some((p) =>
+          (s.profiles ?? []).includes(p),
+        ) && !built.includes(name);
       if (byDigest) expect(digest, `${name} digest`).toMatch(/^sha256:[0-9a-f]{64}$/);
       else expect(digest, `${name} digest`).toBeUndefined();
     }

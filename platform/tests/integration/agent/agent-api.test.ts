@@ -16,6 +16,12 @@
 // Settings: SDLC_AGENT_API_LITELLM_URL (default http://127.0.0.1:4000), SDLC_AGENT_API_LITELLM_CONTAINER
 // (default: the running Compose service `litellm`), SDLC_SANDBOX_IMAGE (skips the node24 build),
 // SDLC_AGENT_API_REPORT (a file that receives the numbers as JSON: time, calls, tokens, cost).
+//
+// L01 (ADR-M71 §2.4, QUESTIONS #550): SDLC_AGENT_API_MODEL (default `claude-haiku-4-5-20251001`)
+// and SDLC_AGENT_API_DATA_CLASS (default `internal`) run the same test with another model of the
+// dev stack, for example the self-hosted vLLM model (`pnpm compose:models-local`) or the Ollama
+// model `gpt-oss-20b` with `client_restricted`. Then the model must be `self_hosted` and the
+// only kind the policy allows for that data class.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -23,7 +29,7 @@ import path from 'node:path';
 
 import { OpenHandsAdapter } from '@sdlc/adapter-agent-openhands';
 import { LiteLLMGateway } from '@sdlc/adapter-model-litellm';
-import { COST_LABEL_NAMES } from '@sdlc/contracts';
+import { COST_LABEL_NAMES, DATA_CLASSES, type DataClass } from '@sdlc/contracts';
 import { Redacted } from '@sdlc/secrets';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -35,6 +41,7 @@ import {
   type AgentDriveDeps,
 } from '../../../apps/runner/src/index.js';
 import { CostController } from '../../../packages/core/src/cost/index.js';
+import { engineFor } from '../../policy/helpers';
 import { createTestDatabase, type TestDatabase } from '../db/helpers.js';
 import { docker, dockerSocket, quietly } from '../runner/live-helpers';
 import { buildSandboxImage } from '../sandbox-image/helpers';
@@ -43,7 +50,14 @@ import { readRenderedMasterKey } from './litellm-master-key';
 
 const enabled = process.env.SDLC_AGENT_API_TEST === '1' && !!process.env.SDLC_TEST_DATABASE_URL;
 /** The gateway name of the Anthropic entry in config.ctmpl (QUESTIONS #93: it carries the version). */
-const MODEL = 'claude-haiku-4-5-20251001';
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+// L01: another model of the dev stack. Kept apart from the literal above: Gitleaks' generic
+// rule reads a long literal next to a name with "API" in it as a key.
+const MODEL = process.env.SDLC_AGENT_API_MODEL || DEFAULT_MODEL;
+const DATA_CLASS = (process.env.SDLC_AGENT_API_DATA_CLASS || 'internal') as DataClass;
+if (!(DATA_CLASSES as readonly string[]).includes(DATA_CLASS)) {
+  throw new Error('SDLC_AGENT_API_DATA_CLASS is not a data class');
+}
 const BUDGET_CAP_USD = 1;
 const RUN_TIMEOUT_MS = 30 * 60_000;
 const LITELLM_URL = process.env.SDLC_AGENT_API_LITELLM_URL ?? 'http://127.0.0.1:4000';
@@ -74,13 +88,14 @@ function litellmContainer(): string {
   return found[0]!;
 }
 
-describe.skipIf(!enabled)(`E07 AC4: a real run with the API model ${MODEL} (QUESTIONS #81)`, () => {
+describe.skipIf(!enabled)(`E07 AC4, L01 AC4: a real run with ${MODEL} (${DATA_CLASS})`, () => {
   let t: TestDatabase;
   let image: string;
   let client: DockerClient;
   let controller: CostController;
   let gateway: LiteLLMGateway;
   let container = '';
+  let providerType = '';
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-e07-api-'));
 
   beforeAll(async () => {
@@ -90,11 +105,14 @@ describe.skipIf(!enabled)(`E07 AC4: a real run with the API model ${MODEL} (QUES
       masterKey: readRenderedMasterKey(container),
       timeoutMs: 60_000,
     });
-    // The API model is served only when its provider key is in OpenBao (T11 §5d).
-    expect(
-      await gateway.listModels(),
-      `${MODEL} is not served: store the key (T11 §5d)`,
-    ).toContainEqual({ model: MODEL, providerType: 'api' });
+    // A model is served only when its provider entry is in OpenBao (T11 §5d, §5d.1).
+    const listed = await gateway.listModels();
+    const served = listed.find((m) => m.model === MODEL);
+    expect(served, `${MODEL} is not served: store its entry (T11 §5d)`).toBeDefined();
+    providerType = served!.providerType;
+    // L01: the policy routes the intent's data class to this model (D-07 §4).
+    expect(engineFor('', listed).allowedModels({ dataClass: DATA_CLASS })).toContain(MODEL);
+    if (DATA_CLASS === 'client_restricted') expect(providerType).toBe('self_hosted');
     t = await createTestDatabase();
     image = process.env.SDLC_SANDBOX_IMAGE || (await buildSandboxImage(registryName));
     client = new DockerClient({ socketPath: dockerSocket(), timeoutMs: 120_000 });
@@ -123,6 +141,7 @@ describe.skipIf(!enabled)(`E07 AC4: a real run with the API model ${MODEL} (QUES
         slug: `e07-api-${suffix}`,
         litellmContainer: container,
         model: MODEL,
+        dataClass: DATA_CLASS,
         planSummary: 'Create the file hello.txt in the repository root, as the specification says.',
         specText:
           '# T01 Hello file\n\n## Acceptance criteria\n\n- AC1: the file `hello.txt` exists in the repository root.\n- AC2: its content is exactly one line: `Hello from the platform.`\n',
@@ -227,12 +246,17 @@ describe.skipIf(!enabled)(`E07 AC4: a real run with the API model ${MODEL} (QUES
         expect(records).toHaveLength(logged.length);
         for (const r of logged) {
           for (const name of COST_LABEL_NAMES) expect(r.labels[name], name).toBeTruthy();
-          expect(r.labels).toMatchObject({ run_id: runId, gate: 'G4', agent: 'coder-openhands' });
+          expect(r.labels).toMatchObject({
+            run_id: runId,
+            gate: 'G4',
+            agent: 'coder-openhands',
+            data_class: DATA_CLASS,
+          });
           expect(Number(r.costUsd)).toBeGreaterThan(0);
           expect(r.model).toBe(MODEL);
         }
         for (const r of records) {
-          expect(r).toMatchObject({ run_id: runId, model: MODEL, provider_type: 'api' });
+          expect(r).toMatchObject({ run_id: runId, model: MODEL, provider_type: providerType });
         }
         // The key is revoked: LiteLLM refuses it now.
         const after = await fetch(`${LITELLM_URL}/v1/chat/completions`, {

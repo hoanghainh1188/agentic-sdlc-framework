@@ -5,6 +5,7 @@
 #   e.g. up.sh core
 #        up.sh core observability
 #        up.sh core models platform access   (team access, V09: README "Team access")
+#        up.sh core models models-local      (self-hosted model, L01: README "Self-hosted model")
 #
 # Environment:
 #   SDLC_ENV_FILE      env file (default: platform/deploy/.env, created by init-env.sh)
@@ -17,7 +18,7 @@
 set -eu
 
 # One-shot jobs (restart: "no"). A static test keeps this list in sync with docker-compose.yml.
-JOBS="backup-agent openbao-tls-init temporal-schema temporal-namespace seaweedfs-init access-tls-init"
+JOBS="backup-agent openbao-tls-init temporal-schema temporal-namespace seaweedfs-init access-tls-init vllm-pull"
 
 [ "$#" -gt 0 ] || { echo "usage: $0 <profile>..." >&2; exit 2; }
 
