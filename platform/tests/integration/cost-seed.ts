@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
-import type { RunContractSigner } from '@sdlc/contracts';
+import type { DataClass, RunContractSigner } from '@sdlc/contracts';
 
 import type { PlatformDatabase } from '../../packages/core/src/db/platform-database.js';
 import { parseTenantId } from '../../packages/core/src/db/tenant-id.js';
@@ -20,6 +20,8 @@ export interface SeedOptions {
   readonly runBudget?: string;
   readonly models: readonly string[];
   readonly now: Date;
+  /** The intent's data class. Default `internal`. */
+  readonly dataClass?: DataClass;
 }
 
 export interface SeededRun {
@@ -67,7 +69,7 @@ export async function seedRun(db: PlatformDatabase, options: SeedOptions): Promi
     title: 'Add Japanese labels',
     createdBy: personA,
     riskTier: 'low',
-    dataClass: 'internal',
+    dataClass: options.dataClass ?? 'internal',
     budgetUsd: options.intentBudget ?? '10',
   });
   const plan = await registry.submitPlan(scope, intent.id, {

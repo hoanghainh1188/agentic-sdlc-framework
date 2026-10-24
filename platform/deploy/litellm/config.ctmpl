@@ -11,6 +11,8 @@
     self-hosted model must declare an internal cost per token above 0: with cost 0, LiteLLM
     skips budget checks (D-07 section 3).
   - Adding a model: add an entry below inside "if in $providers ...", then restart LiteLLM.
+  - Self-hosted vLLM (L01, ADR-M71): the provider entry vllm holds the address and the served
+    model name, no key; the sidecar's SDLC_VLLM_MAX_NUM_SEQS is the limit of requests at a time.
   - Tracing (A08, design/ADR-M35 §2.4): when the sidecar has SDLC_OTEL_ENDPOINT (up.sh sets it with
     the profile observability), LiteLLM's langfuse_otel callback sends one span per model call to
     the OpenTelemetry Collector, which forwards it to Langfuse v4. LiteLLM holds no Langfuse key.
@@ -61,6 +63,25 @@ model_list:
     model_info:
       provider_type: self_hosted
       mode: embedding
+{{- end }}
+{{- end }}
+{{- if in $providers "vllm" }}
+{{- with secret "kv/data/litellm/providers/vllm" }}
+  # L01 (ADR-M71 §2.3): the self-hosted vLLM of the Compose profile models-local, on the server's
+  # GPU. Not a secret: field api_base (http://vllm:8000/v1, the internal network `models`) and
+  # field model (= SDLC_VLLM_SERVED_NAME, the agent register's model_ref, with its version). No key:
+  # only LiteLLM can reach vllm. At most SDLC_VLLM_MAX_NUM_SEQS requests at a time, the same limit
+  # as vLLM's --max-num-seqs; rendering fails if it is not a number. Internal cost above 0 so
+  # budgets still apply (D-07 section 3); [Proposal] the Ollama placeholder until L03.
+  - model_name: {{ .Data.data.model | toJSON }}
+    litellm_params:
+      model: {{ printf "hosted_vllm/%s" .Data.data.model | toJSON }}
+      api_base: {{ .Data.data.api_base | toJSON }}
+      max_parallel_requests: {{ or (env "SDLC_VLLM_MAX_NUM_SEQS") "4" | parseInt }}
+      input_cost_per_token: 0.0000001
+      output_cost_per_token: 0.0000004
+    model_info:
+      provider_type: self_hosted
 {{- end }}
 {{- end }}
 general_settings:

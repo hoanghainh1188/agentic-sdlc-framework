@@ -1383,7 +1383,7 @@ flowchart LR
 - [ ] AC3: D-03 §10.1 and D-07 changed and ADR-M71 written first (today: "API models only, no GPU"); runbook T11 and the deploy README
 - [ ] AC4: A `client_restricted` project runs an agent end to end with the self-hosted model (stub or real)
 
-> Note: QUESTIONS #362 (Harry, 2026-10-10): milestone Models after EXT; earlier when the company has a GPU
+> Note: QUESTIONS #362 (Harry, 2026-10-10): milestone Models after EXT; earlier when the company has a GPU. QUESTIONS #546 (Harry, 2026-10-24): two PRs; PR 1 the GPU in the platform server (internal network `models`, no port; AC1 for the server, AC2–AC4); PR 2 a separate GPU host with mutual TLS through a pinned nginx link (vLLM's `--api-key` leaves `/invocations` open; LiteLLM cannot present a client certificate). QUESTIONS #547–#550: ADR-M71
 
 #### L03. GPU sizing note for leadership
 

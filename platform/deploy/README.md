@@ -11,6 +11,7 @@ This folder runs the infrastructure that the platform reuses, on one server, wit
 | `models` | `litellm-agent`: a sidecar (a helper container next to LiteLLM) that reads LiteLLM's model provider keys, master key and salt key from OpenBao and writes its configuration ([ADR-M24](../../design/ADR-M24-litellm-cost-controller.md)) | **Always on the server** (`pnpm compose:models`). Needs OpenBao unsealed and configured and the sidecar's credentials (runbook T11 §5d). Without it, LiteLLM has no models and uses the development keys from `.env` |
 | `platform` | `sdlc-api`: the REST API and the dashboard ([ADR-M26](../../design/ADR-M26-api-app.md)); `sdlc-worker`: the GitHub poller, the intent workflow, the escalation clocks and the retention loop ([ADR-M27](../../design/ADR-M27-github-poller.md), [ADR-M30](../../design/ADR-M30-intent-workflow.md)). Both built from this repository | With `core` (`pnpm compose:platform`). Needs OpenBao unsealed and configured, `pnpm openbao:bootstrap api-credentials` and `worker-credentials` first, and the GitHub App key stored (runbook T11 §5b, §5e, §5f) |
 | `knowledge` | `knowledge-db`: a PostgreSQL with pgvector of its own for the index of project documents, the first register tool ([ADR-M89](../../design/ADR-M89-project-docs-index.md)). Never the platform's database; no host port | Optional (`pnpm compose:knowledge`). Needed only by plans with a `read_documents` tool. Then `pnpm openbao:bootstrap worker-knowledge-credentials` (runbook T11 §5o) and restart `sdlc-worker` |
+| `models-local` | `vllm`: a self-hosted model service (vLLM) on the server's GPU, reached only by LiteLLM ([ADR-M71](../../design/ADR-M71-self-hosted-model-vllm.md)). One-shot `vllm-pull` (profile `models-local-pull`) downloads the weights once | Optional, **only on a server with an NVIDIA GPU** (`pnpm compose:models-local`). Needs the profile `models`, the weights (`pnpm models-local:pull`) and the provider entry `vllm` (runbook T11 §5d.1). See [Self-hosted model](#self-hosted-model-operator) |
 | `sandbox` | `sdlc-runner` (built from this repository; runs the agent sandboxes), `docker-socket-proxy` (the runner's only way to Docker), `npm-proxy` (Verdaccio: npm packages for the sandboxes), `registry` (sandbox images, 127.0.0.1 only) ([ADR-M25](../../design/ADR-M25-runner-sandbox.md)) | With `core` (`pnpm compose:sandbox`). Needs OpenBao unsealed and configured, `SDLC_DOCKER_GID` right and `pnpm openbao:bootstrap runner-credentials` first (runbook T11 §5g) |
 
 Three one-shot jobs run at every start and then exit: `temporal-schema` (creates or upgrades the Temporal schemas), `temporal-namespace` (creates the namespace) and `seaweedfs-init` (creates the `evidence` and `langfuse` buckets). All three are safe to re-run.
@@ -30,7 +31,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 | Host | One internal Linux server (or VM) with Docker Engine and Docker Compose. Docker Desktop on a laptop is for development and the trial only |
 | Network | Outbound HTTPS only: to GitHub, the model providers, the npm registry and the image registries ([Network and data flows](#network-and-data-flows)). No inbound connection from the internet: the platform polls GitHub and needs no webhook |
 | Size | See [Resource estimate](#resource-estimate): about 3 GiB RAM and 2 vCPU for `core`, 6 GiB and 4 vCPU with `observability`, plus up to 2 GiB per running sandbox. Estimates only, not measured on a server yet (A10) |
-| GPU | Not needed with API models. Only for a self-hosted model on the same machine (D-07 §3) |
+| GPU | Not needed with API models. Only for a self-hosted model on the same machine (D-07 §3): the profile `models-local`, an NVIDIA GPU with the NVIDIA Container Toolkit ([Self-hosted model](#self-hosted-model-operator)) |
 | Sandboxes | 1 by default (`SDLC_RUNNER_MAX_SANDBOXES`); 2 on a larger server. Evaluation runs use free slots only, at most `SDLC_RUNNER_MAX_EVAL_SANDBOXES` (default 1, never above the line before; 0 turns them off) and give a slot back to a real run that waits |
 | The runner | In its own VM or with rootless Docker, because it controls Docker (ADR-M25 §2.5). Not yet done (A10) |
 | OpenBao | TLS on port 8200 runs everywhere (A10); on the server the certificate comes from the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Three named key holders before any real secret or client data (runbook T11 §3.2): not yet done (A10) |
@@ -333,6 +334,7 @@ pnpm compose:models  # core + models: LiteLLM with keys from OpenBao (the server
 pnpm compose:platform # core + platform: the API (sdlc-api) and the worker (sdlc-worker; runbook T11 §5e, §5f)
 pnpm compose:sandbox # core + sandbox: the runner, socket proxy, npm proxy, image registry (runbook T11 §5g)
 pnpm compose:knowledge # core + knowledge: knowledge-db, the index of project documents (runbook T11 §5o)
+pnpm compose:models-local # core + models + models-local: vLLM on the server's GPU (Self-hosted model below)
 pnpm compose:down    # stops everything; data volumes are kept
 ```
 
@@ -421,7 +423,7 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`), except th
 | Team access proxy (`sdlc-access`) | 8443 | `access` profile only. **The only port on another address**: `SDLC_ACCESS_BIND_ADDR`, the server's LAN address ([Team access](#team-access-operator)); without it the profile does not start |
 | Sandbox image registry | 5050 | `sandbox` profile only. **Always 127.0.0.1** (not `SDLC_BIND_ADDR`): it has no authentication. Not 5000: macOS uses it |
 
-Valkey, ClickHouse, the Langfuse worker, the OpenTelemetry Collector, **OpenBao**, the runner, the socket proxy and the npm proxy publish no port.
+Valkey, ClickHouse, the Langfuse worker, the OpenTelemetry Collector, **OpenBao**, the runner, the socket proxy, the npm proxy and `vllm` publish no port.
 
 OpenBao is reachable only on the Compose network (`design/QUESTIONS.md` #27, task A11). The platform processes run in Compose and use `https://openbao:8200`, verified with the CA of the volume `openbao-ca` (TLS since A10, [T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Key holders and admins work inside the container with `pnpm openbao:bootstrap …` or `docker compose … exec openbao …` (runbook T11). There is no host port for `curl`.
 
@@ -446,6 +448,8 @@ What leaves the server, and what stays on it. The data classes and which models 
 | Secrets and keys | OpenBao | Until rotated |
 
 Comes in: with the profile `access` only, HTTPS from the company LAN to the proxy's port (the API and the dashboard; [Team access](#team-access-operator)). Nothing else accepts a connection from another machine.
+
+With the profile `models-local`, prompts to the self-hosted model never leave the server: `vllm` is on the internal network `models` with LiteLLM only, with no route to the internet. Only `vllm-pull` goes out (to Hugging Face), once, when an operator runs it, and sends nothing but the download request.
 
 Sandboxes reach only LiteLLM and the package proxy; never GitHub, OpenBao or the internet. The platform keeps no working copy of the code: clones are removed when a run ends.
 
@@ -604,6 +608,37 @@ Design: [ADR-M85](../../design/ADR-M85-project-task-sets.md); usage: handbook Ch
 
 **Logs.** `worker.task_check_handed_over`, `worker.task_check_requeued`, `worker.task_check_refused` and `worker.task_check_failed` (codes and IDs only). The task's status and check code are in `sdlc eval task list`.
 
+## Self-hosted model (operator)
+
+The profile `models-local` runs a self-hosted model with vLLM on the server's own GPU ([ADR-M71](../../design/ADR-M71-self-hosted-model-vllm.md), task L01). A `client_restricted` intent may use only a self-hosted model ([D-07 §4](../../design/D-07-model-and-token-management.md)). The profile is off by default; a server without a GPU never starts it. A GPU on another machine comes later (L01 PR 2).
+
+### What it does
+
+- `vllm` (image `vllm/vllm-openai`, pinned by tag and digest) serves one model, named `SDLC_VLLM_SERVED_NAME`, on port 8000 of the internal network `models`. Only LiteLLM is on that network; `vllm` has no host port and no route to the internet.
+- Every call goes through LiteLLM with the run's virtual key and its seven labels. LiteLLM counts an internal cost per token (a placeholder until L03), so budgets still stop a run.
+- At most `SDLC_VLLM_MAX_NUM_SEQS` requests at a time (default 4): vLLM's `--max-num-seqs` and LiteLLM's `max_parallel_requests`. LiteLLM refuses a request over the limit; the agent retries.
+- vLLM logs no prompt. It never downloads anything: the weights are in the volume `vllm-models`, mounted read-only, and `HF_HUB_OFFLINE=1`.
+
+### Set it up
+
+1. The host: an NVIDIA GPU with its driver and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) **[External]**. Check: `docker run --rm --gpus all ubuntu nvidia-smi` shows the GPU.
+2. Choose the model in `platform/deploy/.env` (the defaults are in `.env.example`): `SDLC_VLLM_MODEL` (a public Hugging Face repository; check its licence), `SDLC_VLLM_MODEL_REVISION` (a commit hash of that repository is best), `SDLC_VLLM_SERVED_NAME` (with the model version in it: it becomes the agent's `model_ref`), and if needed `SDLC_VLLM_GPU_COUNT`, `SDLC_VLLM_MAX_MODEL_LEN`, `SDLC_VLLM_GPU_MEMORY_UTILIZATION`, `SDLC_VLLM_TOOL_PARSER` (the model family's tool-call parser).
+3. Download the weights once (from the internet; it can take an hour):
+   ```bash
+   pnpm models-local:pull
+   ```
+4. Store the provider entry `vllm` in OpenBao (runbook T11 §5d.1): `api_base=http://vllm:8000/v1` and `model=<SDLC_VLLM_SERVED_NAME>`.
+5. Start with the other profiles of the server, or alone:
+   ```bash
+   pnpm compose:models-local
+   ```
+   `vllm` becomes healthy when the model is on the GPU (up to 15 minutes). Then restart `litellm-agent` and `litellm` if they were already running, so the model appears.
+6. Check: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile models-local ps vllm litellm` shows both healthy. G4 reads the gateway's model list, so a run whose intent is `client_restricted` gets only this model. Then register an agent whose model is the served name (handbook Ch.20 §20.5b, "An agent on the self-hosted model").
+
+### Change the model
+
+Change `SDLC_VLLM_MODEL`, `SDLC_VLLM_MODEL_REVISION` and `SDLC_VLLM_SERVED_NAME`, run `pnpm models-local:pull` again, update the field `model` of the provider entry (T11 §5d.1), and restart `vllm`, `litellm-agent` and `litellm`. A new served name is a new `model_ref`: agents need a new version in the register. Old weights stay in the volume until you remove it (`docker volume rm <project>_vllm-models`, then pull again).
+
 ## Shared Valkey: memory limit
 
 Langfuse and LiteLLM share one Valkey with `maxmemory-policy noeviction`, which Langfuse requires. The limit is `VALKEY_MAXMEMORY` in `.env` (default `256mb`). **When Valkey is full, writes fail for both Langfuse and LiteLLM.** Watch memory use:
@@ -623,6 +658,7 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 
 - Disk for images: about 4.5 GB for `core` and about 4.7 GB more for `observability`. Data volumes start small and grow with use.
 - Add room for the platform processes (api, worker, runner) and 1–2 agent sandboxes (D-03 section 10.1).
+- Profile `models-local`: the GPU memory comes from the model (a 30B-class model in 16-bit needs about 60 GB of GPU memory plus room for the context; task L03 gives the sizing). On the host: RAM about the size of the weights while loading, `SDLC_VLLM_SHM_SIZE` (8 GB) of shared memory, and disk for the weights in the volume `vllm-models` (about 60 GB for the default model) plus about 10 GB for the image.
 - Profile `sandbox` (estimates, A10 measures): socket proxy about 10 MiB, runner about 100–150 MiB, Verdaccio about 100–200 MiB, registry about 20 MiB, so about 0.3–0.4 GiB in total, plus **up to 2 GiB per sandbox** (`SDLC_RUNNER_SANDBOX_MEMORY_MB`, 1 sandbox by default). Disk: the `node24` image is about 0.85 GB compressed and about 3 GB unpacked; the npm cache grows with use (1–5 GB typical); clones up to `SDLC_RUNNER_WORKSPACE_MAX_MB` per running sandbox.
 
 ## Backup and restore

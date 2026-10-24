@@ -3,10 +3,15 @@
 // OpenBao (STUB_EXPECTED_KEY). A call through LiteLLM that succeeds therefore proves that LiteLLM
 // got the key from OpenBao through the sidecar (D-08 C03 AC1). Fixed usage per call:
 // 1000 prompt tokens (200 of them cached) and 100 completion tokens.
+//
+// L01 (ADR-M71 §2.4): with STUB_OPEN=1 it stands in for vLLM, which has no key (only LiteLLM
+// reaches it on the internal network `models`): any Authorization header is accepted. STUB_PORT
+// sets the port (vLLM's is 8000).
 import http from 'node:http';
 
+const open = process.env.STUB_OPEN === '1';
 const expected = process.env.STUB_EXPECTED_KEY ?? '';
-if (expected.length < 16) throw new Error('STUB_EXPECTED_KEY is missing or too short');
+if (!open && expected.length < 16) throw new Error('STUB_EXPECTED_KEY is missing or too short');
 
 let calls = 0;
 
@@ -20,7 +25,7 @@ const server = http.createServer((req, res) => {
     return send(200, { object: 'list', data: [{ id: 'stub', object: 'model' }] });
   if (req.method !== 'POST' || !req.url?.endsWith('/chat/completions'))
     return send(404, { error: { message: 'not found' } });
-  if (req.headers.authorization !== `Bearer ${expected}`)
+  if (!open && req.headers.authorization !== `Bearer ${expected}`)
     return send(401, { error: { message: 'wrong provider key', type: 'auth' } });
   let raw = '';
   req.on('data', (chunk) => (raw += chunk));
@@ -43,4 +48,4 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(8080, '0.0.0.0');
+server.listen(Number(process.env.STUB_PORT ?? '8080'), '0.0.0.0');

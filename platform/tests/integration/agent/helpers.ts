@@ -17,6 +17,7 @@ import {
   isAgentAdapterCode,
   type AgentAdapter,
   type AgentAdapterCode,
+  type DataClass,
   type EvidenceStore,
   RedactedSecret,
   RunContractEnvelope,
@@ -97,6 +98,8 @@ export interface StartAgentRun {
   /** Container that serves as LiteLLM on the run's network (egress alias `litellm`, port 4000). */
   readonly litellmContainer: string;
   readonly model: string;
+  /** The intent's data class (default `internal`; L01: `client_restricted`, ADR-M71 §2.4). */
+  readonly dataClass?: DataClass;
   readonly planSummary: string;
   readonly specText: string;
   readonly agentsMd: string;
@@ -179,7 +182,7 @@ export async function startAgentRun(input: StartAgentRun): Promise<AgentRunFixtu
     title: 'Hello',
     createdBy: person,
     riskTier: 'low',
-    dataClass: 'internal',
+    dataClass: input.dataClass ?? 'internal',
   });
   const blob = fs.readFileSync(path.join(repo, specPath));
   await registry.linkSpec(scope, intent.id, {

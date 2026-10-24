@@ -24,6 +24,7 @@ export const JOBS = [
   'seaweedfs-init',
   'temporal-namespace',
   'temporal-schema',
+  'vllm-pull',
 ] as const;
 /** The AppRole secret ID lifetime (runbook T11 §8): 90 days; a warning 10 days before. */
 export const SECRET_ID_DAYS = 90;

@@ -37,7 +37,7 @@ Then run the suites of section 2 that cover the code you changed (section 5 list
 | `pnpm test:openbao` | OpenBao bootstrap (A03), the OpenBao client (A04), TLS (A10), the SeaweedFS identities `api-evidence`, `worker-evidence`, `worker-purge`, `worker-anchor` on real SeaweedFS and OpenBao | Docker | CI job `compose` |
 | `pnpm test:seaweedfs` | SeaweedFS internal access refused from another container (A12) | Docker | CI job `compose` |
 | `pnpm test:backup` | The whole backup and restore drill on throw-away keys (A10) | Docker, `age` | CI job `compose` |
-| `pnpm test:litellm` | LiteLLM with keys from OpenBao (profile `models`) and the Cost Controller, stub model | Docker | CI job `compose` |
+| `pnpm test:litellm` | LiteLLM with keys from OpenBao (profile `models`) and the Cost Controller, stub model; L01: a second stub in place of vLLM on the network `models` (a `client_restricted` intent, the `self_hosted` cost and budget) | Docker | CI job `compose` |
 | `pnpm test:api` | The `sdlc-api` container with OpenBao | Docker | CI job `compose` |
 | `pnpm test:access` | Team access through the TLS proxy (V09), ports +36000; the api-port check runs on Linux only | Docker | CI job `compose` |
 | `pnpm test:runner` | Runner on the local Docker Engine and a throw-away PostgreSQL: egress and hardening probed inside fixture sandboxes, provisioning, clean-up, clean-up after a restart, the kill measurement | Docker | CI job `compose` |
@@ -173,6 +173,7 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 |---|---|---|
 | Run Contracts | C02; ADR-M22 | unit: `run-contract/run-events.test.ts` and the contract tests; db |
 | LiteLLM and the Cost Controller | C03; ADR-M24 | unit: `cost/litellm-gateway.test.ts`; `pnpm test:litellm` (also: revoke by run; the key ID is not a key) |
+| Self-hosted model (vLLM, profile `models-local`) | L01; ADR-M71 | static: `deploy/models-local-static.test.ts`; `pnpm test:litellm` (L01 AC4, a stub in place of vLLM); owner only: `pnpm test:agent-api` with `SDLC_AGENT_API_MODEL` and `SDLC_AGENT_API_DATA_CLASS` (section 3). vLLM itself needs a GPU: never in CI |
 | Scheduled spend sync | C12; ADR-M24 §2.5 | unit: `worker/cost-sync-loop.test.ts`, `worker/settings.test.ts`; db: `cost-sync.test.ts` |
 | Runner and sandboxes | C04; ADR-M25 | unit: `deploy/sandbox-profile.test.ts` (the socket proxy allowlist equals `ALLOWED_ENDPOINTS`); `pnpm test:runner`, `pnpm test:runner-compose`, `pnpm test:sandbox-image` |
 | Threat model of a run, attack tests | H01; ADR-M80 | unit: `attack/prompt-injection.test.ts`, `attack/comment-commands.test.ts`; `pnpm test:attack` |

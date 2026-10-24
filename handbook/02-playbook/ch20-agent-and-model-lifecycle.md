@@ -150,6 +150,19 @@ What is different with OpenCode:
 
 **Before real client work with OpenCode.** The agent can reach OpenCode's own server from inside the sandbox. The checks above make a change of the agent's limits visible, but not every change: a change that the agent makes and undoes between two status reads, one second apart, is not seen. The time cap and the run's budget in the model gateway stop a run in every case. The full fix is an authenticating proxy in front of OpenCode's server. It comes before OpenCode is used for real client work (`design/QUESTIONS.md` #523). Until then, use OpenCode agents on pilot repositories and in evaluations only. The run's virtual key is in a file in the sandbox's home directory, which is in memory and is removed with the sandbox (accepted in #523).
 
+**An agent on the self-hosted model** (`design/ADR-M71-self-hosted-model-vllm.md`). Work on `client_restricted` data may use only a self-hosted model: the client does not allow the data to leave the company. The platform's self-hosted model runs with vLLM on the server's own GPU (Compose profile `models-local`), when the server has one.
+
+1. **The model.** The server operator chooses the model, downloads it, starts the profile and stores the model's entry in the gateway (`platform/deploy/README.md` "Self-hosted model", runbook T11 §5d.1). The operator gives you the **served name**, for example `qwen3-coder-30b-a3b-instruct`. It includes the model version, like every model name.
+2. **The agent.** Register an agent with that name as its model: `sdlc admin agent register --key coder-local … --model qwen3-coder-30b-a3b-instruct`, with the other options as above. For an existing agent, a new model is a new version (suspend, `update --version <next> --model …`).
+3. **The evaluation and the approval.** The model is part of the fingerprint, so evaluate the agent with the self-hosted model before you approve it (§20.6–§20.7). A smaller model resolves fewer tasks than an API model: read the report before real work.
+4. **The project.** Set `run.agent_key` to the agent's key. G4 then gives a `client_restricted` intent only the self-hosted model. An intent of a lower data class may use it too.
+
+What is different with the self-hosted model:
+
+- **Requests at a time.** The model serves at most a fixed number of requests at the same time (4 by default). The gateway refuses a request over the limit, and the agent tries again. Many runs at the same time are slower.
+- **Cost.** The gateway counts an internal cost per token, so the run's cap and the intent's and tenant's budgets still stop a run. The value is a placeholder until leadership has the GPU cost (task L03).
+- **Nothing leaves the server.** The prompts and the code in them go only to the server's GPU.
+
 ### 20.5c. The tool register on the platform
 
 A **register tool** is a tool for agents that is not part of the agent itself: an MCP server (a program the agent calls through the Model Context Protocol) in a container of its own. The first one searches the project's documents. Register tools have the code `tool:<key>`, for example `tool:project-docs`, next to the built-in tools `file_editor`, `task_tracker` and `terminal`. A tool belongs to the tenant, like an agent, and has the same lifecycle (§20.3–§20.10).
@@ -366,4 +379,5 @@ Old context must not quietly come back through caches, indexes or copied instruc
 | 0.9 | 2026-10-22 | Claude (task X04, PR 1) | §20.5c: the tool register on the platform (commands, approvals, enforced rules, the G4 refusals of a register tool) (ADR-M69, QUESTIONS #516–#535) |
 | 1.0 | 2026-10-22 | Claude (task X03, PR 3) | §20.5b: registering an agent with the adapter `opencode` (image, configuration, new version, evaluation, approval); OpenCode's tool map, the `agent_config_changed` stop, the limits before real client work (ADR-M68, ADR-M88, QUESTIONS #523) |
 | 1.1 | 2026-10-22 | Claude (task X04, PR 2) | §20.5c: the run's MCP gateway, what is recorded per tool, OpenHands only (ADR-M69 §2.4–§2.8, ADR-M87) |
-| 1.2 | 2026-10-24 | Claude (task X04, PR 3b) | §20.5c: the first tool, searching the project's documents: registering it, what a run gets (the index of its commit, a login of its own, a model key of its own) and records (`knowledge_read`, the revocation) (ADR-M89, QUESTIONS #540–#544) |
+| 1.2 | 2026-10-24 | Claude (task L01, PR 1) | §20.5b: an agent on the self-hosted model (vLLM, profile `models-local`): the served name, the evaluation, the limit of requests at a time, the internal cost (ADR-M71, QUESTIONS #546–#550) |
+| 1.3 | 2026-10-24 | Claude (task X04, PR 3b) | §20.5c: the first tool, searching the project's documents: registering it, what a run gets (the index of its commit, a login of its own, a model key of its own) and records (`knowledge_read`, the revocation) (ADR-M89, QUESTIONS #540–#544) |

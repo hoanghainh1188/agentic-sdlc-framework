@@ -19,6 +19,9 @@
 #   knowledge      The index of project documents (X04 PR 3a, design/ADR-M89): knowledge-db, a
 #                  PostgreSQL with pgvector of its own, never the platform's database. Then
 #                  openbao:bootstrap worker-knowledge-credentials: pnpm compose:knowledge
+#   models-local   A self-hosted model service (L01, design/ADR-M71): vLLM on the server's GPU,
+#                  reached by LiteLLM only. Optional, off by default. Weights first
+#                  (pnpm models-local:pull, profile models-local-pull): pnpm compose:models-local
 #
 # Usage (from the repo root; see platform/deploy/README.md):
 #   platform/deploy/scripts/init-env.sh           # once: creates platform/deploy/.env (mode 600)
@@ -63,6 +66,11 @@ networks:
       config:
         - subnet: ${SDLC_ACCESS_NETWORK_SUBNET:-172.30.1.0/29}
           ip_range: ${SDLC_ACCESS_NETWORK_IP_RANGE:-172.30.1.0/30}
+  # Self-hosted models (L01, design/ADR-M71 §2.1): internal, so vLLM has no route to the internet.
+  # LiteLLM always joins it (the network holds only LiteLLM until vllm starts); nothing else does.
+  models:
+    name: ${COMPOSE_PROJECT_NAME:-sdlc}-models
+    internal: true
 
 volumes:
   postgres-data:
@@ -122,6 +130,9 @@ volumes:
   # The team access proxy's certificate, key (owner 101, mode 600) and CA certificate; written by
   # the job access-tls-init from SDLC_ACCESS_TLS_DIR (V09, design/ADR-M67 §2.7).
   access-tls:
+  # The self-hosted model's weights (L01, design/ADR-M71 §2.2): written once by vllm-pull, mounted
+  # read-only by vllm.
+  vllm-models:
 
 services:
   # ---------------------------------------------------------------- core ----
@@ -273,7 +284,8 @@ services:
     image: ghcr.io/berriai/litellm:v1.104.0
     profiles: [core, observability]
     restart: unless-stopped
-    networks: [sdlc]
+    # L01 (ADR-M71 §2.1): `models` reaches the self-hosted vLLM; it has no route to the internet.
+    networks: [sdlc, models]
     depends_on:
       postgres:
         condition: service_healthy
@@ -331,6 +343,8 @@ services:
       # Tracing (A08, ADR-M35 §2.4): when set, config.ctmpl turns on LiteLLM's langfuse_otel and
       # points it at the collector. Empty: no tracing. Set by up.sh with the profile observability.
       SDLC_OTEL_ENDPOINT: ${SDLC_OTEL_ENDPOINT:-}
+      # L01 (ADR-M71 §2.3): LiteLLM's max_parallel_requests for vllm, equal to vLLM's --max-num-seqs.
+      SDLC_VLLM_MAX_NUM_SEQS: ${SDLC_VLLM_MAX_NUM_SEQS:-4}
     volumes:
       - ./litellm/agent.hcl:/openbao/agent/agent.hcl:ro
       # The template. Live tests point SDLC_LITELLM_TEMPLATE at a test template (stub model).
@@ -341,6 +355,99 @@ services:
     healthcheck:
       <<: *healthcheck-defaults
       test: [CMD-SHELL, 'test -s /run/litellm/config.yaml']
+
+  # ---------------------------------------------------------- models-local ----
+  # A self-hosted model service (L01, design/ADR-M71). Optional, off by default (R041): a server
+  # without a GPU never starts it. vLLM (Apache-2.0) pinned by tag and digest (R038). Only on the
+  # internal network `models` with LiteLLM, and no host port: only LiteLLM calls it, with the run's
+  # virtual key and labels (R027). vLLM logs no prompts (--enable-log-requests stays off, R031).
+  # LiteLLM lists the model once its entry kv/litellm/providers/vllm exists (runbook T11 §5d.1).
+  vllm:
+    image: vllm/vllm-openai:v0.31.0@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3
+    profiles: [models-local]
+    restart: unless-stopped
+    networks: [models]
+    # The image's `vllm` user (UID 2000, GID 0), never root. Its caches live in /cache (tmpfs).
+    user: '2000:0'
+    environment:
+      HOME: /cache
+      XDG_CACHE_HOME: /cache
+      VLLM_CACHE_ROOT: /cache/vllm
+      HF_HOME: /models
+      # Never download at run time: the weights come from vllm-pull (ADR-M71 §2.2).
+      HF_HUB_OFFLINE: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      VLLM_NO_USAGE_STATS: '1'
+      DO_NOT_TRACK: '1'
+    # The image's entrypoint is `vllm serve`. Each setting has a default (.env.example).
+    command:
+      - ${SDLC_VLLM_MODEL:-Qwen/Qwen3-Coder-30B-A3B-Instruct}
+      - --revision=${SDLC_VLLM_MODEL_REVISION:-main}
+      - --served-model-name=${SDLC_VLLM_SERVED_NAME:-qwen3-coder-30b-a3b-instruct}
+      - --host=0.0.0.0
+      - --port=8000
+      - --max-num-seqs=${SDLC_VLLM_MAX_NUM_SEQS:-4}
+      - --max-model-len=${SDLC_VLLM_MAX_MODEL_LEN:-32768}
+      - --gpu-memory-utilization=${SDLC_VLLM_GPU_MEMORY_UTILIZATION:-0.90}
+      - --tensor-parallel-size=${SDLC_VLLM_GPU_COUNT:-1}
+      # Tool calls: the coding agents need them.
+      - --enable-auto-tool-choice
+      - --tool-call-parser=${SDLC_VLLM_TOOL_PARSER:-qwen3_coder}
+    volumes:
+      - vllm-models:/models:ro
+    tmpfs:
+      - /cache:uid=2000,gid=0,mode=0700
+    # PyTorch shares tensors between processes through /dev/shm.
+    shm_size: ${SDLC_VLLM_SHM_SIZE:-8gb}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${SDLC_VLLM_GPU_COUNT:-1}
+              capabilities: [gpu]
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Loading the weights onto the GPU takes minutes.
+      start_period: 900s
+      test:
+        - CMD
+        - python3
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)
+
+  # Downloads the weights once into vllm-models (ADR-M71 §2.2). Run by an operator only:
+  # `pnpm models-local:pull` (docker compose run). On `sdlc`, which has internet access; public
+  # models only, so no Hugging Face token. Weights, configuration and tokenizer files only, never
+  # model code (vllm never trusts remote code).
+  vllm-pull:
+    image: vllm/vllm-openai:v0.31.0@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3
+    profiles: [models-local-pull]
+    restart: 'no'
+    networks: [sdlc]
+    environment:
+      HF_HOME: /models
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      SDLC_VLLM_MODEL: ${SDLC_VLLM_MODEL:-Qwen/Qwen3-Coder-30B-A3B-Instruct}
+      SDLC_VLLM_MODEL_REVISION: ${SDLC_VLLM_MODEL_REVISION:-main}
+    entrypoint:
+      - python3
+      - -c
+      - |
+        import os
+        from huggingface_hub import snapshot_download
+        path = snapshot_download(
+            repo_id=os.environ['SDLC_VLLM_MODEL'],
+            revision=os.environ['SDLC_VLLM_MODEL_REVISION'],
+            allow_patterns=['*.json', '*.safetensors', '*.txt', '*.model', '*.tiktoken', '*.jinja'],
+        )
+        print('vllm-pull: weights in', path)
+    volumes:
+      - vllm-models:/models
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.48

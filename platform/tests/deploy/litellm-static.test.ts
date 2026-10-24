@@ -67,6 +67,8 @@ describe('AC1: the sidecar (Compose profile "models")', () => {
       BAO_ADDR: 'https://openbao:8200',
       BAO_CACERT: '/openbao/ca/ca.pem',
       SDLC_OTEL_ENDPOINT: '${SDLC_OTEL_ENDPOINT:-}',
+      // L01 (ADR-M71 §2.3): the limit of the vllm entry; not a secret.
+      SDLC_VLLM_MAX_NUM_SEQS: '${SDLC_VLLM_MAX_NUM_SEQS:-4}',
     });
     expect(agent.volumes).toContain('openbao-ca:/openbao/ca:ro');
   });
