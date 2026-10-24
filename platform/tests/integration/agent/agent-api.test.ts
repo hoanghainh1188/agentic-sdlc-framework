@@ -50,7 +50,10 @@ import { readRenderedMasterKey } from './litellm-master-key';
 
 const enabled = process.env.SDLC_AGENT_API_TEST === '1' && !!process.env.SDLC_TEST_DATABASE_URL;
 /** The gateway name of the Anthropic entry in config.ctmpl (QUESTIONS #93: it carries the version). */
-const MODEL = process.env.SDLC_AGENT_API_MODEL || 'claude-haiku-4-5-20251001';
+const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+// L01: another model of the dev stack. Kept apart from the literal above: Gitleaks' generic
+// rule reads a long literal next to a name with "API" in it as a key.
+const MODEL = process.env.SDLC_AGENT_API_MODEL || DEFAULT_MODEL;
 const DATA_CLASS = (process.env.SDLC_AGENT_API_DATA_CLASS || 'internal') as DataClass;
 if (!(DATA_CLASSES as readonly string[]).includes(DATA_CLASS)) {
   throw new Error('SDLC_AGENT_API_DATA_CLASS is not a data class');
