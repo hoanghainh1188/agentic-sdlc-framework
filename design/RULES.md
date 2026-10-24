@@ -204,6 +204,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R081d | Passphrase never from arg/env | test | tests/deploy/trial-up-static.test.ts:204 | full | pointer-only | platform/deploy/CLAUDE.md |
 | R081e | Fresh deployment ↔ up.ts ↔ test:fresh-deploy | test+ci | tests/deploy/trial-up-static.test.ts:38 | partial | keep-root | platform/deploy/CLAUDE.md |
 | R082a–f | Access proxy rules | test | tests/deploy/access-static.test.ts; tests/trial/trial-up.test.ts:307 | full | pointer-only | platform/deploy/CLAUDE.md |
+| R137 | vLLM (profile `models-local`) only on the internal network `models` with LiteLLM, no host port; weights read-only, offline; no prompt logging, no remote code; the profile optional (added by L01) | test | tests/deploy/models-local-static.test.ts | full | pointer-only | platform/deploy/CLAUDE.md |
 | R083a,b | GitHub App manifest; secrets dropped | test | tests/deploy/github-app.test.ts:58 | full | pointer-only | platform/deploy/CLAUDE.md |
 | R084a | Log only through the platform logger | lint+test | eslint.config.mjs (`no-console` in apps and packages; `migrate-cli.ts` excepted); tests/observability/logger.test.ts:178; tests/workspace/lint-rules.test.ts | full | pointer-only | CLAUDE.md |
 | R084b | Spans hold no headers/SQL params | test | tests/observability/tracing.test.ts:100 | full | pointer-only | CLAUDE.md |
@@ -261,3 +262,4 @@ Some rows group several rules with the same check (for example R082a–f).
 | 0.4 | 2026-10-20 | Claude (task W01, PR 4) | Column "File": the root `CLAUDE.md` or a folder's `CLAUDE.md`; new row R133 |
 | 0.5 | 2026-10-21 | Claude (task L09, PR 2) | New row R135 (evaluations in the agent approvals, `platform/apps/api/CLAUDE.md`) |
 | 0.6 | 2026-10-21 | Claude (task L10) | New row R136 (the platform never suspends an agent by itself, `platform/apps/api/CLAUDE.md`) |
+| 0.7 | 2026-10-24 | Claude (task L01, PR 1) | New row R137 (the self-hosted vLLM of the profile `models-local`, `platform/deploy/CLAUDE.md`) |
