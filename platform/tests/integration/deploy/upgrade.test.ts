@@ -199,8 +199,9 @@ describe.skipIf(!enabled)(
         const mode = current.imagesMode();
         expect(mode).toBe(to === 'HEAD' ? 'local' : 'published');
         if (mode === 'local') {
-          for (const command of ['pull', 'build']) {
-            current.ok(current.compose('', ...current.composeProfileArgs, command), command);
+          // The platform images have a `build` and no published name: pull only the others.
+          for (const command of [['pull', '--ignore-buildable'], ['build']]) {
+            current.ok(current.compose('', ...current.composeProfileArgs, ...command), command[0]!);
           }
         }
 

@@ -693,10 +693,10 @@ Before you start, let the running intents reach a gate: an intent that waits at 
    ```
 
    It prints the names of the keys it added, with a random value for each new secret, never a value. Check the new lines against the Upgrade notes (a host port, a path). After the A10 update (TLS on OpenBao): `pnpm openbao:tls dev` on a development machine; on the server, the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)).
-4. **The images.** On a release tag (step 2) there is nothing to build: `up.sh` in step 9 pulls the release's images, and `sandbox.image` takes `pnpm images get SANDBOX_NODE24` ([Verify the published images](#verify-the-published-images) first). Developers on a branch pull the pinned images and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`):
+4. **The images.** On a release tag (step 2) there is nothing to build: `up.sh` in step 9 pulls the release's images, and `sandbox.image` takes `pnpm images get SANDBOX_NODE24` ([Verify the published images](#verify-the-published-images) first). Developers on a branch pull the pinned images (`--ignore-buildable`: the platform images are built, not pulled) and rebuild the platform images (and the sandbox image when `platform/sandbox-images/` changed: `pnpm sandbox-image:build node24`, then the new digest in `sandbox.image`):
 
    ```bash
-   docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull
+   docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox pull --ignore-buildable
    docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile models --profile platform --profile sandbox build
    ```
 
