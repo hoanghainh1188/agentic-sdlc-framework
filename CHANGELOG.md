@@ -7,6 +7,7 @@
 
 ### Added
 - O01 PR 1 (ADR-M91, accepted; QUESTIONS #576–#580): the decision to run the runner and the sandboxes on their own Docker Engine (a separate VM, or a second rootless Engine on the same server), because rootless Docker on the platform's one Engine still lets a taken-over runner mount the platform's volumes (ADR-M80 gap G-7). CI job `runner-rootless`: `pnpm test:runner` on a rootless Engine (static Docker 29.8.2, pinned by SHA-256; `platform/deploy/scripts/test-rootless-docker.sh`). The fixture sandbox now reads its memory, swap, process and CPU limits, its capabilities and `NoNewPrivs` from the kernel, so an Engine that accepts a limit but does not enforce it fails `pnpm test:runner`.
+- X12 (design only; ADR-M74 proposed; QUESTIONS #571–#575): agent memory across runs. Memory is Markdown in the project repository (`.sdlc/memory/*.md`); a run reads it only when a person who is not a producer approved that set, in its own nonce block framed as data; an agent proposes memory in a separate pull request after the code merge, never blocking a release; `sdlc memory revoke` for an emergency. Proposed changes: D-03 1.49, D-05 1.62, ADR-M80 0.7. X13 builds it.
 
 ## [0.6.0] - 2026-10-24
 
