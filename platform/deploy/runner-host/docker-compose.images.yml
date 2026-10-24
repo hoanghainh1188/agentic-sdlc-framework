@@ -1,0 +1,8 @@
+# The published runner image of a release, pinned by digest (task V04, design/ADR-M66 §2.5): the
+# runner host's copy of the platform's overlay ../docker-compose.images.yml, added by
+# scripts/runner-host.sh only on a release checkout (scripts/images.sh mode prints `published`).
+services:
+  sdlc-runner:
+    image: ${SDLC_IMAGE_RUNNER:?run through scripts/runner-host.sh (images.lock)}
+    build: !reset null
+    pull_policy: missing

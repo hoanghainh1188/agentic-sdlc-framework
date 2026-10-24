@@ -321,6 +321,10 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(start).toBeGreaterThanOrEqual(0);
     expect(order.indexOf('pnpm test:runner')).toBeGreaterThan(start);
     expect(runs('compose')).toContain('pnpm test:runner');
+    // O01 PR 2: the split set-up after the link address exists.
+    const link = order.findIndex((r) => r.includes('ip link add sdlc-link type dummy'));
+    expect(link).toBeGreaterThan(start);
+    expect(order.indexOf('pnpm test:runner-split')).toBeGreaterThan(link);
     expect(job('ci-ok').needs).toContain('runner-rootless');
   });
 

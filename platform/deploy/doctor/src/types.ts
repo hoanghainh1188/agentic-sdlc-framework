@@ -45,6 +45,7 @@ export const CHECK_IDS = [
   'access.ports',
   'access.public_origin',
   'access.trusted_proxy',
+  'runner.engine',
 ] as const;
 export type CheckId = (typeof CHECK_IDS)[number];
 

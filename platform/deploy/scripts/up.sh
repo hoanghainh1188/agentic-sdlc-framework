@@ -6,6 +6,8 @@
 #        up.sh core observability
 #        up.sh core models platform access   (team access, V09: README "Team access")
 #        up.sh core models models-local      (self-hosted model, L01: README "Self-hosted model")
+#        up.sh core models platform runner-link (the runner on its own Engine, O01: README "The
+#                                            runner on its own Docker Engine")
 #
 # Environment:
 #   SDLC_ENV_FILE      env file (default: platform/deploy/.env, created by init-env.sh)
@@ -104,14 +106,31 @@ if [ "$images_mode" = published ]; then
   echo "up: using the published images of v$SDLC_IMAGES_VERSION (platform/deploy/images.lock)" >&2
 fi
 
+# The runner on its own Engine (O01, design/ADR-M91 §2.3): with SDLC_RUNNER_LINK_ADDR in the env
+# file, the overlay docker-compose.runner-link.yml publishes the runner's services on that address
+# only. The runner then runs on the runner host: the profile sandbox would start a second runner
+# with the same instance label (R062), so it is refused; runner-link keeps the registry.
+link_addr="$(sed -n 's/^SDLC_RUNNER_LINK_ADDR=//p' "$env_file" | tail -n 1)"
+if [ -n "$link_addr" ]; then
+  case " $* " in
+    *" sandbox "*)
+      echo "up: SDLC_RUNNER_LINK_ADDR is set: the runner runs on the runner host; use the profile runner-link, not sandbox (README \"The runner on its own Docker Engine\")" >&2
+      exit 1
+      ;;
+  esac
+fi
+
 set -- $(for p in "$@"; do printf -- '--profile %s ' "$p"; done)
 compose() {
   if [ "$images_mode" = published ]; then
-    docker compose -f "$deploy_dir/docker-compose.yml" -f "$deploy_dir/docker-compose.images.yml" \
-      --env-file "$env_file" "$@"
+    set -- -f "$deploy_dir/docker-compose.images.yml" --env-file "$env_file" "$@"
   else
-    docker compose -f "$deploy_dir/docker-compose.yml" --env-file "$env_file" "$@"
+    set -- --env-file "$env_file" "$@"
   fi
+  if [ -n "$link_addr" ]; then
+    set -- -f "$deploy_dir/docker-compose.runner-link.yml" "$@"
+  fi
+  docker compose -f "$deploy_dir/docker-compose.yml" "$@"
 }
 
 services="$(compose "$@" config --services)"

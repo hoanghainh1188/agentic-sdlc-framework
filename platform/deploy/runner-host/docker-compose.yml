@@ -1,0 +1,255 @@
+# The runner on its own Docker Engine (task O01, design/ADR-M91): the runner host's Compose file.
+# It runs on a Docker Engine that holds no platform service and no platform data: a separate VM
+# or a second, rootless Engine of the user `sdlc-runner` on the same server (deploy README "The
+# runner on its own Docker Engine"). The platform's Engine publishes the services the runner needs
+# only on the link address (overlay ../docker-compose.runner-link.yml).
+#
+# Profiles:
+#   sandbox    The runner, the socket proxy, the npm package proxy, the LiteLLM relay and the job
+#              openbao-ca-init: pnpm runner-host:up
+#   knowledge  The knowledge-db relay, when the platform runs the profile knowledge
+#   vm         The registry relay, on a separate VM only (ADR-M91 §2.7, QUESTIONS #599)
+#   credentials  The job runner-approle-init of `openbao:bootstrap runner-credentials` (#597)
+#
+# Rules (static test platform/tests/deploy/runner-host.test.ts):
+#   - sdlc-runner, docker-socket-proxy and npm-proxy have the same definitions as in
+#     ../docker-compose.yml. Allowed differences only: depends_on, networks, extra_hosts, build
+#     and the proxy's socket path (SDLC_DOCKER_SOCKET).
+#   - No platform service, volume or network. The relays have one fixed target each, on
+#     SDLC_RUNNER_LINK_ADDR, and keep the platform's service names: the runner's settings
+#     (SDLC_RUNNER_EGRESS_SERVICES, SDLC_RUNNER_TOOL_SERVICES) do not change.
+#   - No telemetry setting: a runner on its own Engine sends no traces (ADR-M91 §2.5).
+#   - This file holds no secret, and so does its env file (runner-host/.env).
+
+name: ${COMPOSE_PROJECT_NAME:-sdlc}
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 20s
+
+# The platform's services as the runner names them, on the link address (ADR-M91 §2.7). OpenBao's
+# certificate names `openbao`, so the runner still verifies it (R076).
+x-link-hosts: &link-hosts
+  - postgres:${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in runner-host/.env}
+  - openbao:${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in runner-host/.env}
+  - temporal:${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in runner-host/.env}
+  - seaweedfs:${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in runner-host/.env}
+
+# A relay (QUESTIONS #578): the upstream HAProxy image pinned by digest, one fixed target in its
+# configuration file, no capability, no volume, read-only root.
+x-relay: &relay
+  image: haproxy:3.2.26-alpine@sha256:dfba86f031bd4c9039f10f8cc5de75991d1b6766d5460f0335b980408503baad
+  restart: unless-stopped
+  networks: [sdlc]
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  environment:
+    SDLC_RUNNER_LINK_ADDR: ${SDLC_RUNNER_LINK_ADDR:?set SDLC_RUNNER_LINK_ADDR in runner-host/.env}
+  healthcheck:
+    <<: *healthcheck-defaults
+    test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8405/]
+
+networks:
+  # The runner host's own network: never the platform's `sdlc` network.
+  sdlc:
+    name: ${COMPOSE_PROJECT_NAME:-sdlc}-runner-net
+
+volumes:
+  # The same as in ../docker-compose.yml.
+  docker-proxy:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=64k,uid=65534,gid=${SDLC_DOCKER_GID:-0},mode=0770
+  # Written by `openbao:bootstrap runner-credentials` with SDLC_RUNNER_DOCKER_HOST, through the job
+  # runner-approle-init (QUESTIONS #597).
+  runner-approle:
+  runner-work:
+  npm-proxy-storage:
+  # OpenBao's CA certificate only (public), from SDLC_OPENBAO_CA_FILE (QUESTIONS #598).
+  openbao-ca:
+
+services:
+  # Copies OpenBao's CA certificate into the volume openbao-ca at every start, like
+  # openbao-tls-init on the platform's Engine.
+  openbao-ca-init:
+    image: haproxy:3.2.26-alpine@sha256:dfba86f031bd4c9039f10f8cc5de75991d1b6766d5460f0335b980408503baad
+    profiles: [sandbox]
+    restart: 'no'
+    network_mode: none
+    user: root
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        test -s /src/ca.pem || { echo 'openbao-ca-init: SDLC_OPENBAO_CA_FILE is missing or empty' >&2; exit 1; }
+        grep -q 'PRIVATE KEY' /src/ca.pem && { echo 'openbao-ca-init: SDLC_OPENBAO_CA_FILE holds a private key' >&2; exit 1; }
+        cp /src/ca.pem /ca/ca.pem.new
+        chmod 0644 /ca/ca.pem.new
+        chmod 0755 /ca
+        mv /ca/ca.pem.new /ca/ca.pem
+        echo 'openbao-ca-init: CA certificate in place'
+    volumes:
+      - ${SDLC_OPENBAO_CA_FILE:-/etc/sdlc/openbao-ca.pem}:/src/ca.pem:ro
+      - openbao-ca:/ca
+
+  # Only for `openbao:bootstrap runner-credentials` with SDLC_RUNNER_DOCKER_HOST (QUESTIONS #597):
+  # writes the role ID and the secret ID it reads on stdin into the volume runner-approle, owned by
+  # the runner's user (node, 1000). It mounts nothing else, so the delivery creates no other volume.
+  runner-approle-init:
+    image: haproxy:3.2.26-alpine@sha256:dfba86f031bd4c9039f10f8cc5de75991d1b6766d5460f0335b980408503baad
+    profiles: [credentials]
+    restart: 'no'
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - runner-approle:/run/sdlc/approle
+
+  # The same as in ../docker-compose.yml; the socket is the runner Engine's own
+  # (rootless: $XDG_RUNTIME_DIR/docker.sock).
+  docker-socket-proxy:
+    image: wollomatic/socket-proxy:1.13.1@sha256:3935b709275e4ec35d6ed5a5c4a1f0d01ed31eec5e7234efc3357ecd47689002
+    profiles: [sandbox]
+    restart: unless-stopped
+    network_mode: none
+    user: 65534:${SDLC_DOCKER_GID:-0}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ${SDLC_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
+      - docker-proxy:/run/docker-proxy
+    command:
+      - -socketpath=/var/run/docker.sock
+      - -proxysocketendpoint=/run/docker-proxy/docker.sock
+      - -proxysocketendpointfilemode=0660
+      - -allowbindmountfrom=/nonexistent-sdlc-no-bind-mounts
+      - -allowhealthcheck
+      - -logjson
+      - -loglevel=WARN
+      - -shutdowngracetime=5
+      - '-allowGET=/v1\.44/(_ping|images/[a-zA-Z0-9][a-zA-Z0-9_.-]*(:[0-9]{1,5})?(/[a-zA-Z0-9][a-zA-Z0-9_.-]*)*(:[\w.-]+)?(@sha256:[0-9a-f]{64})?/json|containers/json|containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(json|logs)|containers/sdlc-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/archive|networks|networks/[a-zA-Z0-9][a-zA-Z0-9_.-]*|volumes)'
+      - '-allowPOST=/v1\.44/(images/create|containers/create|containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(start|wait)|containers/sdlc-sandbox-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/kill|networks/create|networks/[a-zA-Z0-9][a-zA-Z0-9_.-]*/(connect|disconnect)|volumes/create)'
+      - '-allowPUT=/v1\.44/containers/[a-zA-Z0-9][a-zA-Z0-9_.-]*/archive'
+      - '-allowDELETE=/v1\.44/(containers|networks|volumes)/[a-zA-Z0-9][a-zA-Z0-9_.-]*'
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, /healthcheck]
+
+  # The same as in ../docker-compose.yml: it holds no secret and no client data (ADR-M91 §2.2).
+  npm-proxy:
+    image: verdaccio/verdaccio:6.10.4@sha256:43c4067288b050422265407ea2fe747e511fcd0c407a85ec90ab9a326d9400cd
+    profiles: [sandbox]
+    restart: unless-stopped
+    networks: [sdlc]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ../verdaccio/config.yaml:/verdaccio/conf/config.yaml:ro
+      - npm-proxy-storage:/verdaccio/storage
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:4873/-/ping]
+
+  # Relay to LiteLLM on the link address, port 4000. The container name stays
+  # <project>-litellm-1: the runner attaches it to each run's network under the alias litellm.
+  litellm:
+    <<: *relay
+    profiles: [sandbox]
+    volumes:
+      - ./haproxy/litellm.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+  # Relay to knowledge-db on the link address, port 5433 (PostgreSQL has 5432 there).
+  knowledge-db:
+    <<: *relay
+    profiles: [knowledge]
+    volumes:
+      - ./haproxy/knowledge-db.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+  # VM only (QUESTIONS #599): the Engine pulls sandbox images from 127.0.0.1:5050 by digest;
+  # this relay forwards GET and HEAD only to the platform's registry on the link address.
+  registry:
+    <<: *relay
+    profiles: [vm]
+    volumes:
+      - ./haproxy/registry.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - 127.0.0.1:${SDLC_REGISTRY_HOST_PORT:-5050}:5000
+
+  # The same as in ../docker-compose.yml, environment included: the platform's services are
+  # reached by their names through extra_hosts (the link address).
+  sdlc-runner:
+    image: sdlc-runner:0.0.0
+    build:
+      context: ../../..
+      dockerfile: platform/apps/runner/Dockerfile
+    profiles: [sandbox]
+    restart: unless-stopped
+    networks: [sdlc]
+    extra_hosts: *link-hosts
+    depends_on:
+      openbao-ca-init:
+        condition: service_completed_successfully
+      docker-socket-proxy:
+        condition: service_healthy
+      npm-proxy:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    # Group of the proxy socket (mode 0660, group = the socket proxy's group).
+    group_add: ['${SDLC_DOCKER_GID:-0}']
+    environment:
+      SDLC_RUNNER_DOCKER_SOCKET: /run/docker-proxy/docker.sock
+      SDLC_RUNNER_INSTANCE: ${COMPOSE_PROJECT_NAME:-sdlc}
+      SDLC_RUNNER_MAX_SANDBOXES: ${SDLC_RUNNER_MAX_SANDBOXES:-1}
+      # L04 (ADR-M81 §2.3): free slots only, never above the line before; 0 turns evaluations off.
+      SDLC_RUNNER_MAX_EVAL_SANDBOXES: ${SDLC_RUNNER_MAX_EVAL_SANDBOXES:-1}
+      SDLC_RUNNER_SWEEP_INTERVAL_SECONDS: ${SDLC_RUNNER_SWEEP_INTERVAL_SECONDS:-300}
+      SDLC_RUNNER_EGRESS_SERVICES: litellm=${COMPOSE_PROJECT_NAME:-sdlc}-litellm-1:4000,npm-proxy=${COMPOSE_PROJECT_NAME:-sdlc}-npm-proxy-1:4873
+      SDLC_RUNNER_NPM_REGISTRY: http://npm-proxy:4873/
+      # X04 PR 3b (ADR-M69 §2.4, ADR-M89): the backing services a register tool may reach on its
+      # own service network: the index (profile knowledge) and LiteLLM for its query embeddings.
+      SDLC_RUNNER_TOOL_SERVICES: knowledge-db=${COMPOSE_PROJECT_NAME:-sdlc}-knowledge-db-1:5432,litellm=${COMPOSE_PROJECT_NAME:-sdlc}-litellm-1:4000
+      # C05 (ADR-M29): the runner joins each run's network with its own container to call the
+      # Agent Server, and leaves at clean-up. LiteLLM as the sandbox sees it.
+      SDLC_RUNNER_SELF_CONTAINER: ${COMPOSE_PROJECT_NAME:-sdlc}-sdlc-runner-1
+      SDLC_RUNNER_AGENT_LLM_URL: http://litellm:4000
+      SDLC_RUNNER_WORK_DIR: /var/lib/sdlc-runner/work
+      SDLC_RUNNER_DB_HOST: postgres
+      SDLC_RUNNER_DB_NAME: platform
+      # C06 session 2 (ADR-M33 §2.6): the task queue sdlc-runner; one activity slot per sandbox.
+      SDLC_RUNNER_TEMPORAL_ADDRESS: temporal:7233
+      SDLC_RUNNER_TEMPORAL_NAMESPACE: ${TEMPORAL_NAMESPACE:-default}
+      # C06 session 2b (ADR-M33 §2.9): L1 proposals go to SeaweedFS with the runner's write-only
+      # identity from OpenBao (kv/runner/evidence, `openbao:bootstrap runner-evidence-credentials`).
+      SDLC_RUNNER_EVIDENCE_URL: http://seaweedfs:8333
+      SDLC_RUNNER_EVIDENCE_BUCKET: evidence
+      # TLS (A10, ADR-M63): the client always verifies OpenBao's certificate with this CA.
+      SDLC_OPENBAO_ADDR: https://openbao:8200
+      SDLC_OPENBAO_CA_CERT_FILE: /run/sdlc/openbao-ca/ca.pem
+      SDLC_OPENBAO_ROLE_ID_FILE: /run/sdlc/approle/role_id
+      SDLC_OPENBAO_SECRET_ID_FILE: /run/sdlc/approle/secret_id
+    volumes:
+      - docker-proxy:/run/docker-proxy
+      - runner-approle:/run/sdlc/approle
+      - runner-work:/var/lib/sdlc-runner/work
+      - openbao-ca:/run/sdlc/openbao-ca:ro
+    read_only: true
+    # /tmp holds the heartbeat file the health check reads.
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: [CMD, node, /app/dist/healthcheck.js]

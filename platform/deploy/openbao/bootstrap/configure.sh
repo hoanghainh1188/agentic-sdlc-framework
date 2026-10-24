@@ -5,9 +5,11 @@
 #
 # Runs INSIDE the openbao container. Called by platform/deploy/openbao/bootstrap.sh configure.
 #
-# Usage: configure.sh <secret-id-bound-cidrs> [--keep-token]
+# Usage: configure.sh <secret-id-bound-cidrs> [--keep-token] [--runner-cidr <cidr>]
 #   stdin: one line with a root token. Never an argument or environment variable of the caller.
-#   --keep-token  do not revoke the token at the end (default: revoke it, D-03 section 10.2)
+#   --keep-token   do not revoke the token at the end (default: revoke it, D-03 section 10.2)
+#   --runner-cidr  the runner host's address (SDLC_RUNNER_SOURCE_CIDR): the AppRole "runner" also
+#                  accepts it; every other role does not (O01, design/ADR-M91 §2.7, QUESTIONS #596)
 set -eu
 
 dir=/openbao/bootstrap
@@ -24,10 +26,23 @@ setting() {
   printf '%s' "$value"
 }
 
-[ "$#" -ge 1 ] || fail "usage: configure.sh <secret-id-bound-cidrs> [--keep-token]"
+[ "$#" -ge 1 ] || fail "usage: configure.sh <secret-id-bound-cidrs> [--keep-token] [--runner-cidr <cidr>]"
 cidrs="$1"
+shift
 keep_token=no
-[ "${2:-}" = --keep-token ] && keep_token=yes
+runner_cidr=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --keep-token) keep_token=yes ;;
+    --runner-cidr)
+      [ "$#" -ge 2 ] || fail "--runner-cidr needs a value"
+      runner_cidr="$2"
+      shift
+      ;;
+    *) fail "unknown option: $1" ;;
+  esac
+  shift
+done
 
 IFS= read -r BAO_TOKEN || true
 [ -n "${BAO_TOKEN:-}" ] || fail "no token on stdin"
@@ -116,6 +131,8 @@ fi
 # platform process does not work from anywhere else (task A04, design/ADR-M21 §2.5).
 for role in $roles; do
   [ -f "$dir/policies/$role.hcl" ] || fail "no policy file policies/$role.hcl for AppRole $role"
+  role_cidrs="$cidrs"
+  [ "$role" = runner ] && [ -n "$runner_cidr" ] && role_cidrs="$cidrs,$runner_cidr"
   bao write auth/approle/role/"$role" \
     token_policies="$role" \
     token_type=service \
@@ -123,10 +140,10 @@ for role in $roles; do
     token_max_ttl="$token_max_ttl" \
     secret_id_ttl="$secret_id_ttl" \
     secret_id_num_uses=0 \
-    secret_id_bound_cidrs="$cidrs" \
-    token_bound_cidrs="$cidrs" \
+    secret_id_bound_cidrs="$role_cidrs" \
+    token_bound_cidrs="$role_cidrs" \
     bind_secret_id=true >/dev/null
-  say "approle $role written (secret IDs and tokens bound to $cidrs)"
+  say "approle $role written (secret IDs and tokens bound to $role_cidrs)"
 done
 
 # --- Token role for daily admin work ----------------------------------------------------------
