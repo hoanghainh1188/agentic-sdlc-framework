@@ -1,5 +1,5 @@
 // The credentials of a run's register tools (task X04 PR 3b, design/ADR-M69 §2.4, §2.8, ADR-M89,
-// QUESTIONS #535, #537, #541, #542). For each grant with `read_documents`, in the run preparation:
+// QUESTIONS #535, #537, #540, #541). For each grant with `read_documents`, in the run preparation:
 //
 //   a database login in `knowledge-db` (OpenBao's database engine, role `kdocs-<run_id>`, member
 //   of the project's read role only) + the tool's own model key (alias `tool-<run_id>-<tool_key>`)

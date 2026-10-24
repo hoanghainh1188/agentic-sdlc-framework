@@ -36,7 +36,7 @@ export function runKeyAlias(runId: string): string {
 
 const TOOL_KEY = /^[a-z][a-z0-9-]{1,62}$/;
 
-/** X04 PR 3b (QUESTIONS #542): the alias of a register tool's own key in one run. */
+/** X04 PR 3b (QUESTIONS #541): the alias of a register tool's own key in one run. */
 export function toolKeyAlias(runId: string, toolKey: string): string {
   if (!UUID.test(runId) || !TOOL_KEY.test(toolKey)) {
     throw new GatewayError('invalid_input', 'tool key is not valid', undefined, 'toolKey');

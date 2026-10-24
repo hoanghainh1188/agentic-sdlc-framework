@@ -1,5 +1,5 @@
 // What a run's `read_documents` tools returned (task X04 PR 3b, design/ADR-M89 §2.5, QUESTIONS
-// #533, #536, #544). At the end of the run (also after a kill or a failure, and in the clean-up
+// #533, #536, #543). At the end of the run (also after a kill or a failure, and in the clean-up
 // after a restart), before the tool containers are removed, the runner reads each tool's own log
 // from outside the sandbox. A `read_documents` tool writes one line per answer
 // (`KNOWLEDGE_READ_LOG_EVENT`): the document IDs and content hashes it returned and a chunk count.

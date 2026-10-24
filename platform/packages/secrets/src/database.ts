@@ -1,5 +1,5 @@
 // Short-lived database logins for a run's tools (task X04 PR 3b, design/ADR-M69 §2.4, ADR-M89,
-// QUESTIONS #535, #537, #541). OpenBao's database secrets engine (mount `database/`, connection
+// QUESTIONS #535, #537, #540). OpenBao's database secrets engine (mount `database/`, connection
 // `knowledge-db`) logs in to `knowledge-db` as `kdocs_issuer` and makes one login per tool grant:
 //
 //   write `database/roles/kdocs-<run_id>` (its only grant: the project's read role)

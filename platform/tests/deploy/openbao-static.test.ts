@@ -172,7 +172,7 @@ describe('OpenBao policies', () => {
           expect(rule.capabilities).toEqual(['update']);
           continue;
         }
-        // X04 PR 3b (QUESTIONS #541): the worker revokes the database logins of one run's tools,
+        // X04 PR 3b (QUESTIONS #540): the worker revokes the database logins of one run's tools,
         // `kdocs-<run_id>` only; revoke-prefix needs `sudo`.
         if (name === 'worker' && rule.path === 'sys/leases/revoke-prefix/database/creds/kdocs-*') {
           expect(rule.capabilities).toEqual(['update', 'sudo']);

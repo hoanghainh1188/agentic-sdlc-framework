@@ -1,4 +1,4 @@
-// D-08 X04 AC5 (design/ADR-M89 §2.5; QUESTIONS #533, #536, #544): the runner records
+// D-08 X04 AC5 (design/ADR-M89 §2.5; QUESTIONS #533, #536, #543): the runner records
 // `knowledge_read` once per run and `read_documents` tool, at the end of the run, from the tool's
 // own log: the SHA-256 of the sorted list of document ID and content hash, the counts, and the list
 // itself as the evidence item `knowledge_read`. Never a query, a path or a text.

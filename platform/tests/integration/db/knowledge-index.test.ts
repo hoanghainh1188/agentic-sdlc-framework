@@ -260,7 +260,7 @@ describeDb('X04 PR 3a: the document index on PostgreSQL', () => {
     expect((await w.scope.evidenceItems.listForIntent(w.intentId)).map((i) => i.kind)).toContain(
       'knowledge_read',
     );
-    // Migration 0040: a tool's own model key has the label `agent` = `tool:<key>` (QUESTIONS #542).
+    // Migration 0040: a tool's own model key has the label `agent` = `tool:<key>` (QUESTIONS #541).
     expect(
       await w.scope.costRecords.insertIfNew({
         projectId: w.projectId,

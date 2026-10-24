@@ -57,7 +57,7 @@ export interface RunDatabaseLogin {
 
 /**
  * Short-lived database logins for a run's tools (X04 PR 3b, ADR-M69 §2.4, QUESTIONS #535, #537,
- * #541): one OpenBao database role per run, `kdocs-<run_id>`, whose only grant is `grantRole`.
+ * #540): one OpenBao database role per run, `kdocs-<run_id>`, whose only grant is `grantRole`.
  * Everything is found again from the run ID, so no lease ID ever travels or is stored (R031).
  */
 export interface RunDatabaseCredentials {

@@ -5,7 +5,7 @@
 //   and a budget cap = the smallest of the run budget (contract), what is left of the intent
 //   budget and what is left of the tenant's budget for this UTC month (both from `cost_records`).
 //   A zero or negative remainder is refused, never turned into a zero-budget key.
-// - `issueToolKey` (X04 PR 3b, ADR-M69 §2.4, QUESTIONS #542): the own key of a register tool that
+// - `issueToolKey` (X04 PR 3b, ADR-M69 §2.4, QUESTIONS #541): the own key of a register tool that
 //   calls a model, with the run's labels (`agent` = `tool:<tool_key>`), one model of the contract
 //   and a small cap; revoked with the run's key by alias.
 // - `endRun`: revokes the key first, then syncs spend once.
@@ -196,7 +196,7 @@ export class CostController {
     return { key, labels, maxBudgetUsd, limitedBy };
   }
 
-  /** The own key of a register tool of the run (see the header; QUESTIONS #542). */
+  /** The own key of a register tool of the run (see the header; QUESTIONS #541). */
   async issueToolKey(input: IssueToolKey): Promise<VirtualKey> {
     const scope = this.db.forTenant(input.tenantId);
     const run = await scope.runs.getById(input.runId);

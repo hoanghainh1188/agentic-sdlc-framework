@@ -199,7 +199,7 @@ describe('C06 session 2: revokeRunKey (the key ID never travels)', () => {
   });
 });
 
-describe("X04 PR 3b: a register tool's own key (QUESTIONS #542)", () => {
+describe("X04 PR 3b: a register tool's own key (QUESTIONS #541)", () => {
   it('has its own alias and owner, with the labels given (agent `tool:<key>`)', async () => {
     stub.on('POST', '/key/generate', () => ({
       body: { key: 'sk-tool', token: HASH, expires: '2026-09-26T10:15:00Z' },

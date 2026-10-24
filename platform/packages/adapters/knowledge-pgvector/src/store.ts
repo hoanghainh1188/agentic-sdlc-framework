@@ -2,7 +2,7 @@
 //
 // - One schema per project, `kdocs_p<project ID without dashes>`, and one read role per project
 //   (no login), `kdocs_p<…>_read`, that may read that schema only. A run's tool logs in as a member
-//   of it (PR 3b, QUESTIONS #537, #541): OpenBao's database engine creates that login as
+//   of it (PR 3b, QUESTIONS #537, #540): OpenBao's database engine creates that login as
 //   `kdocs_issuer`, which holds the read role with the admin option only. Names are built from the
 //   project's UUID only, never from input text.
 // - Chunks are keyed by the SHA-256 of their model and text and reused by every index version of

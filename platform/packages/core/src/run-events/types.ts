@@ -71,7 +71,7 @@ export const RUN_EVENT_TYPES = {
    */
   knowledge_unavailable: { reason: 'code' },
   /**
-   * X04 PR 3b (ADR-M89 §2.5, QUESTIONS #533, #536, #544): once per run and `read_documents` tool,
+   * X04 PR 3b (ADR-M89 §2.5, QUESTIONS #533, #536, #543): once per run and `read_documents` tool,
    * at the end of the run (also after a kill or a failure), from the tool's own log lines read by
    * the runner outside the sandbox. `list_sha256`: the SHA-256 of the evidence item `knowledge_read`
    * (the sorted list of document ID and content hash the tool returned); `documents`: how many
@@ -86,7 +86,7 @@ export const RUN_EVENT_TYPES = {
     chunks: 'count',
   },
   /**
-   * X04 PR 3b (ADR-M69 §2.7–§2.8, QUESTIONS #541, #542): the run's tool credentials (the database
+   * X04 PR 3b (ADR-M69 §2.7–§2.8, QUESTIONS #540, #541): the run's tool credentials (the database
    * logins and the tools' model keys) were revoked at the end of the run or at a kill;
    * `tool_credential_revoke_failed` with a code when it failed (the time to live still ends them).
    */

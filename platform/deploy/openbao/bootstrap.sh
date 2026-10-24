@@ -734,7 +734,7 @@ cmd_worker_knowledge_credentials() {
   say "kv/worker/knowledge-db stored and set on the knowledge-db role knowledge; restart sdlc-worker to use it"
 }
 
-# The issuer of the tools' database logins (X04 PR 3b, ADR-M89, QUESTIONS #535, #537, #541). The
+# The issuer of the tools' database logins (X04 PR 3b, ADR-M89, QUESTIONS #535, #537, #540). The
 # password is made inside the openbao container, written into the database engine's connection
 # (not verified yet) and printed as SQL into a variable, never a file or an argument; psql sets it
 # on the role in knowledge-db (the session logs no statement); then `rotate-root` replaces it with

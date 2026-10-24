@@ -8,7 +8,7 @@ import type { ModelRef } from './policy.js';
 import type { RedactedSecret } from './secrets.js';
 
 /**
- * The `agent` label of a register tool's own key (X04 PR 3b, ADR-M69 §2.4, QUESTIONS #542): the
+ * The `agent` label of a register tool's own key (X04 PR 3b, ADR-M69 §2.4, QUESTIONS #541): the
  * tool's code, `tool:<tool_key>`. An agent key never holds a colon, so the two never collide.
  */
 export function toolCostAgent(toolKey: string): string {
@@ -56,7 +56,7 @@ export interface CreateRunKey {
   /** The tenant's budget group (`ensureTenantBudget`); its spend counts against the tenant cap. */
   readonly tenantGroupId: string;
   /**
-   * X04 PR 3b (ADR-M69 §2.4, QUESTIONS #542): the key of one register tool of the run, not of the
+   * X04 PR 3b (ADR-M69 §2.4, QUESTIONS #541): the key of one register tool of the run, not of the
    * agent. Its alias is `tool-<run_id>-<tool_key>`, so it is revoked with the run's key by alias.
    */
   readonly toolKey?: string;

@@ -29,7 +29,7 @@ export interface ExecuteRunInput {
    */
   readonly wrappedFeedbackToken?: string;
   /**
-   * X04 PR 3b (ADR-M69 §2.4, QUESTIONS #535, #542): by tool key, the single-use wrapping token
+   * X04 PR 3b (ADR-M69 §2.4, QUESTIONS #535, #541): by tool key, the single-use wrapping token
    * around a `read_documents` tool's `{ db_username, db_password, llm_key }` and the ID of the
    * index version it reads. The runner unwraps it and writes it into the tool's container as a
    * file; the sandbox never sees it.

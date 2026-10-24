@@ -344,7 +344,7 @@ tools:
   # register tool runs (`tool_unavailable`).
   gateway:
     image: cr.agentgateway.dev/agentgateway:v1.6.0@sha256:9d3e6044ddcdc0878b1787f77bd401252b95e22684203fb5e874c4c42d2ed90c
-  # X04 PR 3b, ADR-M69 §2.4, QUESTIONS #542: a tool that calls a model (`model_ref`, for example
+  # X04 PR 3b, ADR-M69 §2.4, QUESTIONS #541: a tool that calls a model (`model_ref`, for example
   # the embedding model of `read_documents`) gets its own virtual key per run, capped at this
   # amount and never above what the run's own budget leaves. Its spend counts for the run (R027).
   # [Proposal] number: embedding a query with bge-m3 on the server costs nothing per call.

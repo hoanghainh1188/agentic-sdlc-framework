@@ -1,5 +1,5 @@
 // D-08 X04 AC5 and PR 3b on a real knowledge-db and a real OpenBao (dev mode, in memory;
-// `pnpm test:knowledge`; design/ADR-M89, QUESTIONS #535, #537, #541):
+// `pnpm test:knowledge`; design/ADR-M89, QUESTIONS #535, #537, #540):
 // - the issuer role as `knowledge-issuer-credentials` sets it up (bootstrap.sh): it may create and
 //   drop roles and holds each project's read role with the admin option only, so it cannot read an
 //   index itself;

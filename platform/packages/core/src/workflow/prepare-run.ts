@@ -82,7 +82,7 @@ export interface PrepareRunDeps {
    */
   readonly knowledge?: KnowledgeDeps;
   /**
-   * X04 PR 3b (QUESTIONS #535, #541): OpenBao's database engine, for the database login of a
+   * X04 PR 3b (QUESTIONS #535, #540): OpenBao's database engine, for the database login of a
    * `read_documents` tool. Without it a run with such a tool fails (`tool_unavailable`).
    */
   readonly databaseCredentials?: RunDatabaseCredentials;

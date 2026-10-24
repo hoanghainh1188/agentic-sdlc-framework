@@ -31,7 +31,7 @@ path "transit/keys/run-contract" {
 }
 
 # The short-lived database login of a run's `read_documents` tool (X04 PR 3b, ADR-M89, QUESTIONS
-# #535, #537, #541): one role per run, `kdocs-<run_id>`, made and deleted by the worker; its only
+# #535, #537, #540): one role per run, `kdocs-<run_id>`, made and deleted by the worker; its only
 # grant is the project's read role (the statement is checked in @sdlc/secrets). Never the
 # connection, never `rotate-root`, never another role name.
 path "database/roles/kdocs-*" {

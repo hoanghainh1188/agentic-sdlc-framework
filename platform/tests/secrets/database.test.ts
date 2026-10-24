@@ -1,4 +1,4 @@
-// D-08 X04 PR 3b (design/ADR-M69 §2.4, §2.8; QUESTIONS #535, #537, #541): the database logins of a
+// D-08 X04 PR 3b (design/ADR-M69 §2.4, §2.8; QUESTIONS #535, #537, #540): the database logins of a
 // run's tools from OpenBao's database engine. One role per run, `kdocs-<run_id>`, whose only grant
 // is the project's read role; the run ID alone finds the leases and the role again, so no lease ID
 // is kept or travels. The statement is built from checked names only.
@@ -42,7 +42,7 @@ const CREDS = {
   },
 };
 
-describe('the run database login (QUESTIONS #541)', () => {
+describe('the run database login (QUESTIONS #540)', () => {
   it('writes the run role, then reads one login; the login is redacted', async () => {
     const { call, requests } = caller(CREDS);
     const creds = new DatabaseCredentials('database', call);

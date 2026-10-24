@@ -1,4 +1,4 @@
-// D-08 X04 PR 3b (design/ADR-M69 §2.4, §2.8; QUESTIONS #535, #541, #542): the credentials of a
+// D-08 X04 PR 3b (design/ADR-M69 §2.4, §2.8; QUESTIONS #535, #540, #541): the credentials of a
 // run's `read_documents` tool, issued by the worker in the run preparation and revoked at the end
 // of the run, at a kill and for an abandoned run. Only the wrapping token and the index ID go on;
 // revoking twice is harmless and the run events are written once per tool.
@@ -68,7 +68,7 @@ function fakeCredentials(fail = false) {
   return { creds, calls };
 }
 
-describe('issuing the secrets of a read_documents tool (QUESTIONS #535, #542)', () => {
+describe('issuing the secrets of a read_documents tool (QUESTIONS #535, #541)', () => {
   it('one login and one model key per tool, wrapped together; others get nothing', async () => {
     const { scope } = fakeScope([]);
     const { creds, calls } = fakeCredentials();

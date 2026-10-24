@@ -14,7 +14,7 @@ export function knowledgeSchema(projectId: string): string {
 
 /**
  * The project's read role (no login). A run's tool logs in as a member of it only (X04 PR 3b,
- * QUESTIONS #537, #541): the OpenBao database role of the run grants this role and nothing else.
+ * QUESTIONS #537, #540): the OpenBao database role of the run grants this role and nothing else.
  */
 export function knowledgeReadRole(projectId: string): string {
   return `${knowledgeSchema(projectId)}_read`;
