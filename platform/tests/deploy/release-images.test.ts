@@ -59,13 +59,6 @@ const LOCK_NAMES: Record<string, string> = {
   SANDBOX_NODE24: 'sandbox-node24',
   TOOL_PROJECT_DOCS: 'tool-project-docs',
 };
-/**
- * Images added to the release since the lock file was last written (X04 PR 3b, the repository
- * owner, 2026-10-24): the lock is never edited by hand (R089), so a new image may be missing from
- * it until the next release's lock pull request (`pnpm release:lock`) writes it. Only a name listed
- * here may be missing, and only as a whole (never an empty value).
- */
-const NEW_SINCE_LOCK = new Set(['TOOL_PROJECT_DOCS']);
 
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 const wf = parse(read('.github/workflows/release-images.yml')) as Workflow;
@@ -215,9 +208,7 @@ describe('V04: the release workflow', () => {
       .join('\n');
     const written = [...run.matchAll(/echo "(SDLC_IMAGE[A-Z0-9_]*)=/g)].map((m) => m[1]!);
     const lock = [...parseEnvFile(readDeployFile('images.lock')).keys()];
-    const notYet = (name: string) =>
-      NEW_SINCE_LOCK.has(name.replace(/^SDLC_IMAGE_/, '')) && !lock.includes(name);
-    expect(written.filter((name) => !notYet(name))).toEqual(lock);
+    expect(written).toEqual(lock);
   });
 });
 
@@ -231,9 +222,7 @@ describe('V04: Compose uses the published images on a release checkout only', ()
   });
 
   it('the lock file is empty, or complete and pinned by digest, never ahead of package.json', () => {
-    const expected = Object.keys(LOCK_NAMES).filter(
-      (n) => !NEW_SINCE_LOCK.has(n) || lock.has(`SDLC_IMAGE_${n}`),
-    );
+    const expected = Object.keys(LOCK_NAMES);
     expect([...lock.keys()]).toEqual([
       'SDLC_IMAGES_VERSION',
       ...expected.map((n) => `SDLC_IMAGE_${n}`),
