@@ -93,6 +93,7 @@ describePilot(
           'agent_finished',
           'diff_stored',
           'changes_checked',
+          'secrets_scanned',
           'branch_pushed',
         ]),
       );

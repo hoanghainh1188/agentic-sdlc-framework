@@ -130,7 +130,7 @@ Security findings at or above the configured severity (default **HIGH**; **CRITI
 When the platform passed G5 (Chapter 13 §13.10.5), the intent waits at **G6**. The platform then puts the agent's changes into a pull request by itself:
 
 1. **It waits for the G5 block window.** While Person A can still send the changes back at G5, nothing leaves the platform.
-2. **It pushes the checked changes.** The agent in its sandbox has no access to GitHub. The platform's runner takes the diff that G5 checked (never what the agent reports), makes **one commit** from it on the run's start commit, and pushes it to the branch `agent/INT-…`. The commit's author is `sdlc-agent`. The runner never pushes to the default branch, and never force-pushes; branch protection on the default branch also refuses it.
+2. **It pushes the checked changes.** G5 already scanned the lines the run added for secrets (Chapter 13 §13.10.5a): a change with a secret never gets this far. The agent in its sandbox has no access to GitHub. The platform's runner takes the diff that G5 checked (never what the agent reports), makes **one commit** from it on the run's start commit, and pushes it to the branch `agent/INT-…`. The commit's author is `sdlc-agent`. The runner never pushes to the default branch, and never force-pushes; branch protection on the default branch also refuses it.
 3. **It opens the pull request** from `agent/INT-…` into the default branch, or uses the open one, and posts a comment on the intent's issue: **the pull request is open**. The comment mentions Person B.
 
 The pull request follows template T2:
@@ -237,4 +237,5 @@ A project without CI never passes G6.
 | 0.3 | 2026-10-03 | Claude Code (task C08, PR 1) | §14.10.1: the push and the pull request (ADR-M38 §2.1–§2.6, QUESTIONS #155, #156) |
 | 0.4 | 2026-10-03 | Claude Code (task C08, PR 2) | §14.10.2: how G6 reads CI, retries, the timeout, security findings (ADR-M38 §2.7, QUESTIONS #157–#159) |
 | 0.6 | 2026-10-09 | Claude (docs review fixes) | `roll-back` is the decision's spelling (the CLI refuses `roll_back`) |
+| 0.7 | 2026-10-24 | Claude (task H04) | §14.10.1: the push comes after the secret scan of G5 (Chapter 13 §13.10.5a, ADR-M93) |
 | 0.5 | 2026-10-09 | Claude Code (docs review PR C) | §14.10.1, §14.10.2: the GitHub App permissions link to the one list in `platform/deploy/README.md` |

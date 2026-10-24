@@ -5,7 +5,11 @@ import type { RunStatus, ValidatedProjectConfig } from '@sdlc/contracts';
 import { describe, expect, it } from 'vitest';
 
 import type { Run } from '../../packages/core/src/db/schema.js';
-import { spentPercent, type G5Facts } from '../../packages/core/src/workflow/g5-facts.js';
+import {
+  spentPercent,
+  type G5Facts,
+  type G5SecretScan,
+} from '../../packages/core/src/workflow/g5-facts.js';
 import { g5Breach } from '../../packages/core/src/workflow/g5.js';
 
 const loaded = loadProjectConfig('');
@@ -17,6 +21,7 @@ function facts(
   stopReason: string | null,
   changes: { out?: number; instructions?: number } | null = {},
   spentUsd = '0',
+  secrets: G5SecretScan | null = { result: 'clean', findings: 0 },
 ): G5Facts {
   return {
     run: { status, stop_reason: stopReason } as Run,
@@ -30,6 +35,7 @@ function facts(
             instructionFiles: changes.instructions ?? 0,
             pathsSha256: 'a'.repeat(64),
           },
+    secrets,
     keyCapUsd: '2',
     spentUsd,
     intentSpentUsd: spentUsd,
@@ -52,6 +58,35 @@ describe('g5Breach: instruction files, then scope, then caps', () => {
       'instructions_unpinned',
       'instructions_changed',
       'security',
+    ]);
+  });
+
+  it('H04: a secret in the added lines holds the run with a security escalation, before scope and caps', () => {
+    const found = { result: 'found', findings: 2 } as const;
+    expect(check(facts('stopped_budget', 'max_budget', { out: 2 }, '0', found))).toEqual([
+      'secret_in_diff',
+      'secret_found',
+      'security',
+    ]);
+    // Instruction files still come first.
+    expect(check(facts('succeeded', null, { instructions: 1 }, '0', found))).toEqual([
+      'instructions_unpinned',
+      'instructions_changed',
+      'security',
+    ]);
+  });
+
+  it('H04: a failed or missing scan holds the run with a technical escalation (QUESTIONS #587, #590)', () => {
+    const failed = { result: 'failed', findings: 0 } as const;
+    expect(check(facts('succeeded', null, {}, '0', failed))).toEqual([
+      'secret_scan_failed',
+      'secret_scan_failed',
+      'technical',
+    ]);
+    expect(check(facts('succeeded', null, { out: 1 }, '0', null))).toEqual([
+      'secret_scan_failed',
+      'secret_scan_failed',
+      'technical',
     ]);
   });
 

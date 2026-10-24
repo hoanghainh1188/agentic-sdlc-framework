@@ -149,6 +149,11 @@ describeWorkflow(
         instruction_files: 0,
         paths_sha256: 'a'.repeat(64),
       });
+      await scope.runEvents.append(input.runId, 'secrets_scanned', {
+        result: 'clean',
+        findings: 0,
+        rules: 'built_in',
+      });
       await scope.runs.transition(input.runId, {
         from: ['running'],
         to: 'succeeded',

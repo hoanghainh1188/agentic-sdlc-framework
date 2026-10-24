@@ -215,7 +215,7 @@ export function gitArgs(repoDir: string, args: readonly string[]): string[] {
 }
 
 /** Hardened git in the runner's clone (`gitArgs`, `gitEnv`). */
-function gitIn(
+export function gitIn(
   repoDir: string,
   home: string,
   args: string[],
