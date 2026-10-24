@@ -48,7 +48,7 @@ import {
   toolSwitches,
   wrapped,
 } from './request.js';
-import { countsOf, stateOf } from './status.js';
+import { countsOf, fileReadsOfMessages, stateOf } from './status.js';
 
 export interface OpenCodeAdapterOptions {
   /** Per request. Default 30 s. */
@@ -73,6 +73,8 @@ interface RunState {
   /** The highest counts reported so far: they never go down. */
   readonly iterations: number;
   readonly events: number;
+  /** X07: the platform's own commands (commit, diff), which OpenCode logs as `bash` calls. */
+  readonly platformCommands?: readonly string[];
 }
 
 /** Runs kept in memory; the oldest go first (a runner drives 1–2 runs at a time). */
@@ -211,10 +213,16 @@ export class OpenCodeAdapter implements AgentAdapter {
   }
 
   async #shell(handle: AgentRunHandle, script: string): Promise<{ out: string; exit: number }> {
+    const command = wrapped(script);
+    const run = this.#runs.get(handle.runId);
+    if (run) {
+      const platformCommands = [...(run.platformCommands ?? []), command];
+      this.#runs.set(handle.runId, { ...run, platformCommands });
+    }
     const out = await this.#client(handle).shell(
       handle.conversationId,
       AGENT,
-      wrapped(script),
+      command,
       this.#gitTimeout() * 1000,
     );
     const exit = exitCodeOf(out);
@@ -256,7 +264,12 @@ export class OpenCodeAdapter implements AgentAdapter {
       this.#runs.get(handle.runId)?.iterations ?? 0,
       countsOf(messages).iterations,
     );
-    return { changedFiles, headSha, iterations, events };
+    const reads = fileReadsOfMessages(
+      messages,
+      handle.workingDir,
+      this.#runs.get(handle.runId)?.platformCommands ?? [],
+    );
+    return { changedFiles, headSha, iterations, events, reads };
   }
 
   // The answer of a wrapped command must end with its exit code (`exitCodeOf`). An answer the

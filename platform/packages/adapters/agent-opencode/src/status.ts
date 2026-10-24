@@ -5,10 +5,12 @@
 // - Loop detection (C11, ADR-M42 §2.7): `events` counts every part; `identicalCalls` compares the
 //   `tool` parts with the loop key every adapter shares (`callKey` of `@sdlc/agent-kit`). Counts
 //   only: the arguments are client data.
+// - The context snapshot (X07, ADR-M90 §2.1): the files the `read` tool opened; `bash`, `grep`,
+//   `glob` and `list` can read files without naming them, so they are only counted.
 // - The runner never trusts the agent's own limits (gap 1): at the cap the adapter stops the run
 //   itself, whatever OpenCode's `steps` says.
-import { callKey, trailingEqual } from '@sdlc/agent-kit';
-import type { AgentRunState } from '@sdlc/contracts';
+import { callKey, fileReadsOf, trailingEqual } from '@sdlc/agent-kit';
+import type { AgentFileReads, AgentRunState } from '@sdlc/contracts';
 
 import type { OpenCodeMessage, SessionState } from './client.js';
 
@@ -30,6 +32,35 @@ export function countsOf(messages: readonly OpenCodeMessage[]): RunCounts {
     .filter((part) => part.type === TOOL_PART && typeof part.tool === 'string')
     .map((part) => callKey(part.tool ?? '', part.state?.input ?? {}));
   return { iterations, events: parts.length, identicalCalls: trailingEqual(keys) };
+}
+
+const READ_TOOL = 'read';
+const UNNAMED_READ_TOOLS = new Set(['bash', 'grep', 'glob', 'list']);
+
+/**
+ * The files the `read` tool opened and the number of other calls that can read files.
+ * `platformCommands`: the adapter's own shell commands (commit, diff), not counted.
+ */
+export function fileReadsOfMessages(
+  messages: readonly OpenCodeMessage[],
+  workingDir: string,
+  platformCommands: readonly string[] = [],
+): AgentFileReads {
+  const paths: string[] = [];
+  let unattributed = 0;
+  const own = new Set(platformCommands);
+  for (const part of messages.flatMap((message) => message.parts)) {
+    if (part.type !== TOOL_PART || typeof part.tool !== 'string') continue;
+    const command = (part.state?.input as { command?: unknown } | undefined)?.command;
+    if (part.tool === 'bash' && typeof command === 'string' && own.has(command)) continue;
+    if (UNNAMED_READ_TOOLS.has(part.tool)) {
+      unattributed += 1;
+      continue;
+    }
+    const input = part.state?.input as { filePath?: unknown } | undefined;
+    if (part.tool === READ_TOOL && typeof input?.filePath === 'string') paths.push(input.filePath);
+  }
+  return fileReadsOf(paths, workingDir, unattributed);
 }
 
 export interface StateInput {

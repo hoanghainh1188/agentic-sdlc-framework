@@ -29,6 +29,7 @@ describe('run event payloads', () => {
       'tool_failed',
       'knowledge_unavailable',
       'knowledge_read',
+      'context_snapshot',
       'tool_credential_revoked',
       'tool_credential_revoke_failed',
       'provisioning_failed',
@@ -60,6 +61,22 @@ describe('run event payloads', () => {
       'plan_read',
       'plan_unavailable',
     ]);
+  });
+
+  it('X07: context_snapshot holds a hash, a source code and counts, never a path', () => {
+    const payload = {
+      snapshot_sha256: SHA,
+      source: 'agent_log',
+      files: 2,
+      files_outside: 0,
+      unattributed_calls: 1,
+      document_tools: 1,
+      documents: 3,
+    };
+    expect(checkRunEvent('context_snapshot', payload)).toEqual(payload);
+    expect(refused('context_snapshot', { ...payload, source: 'src/index.ts' })).toThrow(DbError);
+    expect(refused('context_snapshot', { ...payload, files: -1 })).toThrow(DbError);
+    expect(refused('context_snapshot', { ...payload, path: SHA })).toThrow(/undeclared/);
   });
 
   it('V13: model_selected holds a gateway model name, never a space or an @', () => {

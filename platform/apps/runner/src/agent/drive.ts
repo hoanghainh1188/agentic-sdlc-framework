@@ -42,6 +42,7 @@
 import {
   AgentError,
   type AgentAdapter,
+  type AgentFileReads,
   type AgentOutputs,
   type AgentRunHandle,
   type AgentRunState,
@@ -172,6 +173,11 @@ export interface AgentRunResult {
   readonly stopReason: string | undefined;
   /** Undefined when the agent could not be reached any more (killed at the time cap, failures). */
   readonly outputs: AgentOutputs | undefined;
+  /**
+   * X07 (ADR-M90 §2.1): the files the agent's log shows it opened, also for an L1 run; undefined
+   * when the log was not read. For the context snapshot only.
+   */
+  readonly reads?: AgentFileReads;
 }
 
 /** The fixed author of the platform's commit: it names the agent (G7 producer, FR-11, #80). */
@@ -574,10 +580,17 @@ export async function driveAgent(
     commit,
     ...(proposed ? { changedFiles: proposed.changedFiles } : {}),
   });
+  const reads = outputs ? { reads: outputs.reads } : {};
   if (set === 'stopped_killed') {
-    return { outcome: 'killed', status: set, stopReason: KILLED, outputs: undefined };
+    return { outcome: 'killed', status: set, stopReason: KILLED, outputs: undefined, ...reads };
   }
-  return { outcome, status: set, stopReason, outputs: proposalOnly ? undefined : outputs };
+  return {
+    outcome,
+    status: set,
+    stopReason,
+    outputs: proposalOnly ? undefined : outputs,
+    ...reads,
+  };
 }
 
 /** The run was moved to `stopping` (C11). A read error is not a kill: the next poll reads again. */

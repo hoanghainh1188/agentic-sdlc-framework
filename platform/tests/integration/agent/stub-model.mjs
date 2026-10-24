@@ -20,6 +20,9 @@
 //   [stub:selfconfig]  X03 (OpenCode only): the agent's shell calls its own OpenCode server with
 //                the password from its environment and raises its step cap (ADR-M68 §6 gap 1),
 //                then keeps working, one reply every 2 s: the adapter must fail the run
+//   [stub:context]  X07: opens README.md and the spec with file_editor `view` (OpenCode: `read`),
+//                runs one terminal command, creates hello.txt, then finishes: the run's context
+//                snapshot lists the two files (hashed) and one unattributed call
 //   [stub:attack=<name>:<params>]  H01 (ADR-M80): a model that obeys every injection. It runs one
 //                attack from the table PROBES below in the real sandbox with the terminal tool
 //                and finishes. <params> is base64url JSON (targets, urls, ...). The probe prints
@@ -100,6 +103,9 @@ function ownTool(request, name, args) {
   if (offered(name)) return { name, args };
   if (name === 'terminal' && offered('bash')) {
     return { name: 'bash', args: { command: args.command, description: 'stub command' } };
+  }
+  if (name === 'file_editor' && args.command === 'view' && offered('read')) {
+    return { name: 'read', args: { filePath: args.path } };
   }
   if (name === 'file_editor' && offered('write')) {
     return { name: 'write', args: { filePath: args.path, content: args.file_text } };
@@ -361,8 +367,8 @@ function attackStep(request, first, step) {
 function reply(request) {
   const first = textOf(request.messages.find((m) => m.role === 'user')?.content);
   const script =
-    ['loop', 'slow', 'repeat', 'silent', 'append', 'count', 'live', 'selfconfig'].find((name) =>
-      first.includes(`[stub:${name}]`),
+    ['loop', 'slow', 'repeat', 'silent', 'append', 'count', 'live', 'selfconfig', 'context'].find(
+      (name) => first.includes(`[stub:${name}]`),
     ) ?? 'edit';
   const step = request.messages.filter((m) => m.role === 'assistant').length;
   if (first.includes('[stub:attack=')) return attackStep(request, first, step);
@@ -395,6 +401,29 @@ function reply(request) {
     const dir = LIVE_FILE.slice(0, LIVE_FILE.lastIndexOf('/'));
     const command = `mkdir -p ${dir} && printf '${LIVE_LINE}\\n' >> ${LIVE_FILE}`;
     return { delayMs, toolCalls: [call(request, step, 'terminal', { command })] };
+  }
+  if (script === 'context' && step < 3) {
+    const steps = [
+      call(request, step, 'file_editor', { command: 'view', path: '/workspace/README.md' }),
+      call(request, step, 'file_editor', {
+        command: 'view',
+        path: '/workspace/docs/specs/T01-labels.md',
+      }),
+      call(request, step, 'terminal', { command: 'ls' }),
+    ];
+    return { delayMs, toolCalls: [steps[step]] };
+  }
+  if (script === 'context' && step === 3) {
+    return {
+      delayMs,
+      toolCalls: [
+        call(request, step, 'file_editor', {
+          command: 'create',
+          path: '/workspace/hello.txt',
+          file_text: 'Hello from the X07 stub model.\n',
+        }),
+      ],
+    };
   }
   if (script === 'loop' || script === 'repeat')
     return { delayMs, toolCalls: [call(request, step, 'terminal', { command: 'ls' })] };

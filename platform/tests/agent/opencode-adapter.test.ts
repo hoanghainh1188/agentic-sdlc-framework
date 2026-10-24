@@ -402,6 +402,8 @@ describe('OpenCodeAdapter.stop, commitWork, collectOutputs', () => {
     expect(outputs.headSha).toBe(head);
     expect(outputs.iterations).toBe(1);
     expect(outputs.events[0]).toMatchObject({ role: 'user', type: 'text' });
+    // X07: the file the `read` tool opened (relative to the working dir).
+    expect(outputs.reads).toEqual({ paths: ['a'], outside: 0, unattributed: 0 });
     // The session key is the server password: an agent that prints it never puts it in evidence.
     state.messages = [
       user,

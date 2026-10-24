@@ -520,3 +520,56 @@ describe('E03 release hash (ADR-M49 §2.2): what a G8 approval is bound to', () 
     expect(md).toContain(build.releaseSha256);
   });
 });
+
+describe('X07 context snapshot (ADR-M90 §2.4, D-08 X07 AC2)', () => {
+  const snapshotPayload = {
+    snapshot_sha256: SHA('5'),
+    source: 'agent_log',
+    files: 4,
+    files_outside: 0,
+    unattributed_calls: 2,
+    document_tools: 1,
+    documents: 3,
+  };
+  const withSnapshot = (): PackSource => {
+    const base = source();
+    const events = [
+      ...(base.runEvents.get(ID(20)) ?? []),
+      event('context_snapshot', snapshotPayload, 9),
+    ];
+    const snapshotItem = {
+      ...item,
+      id: ID(91),
+      kind: 'context_snapshot',
+      sha256: SHA('5'),
+      size_bytes: 512,
+    } as unknown as EvidenceItem;
+    return {
+      ...base,
+      runEvents: new Map([[ID(20), events]]),
+      items: [...base.items, { item: snapshotItem, check: 'verified' }],
+    };
+  };
+
+  it('the manifest lists the snapshot hash and counts per run, and the snapshot file', () => {
+    const content = buildManifestContent(withSnapshot());
+    const runs = content.runs as Record<string, Record<string, unknown>>[];
+    expect(runs[0]!.events!.context_snapshot).toEqual(snapshotPayload);
+    expect(content.evidence_items).toContainEqual(
+      expect.objectContaining({ kind: 'context_snapshot', sha256: SHA('5'), check: 'verified' }),
+    );
+    expect(contentSha256(content)).not.toBe(contentSha256(buildManifestContent(source())));
+  });
+
+  it('the Markdown shows it in the checks table and the evidence files', () => {
+    const md = renderPackMarkdown({
+      source: withSnapshot(),
+      build,
+      names: new Map(),
+      locale: 'en',
+    });
+    expect(md).toContain(mdCode('context_snapshot'));
+    expect(md).toContain(`${mdText('snapshot_sha256')}=${mdCode(SHA('5'))}`);
+    expect(md).toContain(`${mdText('files')}=${mdCode('4')}`);
+  });
+});

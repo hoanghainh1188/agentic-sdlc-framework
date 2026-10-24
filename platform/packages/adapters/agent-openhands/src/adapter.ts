@@ -15,6 +15,7 @@ import {
 
 import { AgentServerClient, type ClientOptions, type ExecutionStatus } from './client.js';
 import { trailingIdenticalCalls } from './loop.js';
+import { fileReads } from './reads.js';
 import { buildConversationRequest } from './request.js';
 
 export interface OpenHandsAdapterOptions {
@@ -155,7 +156,8 @@ export class OpenHandsAdapter implements AgentAdapter {
     const { headSha, changedFiles } = parseDiffOutput(diff.stdout);
     const events = await client.listEvents(handle.conversationId);
     const iterations = events.filter((event) => event.kind === STEP_EVENT).length;
-    return { changedFiles, headSha, iterations, events };
+    const reads = fileReads(events, handle.workingDir);
+    return { changedFiles, headSha, iterations, events, reads };
   }
 
   #gitTimeout(): number {

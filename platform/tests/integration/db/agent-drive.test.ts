@@ -131,6 +131,7 @@ class FakeAgent implements AgentAdapter {
       headSha: HEAD,
       iterations: 3,
       events: [{ kind: 'ActionEvent' }],
+      reads: { paths: [SECRET_PATH, 'README.md'], outside: 1, unattributed: 2 },
     });
   }
 }
@@ -312,6 +313,12 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
 
     expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded' });
     expect(result.outputs?.changedFiles).toHaveLength(2);
+    // X07: the files the log shows go back for the context snapshot, never to a run event.
+    expect(result.reads).toEqual({
+      paths: [SECRET_PATH, 'README.md'],
+      outside: 1,
+      unattributed: 2,
+    });
     const started = agent.started!;
     expect(started.model).toMatchObject({ model: 'stub-model', baseUrl: 'http://litellm:4000' });
     expect(started.model.virtualKey.reveal()).toBe(VIRTUAL_KEY);
@@ -371,6 +378,8 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     expect(result).toMatchObject({ outcome: 'finished', status: 'succeeded_proposal_only' });
     // What the sandbox reports is never the result of an L1 run.
     expect(result.outputs).toBeUndefined();
+    // X07: an L1 run still has its context snapshot.
+    expect(result.reads?.paths).toHaveLength(2);
     expect(seen).toEqual([s.envelope.contract.run_id, s.sandbox.names.container]);
     expect(agent.commits).toBe(0);
     expect(await s.scope.runs.getById(s.envelope.contract.run_id)).toMatchObject({
@@ -460,6 +469,7 @@ describeDb('C05: the runner drives the agent, on PostgreSQL', () => {
     );
     expect(result).toMatchObject({ outcome: 'max_duration', status: 'stopped_timeout' });
     expect(result.outputs).toBeUndefined();
+    expect(result.reads).toBeUndefined();
     expect(await events(s)).toContainEqual([
       'agent_stopped',
       { reason: 'max_duration', method: 'kill' },

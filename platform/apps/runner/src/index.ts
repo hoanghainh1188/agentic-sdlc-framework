@@ -143,6 +143,17 @@ export {
   recordKnowledgeRead,
   type KnowledgeRead,
 } from './tools/knowledge-read.js';
+export {
+  buildContextSnapshot,
+  documentsOf,
+  recordContextSnapshot,
+  SNAPSHOT_SCHEMA_VERSION,
+  specAtStart,
+  type ContextSnapshot,
+  type FileListSource,
+  type SnapshotDocuments,
+  type SnapshotInput,
+} from './snapshot/context.js';
 export { recordToolUse } from './tools/record.js';
 export {
   buildGatewaySpec,

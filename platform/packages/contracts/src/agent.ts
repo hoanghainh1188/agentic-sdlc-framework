@@ -209,6 +209,19 @@ export interface ChangedFile {
 /** One entry of the agent's log, as the agent reports it. Client data: evidence only (E02). */
 export type AgentLogEvent = Readonly<Record<string, unknown>>;
 
+/**
+ * What the agent opened, for the run's context snapshot (X07, ADR-M90 §2.1). Client data: the
+ * runner hashes the paths and never writes them to a run event, a log or a table.
+ */
+export interface AgentFileReads {
+  /** Files opened with the agent's file-reading tool, relative to the working dir, sorted, distinct. */
+  readonly paths: readonly string[];
+  /** Calls of that tool on a path outside the working dir. */
+  readonly outside: number;
+  /** Tool calls that can read files the adapter cannot name (a shell command, a search). */
+  readonly unattributed: number;
+}
+
 export interface AgentOutputs {
   /** Files changed between the contract's `base_sha` and `headSha` (renames as delete + add). */
   readonly changedFiles: readonly ChangedFile[];
@@ -216,6 +229,8 @@ export interface AgentOutputs {
   readonly iterations: number;
   /** The whole log, oldest first. */
   readonly events: readonly AgentLogEvent[];
+  /** X07: the files the log shows the agent opened. */
+  readonly reads: AgentFileReads;
 }
 
 export interface AgentAdapter {

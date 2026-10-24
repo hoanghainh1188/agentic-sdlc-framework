@@ -26,6 +26,8 @@ export const EVIDENCE_KINDS = [
   'disclosure_note',
   /** X04 PR 3b (ADR-M89 §2.5): the document IDs and content hashes a run's tool returned. */
   'knowledge_read',
+  /** X07 (ADR-M90 §2.2): what the agent of one run read, hashes and counts only. */
+  'context_snapshot',
 ] as const;
 export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
 

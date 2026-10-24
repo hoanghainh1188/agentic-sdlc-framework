@@ -250,7 +250,8 @@ The **Evidence Pack** of an intent lists what the platform recorded for it, in o
 - the intent: code, risk tier, data class, autonomy, status, repository, issue and pull request;
 - the spec and the plan: each version's path, commit and SHA-256;
 - the agent runs: status, agent and version, model, start and pushed commits, and the latest checks (files in scope, push, CI and security findings, reviews, merge);
-- the stored evidence files (the run's diff, L1 proposals): kind, SHA-256 and size. The platform reads each file back and checks its hash before it builds the pack;
+- the stored evidence files (the run's diff, L1 proposals, the context snapshots): kind, SHA-256 and size. The platform reads each file back and checks its hash before it builds the pack;
+- per run, the **context snapshot** (task X07, `design/ADR-M90-context-snapshot.md`): what the agent read. See "The context snapshot" below;
 - every gate decision G1–G8: decision, oversight mode (HITL, HOTL, AUDIT, POLICY), the role and **the name of the person who decided**, the reason code and link, the waiting time;
 - the escalations, and the tokens and cost (with wasted cost);
 - the **client AI disclosure note** (Chapter 2 Rule 6), in the project's disclosure format (see below).
@@ -276,6 +277,17 @@ The **Evidence Pack** of an intent lists what the platform recorded for it, in o
 - **The disclosure note:**
   - **Standard note**: the platform writes it from its data: which agent and model wrote code, in how many runs, that people approved the change at G7, and the CI result.
   - **Client's own format**: the pack gives the same facts and says that the client's format applies. **The PM / BrSE writes that note** from the project AI record (its link is in the pack) and adds it to the delivery. The manifest marks `client_text_required: true`.
+- **The context snapshot** (task X07): at the end of every run whose agent started, the platform records what the agent read, as one evidence file per run. The pack shows its SHA-256 and these counts in the checks table (`context_snapshot`):
+
+  | Value | Meaning |
+  |---|---|
+  | `files` | How many repository files the agent opened by name (OpenHands: `file_editor view`; OpenCode: `read`) |
+  | `files_outside` | How many times it opened a file outside the repository |
+  | `unattributed_calls` | How many shell or search calls it made. Such a call can read files that the snapshot cannot name, so a high number means the file list is less complete |
+  | `document_tools`, `documents` | How many document tools returned results, and how many documents they returned (the document IDs and hashes are in the tool's own evidence file, `knowledge_read`) |
+  | `source` | `agent_log`: the list comes from the agent's log. `unavailable`: the platform could not read the log (the run was killed, failed or the runner restarted); the snapshot still records the versions and the documents |
+
+  The file also holds the run's base commit and the plan and spec versions. It holds the **SHA-256 of each file path**, never the path itself. To check whether the agent opened a given file, compute the SHA-256 of its path relative to the repository root (for example `printf '%s' 'src/app.ts' | shasum -a 256`) and look for it in the file's `files.path_sha256` list.
 - **If a stored evidence file was changed or deleted**, the platform refuses to build the pack (`evidence_hash_mismatch` or `evidence_missing`) and records the failure in the audit log. Treat it as a possible security incident: tell Person B and the platform operator (Chapter 18). The same applies when a saved pack file no longer matches its hash.
 - `export` checks the file's SHA-256 before it saves it, and never overwrites an existing file. The file is readable by you only (it names the approvers).
 - **Retention** (task E05, `design/ADR-M51-evidence-retention.md`): the pack files are deleted with the intent's other evidence files after the retention period: 180 days by default from the end of the intent, never less (project setting `retention.evidence_retention_days`, Chapter 3). Every version goes, sealed or not; the rows and hashes stay recorded, so `sdlc evidence show` still shows them, and `export` answers `evidence_pack_purged`. In the store, no process can delete an evidence file during its first 180 days; only the platform's retention job may, and only after the retention or after a project archive.
@@ -353,3 +365,4 @@ After a person merged the approved pull request (§15.10.1), the intent waits at
 | 0.7 | 2026-10-04 | Claude (task E05, PR 1) | §15.10.2: retention of the pack files and evidence holds (ADR-M51) |
 | 0.9 | 2026-10-09 | Claude (docs review fixes) | `roll-back` is the decision's spelling (the CLI refuses `roll_back`) |
 | 0.8 | 2026-10-09 | Claude (docs review PR C) | §15.10.1: "Producers", the one list of producers at G7 and G8 (commit authors at G7 only, as D-03 §6 and the code); other documents link here |
+| 0.10 | 2026-10-24 | Claude (task X07) | §15.10.2: the context snapshot of each run in the Evidence Pack (ADR-M90) |

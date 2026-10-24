@@ -17,6 +17,7 @@ export {
   type ExecutionStatus,
 } from './client.js';
 export { toolCallKey, trailingIdenticalCalls } from './loop.js';
+export { fileReads } from './reads.js';
 export {
   buildConversationRequest,
   FINISH_RULE,
