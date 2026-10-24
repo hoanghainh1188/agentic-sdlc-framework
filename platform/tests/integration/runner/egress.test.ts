@@ -229,6 +229,14 @@ describe.skipIf(!liveEnabled)('C04 live: sandbox egress and hardening on Docker'
       rootfs: 'readonly',
       workspace: 'writable',
       uid: '10001',
+      // O01 (ADR-M91): the limits are enforced by the kernel, also on rootless Docker (256 MiB,
+      // swap = memory so no extra swap, 512 processes, 1.5 CPUs), and no capability is left.
+      memory_max: String(256 * 1024 * 1024),
+      memory_swap_max: '0',
+      pids_max: '512',
+      cpu_max: '150000/100000',
+      cap_eff: '0000000000000000',
+      no_new_privs: '1',
       branch: 'none', // no repository in this test (see provision.test.ts)
       git_auth: 'absent',
       readme: 'none',
