@@ -40,5 +40,6 @@
   "0039-knowledge-indexes.ts": "7b7c3b9c3cdb1f294fb96e9a3b17ecc92e342a1b02cc9e486b01fce48e61ec1c",
   "0040-knowledge-read-evidence.ts": "251d46a4f29717f23d6c1ce579eadddefc61f1fc750a95e39ac9cf220494c001",
   "0041-context-snapshot-evidence.ts": "c11f79735b42ef12cf5ab72bf054340ae9e3d2ac664b4bb576199fc7d7c1cd51",
-  "0042-diff-scan.ts": "b61557feec669aa1dc7bb34880c5e174de68957982d2700d4086bd73d0f7d51c"
+  "0042-diff-scan.ts": "b61557feec669aa1dc7bb34880c5e174de68957982d2700d4086bd73d0f7d51c",
+  "0043-review-limits.ts": "1ce469870eb9fd25a6468443f93cb6f3beb0b8c6ef46ef013ad19e4e1c31f325"
 }

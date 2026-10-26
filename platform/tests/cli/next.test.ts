@@ -179,6 +179,22 @@ describe('AC1: gate decisions name the command for the role holder', () => {
       expect(next.code).toBe(code);
     }
   });
+
+  it.each(['review_too_large', 'review_size_unknown'])(
+    'H05: G5 held with the cause %s: the allowing reason codes and the split',
+    (cause) => {
+      const facts = detail({
+        intent: { current_gate: 'G5', waiting_reason: 'g5_decision', waiting_cause: cause },
+        waitingFor: waitsFor('G5', ['person_a']),
+      });
+      const next = adviseNext(facts, me(['person_a']));
+      expect(next).toMatchObject({ kind: 'you_act', code: 'decide_g5_review' });
+      expect(adviceText(next)).toContain('--reason-code generated_change');
+      expect(adviceText(next)).toContain('request-changes G5');
+      // Another role waits for Person A, as at any decided gate.
+      expect(adviseNext(facts, me(['person_b'])).code).toBe('waits_role');
+    },
+  );
 });
 
 describe('AC2: the advice follows the caller roles; producers never approve', () => {

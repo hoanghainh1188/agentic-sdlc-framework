@@ -36,7 +36,7 @@ export const WAITING_REASON_KEYS: Readonly<Record<string, string>> = {
   not_in_gate: 'intent.waiting.not_in_gate',
 };
 
-/** Known causes (the failed G4 check today; open to later gates) → their catalog key. */
+/** Known causes (the failed G4 check; the G5 review size, H05) → their catalog key. */
 export const WAITING_CAUSE_KEYS: Readonly<Record<string, string>> = {
   spec_changed: 'intent.waiting_cause.spec_changed',
   plan_changed: 'intent.waiting_cause.plan_changed',
@@ -62,6 +62,9 @@ export const WAITING_CAUSE_KEYS: Readonly<Record<string, string>> = {
   tool_not_active: 'intent.waiting_cause.tool_not_active',
   tool_data_class_not_allowed: 'intent.waiting_cause.tool_data_class_not_allowed',
   tool_transport_not_supported: 'intent.waiting_cause.tool_transport_not_supported',
+  // H05 (ADR-M95): G5 is HITL because the run's change is over the review limits, or not measured.
+  review_too_large: 'intent.waiting_cause.review_too_large',
+  review_size_unknown: 'intent.waiting_cause.review_size_unknown',
 };
 
 /** The reason a person needs to see: `decision` is the normal wait, already shown elsewhere. */

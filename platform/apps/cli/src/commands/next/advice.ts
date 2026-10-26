@@ -29,6 +29,7 @@ export const ADVICE_CODES = [
   'decide_gate',
   'decide_g4',
   'decide_g5',
+  'decide_g5_review',
   'decide_g6',
   'review_g7',
   'merge_g7',
@@ -72,6 +73,7 @@ const ADVICE_KEYS: Readonly<Record<AdviceCode, MessageKey>> = {
   decide_gate: 'cli.next.advice.decide_gate',
   decide_g4: 'cli.next.advice.decide_g4',
   decide_g5: 'cli.next.advice.decide_g5',
+  decide_g5_review: 'cli.next.advice.decide_g5_review',
   decide_g6: 'cli.next.advice.decide_g6',
   review_g7: 'cli.next.advice.review_g7',
   merge_g7: 'cli.next.advice.merge_g7',
@@ -273,6 +275,9 @@ export const CAUSE_RULES: Readonly<Record<string, Rule>> = {
   tool_not_active: setupAgent,
   tool_data_class_not_allowed: setupAgent,
   tool_transport_not_supported: setupAgent,
+  // H05 (ADR-M95): G5 waits for Person A because the change is over the review limits.
+  review_too_large: decide('decide_g5_review'),
+  review_size_unknown: decide('decide_g5_review'),
   intent_budget_exhausted: (facts) => advice('fix_setup', 'setup_budget', facts),
   tenant_budget_exhausted: (facts) => advice('fix_setup', 'setup_budget', facts),
 };
@@ -304,7 +309,12 @@ function mergeAtG7(facts: Facts): Advice {
 /** One rule per waiting reason; `Record` makes the compiler check that none is missing. */
 export const REASON_RULES: Readonly<Record<IntentWaitReason, Rule>> = {
   decision: decideAtGate,
-  g5_decision: decide('decide_g5'),
+  // H05: a run held for its size has its own advice (the allowing reason codes, the split).
+  g5_decision: (facts) => {
+    const cause = facts.intent.waiting_cause;
+    const rule = cause ? CAUSE_RULES[cause] : undefined;
+    return rule ? rule(facts) : decide('decide_g5')(facts);
+  },
   g6_decision: decide('decide_g6'),
   g7_decision: decide('review_g7'),
   g8_decision: decide('decide_g8'),

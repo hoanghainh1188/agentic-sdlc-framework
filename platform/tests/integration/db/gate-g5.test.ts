@@ -11,7 +11,10 @@
 //   an expired or mismatched decision is voided; the database refuses a budget that goes down;
 // - decision A: `modify` → G3 HITL, the same plan allowed; decision B: `terminate` → `cancelled`;
 // - decision C: the runner's budget warning writes the run event and the notice together;
-// - a succeeded run in scope passes (HOTL) to G6; FR-11: the run's producer never decides G5.
+// - a succeeded run in scope passes (HOTL) to G6; FR-11: the run's producer never decides G5;
+// - H05 (ADR-M95, QUESTIONS #456, #601–#604): a change at the review limits passes; over them, or
+//   not measured, G5 is HITL with a waiting cause; an approval needs an allowing reason code; a
+//   request for changes splits the plan at G3.
 import { sql } from 'kysely';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -56,6 +59,8 @@ interface Changes {
   readonly instructionFiles?: number;
   /** H04: the runner's secret scan; `none` records no `secrets_scanned` event. */
   readonly secrets?: 'clean' | 'found' | 'failed' | 'none';
+  /** H05: the review size (`diff_measured`); `failed` or `none` (no event): not measured. */
+  readonly review?: { readonly files: number; readonly lines: number } | 'failed' | 'none';
 }
 
 describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
@@ -123,6 +128,22 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
         rules: 'built_in',
         ...(secrets === 'found' ? { rule_ids: 'aws-access-token:private-key' } : {}),
         ...(secrets === 'failed' ? { cause: 'scanner_missing' } : {}),
+      });
+    }
+    const review = changes.review ?? { files: 2, lines: 30 };
+    if (review === 'failed') {
+      await t.f.scope.runEvents.append(runId, 'diff_measured', {
+        result: 'failed',
+        cause: 'numstat_failed',
+      });
+    } else if (review !== 'none') {
+      await t.f.scope.runEvents.append(runId, 'diff_measured', {
+        result: 'measured',
+        review_files: review.files,
+        review_lines: review.lines,
+        generated_files: 1,
+        generated_lines: 4000,
+        binary_files: 0,
       });
     }
     await t.f.scope.runs.transition(runId, {
@@ -596,6 +617,110 @@ describeDb('C07 PR 2: gate G5 on PostgreSQL', () => {
         percent: 85,
       });
       expect(body).toContain('85 %');
+    });
+  });
+
+  describe('H05: the review limits (40 files, 1500 lines by default)', () => {
+    const decideG5 = async (
+      intent: Intent,
+      decision: 'approve' | 'request_changes',
+      reasonCode: 'generated_change' | 'review_too_large' | null,
+    ) =>
+      decideGate(t.f.registry, t.f.scope, {
+        intent: await reload(intent),
+        gate: 'G5',
+        decision,
+        actorId: t.f.users.a,
+        reasonCode,
+        source: 'cli',
+      });
+    const splits = async (intent: Intent) =>
+      (await t.f.scope.audit.listForEntity(intent.id, ['gate.g5_split_requested'])).map(
+        (e) => (e.payload as { check: string }).check,
+      );
+
+    it('AC3: a change at the limits passes (HOTL); generated files are not counted', async () => {
+      const intent = await atG4(t, 'medium');
+      await runToG5(intent, { status: 'succeeded' }, { review: { files: 40, lines: 1500 } });
+      await t.settleRuns(intent);
+      expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G6' });
+      expect(await g5(intent)).toEqual([['pass', null, 'HOTL']]);
+    });
+
+    it('AC2: one file over: HITL with the cause review_too_large; an approval needs a reason code', async () => {
+      const intent = await atG4(t, 'medium');
+      await runToG5(intent, { status: 'succeeded' }, { review: { files: 41, lines: 100 } });
+      expect(await t.settleRuns(intent)).toMatchObject({
+        outcome: 'waiting',
+        reason: 'g5_decision',
+        cause: 'review_too_large',
+      });
+      expect(await reload(intent)).toMatchObject({
+        status: 'in_gate',
+        current_gate: 'G5',
+        waiting_reason: 'g5_decision',
+        waiting_cause: 'review_too_large',
+      });
+      // Medium risk is HOTL by the matrix; the size makes it HITL, and the API shows it.
+      expect(await waitingFor(t, intent)).toMatchObject({ gate: 'G5', mode: 'HITL' });
+      // Never a breach: no fail decision, no escalation.
+      expect(await g5(intent)).toEqual([]);
+      expect(await t.f.scope.escalations.listForIntent(intent.id)).toEqual([]);
+
+      await expect(decideG5(intent, 'approve', null)).rejects.toMatchObject({
+        code: 'review_reason_required',
+      });
+      await decideG5(intent, 'approve', 'generated_change');
+      await t.settleRuns(intent);
+      expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G6' });
+      expect(await g5(intent)).toEqual([['approve', 'generated_change', 'HITL']]);
+    });
+
+    it('AC2: lines over, then a request for changes: back to G3 (HITL) to split the plan', async () => {
+      const intent = await atG4(t, 'medium');
+      await runToG5(intent, { status: 'succeeded' }, { review: { files: 3, lines: 1501 } });
+      await t.settleRuns(intent);
+      expect((await reload(intent)).waiting_cause).toBe('review_too_large');
+
+      await decideG5(intent, 'request_changes', 'review_too_large');
+      await t.settleRuns(intent);
+      expect(await reload(intent)).toMatchObject({ status: 'in_gate', current_gate: 'G3' });
+      expect(await waitingFor(t, intent)).toMatchObject({ gate: 'G3', mode: 'HITL' });
+      expect(await splits(intent)).toEqual(['review_too_large']);
+      expect(await notices(t, intent)).toContain('g5_returned');
+      // Not a scope failure: the same plan is not refused, a person decides at G3.
+      expect(await checks(intent)).toEqual([]);
+    });
+
+    it.each(['failed', 'none'] as const)(
+      'QUESTIONS #603: a size %s: HITL with the cause review_size_unknown',
+      async (review) => {
+        const intent = await atG4(t, 'medium');
+        await runToG5(intent, { status: 'succeeded' }, { review });
+        expect(await t.settleRuns(intent)).toMatchObject({
+          outcome: 'waiting',
+          reason: 'g5_decision',
+          cause: 'review_size_unknown',
+        });
+        expect(await g5(intent)).toEqual([]);
+        await decideG5(intent, 'approve', 'generated_change');
+        await t.settleRuns(intent);
+        expect((await reload(intent)).current_gate).toBe('G6');
+      },
+    );
+
+    it('the limits are per project: a lower limit holds a smaller change', async () => {
+      await t.setConfig(
+        [
+          'run:',
+          `  agent_key: ${t.agent.key}`,
+          '  review_limits: { max_changed_files: 2, max_changed_lines: 10 }',
+          '',
+        ].join('\n'),
+      );
+      const intent = await atG4(t, 'medium');
+      await runToG5(intent, { status: 'succeeded' }, { review: { files: 2, lines: 11 } });
+      expect(await t.settleRuns(intent)).toMatchObject({ cause: 'review_too_large' });
     });
   });
 

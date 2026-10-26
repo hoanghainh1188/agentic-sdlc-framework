@@ -38,6 +38,10 @@ describe('comment command grammar', () => {
     // A named reason code is a reason by itself.
     ['/reject G3 spec_unclear', 'reject', 'G3', 'spec_unclear'],
     ['/request-changes G2 tests-insufficient', 'request_changes', 'G2', 'tests_insufficient'],
+    // H05 (ADR-M95 §2.4): one allowing reason code after the gate, for a change over the limits.
+    ['/approve G5 generated_change', 'approve', 'G5', 'generated_change'],
+    ['/approve G5 Mechanical-Change', 'approve', 'G5', 'mechanical_change'],
+    ['/approve G5 cannot_split\nOne migration with its code.', 'approve', 'G5', 'cannot_split'],
   ])('%j → %s %s (%s)', (body, decision, gate, reasonCode) => {
     expect(parseCommentCommand(body)).toMatchObject({
       kind: 'gate_decision',
@@ -55,6 +59,10 @@ describe('comment command grammar', () => {
     ['/approve INT-2026-0001', 'gate_invalid'],
     ['/approve G3 if the tests pass', 'unexpected_text'],
     ['/approve G3 G4', 'unexpected_text'],
+    // H05: only an allowing reason code, and nothing after it.
+    ['/approve G5 other', 'unexpected_text'],
+    ['/approve G5 spec_unclear', 'unexpected_text'],
+    ['/approve G5 generated_change it is all generated', 'unexpected_text'],
     ['/reject G3', 'reason_missing'],
     ['/reject G3 other', 'reason_missing'],
     ['/request-changes G3   \n   \n', 'reason_missing'],

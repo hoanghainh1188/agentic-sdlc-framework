@@ -245,7 +245,7 @@ When the run ends at G5, the platform checks the run's result by itself, in this
 
 - The audit log keeps the exact cause next to the reason code (for example `max_iterations`, `max_duration` or `stalled` for `run_cap_reached`).
 - A G5 escalation freezes the intent: its response level is `pause` or higher (configuration `run.g5_breach_escalation`, mandatory rule M22). Its decision is bound to this exact result of this exact run (the run, its contract, its diff, its changed files and the intent's spend). If more spend of the run arrives later, the platform voids the decision, closes the escalation and checks G5 again, which raises a new escalation.
-- **When every check holds**, the platform passes G5 (HOTL) and the intent moves to **G6**. Person A is told and can still send the changes back within the block window (Chapter 19 §19.8b): `/request-changes G5 <reason>` starts a new run after G4; `/reject G5 <reason>` closes the intent. A project that makes G5 HITL in its configuration needs a person's `/approve G5`; the person who approved the run at G4 never approves its changes.
+- **When every check holds**, the platform checks the size of the change (§13.10.5b). Within the limits, it passes G5 (HOTL) and the intent moves to **G6**. Person A is told and can still send the changes back within the block window (Chapter 19 §19.8b): `/request-changes G5 <reason>` starts a new run after G4; `/reject G5 <reason>` closes the intent. A project that makes G5 HITL in its configuration needs a person's `/approve G5`; the person who approved the run at G4 never approves its changes.
 
 **Back to G3 (files outside the plan).** G3 is **HITL at every risk tier** from now on for this intent, and the earlier G3 approval no longer counts. Submit a **new plan**: the plan the run went outside of can never be approved again (`plan_refused`). The run's diff stays as evidence.
 
@@ -277,6 +277,35 @@ The agent can copy a secret it finds in the repository (a key in a test file, a 
 **A false positive** (a test value that only looks like a secret): add an allowlist to `.gitleaks.toml` on the default branch, through a reviewed pull request. Then decide `resume`: the new run is scanned with the new rules.
 
 **When the scan fails** (`secret_scan_failed`): the runner has no Gitleaks, the scan took longer than its limit (`SDLC_RUNNER_SECRET_SCAN_TIMEOUT_SECONDS`, default 120), or Gitleaks refused the repository's `.gitleaks.toml`. A run recorded by a runner older than this platform version is held the same way. The cause code is in the run event. The platform operator fixes the cause (the runner image ships Gitleaks; a developer runner uses `SDLC_RUNNER_GITLEAKS_PATH`), or Person A fixes the configuration; then decide `resume`.
+### 13.10.5b. The size of the change a person must review
+
+> Written by Claude Code together with the platform code (task H05, `design/ADR-M95-review-size-limit.md`).
+
+Person B reviews the whole change at G7. A very large change, or one full of generated code, cannot be reviewed well. So at G5 the platform also checks **how much** the run changed.
+
+- **What it counts:** the changed files and the changed lines (added plus removed) of the run's diff. The runner counts them outside the sandbox. A binary file counts as one file and no lines.
+- **What it does not count:** lock files (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `go.sum`, `Cargo.lock`, `poetry.lock` and similar), and files that the repository's `.gitattributes` marks as generated (`linguist-generated`) **at the run's start commit**. A `.gitattributes` the run itself changes is not used. To mark generated files, change `.gitattributes` on the default branch through a reviewed pull request, for example `src/api/generated/** linguist-generated`.
+- **The limits:** the project setting `run.review_limits` (`platform/packages/config/README.md`): `max_changed_files` (40 by default) and `max_changed_lines` (1500 by default). A change at the limit passes; one more file or line is over.
+- **What the platform records:** the counts in the run event `diff_measured` and in the Evidence Pack. Never a file name.
+
+**When the change is over a limit**, G5 is not a failure and there is no escalation. G5 becomes **HITL at every risk tier**: the intent waits at G5 for Person A, and `sdlc next` and the dashboard show the cause `review_too_large`. The person who approved the run at G4 never decides its changes. Person A has two choices:
+
+| Choice | Command | What happens |
+|---|---|---|
+| **Split the work** (the usual choice) | `/request-changes G5 review_too_large <reason>` or `sdlc gate request-changes G5 <INT-…> --reason-code review_too_large` | The intent goes back to **G3**, which is HITL from now on. Submit a plan with a smaller scope (for example the first part of the work); the rest becomes another intent. The run's diff stays as evidence |
+| **Allow it, with a reason** | `/approve G5 <reason_code>` or `sdlc gate approve G5 <INT-…> --reason-code <reason_code>` | The intent moves to G6. The reason code is recorded with the approval, and Person B sees it at G7 |
+
+The reason codes that allow a large change:
+
+| Reason code | Use it when |
+|---|---|
+| `generated_change` | Most of the change is generated code that the repository does not mark as generated |
+| `mechanical_change` | The change is mechanical: a rename, a move, a formatting change |
+| `cannot_split` | The change only works as one piece (for example a migration together with the code that needs it) |
+
+An approval without one of these codes is refused (`review_reason_required`) and nothing is recorded.
+
+**When the size is unknown** (`review_size_unknown`): the runner could not count the change, or the run was recorded by a runner older than this platform version. G5 waits for Person A in the same way: split the work, or allow it with a reason code after looking at the diff.
 
 ### 13.10.6. Recertification warning
 
@@ -333,3 +362,4 @@ The agent can copy a secret it finds in the repository (a key in a test file, a 
 | 0.11 | 2026-10-09 | Claude (docs review PR C2) | §13.10.2 check 6b: the one list of agent instruction files (only the exact pinned path is left out); §13.10.4: "The budgets", the one description with the default amounts (moved from ROLLOUT-GUIDE) |
 | 0.14 | 2026-10-24 | Claude (task X11) | §13.10.4: long runs and small models, context condensing (`run.context_condensing`, rule M35; ADR-M29 §2.10) |
 | 0.15 | 2026-10-24 | Claude (task H04) | §13.10.5: G5 checks the secret scan (`secret_in_diff`, `secret_scan_failed`); new §13.10.5a: the secret scan of the run's diff (ADR-M93, QUESTIONS #586–#590) |
+| 0.16 | 2026-10-26 | Claude (task H05) | §13.10.5: the size check after the other checks; new §13.10.5b: the size of the change a person must review (`run.review_limits`, `review_too_large`, `review_size_unknown`, the allowing reason codes, the split at G3; ADR-M95, QUESTIONS #601–#605) |

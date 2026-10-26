@@ -5,7 +5,8 @@
 // - G1–G4, G7: the change flags of the intent's latest plan (the plan G3 passed: a new plan sends
 //   the intent back to G3, B09); G3 is HITL once G5, G6 or G7 sent the intent back
 //   (`returnedFromG5`, C07);
-// - G5: no change flags, not breached (a breach pauses the intent: it no longer waits at G5);
+// - G5: no change flags, not breached (a breach pauses the intent: it no longer waits at G5); the
+//   size of the last run's change a person reviews (H05, ADR-M95: over the limits → HITL);
 // - G6: no change flags, the findings of the last CI reading (unknown → HITL, QUESTIONS #157);
 // - G8: the latest plan's change flags, always production (QUESTIONS #220).
 import type {
@@ -14,11 +15,13 @@ import type {
   OversightResolution,
   PolicyEngine,
   ProjectRole,
+  ReviewSizeFacts,
 } from '@sdlc/contracts';
 
 import type { Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { gatherG6Facts, type G6Facts } from './g6-ci.js';
+import { G5_RUN_STATUSES, reviewSizeOf } from './g5-facts.js';
 import { returnedFromG5 } from './g5-scope.js';
 
 /** What the resolution of `gate` reads from the database, besides the intent. */
@@ -29,6 +32,11 @@ export interface GateOversightFacts {
   readonly returnedFromG5?: boolean;
   /** G6 only: the last CI reading. */
   readonly g6?: G6Facts | null;
+  /**
+   * G5 only (H05): the review size of the last run (null: not measured). Left out when the intent
+   * has no run that goes to G5.
+   */
+  readonly reviewSize?: ReviewSizeFacts | null;
 }
 
 /** The policy context of G6: the findings counts, and whether they are known (QUESTIONS #157). */
@@ -62,7 +70,10 @@ export function resolveGateOversight(
         gate,
         riskTier,
         changeFlags: [],
-        context: { breached: false },
+        context: {
+          breached: false,
+          ...(facts.reviewSize === undefined ? {} : { reviewSize: facts.reviewSize }),
+        },
       });
     case 'G6':
       return policy.oversightMode({
@@ -89,11 +100,18 @@ export async function gatherGateOversightFacts(
   intent: Pick<Intent, 'id'>,
   gate: GateCode,
 ): Promise<GateOversightFacts> {
-  if (gate === 'G5') return { changeFlags: [] };
+  if (gate === 'G5') return g5OversightFacts(tx, intent.id);
   if (gate === 'G6') return { changeFlags: [], g6: await gatherG6Facts(tx, intent.id) };
   const changeFlags = (await tx.plans.latest(intent.id))?.change_flags ?? [];
   if (gate === 'G3') return { changeFlags, returnedFromG5: await returnedFromG5(tx, intent.id) };
   return { changeFlags };
+}
+
+/** G5: the review size of the intent's last run, when that run goes to G5 (H05). */
+async function g5OversightFacts(tx: TenantScope, intentId: string): Promise<GateOversightFacts> {
+  const run = (await tx.runs.listForIntent(intentId)).at(-1);
+  if (!run || !G5_RUN_STATUSES.includes(run.status)) return { changeFlags: [] };
+  return { changeFlags: [], reviewSize: reviewSizeOf(await tx.runEvents.list(run.id)) };
 }
 
 /** Gather and resolve in one call (the workflow's G1–G4, G7, G8 steps). */

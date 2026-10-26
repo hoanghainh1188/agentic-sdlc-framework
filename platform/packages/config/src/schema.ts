@@ -229,6 +229,11 @@ export const projectConfigSchema = z.strictObject({
       severity: z.enum(SEVERITIES),
       response_level: z.enum(RESPONSE_LEVELS),
     }),
+    // H05 (ADR-M95, QUESTIONS #456): the largest change a person must review; over it G5 is HITL.
+    review_limits: z.strictObject({
+      max_changed_files: positiveInt,
+      max_changed_lines: positiveInt,
+    }),
     // X11 (ADR-M29 §2.10, QUESTIONS #551–#554): context condensing of OpenHands work runs. Rule
     // M35: `summarize` needs a context size for at least one model and fewer kept events than the
     // maximum. Model names are `allowed_models` entries.

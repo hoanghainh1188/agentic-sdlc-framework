@@ -173,6 +173,11 @@ export interface ProposalGitOptions {
   readonly timeoutMs: number;
   /** Upper bound of the patch, in bytes. */
   readonly maxPatchBytes: number;
+  /**
+   * H05: a temporary index of the base commit for `check-attr --cached` (`GIT_INDEX_FILE`), the
+   * only variable a caller may add to `gitEnv`.
+   */
+  readonly indexFile?: string;
 }
 
 export interface Proposal {
@@ -226,7 +231,10 @@ export function gitIn(
       'git',
       gitArgs(repoDir, args),
       {
-        env: gitEnv(home),
+        env:
+          options.indexFile === undefined
+            ? gitEnv(home)
+            : { ...gitEnv(home), GIT_INDEX_FILE: options.indexFile },
         timeout: options.timeoutMs,
         maxBuffer: options.maxPatchBytes,
         encoding: 'buffer',

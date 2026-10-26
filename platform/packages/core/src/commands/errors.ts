@@ -37,6 +37,11 @@ export type CommandErrorCode =
    * #292): the spec must hold at least one; reject or request changes instead.
    */
   | 'spec_unclear'
+  /**
+   * An approval at G5 of a run whose change is over the review limits, or not measured (task H05,
+   * ADR-M95 §2.4), without a reason code of `REVIEW_ALLOW_REASON_CODES`.
+   */
+  | 'review_reason_required'
   /** Unknown intent, or an intent of a project the actor cannot read. */
   | 'intent_not_found'
   /** Unknown project, or a project the actor has no role on. */

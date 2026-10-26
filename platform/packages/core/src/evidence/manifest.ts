@@ -35,6 +35,8 @@ export const PACK_RUN_EVENTS = [
   'changes_checked',
   // H04 (ADR-M93 §2.3): the secret scan of the run's added lines (codes and counts).
   'secrets_scanned',
+  // H05 (ADR-M95 §2.2): the size of the change a person reviews at G7 (counts only).
+  'diff_measured',
   'branch_pushed',
   'ci_checked',
   'g7_checked',

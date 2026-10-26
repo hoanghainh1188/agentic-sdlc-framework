@@ -8,7 +8,8 @@
 // and the closed G5 escalations with their decision. C08 PR 2: G6 sends the intent back to G3 the
 // same way (`gate.g6_check_failed` with `ci_no_retries`, or `modify` / `roll_back` on a G6
 // escalation); the new-plan rule stays for `out_of_scope` only. E01: G7 too (a rejection, or
-// `modify` / `roll_back` on a G7 escalation; QUESTIONS #178).
+// `modify` / `roll_back` on a G7 escalation; QUESTIONS #178). H05: a request for changes at G5 of
+// a run too large to review (`gate.g5_split_requested`).
 import type { TenantScope } from '../db/tenant-scope.js';
 
 /** Decisions on a G5 escalation that send the intent back to G3. */
@@ -28,6 +29,10 @@ async function scopeFailures(scope: TenantScope, intentId: string): Promise<stri
  */
 export async function returnedFromG5(scope: TenantScope, intentId: string): Promise<boolean> {
   if ((await scopeFailures(scope, intentId)).length > 0) return true;
+  // H05 (ADR-M95 §2.5): a request for changes of a run too large to review split the plan at G3.
+  if ((await scope.audit.listForEntity(intentId, ['gate.g5_split_requested'])).length > 0) {
+    return true;
+  }
   // C08 PR 2 (ADR-M38 §2.7): G6 sent the intent back to G3 when CI failed with no retries left
   // (N2, FR-13). The same rule holds: G3 is HITL from then on.
   const g6 = await scope.audit.listForEntity(intentId, ['gate.g6_check_failed']);

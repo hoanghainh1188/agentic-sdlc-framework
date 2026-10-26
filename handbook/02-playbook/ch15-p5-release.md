@@ -249,7 +249,7 @@ The **Evidence Pack** of an intent lists what the platform recorded for it, in o
 
 - the intent: code, risk tier, data class, autonomy, status, repository, issue and pull request;
 - the spec and the plan: each version's path, commit and SHA-256;
-- the agent runs: status, agent and version, model, start and pushed commits, and the latest checks (files in scope, push, CI and security findings, reviews, merge);
+- the agent runs: status, agent and version, model, start and pushed commits, and the latest checks (files in scope, the secret scan, **the size of the change**, push, CI and security findings, reviews, merge). The size (task H05, Chapter 13 §13.10.5b) is the number of files and lines a person reviews, and the lock and generated files counted apart. If Person A allowed a change over the review limits at G5, the G5 approval shows the reason code (`generated_change`, `mechanical_change` or `cannot_split`): review such a change with extra care;
 - the stored evidence files (the run's diff, L1 proposals, the context snapshots): kind, SHA-256 and size. The platform reads each file back and checks its hash before it builds the pack;
 - per run, the **context snapshot** (task X07, `design/ADR-M90-context-snapshot.md`): what the agent read. See "The context snapshot" below;
 - every gate decision G1–G8: decision, oversight mode (HITL, HOTL, AUDIT, POLICY), the role and **the name of the person who decided**, the reason code and link, the waiting time;
@@ -366,3 +366,4 @@ After a person merged the approved pull request (§15.10.1), the intent waits at
 | 0.9 | 2026-10-09 | Claude (docs review fixes) | `roll-back` is the decision's spelling (the CLI refuses `roll_back`) |
 | 0.8 | 2026-10-09 | Claude (docs review PR C) | §15.10.1: "Producers", the one list of producers at G7 and G8 (commit authors at G7 only, as D-03 §6 and the code); other documents link here |
 | 0.10 | 2026-10-24 | Claude (task X07) | §15.10.2: the context snapshot of each run in the Evidence Pack (ADR-M90) |
+| 0.11 | 2026-10-26 | Claude (task H05) | §15.10.2: the size of each run's change and the reason code of a G5 approval over the review limits in the Evidence Pack (ADR-M95) |
