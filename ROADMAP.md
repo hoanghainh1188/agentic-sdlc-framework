@@ -8,9 +8,9 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) |
 | DEV | Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479) |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) |
-| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, then X12 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike) |
+| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike) |
 | Models | Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424) |
-| Server | A team on a server: toward v1.0 (QUESTIONS #363) |
+| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; toward v1.0 (QUESTIONS #363) |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) |
 | M-F | Adjust gates, budgets and rules from the trial data, then a trial on a real internal tool (D-02 §13.3) |
 
@@ -51,7 +51,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **L09** Evaluations in the agent register's approvals (done, v0.5.0)
 - **L10** Evaluations in the agent recertification (done, v0.5.0)
 
-## EXT: Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, then X12 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike)
+## EXT: Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike)
 
 - **X09** Spike: other Git hosts (GitLab, Backlog Git, Bitbucket) (done, v0.5.0)
 - **X01** Spike: a second, open-source coding agent (Aider or OpenCode) (done, v0.6.0)
@@ -61,7 +61,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **X04** The tool register and the first tool: search the project's documents (done, v0.6.0)
 - **X07** A context snapshot for every run (done, v0.6.0)
 - **X11** Context condensing for agent runs (done, v0.6.0)
-- **X12** Design: agent memory across runs
+- **X12** Design: agent memory across runs (done, v0.7.0)
 
 ## Models: Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424)
 
@@ -69,17 +69,17 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **L03** GPU sizing note for leadership (done, v0.6.0)
 - **L03b** Measure a 30B-class model on a rented GPU
 
-## Server: A team on a server: toward v1.0 (QUESTIONS #363)
+## Server: A team on a server: v0.7.0 with O01, O02, H04, H05, V15; toward v1.0 (QUESTIONS #363)
 
 - **A10** Resource measurement + backup / restore drill + internal CA / TLS
-- **V15** Release on the tag: one workflow builds the images, the lock file is a release asset
+- **V15** Release on the tag: one workflow builds the images, the lock file is a release asset (done, v0.7.0)
 - **H02** Dependencies an agent adds: licence, known vulnerabilities, name checks
 - **H03** Design: deleting a client's data on request
-- **H04** A secret scan of a run's diff before G5
-- **H05** A size bound for a change a person must review
+- **H04** A secret scan of a run's diff before G5 (done, v0.7.0)
+- **H05** A size bound for a change a person must review (done, v0.7.0)
 - **H07** A Docker authorization plugin that checks the body of container requests
-- **O01** The runner in its own VM or with rootless Docker
-- **O02** A tested upgrade between two releases
+- **O01** The runner in its own VM or with rootless Docker (done, v0.7.0)
+- **O02** A tested upgrade between two releases (done, v0.7.0)
 - **O03** Operational alerts
 - **O04** Data that only grows: run events, sessions, challenges, partitions
 - **O05** Key rotation: the Run Contract signing key and the processes' secret IDs

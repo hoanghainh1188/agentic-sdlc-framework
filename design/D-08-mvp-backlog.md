@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.58 |
+| Version | 1.59 |
 | Date | 2026-10-26 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -47,9 +47,9 @@
 | UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) | 14 | S×3 · M×9 · L×2 |
 | DEV | Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479) | 1 | M×1 |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 7 | S×2 · M×4 · L×1 |
-| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, then X12 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike) | 9 | S×5 · M×2 · L×2 |
+| EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike) | 9 | S×5 · M×2 · L×2 |
 | Models | Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424) | 3 | S×2 · M×1 |
-| Server | A team on a server: toward v1.0 (QUESTIONS #363) | 12 | S×3 · M×9 |
+| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; toward v1.0 (QUESTIONS #363) | 12 | S×3 · M×9 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 16 | S×4 · M×6 · L×6 |
 | **Total** | | **117** | |
 
@@ -65,9 +65,9 @@ flowchart LR
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
     ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
     UX --> EV["EVAL L04–L10: evaluations, reports, recommendations for managers"]
-    EV --> EXT["EXT X09 (v0.5.0), X01–X04, X14, X07, X11 (v0.6.0), then X12"]
+    EV --> EXT["EXT X09 (v0.5.0), X01–X04, X14, X07, X11 (v0.6.0), X12 (v0.7.0)"]
     EXT --> MO["Models L01 PR 1, L03 (v0.6.0), then L01 PR 2, L03b"]
-    MO --> SV["Server A10, O01–O03 (v1.0)"]
+    MO --> SV["Server O01, O02, H04, H05, V15 (v0.7.0), then A10, O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
     MD --> MU["U01–U03 read-only dashboard, done (Later)"]
 ```
@@ -1229,7 +1229,7 @@ flowchart LR
 > Note: ADR-M86 §2.6; QUESTIONS #499
 
 
-### EXT — Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, then X12 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike)
+### EXT — Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike)
 
 #### X09. Spike: other Git hosts (GitLab, Backlog Git, Bitbucket)
 
@@ -1413,7 +1413,7 @@ flowchart LR
 > Note: QUESTIONS #566, #567 (Harry, 2026-10-24): the harness gets a `vllm` provider; only the model service runs on the rented machine; fictional sample repository only, never client data; the owner runs it (R035)
 
 
-### Server — A team on a server: toward v1.0 (QUESTIONS #363)
+### Server — A team on a server: v0.7.0 with O01, O02, H04, H05, V15; toward v1.0 (QUESTIONS #363)
 
 #### A10. Resource measurement + backup / restore drill + internal CA / TLS
 
@@ -1924,6 +1924,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.56 | 2026-10-22 | Claude (docs), approved by the repository owner | X03 note: OpenCode and the conditions of ADR-M68 (QUESTIONS #521–#524) |
 | 1.57 | 2026-10-24 | Claude, approved by the repository owner | Release v0.6.0 with X01–X04, X07, X11, X14 (EXT except X12), L01 PR 1 and L03; X12, L01 PR 2 and the L03b measurement come next |
 | 1.58 | 2026-10-26 | Claude, approved by Harry | New change task V15: the release on the tag (QUESTIONS #591–#595, ADR-M94); it changes V04 AC3 and V12 AC2 |
+| 1.59 | 2026-10-26 | Claude, approved by the repository owner | Release v0.7.0 with X12, O01, O02, H04, H05 and V15 |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
