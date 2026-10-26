@@ -1,7 +1,7 @@
-# The published images of a release, pinned by digest (task V04, design/ADR-M66 §2.5). An overlay of
-# docker-compose.yml, added by scripts/up.sh only on a release checkout (scripts/images.sh mode
-# prints `published`), with the variables of images.lock. Every service that docker-compose.yml
-# builds is here: `build` is removed (`!reset`, Compose v2.24+) and the image comes from GHCR.
+# The published images of a release, pinned by digest (tasks V04, V15, design/ADR-M94 §2.4). An
+# overlay of docker-compose.yml, added by scripts/up.sh only on a release checkout (scripts/images.sh
+# mode prints `published`), with the variables of the release's images.lock. Every service that
+# docker-compose.yml builds is here: `build` is removed (`!reset`, Compose v2.24+) and the image comes from GHCR.
 # Verify an image: README "Verify the published images".
 services:
   otel-collector:

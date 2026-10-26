@@ -426,7 +426,7 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
   // Step 10: the sandbox image, by digest.
   step('10');
   let image = deps.sandboxImage ?? '';
-  // A release checkout uses the release's published image by digest (V04, design/ADR-M66 §2.5).
+  // A release checkout uses the release's published image by digest (V04, V15, design/ADR-M94 §2.4).
   const images = path.join(deployDir, 'scripts/images.sh');
   if (!image && ok(await run(images, ['mode']), 'images mode').stdout.trim() === 'published') {
     image = ok(await run(images, ['get', 'SANDBOX_NODE24']), 'images get').stdout.trim();

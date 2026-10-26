@@ -71,6 +71,7 @@ jobs:
       run_sandbox_image: ${{ steps.decide.outputs.run_sandbox_image }}
       run_dashboard: ${{ steps.decide.outputs.run_dashboard }}
       run_fresh_deploy: ${{ steps.decide.outputs.run_fresh_deploy }}
+      release_version: ${{ steps.decide.outputs.release_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -168,6 +169,23 @@ jobs:
           # longest job: weekly and manual runs only, never on a pull request.
           echo "run_fresh_deploy=$all" >> "$GITHUB_OUTPUT"
           echo "Fresh deployment job: run=$all (weekly and manual runs only)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # V15 (ADR-M94 §2.5): a pull request that changes the root package.json version builds
+          # and scans every release image, pushing nothing, so most failures appear before the tag.
+          version=""; vwhy="the version is unchanged"
+          if [ "$EVENT_NAME" != pull_request ]; then
+            vwhy="not a pull request"
+          elif [ "$DRAFT" = true ]; then
+            vwhy="draft pull request: runs when marked ready for review"
+          elif git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            head_version="$(jq -r .version package.json)"
+            base_version="$(git show "$BASE_SHA:package.json" | jq -r .version)"
+            if [ "$head_version" != "$base_version" ]; then
+              version="$head_version"; vwhy="the version changes from $base_version to $head_version"
+            fi
+          fi
+          echo "release_version=$version" >> "$GITHUB_OUTPUT"
+          echo "Release image scan job: run=$([ -n "$version" ] && echo true || echo false) ($vwhy)" | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Diagrams: every SVG carries the SHA-256 of its Mermaid source (scripts/diagrams.py). The
       # author renders with `pnpm diagrams:render` and commits the SVG; CI never commits.
@@ -694,10 +712,31 @@ jobs:
       - name: Intent workflow tests (Temporal test server + database)
         run: pnpm test:workflow
 
+  release-images:
+    # V15 (ADR-M94 §2.5): a version pull request builds and scans the six release images on both
+    # architectures with the release's own workflow, and pushes nothing. release-images-scan.yml
+    # only reads, so this job widens no permission.
+    needs: [scan, checks]
+    if: needs.scan.outputs.release_version != ''
+    uses: ./.github/workflows/release-images-scan.yml
+    with:
+      version: ${{ needs.scan.outputs.release_version }}
+
   ci-ok:
     name: ci-ok
     needs:
-      [scan, checks, compose, runner-rootless, sandbox-image, fresh-deploy, upgrade, trial-up, db]
+      [
+        scan,
+        checks,
+        compose,
+        runner-rootless,
+        sandbox-image,
+        fresh-deploy,
+        upgrade,
+        trial-up,
+        db,
+        release-images,
+      ]
     # The summary for pull requests (the future required check). Scheduled runs need no summary:
     # a failed job there already marks the run red.
     if: ${{ always() && github.event_name != 'schedule' }}

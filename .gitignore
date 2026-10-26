@@ -21,5 +21,8 @@ access-tls/
 platform/tests/e2e/screenshots/
 platform/tests/e2e/test-results/
 
+# The images.lock of a release, downloaded once by platform/deploy/scripts/images.sh (V15, ADR-M94 §2.4).
+platform/deploy/.images/
+
 # The npm package build of the CLI (V05): made by pnpm cli:pack, never committed.
 platform/apps/cli/npm-dist/

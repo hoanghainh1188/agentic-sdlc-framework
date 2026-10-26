@@ -95,15 +95,16 @@ case " $* " in
     ;;
 esac
 
-# Published images (V04, design/ADR-M66 §2.5): on a release checkout, the images of
-# images.lock pinned by digest (overlay docker-compose.images.yml); everywhere else they are
-# built locally from the checkout. SDLC_IMAGES=published|local overrides it (scripts/images.sh).
+# Published images (V04, V15, design/ADR-M94 §2.4): on a release checkout, the images of the
+# release's images.lock (an asset of its GitHub Release, or SDLC_IMAGES_LOCK) pinned by digest
+# (overlay docker-compose.images.yml); everywhere else they are built locally from the checkout.
+# SDLC_IMAGES=published|local overrides it (scripts/images.sh).
 images_mode="$("$deploy_dir/scripts/images.sh" mode)"
 if [ "$images_mode" = published ]; then
   for line in $("$deploy_dir/scripts/images.sh" export); do
     export "${line?}"
   done
-  echo "up: using the published images of v$SDLC_IMAGES_VERSION (platform/deploy/images.lock)" >&2
+  echo "up: using the published images of v$SDLC_IMAGES_VERSION (the images.lock of its GitHub Release)" >&2
 fi
 
 # The runner on its own Engine (O01, design/ADR-M91 §2.3): with SDLC_RUNNER_LINK_ADDR in the env

@@ -1,19 +1,20 @@
 #!/usr/bin/env node
-// The release gate (task V12, RELEASING.md, QUESTIONS #390). One script for every place that
-// decides whether a commit may be released, so they can never disagree:
-// - .github/workflows/release.yml and npm-publish.yml run `tag` on a pushed tag;
-// - `pnpm release:lock` runs `lock` on the images.lock it downloaded;
+// The release gate (tasks V12 and V15, RELEASING.md, QUESTIONS #390, ADR-M94). One script for every
+// place that decides whether a commit may be released, so they can never disagree:
+// - .github/workflows/release.yml and npm-publish.yml run `tag` on the tag, and `lock` on the
+//   images.lock of the release (the artifact of release-images.yml, or the Release's asset);
 // - the tests run every mode on fixtures, and `changelog` on the real CHANGELOG.
 //
-//   release-check.mjs tag vX.Y.Z [--root <dir>] [--notes-out <file>] [--images-out <file>]
+//   release-check.mjs tag vX.Y.Z [--root <dir>] [--notes-out <file>]
 //   release-check.mjs changelog X.Y.Z [--root <dir>] [--notes-out <file>]
-//   release-check.mjs lock <file> X.Y.Z
+//   release-check.mjs lock <file> X.Y.Z [--images-out <file>]
 //
 // `tag` checks: the tag is `vX.Y.Z`; the root package.json and PLATFORM_VERSION hold X.Y.Z; the
-// CHANGELOG has a section `## [X.Y.Z] - YYYY-MM-DD` with non-empty "Upgrade notes";
-// platform/deploy/images.lock holds X.Y.Z and the six images pinned by digest (the images are
-// built before the tag, QUESTIONS #370). Every problem is printed (one line each, a code first),
-// then the exit code is 1. Prints nothing secret: it reads tracked files only.
+// CHANGELOG has a section `## [X.Y.Z] - YYYY-MM-DD` with non-empty "Upgrade notes". The images are
+// built on the tag, so the tagged commit holds no lock file (ADR-M94 §2.4). `lock` checks a lock
+// file: X.Y.Z and the six images pinned by digest on the one registry path; `--images-out` writes
+// the six references. Every problem is printed (one line each, a code first), then the exit code
+// is 1. Prints nothing secret: it reads tracked files and the lock file only.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -171,11 +172,9 @@ function main(argv) {
     checkVersions(opts.root, version, errors);
     const changelog = readFile(opts.root, 'CHANGELOG.md', errors);
     const notes = changelog === null ? null : changelogSection(changelog, version, errors);
-    const lock = readFile(opts.root, 'platform/deploy/images.lock', errors);
-    const refs = lock === null ? [] : checkLock(lock, version, errors);
+    if (opts.imagesOut) errors.push('usage: --images-out belongs to the mode lock');
     if (errors.length === 0) {
       if (opts.notesOut) fs.writeFileSync(opts.notesOut, notes);
-      if (opts.imagesOut) fs.writeFileSync(opts.imagesOut, refs.join('\n') + '\n');
       process.stdout.write(`release-check: v${version} ok\n`);
     }
     return finish(errors);
@@ -195,11 +194,15 @@ function main(argv) {
     } catch {
       errors.push(`file_missing: ${a}`);
     }
-    if (text !== null && errors.length === 0) checkLock(text, b, errors);
+    const refs = text !== null && errors.length === 0 ? checkLock(text, b, errors) : [];
+    if (errors.length === 0) {
+      if (opts.imagesOut) fs.writeFileSync(opts.imagesOut, refs.join('\n') + '\n');
+      process.stdout.write(`release-check: images.lock for ${b} ok\n`);
+    }
     return finish(errors);
   }
   errors.push(
-    'usage: release-check.mjs tag vX.Y.Z | changelog X.Y.Z | lock <file> X.Y.Z [--root <dir>] [--notes-out <file>] [--images-out <file>]',
+    'usage: release-check.mjs tag vX.Y.Z | changelog X.Y.Z [--root <dir>] [--notes-out <file>] | lock <file> X.Y.Z [--images-out <file>]',
   );
   return finish(errors);
 }

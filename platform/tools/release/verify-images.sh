@@ -1,20 +1,30 @@
 #!/usr/bin/env bash
-# Verifies the release images before anything is released (task V12, RELEASING.md, QUESTIONS #390).
-# Used by both tag workflows, release.yml and npm-publish.yml, so they can never disagree.
+# Verifies the release images before anything is released (tasks V12 and V15, RELEASING.md,
+# ADR-M94 §2.6). Used by release.yml, npm-publish.yml and `pnpm images verify`, so they can never
+# disagree.
 #
-#   verify-images.sh <file with one image reference per line>
+#   verify-images.sh <file with one image reference per line> <tag vX.Y.Z>
 #
-# Every reference (ghcr.io/…@sha256:…, from release-check.mjs --images-out) must carry a cosign
-# signature and a GitHub build provenance attestation whose certificate names exactly
-# release-images.yml on refs/heads/main (checked against the v0.1.1 bundles on 2026-10-10).
-# Needs cosign 3.x and gh (GH_TOKEN with attestations: read). Prints no secret.
+# Every reference (ghcr.io/…@sha256:…, from release-check.mjs lock --images-out) must carry a
+# cosign signature and a GitHub build provenance attestation whose certificate names exactly
+# release-images.yml at refs/tags/<tag>: release.yml calls it on the tag, and a called workflow
+# signs with its own identity at the caller's ref. Releases v0.6.0 and before were signed on
+# refs/heads/main; their own checkout keeps that check. Needs cosign 3.x and gh (GH_TOKEN with
+# attestations: read in a workflow). Prints no secret.
 set -euo pipefail
 
-SIGNER_IDENTITY='https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/heads/main'
+file="${1:?usage: verify-images.sh <images file> <tag vX.Y.Z>}"
+tag="${2:?usage: verify-images.sh <images file> <tag vX.Y.Z>}"
+[ "$#" -eq 2 ] || { echo "usage: verify-images.sh <images file> <tag vX.Y.Z>" >&2; exit 2; }
+if ! [[ "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+  echo "verify-images: the tag must be vX.Y.Z, got '$tag'" >&2
+  exit 2
+fi
+
+SIGNER_IDENTITY="https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/tags/$tag"
 SIGNER_ISSUER='https://token.actions.githubusercontent.com'
 REPO='hoanghainh1188/agentic-sdlc-framework'
 
-file="${1:?usage: verify-images.sh <images file>}"
 count=0
 while read -r ref; do
   [ -n "$ref" ] || continue
@@ -30,4 +40,4 @@ if [ "$count" != 6 ]; then
   echo "::error::expected six images, verified $count"
   exit 1
 fi
-echo "verify-images: six images signed and attested by release-images.yml on main"
+echo "verify-images: six images signed and attested by release-images.yml at $tag"

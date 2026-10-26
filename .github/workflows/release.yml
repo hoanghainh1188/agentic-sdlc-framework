@@ -1,18 +1,19 @@
-# The release of a pushed tag vX.Y.Z (task V12, RELEASING.md, QUESTIONS #364, #370, #390).
+# The release of a pushed tag vX.Y.Z (tasks V12 and V15, RELEASING.md, design/ADR-M94).
 #
-# A person (Harry) makes the tag, on the merge commit of the images.lock pull request. The
-# images of the release were built, scanned, signed and attested BEFORE the tag by
-# release-images.yml on main (ADR-M66 §2.5), so this workflow builds nothing:
+# A person (Harry) makes the tag, on the merge commit of the version pull request. This workflow
+# then makes the whole release (ADR-M94 §2.2):
 # - check: platform/tools/release/release-check.mjs (the tag equals package.json and
-#   PLATFORM_VERSION, the CHANGELOG section with its Upgrade notes, images.lock for this version
-#   with six digests), and the tagged commit is on main;
-# - verify-images: every digest of images.lock carries a cosign signature and a build provenance
-#   attestation made by release-images.yml on refs/heads/main (platform/tools/release/
-#   verify-images.sh, read only);
-# - release: creates the GitHub Release from the CHANGELOG section; an existing release is never
-#   changed.
-# npm-publish.yml runs on the same tag with the same release-check.mjs and verify-images.sh, in
-# its own file: npm's trusted publisher names that file and the environment `npm` (ADR-M72 §2.3).
+#   PLATFORM_VERSION, the CHANGELOG section with its Upgrade notes), and the tagged commit is on
+#   main;
+# - images: release-images.yml with push: true builds and scans all six images on both
+#   architectures, and only then pushes, signs and attests them and writes images.lock;
+# - verify-images: every digest of that images.lock carries a cosign signature and a build
+#   provenance attestation made by release-images.yml at this exact tag (verify-images.sh);
+# - release: creates the GitHub Release from the CHANGELOG section as a draft, attaches
+#   images.lock, publishes it and checks that it is immutable; a published release is never changed;
+# - npm: starts npm-publish.yml on the tag (workflow_dispatch, the one event a GITHUB_TOKEN may
+#   start). npm-publish.yml stays its own file: npm's trusted publisher names that file and the
+#   environment `npm` (ADR-M72 §2.3), and the owner approves that environment.
 name: release
 
 on:
@@ -31,9 +32,11 @@ env:
 
 jobs:
   check:
-    name: check the tag, the versions, the CHANGELOG and images.lock
+    name: check the tag, the versions and the CHANGELOG
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,10 +53,28 @@ jobs:
         run: |
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
             echo "::error::the tagged commit $GITHUB_SHA is not on main"; exit 1; }
+      - id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+  # The images of the release, built on the tag (ADR-M94 §2.2). The signer is release-images.yml at
+  # this tag. Only this job holds the write permissions the image workflow needs.
+  images:
+    needs: check
+    permissions:
+      contents: read
+      packages: write # push by digest, the index and its tags
+      id-token: write # cosign keyless and the attestation (GitHub OIDC)
+      attestations: write
+    uses: ./.github/workflows/release-images.yml
+    with:
+      version: ${{ needs.check.outputs.version }}
+      push: true
 
   verify-images:
     name: verify the signatures and attestations of the release images
-    needs: check
+    needs: [check, images]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -67,10 +88,16 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: images-lock-${{ needs.check.outputs.version }}
+          path: ${{ runner.temp }}/lock
       - name: The image references
         env:
-          TAG: ${{ github.ref_name }}
-        run: node platform/tools/release/release-check.mjs tag "$TAG" --images-out "$RUNNER_TEMP/images.txt"
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          node platform/tools/release/release-check.mjs lock "$RUNNER_TEMP/lock/images.lock" \
+            "$VERSION" --images-out "$RUNNER_TEMP/images.txt"
       # cosign from the official release, checked against a pinned SHA-256, with retries
       # (platform/tools/release/install-cosign.sh: long retries, unlike the installer action).
       - name: Install cosign
@@ -80,14 +107,15 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }} # the job's own token, read only; no repository secret
-      # The signer is pinned in the script, shared with npm-publish.yml: release-images.yml on main.
+      # The signer is pinned in the script, shared with npm-publish.yml: release-images.yml at the tag.
       - name: cosign verify and gh attestation verify, every image
         env:
           GH_TOKEN: ${{ github.token }}
-        run: platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt"
+          TAG: ${{ github.ref_name }}
+        run: platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt" "$TAG"
 
   release:
-    name: create the GitHub Release
+    name: create the GitHub Release with images.lock
     needs: [check, verify-images]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -104,14 +132,49 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: node platform/tools/release/release-check.mjs tag "$TAG" --notes-out "$RUNNER_TEMP/notes.md"
-      - name: Create the release (never change an existing one)
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: images-lock-${{ needs.check.outputs.version }}
+          path: ${{ runner.temp }}/lock
+      # An immutable release takes no asset after it is published: the draft gets images.lock first
+      # (ADR-M94 §2.4). A draft is not public and not immutable, so a draft left by a failed run is
+      # made again; a published release is never changed.
+      - name: Create the draft, attach images.lock, publish
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            echo "::error::the release $TAG already exists; it is never changed by this workflow"
-            exit 1
+          if draft="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$draft" != true ]; then
+              echo "::error::the release $TAG is published; it is never changed by this workflow"
+              exit 1
+            fi
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes
           fi
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft \
+            --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" "$RUNNER_TEMP/lock/images.lock"
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+      # The setting itself needs admin access, which this token does not have: check the result.
+      - name: The published release is immutable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          immutable="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .immutable)"
+          [ "$immutable" = true ] || {
+            echo "::error::the release $TAG is not immutable: turn on immutable releases (RELEASING.md §4); npm is not started"
+            exit 1; }
+
+  npm:
+    name: start npm-publish on the tag
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write # gh workflow run; nothing else
+    steps:
+      - name: Start npm-publish.yml (the owner approves the environment npm)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh workflow run npm-publish.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"

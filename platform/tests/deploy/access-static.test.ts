@@ -65,8 +65,8 @@ describe('V09: the profile access in docker-compose.yml', () => {
       /^nginxinc\/nginx-unprivileged:\d+\.\d+\.\d+-alpine@sha256:[0-9a-f]{64}$/,
     );
     expect(job.image).toBe(proxy.image);
-    // Not an image the project builds: not in the release lock (ADR-M66).
-    expect(readDeployFile('images.lock')).not.toContain('nginx');
+    // Not an image the project builds: not one of the images of the release lock (ADR-M94 §2.4).
+    expect(readDeployFile('scripts/images.sh')).not.toContain('nginx');
   });
 
   it('publishes one port, on SDLC_ACCESS_BIND_ADDR only (127.0.0.1 when unset)', () => {

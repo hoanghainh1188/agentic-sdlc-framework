@@ -52,7 +52,8 @@ for p in "$@"; do
 done
 [ "$command" = down ] && profiles="--profile sandbox --profile knowledge --profile vm"
 
-# Published images (V04, ADR-M66 §2.5): on a release checkout, the runner image of images.lock.
+# Published images (V04, V15, ADR-M94 §2.4): on a release checkout, the runner image of the
+# release's images.lock (scripts/images.sh).
 images_mode="$("$deploy_dir/scripts/images.sh" mode)"
 if [ "$images_mode" = published ]; then
   for line in $("$deploy_dir/scripts/images.sh" export); do

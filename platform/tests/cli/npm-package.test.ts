@@ -116,8 +116,8 @@ describe('CI runs the check on every pull request', () => {
 describe('npm-publish workflow', () => {
   const job = publish.jobs.publish;
 
-  it('runs only for a release tag', () => {
-    expect(publish.on).toEqual({ push: { tags: ['v*'] } });
+  it('runs only when dispatched (release.yml starts it on the tag, V15, ADR-M94 §2.3)', () => {
+    expect(publish.on).toEqual({ workflow_dispatch: null });
   });
 
   it('waits for the environment npm and asks only for an OIDC token', () => {

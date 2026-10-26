@@ -278,7 +278,7 @@ The merged change is one fixed, fictional line appended to `docs/live-test/RUNS.
 
 ## Publishing the CLI on npm (owner)
 
-The `sdlc` command is published as `agentic-sdlc-cli` by `.github/workflows/npm-publish.yml`, only from a release tag (task V05, `design/ADR-M72-cli-npm-package.md`). Tags, releases and npm publishes are public actions: only the owner starts them. Claude never pushes a tag or publishes.
+The `sdlc` command is published as `agentic-sdlc-cli` by `.github/workflows/npm-publish.yml`, only on a release tag: `release.yml` starts it on the tag after the GitHub Release exists (tasks V05, V15, `design/ADR-M72-cli-npm-package.md`, `design/ADR-M94-release-on-the-tag.md`). Tags, releases and npm publishes are public actions: only the owner starts them. Claude never pushes a tag or publishes.
 
 **Once, before the first tag** (🧑):
 
@@ -296,7 +296,7 @@ The `sdlc` command is published as `agentic-sdlc-cli` by `.github/workflows/npm-
 
 Done for v0.1.1 on 2026-10-10. The images on GHCR need no step: the packages are linked to this public repository and are public already (check: an anonymous pull of a release image works).
 
-**Every later release:** follow [RELEASING.md](../RELEASING.md) (the whole release, steps 1–7); for npm, approve the `npm` environment when GitHub asks, and the workflow publishes with provenance after the same release gate as `release.yml`. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
+**Every later release:** follow [RELEASING.md](../RELEASING.md) (the whole release); for npm, approve the `npm` environment when GitHub asks, and the workflow publishes with provenance after the same release gate as `release.yml`. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
 
 What v0.2.0 (2026-10-12, the first publish by the workflow) taught:
 

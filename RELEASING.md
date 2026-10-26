@@ -1,6 +1,6 @@
 # Releasing
 
-How the platform is versioned and released (D-08 task V12, QUESTIONS #364, #370, #390). A release, a tag, an image push and an npm publish are public actions: **only the owner (Harry) starts them**. Claude prepares the pull requests and never pushes a tag, creates a release or runs a workflow with `push: true`.
+How the platform is versioned and released (D-08 tasks V12 and V15, QUESTIONS #364, #390, #591–#595, `design/ADR-M94-release-on-the-tag.md`). A release, a tag, an image push and an npm publish are public actions: **only the owner (Harry) starts them**. Claude prepares the pull requests and never pushes a tag, creates a release or runs a workflow with `push: true`.
 
 ## 1. Versioning policy
 
@@ -28,46 +28,52 @@ Every CHANGELOG release section from 0.1.1 on has a `### Upgrade notes` list (a 
 
 ## 2. How a release is made
 
-The images are built **before** the tag (QUESTIONS #370), so the tag holds the digests of its own images.
+The images are built **on the tag**, by the release workflow itself (ADR-M94). The tagged commit holds no lock file: the digests of the images are the asset `images.lock` of the GitHub Release, which is immutable.
 
 | Step | Who | What |
 |---|---|---|
-| 1. Version pull request | Claude, merged by the owner | `package.json` and `PLATFORM_VERSION` set to `X.Y.Z`; the CHANGELOG's `[Unreleased]` becomes `## [X.Y.Z] - YYYY-MM-DD` with a short summary and its Upgrade notes; CLAUDE.md "Current constraints" if the state changes |
+| 1. Version pull request | Claude, merged by the owner | `package.json` and `PLATFORM_VERSION` set to `X.Y.Z`; the CHANGELOG's `[Unreleased]` becomes `## [X.Y.Z] - YYYY-MM-DD` with a short summary and its Upgrade notes; CLAUDE.md "Current constraints" if the state changes. Because the version changes, CI's job `release-images` builds and scans all six images on both architectures and pushes nothing (`release-images-scan.yml`): wait for it to be green |
 | 1b. The upgrade test | 🧑 owner | Actions → **ci** → Run workflow on the version pull request's branch. Its job `upgrade` deploys the last release and upgrades it to this branch with the README "Upgrade" steps and the new Upgrade notes (`pnpm test:upgrade`, QUESTIONS #585). Go on only when it is green |
-| 2. The images | 🧑 owner | Actions → **release-images** → Run workflow on `main`, version `X.Y.Z`, `push: true`. Builds, scans, pushes by digest, signs and attests the six images, and writes the artifact `images-lock-X.Y.Z` |
-| 3. The lock file pull request | Claude, merged by the owner | `pnpm release:lock <run-id>` copies that run's `images.lock` over `platform/deploy/images.lock`; it refuses a run that is not a successful `release-images` run on `main` or a lock file for another version |
-| 4. The tag | 🧑 owner | Tag **the merge commit of step 3** and push it: `git tag vX.Y.Z <commit> && git push origin vX.Y.Z` |
-| 5. The release | `release.yml` | Runs the release gate, checks that the commit is on `main`, verifies every image's cosign signature and build provenance attestation (signer: `release-images.yml` on `main`), then creates the GitHub Release from the CHANGELOG section |
-| 6. npm | `npm-publish.yml`, 🧑 owner approves | Runs the same release gate and the same image check (job `verify-images`, `platform/tools/release/verify-images.sh`); only then does GitHub ask the owner to approve the environment `npm`. Approve it only when `release.yml` is green too. Then it builds and checks the package and publishes with provenance |
-| 7. Check | 🧑 owner | The GitHub Release exists; `npm view agentic-sdlc-cli version` shows `X.Y.Z`; on a clean checkout of the tag `pnpm images mode` prints `published` |
+| 2. The tag | 🧑 owner | Tag **the merge commit of step 1** and push it: `git tag vX.Y.Z <commit> && git push origin vX.Y.Z` |
+| 3. The release | `release.yml` | `check`: the release gate and the commit is on `main`. `images`: `release-images.yml` with `push: true` builds and scans all six images on both architectures, and only then pushes them by digest, scans each pushed digest again, tags, signs and attests them, and writes `images.lock`. `verify-images`: every image's cosign signature and build provenance attestation (signer: `release-images.yml` at `refs/tags/vX.Y.Z`). `release`: the GitHub Release from the CHANGELOG section, as a draft with the asset `images.lock`, then published, then checked to be immutable. `npm`: starts `npm-publish.yml` on the tag |
+| 4. npm | `npm-publish.yml`, 🧑 owner approves | Refuses a ref that is not a tag `vX.Y.Z` with a published Release; runs the release gate and the image check on the Release's own `images.lock` (job `verify-images`); only then does GitHub ask the owner to approve the environment `npm`. Then it builds and checks the package and publishes with provenance |
+| 5. Check | 🧑 owner | The GitHub Release exists, is marked immutable and has the asset `images.lock`; `npm view agentic-sdlc-cli version` shows `X.Y.Z`; on a clean checkout of the tag `pnpm images mode` prints `published` (it downloads `images.lock` once) |
 
-The release gate is `platform/tools/release/release-check.mjs`. Both tag workflows run it; it refuses the tag when:
+The release gate is `platform/tools/release/release-check.mjs`. `release-check.mjs tag vX.Y.Z` refuses the tag when:
 
 - the tag is not `vX.Y.Z`, or differs from `package.json` or `PLATFORM_VERSION`;
-- the CHANGELOG has no `## [X.Y.Z] - YYYY-MM-DD` section, or its Upgrade notes are missing or empty;
-- `platform/deploy/images.lock` is for another version, or does not pin all six images by digest on `ghcr.io/hoanghainh1188/agentic-sdlc-framework`.
+- the CHANGELOG has no `## [X.Y.Z] - YYYY-MM-DD` section, or its Upgrade notes are missing or empty.
 
-Both tag workflows also verify every image with `platform/tools/release/verify-images.sh`: a cosign signature and a build provenance attestation whose certificate names exactly `release-images.yml` on `refs/heads/main`. npm never publishes a release whose images fail this check.
+`release-check.mjs lock <file> X.Y.Z` refuses a lock file that is for another version, or does not pin all six images by digest on `ghcr.io/hoanghainh1188/agentic-sdlc-framework`. Both workflows run it on the release's `images.lock` (`release.yml` on the artifact of `release-images.yml`, `npm-publish.yml` on the Release's asset).
+
+Both workflows also verify every image with `platform/tools/release/verify-images.sh <images> vX.Y.Z`: a cosign signature and a build provenance attestation whose certificate names exactly `release-images.yml` at `refs/tags/vX.Y.Z`. npm never publishes a release whose images fail this check.
 
 Try the gate before you tag: `node platform/tools/release/release-check.mjs tag vX.Y.Z` on the commit you will tag.
+
+The first release made this way checks two things the documentation does not state clearly (ADR-M94 §2.3): the environment `npm` accepts a run dispatched on the tag, and npm trusted publishing accepts it. Record the result here, in §3.
 
 ## 3. When something fails
 
 | Problem | What to do |
 |---|---|
-| `release-images` fails (a scan, a push) | Fix it in a pull request and run step 2 again. A version already on GHCR is refused: delete its packages' version on purpose first, or take the next patch version |
-| `release.yml` refuses the tag | Nothing was released: `npm-publish` refuses the same tag. The owner, as the tag ruleset's bypass actor (§4), deletes the tag (`git push origin :refs/tags/vX.Y.Z`) **only while it has no GitHub Release and no npm version**, fixes the cause in a pull request, and tags again. A tag that was released is never deleted: release the next patch version |
-| `release.yml` fails after a check passed (a network error) | Re-run the failed jobs. An existing GitHub Release is never changed: a release made by hand stays |
+| CI's job `release-images` fails on the version pull request (a scan) | Fix it in the same or another pull request before the tag. Nothing was pushed |
+| `release.yml` fails in `check` or in `images` **before any push** (the gate, a scan, a build) | Nothing was released. The owner, as the tag ruleset's bypass actor (§4), deletes the tag (`git push origin :refs/tags/vX.Y.Z`) **only while it has no GitHub Release, no npm version and no image of that version on GHCR**, fixes the cause in a pull request, and tags again |
+| `release.yml` fails in `images` **after a push** (for example the scan of a pushed digest, or `publish`) | Release the next patch version. A version already on GHCR is refused (tags never move) |
+| `release.yml` fails after `images` succeeded (a network error in `verify-images`, `release` or `npm`) | Re-run the failed jobs: the images are not built again. A draft Release left by a failed run is made again; a published Release is never changed |
+| `release` fails with "is not immutable" | The Release is published but not immutable, and npm was not started. Turn on immutable releases (§4); a Release published before that stays changeable, so compare its asset `images.lock` with the artifact `images-lock-X.Y.Z` of the run. Then start npm-publish by hand on the tag (next row) |
+| `npm-publish` was not started, or must run again | Actions → **npm-publish** → Run workflow, **on the tag** `vX.Y.Z` (not on `main`): the same checks apply |
 | `npm-publish` fails | Fix the cause, then re-run the workflow. A version is never published twice |
-| `npm-publish` fails with `ENEEDAUTH` | The trusted publisher on npmjs.com is wrong or **expired**: delete it and add it again (GETTING-STARTED, "Publishing the CLI on npm"), then re-run the failed jobs and approve `npm` again |
+| `npm-publish` fails with `ENEEDAUTH` | The trusted publisher on npmjs.com is wrong or **expired**: delete it and add it again (GETTING-STARTED, "Publishing the CLI on npm"), then re-run the failed jobs and approve `npm` again. If npm refuses a dispatched run (ADR-M94 §2.3): publish this version by hand from the checked tarball (the artifact `agentic-sdlc-cli`), as for 0.1.1, and add a question to `design/QUESTIONS.md` |
 | npm shows the new version as "validating" | Normal for a few minutes after the publish; then it appears (approve it on npmjs.com if it waits as a staged version) |
 | A workflow fails while it installs cosign (a network error from GitHub) | `platform/tools/release/install-cosign.sh` already retried for about three minutes: re-run the failed jobs later. A new cosign version changes `COSIGN_VERSION` in the three release workflows and the SHA-256 pins in the script together (a test checks both) |
+| A release checkout says it could not download `images.lock` | The machine cannot reach `github.com`: download `images.lock` from the release page elsewhere, copy it to the machine, and set `SDLC_IMAGES_LOCK=<file>` (deploy README) |
 | A released version is broken | Release the fix as the next patch version; `npm deprecate agentic-sdlc-cli@X.Y.Z "<reason>"` |
 
 ## 4. Repository settings (owner, once)
 
+- **Immutable releases** on (repository Settings → General, section "Releases"), before the first release made on the tag. Then a published Release, its tag and its assets never change (ADR-M94 §2.4). `release.yml` cannot read this setting (it needs admin access), so it checks each published Release instead.
 - The environment `npm` with the owner as required reviewer, tags `v*` only (GETTING-STARTED, "Publishing the CLI on npm").
-- A **tag ruleset** for `v*`: only the owner may create tags; nobody may update or delete them. The owner is the ruleset's only **bypass actor**, used for one case only: deleting a refused tag before any GitHub Release or npm publish of it (§3).
+- A **tag ruleset** for `v*`: only the owner may create tags; nobody may update or delete them. The owner is the ruleset's only **bypass actor**, used for one case only: deleting a refused tag before any GitHub Release, npm publish or image push of it (§3).
 - The six GHCR packages are public. A new image's package starts private: after its first push the owner sets it to public once (v0.6.0: `tool-project-docs`).
 - Never rename `npm-publish.yml` or the environment `npm`: npm's trusted publisher names both (ADR-M72 §2.3).
 
@@ -80,3 +86,4 @@ Try the gate before you tag: `node platform/tools/release/release-check.mjs tag 
 | 1.2 | 2026-10-12 | Claude (docs review for v0.2.0), approved by Harry | §1: the versioning rules in general terms (a patch when nothing must be done, the next minor when an upgrade step is needed); the line "v0.2.0 when the milestone UX is done" removed |
 | 1.3 | 2026-10-24 | Claude, for the owner's approval | Six images: `tool-project-docs` (X04 PR 3b, ADR-M89) is in the release gate and in `verify-images.sh`, not only in `release-images.yml`; §4: a new package is set to public after its first push |
 | 1.4 | 2026-10-24 | Claude (task O02), approved by Harry | §2 step 1b: the upgrade test from the last release on the version branch before the images (QUESTIONS #585) |
+| 2.0 | 2026-10-26 | Claude (task V15), for the owner's approval | The release on the tag (ADR-M94, QUESTIONS #591–#595): three steps for the owner; `release.yml` builds the images and attaches `images.lock` to an immutable Release; npm is dispatched on the tag; no lock file pull request and no `pnpm release:lock` |

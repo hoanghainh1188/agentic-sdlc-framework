@@ -117,7 +117,8 @@ describe.skipIf(!enabled)(
           portOffset: PORT_OFFSET,
         },
       });
-      // A release checkout uses the published images of its own images.lock (ADR-M66 §2.5).
+      // A release checkout uses the published images of its own images.lock: in the tagged commit
+      // up to v0.6.0 (ADR-M66 §2.5), the asset of its GitHub Release after that (ADR-M94 §2.4).
       expect(old.imagesMode()).toBe('published');
       mark('from_checkout');
 

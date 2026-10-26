@@ -1,20 +1,21 @@
 # Publishes the CLI to npm as `agentic-sdlc-cli` (task V05, design/ADR-M72, QUESTIONS #365–#367).
 #
-# Only a release tag `vX.Y.Z` starts it, and a person always makes the tag. The job runs in the
+# Only a released tag `vX.Y.Z` starts it: release.yml dispatches it on the tag after the GitHub
+# Release exists (ADR-M94 §2.3), and a person always makes the tag. The job runs in the
 # GitHub environment `npm` (required reviewer: Harry), so nothing is published without a second
 # yes. npm trusted publishing (OIDC, `id-token: write`) proves the workflow to npm: there is no
 # npm token in the repository or its secrets, and every version carries npm provenance.
 # Before the first run: create the environment `npm` with its reviewer (GitHub would otherwise
 # create it without protection) and add this workflow as the package's trusted publisher on
 # npmjs.com (platform/GETTING-STARTED.md, "Publishing the CLI on npm").
-# V12 (RELEASING.md, QUESTIONS #390): this stays its own tag workflow, next to release.yml, with the
-# same release gate and image check (job verify-images, before the environment approval). Never
-# rename this file or the environment: npm's trusted publisher names both.
+# V12, V15 (RELEASING.md, ADR-M94): this stays its own workflow, next to release.yml, with the same
+# release gate and image check (job verify-images, before the environment approval), on the
+# Release's own images.lock. Never rename this file or the environment: npm's trusted publisher
+# names both. The owner may also run it by hand on the tag: the same checks apply.
 name: npm-publish
 
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch: # on the tag vX.Y.Z only; started by release.yml
 
 permissions:
   contents: read
@@ -39,6 +40,18 @@ jobs:
       packages: read # pull the signatures from GHCR
       attestations: read # gh attestation verify
     steps:
+      - name: The ref is a tag vX.Y.Z with a published GitHub Release; its images.lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          printf '%s' "$GITHUB_REF" | grep -Eq '^refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' || {
+            echo "::error::run this workflow on a release tag vX.Y.Z, not $GITHUB_REF"; exit 1; }
+          draft="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" || {
+            echo "::error::the tag $TAG has no GitHub Release"; exit 1; }
+          [ "$draft" = false ] || { echo "::error::the release $TAG is a draft"; exit 1; }
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern images.lock \
+            --dir "$RUNNER_TEMP/lock"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -48,7 +61,10 @@ jobs:
       - name: The release gate and the image references
         env:
           TAG: ${{ github.ref_name }}
-        run: node platform/tools/release/release-check.mjs tag "$TAG" --images-out "$RUNNER_TEMP/images.txt"
+        run: |
+          node platform/tools/release/release-check.mjs tag "$TAG"
+          node platform/tools/release/release-check.mjs lock "$RUNNER_TEMP/lock/images.lock" \
+            "${TAG#v}" --images-out "$RUNNER_TEMP/images.txt"
       # cosign from the official release, checked against a pinned SHA-256, with retries
       # (platform/tools/release/install-cosign.sh: long retries, unlike the installer action).
       - name: Install cosign
@@ -61,7 +77,8 @@ jobs:
       - name: cosign verify and gh attestation verify, every image
         env:
           GH_TOKEN: ${{ github.token }}
-        run: platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt"
+          TAG: ${{ github.ref_name }}
+        run: platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt" "$TAG"
 
   publish:
     name: publish agentic-sdlc-cli
@@ -83,12 +100,15 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # The same release gate as release.yml (task V12): the tag, package.json, PLATFORM_VERSION,
-      # the CHANGELOG section with its Upgrade notes, images.lock for this version.
+      # The same release gate as release.yml (tasks V12, V15): the tag, package.json,
+      # PLATFORM_VERSION, the CHANGELOG section with its Upgrade notes.
       - name: The release gate
         env:
           TAG: ${{ github.ref_name }}
-        run: node platform/tools/release/release-check.mjs tag "$TAG"
+        run: |
+          case "$GITHUB_REF" in refs/tags/v*) ;; *)
+            echo "::error::run this workflow on a release tag, not $GITHUB_REF"; exit 1 ;; esac
+          node platform/tools/release/release-check.mjs tag "$TAG"
       - name: Build and check the package
         run: |
           mkdir -p "$RUNNER_TEMP/npm"
