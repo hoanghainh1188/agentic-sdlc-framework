@@ -2,8 +2,8 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.57 |
-| Date | 2026-10-24 |
+| Version | 1.58 |
+| Date | 2026-10-26 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-05 (data), D-07 (tokens), D-09 (sample repo) |
@@ -49,9 +49,9 @@
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 7 | S×2 · M×4 · L×1 |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, then X12 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike) | 9 | S×5 · M×2 · L×2 |
 | Models | Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424) | 3 | S×2 · M×1 |
-| Server | A team on a server: toward v1.0 (QUESTIONS #363) | 11 | S×3 · M×8 |
+| Server | A team on a server: toward v1.0 (QUESTIONS #363) | 12 | S×3 · M×9 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 16 | S×4 · M×6 · L×6 |
-| **Total** | | **116** | |
+| **Total** | | **117** | |
 
 ### Order and dependencies between milestones
 
@@ -893,7 +893,7 @@ flowchart LR
 - [ ] AC3: Compose uses the published images by digest for a release checkout and builds locally otherwise; a static test checks the digests
 - [ ] AC4: TRIAL.md and the README's fresh deployment skip the local builds when the images are published
 
-> Note: QUESTIONS #342 (Harry, 2026-10-09): after v0.1.0, while the first reports come in; moved to the milestone UX with v0.2.0 (QUESTIONS #355). ADR-M66 records the registry, signing (for example cosign keyless) and the supply-chain checks
+> Note: QUESTIONS #342 (Harry, 2026-10-09): after v0.1.0, while the first reports come in; moved to the milestone UX with v0.2.0 (QUESTIONS #355). ADR-M66 records the registry, signing (for example cosign keyless) and the supply-chain checks. AC3 changed by V15 (ADR-M94): from the release after v0.6.0 the digests are a release asset
 
 #### V05. Install the `sdlc` command with one command (npm package `agentic-sdlc-cli`)
 
@@ -1048,7 +1048,7 @@ flowchart LR
 - [ ] AC3: Every CHANGELOG release section has "Upgrade notes" (migrations, credentials commands to run again, changed settings), checked by a test
 - [ ] AC4: Small releases: a v0.1.x when something useful lands without an upgrade step (for example the CLI on npm and `sdlc next`); v0.2.0 when the milestone UX is done or an upgrade step is needed
 
-> Note: QUESTIONS #364 (Harry, 2026-10-10). Releases, tags and npm publishes are public actions: ask Harry first. The upgrade test between two releases is O02 (Server). AC2 as built (QUESTIONS #370, #390): the images are built before the tag, so `release.yml` on the tag runs the release gate `release-check.mjs`, verifies the images' signatures and attestations (never builds them) and creates the GitHub Release; npm stays its own tag workflow `npm-publish.yml` with the same gate (its trusted-publisher identity); `pnpm release:lock` prepares the lock file pull request. AC3: from 0.1.1 on (0.1.0, the first release, is exempt). RELEASING.md
+> Note: QUESTIONS #364 (Harry, 2026-10-10). Releases, tags and npm publishes are public actions: ask Harry first. The upgrade test between two releases is O02 (Server). AC2 as built (QUESTIONS #370, #390): the images are built before the tag, so `release.yml` on the tag runs the release gate `release-check.mjs`, verifies the images' signatures and attestations (never builds them) and creates the GitHub Release; npm stays its own tag workflow `npm-publish.yml` with the same gate (its trusted-publisher identity); `pnpm release:lock` prepares the lock file pull request. AC3: from 0.1.1 on (0.1.0, the first release, is exempt). RELEASING.md. AC2 changed by V15 (ADR-M94, QUESTIONS #591): from the release after v0.6.0 the tag workflow builds the images
 
 #### L02. Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision)
 
@@ -1430,6 +1430,23 @@ flowchart LR
 - [ ] AC5: Runbook T11 written in full
 
 > Note: Three PRs (ADR-M63, QUESTIONS #325–#327): PR 1 = TLS on 8200 everywhere (AC1; a throw-away CA on development machines and in CI, `pnpm openbao:tls`, renewal without unsealing); PR 2 = backup and restore scripts, encrypted with age to a target folder, and a live restore drill with throw-away keys (AC2, AC3); PR 3 = with the infrastructure operator and the three key holders on the internal server (the company CA, AC4, AC5). Done together with the infrastructure operator. Also before the real server: the runner in its own VM or rootless Docker (ADR-M25 §2.5); done: ClickHouse's `langfuse` user has no access management, a loopback-only `sdlc_admin` makes `sdlc_purge` (ADR-M63 §6, QUESTIONS #330) Condition for the company server (Harry, 2026-10-13, QUESTIONS #455): the first real agent run needs the runner in its own VM or on rootless Docker until H07 exists; PR 3's checklist says so
+
+#### V15. Release on the tag: one workflow builds the images, the lock file is a release asset
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | V04, V12, O02 | NFR-04, NFR-07 | .github/workflows/release.yml, .github/workflows/release-images.yml, .github/workflows/npm-publish.yml, .github/workflows/ci.yml, platform/tools/release/*, platform/deploy/scripts/images.sh, platform/deploy/.gitignore, platform/deploy/README.md, RELEASING.md, CLAUDE.md, design/RULES.md, CHANGELOG.md, platform/tests/workspace/release.test.ts, platform/tests/deploy/release-images.test.ts, design/ADR-M94 |
+
+**Acceptance criteria**
+
+- [ ] AC1: The owner's steps are three: merge the version pull request, push the tag `vX.Y.Z` on its merge commit, approve the environment `npm`; no lock file pull request, no `pnpm release:lock`, no run of `release-images` on `main` (QUESTIONS #591)
+- [ ] AC2: `release.yml` on the tag runs the release gate (no lock file check), checks that the commit is on `main` and that immutable releases are on, calls `release-images.yml` with `push: true`, verifies every image with the signer `release-images.yml@refs/tags/vX.Y.Z`, creates the GitHub Release as a draft with the asset `images.lock`, publishes it, then starts `npm-publish.yml` with `workflow_dispatch` on the tag (QUESTIONS #591, #594)
+- [ ] AC3: `release-images.yml` pushes nothing until all six images on both architectures are built and scanned; a version pull request runs it with `push: false` from `ci.yml` (QUESTIONS #593)
+- [ ] AC4: `npm-publish.yml` keeps its name and the environment `npm`, starts only by `workflow_dispatch`, and refuses a ref that is not a tag `vX.Y.Z` with a published GitHub Release; it checks the gate and the images with the Release's `images.lock` before the environment (QUESTIONS #594)
+- [ ] AC5: A release checkout reads its lock file from `SDLC_IMAGES_LOCK` or downloads it once from the GitHub Release into the ignored `platform/deploy/.images/vX.Y.Z.lock`, refuses a file that is not complete, and stops with a clear error when the download fails; tags v0.6.0 and before work as before; the tracked `images.lock` and `lock.mjs` are removed (QUESTIONS #592)
+- [ ] AC6: Tests: the workflows (jobs, permissions, triggers, the signer, the order of scan and push), `images.sh` (download, complete file, override, failure, older tags), the release gate; `RELEASING.md` 2.0, the deploy README, CLAUDE.md "Releases" and R089, `design/RULES.md` updated in the same PR (QUESTIONS #595)
+
+> Note: QUESTIONS #591–#595 (Harry, 2026-10-26), ADR-M94. Changes V04 AC3 (the digests of a release checkout come from its Release, not from the tagged commit) and V12 AC2 (the tag workflow builds the images). The first release made this way checks that the environment `npm` and npm trusted publishing accept the dispatched run (ADR-M94 §2.3); a tag, a release, an image push and an npm publish stay the owner's actions (R040)
 
 #### H02. Dependencies an agent adds: licence, known vulnerabilities, name checks
 
@@ -1906,6 +1923,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.55 | 2026-10-22 | Claude (task X02), approved by the repository owner | New task X14: spike of an open-source MCP gateway before X04 (QUESTIONS #520, ADR-M87); X04 depends on X14 and starts by checking MCP in OpenHands (QUESTIONS #519) |
 | 1.56 | 2026-10-22 | Claude (docs), approved by the repository owner | X03 note: OpenCode and the conditions of ADR-M68 (QUESTIONS #521–#524) |
 | 1.57 | 2026-10-24 | Claude, approved by the repository owner | Release v0.6.0 with X01–X04, X07, X11, X14 (EXT except X12), L01 PR 1 and L03; X12, L01 PR 2 and the L03b measurement come next |
+| 1.58 | 2026-10-26 | Claude, approved by Harry | New change task V15: the release on the tag (QUESTIONS #591–#595, ADR-M94); it changes V04 AC3 and V12 AC2 |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

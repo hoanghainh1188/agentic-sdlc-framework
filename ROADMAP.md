@@ -72,6 +72,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 ## Server: A team on a server: toward v1.0 (QUESTIONS #363)
 
 - **A10** Resource measurement + backup / restore drill + internal CA / TLS
+- **V15** Release on the tag: one workflow builds the images, the lock file is a release asset
 - **H02** Dependencies an agent adds: licence, known vulnerabilities, name checks
 - **H03** Design: deleting a client's data on request
 - **H04** A secret scan of a run's diff before G5

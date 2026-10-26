@@ -384,7 +384,7 @@ t("V04","UX","Publish the platform's images to GHCR for each release","M",["V01"
   "The images are signed and carry an SBOM and provenance (decided in ADR-M66); the README says how to verify them",
   "Compose uses the published images by digest for a release checkout and builds locally otherwise; a static test checks the digests",
   "TRIAL.md and the README's fresh deployment skip the local builds when the images are published"],
- "QUESTIONS #342 (Harry, 2026-10-09): after v0.1.0, while the first reports come in; moved to the milestone UX with v0.2.0 (QUESTIONS #355). ADR-M66 records the registry, signing (for example cosign keyless) and the supply-chain checks")
+ "QUESTIONS #342 (Harry, 2026-10-09): after v0.1.0, while the first reports come in; moved to the milestone UX with v0.2.0 (QUESTIONS #355). ADR-M66 records the registry, signing (for example cosign keyless) and the supply-chain checks. AC3 changed by V15 (ADR-M94): from the release after v0.6.0 the digests are a release asset")
 t("V05","UX","Install the `sdlc` command with one command (npm package `agentic-sdlc-cli`)","M",["V01"],"FR-20, NFR-08",
  "platform/apps/cli (bundle, package.json), platform/apps/cli/src (version flag), .github/workflows/* (publish on a release tag), platform/USER-GUIDE.md, TRIAL.md, platform/tests/cli/*",
  ["`npm install -g agentic-sdlc-cli` gives the `sdlc` command (Node.js 24), and this task adds `sdlc --version` (prints `PLATFORM_VERSION`): the CLI and the workspace packages it uses bundled into the published package; no repository checkout, pnpm or build on the user's machine",
@@ -479,7 +479,7 @@ t("V12","UX","Release process: SemVer, a tag-driven release workflow, upgrade no
   "A release workflow on a pushed tag `vX.Y.Z`: refuses a tag that differs from the root `package.json` and `PLATFORM_VERSION`, creates the GitHub Release from the CHANGELOG section, and starts the image (V04) and npm (V05) jobs when they exist; the tag is always made by a person",
   "Every CHANGELOG release section has \"Upgrade notes\" (migrations, credentials commands to run again, changed settings), checked by a test",
   "Small releases: a v0.1.x when something useful lands without an upgrade step (for example the CLI on npm and `sdlc next`); v0.2.0 when the milestone UX is done or an upgrade step is needed"],
- "QUESTIONS #364 (Harry, 2026-10-10). Releases, tags and npm publishes are public actions: ask Harry first. The upgrade test between two releases is O02 (Server). AC2 as built (QUESTIONS #370, #390): the images are built before the tag, so `release.yml` on the tag runs the release gate `release-check.mjs`, verifies the images' signatures and attestations (never builds them) and creates the GitHub Release; npm stays its own tag workflow `npm-publish.yml` with the same gate (its trusted-publisher identity); `pnpm release:lock` prepares the lock file pull request. AC3: from 0.1.1 on (0.1.0, the first release, is exempt). RELEASING.md")
+ "QUESTIONS #364 (Harry, 2026-10-10). Releases, tags and npm publishes are public actions: ask Harry first. The upgrade test between two releases is O02 (Server). AC2 as built (QUESTIONS #370, #390): the images are built before the tag, so `release.yml` on the tag runs the release gate `release-check.mjs`, verifies the images' signatures and attestations (never builds them) and creates the GitHub Release; npm stays its own tag workflow `npm-publish.yml` with the same gate (its trusted-publisher identity); `pnpm release:lock` prepares the lock file pull request. AC3: from 0.1.1 on (0.1.0, the first release, is exempt). RELEASING.md. AC2 changed by V15 (ADR-M94, QUESTIONS #591): from the release after v0.6.0 the tag workflow builds the images")
 t("L02","UX","Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision)","L",["C05"],"D-07 §3, §4, §5, NFR-01",
  "platform/tests/integration/agent/* (or platform/eval/*), package.json, design/ADR-M78, design/D-07 (results), docs of the harness",
  ["`pnpm eval` (developer machines, never in CI) runs a fixed task set on the sample repository: T01–T08 shapes plus a few seeded bug fixes, each with **hidden acceptance tests** the agent never sees (fail-to-pass for the new behaviour, pass-to-pass for what must not break)",
@@ -500,6 +500,15 @@ t("V13","UX","Agent efficiency report from real runs: `sdlc metrics agents`","M"
   "Access (QUESTIONS #430): a role in both `access.cost_read_roles` and `access.metrics_read_roles` (never `viewer`), tenant admins always; no new config key; range half-open UTC, default the last 30 days; sums in SQL; money as decimal strings; numbers and codes only, never a person or a text",
   "Tests: `pnpm test` (the CLI, the rules), `pnpm test:db` (each measure on seeded runs, tenants, roles); handbook Ch.19 usage; the dashboard may show it later"],
  "QUESTIONS #422 (Harry, 2026-10-12): measure whether agents and models are worth it in real work, next to the evaluation harness (L02). The `sdlc trial report` (V01) may include its numbers later. QUESTIONS #430–#433, ADR-M79 (V13 plan, 2026-10-12): intent-level measures count under the run that was merged; the human-effort baseline moved to V14")
+t("V15","Server","Release on the tag: one workflow builds the images, the lock file is a release asset","M",["V04","V12","O02"],"NFR-04, NFR-07",
+ ".github/workflows/release.yml, .github/workflows/release-images.yml, .github/workflows/npm-publish.yml, .github/workflows/ci.yml, platform/tools/release/*, platform/deploy/scripts/images.sh, platform/deploy/.gitignore, platform/deploy/README.md, RELEASING.md, CLAUDE.md, design/RULES.md, CHANGELOG.md, platform/tests/workspace/release.test.ts, platform/tests/deploy/release-images.test.ts, design/ADR-M94",
+ ["The owner's steps are three: merge the version pull request, push the tag `vX.Y.Z` on its merge commit, approve the environment `npm`; no lock file pull request, no `pnpm release:lock`, no run of `release-images` on `main` (QUESTIONS #591)",
+  "`release.yml` on the tag runs the release gate (no lock file check), checks that the commit is on `main` and that immutable releases are on, calls `release-images.yml` with `push: true`, verifies every image with the signer `release-images.yml@refs/tags/vX.Y.Z`, creates the GitHub Release as a draft with the asset `images.lock`, publishes it, then starts `npm-publish.yml` with `workflow_dispatch` on the tag (QUESTIONS #591, #594)",
+  "`release-images.yml` pushes nothing until all six images on both architectures are built and scanned; a version pull request runs it with `push: false` from `ci.yml` (QUESTIONS #593)",
+  "`npm-publish.yml` keeps its name and the environment `npm`, starts only by `workflow_dispatch`, and refuses a ref that is not a tag `vX.Y.Z` with a published GitHub Release; it checks the gate and the images with the Release's `images.lock` before the environment (QUESTIONS #594)",
+  "A release checkout reads its lock file from `SDLC_IMAGES_LOCK` or downloads it once from the GitHub Release into the ignored `platform/deploy/.images/vX.Y.Z.lock`, refuses a file that is not complete, and stops with a clear error when the download fails; tags v0.6.0 and before work as before; the tracked `images.lock` and `lock.mjs` are removed (QUESTIONS #592)",
+  "Tests: the workflows (jobs, permissions, triggers, the signer, the order of scan and push), `images.sh` (download, complete file, override, failure, older tags), the release gate; `RELEASING.md` 2.0, the deploy README, CLAUDE.md \"Releases\" and R089, `design/RULES.md` updated in the same PR (QUESTIONS #595)"],
+ "QUESTIONS #591–#595 (Harry, 2026-10-26), ADR-M94. Changes V04 AC3 (the digests of a release checkout come from its Release, not from the tagged commit) and V12 AC2 (the tag workflow builds the images). The first release made this way checks that the environment `npm` and npm trusted publishing accept the dispatched run (ADR-M94 §2.3); a tag, a release, an image push and an npm publish stay the owner's actions (R040)")
 t("V14","Later","Human-effort baseline for the agent report","S",["V13"],"FR-53",
  "platform/packages/core (intents), migrations, platform/apps/api, platform/apps/cli, platform/tests/*, design/D-05",
  ["A person with a write role may record an estimate of the human effort for an intent (hours, a number; codes and numbers only, no text); empty by default",
@@ -771,8 +780,8 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.57 |
-| Date | 2026-10-24 |
+| Version | 1.58 |
+| Date | 2026-10-26 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-05 (data), D-07 (tokens), D-09 (sample repo) |
@@ -954,6 +963,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.55 | 2026-10-22 | Claude (task X02), approved by the repository owner | New task X14: spike of an open-source MCP gateway before X04 (QUESTIONS #520, ADR-M87); X04 depends on X14 and starts by checking MCP in OpenHands (QUESTIONS #519) |
 | 1.56 | 2026-10-22 | Claude (docs), approved by the repository owner | X03 note: OpenCode and the conditions of ADR-M68 (QUESTIONS #521–#524) |
 | 1.57 | 2026-10-24 | Claude, approved by the repository owner | Release v0.6.0 with X01–X04, X07, X11, X14 (EXT except X12), L01 PR 1 and L03; X12, L01 PR 2 and the L03b measurement come next |
+| 1.58 | 2026-10-26 | Claude, approved by Harry | New change task V15: the release on the tag (QUESTIONS #591–#595, ADR-M94); it changes V04 AC3 and V12 AC2 |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
