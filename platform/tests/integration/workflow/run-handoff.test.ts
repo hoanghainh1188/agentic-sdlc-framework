@@ -142,6 +142,15 @@ describeWorkflow(
           findings: 0,
           rules: 'built_in',
         });
+        // H05: the size a person reviews, within the review limits.
+        await scope.runEvents.append(input.runId, 'diff_measured', {
+          result: 'measured',
+          review_files: 1,
+          review_lines: 2,
+          generated_files: 0,
+          generated_lines: 0,
+          binary_files: 0,
+        });
         await scope.runs.transition(input.runId, {
           from: ['running'],
           to: end.status,

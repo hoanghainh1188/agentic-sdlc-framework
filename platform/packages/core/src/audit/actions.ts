@@ -307,6 +307,16 @@ export const AUDIT_ACTIONS = {
     fields: { decision_id: 'uuid', check: 'code', run_id: 'uuid' },
   },
   /**
+   * A person requested changes at G5 on a run whose change is over the review limits (H05,
+   * ADR-M95 §2.5): the intent goes back to G3 to split the plan, and G3 is HITL from then on
+   * (`returnedFromG5`). `decision_id` is the request for changes; `check` is `review_too_large` or
+   * `review_size_unknown`. Never a path.
+   */
+  'gate.g5_split_requested': {
+    entityType: 'intent',
+    fields: { decision_id: 'uuid', check: 'code', run_id: 'uuid' },
+  },
+  /**
    * The pull request of the intent's agent branch was linked to the intent (C08, ADR-M38 §2.4):
    * the run whose push it shows, its number and the pushed head. Never its title, body or URL.
    */

@@ -207,6 +207,15 @@ run:
     max_events: 120
     keep_first: 2
     model_context_tokens: {}
+  # H05 (ADR-M95, QUESTIONS #456, #601–#603; Harry, 2026-10-13): the largest change a person must
+  # review. The runner counts the changed files and lines (added plus removed) of the run's diff;
+  # lock files and files the base commit's `.gitattributes` marks `linguist-generated` are counted
+  # apart and not against the limits. Over a limit (or with no count), G5 is HITL: Person A allows
+  # the change with a reason code or sends it back to G3 to split the plan. Never a hard block.
+  # [Proposal] review after the first trial reports.
+  review_limits:
+    max_changed_files: 40
+    max_changed_lines: 1500
 
 budget:
   # D-07 §6; D-02 FR-52; handbook Ch.3 §3.6: warning at 80 %, stop at 100 %.

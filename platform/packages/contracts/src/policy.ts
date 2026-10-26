@@ -26,6 +26,12 @@ export type TaskKind = 'simple' | 'medium' | 'hard';
 /** G8 uses a different matrix table for production and non-production releases. */
 export type ReleaseEnvironment = 'production' | 'non_production';
 
+/** H05: the changed files and lines (added plus removed) a person reviews at G7. */
+export interface ReviewSizeFacts {
+  readonly files: number;
+  readonly lines: number;
+}
+
 /** Facts about the gate that change the oversight mode (design/D-03 section 6.1). */
 export interface GateContext {
   /** G8 only. Missing means `production`, the stricter table. */
@@ -40,6 +46,13 @@ export interface GateContext {
   readonly securityFindingsUnknown?: boolean;
   /** G5 only: a limit (file scope, budget, loop) was breached. */
   readonly breached?: boolean;
+  /**
+   * G5 only (H05, ADR-M95 §2.3): the size of the run's change a person reviews (the runner's
+   * `diff_measured`, generated files left out); null when it was not measured. Over the project's
+   * `run.review_limits`, or null, G5 is HITL at every tier and the platform never passes it.
+   * Left out: no size check (a gate other than G5).
+   */
+  readonly reviewSize?: ReviewSizeFacts | null;
   /**
    * G3 only (C07, QUESTIONS #131): G5 sent the intent back to G3, because a run changed files
    * outside its plan, or because a person decided `modify` or `roll_back` on a G5 escalation. G3 is
@@ -57,7 +70,8 @@ export type OversightOverride =
   | 'limit_breached'
   | 'dual_approval_change_flag'
   | 'returned_from_g5'
-  | 'security_findings_unknown';
+  | 'security_findings_unknown'
+  | 'review_too_large';
 
 export interface OversightResolution {
   readonly mode: GateCheckMode;

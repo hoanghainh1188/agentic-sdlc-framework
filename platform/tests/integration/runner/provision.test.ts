@@ -385,7 +385,7 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
         expect(puts[0]!.content.toString()).not.toContain(TOKEN);
         const [item] = await scope.evidenceItems.listForIntent(envelope.contract.intent_id);
         expect(item).toMatchObject({ kind: 'diff', run_id: runId, sha256: checked.diffSha256 });
-        const events = (await scope.runEvents.list(runId)).slice(-3);
+        const events = (await scope.runEvents.list(runId)).slice(-4);
         expect(events.map((e) => [e.event_type, e.payload])).toEqual([
           [
             'diff_stored',
@@ -402,6 +402,8 @@ describe.skipIf(!liveEnabled || !process.env.SDLC_TEST_DATABASE_URL)(
           ],
           // H04: the added lines were scanned (the runner's Gitleaks, built-in rules).
           ['secrets_scanned', expect.objectContaining({ result: 'clean', findings: 0 })],
+          // H05: the size a person reviews, counts only.
+          ['diff_measured', expect.objectContaining({ result: 'measured', review_files: 4 })],
         ]);
         expect(JSON.stringify(events)).not.toMatch(/new\.txt|AGENTS|README/);
       } finally {

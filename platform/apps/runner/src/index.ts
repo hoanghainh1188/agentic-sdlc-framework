@@ -196,6 +196,7 @@ export {
 } from './workspace/export.js';
 export {
   checkChangedPaths,
+  diffMeasuredPayload,
   secretsScannedPayload,
   storeChanges,
   type ChangesDeps,
@@ -211,6 +212,17 @@ export {
   type SecretScan,
   type SecretScanCause,
 } from './workspace/secrets.js';
+export {
+  countReviewSize,
+  isLockFile,
+  LOCK_FILE_NAMES,
+  measureReviewSize,
+  parseCheckAttr,
+  parseNumstat,
+  type NumstatEntry,
+  type ReviewSize,
+  type ReviewSizeCause,
+} from './workspace/review-size.js';
 export { IgnoreChecker } from './workspace/ignore.js';
 export {
   planFileReader,

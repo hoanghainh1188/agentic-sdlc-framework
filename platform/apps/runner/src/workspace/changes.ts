@@ -13,7 +13,11 @@
 // 4. The added lines are scanned for secrets (`secrets.ts`, H04, ADR-M93): the run event
 //    `secrets_scanned` holds the result, counts and rule codes, never a match or a path. A failed
 //    scan is recorded, never thrown: G5 holds the run on it (QUESTIONS #587).
-// G5 (PR 2) decides from `changes_checked` and `secrets_scanned`; the runner only records. Any other
+// 5. The size a person must review is measured (`review-size.ts`, H05, ADR-M95): the run event
+//    `diff_measured` holds counts only. A failed measurement is recorded, never thrown: G5 holds
+//    the run on it (QUESTIONS #603).
+// G5 (PR 2) decides from `changes_checked`, `secrets_scanned` and `diff_measured`; the runner
+// only records. Any other
 // failure throws: the caller fails the run (`agent_changes_unavailable`), so no run reaches G5
 // without its checked changes.
 import crypto from 'node:crypto';
@@ -29,6 +33,7 @@ import { parseTenantId, type PlatformDatabase, type RunEventPayload } from '@sdl
 import type { DockerClient } from '../docker/client.js';
 import type { RunnerSettings } from '../settings.js';
 import { computeRunPatch } from './export.js';
+import { measureReviewSize, type ReviewSize } from './review-size.js';
 import { scanDiffForSecrets, type SecretScan } from './secrets.js';
 
 export interface ChangesDeps {
@@ -49,6 +54,7 @@ export interface CheckedChanges {
   readonly pathsSha256: string;
   readonly diffSha256: string;
   readonly secrets: SecretScan;
+  readonly reviewSize: ReviewSize;
 }
 
 /** Counts of the changed paths; the paths stay in memory. */
@@ -56,7 +62,7 @@ export function checkChangedPaths(
   policy: Pick<PolicyEngine, 'checkScope'>,
   plannedFiles: readonly string[],
   changedFiles: readonly string[],
-): Omit<CheckedChanges, 'diffSha256' | 'secrets'> {
+): Omit<CheckedChanges, 'diffSha256' | 'secrets' | 'reviewSize'> {
   const sorted = [...changedFiles].sort();
   const scope = policy.checkScope({ plannedFiles, changedFiles: sorted });
   return {
@@ -76,6 +82,13 @@ export async function storeChanges(
 ): Promise<CheckedChanges> {
   const patch = await computeRunPatch(deps, contract, cloneDir);
   const checked = checkChangedPaths(deps.policy, contract.planned_files, patch.changedFiles);
+  // Before anything else uses the clone: the staged index is the run's change.
+  const reviewSize = await measureReviewSize({
+    cloneDir,
+    baseSha: contract.base_sha,
+    timeoutMs: deps.settings.git.timeoutMs,
+    maxOutputBytes: deps.settings.workspaceMaxBytes,
+  });
   const stored = await deps.evidence.put(
     contract.tenant_id,
     `${contract.intent_id}/${contract.run_id}.patch`,
@@ -111,8 +124,9 @@ export async function storeChanges(
       paths_sha256: checked.pathsSha256,
     });
     await tx.runEvents.append(contract.run_id, 'secrets_scanned', secretsScannedPayload(secrets));
+    await tx.runEvents.append(contract.run_id, 'diff_measured', diffMeasuredPayload(reviewSize));
   });
-  return { ...checked, diffSha256: stored.sha256, secrets };
+  return { ...checked, diffSha256: stored.sha256, secrets, reviewSize };
 }
 
 /** The payload of the run event `secrets_scanned`: codes and counts only (ADR-M93 §2.3). */
@@ -125,5 +139,20 @@ export function secretsScannedPayload(scan: SecretScan): RunEventPayload<'secret
     ...(scan.configSha256 !== null ? { config_sha256: scan.configSha256 } : {}),
     ...(scan.scannerVersion !== null ? { scanner_version: scan.scannerVersion } : {}),
     ...(scan.cause !== undefined ? { cause: scan.cause } : {}),
+  };
+}
+
+/** The payload of the run event `diff_measured`: the result and counts only (ADR-M95 §2.2). */
+export function diffMeasuredPayload(size: ReviewSize): RunEventPayload<'diff_measured'> {
+  if (size.result === 'failed') {
+    return { result: 'failed', ...(size.cause !== undefined ? { cause: size.cause } : {}) };
+  }
+  return {
+    result: 'measured',
+    review_files: size.reviewFiles,
+    review_lines: size.reviewLines,
+    generated_files: size.generatedFiles,
+    generated_lines: size.generatedLines,
+    binary_files: size.binaryFiles,
   };
 }

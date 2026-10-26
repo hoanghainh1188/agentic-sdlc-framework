@@ -20,6 +20,11 @@
 //      `intent` escalation (QUESTIONS #21, #82);
 //   no record of the changes (the runner never lets this happen) → `fail input_mismatch`, paused,
 //      `technical` escalation.
+// Then the review size (H05, ADR-M95, QUESTIONS #456, #601–#604): a change over
+// `run.review_limits`, or with no measurement, makes G5 HITL at every tier (never a breach, never
+// an escalation). The intent waits with the cause `review_too_large` or `review_size_unknown`;
+// only an approval with a reason code of `REVIEW_ALLOW_REASON_CODES` counts, and a request for
+// changes takes the intent back to G3 (HITL) to split the plan, not to G4.
 // Otherwise, by the matrix: HOTL (and AUDIT) → a system `pass`, `in_gate G6` (the block window
 // applies: `/reject G5` or `/request-changes G5` within it; C08 waits for it before G6 acts);
 // HITL → Person A approves (`/approve G5`). A request for changes at G5 takes the intent back to
@@ -38,11 +43,13 @@
 // database: G5 reads counts and hashes.
 import {
   GATE_REASON_CODES,
+  REVIEW_ALLOW_REASON_CODES,
   type EscalationRoute,
   type EscalationTrigger,
   type GateReasonCode,
   type IntentStepResult,
   type IntentStatus,
+  type OversightResolution,
   type PolicyEngine,
   type ProjectRole,
   type ValidatedProjectConfig,
@@ -172,6 +179,17 @@ export async function stepG5(
       audience: [],
     });
   }
+  // H05: the oversight is resolved before the decisions are read; it says whether the run is held
+  // for its size (pure: the size is one of the facts).
+  const oversight = resolveGateOversight(policy.policy, intent, 'G5', {
+    changeFlags: [],
+    reviewSize: facts.review,
+  });
+  const held = reviewHold(oversight, facts);
+  // H05: a request for changes of a change too large to review splits the plan at G3.
+  if (history.latestChangesRequest !== null && held !== null) {
+    return splitAtG3(tx, registry, policy, intent, facts, held, history.latestChangesRequest);
+  }
   // A person sent the run's changes back (HITL, or within the block window): a new run after G4.
   if (history.latestChangesRequest !== null) {
     return move(tx, registry, intent, { status: 'in_gate', gate: 'G4' }, 'returned', {
@@ -183,14 +201,16 @@ export async function stepG5(
   const breach = g5Breach(facts, policy.config);
   if (breach) return failG5(tx, registry, policy, intent, facts, breach);
 
-  const oversight = resolveGateOversight(policy.policy, intent, 'G5', { changeFlags: [] });
   if (oversight.mode === 'HITL') {
     const { valid } = await registry.revalidateApprovals(tx, {
       intentId: intent.id,
       gate: 'G5',
       inputSha256: facts.inputSha256,
     });
-    const approvals = valid.filter((a) => history.countedApprovals.has(a.id));
+    const approvals = valid.filter(
+      (a) =>
+        history.countedApprovals.has(a.id) && (held === null || allowsReviewSize(a.reason_code)),
+    );
     if (approvals.length < Math.max(1, oversight.approvalsNeeded)) {
       // FR-12 (ADR-M30 §2.9): the gate deadline and its overdue escalation, as at G1–G4.
       const wakeInMs = await checkGateOverdue(tx, registry, {
@@ -202,9 +222,12 @@ export async function stepG5(
         subject: { kind: 'g5_input', sha256: facts.inputSha256 },
         producers: facts.run.triggered_by === null ? [] : [facts.run.triggered_by],
       });
-      return wakeInMs === undefined
-        ? wait('g5_decision')
-        : { outcome: 'waiting', reason: 'g5_decision', wakeInMs };
+      return {
+        outcome: 'waiting',
+        reason: 'g5_decision',
+        ...(wakeInMs === undefined ? {} : { wakeInMs }),
+        ...(held === null ? {} : { cause: held }),
+      };
     }
     // A person decided: the overdue escalation closes before the freeze check (as at G1–G4).
     await closeGateOverdue(tx, registry, intent.id, 'G5');
@@ -229,6 +252,51 @@ export async function stepG5(
   return move(tx, registry, intent, { status: 'in_gate', gate: 'G6' }, 'hotl_passed', {
     decisionId: pass.id,
     audience: oversight.roles.filter((role) => role !== 'viewer'),
+  });
+}
+
+/** Why the run is held for its size (H05), or null: the policy's `review_too_large` override. */
+export function reviewHold(
+  oversight: Pick<OversightResolution, 'overrides'>,
+  facts: Pick<G5Facts, 'review'>,
+): 'review_too_large' | 'review_size_unknown' | null {
+  if (!oversight.overrides.includes('review_too_large')) return null;
+  return facts.review === null ? 'review_size_unknown' : 'review_too_large';
+}
+
+/** An approval of a held run counts only with a reason code of `REVIEW_ALLOW_REASON_CODES`. */
+export function allowsReviewSize(reasonCode: string | null): boolean {
+  return (
+    reasonCode !== null && (REVIEW_ALLOW_REASON_CODES as readonly string[]).includes(reasonCode)
+  );
+}
+
+/**
+ * H05 (ADR-M95 §2.5): a person requested changes of a run held for its size. The intent goes back
+ * to G3 to split the plan; G3 is HITL from then on (`returnedFromG5` reads the audit event) and
+ * the earlier G3 approval no longer counts. The same plan may be approved again: a person decides.
+ */
+async function splitAtG3(
+  tx: TenantScope,
+  registry: Registry,
+  policy: G5Policy,
+  intent: Intent,
+  facts: G5Facts,
+  held: 'review_too_large' | 'review_size_unknown',
+  decisionId: string,
+): Promise<IntentStepResult> {
+  await tx.audit.append({
+    action: 'gate.g5_split_requested',
+    actorType: 'system',
+    actorId: null,
+    entityId: intent.id,
+    occurredAt: registry.now(),
+    payload: { decision_id: decisionId, check: held, run_id: facts.run.id },
+  });
+  await registry.voidApprovals(tx, { intentId: intent.id, gate: 'G3', reasonCode: held });
+  return move(tx, registry, intent, { status: 'in_gate', gate: 'G3' }, 'g5_returned', {
+    decisionId,
+    audience: await g3Approvers(tx, policy, intent),
   });
 }
 

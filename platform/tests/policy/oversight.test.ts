@@ -249,6 +249,47 @@ describe('G5 breach (codes table §4 "HOTL → HITL on breach")', () => {
   });
 });
 
+describe('H05: G5 over the review limits (ADR-M95 §2.3)', () => {
+  it.each(RISK_TIERS)('%s: at the limits the matrix holds; over them, or unknown, HITL', (tier) => {
+    const plain = resolve('G5', tier, []);
+    expect(resolve('G5', tier, [], { reviewSize: { files: 40, lines: 1500 } })).toEqual(plain);
+    for (const reviewSize of [{ files: 41, lines: 0 }, { files: 1, lines: 1501 }, null]) {
+      expect(resolve('G5', tier, [], { reviewSize })).toEqual({
+        mode: 'HITL',
+        approvalsNeeded: 1,
+        roles: A,
+        overrides: ['review_too_large'],
+      });
+    }
+  });
+
+  it('a breach keeps its own resolution', () => {
+    expect(
+      resolve('G5', 'high', [], { breached: true, reviewSize: { files: 99, lines: 0 } }).overrides,
+    ).toEqual(['limit_breached']);
+  });
+
+  it('the limits come from the project configuration', () => {
+    const engine = engineFor(
+      'run:\n  review_limits: { max_changed_files: 5, max_changed_lines: 50 }\n',
+    );
+    const size = (files: number, lines: number) =>
+      engine.oversightMode({
+        gate: 'G5',
+        riskTier: 'low',
+        changeFlags: [],
+        context: { reviewSize: { files, lines } },
+      }).mode;
+    expect(size(5, 50)).toBe('HOTL');
+    expect(size(6, 50)).toBe('HITL');
+    expect(size(5, 51)).toBe('HITL');
+  });
+
+  it('other gates ignore the review size', () => {
+    expect(resolve('G6', 'low', [], { reviewSize: null })).toEqual(resolve('G6', 'low', []));
+  });
+});
+
 describe('values come from the project configuration, not code (AP5, ADR-M13)', () => {
   it('follows a tightened matrix cell', () => {
     const policy = engineFor('oversight:\n  matrix:\n    G2:\n      low: { mode: HITL }\n');

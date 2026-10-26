@@ -194,9 +194,26 @@ export const GATE_REASON_CODES = [
   // run's added lines, or the scan failed (or was not recorded). Codes and counts only.
   'secret_in_diff',
   'secret_scan_failed',
+  // G5 (task H05, ADR-M95, QUESTIONS #601–#603): the run's change is larger than a person can
+  // review (`run.review_limits`), or its size was not measured. G5 is then HITL: Person A allows
+  // it with one of `REVIEW_ALLOW_REASON_CODES` or requests changes (back to G3, to split the plan).
+  'review_too_large',
+  'review_size_unknown',
+  // The reasons a person gives to allow a change over the review limits (QUESTIONS #604).
+  'generated_change',
+  'mechanical_change',
+  'cannot_split',
   'other',
 ] as const;
 export type GateReasonCode = (typeof GATE_REASON_CODES)[number];
+
+/** H05 (ADR-M95 §2.4): the reason codes of a G5 approval of a change over the review limits. */
+export const REVIEW_ALLOW_REASON_CODES = [
+  'generated_change',
+  'mechanical_change',
+  'cannot_split',
+] as const satisfies readonly GateReasonCode[];
+export type ReviewAllowReasonCode = (typeof REVIEW_ALLOW_REASON_CODES)[number];
 
 /** How a Git host event reached the platform (design/D-05 section 5, ADR-M11). */
 export const EVENT_SOURCES = ['polling', 'webhook'] as const;

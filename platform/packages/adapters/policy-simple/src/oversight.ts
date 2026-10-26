@@ -4,6 +4,7 @@
 //   G3 + a forced-HITL change flag          → HITL
 //   G3 after G5 sent the intent back        → HITL (C07, QUESTIONS #131)
 //   G5 + a breached limit                   → the cell's `on_breach` mode
+//   G5 + a change over the review limits    → HITL (H05, ADR-M95; also when not measured)
 //   G6 + a finding at or above min_severity → `g6_security_findings.mode`
 //   G7 + a dual-approval change flag        → the dual-approval roles, one approval each
 import type {
@@ -41,6 +42,15 @@ function securityFindingAtThreshold(
   return SEVERITIES.slice(0, threshold + 1).some((severity) => (findings[severity] ?? 0) > 0);
 }
 
+/** H05: the run's change is over `run.review_limits`, or its size is unknown (null). */
+function overReviewLimits(config: ValidatedProjectConfig, input: OversightInput): boolean {
+  const size = input.context?.reviewSize;
+  if (size === undefined) return false;
+  if (size === null) return true;
+  const limits = config.run.review_limits;
+  return size.files > limits.max_changed_files || size.lines > limits.max_changed_lines;
+}
+
 function union(first: readonly ProjectRole[], second: readonly ProjectRole[]): ProjectRole[] {
   return [...first, ...second.filter((role) => !first.includes(role))];
 }
@@ -74,8 +84,18 @@ function applyOverrides(
       return overrides.length > 0 ? { ...base, mode: 'HITL', overrides } : base;
     }
     case 'G5':
-      return input.context?.breached === true && cell.on_breach !== undefined
-        ? { ...base, mode: cell.on_breach, overrides: ['limit_breached'] }
+      if (input.context?.breached === true && cell.on_breach !== undefined) {
+        return { ...base, mode: cell.on_breach, overrides: ['limit_breached'] };
+      }
+      // H05 (ADR-M95 §2.3): a change over the review limits, or not measured, is HITL at every
+      // tier, one approval at least.
+      return overReviewLimits(config, input)
+        ? {
+            ...base,
+            mode: 'HITL',
+            approvals: Math.max(1, cell.approvals),
+            overrides: ['review_too_large'],
+          }
         : base;
     case 'G6':
       if (securityFindingAtThreshold(config, input)) {

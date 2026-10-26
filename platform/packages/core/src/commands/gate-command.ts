@@ -2,7 +2,7 @@
 // (B06) and the workflow signal (B07) (ADR-M26 section 2.4, QUESTIONS.md #64).
 // It records the decision only. Moving the intent to the next gate is the workflow's job (B07,
 // ADR-M30): the caller wakes the intent's workflow after the commit.
-import type { EventSource, GateReasonCode, UserId } from '@sdlc/contracts';
+import type { EventSource, GateContext, GateReasonCode, UserId } from '@sdlc/contracts';
 
 import type { GateDecisionRow, Intent } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
@@ -16,6 +16,8 @@ import { gatherG6Facts } from '../workflow/g6-ci.js';
 import { g7Producers } from '../workflow/g7-facts.js';
 import { g8Producers } from '../workflow/g8-facts.js';
 import { contextOf } from '../workflow/g6-verify.js';
+import { allowsReviewSize, reviewHold } from '../workflow/g5.js';
+import { gatherGateOversightFacts, resolveGateOversight } from '../workflow/oversight.js';
 import { isPassableGate, openBlockWindow } from '../workflow/hotl.js';
 import { waitedSeconds } from '../workflow/waited.js';
 import { projectAccess } from './access.js';
@@ -128,6 +130,19 @@ export async function decideGate(
         `${current.code}: the spec has no acceptance criteria`,
       );
     }
+    // H05 (ADR-M95 §2.4): G5 of a change over the review limits is HITL and an approval needs an
+    // allowing reason code. The context makes the registry record the HITL resolution.
+    const g5 = gate === 'G5' ? await g5ReviewContext(registry, tx, current) : null;
+    if (
+      g5?.held === true &&
+      command.decision === 'approve' &&
+      !allowsReviewSize(command.reasonCode ?? null)
+    ) {
+      throw new CommandError(
+        'review_reason_required',
+        `${current.code}: G5 is over the review limits; approve with a reason code`,
+      );
+    }
     // C07 (QUESTIONS #131): after a run went outside its plan, G3 is HITL and needs a new plan.
     const returned = gate === 'G3' && (await returnedFromG5(tx, current.id));
     if (
@@ -152,6 +167,7 @@ export async function decideGate(
       source: command.source,
       eventSource: command.eventSource ?? null,
       ...(returned ? { context: { returnedFromG5: true } } : {}),
+      ...(g5?.context === undefined ? {} : { context: g5.context }),
       // C08 PR 2: G6's oversight depends on the findings G6 read (QUESTIONS #157).
       ...(gate === 'G6' ? { context: await g6Context(tx, current.id) } : {}),
       // E03 (QUESTIONS #220): every G8 is a production release in the MVP.
@@ -178,6 +194,25 @@ async function producersOf(tx: TenantScope, intent: Intent, gate: string): Promi
 async function planSubmitters(tx: TenantScope, intentId: string): Promise<string[]> {
   const plans = await tx.plans.list(intentId);
   return [...new Set(plans.map((p) => p.submitted_by).filter((id): id is string => id !== null))];
+}
+
+/**
+ * H05: the G5 context of the last run's review size, and whether the run is held for it. No
+ * context when the intent has no run that goes to G5.
+ */
+async function g5ReviewContext(
+  registry: Registry,
+  tx: TenantScope,
+  intent: Intent,
+): Promise<{ readonly context?: GateContext; readonly held: boolean }> {
+  const facts = await gatherGateOversightFacts(tx, intent, 'G5');
+  if (facts.reviewSize === undefined) return { held: false };
+  const { policy } = await registry.policyFor(tx, intent.project_id);
+  const oversight = resolveGateOversight(policy, intent, 'G5', facts);
+  return {
+    context: { breached: false, reviewSize: facts.reviewSize },
+    held: reviewHold(oversight, { review: facts.reviewSize }) !== null,
+  };
 }
 
 /** The policy context of G6 from the last reading (`ci_checked`). */

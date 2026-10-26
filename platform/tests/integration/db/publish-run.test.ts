@@ -204,6 +204,15 @@ describeDb('C08: the runner pushes the checked changes (stub Git host, PostgreSQ
         findings: 0,
         rules: 'built_in',
       });
+      // H05: the size a person reviews, within the review limits.
+      await tx.runEvents.append(runId, 'diff_measured', {
+        result: 'measured',
+        review_files: 1,
+        review_lines: 2,
+        generated_files: 0,
+        generated_lines: 0,
+        binary_files: 0,
+      });
     });
     await t.f.scope.runs.transition(runId, {
       from: ['running'],

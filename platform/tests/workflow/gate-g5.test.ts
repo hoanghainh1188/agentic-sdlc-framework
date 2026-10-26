@@ -6,11 +6,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { Run } from '../../packages/core/src/db/schema.js';
 import {
+  reviewSizeOf,
   spentPercent,
   type G5Facts,
   type G5SecretScan,
 } from '../../packages/core/src/workflow/g5-facts.js';
-import { g5Breach } from '../../packages/core/src/workflow/g5.js';
+import { allowsReviewSize, g5Breach, reviewHold } from '../../packages/core/src/workflow/g5.js';
 
 const loaded = loadProjectConfig('');
 if (!loaded.ok) throw new Error('default configuration refused');
@@ -36,6 +37,7 @@ function facts(
             pathsSha256: 'a'.repeat(64),
           },
     secrets,
+    review: { files: 3, lines: 40 },
     keyCapUsd: '2',
     spentUsd,
     intentSpentUsd: spentUsd,
@@ -155,5 +157,44 @@ describe('spentPercent', () => {
     expect(spentPercent({ keyCapUsd: '3', spentUsd: '1' })).toBe(33);
     expect(spentPercent({ keyCapUsd: null, spentUsd: '1' })).toBeNull();
     expect(spentPercent({ keyCapUsd: '0', spentUsd: '1' })).toBeNull();
+  });
+});
+
+describe('H05: the review size (ADR-M95)', () => {
+  const measured = (payload: Record<string, unknown>) => [{ event_type: 'diff_measured', payload }];
+
+  it('reviewSizeOf reads the last measurement; failed, missing or malformed is null (#603)', () => {
+    expect(
+      reviewSizeOf([
+        ...measured({ result: 'measured', review_files: 1, review_lines: 1 }),
+        ...measured({ result: 'measured', review_files: 41, review_lines: 7 }),
+      ]),
+    ).toEqual({ files: 41, lines: 7 });
+    expect(reviewSizeOf(measured({ result: 'failed', cause: 'numstat_failed' }))).toBeNull();
+    expect(reviewSizeOf([])).toBeNull();
+    expect(reviewSizeOf(measured({ result: 'measured', review_files: '4' }))).toBeNull();
+  });
+
+  it('reviewHold reads the policy override; the cause says whether the size is known', () => {
+    const held = { overrides: ['review_too_large'] as const };
+    expect(reviewHold(held, { review: { files: 41, lines: 0 } })).toBe('review_too_large');
+    expect(reviewHold(held, { review: null })).toBe('review_size_unknown');
+    expect(reviewHold({ overrides: [] }, { review: null })).toBeNull();
+  });
+
+  it('only the allowing reason codes count for a held run (#604)', () => {
+    for (const code of ['generated_change', 'mechanical_change', 'cannot_split']) {
+      expect(allowsReviewSize(code)).toBe(true);
+    }
+    for (const code of [null, 'other', 'review_too_large', 'spec_unclear']) {
+      expect(allowsReviewSize(code)).toBe(false);
+    }
+  });
+
+  it('a size over the limits is never a breach (no escalation, no fail)', () => {
+    expect(
+      check({ ...facts('succeeded', null), review: { files: 999, lines: 99_999 } }),
+    ).toBeNull();
+    expect(check({ ...facts('succeeded', null), review: null })).toBeNull();
   });
 });

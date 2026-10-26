@@ -1,6 +1,6 @@
 // Comment commands on the Git host (D-02 FR-21, D-08 B06 AC2, design/ADR-M27 section 2.3).
 //
-//   /approve G<n>
+//   /approve G<n> [<allow_reason_code>]                     (H05: G5 over the review limits)
 //   /reject G<n> [<reason_code>] <reason>
 //   /request-changes G<n> [<reason_code>] <reason>
 //   /ack [ESC-YYYY-NNNN]                                                  (B11, ADR-M28 §2.7)
@@ -20,6 +20,7 @@
 import {
   GATE_CODES,
   GATE_REASON_CODES,
+  REVIEW_ALLOW_REASON_CODES,
   type EscalationDecision,
   type GateCode,
   type GateReasonCode,
@@ -140,9 +141,19 @@ export function parseCommentCommand(body: string): ParsedComment {
   const decision = COMMENT_VERBS[verb];
 
   if (decision === 'approve') {
-    // Only the gate: "/approve G3 if the tests pass" must not pass as a plain approval.
-    if (rest.length > 0) return { kind: 'invalid', verb, problem: 'unexpected_text' };
-    return { kind: 'gate_decision', verb, gate: gate as GateCode, decision, reasonCode: null };
+    // Only the gate: "/approve G3 if the tests pass" must not pass as a plain approval. H05
+    // (ADR-M95 §2.4): one allowing reason code may follow, for a change over the review limits.
+    const allow = rest.length === 1 ? allowReasonCodeOf(rest[0]) : undefined;
+    if (rest.length > 0 && allow === undefined) {
+      return { kind: 'invalid', verb, problem: 'unexpected_text' };
+    }
+    return {
+      kind: 'gate_decision',
+      verb,
+      gate: gate as GateCode,
+      decision,
+      reasonCode: allow ?? null,
+    };
   }
 
   const code = reasonCodeOf(rest[0]);
@@ -212,4 +223,12 @@ function parseEscalationCommand(
     decision,
     reasonCode: reasonCodeOf(reason[0]) ?? null,
   };
+}
+
+/** A reason code that allows a change over the review limits (`generated_change` …), or undefined. */
+function allowReasonCodeOf(word: string | undefined): GateReasonCode | undefined {
+  const code = word?.toLowerCase().replaceAll('-', '_');
+  return code !== undefined && (REVIEW_ALLOW_REASON_CODES as readonly string[]).includes(code)
+    ? (code as GateReasonCode)
+    : undefined;
 }

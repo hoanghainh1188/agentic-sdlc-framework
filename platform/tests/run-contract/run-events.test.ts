@@ -46,6 +46,7 @@ describe('run event payloads', () => {
       'diff_stored',
       'changes_checked',
       'secrets_scanned',
+      'diff_measured',
       'branch_pushed',
       'publish_refused',
       'publish_failed',

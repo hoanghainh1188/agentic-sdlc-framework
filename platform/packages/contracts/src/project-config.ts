@@ -175,6 +175,14 @@ export interface ProjectConfig {
       readonly response_level: ResponseLevel;
     };
     /**
+     * H05 (ADR-M95, QUESTIONS #456): the largest change a person must review, generated files left
+     * out. Over either limit, or with no measurement, G5 is HITL at every tier.
+     */
+    readonly review_limits: {
+      readonly max_changed_files: number;
+      readonly max_changed_lines: number;
+    };
+    /**
      * X11 (ADR-M29 §2.10, QUESTIONS #551–#554): how an agent's context is condensed in a long run.
      * `summarize`: the OpenHands condenser replaces old events with a summary made by the run's own
      * model. Only for a model with a known context size (rule M35); otherwise the run has none.

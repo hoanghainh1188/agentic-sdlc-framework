@@ -2,15 +2,16 @@
 // status and stop reason, the runner's records of its changes (`diff_stored`, `changes_checked`,
 // PR 1), the key's cap (`key_issued`), the run's synced spend
 // (`cost_records`), and the intent's synced spend; the runner's secret scan of the added lines
-// (`secrets_scanned`, H04, ADR-M93). The G5 input hash binds every G5 decision and the G5 escalation to exactly this
+// (`secrets_scanned`, H04, ADR-M93); the size a person reviews (`diff_measured`, H05, ADR-M95). The
+// review size is not in the G5 input hash: it is computed from the stored diff, which is. The G5 input hash binds every G5 decision and the G5 escalation to exactly this
 // result of exactly this run (FR-17). Codes, counts and hashes only: never a path.
 import { createHash } from 'node:crypto';
 
 import { canonicalJson } from '@sdlc/config';
-import type { RunStatus } from '@sdlc/contracts';
+import type { ReviewSizeFacts, RunStatus } from '@sdlc/contracts';
 
 import { fromMicros, toMicros } from '../cost/money.js';
-import type { Run } from '../db/schema.js';
+import type { Run, RunEventRow } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 
 /** Run statuses that go to G5 (`finishRun`, the runner's changes step). */
@@ -43,6 +44,8 @@ export interface G5Facts {
   readonly changes: G5Changes | null;
   /** The runner's secret scan (`secrets_scanned`); null when missing (QUESTIONS #590). */
   readonly secrets: G5SecretScan | null;
+  /** The size a person reviews (`diff_measured`); null when missing or failed (QUESTIONS #603). */
+  readonly review: ReviewSizeFacts | null;
   /** The cap of the run's key (`key_issued`); null when unknown. */
   readonly keyCapUsd: string | null;
   /** The run's synced spend (`cost_records`), as a decimal string. */
@@ -63,6 +66,21 @@ function str(value: unknown): string | null {
 
 function num(value: unknown): number {
   return typeof value === 'number' ? value : 0;
+}
+
+/**
+ * The review size of a run from its events (`diff_measured`, H05): the last one, when measured;
+ * null when missing, failed or malformed (G5 then holds the run, QUESTIONS #603).
+ */
+export function reviewSizeOf(
+  events: readonly Pick<RunEventRow, 'event_type' | 'payload'>[],
+): ReviewSizeFacts | null {
+  const measured = events.filter((e) => e.event_type === 'diff_measured').at(-1)?.payload;
+  if (measured?.result !== 'measured') return null;
+  const { review_files: files, review_lines: lines } = measured;
+  if (typeof files !== 'number' || typeof lines !== 'number') return null;
+  if (!Number.isSafeInteger(files) || !Number.isSafeInteger(lines)) return null;
+  return { files, lines };
 }
 
 /** The facts of the intent's last run, or null when it has no run that goes to G5. */
@@ -89,6 +107,7 @@ export async function gatherG5Facts(scope: TenantScope, intentId: string): Promi
           pathsSha256: checked.paths_sha256,
         }
       : null;
+  const review = reviewSizeOf(events);
   const records = await scope.costRecords.listForRun(run.id);
   const spent = records.reduce((sum, r) => sum + toMicros(String(r.cost_usd)), 0n);
   const diffSha256 = str(diff?.sha256);
@@ -99,6 +118,7 @@ export async function gatherG5Facts(scope: TenantScope, intentId: string): Promi
     diffSha256,
     changes,
     secrets,
+    review,
     keyCapUsd: str(key?.max_budget_usd),
     spentUsd: fromMicros(spent),
     intentSpentUsd,

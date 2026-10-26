@@ -215,6 +215,22 @@ export const RUN_EVENT_TYPES = {
     cause: 'code?',
   },
   /**
+   * The size of the run's change a person must review (H05, ADR-M95 §2.2), measured by the runner
+   * outside the sandbox from the staged diff: `result` `measured` or `failed` (with `cause`). The
+   * review counts leave out the generated files (lock files, and the files the base commit's
+   * `.gitattributes` marks `linguist-generated`), which are counted apart. A binary file counts as
+   * one file and no lines. Counts only, never a path.
+   */
+  diff_measured: {
+    result: 'code',
+    review_files: 'count?',
+    review_lines: 'count?',
+    generated_files: 'count?',
+    generated_lines: 'count?',
+    binary_files: 'count?',
+    cause: 'code?',
+  },
+  /**
    * The runner pushed the run's checked changes as one commit on `agent/INT-…` (C08, ADR-M38
    * §2.2): `head_sha` is the commit the runner made from the stored diff (never what the sandbox
    * reported) and that the Git host now shows for the branch; `diff_sha256` and `paths_sha256` are

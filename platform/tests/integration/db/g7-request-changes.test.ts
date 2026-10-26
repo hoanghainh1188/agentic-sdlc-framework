@@ -106,6 +106,15 @@ describeDb('E01 PR 2: a request for changes at G7 starts a new run, on PostgreSQ
       findings: 0,
       rules: 'built_in',
     });
+    // H05: the size a person reviews, within the review limits.
+    await w.t.f.scope.runEvents.append(runId, 'diff_measured', {
+      result: 'measured',
+      review_files: 1,
+      review_lines: 2,
+      generated_files: 0,
+      generated_lines: 0,
+      binary_files: 0,
+    });
     await w.t.f.scope.runs.transition(runId, {
       from: ['running'],
       to: 'succeeded',
