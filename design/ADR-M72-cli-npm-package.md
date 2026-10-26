@@ -5,7 +5,7 @@
 | Status | **Accepted** (Harry, 2026-10-16; built by task V05) |
 | Date | 2026-10-10 |
 | Decided by | Harry (V05 plan approved 2026-10-10; QUESTIONS #365–#367 answered 2026-10-10) |
-| Related | D-08 task V05; QUESTIONS #357, #364, #365–#367; ADR-M16 (monorepo tooling); ADR-M36 (the CLI's API client); `platform/USER-GUIDE.md` §2; task V12 (the release process) |
+| Related | D-08 tasks V05, V15; ADR-M94 §2.3 (the trigger); QUESTIONS #357, #364, #365–#367; ADR-M16 (monorepo tooling); ADR-M36 (the CLI's API client); `platform/USER-GUIDE.md` §2; task V12 (the release process) |
 
 ## 1. Context
 
@@ -46,6 +46,8 @@ npm **trusted publishing** (OpenID Connect, `id-token: write`) proves the workfl
 **The first version** (QUESTIONS #365, Harry 2026-10-10): npm lets a package's owner add a trusted publisher only to a package that exists. So the first version is published once by Harry, by hand (version 0.1.1), from the tarball the tag workflow checked and kept (2FA, no provenance for that version); then Harry adds the trusted publisher (repository `hoanghainh1188/agentic-sdlc-framework`, workflow `npm-publish.yml`, environment `npm`) and sets "Require two-factor authentication and disallow tokens". Every later version goes through the workflow. The steps are in `platform/GETTING-STARTED.md`, "Publishing the CLI on npm".
 
 Task V12 may fold this job into the release workflow; V04 (images on GHCR) has its own job.
+
+> **Changed by ADR-M94 §2.3** (QUESTIONS #594, Harry 2026-10-26; built by V15): the file name, the environment `npm` and the trusted publisher stay; the trigger becomes `workflow_dispatch` on the tag, started by `release.yml` after the GitHub Release exists.
 
 ## 3. Consequences
 

@@ -5,7 +5,7 @@
 | Status | **Accepted** (Harry, 2026-10-16; built by task V04) |
 | Date | 2026-10-10 |
 | Decided by | Harry (V04 plan approved 2026-10-10: images built before the tag, amd64 and arm64, the registry path below; QUESTIONS #370, #371) |
-| Related | D-08 tasks V04, V12, O02; QUESTIONS #54, #342, #355, #364, #370, #371; D-03 §10 (version 1.39); ADR-M10 §2.1 (licences), ADR-M25 §2.9 (sandbox images), A09 (`ci.yml`, Trivy); `platform/deploy/README.md` "Verify the published images" |
+| Related | D-08 tasks V04, V12, O02, V15; ADR-M94 (replaces §2.5); QUESTIONS #54, #342, #355, #364, #370, #371; D-03 §10 (version 1.39); ADR-M10 §2.1 (licences), ADR-M25 §2.9 (sandbox images), A09 (`ci.yml`, Trivy); `platform/deploy/README.md` "Verify the published images" |
 
 ## 1. Context
 
@@ -41,6 +41,8 @@ Many trial users run Docker Desktop on Apple Silicon. Every base image is publis
 - **Provenance**: BuildKit's SLSA provenance (`provenance: mode=max`; the build has no secret and no secret build argument), and a GitHub build provenance attestation (`actions/attest-build-provenance`, pushed to the registry), checked with `gh attestation verify`.
 
 ### 2.5 How Compose chooses: the lock file and the release checkout (QUESTIONS #370)
+
+> **Replaced by ADR-M94** (QUESTIONS #591–#595, Harry 2026-10-26; built by V15) from the first release after v0.6.0: the images are built on the tag and `images.lock` is an asset of the GitHub Release. This section stays true for v0.6.0 and earlier tags.
 
 The images of a release are **built before its tag** (option A):
 
