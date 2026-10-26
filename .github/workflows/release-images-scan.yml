@@ -1,0 +1,151 @@
+# Build and scan the platform's images, push nothing (ADR-M94 §2.5, task V15).
+#
+# The first stage of release-images.yml, in its own file so that ci.yml can run it on a pull
+# request that changes the version: a caller must grant every permission the called file's jobs
+# ask for, also for a job that is skipped, so ci.yml could not call release-images.yml without
+# write permissions. This file only reads.
+#
+# Builds the six images for linux/amd64 and linux/arm64, each on its own native runner, and scans
+# each one with Trivy (CRITICAL blocks, the thresholds of ci.yml). `cache: true` (a release only)
+# exports the layers to the Actions cache for release-images.yml's job push.
+name: release-images-scan
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Release version, equal to the root package.json version (for example 0.1.1)
+        type: string
+        required: true
+      cache:
+        description: Export the layers for the job push of release-images.yml
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  # Keep these equal to ci.yml (platform/tests/deploy/release-images.test.ts checks it).
+  TRIVY_BLOCK_SEVERITY: CRITICAL
+  TRIVY_REPORT_SEVERITY: HIGH
+  TRIVY_VERSION: 0.74.0
+  TRIVY_SHA256: 2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+  TRIVY_ARM64_SHA256: b94ce1976bbf3c15b514b605ee88be7c6d94a29be2302847ff01cb794d47aad5
+
+jobs:
+  scan:
+    name: build and scan ${{ matrix.image }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+        image:
+          [
+            sdlc-api,
+            sdlc-worker,
+            sdlc-runner,
+            sdlc-otel-collector,
+            sandbox-node24,
+            tool-project-docs,
+          ]
+        include:
+          - image: sdlc-api
+            context: .
+            dockerfile: platform/apps/api/Dockerfile
+            ignorefile: .trivyignore
+          - image: sdlc-worker
+            context: .
+            dockerfile: platform/apps/worker/Dockerfile
+            ignorefile: .trivyignore
+          - image: sdlc-runner
+            context: .
+            dockerfile: platform/apps/runner/Dockerfile
+            ignorefile: .trivyignore
+          - image: sdlc-otel-collector
+            context: platform/deploy/otel-collector
+            dockerfile: platform/deploy/otel-collector/Dockerfile
+            ignorefile: .trivyignore
+          - image: sandbox-node24
+            context: platform/sandbox-images/node24
+            dockerfile: platform/sandbox-images/node24/Dockerfile
+            ignorefile: platform/sandbox-images/.trivyignore
+          # X04 PR 3b (ADR-M89): the first register tool, registered by its digest.
+          - image: tool-project-docs
+            context: .
+            dockerfile: platform/apps/tool-project-docs/Dockerfile
+            ignorefile: .trivyignore
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The commit time, as in release-images.yml's check job: the job push builds the same image.
+      - name: SOURCE_DATE_EPOCH
+        run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Install trivy
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          if [ "$ARCH" = arm64 ]; then
+            archive="trivy_${TRIVY_VERSION}_Linux-ARM64.tar.gz"; sum="$TRIVY_ARM64_SHA256"
+          else
+            archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"; sum="$TRIVY_SHA256"
+          fi
+          curl -fsSLo "$RUNNER_TEMP/$archive" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$archive"
+          echo "$sum  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" trivy
+      # Build into the runner's Docker Engine and scan. Nothing is pushed here: the job push runs
+      # only after every scan of the release passed (ADR-M94 §2.5). The layers go to the Actions
+      # cache of this ref for that job.
+      - name: Build (local, for the scan)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: release-scan/${{ matrix.image }}:${{ inputs.version }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.licenses=MIT
+          provenance: false
+          sbom: false
+          # Only a release fills the cache: a pull request has no job push to use it.
+          cache-to: ${{ inputs.cache && format('type=gha,mode=max,scope={0}-{1}-{2}', matrix.image, matrix.arch, inputs.version) || '' }}
+      - name: Trivy report (does not block)
+        env:
+          IGNOREFILE: ${{ matrix.ignorefile }}
+          IMAGE: release-scan/${{ matrix.image }}:${{ inputs.version }}
+          TITLE: ${{ matrix.image }} (${{ matrix.arch }})
+        run: |
+          "$RUNNER_TEMP/trivy" image --scanners vuln \
+            --severity "$TRIVY_REPORT_SEVERITY,$TRIVY_BLOCK_SEVERITY" --ignorefile "$IGNOREFILE" \
+            --disable-telemetry --skip-version-check --exit-code 0 \
+            --format table --output "$RUNNER_TEMP/trivy.txt" "$IMAGE"
+          {
+            echo "### trivy $TITLE: $TRIVY_REPORT_SEVERITY and $TRIVY_BLOCK_SEVERITY findings (only $TRIVY_BLOCK_SEVERITY blocks)"
+            echo '```text'
+            cat "$RUNNER_TEMP/trivy.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Trivy scan (severity CRITICAL blocks)
+        env:
+          IGNOREFILE: ${{ matrix.ignorefile }}
+          IMAGE: release-scan/${{ matrix.image }}:${{ inputs.version }}
+        run: |
+          "$RUNNER_TEMP/trivy" image --scanners vuln --severity "$TRIVY_BLOCK_SEVERITY" \
+            --ignorefile "$IGNOREFILE" --disable-telemetry --skip-version-check --exit-code 1 "$IMAGE"
+      # ADR-M10 §2.1: the CRITICAL licence category (AGPL, SSPL, commercial) blocks the sandbox.
+      - name: Trivy licences (sandbox image, CRITICAL category blocks)
+        if: matrix.image == 'sandbox-node24'
+        env:
+          IMAGE: release-scan/${{ matrix.image }}:${{ inputs.version }}
+        run: |
+          "$RUNNER_TEMP/trivy" image --scanners license --severity "$TRIVY_BLOCK_SEVERITY" \
+            --disable-telemetry --skip-version-check --exit-code 1 "$IMAGE"

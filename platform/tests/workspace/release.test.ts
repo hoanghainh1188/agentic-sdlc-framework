@@ -1,10 +1,13 @@
-// D-08 V12 (RELEASING.md, QUESTIONS #364, #370, #390): the release process.
-// - platform/tools/release/release-check.mjs, the one release gate, on fixtures (AC2);
-// - every CHANGELOG release section from 0.1.1 on has "Upgrade notes" (AC3; 0.1.0 is exempt);
-// - release.yml: only a pushed tag, verifies the images (built before the tag) instead of
-//   building them, creates the GitHub Release, the least permissions per job (AC2);
-// - npm-publish.yml keeps its trusted-publisher identity and runs the same gate;
-// - `pnpm release:lock` copies a release-images run's lock file, with a fake `gh`.
+// D-08 V12 and V15 (RELEASING.md, QUESTIONS #364, #390, #591–#595, design/ADR-M94): the release.
+// - platform/tools/release/release-check.mjs, the one release gate, on fixtures (V12 AC2, V15);
+// - every CHANGELOG release section from 0.1.1 on has "Upgrade notes" (V12 AC3; 0.1.0 is exempt);
+// - release.yml: only a pushed tag; builds the images through release-images.yml, verifies them,
+//   creates the immutable GitHub Release with images.lock, starts npm; the least permissions per
+//   job (V15 AC1, AC2);
+// - npm-publish.yml keeps its trusted-publisher identity, runs only when dispatched on a released
+//   tag and checks the Release's own images.lock (V15 AC4);
+// - verify-images.sh pins the signer release-images.yml at the exact tag (V15 AC2);
+// - the lock file pull request is gone: no `pnpm release:lock`, no lock.mjs (V15 AC1).
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -24,9 +27,13 @@ interface Step {
 }
 interface Job {
   needs?: string | string[];
+  if?: string;
+  uses?: string;
+  with?: Record<string, unknown>;
+  outputs?: Record<string, string>;
   environment?: string;
   permissions?: Record<string, string>;
-  steps: Step[];
+  steps?: Step[];
 }
 interface Workflow {
   on: Record<string, { tags?: string[] } | null>;
@@ -38,10 +45,9 @@ interface Workflow {
 const root = repoRoot();
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 const CHECK = path.join(root, 'platform/tools/release/release-check.mjs');
-const LOCK = path.join(root, 'platform/tools/release/lock.mjs');
 const PREFIX = 'ghcr.io/hoanghainh1188/agentic-sdlc-framework';
 const SIGNER =
-  'https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/heads/main';
+  'https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/tags/$tag';
 const IMAGES: Record<string, string> = {
   API: 'sdlc-api',
   WORKER: 'sdlc-worker',
@@ -79,19 +85,16 @@ interface Fixture {
   pkg?: string;
   platform?: string;
   changelog?: string;
-  lock?: string;
 }
 function fixture(version: string, f: Fixture = {}): string {
   const dir = tempDir();
   fs.mkdirSync(path.join(dir, 'platform/packages/api-schemas/src'), { recursive: true });
-  fs.mkdirSync(path.join(dir, 'platform/deploy'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ version: f.pkg ?? version }));
   fs.writeFileSync(
     path.join(dir, 'platform/packages/api-schemas/src/version.ts'),
     `export const PLATFORM_VERSION = '${f.platform ?? version}';\n`,
   );
   fs.writeFileSync(path.join(dir, 'CHANGELOG.md'), f.changelog ?? changelog(version));
-  fs.writeFileSync(path.join(dir, 'platform/deploy/images.lock'), f.lock ?? lockText(version));
   return dir;
 }
 function check(args: string[]) {
@@ -100,13 +103,19 @@ function check(args: string[]) {
 }
 const tagCheck = (dir: string, tag: string, extra: string[] = []) =>
   check(['tag', tag, '--root', dir, ...extra]);
+/** `release-check.mjs lock <file> <version>` on a lock file written to a temporary folder. */
+function lockCheck(text: string, version: string, extra: string[] = []) {
+  const file = path.join(tempDir(), 'images.lock');
+  fs.writeFileSync(file, text);
+  return check(['lock', file, version, ...extra]);
+}
+const steps = (j: Job): Step[] => j.steps ?? [];
 
-describe('V12: release-check.mjs, the release gate', () => {
-  it('accepts a complete release and writes the notes and the six image references', () => {
+describe('V12, V15: release-check.mjs, the release gate', () => {
+  it('accepts a complete release, writes the notes, and reads no lock file (ADR-M94 §2.4)', () => {
     const dir = fixture('0.1.2');
     const notes = path.join(dir, 'notes.md');
-    const images = path.join(dir, 'images.txt');
-    const r = tagCheck(dir, 'v0.1.2', ['--notes-out', notes, '--images-out', images]);
+    const r = tagCheck(dir, 'v0.1.2', ['--notes-out', notes]);
     expect(r.err).toBe('');
     expect(r.status).toBe(0);
     expect(r.out).toBe('release-check: v0.1.2 ok\n');
@@ -115,10 +124,15 @@ describe('V12: release-check.mjs, the release gate', () => {
     expect(body).toContain('### Upgrade notes');
     expect(body).not.toContain('## [');
     expect(body).not.toContain('first');
-    const refs = fs.readFileSync(images, 'utf8').trim().split('\n');
-    expect(refs).toHaveLength(6);
-    for (const ref of refs)
-      expect(ref).toMatch(new RegExp(`^${PREFIX}/[a-z0-9-]+@sha256:[0-9a-f]{64}$`));
+    expect(fs.existsSync(path.join(dir, 'platform/deploy/images.lock'))).toBe(false);
+  });
+
+  it('the mode tag writes no image list: that belongs to the mode lock', () => {
+    const dir = fixture('0.1.2');
+    const r = tagCheck(dir, 'v0.1.2', ['--images-out', path.join(dir, 'images.txt')]);
+    expect(r.status).toBe(1);
+    expect(r.err).toContain('usage: --images-out belongs to the mode lock');
+    expect(fs.existsSync(path.join(dir, 'images.txt'))).toBe(false);
   });
 
   it.each(['0.1.2', 'v0.1', 'v0.1.2-rc.1', 'v01.1.2', 'version', ''])(
@@ -173,7 +187,28 @@ describe('V12: release-check.mjs, the release gate', () => {
     expect(check(['changelog', '0.1.2', '--root', dir]).status).toBe(0);
   });
 
-  it('refuses images.lock for another version, with a tag, a missing image, another registry or an extra key', () => {
+  it('lists every problem at once and writes no output file when it refuses', () => {
+    const dir = fixture('0.1.2', { pkg: '0.1.1', changelog: changelog('0.1.2', '') });
+    const notes = path.join(dir, 'notes.md');
+    const r = tagCheck(dir, 'v0.1.2', ['--notes-out', notes]);
+    expect(r.status).toBe(1);
+    for (const code of ['package_version', 'upgrade_notes_missing']) expect(r.err).toContain(code);
+    expect(fs.existsSync(notes)).toBe(false);
+  });
+
+  it('the mode lock accepts a complete lock file and writes the six image references', () => {
+    const images = path.join(tempDir(), 'images.txt');
+    const r = lockCheck(lockText('0.1.2'), '0.1.2', ['--images-out', images]);
+    expect(r.err).toBe('');
+    expect(r.status).toBe(0);
+    expect(r.out).toBe('release-check: images.lock for 0.1.2 ok\n');
+    const refs = fs.readFileSync(images, 'utf8').trim().split('\n');
+    expect(refs).toHaveLength(6);
+    for (const ref of refs)
+      expect(ref).toMatch(new RegExp(`^${PREFIX}/[a-z0-9-]+@sha256:[0-9a-f]{64}$`));
+  });
+
+  it('the mode lock refuses another version, a tag, a missing image, another registry or an extra key', () => {
     const cases: [string, string][] = [
       [lockText('0.1.1'), 'lock_version'],
       [lockText('0.1.2', { SDLC_IMAGE_API: `${PREFIX}/sdlc-api:0.1.2` }), 'lock_image'],
@@ -187,30 +222,22 @@ describe('V12: release-check.mjs, the release gate', () => {
       ['', 'lock_version'],
     ];
     for (const [lock, code] of cases) {
-      const r = tagCheck(fixture('0.1.2', { lock }), 'v0.1.2');
+      const images = path.join(tempDir(), 'images.txt');
+      const r = lockCheck(lock, '0.1.2', ['--images-out', images]);
       expect(r.status, code).toBe(1);
       expect(r.err).toContain(code);
+      expect(fs.existsSync(images), code).toBe(false);
     }
-  });
-
-  it('lists every problem at once and writes no output file when it refuses', () => {
-    const dir = fixture('0.1.2', {
-      pkg: '0.1.1',
-      lock: lockText('0.1.1'),
-      changelog: changelog('0.1.2', ''),
-    });
-    const notes = path.join(dir, 'notes.md');
-    const r = tagCheck(dir, 'v0.1.2', ['--notes-out', notes]);
-    expect(r.status).toBe(1);
-    for (const code of ['package_version', 'upgrade_notes_missing', 'lock_version'])
-      expect(r.err).toContain(code);
-    expect(fs.existsSync(notes)).toBe(false);
+    expect(check(['lock', path.join(tempDir(), 'none.lock'), '0.1.2']).err).toContain(
+      'file_missing',
+    );
   });
 
   it('refuses unknown modes and missing values', () => {
     expect(check([]).status).toBe(1);
     expect(check(['publish', 'v1.0.0']).err).toContain('usage');
     expect(check(['tag', 'v1.0.0', '--root']).err).toContain('usage');
+    expect(check(['lock', 'images.lock']).err).toContain('usage');
   });
 });
 
@@ -244,87 +271,155 @@ describe('V12 AC3: the real CHANGELOG', () => {
   });
 });
 
-describe('V12 AC2: release.yml', () => {
+describe('V15: release.yml makes the release on the tag (ADR-M94 §2.2)', () => {
   const wf = parse(read('.github/workflows/release.yml')) as Workflow;
   const job = (name: string): Job => {
     const found = wf.jobs[name];
     if (!found) throw new Error(`release.yml has no job "${name}"`);
     return found;
   };
-  const runs = (j: Job) => j.steps.map((s) => s.run ?? '').join('\n');
+  const runs = (j: Job) =>
+    steps(j)
+      .map((s) => s.run ?? '')
+      .join('\n');
 
   it('runs only on a pushed tag v*: never by hand, on a branch or a pull request', () => {
     expect(wf.on).toEqual({ push: { tags: ['v*'] } });
   });
 
-  it('only reads by default; packages and attestations read for the check; contents write for the release only', () => {
+  it('has the five jobs in order: check, images, verify-images, release, npm', () => {
+    expect(Object.keys(wf.jobs)).toEqual(['check', 'images', 'verify-images', 'release', 'npm']);
+    expect(job('images').needs).toBe('check');
+    expect(job('verify-images').needs).toEqual(['check', 'images']);
+    expect(job('release').needs).toEqual(['check', 'verify-images']);
+    expect(job('npm').needs).toBe('release');
+  });
+
+  it('only reads by default; each job holds only the permissions it needs', () => {
     expect(wf.permissions).toEqual({ contents: 'read' });
-    expect(Object.keys(wf.jobs).sort()).toEqual(['check', 'release', 'verify-images']);
     expect(job('check').permissions).toBeUndefined();
+    expect(job('images').permissions).toEqual({
+      contents: 'read',
+      packages: 'write',
+      'id-token': 'write',
+      attestations: 'write',
+    });
     expect(job('verify-images').permissions).toEqual({
       contents: 'read',
       packages: 'read',
       attestations: 'read',
     });
     expect(job('release').permissions).toEqual({ contents: 'write' });
+    expect(job('npm').permissions).toEqual({ actions: 'write' });
   });
 
-  it('every job runs the release gate on the tag, and the tagged commit must be on main', () => {
-    for (const name of Object.keys(wf.jobs)) {
-      expect(runs(job(name))).toContain('node platform/tools/release/release-check.mjs tag "$TAG"');
-      const gate = job(name).steps.find((s) => s.run?.includes('release-check.mjs'));
-      expect(gate?.env?.TAG).toBe('${{ github.ref_name }}');
+  it('check runs the release gate on the tag, and the tagged commit must be on main', () => {
+    const text = runs(job('check'));
+    expect(text).toContain('node platform/tools/release/release-check.mjs tag "$TAG"');
+    const gate = steps(job('check')).find((s) => s.run?.includes('release-check.mjs'));
+    expect(gate?.env?.TAG).toBe('${{ github.ref_name }}');
+    expect(text).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+    expect(text).toContain('echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"');
+    expect(job('check').outputs?.version).toBe('${{ steps.version.outputs.version }}');
+  });
+
+  it('images calls release-images.yml with push: true for the version of the tag', () => {
+    const images = job('images');
+    expect(images.uses).toBe('./.github/workflows/release-images.yml');
+    expect(images.with).toEqual({ version: '${{ needs.check.outputs.version }}', push: true });
+    expect(images.steps).toBeUndefined();
+  });
+
+  it('no other job builds, pushes or signs an image, or publishes to npm', () => {
+    for (const name of ['check', 'verify-images', 'release', 'npm']) {
+      for (const step of steps(job(name))) {
+        expect(step.uses ?? '').not.toMatch(/build-push-action|release-images/);
+        expect(step.run ?? '').not.toMatch(
+          /docker (build|push)|buildx|git push|npm publish|cosign sign/,
+        );
+      }
     }
-    expect(runs(job('check'))).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
   });
 
-  it('builds and pushes nothing: the images were built before the tag (QUESTIONS #370)', () => {
-    const all = Object.values(wf.jobs).flatMap((j) => j.steps);
-    for (const step of all) {
-      expect(step.uses ?? '').not.toMatch(/build-push-action|release-images/);
-      expect(step.run ?? '').not.toMatch(
-        /docker (build|push)|buildx|git push|npm publish|cosign sign/,
-      );
-    }
-  });
-
-  it('verifies every image with the shared script, which pins the exact signer', () => {
+  it('verify-images checks the artifact images.lock with the signer at this tag', () => {
     const verify = job('verify-images');
-    expect(runs(verify)).toContain(
-      'release-check.mjs tag "$TAG" --images-out "$RUNNER_TEMP/images.txt"',
+    const download = steps(verify).find((s) => s.uses?.startsWith('actions/download-artifact@'));
+    expect(download?.with?.name).toBe('images-lock-${{ needs.check.outputs.version }}');
+    const text = runs(verify).replace(/\s*\\\n\s*/g, ' ');
+    expect(text).toContain(
+      'node platform/tools/release/release-check.mjs lock "$RUNNER_TEMP/lock/images.lock" "$VERSION" --images-out "$RUNNER_TEMP/images.txt"',
     );
-    expect(runs(verify)).toContain(
-      'platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt"',
+    expect(text).toContain(
+      'platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt" "$TAG"',
     );
-    expect(runs(verify)).toContain('platform/tools/release/install-cosign.sh "$COSIGN_VERSION"');
+    expect(text).toContain('platform/tools/release/install-cosign.sh "$COSIGN_VERSION"');
   });
 
-  it('the release comes after both checks, from the CHANGELOG section, and never changes an existing one', () => {
-    expect(job('verify-images').needs).toBe('check');
-    expect(job('release').needs).toEqual(['check', 'verify-images']);
-    const text = runs(job('release'));
+  it('release: a draft with images.lock first, then published; a published release is never changed', () => {
+    const release = job('release');
+    const text = runs(release);
     expect(text).toContain('--notes-out "$RUNNER_TEMP/notes.md"');
-    expect(text).toContain('gh release view "$TAG"');
-    expect(text).toContain('gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag');
-    expect(text).not.toMatch(/gh release (edit|delete|upload)|--clobber|--draft/);
+    const create = text.indexOf('gh release create "$TAG"');
+    const publish = text.indexOf(
+      'gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false',
+    );
+    expect(create).toBeGreaterThan(-1);
+    expect(publish).toBeGreaterThan(create);
+    const createLine = text.slice(create, text.indexOf('\n', text.indexOf('\n', create) + 1));
+    expect(createLine).toContain('--verify-tag --draft');
+    expect(createLine).toContain('"$RUNNER_TEMP/lock/images.lock"');
+    // Only a draft (not public, not immutable) is ever deleted, and only before it is made again.
+    expect(text).toContain('--json isDraft --jq .isDraft');
+    expect(text).toContain('it is never changed by this workflow');
+    const del = text.indexOf('gh release delete "$TAG"');
+    expect(text.lastIndexOf('if [ "$draft" != true ]', del)).toBeGreaterThan(-1);
+    expect(del).toBeLessThan(create);
+    expect(text).not.toMatch(/gh release upload|--clobber|--cleanup-tag/);
   });
 
-  it('checkouts never keep the token', () => {
+  it('release checks that the published release is immutable before npm starts', () => {
+    const text = runs(job('release'));
+    expect(text).toContain('gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .immutable');
+    expect(text).toContain('[ "$immutable" = true ]');
+  });
+
+  it('npm dispatches npm-publish.yml on the tag, and does nothing else', () => {
+    const npm = job('npm');
+    expect(steps(npm)).toHaveLength(1);
+    expect(runs(npm)).toBe(
+      'gh workflow run npm-publish.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"',
+    );
+  });
+
+  it('checkouts never keep the token, and no script reads an expression inline', () => {
     for (const j of Object.values(wf.jobs)) {
-      for (const step of j.steps.filter((s) => s.uses?.startsWith('actions/checkout@'))) {
-        expect(step.with?.['persist-credentials']).toBe(false);
+      for (const step of steps(j)) {
+        if (step.uses?.startsWith('actions/checkout@'))
+          expect(step.with?.['persist-credentials']).toBe(false);
+        expect(step.run ?? '').not.toContain('${{');
       }
     }
   });
 });
 
-describe('V12: verify-images.sh, the image check of both tag workflows', () => {
+describe('V15: verify-images.sh pins the signer at the exact tag (ADR-M94 §2.6)', () => {
   const script = read('platform/tools/release/verify-images.sh');
   // Continuation lines joined, so the test reads one command per line.
   const text = script.replace(/\s*\\\n\s*/g, ' ');
+  const run = (args: string[]) => {
+    const r = spawnSync(
+      'bash',
+      [path.join(root, 'platform/tools/release/verify-images.sh'), ...args],
+      {
+        encoding: 'utf8',
+        env: { PATH: '/usr/bin:/bin' }, // no cosign: a refused argument must stop before it
+      },
+    );
+    return { status: r.status, err: r.stderr };
+  };
 
-  it('pins the exact signer and issuer of release-images.yml on main, never a pattern', () => {
-    expect(script).toContain(`SIGNER_IDENTITY='${SIGNER}'`);
+  it('pins the exact signer and issuer of release-images.yml at the tag, never a pattern', () => {
+    expect(script).toContain(`SIGNER_IDENTITY="${SIGNER}"`);
     expect(script).toContain("SIGNER_ISSUER='https://token.actions.githubusercontent.com'");
     expect(text).toContain(
       'cosign verify --certificate-identity "$SIGNER_IDENTITY" --certificate-oidc-issuer "$SIGNER_ISSUER" "$ref"',
@@ -332,7 +427,19 @@ describe('V12: verify-images.sh, the image check of both tag workflows', () => {
     expect(text).toContain(
       '--cert-identity "$SIGNER_IDENTITY" --cert-oidc-issuer "$SIGNER_ISSUER"',
     );
-    expect(script).not.toMatch(/regexp|--signer-workflow/);
+    expect(script).not.toMatch(/regexp|--signer-workflow|refs\/heads\/main'/);
+  });
+
+  it.each([
+    [['images.txt']],
+    [['images.txt', 'v0.1']],
+    [['images.txt', 'main']],
+    [['a', 'v1.0.0', 'b']],
+  ])('refuses the arguments %j before it verifies anything', (args) => {
+    const r = run(args);
+    expect(r.status).not.toBe(0);
+    expect(r.err).toMatch(/usage|the tag must be vX\.Y\.Z/);
+    expect(r.err).not.toContain('cosign');
   });
 
   it('fails on an error and unless it verified six images', () => {
@@ -344,140 +451,72 @@ describe('V12: verify-images.sh, the image check of both tag workflows', () => {
   });
 });
 
-describe('V12: npm-publish.yml keeps its trusted-publisher identity and shares the checks', () => {
+describe('V15: npm-publish.yml keeps its identity and starts only on a released tag (ADR-M94 §2.3)', () => {
   const wf = parse(read('.github/workflows/npm-publish.yml')) as Workflow;
   const publish = wf.jobs.publish!;
   const verify = wf.jobs['verify-images']!;
-  const runs = (j: Job) => j.steps.map((st) => st.run ?? '').join('\n');
+  const runs = (j: Job) =>
+    steps(j)
+      .map((st) => st.run ?? '')
+      .join('\n');
 
-  it('the file, the trigger and the environment npm are unchanged (npm names them)', () => {
+  it('the file and the environment npm are unchanged (npm names them); only a dispatch starts it', () => {
     expect(fs.existsSync(path.join(root, '.github/workflows/npm-publish.yml'))).toBe(true);
-    expect(wf.on).toEqual({ push: { tags: ['v*'] } });
+    expect(wf.on).toEqual({ workflow_dispatch: null });
     expect(Object.keys(wf.jobs).sort()).toEqual(['publish', 'verify-images']);
     expect(publish.environment).toBe('npm');
     expect(publish.permissions).toEqual({ contents: 'read', 'id-token': 'write' });
   });
 
-  it('verifies the release images first, read only, and publish waits for it', () => {
+  it('verify-images refuses a ref that is not a tag vX.Y.Z with a published Release, first', () => {
+    const first = steps(verify)[0]?.run ?? '';
+    expect(first).toContain(
+      "grep -Eq '^refs/tags/v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$'",
+    );
+    expect(first).toContain('--json isDraft --jq .isDraft');
+    expect(first).toContain('[ "$draft" = false ]');
+    expect(first).toContain(
+      'gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern images.lock',
+    );
+  });
+
+  it("verifies the Release's images.lock first, read only, and publish waits for it", () => {
     expect(verify.permissions).toEqual({
       contents: 'read',
       packages: 'read',
       attestations: 'read',
     });
     expect(verify.environment).toBeUndefined();
-    expect(runs(verify)).toContain(
-      'platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt"',
+    const text = runs(verify).replace(/\s*\\\n\s*/g, ' ');
+    expect(text).toContain('node platform/tools/release/release-check.mjs tag "$TAG"');
+    expect(text).toContain(
+      'release-check.mjs lock "$RUNNER_TEMP/lock/images.lock" "${TAG#v}" --images-out "$RUNNER_TEMP/images.txt"',
+    );
+    expect(text).toContain(
+      'platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt" "$TAG"',
     );
     expect(publish.needs).toBe('verify-images');
   });
 
-  it('runs release-check.mjs on the tag before it builds the package', () => {
-    const gate = publish.steps.findIndex((st) => st.run?.includes('release-check.mjs tag "$TAG"'));
-    const build = publish.steps.findIndex((st) => st.run?.includes('cli:pack-check'));
+  it('publish refuses a ref that is not a tag and runs the gate before it builds the package', () => {
+    const gate = steps(publish).findIndex((st) => st.run?.includes('release-check.mjs tag "$TAG"'));
+    const build = steps(publish).findIndex((st) => st.run?.includes('cli:pack-check'));
     expect(gate).toBeGreaterThan(-1);
     expect(gate).toBeLessThan(build);
+    expect(steps(publish)[gate]?.run).toContain('case "$GITHUB_REF" in refs/tags/v*)');
   });
 });
 
-describe('V12: pnpm release:lock', () => {
+describe('V15: the lock file pull request is gone (ADR-M94 §2.4)', () => {
   const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
 
-  it('is the root script', () => {
-    expect(pkg.scripts['release:lock']).toBe('node platform/tools/release/lock.mjs');
-  });
-
-  interface Run {
-    workflowName?: string;
-    headBranch?: string;
-    event?: string;
-    status?: string;
-    conclusion?: string;
-  }
-  // A fake `gh` on PATH: `run view` prints RUN_JSON, `run download` copies ARTIFACT into --dir.
-  function runLock(run: Run, artifact: string | null, args = ['123']) {
-    const dir = fixture('0.1.2', { lock: '# old\n' });
-    const bin = tempDir();
-    const art = path.join(bin, 'artifact.lock');
-    if (artifact !== null) fs.writeFileSync(art, artifact);
-    const json = JSON.stringify({
-      workflowName: 'release-images',
-      headBranch: 'main',
-      event: 'workflow_dispatch',
-      status: 'completed',
-      conclusion: 'success',
-      ...run,
-    });
-    fs.writeFileSync(path.join(bin, 'run.json'), json);
-    fs.writeFileSync(
-      path.join(bin, 'gh'),
-      [
-        '#!/bin/sh',
-        'echo "$@" >> "$FAKE_GH_DIR/calls"',
-        'if [ "$1 $2" = "run view" ]; then cat "$FAKE_GH_DIR/run.json"; exit 0; fi',
-        'if [ "$1 $2" = "run download" ]; then',
-        '  while [ $# -gt 0 ]; do [ "$1" = --dir ] && out="$2"; shift; done',
-        '  [ -f "$FAKE_GH_DIR/artifact.lock" ] && cp "$FAKE_GH_DIR/artifact.lock" "$out/images.lock"; exit 0',
-        'fi',
-        'exit 2',
-      ].join('\n'),
-      { mode: 0o755 },
-    );
-    const r = spawnSync(process.execPath, [LOCK, ...args], {
-      cwd: dir,
+  it('no pnpm release:lock, no lock.mjs, no tracked images.lock', () => {
+    expect(pkg.scripts['release:lock']).toBeUndefined();
+    expect(fs.existsSync(path.join(root, 'platform/tools/release/lock.mjs'))).toBe(false);
+    const tracked = spawnSync('git', ['-C', root, 'ls-files', 'platform/deploy/images.lock'], {
       encoding: 'utf8',
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}`, FAKE_GH_DIR: bin },
     });
-    const calls = fs.existsSync(path.join(bin, 'calls'))
-      ? fs.readFileSync(path.join(bin, 'calls'), 'utf8')
-      : '';
-    return {
-      status: r.status,
-      err: r.stderr,
-      calls,
-      lock: fs.readFileSync(path.join(dir, 'platform/deploy/images.lock'), 'utf8'),
-    };
-  }
-
-  it('copies the lock file of a successful release-images run on main', () => {
-    const r = runLock({}, lockText('0.1.2'));
-    expect(r.err).toBe('');
-    expect(r.status).toBe(0);
-    expect(r.lock).toBe(lockText('0.1.2'));
-    expect(r.calls).toContain(
-      'run download 123 --repo hoanghainh1188/agentic-sdlc-framework --name images-lock-0.1.2',
-    );
-    expect(r.calls).not.toMatch(/workflow run|release create|pr create/);
-  });
-
-  it.each<[Run, string]>([
-    [{ workflowName: 'ci' }, 'not release-images'],
-    [{ headBranch: 'task/x' }, 'not main'],
-    [{ event: 'workflow_call' }, 'not a person'],
-    [{ conclusion: 'failure' }, 'not completed/success'],
-    [{ status: 'in_progress' }, 'not completed/success'],
-  ])('refuses the run %o', (run, message) => {
-    const r = runLock(run, lockText('0.1.2'));
-    expect(r.status).toBe(1);
-    expect(r.err).toContain(message);
-    expect(r.lock).toBe('# old\n');
-  });
-
-  it('refuses a lock file for another version, or no lock file, and keeps the old one', () => {
-    let r = runLock({}, lockText('0.1.1'));
-    expect(r.status).toBe(1);
-    expect(r.lock).toBe('# old\n');
-    r = runLock({}, null);
-    expect(r.status).toBe(1);
-    expect(r.err).toContain('holds no images.lock');
-  });
-
-  it('needs exactly one numeric run ID', () => {
-    for (const args of [[], ['abc'], ['1', '2']]) {
-      const r = runLock({}, lockText('0.1.2'), args);
-      expect(r.status).toBe(1);
-      expect(r.err).toContain('usage');
-      expect(r.calls).toBe('');
-    }
+    expect(tracked.stdout.trim()).toBe('');
   });
 });
 

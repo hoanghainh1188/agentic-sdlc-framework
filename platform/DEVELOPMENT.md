@@ -232,7 +232,8 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 | GitHub App from a manifest | V03 | unit: `deploy/github-app.test.ts` (a fake GitHub only; the manifest equals the README's permissions table) |
 | Fresh deployment | E07 | unit: `deploy/fresh-deploy-readme.test.ts` (fails on a README command, option or credentials command that drifts); `pnpm test:fresh-deploy` |
 | Upgrade between two releases | O02 | unit: `deploy/upgrade-readme.test.ts` (the README "Upgrade" steps are the live test's, in order; every release's Upgrade notes can be read), `deploy/compose-static.test.ts` (`compose:env --add-missing`), `workspace/ci-workflow.test.ts` (the job `upgrade`); `pnpm test:upgrade` |
-| Published images | V04; ADR-M66 | unit: `deploy/release-images.test.ts` |
+| Published images | V04, V15; ADR-M66, ADR-M94 | unit: `deploy/release-images.test.ts` (scan before push, `images.sh` with a fake download); CI job `release-images` on a version pull request |
+| The release on the tag | V12, V15; ADR-M94 | unit: `workspace/release.test.ts` (`release.yml`, `npm-publish.yml`, the release gate, `verify-images.sh`), `workspace/ci-workflow.test.ts` |
 | The CLI on npm | V05; ADR-M72 | `pnpm cli:pack-check` (CI job `checks`) |
 | `pnpm doctor` | V07 PR 2 | unit: `doctor/checks.test.ts`, `no-secrets.test.ts`, `host-readonly.test.ts`, `github-permissions.test.ts`, `deploy/doctor-troubleshooting.test.ts` (every README "Troubleshooting" row has an entry; services, jobs and AppRole folders follow the compose file), `worker/doctor-github.test.ts` |
 | Team access | V09; ADR-M67 | unit: `deploy/access-static.test.ts`, `doctor/access.test.ts`, `api/settings.test.ts`, `cli/doctor.test.ts`, `trial/trial-up.test.ts`; `pnpm test:access` |

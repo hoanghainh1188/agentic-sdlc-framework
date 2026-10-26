@@ -80,7 +80,7 @@ Claude Code reads a folder's `CLAUDE.md` when it opens a file in that folder. Be
 ## Platform-wide module rules (detail in the linked ADR)
 - Secret values are `Redacted`: call `reveal()` only where the value is used, never to log it (ADR-M21). [R077]
 - Logging only through the platform logger (codes, flat IDs and counts); spans never hold headers, query strings or SQL parameter values (ADR-M35). Database pools always have error listeners; api and worker import `./telemetry.js` first. The `otel-collector` has no host port, is never a sandbox egress service and is the only holder of the Langfuse project key. [R084]
-- Never rename the job `verify-images` or the environment `npm`; never edit `images.lock` by hand; a version tag never moves. Images are scanned with Trivy before any push. A package bundled into the CLI must have an allowed licence (`ALLOWED_LICENCES`). A new built image goes into the workflow matrix, the overlay, the lock file and `images.sh` together (ADR-M66, RELEASING.md). [R089]
+- Never rename the job `verify-images` or the environment `npm`; the lock file is a release asset, never edited or replaced; a version tag never moves. Images are scanned with Trivy before any push. A package bundled into the CLI must have an allowed licence (`ALLOWED_LICENCES`). A new built image goes into both workflow matrices, the overlay, the lock job and `images.sh` together (ADR-M66, ADR-M94, RELEASING.md). [R089]
 - `PLATFORM_VERSION` equals the root `package.json` version. Every CHANGELOG release section from 0.1.1 on has non-empty `### Upgrade notes`. [R090]
 
 ## Documentation rules
@@ -118,7 +118,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - Database (ADR-M09): `pnpm db:migrate` / `pnpm db:status` (`SDLC_DB_MIGRATION_URL`, owner role `platform`; processes connect as `platform_app`).
 - Dev mode without Compose: `pnpm api:start`, `pnpm worker:start` (ADR-M26, ADR-M27; refused with `NODE_ENV=production`).
 - Operator commands on the server: `pnpm sdlc ops bootstrap|token|audit verify|tenant-admin|role|ai-record|agent|run kill|retention report|eval start` (`SDLC_DB_URL`, actor `system`; ADR-M26, ADR-M37; deploy README "Fresh deployment" step 8). A token is printed once: owner's terminal only.
-- Releases (`RELEASING.md`, ADR-M66, ADR-M72): `pnpm images mode|get|export`, `pnpm release:lock <run-id>`, `pnpm cli:pack` / `pnpm cli:pack-check`. Order: version PR → `release-images` `push: true` (Harry) → lock file PR → tag (Harry) → `release.yml`, `npm-publish.yml`.
+- Releases (`RELEASING.md`, ADR-M94, ADR-M72): `pnpm images mode|get|export|verify`, `pnpm cli:pack` / `pnpm cli:pack-check`. Order: version PR → tag (Harry) → `release.yml` (images, Release with `images.lock`) → `npm-publish.yml` (Harry approves `npm`).
 - Claude Code hook (W01, ADR-M84 §2.3): `.claude/settings.json` runs `platform/tools/claude-hooks/guard-bash.mjs` before every Bash call and refuses the commands this file forbids for Claude (rule IDs in `design/RULES.md`); never weaken or bypass it. [R132]
 - CI: `.github/workflows/ci.yml` (A09; jobs, triggers and path filters in `platform/DEVELOPMENT.md` §2). Actions pinned by commit SHA; thresholds in the workflow `env:`. Short checks share the `scan` job; do not add a job for a check under a minute; every job has `timeout-minutes`.
 

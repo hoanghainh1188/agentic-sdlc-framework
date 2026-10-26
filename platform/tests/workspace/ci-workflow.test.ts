@@ -22,6 +22,8 @@ interface Step {
 interface Job {
   needs?: string | string[];
   if?: string;
+  uses?: string; // a job that calls a reusable workflow has no steps and no timeout of its own
+  with?: Record<string, unknown>;
   'timeout-minutes'?: number;
   permissions?: unknown;
   outputs?: Record<string, string>;
@@ -38,13 +40,19 @@ interface Workflow {
 function readYaml<T>(file: string): T {
   return parse(fs.readFileSync(path.join(root, file), 'utf8')) as T;
 }
+/** A workflow file; a job that calls a reusable workflow gets an empty step list. */
+function readWorkflow(file: string): Workflow {
+  const wf = readYaml<Workflow>(file);
+  for (const j of Object.values(wf.jobs)) j.steps ??= [];
+  return wf;
+}
 
 const workflowFiles = fs
   .readdirSync(workflowsDir)
   .filter((name) => name.endsWith('.yml'))
   .map((name) => `.github/workflows/${name}`);
-const workflows = workflowFiles.map((file) => ({ file, wf: readYaml<Workflow>(file) }));
-const ci = readYaml<Workflow>('.github/workflows/ci.yml');
+const workflows = workflowFiles.map((file) => ({ file, wf: readWorkflow(file) }));
+const ci = readWorkflow('.github/workflows/ci.yml');
 const ciEnv = ci.env ?? {};
 
 function job(name: string): Job {
@@ -177,8 +185,18 @@ describe('workflow hardening (all workflows)', () => {
 
   it.each(workflows)('$file sets timeout-minutes on every job', ({ wf }) => {
     for (const job of Object.values(wf.jobs)) {
+      // A job that calls a workflow cannot set a timeout: the called file's jobs do (V15).
+      if (job.uses) continue;
       expect(job['timeout-minutes']).toBeGreaterThan(0);
       expect(job['timeout-minutes']).toBeLessThanOrEqual(40);
+    }
+  });
+
+  it.each(workflows)('$file calls only local workflows that only run when called', ({ wf }) => {
+    for (const job of Object.values(wf.jobs).filter((j) => j.uses)) {
+      expect(job.uses).toMatch(/^\.\/\.github\/workflows\/[\w-]+\.yml$/);
+      const called = readWorkflow(job.uses!.slice(2));
+      expect(Object.keys(called.on)).toContain('workflow_call');
     }
   });
 
@@ -414,6 +432,24 @@ describe('AC3: Gitleaks, Semgrep and Trivy run and block critical findings', () 
     expect(block).toContain('--severity "$TRIVY_BLOCK_SEVERITY"');
     expect(block).toContain('--exit-code 1');
     for (const r of [report, block]) expect(r).toContain('--include-dev-deps');
+  });
+
+  it('a pull request that changes the version builds and scans the release images, read only (V15)', () => {
+    const scan = job('release-images');
+    expect(scan.needs).toEqual(['scan', 'checks']);
+    expect(scan.if).toBe("needs.scan.outputs.release_version != ''");
+    expect(scan.uses).toBe('./.github/workflows/release-images-scan.yml');
+    expect(scan.with).toEqual({ version: '${{ needs.scan.outputs.release_version }}' });
+    expect(scan.permissions).toBeUndefined();
+    const called = readWorkflow('.github/workflows/release-images-scan.yml');
+    expect(called.permissions).toEqual({ contents: 'read' });
+    for (const j of Object.values(called.jobs)) expect(j.permissions).toBeUndefined();
+    expect(job('scan').outputs?.release_version).toBe(
+      '${{ steps.decide.outputs.release_version }}',
+    );
+    const decide = runText('scan');
+    expect(decide).toContain('git show "$BASE_SHA:package.json" | jq -r .version');
+    expect(decide).toContain('echo "release_version=$version" >> "$GITHUB_OUTPUT"');
   });
 
   it('ci-ok fails when any job failed or was cancelled, and treats skipped as OK', () => {
