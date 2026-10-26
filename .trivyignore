@@ -16,5 +16,5 @@ CVE-2023-45853
 # only as `gitleaks dir` on a local folder, with a clean environment and its own configuration
 # file (secrets.ts); Gitleaks opens no TLS connection there. Remove when a Gitleaks release is
 # built with a fixed Go, and update platform/deploy/scripts/gitleaks.sh and ci.yml together.
-# Person B (Harry) approves in PR #449.
+# Approved by Harry (Person B) in PR #449 (2026-10-26).
 CVE-2025-68121
