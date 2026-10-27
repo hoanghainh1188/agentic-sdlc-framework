@@ -44,6 +44,15 @@ export interface GateContext {
    * threshold.
    */
   readonly securityFindingsUnknown?: boolean;
+  /**
+   * G6 only (H02, ADR-M96 §2.4): dependency findings (unapproved license, install script,
+   * typosquatting warning, or advisory finding). G6 is then forced to HITL.
+   */
+  readonly dependencyFinding?: boolean;
+  /**
+   * G6 only (H02, ADR-M96 §2.4): the dependency scan failed (or was unreadable). G6 fails closed: HITL.
+   */
+  readonly dependencyScanFailed?: boolean;
   /** G5 only: a limit (file scope, budget, loop) was breached. */
   readonly breached?: boolean;
   /**
@@ -71,7 +80,8 @@ export type OversightOverride =
   | 'dual_approval_change_flag'
   | 'returned_from_g5'
   | 'security_findings_unknown'
-  | 'review_too_large';
+  | 'review_too_large'
+  | 'dependency_finding';
 
 export interface OversightResolution {
   readonly mode: GateCheckMode;

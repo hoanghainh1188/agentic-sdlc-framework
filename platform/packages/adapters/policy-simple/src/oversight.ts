@@ -105,6 +105,17 @@ function applyOverrides(
           overrides: ['security_finding'],
         };
       }
+      if (
+        input.context?.dependencyFinding === true ||
+        input.context?.dependencyScanFailed === true
+      ) {
+        return {
+          ...base,
+          mode: 'HITL',
+          approvals: Math.max(1, cell.approvals),
+          overrides: ['dependency_finding'],
+        };
+      }
       // C08 PR 2 (QUESTIONS #157): findings the Git host cannot report fail closed.
       return input.context?.securityFindingsUnknown === true
         ? {

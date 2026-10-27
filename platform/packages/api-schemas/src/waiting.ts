@@ -65,6 +65,9 @@ export const WAITING_CAUSE_KEYS: Readonly<Record<string, string>> = {
   // H05 (ADR-M95): G5 is HITL because the run's change is over the review limits, or not measured.
   review_too_large: 'intent.waiting_cause.review_too_large',
   review_size_unknown: 'intent.waiting_cause.review_size_unknown',
+  // H02 (ADR-M96): G6 is HITL because added dependencies have findings or scan failed.
+  dependency_finding: 'intent.waiting_cause.dependency_finding',
+  dependency_scan_failed: 'intent.waiting_cause.dependency_scan_failed',
 };
 
 /** The reason a person needs to see: `decision` is the normal wait, already shown elsewhere. */

@@ -1925,6 +1925,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.57 | 2026-10-24 | Claude, approved by the repository owner | Release v0.6.0 with X01–X04, X07, X11, X14 (EXT except X12), L01 PR 1 and L03; X12, L01 PR 2 and the L03b measurement come next |
 | 1.58 | 2026-10-26 | Claude, approved by Harry | New change task V15: the release on the tag (QUESTIONS #591–#595, ADR-M94); it changes V04 AC3 and V12 AC2 |
 | 1.59 | 2026-10-26 | Claude, approved by the repository owner | Release v0.7.0 with X12, O01, O02, H04, H05 and V15 |
+| 1.60 | 2026-10-27 | Claude Code (task H02), approved by Harry | H02 done: agent dependency checks (licence, install scripts, typosquatting; ADR-M96, QUESTIONS #606–#608) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

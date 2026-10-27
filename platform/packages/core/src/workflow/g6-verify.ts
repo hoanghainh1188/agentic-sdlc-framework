@@ -141,7 +141,10 @@ export async function stepCi(
   }
 
   // CI passed.
-  if (ci.counts.critical > 0 && !(await resumedFor(tx, intent.id, facts.inputSha256))) {
+  const hasCritical =
+    ci.counts.critical > 0 ||
+    (facts.dependencies !== null && facts.dependencies.advisoryFindings > 0);
+  if (hasCritical && !(await resumedFor(tx, intent.id, facts.inputSha256))) {
     return stop(tx, registry, policy, intent, facts, 'critical_finding');
   }
   const oversight = oversightAt(policy, intent, facts);

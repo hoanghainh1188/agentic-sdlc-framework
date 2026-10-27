@@ -19,7 +19,8 @@ uplinks:
     url: https://registry.npmjs.org/
     timeout: 60s
     maxage: 10m
-    cache: true
+    # H02 (ADR-M96, ADR-M80 gap G-5): do not share cached packages between tenants and runs.
+    cache: false
 
 packages:
   '@*/*':

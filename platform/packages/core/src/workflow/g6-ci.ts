@@ -159,6 +159,17 @@ export async function recordCiReading(tx: TenantScope, reading: CiReading): Prom
   return true;
 }
 
+export interface DependencyScanFacts {
+  readonly result: string;
+  readonly newDependencies: number;
+  readonly changedDependencies: number;
+  readonly licenseViolations: number;
+  readonly installScripts: number;
+  readonly typosquattingWarnings: number;
+  readonly advisoryFindings: number;
+  readonly cause?: string;
+}
+
 export interface G6Facts {
   readonly run: Run;
   /** The commit the platform pushed. */
@@ -167,6 +178,8 @@ export interface G6Facts {
   readonly ci: Omit<CiReading, 'runId'> | null;
   /** When the last reading was recorded (database clock); null before the first one. */
   readonly ciReadAt: Date | null;
+  /** The scan of added or changed dependencies (H02, ADR-M96); null before recorded. */
+  readonly dependencies: DependencyScanFacts | null;
   /** The G6 input hash: the decisions and escalations are bound to it. */
   readonly inputSha256: string;
 }
@@ -187,6 +200,20 @@ export async function gatherG6Facts(scope: TenantScope, intentId: string): Promi
   const pushedEvent = events.filter((e) => e.event_type === 'branch_pushed').at(-1);
   if (!pushedEvent) return null;
   const pushedHead = str(pushedEvent.payload.head_sha);
+  const depEvent = events.filter((e) => e.event_type === 'dependencies_scanned').at(-1);
+  const depPayload = depEvent?.payload;
+  const dependencies: DependencyScanFacts | null = depPayload
+    ? {
+        result: str(depPayload.result),
+        newDependencies: num(depPayload.new_dependencies),
+        changedDependencies: num(depPayload.changed_dependencies),
+        licenseViolations: num(depPayload.license_violations),
+        installScripts: num(depPayload.install_scripts),
+        typosquattingWarnings: num(depPayload.typosquatting_warnings),
+        advisoryFindings: num(depPayload.advisory_findings),
+        ...(depPayload.cause ? { cause: str(depPayload.cause) } : {}),
+      }
+    : null;
   const checkedEvent = events.filter((e) => e.event_type === 'ci_checked').at(-1);
   const checked = checkedEvent?.payload;
   const ci: G6Facts['ci'] = checked
@@ -210,6 +237,7 @@ export async function gatherG6Facts(scope: TenantScope, intentId: string): Promi
     pushedHead,
     ci,
     ciReadAt: checkedEvent ? new Date(checkedEvent.created_at) : null,
-    inputSha256: sha256({ v: 1, run_id: run.id, pushed_head: pushedHead, ci }),
+    dependencies,
+    inputSha256: sha256({ v: 1, run_id: run.id, pushed_head: pushedHead, ci, dependencies }),
   };
 }

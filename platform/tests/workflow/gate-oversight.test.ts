@@ -23,12 +23,25 @@ const resolve = (
   facts: Parameters<typeof resolveGateOversight>[3] = { changeFlags: [] },
 ) => resolveGateOversight(policy, { risk_tier: risk }, gate, facts);
 
-function g6Facts(findings: 'known' | 'not_enabled', high = 0): G6Facts {
+function g6Facts(
+  findings: 'known' | 'not_enabled',
+  high = 0,
+  depResult: 'clean' | 'warning' | 'finding' | 'failed' = 'clean',
+): G6Facts {
   return {
     ci: {
       findings,
       counts: { critical: 0, high, medium: 0, low: 0 },
       state: 'passed',
+    },
+    dependencies: {
+      result: depResult,
+      newDependencies: 0,
+      changedDependencies: 0,
+      licenseViolations: depResult === 'warning' ? 1 : 0,
+      installScripts: 0,
+      typosquattingWarnings: 0,
+      advisoryFindings: depResult === 'finding' ? 1 : 0,
     },
   } as unknown as G6Facts;
 }
@@ -67,6 +80,22 @@ describe('resolveGateOversight', () => {
     expect(unknown.mode).toBe('HITL');
     expect(resolve('G6', 'low', { changeFlags: [], g6: null }).mode).toBe('HITL');
     expect(resolve('G6', 'low', { changeFlags: [], g6: g6Facts('known', 1) }).mode).toBe('HITL');
+  });
+
+  it('G6 is HITL when dependency findings or warnings are present (H02 AC3)', () => {
+    const warning = resolve('G6', 'low', {
+      changeFlags: [],
+      g6: g6Facts('known', 0, 'warning'),
+    });
+    expect(warning.mode).toBe('HITL');
+    expect(warning.overrides).toContain('dependency_finding');
+
+    const failed = resolve('G6', 'low', {
+      changeFlags: [],
+      g6: g6Facts('known', 0, 'failed'),
+    });
+    expect(failed.mode).toBe('HITL');
+    expect(failed.overrides).toContain('dependency_finding');
   });
 
   it('G7 needs two approvals for a dual-approval change flag, or at Critical risk', () => {

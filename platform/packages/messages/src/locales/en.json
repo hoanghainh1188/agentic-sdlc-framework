@@ -1637,6 +1637,8 @@
   "intent.waiting_cause.tool_transport_not_supported": "the agent's adapter cannot give the run a register tool the plan asks for",
   "intent.waiting_cause.review_too_large": "the change is larger than the project's review limits (run.review_limits)",
   "intent.waiting_cause.review_size_unknown": "the size of the change was not measured",
+  "intent.waiting_cause.dependency_finding": "the change adds or modifies dependencies that require review (license, install script or typosquatting)",
+  "intent.waiting_cause.dependency_scan_failed": "the dependency scan of the change failed",
   "dashboard.detail.held_by": "What holds it",
   "dashboard.detail.held_since": "Held for",
   "dashboard.detail.held_until": "Until",
