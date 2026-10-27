@@ -345,6 +345,13 @@ export interface ProjectConfig {
     readonly model_budget_usd: number;
   };
   /**
+   * H02 (ADR-M96 §2.2): dependency checks for libraries added or changed by an agent.
+   */
+  readonly dependencies: {
+    readonly allowed_licenses: readonly string[];
+    readonly blocked_packages: readonly string[];
+  };
+  /**
    * Sandbox images of the project, pinned by digest (QUESTIONS #59, ADR-M25). `image` is the
    * OpenHands image; `images` gives one image per adapter (X03, QUESTIONS #522, #528).
    */

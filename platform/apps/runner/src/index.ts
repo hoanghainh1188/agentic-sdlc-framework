@@ -223,6 +223,20 @@ export {
   type ReviewSize,
   type ReviewSizeCause,
 } from './workspace/review-size.js';
+export {
+  DEFAULT_ALLOWED_LICENSES,
+  DEPENDENCY_MANIFEST_NAMES,
+  POPULAR_PACKAGES,
+  isTyposquatting,
+  levenshteinDistance,
+  parsePackageJson,
+  parsePackageLockJson,
+  scanDependencies,
+  type DependencyScan,
+  type DependencyScanInput,
+  type DependencyScanResult,
+  type PackageEntry,
+} from './workspace/dependencies.js';
 export { IgnoreChecker } from './workspace/ignore.js';
 export {
   planFileReader,

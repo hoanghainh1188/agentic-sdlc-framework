@@ -47,6 +47,7 @@ describe('run event payloads', () => {
       'changes_checked',
       'secrets_scanned',
       'diff_measured',
+      'dependencies_scanned',
       'branch_pushed',
       'publish_refused',
       'publish_failed',
@@ -226,6 +227,25 @@ describe('run event payloads', () => {
     expect(checkRunEvent('changes_checked', checked)).toEqual(checked);
     expect(refused('changes_checked', { ...checked, out_of_scope_paths: 'a.ts' })).toThrow(DbError);
     expect(refused('changes_checked', { ...checked, paths_sha256: 'src/a.ts' })).toThrow(DbError);
+  });
+
+  it('H02: dependencies_scanned holds codes and counts only, never package text', () => {
+    const payload = {
+      result: 'warning',
+      new_dependencies: 2,
+      changed_dependencies: 1,
+      license_violations: 1,
+      install_scripts: 0,
+      typosquatting_warnings: 1,
+      advisory_findings: 0,
+    };
+    expect(checkRunEvent('dependencies_scanned', payload)).toEqual(payload);
+    expect(refused('dependencies_scanned', { ...payload, package_name: 'evil' })).toThrow(
+      /undeclared/,
+    );
+    expect(refused('dependencies_scanned', { ...payload, path: 'package.json' })).toThrow(
+      /undeclared/,
+    );
   });
 
   it('C06 2b: proposal_stored holds a hash and counts only, never paths', () => {

@@ -203,6 +203,10 @@ export const GATE_REASON_CODES = [
   'generated_change',
   'mechanical_change',
   'cannot_split',
+  // G6 (task H02, ADR-M96 §2.4): the runner's dependency scan found unapproved licenses, install
+  // scripts or typosquatting warnings (HITL), or the scan failed.
+  'dependency_finding',
+  'dependency_scan_failed',
   'other',
 ] as const;
 export type GateReasonCode = (typeof GATE_REASON_CODES)[number];

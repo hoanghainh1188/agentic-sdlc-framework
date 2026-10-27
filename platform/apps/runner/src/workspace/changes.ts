@@ -35,6 +35,7 @@ import type { RunnerSettings } from '../settings.js';
 import { computeRunPatch } from './export.js';
 import { measureReviewSize, type ReviewSize } from './review-size.js';
 import { scanDiffForSecrets, type SecretScan } from './secrets.js';
+import { scanDependencies, type DependencyScan } from './dependencies.js';
 
 export interface ChangesDeps {
   readonly db: PlatformDatabase;
@@ -55,6 +56,7 @@ export interface CheckedChanges {
   readonly diffSha256: string;
   readonly secrets: SecretScan;
   readonly reviewSize: ReviewSize;
+  readonly dependencies: DependencyScan;
 }
 
 /** Counts of the changed paths; the paths stay in memory. */
@@ -62,7 +64,7 @@ export function checkChangedPaths(
   policy: Pick<PolicyEngine, 'checkScope'>,
   plannedFiles: readonly string[],
   changedFiles: readonly string[],
-): Omit<CheckedChanges, 'diffSha256' | 'secrets' | 'reviewSize'> {
+): Omit<CheckedChanges, 'diffSha256' | 'secrets' | 'reviewSize' | 'dependencies'> {
   const sorted = [...changedFiles].sort();
   const scope = policy.checkScope({ plannedFiles, changedFiles: sorted });
   return {
@@ -102,6 +104,12 @@ export async function storeChanges(
     gitTimeoutMs: deps.settings.git.timeoutMs,
     patch: patch.patch,
   });
+  const dependencies = await scanDependencies({
+    cloneDir,
+    baseSha: contract.base_sha,
+    changedFiles: patch.changedFiles,
+    gitTimeoutMs: deps.settings.git.timeoutMs,
+  });
   const scope = deps.db.forTenant(parseTenantId(contract.tenant_id));
   await scope.transaction(async (tx) => {
     await tx.evidenceItems.record({
@@ -125,8 +133,13 @@ export async function storeChanges(
     });
     await tx.runEvents.append(contract.run_id, 'secrets_scanned', secretsScannedPayload(secrets));
     await tx.runEvents.append(contract.run_id, 'diff_measured', diffMeasuredPayload(reviewSize));
+    await tx.runEvents.append(
+      contract.run_id,
+      'dependencies_scanned',
+      dependenciesScannedPayload(dependencies),
+    );
   });
-  return { ...checked, diffSha256: stored.sha256, secrets, reviewSize };
+  return { ...checked, diffSha256: stored.sha256, secrets, reviewSize, dependencies };
 }
 
 /** The payload of the run event `secrets_scanned`: codes and counts only (ADR-M93 §2.3). */
@@ -154,5 +167,21 @@ export function diffMeasuredPayload(size: ReviewSize): RunEventPayload<'diff_mea
     generated_files: size.generatedFiles,
     generated_lines: size.generatedLines,
     binary_files: size.binaryFiles,
+  };
+}
+
+/** The payload of the run event `dependencies_scanned`: codes and counts only (ADR-M96 §2.3). */
+export function dependenciesScannedPayload(
+  scan: DependencyScan,
+): RunEventPayload<'dependencies_scanned'> {
+  return {
+    result: scan.result,
+    new_dependencies: scan.newDependencies,
+    changed_dependencies: scan.changedDependencies,
+    license_violations: scan.licenseViolations,
+    install_scripts: scan.installScripts,
+    typosquatting_warnings: scan.typosquattingWarnings,
+    advisory_findings: scan.advisoryFindings,
+    ...(scan.cause !== undefined ? { cause: scan.cause } : {}),
   };
 }

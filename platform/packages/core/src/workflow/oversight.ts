@@ -42,9 +42,21 @@ export interface GateOversightFacts {
 /** The policy context of G6: the findings counts, and whether they are known (QUESTIONS #157). */
 export function g6Context(facts: G6Facts | null | undefined) {
   const ci = facts?.ci ?? null;
+  const deps = facts?.dependencies ?? null;
+  const hasDependencyFinding =
+    deps !== null &&
+    (deps.result === 'finding' ||
+      deps.result === 'warning' ||
+      deps.licenseViolations > 0 ||
+      deps.installScripts > 0 ||
+      deps.typosquattingWarnings > 0 ||
+      deps.advisoryFindings > 0);
+  const isScanFailed = deps !== null && deps.result === 'failed';
   return {
     securityFindings: ci?.counts ?? {},
     securityFindingsUnknown: ci === null || ci.findings !== 'known',
+    dependencyFinding: hasDependencyFinding,
+    dependencyScanFailed: isScanFailed,
   };
 }
 

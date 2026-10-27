@@ -231,6 +231,21 @@ export const RUN_EVENT_TYPES = {
     cause: 'code?',
   },
   /**
+   * The runner's dependency scan of the run's changed manifest and lockfiles, outside the sandbox
+   * (H02, ADR-M96 §2.3): `result` is `clean`, `warning`, `finding` or `failed`.
+   * Counts and codes only, never package text, commands or secrets.
+   */
+  dependencies_scanned: {
+    result: 'code',
+    new_dependencies: 'count',
+    changed_dependencies: 'count',
+    license_violations: 'count',
+    install_scripts: 'count',
+    typosquatting_warnings: 'count',
+    advisory_findings: 'count',
+    cause: 'code?',
+  },
+  /**
    * The runner pushed the run's checked changes as one commit on `agent/INT-…` (C08, ADR-M38
    * §2.2): `head_sha` is the commit the runner made from the stored diff (never what the sandbox
    * reported) and that the Git host now shows for the branch; `diff_sha256` and `paths_sha256` are

@@ -376,6 +376,21 @@ sandbox:
   # Default: the pinned base itself (ADR-M10 §2.1), which has no project toolchain.
   image: ghcr.io/openhands/agent-server:1.48.0-python-slim@sha256:8fcfab2dedb4b41b6aef219b9fa9b1f2588033fad3d998ae6aa11fe8c4fcf8b7
 
+dependencies:
+  # Task H02, ADR-M96 §2.2: allowed SPDX licenses for packages added or changed by agents.
+  # Packages with licenses outside this set or with ambiguous/missing licenses trigger HITL.
+  allowed_licenses:
+    - MIT
+    - Apache-2.0
+    - BSD-2-Clause
+    - BSD-3-Clause
+    - ISC
+    - 0BSD
+    - CC0-1.0
+    - Unlicense
+  # Packages explicitly forbidden across the project.
+  blocked_packages: []
+
 evaluation:
   # Task L07, ADR-M85 §2.4. A project's own evaluation tasks come from its merged intents.
   # `test_globs`: a file the pull request added or changed and that matches one of these is a

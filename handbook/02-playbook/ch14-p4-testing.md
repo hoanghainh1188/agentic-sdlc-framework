@@ -190,6 +190,14 @@ A project without CI never passes G6.
 - A **critical** finding pauses the intent with a **security** escalation to Person B. `resume` takes the intent back to G6, where Person B still has to approve.
 - If GitHub cannot report findings (code scanning is not enabled, or the App may not read it), G6 is **HITL** every time. GitHub code scanning is free for public repositories only; on a private repository without GitHub Advanced Security, plan for Person B to approve every G6. The project's CI must upload its scanner results (SARIF) for the counts to exist.
 
+**Dependency findings (task H02, ADR-M96).** The runner scans the staged manifest and lockfiles (`package.json`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`) outside the sandbox before pushing:
+- Checks added or changed dependencies against allowed SPDX licenses (`dependencies.allowed_licenses`).
+- Checks for install scripts (`preinstall`, `install`, `postinstall`, or lockfile flags like `requiresBuild: true`).
+- Checks for typosquatting against popular packages using Levenshtein distance.
+- Checks against blocked packages (`dependencies.blocked_packages`).
+
+If any unapproved licenses, install scripts, or typosquatting warnings are detected, G6 is forced to **HITL** with reason `dependency_finding`. If any blocked package advisory finding is detected, G6 is paused with a **security** escalation to Person B.
+
 **The pull request changes.** If someone closes or merges the pull request, or pushes another commit to the agent branch, G6 stops: the intent is **paused** with a **technical** escalation (§14.10.1 shows the decisions).
 
 **Who approves.** Person B, never the person who allowed the run at G4 (the producer). Decide with `/approve G6`, `/reject G6 <reason>` or `/request-changes G6 <reason>` on the intent's issue (Chapter 19 §19.8).
@@ -238,4 +246,5 @@ A project without CI never passes G6.
 | 0.4 | 2026-10-03 | Claude Code (task C08, PR 2) | §14.10.2: how G6 reads CI, retries, the timeout, security findings (ADR-M38 §2.7, QUESTIONS #157–#159) |
 | 0.6 | 2026-10-09 | Claude (docs review fixes) | `roll-back` is the decision's spelling (the CLI refuses `roll_back`) |
 | 0.7 | 2026-10-24 | Claude (task H04) | §14.10.1: the push comes after the secret scan of G5 (Chapter 13 §13.10.5a, ADR-M93) |
+| 0.8 | 2026-10-27 | Claude Code (task H02) | §14.10.2: dependency scanning outside the sandbox (ADR-M96, QUESTIONS #606–#608) |
 | 0.5 | 2026-10-09 | Claude Code (docs review PR C) | §14.10.1, §14.10.2: the GitHub App permissions link to the one list in `platform/deploy/README.md` |

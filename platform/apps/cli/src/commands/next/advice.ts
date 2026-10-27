@@ -278,6 +278,9 @@ export const CAUSE_RULES: Readonly<Record<string, Rule>> = {
   // H05 (ADR-M95): G5 waits for Person A because the change is over the review limits.
   review_too_large: decide('decide_g5_review'),
   review_size_unknown: decide('decide_g5_review'),
+  // H02 (ADR-M96): G6 waits for Person B because dependencies have findings or scan failed.
+  dependency_finding: decide('decide_g6'),
+  dependency_scan_failed: decide('decide_g6'),
   intent_budget_exhausted: (facts) => advice('fix_setup', 'setup_budget', facts),
   tenant_budget_exhausted: (facts) => advice('fix_setup', 'setup_budget', facts),
 };
