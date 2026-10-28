@@ -3,12 +3,15 @@
 // module: owner, backup (from the backup step) or governance, never a producer (FR-18).
 import {
   acknowledgeEscalation,
+  consumeStepUp,
   decideEscalation,
   EscalationError,
   INTENT_CODE_PATTERN,
   loadEffectiveConfig,
+  PasskeyError,
   projectAccess,
   RegistryError,
+  stepUpRequestSha256,
   type Escalation,
   type Intent,
   type TenantScope,
@@ -17,7 +20,9 @@ import type { EscalationRouting, IntentWorkflowSignals } from '@sdlc/contracts';
 import type { z } from 'zod';
 
 import type { Principal } from '../auth/principal.js';
+import { ApiError } from '../errors/api-error.js';
 import { wakeQuietly, type WakeLogger } from '../intent-signals.js';
+import type { PasskeysService } from '../passkeys/passkeys.service.js';
 import { presentEscalation } from './present.js';
 import type { escalationDecisionSchema, listEscalationsSchema } from './schemas.js';
 
@@ -26,6 +31,7 @@ export class EscalationsService {
     private readonly now: () => Date,
     private readonly signals: IntentWorkflowSignals,
     private readonly logger: WakeLogger,
+    private readonly passkeys?: PasskeysService,
   ) {}
 
   async list(
@@ -73,6 +79,42 @@ export class EscalationsService {
     body: z.infer<typeof escalationDecisionSchema>,
   ): Promise<Record<string, unknown>> {
     const { escalation, intent } = await this.readable(p, code);
+    if (p.credential.kind === 'session') {
+      const { step_up: answer, expected_input_sha256, ...rest } = body;
+      if (!answer || !this.passkeys) throw new ApiError(403, 'step_up_refused');
+      const verified = await this.passkeys.verifyStepUp(p, answer);
+      const binding = {
+        action: 'escalation.decide' as const,
+        decision: body.decision,
+        intentId: null,
+        escalationId: escalation.id,
+        gate: null,
+        expectedInputSha256: expected_input_sha256 ?? null,
+        requestSha256: stepUpRequestSha256(rest),
+      };
+      const updated = await p.scope.transaction(async (tx) => {
+        await consumeStepUp(tx, verified, binding, this.now()).catch((error: unknown) => {
+          throw error instanceof PasskeyError ? new ApiError(403, 'step_up_refused') : error;
+        });
+        return decideEscalation(
+          tx,
+          {
+            escalationId: escalation.id,
+            actorId: p.userId,
+            decision: body.decision,
+            reasonCode: body.reason_code ?? null,
+            reasonRef: body.reason_ref ?? null,
+            ...(body.actions === undefined ? {} : { actions: body.actions }),
+            ...(body.budget_increase_usd === undefined
+              ? {}
+              : { budgetIncreaseUsd: body.budget_increase_usd }),
+          },
+          { now: this.now },
+        );
+      });
+      await this.wake(p, intent);
+      return presentEscalation(updated, intent, await routingOf(p.scope, intent, updated));
+    }
     const updated = await decideEscalation(
       p.scope,
       {

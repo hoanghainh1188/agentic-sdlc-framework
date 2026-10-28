@@ -460,7 +460,7 @@ export function refusalReply(
         ? 'intent_not_found'
         : error.code === 'scope_not_allowed'
           ? 'decision_not_allowed'
-          : error.code === 'g7_feedback_on_git_host'
+          : error.code === 'g7_feedback_on_git_host' || error.code === 'gate_input_conflict'
             ? 'failed'
             : error.code;
     return { code, params: gate };

@@ -15,6 +15,9 @@ const ALLOWED: Record<string, number> = {
   'auth/sign-in.controller.ts': 2,
   'passkeys/passkeys.controller.ts': 4,
   'evaluations/evaluations.controller.ts': 4,
+  'intents/intents.controller.ts': 1,
+  'runs/runs.controller.ts': 1,
+  'escalations/escalations.controller.ts': 2,
 };
 
 function sourceFiles(dir: string): string[] {

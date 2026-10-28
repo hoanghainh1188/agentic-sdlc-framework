@@ -4,21 +4,28 @@
 // After a change, the intent's workflow is woken (B07, ADR-M30): creating an intent is its submit.
 import {
   CommandError,
+  consumeStepUp,
   currentGateWaitingFor,
   decideGate,
+  gateInputSha256,
   INTENT_CODE_PATTERN,
+  isDecidableGate,
+  PasskeyError,
   projectAccess,
   RegistryError,
+  stepUpRequestSha256,
   type Intent,
   type Project,
   type Registry,
   type TenantScope,
 } from '@sdlc/core';
-import type { IntentWorkflowSignals } from '@sdlc/contracts';
+import type { GateCode, IntentWorkflowSignals } from '@sdlc/contracts';
 import type { z } from 'zod';
 
 import type { Principal } from '../auth/principal.js';
+import { ApiError } from '../errors/api-error.js';
 import { wakeQuietly, type WakeLogger } from '../intent-signals.js';
+import type { PasskeysService } from '../passkeys/passkeys.service.js';
 import { decodeCursor, encodeCursor } from './cursor.js';
 import {
   presentDecision,
@@ -40,6 +47,7 @@ export class IntentsService {
     private readonly registry: Registry,
     private readonly signals: IntentWorkflowSignals,
     private readonly logger: WakeLogger,
+    private readonly passkeys?: PasskeysService,
   ) {}
 
   async create(p: Principal, body: z.infer<typeof createIntentSchema>): Promise<IntentBody> {
@@ -71,19 +79,34 @@ export class IntentsService {
 
   async show(p: Principal, ref: string): Promise<Record<string, unknown>> {
     const { intent, project } = await this.readable(p, ref);
-    const [decisions, spec, plan, waitingFor] = await Promise.all([
+    const [decisions, spec, plan, waitingFor, gateInputSha256] = await Promise.all([
       p.scope.gateDecisions.listForIntent(intent.id),
       p.scope.specRefs.latest(intent.id),
       p.scope.plans.latest(intent.id),
       this.waitingFor(p, intent),
+      this.gateInput(p, intent),
     ]);
     return {
       ...presentIntent(intent, project),
+      gate_input_sha256: gateInputSha256,
       waiting_for: presentWaitingFor(waitingFor),
       spec: presentSpec(spec),
       plan: presentPlan(plan),
       decisions: decisions.map(presentDecision),
     };
+  }
+
+  /** U07: the current gate's input hash the confirmation step shows. */
+  private async gateInput(p: Principal, intent: Intent): Promise<string | null> {
+    if (intent.status !== 'in_gate' || !intent.current_gate || !isDecidableGate(intent.current_gate)) {
+      return null;
+    }
+    try {
+      return await gateInputSha256(p.scope, intent, intent.current_gate);
+    } catch (error) {
+      if (error instanceof CommandError && error.code === 'gate_input_missing') return null;
+      throw error;
+    }
   }
 
   async list(p: Principal, query: z.infer<typeof listIntentsSchema>): Promise<IntentPage> {
@@ -113,16 +136,50 @@ export class IntentsService {
     body: z.infer<typeof decisionSchema>,
   ): Promise<Record<string, unknown>> {
     const { intent } = await this.readable(p, ref);
-    const row = await decideGate(this.registry, p.scope, {
-      intent,
-      gate,
-      decision: body.decision,
-      actorId: p.userId,
-      reasonCode: body.reason_code ?? null,
-      reasonRef: body.reason_ref ?? null,
-      scope: body.scope ?? null,
-      source: 'cli',
-    });
+    const source = p.credential.kind === 'session' ? 'web' : 'cli';
+    let row;
+    if (p.credential.kind === 'session') {
+      const { step_up: answer, expected_input_sha256, ...rest } = body;
+      if (!answer || !this.passkeys) throw new ApiError(403, 'step_up_refused');
+      const verified = await this.passkeys.verifyStepUp(p, answer);
+      const binding = {
+        action: 'gate.decide' as const,
+        decision: body.decision,
+        intentId: intent.id,
+        escalationId: null,
+        gate: gate as GateCode,
+        expectedInputSha256: expected_input_sha256 ?? null,
+        requestSha256: stepUpRequestSha256(rest),
+      };
+      row = await p.scope.transaction(async (tx) => {
+        await consumeStepUp(tx, verified, binding, this.registry.now()).catch((error: unknown) => {
+          throw error instanceof PasskeyError ? new ApiError(403, 'step_up_refused') : error;
+        });
+        return decideGate(this.registry, tx, {
+          intent,
+          gate,
+          decision: body.decision,
+          actorId: p.userId,
+          reasonCode: body.reason_code ?? null,
+          reasonRef: body.reason_ref ?? null,
+          scope: body.scope ?? null,
+          source,
+          expectedInputSha256: body.expected_input_sha256 ?? null,
+        });
+      });
+    } else {
+      row = await decideGate(this.registry, p.scope, {
+        intent,
+        gate,
+        decision: body.decision,
+        actorId: p.userId,
+        reasonCode: body.reason_code ?? null,
+        reasonRef: body.reason_ref ?? null,
+        scope: body.scope ?? null,
+        source,
+        expectedInputSha256: body.expected_input_sha256 ?? null,
+      });
+    }
     await wakeQuietly(
       this.signals,
       { tenantId: p.scope.tenantId, intentId: intent.id },

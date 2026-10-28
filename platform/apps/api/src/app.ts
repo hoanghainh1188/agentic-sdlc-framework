@@ -235,10 +235,14 @@ class ApiModule {
         },
         {
           provide: INTENTS,
-          useFactory: (registry: Registry) => new IntentsService(registry, signals, wakeLogger),
+          useFactory: (registry: Registry) =>
+            new IntentsService(registry, signals, wakeLogger, passkeys?.service),
           inject: [REGISTRY],
         },
-        { provide: ESCALATIONS, useValue: new EscalationsService(now, signals, wakeLogger) },
+        {
+          provide: ESCALATIONS,
+          useValue: new EscalationsService(now, signals, wakeLogger, passkeys?.service),
+        },
         {
           provide: SPECS,
           useValue: new SpecsService(

@@ -993,3 +993,79 @@ tbody th.mono {
   margin-top: 0;
   font-size: 1rem;
 }
+
+/* U07: Decision modal and gate action buttons */
+.gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-4);
+}
+
+.modal-card {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-card);
+  padding: var(--space-6);
+  max-width: 34rem;
+  width: 100%;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.modal-card h3 {
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+}
+
+.modal-card .binding-info {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  font-size: 0.85rem;
+}
+
+.modal-card .binding-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+
+.modal-card .field {
+  margin-bottom: var(--space-4);
+}
+
+.modal-card .field label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.modal-card .field input,
+.modal-card .field select {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  color: inherit;
+}
+
+.modal-card .modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}

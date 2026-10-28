@@ -6,6 +6,7 @@ import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 
 import { ApiError } from '../api/client.js';
+import { killRun } from '../api/writes.js';
 import {
   readIntent,
   readOpenEscalations,
@@ -14,6 +15,7 @@ import {
   readRuns,
 } from '../api/reads.js';
 import { useApi } from '../api/use-api.js';
+import { DecisionModal } from '../components/DecisionModal.js';
 import {
   codeClass,
   Due,
@@ -34,6 +36,7 @@ import { intentLinks } from '../model/intents.js';
 import { roundUsd } from '../model/numbers.js';
 import { secondsSince } from '../model/time.js';
 import { href } from '../router.js';
+import { session } from '../session.js';
 
 export function IntentDetail({ code }: { readonly code: string }) {
   const { result, reload } = useApi(
@@ -55,6 +58,17 @@ export function IntentDetail({ code }: { readonly code: string }) {
     [code],
   );
 
+  const handleKillRun = (runId: string) => {
+    if (!window.confirm(t('dashboard.action.kill_confirm'))) return;
+    void killRun(runId)
+      .then(() => {
+        reload();
+      })
+      .catch((err: unknown) => {
+        alert(err instanceof Error ? err.message : 'Kill failed');
+      });
+  };
+
   return (
     <section class="screen" aria-labelledby="intent-title">
       <p class="crumbs">
@@ -67,7 +81,7 @@ export function IntentDetail({ code }: { readonly code: string }) {
             <Head intent={intent} at={at} reload={reload} />
             <div class="detail-grid">
               <div class="detail-stack">
-                <DecidedBy intent={intent} at={at} />
+                <DecidedBy intent={intent} at={at} reload={reload} />
                 <HeldBy intent={intent} at={at} />
               </div>
               <Facts intent={intent} />
@@ -115,6 +129,7 @@ export function IntentDetail({ code }: { readonly code: string }) {
                         <th scope="col">{t('dashboard.col.iterations')}</th>
                         <th scope="col">{t('dashboard.col.started')}</th>
                         <th scope="col">{t('dashboard.col.finished')}</th>
+                        {session.actions() && <th scope="col">{t('dashboard.action.kill_run')}</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -138,6 +153,22 @@ export function IntentDetail({ code }: { readonly code: string }) {
                           <td>
                             <When iso={run.finished_at} />
                           </td>
+                          {session.actions() && (
+                            <td>
+                              {run.status === 'provisioning' || run.status === 'running' ? (
+                                <button
+                                  type="button"
+                                  class="button button-danger"
+                                  style="padding: var(--space-1) var(--space-2); font-size: 0.8rem;"
+                                  onClick={() => handleKillRun(run.id)}
+                                >
+                                  {t('dashboard.action.kill_run')}
+                                </button>
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -199,8 +230,14 @@ function Head({ intent, at, reload }: { intent: Detail; at: Date; reload: () => 
 }
 
 /** `waiting_for` (QUESTIONS #261): who decides the current gate, as the workflow resolves it. */
-function DecidedBy({ intent, at }: { intent: Detail; at: Date }) {
+function DecidedBy({ intent, at, reload }: { intent: Detail; at: Date; reload: () => void }) {
   const w = intent.waiting_for;
+  const [activeDecision, setActiveDecision] = useState<
+    'approve' | 'reject' | 'request_changes' | null
+  >(null);
+  const links = intentLinks(intent);
+  const canAct = session.actions();
+
   return (
     <section class="panel panel-focus" aria-labelledby="decided-title">
       <h2 id="decided-title">{t('dashboard.detail.decided_by')}</h2>
@@ -232,6 +269,61 @@ function DecidedBy({ intent, at }: { intent: Detail; at: Date }) {
             <Duration seconds={secondsSince(intent.gate_entered_at, at)} />
           </p>
           <p class="hint">{t('dashboard.detail.decided_by_hint')}</p>
+
+          {w.gate === 'G7' ? (
+            links.pullRequest ? (
+              <p class="gate-actions">
+                <a
+                  class="button button-primary"
+                  href={links.pullRequest}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t('dashboard.action.g7_pr_notice')} #{intent.pr_number} ↗
+                </a>
+              </p>
+            ) : null
+          ) : (
+            canAct && (
+              <div class="gate-actions">
+                <button
+                  type="button"
+                  class="button button-primary"
+                  onClick={() => setActiveDecision('approve')}
+                >
+                  {t('dashboard.action.approve')}
+                </button>
+                <button
+                  type="button"
+                  class="button button-quiet"
+                  onClick={() => setActiveDecision('request_changes')}
+                >
+                  {t('dashboard.action.request_changes')}
+                </button>
+                <button
+                  type="button"
+                  class="button button-danger"
+                  onClick={() => setActiveDecision('reject')}
+                >
+                  {t('dashboard.action.reject')}
+                </button>
+              </div>
+            )
+          )}
+
+          {activeDecision && (
+            <DecisionModal
+              intent={intent}
+              gate={w.gate}
+              mode={w.mode}
+              decision={activeDecision}
+              onClose={() => setActiveDecision(null)}
+              onSuccess={() => {
+                setActiveDecision(null);
+                reload();
+              }}
+            />
+          )}
         </>
       )}
     </section>

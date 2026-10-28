@@ -2,6 +2,7 @@
 // tenant scope. The CLI commands `sdlc escalation …` come with B04 (QUESTIONS #77).
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
 
+import { SessionAction } from '../auth/auth.guard.js';
 import { CurrentPrincipal, type Principal } from '../auth/principal.js';
 import { ESCALATIONS } from '../tokens.js';
 import { parseRequest } from '../validation.js';
@@ -33,6 +34,7 @@ export class EscalationsController {
   }
 
   @Post(':code/ack')
+  @SessionAction('actions')
   @HttpCode(200)
   acknowledge(
     @CurrentPrincipal() p: Principal,
@@ -42,6 +44,7 @@ export class EscalationsController {
   }
 
   @Post(':code/decisions')
+  @SessionAction('actions')
   @HttpCode(201)
   decide(
     @CurrentPrincipal() p: Principal,

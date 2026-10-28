@@ -74,6 +74,11 @@ describe('the dashboard writes only its own session and passkeys (AC1; U05, U06)
         'POST /v1/eval-plans/X/versions',
         'POST /v1/eval-plans/X/archive',
         'POST /v1/eval-plans/X/runs',
+        // U07: gate decisions, escalation actions, kill run.
+        'POST /v1/intents/X/gates/X/decisions',
+        'POST /v1/escalations/X/ack',
+        'POST /v1/escalations/X/decisions',
+        'POST /v1/runs/X/kill',
       ].sort(),
     );
     expect([...writes.matchAll(/\bsend\(/g)]).toHaveLength(calls.length);

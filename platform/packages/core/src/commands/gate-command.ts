@@ -40,8 +40,9 @@ export interface GateCommand {
   readonly reasonCode?: GateReasonCode | null;
   readonly reasonRef?: string | null;
   readonly scope?: ApprovalScope | null;
-  readonly source: 'cli' | 'github_comment' | 'github_review';
+  readonly source: 'cli' | 'github_comment' | 'github_review' | 'web';
   readonly eventSource?: EventSource | null;
+  readonly expectedInputSha256?: string | null;
 }
 
 /**
@@ -109,6 +110,12 @@ export async function decideGate(
       );
     }
     const inputSha256 = await gateInputSha256(tx, current, gate);
+    if (command.expectedInputSha256 && command.expectedInputSha256 !== inputSha256) {
+      throw new CommandError(
+        'gate_input_conflict',
+        `${current.code}: the input to ${gate} changed since it was read`,
+      );
+    }
     const producers = await producersOf(tx, current, gate);
     // E01 (QUESTIONS #179): a producer never decides G7, a request for changes included; E03:
     // nor G8 (FR-11, ADR-M49 §2.3).

@@ -4,11 +4,16 @@
 // those come with U07. A static test checks that these are the only writes and that each is a
 // route of the API.
 import {
+  decisionSchema,
   endedSessionsSchema,
+  escalationSchema,
   evalPlanSchema,
+  killResultSchema,
   stepUpOptionsSchema,
   passkeyRegistrationOptionsSchema,
   passkeySchema,
+  type DecisionView,
+  type EscalationView,
   type EvalPlanView,
   type PasskeyRegistrationOptions,
   type StepUpOptions,
@@ -54,18 +59,77 @@ export async function removePasskey(id: string): Promise<PasskeyView> {
 /** The step-up actions of evaluation plans (L05). */
 export type EvalPlanAction = 'eval_plan.create' | 'eval_plan.change' | 'eval_plan.run';
 
+export type StepUpRequestInput =
+  | { readonly action: EvalPlanAction; readonly request: Readonly<Record<string, unknown>> }
+  | {
+      readonly action: 'gate.decide';
+      readonly intent: string;
+      readonly gate: string;
+      readonly expected_input_sha256?: string;
+      readonly request: Readonly<Record<string, unknown>>;
+    }
+  | {
+      readonly action: 'escalation.decide';
+      readonly escalation: string;
+      readonly expected_input_sha256?: string;
+      readonly request: Readonly<Record<string, unknown>>;
+    };
+
 /**
- * A passkey challenge for one plan action, bound to the body the page will send (without
- * `step_up`) with `decision` and `target` (the project's slug for create, else the plan's ID).
+ * A passkey challenge for one action, bound to the body the page will send (without
+ * `step_up`).
  */
 export async function stepUpOptions(
-  action: EvalPlanAction,
-  request: Readonly<Record<string, unknown>>,
+  actionOrPayload: EvalPlanAction | StepUpRequestInput,
+  request?: Readonly<Record<string, unknown>>,
 ): Promise<StepUpOptions> {
-  const answer = await send(apiPath('/v1/auth/step-up'), 'POST', stepUpOptionsSchema, {
-    action,
-    request,
-  });
+  const payload =
+    typeof actionOrPayload === 'string'
+      ? { action: actionOrPayload, request: request! }
+      : actionOrPayload;
+  const answer = await send(apiPath('/v1/auth/step-up'), 'POST', stepUpOptionsSchema, payload);
+  return answer!;
+}
+
+/** U07: Kills an active run (ADR-M42). No step-up: containment must be fast. */
+export async function killRun(runId: string): Promise<void> {
+  await send(apiPath(`/v1/runs/${segment(runId)}/kill`), 'POST', killResultSchema, {});
+}
+
+/** U07: Decides a gate (ADR-M73). */
+export async function decideGate(
+  intent: string,
+  gate: string,
+  body: unknown,
+): Promise<DecisionView> {
+  const answer = await send(
+    apiPath(`/v1/intents/${segment(intent)}/gates/${segment(gate)}/decisions`),
+    'POST',
+    decisionSchema,
+    body,
+  );
+  return answer!;
+}
+
+/** U07: Acknowledges an escalation (ADR-M28). */
+export async function ackEscalation(code: string): Promise<EscalationView> {
+  const answer = await send(
+    apiPath(`/v1/escalations/${segment(code)}/ack`),
+    'POST',
+    escalationSchema,
+    {},
+  );
+  return answer!;
+}
+
+/** U07: Decides an escalation (ADR-M28). */
+export async function decideEscalation(code: string, body: unknown): Promise<EscalationView> {
+  const answer = await send(
+    apiPath(`/v1/escalations/${segment(code)}/decisions`),
+    'POST',
+    escalationSchema,
+    body,
+  );
   return answer!;
 }
 
