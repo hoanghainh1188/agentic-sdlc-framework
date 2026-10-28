@@ -16,6 +16,9 @@
       "path": "../../packages/api-schemas"
     },
     {
+      "path": "../../packages/config"
+    },
+    {
       "path": "../../packages/contracts"
     },
     {

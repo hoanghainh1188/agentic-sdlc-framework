@@ -22,6 +22,7 @@ import {
   type AdminApiCommand,
   type AdminCall,
 } from './admin-call.js';
+import { PROJECT_APPLY_COMMAND } from './admin-project-apply.js';
 
 /** Largest configuration file read (the API refuses more than 32 KiB of YAML). */
 export const MAX_CONFIG_FILE_BYTES = 32 * 1024;
@@ -93,6 +94,7 @@ export const PROJECT_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
       return output(call, updated, () => sayProject(call, updated));
     },
   },
+  'project apply': PROJECT_APPLY_COMMAND,
   'project archive': {
     options: project,
     required: ['project'],

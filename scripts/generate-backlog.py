@@ -526,7 +526,7 @@ t("V17","UX","`sdlc admin project apply`: a project and its team from one file",
   "It calls the same API endpoints as the manual commands, one call per change, so the audit log is the same; it creates what is missing, shows a difference for what has changed, passes the configuration version itself; `--dry-run` writes nothing; a second run with the same file changes nothing",
   "It never approves the agent and never writes the project AI record (those stay with the agent's owner, Person B and Person A); it issues no token; at the end it prints, per person, the commands that are still theirs",
   "Tests: a new project, a second run, a changed file, M21 within the file and against existing bindings, an unknown GitHub login, `--dry-run`; messages through the catalog; handbook Ch.19 §19.8d and deploy README steps 9–12 updated in the same task"],
- "QUESTIONS #617 and #618 (Harry, 2026-10-28). Comes before V16. Bugs from trial reports come first (R123)")
+ "QUESTIONS #617 and #618 (Harry, 2026-10-28). Comes before V16. Bugs from trial reports come first (R123). Done: `sdlc admin project apply` (schema `projectFileSchema` in `@sdlc/api-schemas`; handbook Ch.19 §19.8d)")
 t("V14","Later","Human-effort baseline for the agent report","S",["V13"],"FR-53",
  "platform/packages/core (intents), migrations, platform/apps/api, platform/apps/cli, platform/tests/*, design/D-05",
  ["A person with a write role may record an estimate of the human effort for an intent (hours, a number; codes and numbers only, no text); empty by default",
@@ -986,6 +986,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.60 | 2026-10-28 | Claude, approved by Harry | New tasks V16 (`pnpm server:setup`, milestone Server) and V17 (`sdlc admin project apply`, milestone UX); V17 first, V16 before A10 PR 3 (QUESTIONS #616–#618) |
 | 1.60 | 2026-10-27 | Claude Code (task H02), approved by Harry | H02 done: agent dependency checks (licence, install scripts, typosquatting; ADR-M96, QUESTIONS #606–#608) |
 | 1.61 | 2026-10-27 | Claude Code (task H03), approved by Harry | H03 design done: deleting a client's data on request (ADR-M97, QUESTIONS #611–#615) |
+| 1.62 | 2026-10-28 | Claude Code (task V17), approved by Harry | V17 done: `sdlc admin project apply`, a project and its team from one file (QUESTIONS #617) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

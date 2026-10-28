@@ -207,6 +207,9 @@ importers:
       '@sdlc/api-schemas':
         specifier: workspace:*
         version: link:../../packages/api-schemas
+      '@sdlc/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@sdlc/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -219,6 +222,9 @@ importers:
       '@sdlc/messages':
         specifier: workspace:*
         version: link:../../packages/messages
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
       zod:
         specifier: 4.6.5
         version: 4.6.5
