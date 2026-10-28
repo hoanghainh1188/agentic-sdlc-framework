@@ -8,6 +8,7 @@ import {
   endedSessionsSchema,
   escalationSchema,
   evalPlanSchema,
+  intentSchema,
   killResultSchema,
   stepUpOptionsSchema,
   passkeyRegistrationOptionsSchema,
@@ -15,6 +16,7 @@ import {
   type DecisionView,
   type EscalationView,
   type EvalPlanView,
+  type IntentView,
   type PasskeyRegistrationOptions,
   type StepUpOptions,
   type PasskeyView,
@@ -174,5 +176,21 @@ export async function runEvalPlan(id: string, body: unknown): Promise<EvalPlanVi
     evalPlanSchema,
     body,
   );
+  return answer!;
+}
+
+export interface CreateIntentInput {
+  readonly project: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly risk_tier: 'low' | 'medium' | 'high' | 'critical';
+  readonly data_class: 'public' | 'internal' | 'confidential' | 'restricted';
+  readonly budget_usd?: string;
+  readonly issue_number?: number;
+}
+
+/** U08: Creates a new intent directly from the dashboard. */
+export async function createIntent(body: CreateIntentInput): Promise<IntentView> {
+  const answer = await send(apiPath('/v1/intents'), 'POST', intentSchema, { body });
   return answer!;
 }

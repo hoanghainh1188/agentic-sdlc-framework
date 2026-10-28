@@ -23,6 +23,7 @@ export default tseslint.config(
   {
     // Documents are never linted or changed by tools. Only platform code and root config files are.
     ignores: [
+      '.claude/',
       'handbook/',
       'design/',
       '_review/',

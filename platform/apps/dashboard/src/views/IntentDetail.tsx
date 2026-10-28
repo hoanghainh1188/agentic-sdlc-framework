@@ -113,6 +113,7 @@ export function IntentDetail({ code }: { readonly code: string }) {
                 </ul>
               )}
             </section>
+            <SpecAndPlan intent={intent} />
             <Decisions intent={intent} />
             <section aria-labelledby="runs-title" class="panel">
               <h2 id="runs-title">{t('dashboard.detail.runs')}</h2>
@@ -538,6 +539,92 @@ function Packs({ code, packs }: { code: string; packs: readonly EvidencePackView
           </table>
         </div>
       )}
+    </section>
+  );
+}
+
+function SpecAndPlan({ intent }: { intent: Detail }) {
+  const spec = intent.spec;
+  const plan = intent.plan;
+
+  return (
+    <section class="panel" aria-labelledby="spec-plan-title">
+      <h2 id="spec-plan-title">{t('dashboard.detail.spec_and_plan')}</h2>
+      <div class="field-row">
+        <div class="panel panel-quiet">
+          <h3>{t('dashboard.detail.spec_title')}</h3>
+          {spec === null ? (
+            <p class="muted">{t('dashboard.detail.no_spec')}</p>
+          ) : (
+            <dl class="facts">
+              <div>
+                <dt>{t('dashboard.detail.file_path')}</dt>
+                <dd class="mono">{cleanText(spec.path)}</dd>
+              </div>
+              <div>
+                <dt>{t('dashboard.detail.acceptance_criteria')}</dt>
+                <dd>
+                  <span class="chip chip-success">
+                    {spec.acceptance_criteria !== null ? `${spec.acceptance_criteria}` : '—'}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt>{t('dashboard.detail.structure')}</dt>
+                <dd class="mono">{spec.structure ? cleanText(spec.structure) : '—'}</dd>
+              </div>
+              <div>
+                <dt>{t('dashboard.detail.content_hash')}</dt>
+                <dd class="mono" style="font-size: 0.8rem; word-break: break-all;">
+                  {cleanText(spec.content_sha256)}
+                </dd>
+              </div>
+              <div>
+                <dt>{t('dashboard.detail.commit_sha')}</dt>
+                <dd class="mono" style="font-size: 0.8rem;">
+                  {cleanText(spec.commit_sha)}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </div>
+
+        <div class="panel panel-quiet">
+          <h3>{t('dashboard.detail.plan_title')}</h3>
+          {plan === null ? (
+            <p class="muted">{t('dashboard.detail.no_plan')}</p>
+          ) : (
+            <dl class="facts">
+              <div>
+                <dt>{t('dashboard.detail.plan_version')}</dt>
+                <dd class="mono">v{plan.version}</dd>
+              </div>
+              <div>
+                <dt>{t('dashboard.action.plan_hash')}</dt>
+                <dd class="mono" style="font-size: 0.8rem; word-break: break-all;">
+                  {cleanText(plan.plan_sha256)}
+                </dd>
+              </div>
+              <div>
+                <dt>{t('dashboard.detail.change_flags')}</dt>
+                <dd>
+                  {plan.change_flags.length === 0 ? (
+                    '—'
+                  ) : (
+                    <div style="display: flex; gap: var(--space-1); flex-wrap: wrap;">
+                      {plan.change_flags.map((flag) => (
+                        <span key={flag} class="chip chip-warn">
+                          {cleanText(flag)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

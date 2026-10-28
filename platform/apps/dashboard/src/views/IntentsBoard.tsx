@@ -1,10 +1,12 @@
 // Intents and gates (U01 AC4): open intents in one row per gate, the longest wait first. Filters
 // (project, open or finished) are kept in the URL.
+import { useState } from 'preact/hooks';
 import type { IntentView, Me } from '@sdlc/api-schemas';
 
 import { readIntents, readOpenEscalations } from '../api/reads.js';
 import { useApi } from '../api/use-api.js';
 import { Bar, codeClass, Duration, Empty, Label, Show, Txt } from '../components/common.js';
+import { CreateIntentModal } from '../components/CreateIntentModal.js';
 import { holdOf } from '../model/hold.js';
 import { t } from '../i18n.js';
 import {
@@ -16,6 +18,7 @@ import {
   type LaneId,
 } from '../model/intents.js';
 import { href, intentHref } from '../router.js';
+import { session } from '../session.js';
 import { ProjectFilter, projectsOf } from './filters.js';
 
 const LANE_KEYS: Readonly<Record<LaneId, string>> = {
@@ -31,6 +34,7 @@ const LANE_KEYS: Readonly<Record<LaneId, string>> = {
 };
 
 export function IntentsBoard({ me, query }: { readonly me: Me; readonly query: URLSearchParams }) {
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const projects = projectsOf(me);
   const project = projects.includes(query.get('project') ?? '') ? query.get('project')! : undefined;
   const finished = query.get('show') === 'finished';
@@ -77,6 +81,15 @@ export function IntentsBoard({ me, query }: { readonly me: Me; readonly query: U
           <button type="button" class="button button-quiet" onClick={reload}>
             {t('dashboard.refresh')}
           </button>
+          {session.actions() && (
+            <button
+              type="button"
+              class="button button-primary"
+              onClick={() => setShowCreateModal(true)}
+            >
+              {t('dashboard.intent.new')}
+            </button>
+          )}
         </div>
       </div>
       <Show loaded={result}>
@@ -95,6 +108,17 @@ export function IntentsBoard({ me, query }: { readonly me: Me; readonly query: U
           )
         }
       </Show>
+      {showCreateModal && (
+        <CreateIntentModal
+          projects={projects}
+          defaultProject={project}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={(newIntent) => {
+            setShowCreateModal(false);
+            window.location.hash = intentHref(newIntent.code);
+          }}
+        />
+      )}
     </section>
   );
 }

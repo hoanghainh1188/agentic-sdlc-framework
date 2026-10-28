@@ -20,6 +20,7 @@ export class IntentsController {
   constructor(@Inject(INTENTS) private readonly intents: IntentsService) {}
 
   @Post()
+  @SessionAction('actions')
   @HttpCode(201)
   create(@CurrentPrincipal() p: Principal, @Body() body: unknown): Promise<IntentBody> {
     return this.intents.create(p, parseRequest(createIntentSchema, body, 'body'));
