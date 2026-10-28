@@ -35,6 +35,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes (done, v0.2.0)
 - **L02** Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision) (done, v0.3.0)
 - **V13** Agent efficiency report from real runs: `sdlc metrics agents` (done, v0.3.0)
+- **V17** `sdlc admin project apply`: a project and its team from one file
 - **H01** Threat model for agent runs and attack tests (done, v0.3.0)
 
 ## DEV: Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479)
@@ -73,6 +74,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 
 - **A10** Resource measurement + backup / restore drill + internal CA / TLS
 - **V15** Release on the tag: one workflow builds the images, the lock file is a release asset (done, v0.7.0)
+- **V16** `pnpm server:setup`: a guided fresh deployment on a server (steps 2–7)
 - **H02** Dependencies an agent adds: licence, known vulnerabilities, name checks
 - **H03** Design: deleting a client's data on request
 - **H04** A secret scan of a run's diff before G5 (done, v0.7.0)

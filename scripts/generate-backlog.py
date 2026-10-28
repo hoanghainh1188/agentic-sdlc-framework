@@ -509,6 +509,24 @@ t("V15","Server","Release on the tag: one workflow builds the images, the lock f
   "A release checkout reads its lock file from `SDLC_IMAGES_LOCK` or downloads it once from the GitHub Release into the ignored `platform/deploy/.images/vX.Y.Z.lock`, refuses a file that is not complete, and stops with a clear error when the download fails; tags v0.6.0 and before work as before; the tracked `images.lock` and `lock.mjs` are removed (QUESTIONS #592)",
   "Tests: the workflows (jobs, permissions, triggers, the signer, the order of scan and push), `images.sh` (download, complete file, override, failure, older tags), the release gate; `RELEASING.md` 2.0, the deploy README, CLAUDE.md \"Releases\" and R089, `design/RULES.md` updated in the same PR (QUESTIONS #595)"],
  "QUESTIONS #591–#595 (Harry, 2026-10-26), ADR-M94. Changes V04 AC3 (the digests of a release checkout come from its Release, not from the tagged commit) and V12 AC2 (the tag workflow builds the images). The first release made this way checks that the environment `npm` and npm trusted publishing accept the dispatched run (ADR-M94 §2.3); a tag, a release, an image push and an npm publish stay the owner's actions (R040)")
+t("V16","Server","`pnpm server:setup`: a guided fresh deployment on a server (steps 2–7)","M",["V02","V08"],"NFR-01, NFR-03",
+ "platform/deploy/server-setup/* (new), platform/deploy/trial/src (the steps move to a shared module), platform/deploy/openbao/bootstrap.sh, platform/tools/claude-hooks/guard-bash.mjs, platform/deploy/README.md, handbook T11, design/ADR (next free number), design/RULES.md, platform/tests/deploy/*, platform/tests/integration/* (`test:fresh-deploy`)",
+ ["`pnpm server:setup --settings <file outside the repo>` runs deploy README \"Fresh deployment\" steps 2–7 in their order; the step code is shared with `trial:up` and `test:fresh-deploy`, so the three keep one sequence (R081); the Bash hook refuses the command for Claude (R035)",
+  "Key custody as runbook T11 §3.2: when the three key holders have PGP keys, `init` encrypts each share with its holder's key (`-pgp-keys`) and the command never sees a share in clear (the default); without them it shows the shares one at a time and, after each holder confirms the copy, clears the screen and the scrollback; it refuses to run when its output is not a terminal; no share and no token is ever written to a file (QUESTIONS #616)",
+  "The root token, made from two shares at a hidden prompt, is used only for `configure`, which revokes it; steps 4 and 5 use one admin token (role `platform-admin`) in one pass; no token goes into an environment variable, a command line or a log; when the command stops after it made the root token and before `configure`, it revokes the root token, and the next start says where the last one stopped (QUESTIONS #616)",
+  "Step 4 reads each shared secret from a file named in the settings or at a hidden prompt; the LiteLLM master and salt keys are made inside the container; the database URLs are built from `.env` by the command; the optional parts (`observability`, `knowledge`, dashboard sign-in, dashboard actions) are a list in the settings and get their credentials commands and `.env` keys",
+  "It can start again after a failure: each step checks the state (initialised, sealed, pending migrations, delivered credentials) and skips what is done; a failure names the step and the README section; it ends with `doctor`; messages go through the catalog",
+  "Tests: the step order against the README, the refusal without a terminal, the root-token revocation on a stop, a second start after each step; `pnpm test:fresh-deploy` runs through the command with throw-away keys; the deploy README, runbook T11 and an ADR updated in the same task"],
+ "QUESTIONS #616 and #618 (Harry, 2026-10-28). Must be done before A10 PR 3 (the company server's first real run). Still by hand: the company CA certificate (T11 §3c), the GitHub App, the key holders' presence. Bugs from trial reports come first (R123)")
+t("V17","UX","`sdlc admin project apply`: a project and its team from one file","M",["B13","C10","V10"],"FR-11, NFR-08",
+ "platform/apps/cli (admin), platform/packages/api-schemas (the file schema), platform/packages/messages, platform/tests/cli/*, handbook Ch.19 §19.8d, platform/deploy/README.md (steps 9–12)",
+ ["`sdlc admin project apply --file project.yaml [--dry-run]`: one file holds the project (slug, name, repository), the team (email, name, GitHub login, roles), the agent to register and the project configuration that differs from the defaults; no secret in the file; the schema lives in `@sdlc/api-schemas`",
+  "The CLI looks up the numeric GitHub ID of each login and shows login and ID for the operator to confirm; users are still matched by numeric ID only (R037)",
+  "Before the first write it checks the whole file and the role bindings already in the database: Person A and Person B are never the same person (M21), and every role exists; a refused file writes nothing (QUESTIONS #617)",
+  "It calls the same API endpoints as the manual commands, one call per change, so the audit log is the same; it creates what is missing, shows a difference for what has changed, passes the configuration version itself; `--dry-run` writes nothing; a second run with the same file changes nothing",
+  "It never approves the agent and never writes the project AI record (those stay with the agent's owner, Person B and Person A); it issues no token; at the end it prints, per person, the commands that are still theirs",
+  "Tests: a new project, a second run, a changed file, M21 within the file and against existing bindings, an unknown GitHub login, `--dry-run`; messages through the catalog; handbook Ch.19 §19.8d and deploy README steps 9–12 updated in the same task"],
+ "QUESTIONS #617 and #618 (Harry, 2026-10-28). Comes before V16. Bugs from trial reports come first (R123)")
 t("V14","Later","Human-effort baseline for the agent report","S",["V13"],"FR-53",
  "platform/packages/core (intents), migrations, platform/apps/api, platform/apps/cli, platform/tests/*, design/D-05",
  ["A person with a write role may record an estimate of the human effort for an intent (hours, a number; codes and numbers only, no text); empty by default",
@@ -780,8 +798,8 @@ w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.59 |
-| Date | 2026-10-26 |
+| Version | 1.60 |
+| Date | 2026-10-28 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-05 (data), D-07 (tokens), D-09 (sample repo) |
@@ -965,6 +983,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.57 | 2026-10-24 | Claude, approved by the repository owner | Release v0.6.0 with X01–X04, X07, X11, X14 (EXT except X12), L01 PR 1 and L03; X12, L01 PR 2 and the L03b measurement come next |
 | 1.58 | 2026-10-26 | Claude, approved by Harry | New change task V15: the release on the tag (QUESTIONS #591–#595, ADR-M94); it changes V04 AC3 and V12 AC2 |
 | 1.59 | 2026-10-26 | Claude, approved by the repository owner | Release v0.7.0 with X12, O01, O02, H04, H05 and V15 |
+| 1.60 | 2026-10-28 | Claude, approved by Harry | New tasks V16 (`pnpm server:setup`, milestone Server) and V17 (`sdlc admin project apply`, milestone UX); V17 first, V16 before A10 PR 3 (QUESTIONS #616–#618) |
 | 1.60 | 2026-10-27 | Claude Code (task H02), approved by Harry | H02 done: agent dependency checks (licence, install scripts, typosquatting; ADR-M96, QUESTIONS #606–#608) |
 | 1.61 | 2026-10-27 | Claude Code (task H03), approved by Harry | H03 design done: deleting a client's data on request (ADR-M97, QUESTIONS #611–#615) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
