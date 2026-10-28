@@ -257,6 +257,8 @@ pnpm sdlc admin token issue --user <person-a> --name <token-name>
 
 Do the same for Person B (`--role person_b`) and every other role you need (the rules and every command: [handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)). Person A and Person B are always two different people with two GitHub accounts. The numeric ID comes from `gh api users/<login> --jq .id`. Each person replaces the issued token with their own (`sdlc token create`, then `sdlc token revoke`).
 
+**Or from one file (V17).** Steps 9, 11 and 12 can come from one YAML file outside the repository: `pnpm sdlc admin project apply --file <project.yaml> --dry-run`, then the same without `--dry-run`. The file holds the project, the team with each person's GitHub login, the agent and the configuration ([handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#project-file)). The command looks up each numeric GitHub ID and shows it for you to confirm, refuses a file that would make one person Person A and Person B, and makes one API call per change. It issues no token, approves no agent and writes no AI record: at the end it prints these commands, per person. A role for yourself goes to another admin (`sdlc ops role grant` on the server for a one-admin tenant, as in step 8).
+
 ### 10. The sandbox image
 
 ```bash

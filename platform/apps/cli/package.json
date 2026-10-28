@@ -15,10 +15,12 @@
   "dependencies": {
     "@sdlc/adapter-policy-simple": "workspace:*",
     "@sdlc/api-schemas": "workspace:*",
+    "@sdlc/config": "workspace:*",
     "@sdlc/contracts": "workspace:*",
     "@sdlc/core": "workspace:*",
     "@sdlc/eval": "workspace:*",
     "@sdlc/messages": "workspace:*",
+    "yaml": "2.9.1",
     "zod": "4.6.5"
   }
 }
