@@ -66,7 +66,12 @@ export function CreateIntentModal({
   };
 
   return (
-    <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="create-intent-title">
+    <div
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-intent-title"
+    >
       <div class="modal-card">
         <h3 id="create-intent-title">{t('dashboard.intent.create_title')}</h3>
 
@@ -137,7 +142,12 @@ export function CreateIntentModal({
               value={dataClass}
               onChange={(e) => {
                 const val = e.currentTarget.value;
-                if (val === 'public' || val === 'internal' || val === 'confidential' || val === 'restricted') {
+                if (
+                  val === 'public' ||
+                  val === 'internal' ||
+                  val === 'confidential' ||
+                  val === 'restricted'
+                ) {
                   setDataClass(val);
                 }
               }}

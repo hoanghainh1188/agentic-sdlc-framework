@@ -15,7 +15,9 @@ export interface EscalationModalProps {
 }
 
 export function EscalationModal({ escalation, onClose, onSuccess }: EscalationModalProps) {
-  const [decision, setDecision] = useState<'resume' | 'modify' | 'terminate' | 'escalate_further'>('resume');
+  const [decision, setDecision] = useState<'resume' | 'modify' | 'terminate' | 'escalate_further'>(
+    'resume',
+  );
   const [reasonCode, setReasonCode] = useState('');
   const [reasonRef, setReasonRef] = useState('');
   const [budgetIncrease, setBudgetIncrease] = useState('');
@@ -33,15 +35,12 @@ export function EscalationModal({ escalation, onClose, onSuccess }: EscalationMo
         ...(budgetIncrease ? { budget_increase_usd: budgetIncrease } : {}),
       };
 
-      const packetSha = typeof escalation.packet?.subject_sha256 === 'string'
-        ? escalation.packet.subject_sha256
-        : undefined;
+      const packetSha =
+        typeof escalation.packet?.subject_sha256 === 'string'
+          ? escalation.packet.subject_sha256
+          : undefined;
 
-      const stepUp = await confirmEscalationWithPasskey(
-        escalation.code,
-        packetSha,
-        decisionBody,
-      );
+      const stepUp = await confirmEscalationWithPasskey(escalation.code, packetSha, decisionBody);
 
       await decideEscalation(escalation.code, {
         ...decisionBody,
@@ -80,7 +79,12 @@ export function EscalationModal({ escalation, onClose, onSuccess }: EscalationMo
             value={decision}
             onChange={(e) => {
               const val = e.currentTarget.value;
-              if (val === 'resume' || val === 'modify' || val === 'terminate' || val === 'escalate_further') {
+              if (
+                val === 'resume' ||
+                val === 'modify' ||
+                val === 'terminate' ||
+                val === 'escalate_further'
+              ) {
                 setDecision(val);
               }
             }}

@@ -98,7 +98,11 @@ export class IntentsService {
 
   /** U07: the current gate's input hash the confirmation step shows. */
   private async gateInput(p: Principal, intent: Intent): Promise<string | null> {
-    if (intent.status !== 'in_gate' || !intent.current_gate || !isDecidableGate(intent.current_gate)) {
+    if (
+      intent.status !== 'in_gate' ||
+      !intent.current_gate ||
+      !isDecidableGate(intent.current_gate)
+    ) {
       return null;
     }
     try {
