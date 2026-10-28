@@ -34,6 +34,7 @@ MILESTONES = {
     "Pre-M-E": "Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)",
     "M-E": "The trial, run by the community (QUESTIONS #340)",
     "UX": "Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)",
+    "DEV": "Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479)",
     "EXT": "Other Git hosts first, then other agents, tools for agents, document knowledge: toward v0.4.0 (QUESTIONS #361, #420, #424)",
     "Models": "Self-hosted models (QUESTIONS #362)",
     "Server": "A team on a server: toward v1.0 (QUESTIONS #363)",
