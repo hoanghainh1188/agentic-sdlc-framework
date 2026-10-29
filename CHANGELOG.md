@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-29
+
+**The first version of `@hoanghainh/governed-adlc` published by the release workflow, with npm provenance.** Version 0.9.0 of the new package was published by hand (ADR-M100 §2.6); this patch checks the whole publish path again and corrects the npm page.
+
+### Upgrade notes
+- **On a running stack:** nothing to do. No migration, no changed setting, no credentials command to run again, no image change except the version. On a checkout of the tag `v0.9.1` the published images are pulled as usual (`pnpm images mode`); on any other checkout rebuild `sdlc-api`, `sdlc-worker` and `sdlc-runner` and deploy the three together.
+- The command: `npm install -g @hoanghainh/governed-adlc@0.9.1`. Coming from `agentic-sdlc-cli`: the steps of 0.9.0 below.
+
+### Fixed
+- The npm page (`platform/apps/cli/npm/README.md`) and USER-GUIDE §2 said that only 0.1.1 was published by hand. Version 0.9.0, the first of `@hoanghainh/governed-adlc`, was published by hand too, without provenance; provenance starts again with 0.9.1.
+
 ## [0.9.0] - 2026-10-29
 
 **The CLI's new name: `adlc`, from the npm package `@hoanghainh/governed-adlc`** (ADR-M100), to match the repository's name `governed-adlc-fw` (ADR-M99). Existing logins keep working, and `sdlc` still works until v0.10.0. Nothing changes on a running stack.
