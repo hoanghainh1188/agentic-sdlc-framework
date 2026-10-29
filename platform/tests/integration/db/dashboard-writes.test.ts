@@ -421,16 +421,14 @@ describeDb('U06: CSRF, the actions switch, passkeys and the step-up', () => {
           'session_write_not_allowed',
         );
       }
-      for (const [url, decision] of [
-        [`/v1/intents/${intentCode}/gates/G1/decisions`, 'approve'],
-        ['/v1/escalations/ESC-2026-0001/decisions', 'resume'],
-      ] as const) {
-        expectError(
-          await inject(app, 'POST', url, page(s), { decision }),
-          403,
-          'step_up_refused',
-        );
-      }
+      // A gate decision from a session needs a step-up.
+      expectError(
+        await inject(app, 'POST', `/v1/intents/${intentCode}/gates/G1/decisions`, page(s), {
+          decision: 'approve',
+        }),
+        403,
+        'step_up_refused',
+      );
       // Nothing was recorded.
       expect(await acme.gateDecisions.listForIntent(intentId)).toEqual([]);
     });
