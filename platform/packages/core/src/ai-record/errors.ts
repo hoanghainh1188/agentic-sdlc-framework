@@ -9,7 +9,7 @@ export type AiRecordErrorCode =
   | AiRecordViolation
   /** The record changed since the version the caller read (compare-and-set). */
   | 'version_conflict'
-  /** The named user holds none of the write roles of the project (`sdlc admin ai-record`). */
+  /** The named user holds none of the write roles of the project (`adlc admin ai-record`). */
   | 'not_a_writer';
 
 export class AiRecordError extends Error {

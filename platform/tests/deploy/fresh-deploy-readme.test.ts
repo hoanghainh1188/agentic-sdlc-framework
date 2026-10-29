@@ -2,7 +2,7 @@
 // - every `pnpm <script>` it names exists in package.json;
 // - every `openbao:bootstrap <command>` it names exists in bootstrap.sh, and it names every
 //   credentials command of bootstrap.sh;
-// - every `sdlc …` command and option it names is in the CLI's usage texts (message catalog);
+// - every `adlc …` command and option it names is in the CLI's usage texts (message catalog);
 // - the live test `pnpm test:fresh-deploy` runs every credentials command the README names.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -66,15 +66,15 @@ describe('E07: README "Fresh deployment (operator)"', () => {
     expect(named.filter((n) => n.endsWith('-credentials')).sort()).toEqual([...credentials].sort());
   });
 
-  it('names only sdlc commands and options that the CLI documents', () => {
-    const lines = commandLines().filter((line) => /\bpnpm sdlc /.test(line));
+  it('names only adlc commands and options that the CLI documents', () => {
+    const lines = commandLines().filter((line) => /\bpnpm adlc /.test(line));
     expect(lines.length).toBeGreaterThan(10);
     for (const line of lines) {
-      const words = line.replace(/^.*?\bpnpm sdlc /, '').split(/\s+/);
+      const words = line.replace(/^.*?\bpnpm adlc /, '').split(/\s+/);
       const command = words.filter((w) => /^[a-z][a-z-]*$/.test(w)).slice(0, 3);
-      // The longest documented prefix ("sdlc admin agent approve", "sdlc intent show", …).
+      // The longest documented prefix ("adlc admin agent approve", "adlc intent show", …).
       const documented = [3, 2, 1].some((n) =>
-        catalog.includes(`sdlc ${command.slice(0, n).join(' ')}`),
+        catalog.includes(`adlc ${command.slice(0, n).join(' ')}`),
       );
       expect(documented, line).toBe(true);
       for (const option of words.filter((w) => w.startsWith('--'))) {

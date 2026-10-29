@@ -21,7 +21,7 @@ The change is **Low risk** and uses **internal** data only (the application is f
 An opens a GitHub issue on the application's repository, as usual: **#107 "Japanese labels on the product list screen"**. Then An creates the intent and links it to the issue:
 
 ```bash
-sdlc intent create --project pilot --title "Japanese labels on the product list screen" \
+adlc intent create --project pilot --title "Japanese labels on the product list screen" \
   --risk low --data-class internal --issue 107
 ```
 
@@ -69,7 +69,7 @@ An writes the spec as a Markdown file and merges it into `main` with a normal pu
 An links it to the intent:
 
 ```bash
-sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.md
+adlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.md
 ```
 
 ```text
@@ -111,7 +111,7 @@ tasks:
 An submits it:
 
 ```bash
-sdlc plan submit INT-2026-0007
+adlc plan submit INT-2026-0007
 ```
 
 ```text
@@ -171,20 +171,20 @@ Binh clicks **Merge** on GitHub.
 
 The platform builds the **Evidence Pack**: the hashes of the spec, the plan and the diff (never the code or the texts), CI, every gate decision with who made it, the runs, the cost, and the client AI disclosure note ([what it holds](../handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)).
 
-> **INT-2026-0007** waits for the release approval at **G8** (Release). The platform built the Evidence Pack (`sdlc evidence show INT-2026-0007`); the approval is bound to its release hash. @binh: check the pack …, then approve with `/approve G8` …
+> **INT-2026-0007** waits for the release approval at **G8** (Release). The platform built the Evidence Pack (`adlc evidence show INT-2026-0007`); the approval is bound to its release hash. @binh: check the pack …, then approve with `/approve G8` …
 
 The release hash is the fingerprint of the Evidence Pack Binh approves. If the pack changes after the approval, the approval no longer counts.
 
 Binh reads it, then approves:
 
 ```bash
-sdlc evidence show INT-2026-0007
-sdlc gate approve G8 INT-2026-0007
+adlc evidence show INT-2026-0007
+adlc gate approve G8 INT-2026-0007
 ```
 
 > **INT-2026-0007**: G8 passed (Binh approved the release). The platform sealed the Evidence Pack, and the intent is closed (`done`).
 
-The feature is merged, and the record of how it was made is sealed. `sdlc evidence export INT-2026-0007 --output INT-2026-0007.md` gives a readable copy for a client.
+The feature is merged, and the record of how it was made is sealed. `adlc evidence export INT-2026-0007 --output INT-2026-0007.md` gives a readable copy for a client.
 
 ---
 

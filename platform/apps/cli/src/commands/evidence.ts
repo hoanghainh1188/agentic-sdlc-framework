@@ -1,4 +1,4 @@
-// `sdlc evidence build|list|show|export` over the API (task E02, D-08 E02 AC1–AC4, D-02 FR-40,
+// `adlc evidence build|list|show|export` over the API (task E02, D-08 E02 AC1–AC4, D-02 FR-40,
 // FR-42, FR-43, ADR-M48, handbook Ch.15 §15.10.2, Ch.19 §19.8c). Who: project config
 // `access.evidence_build_roles` (build) and `access.evidence_read_roles` (list, show, export);
 // tenant admins always; never `viewer` (rule M30).

@@ -1,4 +1,4 @@
-// `sdlc plan draft`: a plan file draft from a Spec Kit task list or a BMAD story file (task S02,
+// `adlc plan draft`: a plan file draft from a Spec Kit task list or a BMAD story file (task S02,
 // D-08 S02, design/ADR-M62, QUESTIONS #295–#297). Pure: text in, YAML out; the CLI reads and
 // writes the files. The draft is never submitted, committed or pushed (QUESTIONS #167): a person
 // fills the marked fields, commits the file and submits it.

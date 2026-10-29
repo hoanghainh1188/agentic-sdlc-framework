@@ -1,4 +1,4 @@
-// `sdlc metrics gates` (E06 AC1, D-02 FR-12, ADR-M47) against a mocked API: the filters go to the
+// `adlc metrics gates` (E06 AC1, D-02 FR-12, ADR-M47) against a mocked API: the filters go to the
 // API as query parameters; the table shows, per project and gate, the count, average, median, p90
 // and maximum of the waits of the first round and after changes, apart (QUESTIONS #205); the
 // platform passes and the intents at the gate now in their own table (QUESTIONS #207); the
@@ -41,7 +41,7 @@ describe('formatDuration', () => {
   });
 });
 
-describe('sdlc metrics gates', () => {
+describe('adlc metrics gates', () => {
   it('sends the scope, filters and range as query parameters (AC1)', async () => {
     const h = await harness({ routes: { [GATES]: { status: 200, body: gateMetricsBody() } } });
     const args = ['metrics', 'gates', '--project', 'pilot', '--gate', 'G3', '--mode', 'HITL'];
@@ -218,7 +218,7 @@ describe('formatShare', () => {
   });
 });
 
-describe('sdlc metrics agents (V13, ADR-M79)', () => {
+describe('adlc metrics agents (V13, ADR-M79)', () => {
   it('sends the scope, filters and range as query parameters', async () => {
     const h = await harness({ routes: { [AGENTS]: { status: 200, body: agentMetricsBody() } } });
     const args = ['metrics', 'agents', '--project', 'pilot', '--agent', 'coder-openhands'];

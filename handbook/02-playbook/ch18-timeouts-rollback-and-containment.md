@@ -178,10 +178,10 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 
   | Command | Does |
   |---|---|
-  | `sdlc escalation list [--intent INT-…] [--status open\|acknowledged\|resolved\|closed]` | Lists the escalations of the intents you can read |
-  | `sdlc escalation show ESC-2026-0001` | Shows one escalation: clocks, owners, decision |
-  | `sdlc escalation ack ESC-2026-0001` | Same as `/ack` |
-  | `sdlc escalation decide ESC-2026-0001 <resume\|modify\|roll-back\|terminate\|escalate> [--reason-code <code>] [--reason-ref <https://…>]` | Same as `/decide` |
+  | `adlc escalation list [--intent INT-…] [--status open\|acknowledged\|resolved\|closed]` | Lists the escalations of the intents you can read |
+  | `adlc escalation show ESC-2026-0001` | Shows one escalation: clocks, owners, decision |
+  | `adlc escalation ack ESC-2026-0001` | Same as `/ack` |
+  | `adlc escalation decide ESC-2026-0001 <resume\|modify\|roll-back\|terminate\|escalate> [--reason-code <code>] [--reason-ref <https://…>]` | Same as `/decide` |
   | `… decide … resume --actions run_start,budget_increase --budget-increase-usd 2.5` | Names the actions the decision allows; a budget increase only this way (comments never raise a budget) |
 
   The API behind it: `GET /v1/escalations[/<code>]`, `POST /v1/escalations/<code>/ack`, `POST /v1/escalations/<code>/decisions`.
@@ -209,7 +209,7 @@ The platform raises an escalation when a run or a gate needs a decision from a p
 | Decision | What happens |
 |---|---|
 | `resume` | The intent goes back to G4; a new run starts after G4 is decided again. Choose it when the cause is gone (for example the runner is back). If the run answered a review's request for changes and that review was withdrawn, the intent goes back to G7 when the pull request still shows the same commit |
-| `modify` or `roll-back` | The intent goes back to **G3**. G3 is now HITL at every risk tier, and the earlier G3 approval no longer counts. Change the plan and submit it again (`sdlc plan submit`), or approve the same plan again. Choose it when the cause is in the plan, for example when the platform could not read the submitted plan file (`plan_unavailable`) |
+| `modify` or `roll-back` | The intent goes back to **G3**. G3 is now HITL at every risk tier, and the earlier G3 approval no longer counts. Change the plan and submit it again (`adlc plan submit`), or approve the same plan again. Choose it when the cause is in the plan, for example when the platform could not read the submitted plan file (`plan_unavailable`) |
 | `terminate` | The intent is closed (`cancelled`) |
 
 The issue gets a status comment for each of these (`run_resumed`, `run_returned`, `terminated`).
@@ -228,7 +228,7 @@ Content-Type: application/json
 }
 ```
 
-- The CLI does the same: `sdlc escalation decide ESC-2026-0001 resume --actions run_start,budget_increase --budget-increase-usd 2.5`.
+- The CLI does the same: `adlc escalation decide ESC-2026-0001 resume --actions run_start,budget_increase --budget-increase-usd 2.5`.
 - The intent budget grows by the amount, and the run budget of the intent's next runs becomes the stopped run's limit plus the amount. Both only go up. The run's real limit is still the smallest of the run budget, what is left of the intent budget and what is left of the tenant's month.
 - The intent goes back to G4; the new run starts after G4. A G4 that needs Person A's approval (High risk) shows the new limit in its proposal.
 - A decision with `budget_increase` but without `run_start` allows no new run: the intent keeps waiting. Decide again with both actions.
@@ -265,8 +265,8 @@ Use the kill switch when an agent run must stop **now**: it does something it sh
 | Where | Command |
 |---|---|
 | On the intent's GitHub issue or pull request | A new comment whose first line is `/kill`. You may add the reason after it: `/kill it rewrites the payment module`. The reason stays on GitHub |
-| In a terminal | `sdlc run kill <INT-…>` (the intent's current run) or `sdlc run kill <run ID>`. `sdlc run list <INT-…>` shows the runs and their IDs |
-| On the server, when nobody with a role can act or the API is down | The operator runs `pnpm sdlc ops run kill --tenant <slug> --run <run ID>` (recorded as the system) |
+| In a terminal | `adlc run kill <INT-…>` (the intent's current run) or `adlc run kill <run ID>`. `adlc run list <INT-…>` shows the runs and their IDs |
+| On the server, when nobody with a role can act or the API is down | The operator runs `pnpm adlc ops run kill --tenant <slug> --run <run ID>` (recorded as the system) |
 
 **Who may.** Person A, Person B and governance on the project (project setting `access.kill_roles`; a project may add roles, never remove these three; the viewer never). The person who started the run may stop it too. Your GitHub account must be linked to your platform user (§19.8b): a comment from an account that is not linked stops nothing.
 
@@ -280,7 +280,7 @@ Use the kill switch when an agent run must stop **now**: it does something it sh
 
 **Afterwards.** Review the run with the escalation (§18.8b): the run's events, its diff, the logs and traces of §18.8c. Then decide:
 
-- `/decide resume` (or `sdlc escalation decide … resume`): the intent goes back to G4, and a new run starts after G4 is decided again;
+- `/decide resume` (or `adlc escalation decide … resume`): the intent goes back to G4, and a new run starts after G4 is decided again;
 - `/decide modify` or `/decide roll-back`: the intent goes back to G3, HITL (§18.8b, after a failed run);
 - `/decide terminate`: the intent is closed (`cancelled`).
 
@@ -302,7 +302,7 @@ The runner interrupts the agent, the run ends `stopped_stalled`, and its diff is
 
 **Is a `no_progress` stop real?** A command that prints nothing until it ends looks like no progress: the agent sees its output only at the end. To tell the two apart:
 
-1. `sdlc run list <INT-…>` shows the stop reason. The run event `loop_detected` gives `idle_minutes`: how long the log was silent.
+1. `adlc run list <INT-…>` shows the stop reason. The run event `loop_detected` gives `idle_minutes`: how long the log was silent.
 2. Open the run's last steps in the traces (§18.8c, filter by the run ID):
    - **A false stop:** the agent's last step was a long command that was still working, for example `pnpm install` on a cold package cache, a full test suite or a build. The last model call ended normally and asked for that command.
    - **A real stall:** the last model call never ended or failed again and again, or the agent was waiting with nothing running. The same happens when the model gateway or the package proxy was down: check §18.8c and the platform's health first.
@@ -310,14 +310,14 @@ The runner interrupts the agent, the run ends `stopped_stalled`, and its diff is
 
 **A run that ends `agent_config_changed`** (agents with the adapter `opencode` only; Chapter 20 §20.5b). The agent changed OpenCode's configuration, its tool list or its list of sessions during the run, for example to raise its own iteration limit. The runner stopped the run, and the run ends `failed`. As for any failed run, the intent is paused at G4 with a technical escalation to Person B (§18.8b). Treat it as a possible attempt to get around the platform's controls:
 
-1. `sdlc run list <INT-…>` shows the stop reason. When the run has no event `agent_started`, the stop came before the agent's first step: the repository changed settings the run needs, for example with its own `opencode.json`.
+1. `adlc run list <INT-…>` shows the stop reason. When the run has no event `agent_started`, the stop came before the agent's first step: the repository changed settings the run needs, for example with its own `opencode.json`.
 2. Read the run's last steps in the traces (§18.8c, filter by the run ID): which command changed the configuration, and why.
 3. If the task or the repository led the agent there (for example a file that tells the agent to change its settings), fix that first. Then decide `resume`, or `modify` to go back to G3.
 4. If the cause is not clear, decide `terminate`, and ask the agent owner and Person B to consider suspending or quarantining the agent (Chapter 20 §20.9).
 
 **Raising the window.** It is a project setting, changed by a tenant admin or the project admin (§19.8d):
 
-1. `sdlc admin config show --project <slug>` shows the configuration and its version.
+1. `adlc admin config show --project <slug>` shows the configuration and its version.
 2. In the YAML, set for example:
 
    ```yaml
@@ -326,7 +326,7 @@ The runner interrupts the agent, the run ends `stopped_stalled`, and its diff is
        no_progress_window_minutes: 25
    ```
 
-3. `sdlc admin config set --project <slug> --file <config.yaml> --expected-version <version>`.
+3. `adlc admin config set --project <slug> --file <config.yaml> --expected-version <version>`.
 
 The new window applies to runs that start after the change; a run already working keeps the window it started with. The platform refuses more than 30 minutes (rule M27): a run silent for longer is not making progress you can review. Prefer making the long command shorter or louder (for example a warm package cache, or tests split by package) to a longer window.
 

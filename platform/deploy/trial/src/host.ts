@@ -1,5 +1,5 @@
 // The real machine for `trial:up` and `trial:down`: child processes (output captured, never
-// inherited), the `sdlc` command in this process, and the facts `preflight` decides on.
+// inherited), the `adlc` command in this process, and the facts `preflight` decides on.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,13 +10,13 @@ import { exec } from '../../steps/dist/exec.js';
 
 import { keyFileFor } from './keys.js';
 import { OLLAMA_TAG, type FileFact, type HostFacts } from './preflight.js';
-import { credentialsFile, secretFiles, type TrialSettings } from './settings.js';
+import { credentialsFiles, secretFiles, type TrialSettings } from './settings.js';
 import type { Sdlc } from './up.js';
 
 export { exec };
 
 /**
- * One `sdlc …` command in this process. The environment is only what the call names (an API URL
+ * One `adlc …` command in this process. The environment is only what the call names (an API URL
  * and token, a database URL, a config folder), so no saved login of the machine's user is used;
  * a token goes in through memory, never through `process.env` or a command line.
  */
@@ -119,7 +119,7 @@ export async function gatherFacts(
     secretFiles: secretFiles(settings).map(fileFact),
     forkInstructions,
     existingCredentials: [settings.personA, settings.personB]
-      .map(credentialsFile)
+      .flatMap(credentialsFiles)
       .filter((f) => fs.existsSync(f)),
     keyFile: {
       path: keyFileFor(envFile),

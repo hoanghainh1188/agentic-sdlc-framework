@@ -161,7 +161,7 @@ When CI passed at G6 (Chapter 14 §14.10.2), the intent waits at **G7**. The pla
 - **Request changes**: a request for changes at G7.
 - A review with comments only changes nothing.
 
-`/approve G7` in a comment or `sdlc gate approve G7` is refused: G7 approvals are GitHub reviews, so GitHub and the platform see the same approvals. `/reject G7 <reason>` (comment or CLI) and `/request-changes G7 <reason>` (comment only, see "Requesting changes") are accepted.
+`/approve G7` in a comment or `adlc gate approve G7` is refused: G7 approvals are GitHub reviews, so GitHub and the platform see the same approvals. `/reject G7 <reason>` (comment or CLI) and `/request-changes G7 <reason>` (comment only, see "Requesting changes") are accepted.
 
 **Which reviews count.** The platform reads the reviews itself; it does not rely on the repository's branch protection count.
 
@@ -215,7 +215,7 @@ How to request changes:
 
 - Submit a GitHub review with **Request changes** on the pull request. Write what to change in the review and in its line comments.
 - Or write a comment on the pull request or on the intent's issue: `/request-changes G7 [reason_code] <what to change>`. Lines below the command are part of the feedback.
-- `sdlc gate request-changes G7` and the API are refused (`g7_feedback_on_git_host`): the agent reads the feedback from the review or the comment, so write it there.
+- `adlc gate request-changes G7` and the API are refused (`g7_feedback_on_git_host`): the agent reads the feedback from the review or the comment, so write it there.
 
 What the platform does with it:
 
@@ -267,13 +267,13 @@ The **Evidence Pack** of an intent lists what the platform recorded for it, in o
 
 | Command | What it does |
 |---|---|
-| `sdlc evidence build INT-2026-0007` | Builds a new version. If nothing changed since the latest version, you get that version and no new one |
-| `sdlc evidence list INT-2026-0007` | Lists the versions |
-| `sdlc evidence show INT-2026-0007 [--version 2]` | Shows one version (default: the latest) |
-| `sdlc evidence export INT-2026-0007 [--version 2] --output INT-2026-0007-evidence.md` | Saves `pack.md` to a new file. `--manifest` saves `manifest.json` instead. Without `--output`, it prints the file |
+| `adlc evidence build INT-2026-0007` | Builds a new version. If nothing changed since the latest version, you get that version and no new one |
+| `adlc evidence list INT-2026-0007` | Lists the versions |
+| `adlc evidence show INT-2026-0007 [--version 2]` | Shows one version (default: the latest) |
+| `adlc evidence export INT-2026-0007 [--version 2] --output INT-2026-0007-evidence.md` | Saves `pack.md` to a new file. `--manifest` saves `manifest.json` instead. Without `--output`, it prints the file |
 
 - **Who:** Person A, Person B, PM / BrSE, governance and admin may build (project setting `access.evidence_build_roles`). The same and the second approver may read and export (`access.evidence_read_roles`). Tenant admins always may. The viewer role never may.
-- **Versions:** every build that finds new data makes a new version; old versions never change. At G8 the platform seals one version (§15.10.3); after that, no new version can be built. `sdlc evidence show` also prints the version's **release SHA-256**: what a G8 approval is bound to.
+- **Versions:** every build that finds new data makes a new version; old versions never change. At G8 the platform seals one version (§15.10.3); after that, no new version can be built. `adlc evidence show` also prints the version's **release SHA-256**: what a G8 approval is bound to.
 - **The disclosure note:**
   - **Standard note**: the platform writes it from its data: which agent and model wrote code, in how many runs, that people approved the change at G7, and the CI result.
   - **Client's own format**: the pack gives the same facts and says that the client's format applies. **The PM / BrSE writes that note** from the project AI record (its link is in the pack) and adds it to the delivery. The manifest marks `client_text_required: true`.
@@ -290,8 +290,8 @@ The **Evidence Pack** of an intent lists what the platform recorded for it, in o
   The file also holds the run's base commit and the plan and spec versions. It holds the **SHA-256 of each file path**, never the path itself. To check whether the agent opened a given file, compute the SHA-256 of its path relative to the repository root (for example `printf '%s' 'src/app.ts' | shasum -a 256`) and look for it in the file's `files.path_sha256` list.
 - **If a stored evidence file was changed or deleted**, the platform refuses to build the pack (`evidence_hash_mismatch` or `evidence_missing`) and records the failure in the audit log. Treat it as a possible security incident: tell Person B and the platform operator (Chapter 18). The same applies when a saved pack file no longer matches its hash.
 - `export` checks the file's SHA-256 before it saves it, and never overwrites an existing file. The file is readable by you only (it names the approvers).
-- **Retention** (task E05, `design/ADR-M51-evidence-retention.md`): the pack files are deleted with the intent's other evidence files after the retention period: 180 days by default from the end of the intent, never less (project setting `retention.evidence_retention_days`, Chapter 3). Every version goes, sealed or not; the rows and hashes stay recorded, so `sdlc evidence show` still shows them, and `export` answers `evidence_pack_purged`. In the store, no process can delete an evidence file during its first 180 days; only the platform's retention job may, and only after the retention or after a project archive.
-- **Keeping evidence longer (hold):** for a dispute, an incident or a client request, a tenant admin or governance puts the intent's evidence on hold: `sdlc admin evidence hold INT-2026-0007 --ref <https link to the reason>` (Chapter 19 §19.8d). Held evidence is never deleted, also after a project archive, until `sdlc admin evidence release INT-2026-0007`. Agree the hold with Person B, and release it when the matter is closed.
+- **Retention** (task E05, `design/ADR-M51-evidence-retention.md`): the pack files are deleted with the intent's other evidence files after the retention period: 180 days by default from the end of the intent, never less (project setting `retention.evidence_retention_days`, Chapter 3). Every version goes, sealed or not; the rows and hashes stay recorded, so `adlc evidence show` still shows them, and `export` answers `evidence_pack_purged`. In the store, no process can delete an evidence file during its first 180 days; only the platform's retention job may, and only after the retention or after a project archive.
+- **Keeping evidence longer (hold):** for a dispute, an incident or a client request, a tenant admin or governance puts the intent's evidence on hold: `adlc admin evidence hold INT-2026-0007 --ref <https link to the reason>` (Chapter 19 §19.8d). Held evidence is never deleted, also after a project archive, until `adlc admin evidence release INT-2026-0007`. Agree the hold with Person B, and release it when the matter is closed.
 - If the platform cannot reach its evidence store, building and exporting answer `evidence_unavailable`; ask the platform operator (runbook T11 §5h).
 
 ### 15.10.3. Gate G8: release
@@ -302,22 +302,22 @@ After a person merged the approved pull request (§15.10.1), the intent waits at
 
 **What the platform does first:** it builds the Evidence Pack (§15.10.2) itself. It reads every stored evidence file back and checks its hash. Then it posts **waits for the release approval** on the intent's issue and mentions Person B (and the second approver at Critical risk).
 
-**Person B checks** (Step 4 above, template T14): the release record, the rollback, the pack (`sdlc evidence show` and `sdlc evidence export`), and the client AI disclosure note. Then:
+**Person B checks** (Step 4 above, template T14): the release record, the rollback, the pack (`adlc evidence show` and `adlc evidence export`), and the client AI disclosure note. Then:
 
 | Decision | How | What happens |
 |---|---|---|
-| Approve | `/approve G8` on the intent's issue, or `sdlc gate approve G8 INT-…` | Bound to the pack's **release SHA-256**. When the approvals are complete, the platform seals the pack and closes the intent (`done`): the comment **released** |
-| Reject | `/reject G8 <reason>`, or `sdlc gate reject G8 INT-… --reason-code …` | The intent is closed as `rejected`; the pack is not sealed |
+| Approve | `/approve G8` on the intent's issue, or `adlc gate approve G8 INT-…` | Bound to the pack's **release SHA-256**. When the approvals are complete, the platform seals the pack and closes the intent (`done`): the comment **released** |
+| Reject | `/reject G8 <reason>`, or `adlc gate reject G8 INT-… --reason-code …` | The intent is closed as `rejected`; the pack is not sealed |
 | Request changes | `/request-changes G8 <reason>` | The intent stays at G8. The change is already merged: **a fix needs a new intent**. Approvals given before the request no longer count |
 
 - **Who:** Person B; at **Critical** risk Person B **and** the second approver (two different people). The producers of the change never decide G8 ([§15.10.1, Producers](#producers): the commit authors are not G8 producers).
 - **Approvals are bound to the evidence.** If anything recorded before G8 changes (a new evidence file, an escalation, a CI result, the cost, the project AI record's disclosure format or link), the pack gets a new release SHA-256 and earlier G8 approvals no longer count: approve again. Another person's G8 approval does not cancel yours.
 - **The client's own disclosure format:** the G8 comment says so and links the project AI record. **Approving G8 confirms that the client's note is ready**: the PM / BrSE writes it from the AI record before Person B approves.
-- **No project AI record:** the pack has no disclosure note and G8 cannot pass. The platform posts **G8 cannot pass**; save the record (`sdlc ai-record set`, Chapter 2), and G8 checks again.
+- **No project AI record:** the pack has no disclosure note and G8 cannot pass. The platform posts **G8 cannot pass**; save the record (`adlc ai-record set`, Chapter 2), and G8 checks again.
 - **A stored evidence file was changed or deleted:** the platform stops G8, pauses the intent and raises a **security** escalation (Chapter 18). Decide with `/decide resume` (after the file is restored or explained: the platform builds the pack again) or `/decide terminate` (the intent is closed without a release).
 - **Deadline:** G8 has the gate deadline of every human gate; when it passes, an escalation is raised (Chapter 6).
 - **Frozen:** while an escalation freezes the intent, the platform does not release it.
-- **What is recorded:** the sealed pack version (audit `evidence.pack_sealed`) and the intent's metrics at close (`intent.closed`: lead time, runs, G7 requests for changes, tokens and cost). The waiting time at G8 appears in `sdlc metrics gates`.
+- **What is recorded:** the sealed pack version (audit `evidence.pack_sealed`) and the intent's metrics at close (`intent.closed`: lead time, runs, G7 requests for changes, tokens and cost). The waiting time at G8 appears in `adlc metrics gates`.
 - If the platform cannot reach its evidence store, the intent waits at G8; ask the platform operator (runbook T11 §5i).
 
 ---

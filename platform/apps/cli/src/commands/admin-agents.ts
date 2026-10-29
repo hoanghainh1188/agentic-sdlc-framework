@@ -1,4 +1,4 @@
-// `sdlc admin agent …`: the agent register through the API (task B13 AC7, handbook Ch.20,
+// `adlc admin agent …`: the agent register through the API (task B13 AC7, handbook Ch.20,
 // ADR-M37 §2.8). An agent is activated or retired only by approvals: `approve --as <capacity>`;
 // the last approval of a set changes the status. `--owner` takes a user ID or an e-mail address.
 // An activation names its evaluation with `--evaluation` (L09, ADR-M86 §2.5); `show` gives the

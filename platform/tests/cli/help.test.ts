@@ -1,4 +1,4 @@
-// A friendlier CLI (task V10, D-08 V10 AC1–AC4): `sdlc help [topic|command]`, `--help` and `-h`
+// A friendlier CLI (task V10, D-08 V10 AC1–AC4): `adlc help [topic|command]`, `--help` and `-h`
 // on every command, one example per command (a test fails on a command without one), the
 // next-step line after a command that moves an intent (never in `--json`, never a reason to fail),
 // the line that says what to do after a failure, and no colour anywhere (Harry, 2026-10-13).
@@ -33,14 +33,14 @@ describe('AC1, AC4: every command has help and an example', () => {
   it.each(Object.entries(COMMAND_HELP))('%s: a usage text and one example', (group, keys) => {
     expect(t(keys.usage).trim()).not.toBe('');
     const example = t(keys.example);
-    expect(example).toMatch(/^(pnpm )?sdlc /);
+    expect(example).toMatch(/^(pnpm )?adlc /);
     expect(example).toContain(` ${group === 'ai-record' ? 'ai-record' : group}`);
     expect(commandHelp(group)).toBe(
       `${t(keys.usage)}\n\n${t('cli.help.example_header')}\n  ${example}`,
     );
   });
 
-  it('sdlc help lists every command and topic', async () => {
+  it('adlc help lists every command and topic', async () => {
     const h = await harness();
     expect(await h.run(['help'])).toBe(EXIT.ok);
     const text = h.out.join('\n');
@@ -49,7 +49,7 @@ describe('AC1, AC4: every command has help and an example', () => {
     for (const topic of Object.keys(HELP_TOPICS)) expect(text).toContain(topic);
   });
 
-  it.each(Object.entries(HELP_TOPICS))('sdlc help %s prints its guide', async (topic, key) => {
+  it.each(Object.entries(HELP_TOPICS))('adlc help %s prints its guide', async (topic, key) => {
     const h = await harness();
     expect(await h.run(['help', topic])).toBe(EXIT.ok);
     expect(h.out).toEqual([t(key)]);
@@ -67,7 +67,7 @@ describe('AC1, AC4: every command has help and an example', () => {
     expect(h.requests).toEqual([]);
   });
 
-  it('works for audit and ops, and sdlc --help prints the overview', async () => {
+  it('works for audit and ops, and adlc --help prints the overview', async () => {
     for (const group of ['audit', 'ops']) {
       const h = await harness();
       expect(await h.run([group, '--help'])).toBe(EXIT.ok);
@@ -78,14 +78,14 @@ describe('AC1, AC4: every command has help and an example', () => {
     expect(h.out).toEqual([t('cli.help.overview')]);
   });
 
-  it('refuses an unknown topic or command (exit 2), and sdlc alone still prints the usage', async () => {
+  it('refuses an unknown topic or command (exit 2), and adlc alone still prints the usage', async () => {
     const h = await harness();
     expect(await h.run(['help', 'nope'])).toBe(EXIT.usage);
     expect(h.err).toEqual([t('cli.help.unknown', { subject: 'nope' })]);
     const bare = await harness();
     expect(await bare.run([])).toBe(EXIT.usage);
     expect(bare.err).toEqual([t('cli.usage')]);
-    expect(t('cli.usage')).toContain('sdlc help');
+    expect(t('cli.usage')).toContain('adlc help');
   });
 });
 
@@ -98,7 +98,7 @@ describe('AC2: the next step after a command that moves an intent', () => {
       intent: CODE,
     });
 
-  it('prints one line with the advice of sdlc next after the decision', async () => {
+  it('prints one line with the advice of adlc next after the decision', async () => {
     const h = await harness({
       routes: { [DECIDE]: { status: 201, body: decisionBody() }, ...mapOk(READS) },
     });

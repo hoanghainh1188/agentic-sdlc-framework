@@ -1,4 +1,4 @@
-// `sdlc spec link|list` (B08 AC1, ADR-M39 §2.2) against a mocked API: the request carries the
+// `adlc spec link|list` (B08 AC1, ADR-M39 §2.2) against a mocked API: the request carries the
 // path and, when given, the commit; the content is never sent (the platform reads it from the Git
 // host); refusals come back with their code; the token never reaches the output.
 import { t } from '@sdlc/messages';
@@ -12,7 +12,7 @@ const harness = useHarness();
 const PATH = '/v1/intents/INT-2026-0007/specs';
 const COMMIT = 'd'.repeat(40);
 
-describe('sdlc spec', () => {
+describe('adlc spec', () => {
   it('links a spec by path and commit', async () => {
     const h = await harness({
       routes: { [`POST ${PATH}`]: { status: 201, body: linkedSpecBody() } },

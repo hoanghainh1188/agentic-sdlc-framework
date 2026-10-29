@@ -1,6 +1,6 @@
 // The whole G1–G3 stack in one process, for the integration tests of task B10 (D-08 B10, D-09 §7).
 // Every action goes through a public entry point:
-// - the `sdlc` CLI (operator commands on the database, user and admin commands through the API);
+// - the `adlc` CLI (operator commands on the database, user and admin commands through the API);
 // - the API app (Nest + Fastify `inject()`, no port), which the CLI's `fetch` is routed to;
 // - comment commands on the GitHub stub, read by the poller (`pollProject`) with the real adapter;
 // - the intent workflow on the Temporal time-skipping server with the worker's real activities;
@@ -98,7 +98,7 @@ export interface ActivityContext {
 }
 
 export interface StackOptions {
-  /** Skip `sdlc ai-record set` (AC6: the intents wait for the record). */
+  /** Skip `adlc ai-record set` (AC6: the intents wait for the record). */
   readonly withoutAiRecord?: boolean;
   /** Default: files kept in memory (B10). */
   readonly repo?: RepoBackend;
@@ -353,7 +353,7 @@ export class Stack {
 
   // --- The CLI -----------------------------------------------------------------------------------
 
-  /** `sdlc …` as `person` (through the API), or the operator (`ops …`, on the database). */
+  /** `adlc …` as `person` (through the API), or the operator (`ops …`, on the database). */
   async cli(who: Person | 'admin' | 'operator', argv: readonly string[]): Promise<CliResult> {
     const out: string[] = [];
     const err: string[] = [];
@@ -498,7 +498,7 @@ export class Stack {
 
   // --- Creating intents through the CLI ----------------------------------------------------------
 
-  /** `sdlc intent create` by Person A, on a new issue. Returns the intent as stored. */
+  /** `adlc intent create` by Person A, on a new issue. Returns the intent as stored. */
   async createIntent(
     risk: 'low' | 'medium' | 'high' | 'critical',
     extra: readonly string[] = [],
@@ -526,7 +526,7 @@ export class Stack {
     return this.reload({ id: created.id });
   }
 
-  /** `sdlc spec link` (Person A) and, after committing the plan file, `sdlc plan submit`. */
+  /** `adlc spec link` (Person A) and, after committing the plan file, `adlc plan submit`. */
   async linkInputs(
     intent: Intent,
     plan: {
@@ -558,9 +558,9 @@ export class Stack {
   }
 
   /**
-   * B13: the operator bootstraps the tenant (`sdlc ops bootstrap`); the tenant admin sets up the
+   * B13: the operator bootstraps the tenant (`adlc ops bootstrap`); the tenant admin sets up the
    * project, the people, their GitHub identities, their roles and the configuration through the
-   * API (`sdlc admin …`); the operator issues each person's token; Person A saves the AI record.
+   * API (`adlc admin …`); the operator issues each person's token; Person A saves the AI record.
    */
   async #onboard(options: StackOptions, repoFullName: string): Promise<void> {
     const boot = await this.cliJson<{ tenant_id: string; token: string }>('operator', [
@@ -660,7 +660,7 @@ export class Stack {
     if (!options.withoutAiRecord) await this.saveAiRecord();
   }
 
-  /** `sdlc ai-record set` by Person A (a write role, rule M19). */
+  /** `adlc ai-record set` by Person A (a write role, rule M19). */
   async saveAiRecord(expectedVersion = 0): Promise<void> {
     await this.cliJson('a', [
       'ai-record',

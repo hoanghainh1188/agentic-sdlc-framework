@@ -1,5 +1,5 @@
 // Where a user command gets its API address and token (design/ADR-M36 §2.1–§2.3):
-// SDLC_API_URL and SDLC_API_TOKEN (for CI, read once) or the saved login of `sdlc login`.
+// SDLC_API_URL and SDLC_API_TOKEN (for CI, read once) or the saved login of `adlc login`.
 import { parseArgs, type ParseArgsConfig } from 'node:util';
 
 import type { MessageKey } from '@sdlc/messages';

@@ -56,9 +56,9 @@ Best: two people. If you are alone, you may use a second GitHub account for Pers
    ```bash
    pnpm trial:up --settings ~/trial-settings.yaml
    ```
-   First it asks you to choose a **passphrase** (at least 12 characters, typed twice, not shown). Then it follows [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator), steps 2–13, for you, in 20 to 40 minutes: OpenBao with throw-away keys, every credential, the database, the platform (`core models platform sandbox`), the tenant (Person A is its admin), the project with Person A and Person B, the sandbox image (published, or built when the release has none), the agent, the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial) and the AI record (data class `internal`). At the end, Person A and Person B are each logged in, in their own config folder. Run Person B's commands as `XDG_CONFIG_HOME=<Person B's folder> pnpm sdlc …`.
+   First it asks you to choose a **passphrase** (at least 12 characters, typed twice, not shown). Then it follows [Fresh deployment](platform/deploy/README.md#fresh-deployment-operator), steps 2–13, for you, in 20 to 40 minutes: OpenBao with throw-away keys, every credential, the database, the platform (`core models platform sandbox`), the tenant (Person A is its admin), the project with Person A and Person B, the sandbox image (published, or built when the release has none), the agent, the trial settings of [M-E-TRIAL-PLAN §6](design/M-E-TRIAL-PLAN.md#6-project-configuration-for-the-trial) and the AI record (data class `internal`). At the end, Person A and Person B are each logged in, in their own config folder. Run Person B's commands as `XDG_CONFIG_HOME=<Person B's folder> pnpm adlc …`.
 
-   From v0.1.1 on you may also install the command from npm, at the version of your checkout (`npm install -g agentic-sdlc-cli@<version>`, [USER-GUIDE §2](platform/USER-GUIDE.md#install-the-sdlc-command)), and write `sdlc …` instead of `pnpm sdlc …`; the logins are the same.
+   You may also install the command from npm, at the version of your checkout (`npm install -g @hoanghainh/governed-adlc@<version>` from v0.9.0, `agentic-sdlc-cli@<version>` before it, [USER-GUIDE §2](platform/USER-GUIDE.md#install-the-adlc-command)), and write `adlc …` instead of `pnpm adlc …`; the logins are the same.
 
 What `trial:up` refuses and keeps safe:
 
@@ -106,22 +106,22 @@ Read [platform/USER-GUIDE.md](platform/USER-GUIDE.md) first: it takes one intent
 | Order | Task (spec in your fork's `docs/specs/`) | Risk | What should happen |
 |---|---|---|---|
 | 1 | **T01** Japanese labels on the product list | Low | The full path G1 → G8: the agent writes the change, Person B reviews and merges it, Person B approves the release |
-| 2 | **T09** Multiple warehouses | High | The agent only **proposes**: no branch, no pull request. Person A downloads the proposal (`sdlc evidence proposal <INT> --output <file>`) and ends the intent (`sdlc gate reject G4 <INT> --reason-code other`) |
+| 2 | **T09** Multiple warehouses | High | The agent only **proposes**: no branch, no pull request. Person A downloads the proposal (`adlc evidence proposal <INT> --output <file>`) and ends the intent (`adlc gate reject G4 <INT> --reason-code other`) |
 | 3 | **T10** Delete orders older than 5 years | Critical | The platform **refuses** to run the agent: the intent is `blocked` at G4 |
 | More (optional) | T02–T08 | Low, Medium | Each one like T01. Medium risk makes G2 and G3 human decisions |
 
 For each task: create the intent on its own GitHub issue in your fork, link the spec, write the plan file and merge it through a pull request, then let the gates run (USER-GUIDE §3). While you work, keep a short **log** per task: the minutes each step took, whether the agent's change met the spec, and anything that was unclear, slow or broken.
 
-Stop and report at once if you see a `security` escalation, if `sdlc audit verify` fails, or if anything looks like real client data.
+Stop and report at once if you see a `security` escalation, if `adlc audit verify` fails, or if anything looks like real client data.
 
 ## 6. Send your report
 
 1. Make the report (counts and codes only; your project, intents, people and repository are not in it):
    ```bash
-   pnpm sdlc trial report --json > trial-report.json
+   pnpm adlc trial report --json > trial-report.json
    ```
-   (Or `sdlc trial report --json …` with the npm package.)
-   A report for the whole tenant needs a tenant admin. After `pnpm trial:up` that is Person A, whose login is in the default config folder: run it as Person A, without Person B's `XDG_CONFIG_HOME`. If you set the platform up by hand, the operator runs it (the first user of `sdlc ops bootstrap` is the tenant admin).
+   (Or `adlc trial report --json …` with the npm package.)
+   A report for the whole tenant needs a tenant admin. After `pnpm trial:up` that is Person A, whose login is in the default config folder: run it as Person A, without Person B's `XDG_CONFIG_HOME`. If you set the platform up by hand, the operator runs it (the first user of `adlc ops bootstrap` is the tenant admin).
    Read the file before you send it.
 2. Open an issue in this repository with the template **"Trial report"**: paste the JSON, your log, the model you used, your machine, and the problems you found (one issue per bug is even better: link them).
 3. Never paste tokens, keys, `.env` values or client data into an issue. A security problem goes through [SECURITY.md](SECURITY.md), never into a public issue.
@@ -130,6 +130,6 @@ Thank you. When enough reports have arrived (for example from three teams), we p
 
 ## 7. Help
 
-- Something does not work: first `pnpm doctor` (the stack; the trial uses the default env file `platform/deploy/.env`) and `sdlc doctor` (your login): both say what to fix and change nothing ([Doctor](platform/deploy/README.md#doctor-pnpm-doctor)). Then [platform/deploy/README.md, Troubleshooting](platform/deploy/README.md#troubleshooting) and [USER-GUIDE §5](platform/USER-GUIDE.md#5-when-something-goes-wrong).
+- Something does not work: first `pnpm doctor` (the stack; the trial uses the default env file `platform/deploy/.env`) and `adlc doctor` (your login): both say what to fix and change nothing ([Doctor](platform/deploy/README.md#doctor-pnpm-doctor)). Then [platform/deploy/README.md, Troubleshooting](platform/deploy/README.md#troubleshooting) and [USER-GUIDE §5](platform/USER-GUIDE.md#5-when-something-goes-wrong).
 - A bug: open an issue with the bug template; say that you were in the trial.
 - A word or a code you do not know: the [glossary](handbook/00-introduction/02-glossary.md) and the [codes table](handbook/00-introduction/05-codes.md).

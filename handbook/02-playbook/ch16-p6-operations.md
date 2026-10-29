@@ -123,7 +123,7 @@ The v0.1 platform has no feature made for operations and maintenance alone. An a
 | Stop an agent that behaves unexpectedly | The kill switch, within minutes; its escalation | Chapter 18 §18.8d |
 | Loops and runs that make no progress | Loop detection stops the run; G5 raises an escalation | Chapter 18 §18.8d, Chapter 13 §13.10.5 |
 | What a run did, for an incident review | The run's events and the model-call traces (codes, counts, hashes; the prompts in Langfuse when `observability` is on) | Chapter 18 §18.8c |
-| Cost of the agents' work per project or intent | `sdlc cost report` | Chapter 19 §19.8c |
+| Cost of the agents' work per project or intent | `adlc cost report` | Chapter 19 §19.8c |
 | Evidence of a released change | The sealed Evidence Pack of the intent | Chapter 15 §15.10.2 |
 | Production data for an operations task | Only what the project AI record allows (`prod_logs_allowed`); the platform refuses an intent whose data class the record does not allow | Chapter 19 §19.8b, Chapter 2 §2.5 |
 

@@ -1,9 +1,9 @@
-// `sdlc next` (task V06): what the signed-in person does next for one intent. Pure: it reads the
+// `adlc next` (task V06): what the signed-in person does next for one intent. Pure: it reads the
 // intent (`GET /v1/intents/:intent`) and the person (`GET /v1/me`) only, and never evaluates a gate
 // again: the hold is what the workflow's step recorded (U02, ADR-M54 §2.4b) and who decides is the
 // API's `waiting_for` (U01). QUESTIONS #368: the plan submitter is not in these two answers, so at G3
 // a note says the platform refuses their approval. QUESTIONS #369: an escalation is found with
-// `sdlc escalation list --intent`.
+// `adlc escalation list --intent`.
 import type { IntentWaitReason } from '@sdlc/contracts';
 import type { MessageKey } from '@sdlc/messages';
 

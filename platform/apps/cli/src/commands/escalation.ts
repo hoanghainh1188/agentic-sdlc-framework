@@ -1,4 +1,4 @@
-// `sdlc escalation list|show|ack|decide` over the API (D-08 B04 AC4, QUESTIONS #77; design/
+// `adlc escalation list|show|ack|decide` over the API (D-08 B04 AC4, QUESTIONS #77; design/
 // ADR-M28 §2.7, handbook Ch.18 §18.8b). The decision words are the same as `/decide` in a comment.
 // Codes and one https link only: escalations are kept 2 years and never hold free text.
 import { ESCALATION_STATUSES, GATE_REASON_CODES, PROTECTED_ACTIONS } from '@sdlc/contracts';
@@ -17,7 +17,7 @@ import { sayNextHint } from './next/hint.js';
 const MAX_PAGE = 100;
 const DECIMAL = /^\d{1,12}(\.\d{1,6})?$/;
 
-/** The words of `sdlc escalation decide`: those of the `/decide` comment, with dashes. */
+/** The words of `adlc escalation decide`: those of the `/decide` comment, with dashes. */
 const CLI_DECISION_WORDS = ['resume', 'modify', 'roll-back', 'terminate', 'escalate'] as const;
 
 export async function runEscalation(args: readonly string[], ctx: CliContext): Promise<number> {

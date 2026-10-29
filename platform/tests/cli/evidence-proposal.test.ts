@@ -1,4 +1,4 @@
-// `sdlc evidence proposal` (D-08 C13, ADR-M64 §2.1) against a mocked API: the latest run with a
+// `adlc evidence proposal` (D-08 C13, ADR-M64 §2.1) against a mocked API: the latest run with a
 // proposal by default, or the named run; the bytes checked against the SHA-256 before they are
 // saved (mode 600, never printed, never over a file without --force); refusals and the usage.
 import { lstat, readFile, stat, symlink, writeFile } from 'node:fs/promises';
@@ -20,7 +20,7 @@ const PATCH = Buffer.concat([
   Buffer.from([0x93, 0xfa, 0x0a]),
 ]);
 
-describe('sdlc evidence proposal', () => {
+describe('adlc evidence proposal', () => {
   it('saves the latest run with a proposal, byte for byte, with mode 600, and prints no content', async () => {
     const h = await harness({
       routes: {

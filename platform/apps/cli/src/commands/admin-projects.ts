@@ -1,4 +1,4 @@
-// `sdlc admin project|role|config …` through the API (task B13 AC2, AC4; ADR-M37 §2.7).
+// `adlc admin project|role|config …` through the API (task B13 AC2, AC4; ADR-M37 §2.7).
 import { open } from 'node:fs/promises';
 
 import {

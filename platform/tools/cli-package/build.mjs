@@ -1,5 +1,6 @@
-// Builds the npm package `agentic-sdlc-cli` (task V05, design/ADR-M72) into platform/apps/cli/npm-dist/:
-// the compiled CLI and every package it uses bundled into one CommonJS file (Rolldown), the
+// Builds the npm package `@hoanghainh/governed-adlc` (task V05, design/ADR-M72, ADR-M100) into
+// platform/apps/cli/npm-dist/: the compiled CLI and every package it uses bundled into one CommonJS
+// file (Rolldown, `bin/adlc.cjs`; `bin/sdlc.cjs` runs it under the old name until v0.10.0), the
 // shipped default project configuration, the licences of the bundled packages, and package.json
 // from the template with the platform version. Run after `tsc -b platform/apps/cli`
 // (`pnpm cli:pack` does both). Nothing is published here: only the tag workflow publishes.
@@ -21,6 +22,10 @@ const ALLOWED_LICENCES = new Set([
   'BSD-3-Clause',
   '0BSD',
 ]);
+
+/** `bin/sdlc.cjs`: the old command name runs the same bundle (ADR-M100 §2.2). */
+const LEGACY_BIN =
+  "#!/usr/bin/env node\n'use strict';\n// `sdlc` is now `adlc` (ADR-M100); removed in v0.10.0.\nrequire('./adlc.cjs');\n";
 
 /** Optional `pg` modules, loaded only inside guarded `require` calls; never needed by the CLI. */
 const EXTERNAL = ['pg-native', 'pg-cloudflare'];
@@ -69,7 +74,7 @@ async function thirdPartyNotices(moduleIds) {
   const blocks = entries.map(
     (e) => `${e.name}@${e.version} (${e.license ?? 'see text'})\n\n${e.text.trim()}\n`,
   );
-  return `Third-party software bundled in agentic-sdlc-cli\n\n${blocks.join('\n---\n\n')}`;
+  return `Third-party software bundled in @hoanghainh/governed-adlc\n\n${blocks.join('\n---\n\n')}`;
 }
 
 async function licenceText(dir) {
@@ -98,13 +103,16 @@ async function main() {
   // The bundle lives in bin/: @sdlc/config reads `<__dirname>/../defaults/…`, which is then the
   // package's own defaults/ folder.
   const { output } = await bundle.write({
-    file: path.join(OUT, 'bin', 'sdlc.cjs'),
+    file: path.join(OUT, 'bin', 'adlc.cjs'),
     format: 'cjs',
     sourcemap: false,
   });
   await bundle.close();
   const chunk = output.find((item) => item.type === 'chunk');
   if (chunk === undefined) throw new Error('rolldown wrote no chunk');
+  // ADR-M100 §2.2: the old command name, until v0.10.0. The CLI sees the script name and prints
+  // its note; everything else is the same file.
+  await writeFile(path.join(OUT, 'bin', 'sdlc.cjs'), LEGACY_BIN, { mode: 0o755 });
 
   await copyFile(
     path.join(ROOT, 'platform', 'packages', 'config', 'defaults', 'project-config.default.yaml'),
@@ -124,7 +132,7 @@ async function main() {
     path.join(OUT, 'package.json'),
     `${JSON.stringify({ ...template, version }, null, 2)}\n`,
   );
-  process.stdout.write(`agentic-sdlc-cli ${version}: ${path.relative(ROOT, OUT)}\n`);
+  process.stdout.write(`@hoanghainh/governed-adlc ${version}: ${path.relative(ROOT, OUT)}\n`);
 }
 
 await main();

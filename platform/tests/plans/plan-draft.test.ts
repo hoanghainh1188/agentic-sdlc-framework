@@ -56,7 +56,7 @@ function specKitItems(phases: number, perPhase: number): string {
   return lines.join('\n');
 }
 
-describe('sdlc plan draft: Spec Kit tasks.md', () => {
+describe('adlc plan draft: Spec Kit tasks.md', () => {
   const draft = ok(
     draftPlan({ text: fixture('spec-kit-tasks-filled.md'), tool: 'spec-kit', intentCode: CODE }),
   );
@@ -232,7 +232,7 @@ describe('sdlc plan draft: Spec Kit tasks.md', () => {
   });
 });
 
-describe('sdlc plan draft: BMAD story file', () => {
+describe('adlc plan draft: BMAD story file', () => {
   it('writes one task per top-level item, subtasks in definition_of_done (AC1)', () => {
     const draft = ok(
       draftPlan({ text: fixture('bmad-story-tasks.md'), tool: 'bmad', intentCode: CODE }),

@@ -54,7 +54,7 @@ describe('CLI ASCII banner', () => {
     expect(banner).toContain('\x1b[0m');
   });
 
-  it('sdlc banner prints the banner and exits 0', async () => {
+  it('adlc banner prints the banner and exits 0', async () => {
     const { ctx, out } = makeContext({ NO_COLOR: '1' });
     expect(await runCli(['banner'], ctx)).toBe(EXIT.ok);
     expect(out.length).toBe(1);
@@ -62,7 +62,7 @@ describe('CLI ASCII banner', () => {
     expect(out[0]).toContain(`v${PLATFORM_VERSION}`);
   });
 
-  it('sdlc --banner prints the banner and exits 0', async () => {
+  it('adlc --banner prints the banner and exits 0', async () => {
     const { ctx, out } = makeContext({ NO_COLOR: '1' });
     expect(await runCli(['--banner'], ctx)).toBe(EXIT.ok);
     expect(out.length).toBe(1);

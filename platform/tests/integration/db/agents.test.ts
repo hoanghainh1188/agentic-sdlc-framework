@@ -1,6 +1,6 @@
 // D-08 C10 on a live PostgreSQL (handbook Ch.20, design/ADR-M31).
 // AC1: the `agents` table, the lifecycle (register, activate, suspend, quarantine, retire), every
-//      change audited with keys, codes and hashes only; the operator CLI `sdlc admin agent …`.
+//      change audited with keys, codes and hashes only; the operator CLI `adlc admin agent …`.
 // AC2: runs refer to a registered agent (runs.test.ts covers the foreign key); the check before a
 //      run refuses agents that are not active.
 // AC3: the instructions hash is stored and checked before each run.
@@ -515,7 +515,7 @@ describeDb('C10: the agent register on PostgreSQL', () => {
     });
   });
 
-  describe('AC1: sdlc ops agent (operator CLI)', () => {
+  describe('AC1: adlc ops agent (operator CLI)', () => {
     async function cli(argv: string[]) {
       const out: string[] = [];
       const err: string[] = [];
@@ -530,7 +530,7 @@ describeDb('C10: the agent register on PostgreSQL', () => {
     }
 
     // B13 (QUESTIONS #153, ADR-M37 §2.8): registering and activating go through the API; the
-    // operator keeps show, list, suspend and quarantine (`sdlc ops agent …`).
+    // operator keeps show, list, suspend and quarantine (`adlc ops agent …`).
     // The CLI rightly reads the real clock for `overdue`: the agent is activated on the real day,
     // so the test passes whatever the date (with NOW it broke 3 months after 2026-09-27).
     it.each([
@@ -637,7 +637,7 @@ describeDb('C10: the agent register on PostgreSQL', () => {
       });
     });
 
-    it('keeps the audit chain intact (sdlc ops audit verify)', async () => {
+    it('keeps the audit chain intact (adlc ops audit verify)', async () => {
       const s = await seed();
       await active(s);
       await changeAgentStatus(s.scope, 'coder-openhands', { to: 'retired', reason: 'unused' });

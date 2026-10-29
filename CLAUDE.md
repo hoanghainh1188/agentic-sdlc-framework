@@ -58,7 +58,7 @@ Always loaded:
 - Evidence retention: default 180 days (configurable, never below 180). Purge deletes SeaweedFS objects only; keep DB rows + hashes; respect holds (`evidence_holds`); log `evidence.purged`. Open or held intents are never purged. [R032]
 - Git host, agent, policy engine and model provider are behind interfaces. Do not hard-code one vendor in core logic. [R033]
 - No secrets in the repo. All secrets live in OpenBao (Vault-compatible API); processes use AppRole + short-lived tokens, credential files never environment values. Sandboxes never access OpenBao. Never write key shares, root tokens or secret values to files, logs or test output (only exception: the trial stack's encrypted key file, ADR-M76). [R034]
-- **Commands that print or take a secret or token run only in the owner's macOS Terminal app**, never through a chat tool or the desktop app's terminal pane (Claude can read it): `openbao:bootstrap init|unseal|root-token`, credentials commands that the owner runs, `pnpm sdlc ops bootstrap|token issue`, `pnpm github-app:create`, the live tests with keys. [R035]
+- **Commands that print or take a secret or token run only in the owner's macOS Terminal app**, never through a chat tool or the desktop app's terminal pane (Claude can read it): `openbao:bootstrap init|unseal|root-token`, credentials commands that the owner runs, `pnpm adlc ops bootstrap|token issue` (also as `adlc …`, and the old name `sdlc` until v0.10.0, ADR-M100), `pnpm github-app:create`, the live tests with keys. [R035]
 - Run Contracts are signed via OpenBao Transit (Ed25519); the signing key never leaves OpenBao. [R036]
 - GitHub events are read by polling (GitHub App + API) in v0.1; webhooks come later. Both must feed the same event handler. Users are matched by numeric GitHub account ID only; bots never decide. [R037]
 - Object storage: SeaweedFS (S3 API). Cache/rate limit: Valkey. Never MinIO, Redis or Elasticsearch (license/maintenance reasons). Pin every image to an exact version; images we publish or depend on are used by digest. [R038]
@@ -74,7 +74,7 @@ Claude Code reads a folder's `CLAUDE.md` when it opens a file in that folder. Be
 - `platform/deploy/CLAUDE.md` — OpenBao and TLS, SeaweedFS, backups, `doctor`, `trial`, access proxy, GitHub App; the deployment commands.
 - `platform/apps/dashboard/CLAUDE.md` — dashboard, sign-in, sessions and the routes a session may write to.
 - `platform/apps/api/CLAUDE.md` — administration and the agent register.
-- `platform/apps/cli/CLAUDE.md` — CLI tokens, `sdlc plan draft`, the user commands.
+- `platform/apps/cli/CLAUDE.md` — CLI tokens, `adlc plan draft`, the user commands.
 - `platform/eval/CLAUDE.md` — the evaluation harness.
 
 ## Platform-wide module rules (detail in the linked ADR)
@@ -114,10 +114,10 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - Before a PR: `pnpm build && pnpm typecheck && pnpm lint && pnpm format:check && pnpm test`.
 - New package: put it under `platform/apps/`, `platform/packages/` or `platform/packages/adapters/` with the `@sdlc/` scope, and add it to the root `tsconfig.json` references.
 - `pnpm diagrams:render [name …]` / `pnpm diagrams:check` — render Mermaid to SVG (needs Docker) / the CI check (`diagrams/README.md`).
-- Deployment (Compose, OpenBao, backups, `doctor`, `trial`, `github-app:create`): commands in `platform/deploy/CLAUDE.md`. User CLI (`sdlc …`): `platform/apps/cli/CLAUDE.md`. Sandbox images: `platform/apps/runner/CLAUDE.md`. Evaluation harness (`pnpm eval`): `platform/eval/CLAUDE.md`.
+- Deployment (Compose, OpenBao, backups, `doctor`, `trial`, `github-app:create`): commands in `platform/deploy/CLAUDE.md`. User CLI (`adlc …`): `platform/apps/cli/CLAUDE.md`. Sandbox images: `platform/apps/runner/CLAUDE.md`. Evaluation harness (`pnpm eval`): `platform/eval/CLAUDE.md`.
 - Database (ADR-M09): `pnpm db:migrate` / `pnpm db:status` (`SDLC_DB_MIGRATION_URL`, owner role `platform`; processes connect as `platform_app`).
 - Dev mode without Compose: `pnpm api:start`, `pnpm worker:start` (ADR-M26, ADR-M27; refused with `NODE_ENV=production`).
-- Operator commands on the server: `pnpm sdlc ops bootstrap|token|audit verify|tenant-admin|role|ai-record|agent|run kill|retention report|eval start` (`SDLC_DB_URL`, actor `system`; ADR-M26, ADR-M37; deploy README "Fresh deployment" step 8). A token is printed once: owner's terminal only.
+- Operator commands on the server: `pnpm adlc ops bootstrap|token|audit verify|tenant-admin|role|ai-record|agent|run kill|retention report|eval start` (`SDLC_DB_URL`, actor `system`; ADR-M26, ADR-M37; deploy README "Fresh deployment" step 8). A token is printed once: owner's terminal only.
 - Releases (`RELEASING.md`, ADR-M94, ADR-M72): `pnpm images mode|get|export|verify`, `pnpm cli:pack` / `pnpm cli:pack-check`. Order: version PR → tag (Harry) → `release.yml` (images, Release with `images.lock`) → `npm-publish.yml` (Harry approves `npm`).
 - Claude Code hook (W01, ADR-M84 §2.3): `.claude/settings.json` runs `platform/tools/claude-hooks/guard-bash.mjs` before every Bash call and refuses the commands this file forbids for Claude (rule IDs in `design/RULES.md`); never weaken or bypass it. [R132]
 - CI: `.github/workflows/ci.yml` (A09; jobs, triggers and path filters in `platform/DEVELOPMENT.md` §2). Actions pinned by commit SHA; thresholds in the workflow `env:`. Short checks share the `scan` job; do not add a job for a check under a minute; every job has `timeout-minutes`.

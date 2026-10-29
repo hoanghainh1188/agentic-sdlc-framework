@@ -1,11 +1,11 @@
-// `sdlc help [topic|command]` and `sdlc <command> --help` (task V10 AC1). Every text comes from the
+// `adlc help [topic|command]` and `adlc <command> --help` (task V10 AC1). Every text comes from the
 // catalog: an overview, five short guides, and for every command group its usage and one example.
 // A test fails when a command group has no help (`cli/help.test.ts`).
 import { t, type MessageKey } from '@sdlc/messages';
 
 import { EXIT, type CliContext } from '../context.js';
 
-/** The guides of `sdlc help <topic>`. */
+/** The guides of `adlc help <topic>`. */
 export const HELP_TOPICS = {
   'getting-started': 'cli.help.topic.getting_started',
   roles: 'cli.help.topic.roles',

@@ -1,4 +1,4 @@
-// `sdlc admin evidence hold|release|show <INT-…>` through the API (task E05, design/ADR-M51,
+// `adlc admin evidence hold|release|show <INT-…>` through the API (task E05, design/ADR-M51,
 // QUESTIONS #235; handbook Ch.15, Ch.19 §19.8d). A hold keeps an intent's evidence files from the
 // retention purge until it is released. Who: tenant admins, or a role in config
 // `access.evidence_hold_roles` (default governance and admin; never viewer, rule M32).

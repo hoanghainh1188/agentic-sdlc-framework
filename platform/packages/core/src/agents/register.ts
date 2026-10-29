@@ -3,7 +3,7 @@
 // The functions take an optional `actor` (B13): the person who acts through the API, or the
 // operator on the server (`system`, the default). Who may do what (handbook Ch.20 §20.7, §20.9,
 // §20.11) is checked by the callers: the API through `approvals.ts`, the operator only for the
-// safety moves (`sdlc ops agent suspend|quarantine`, ADR-M37 §2.8).
+// safety moves (`adlc ops agent suspend|quarantine`, ADR-M37 §2.8).
 //
 // Every change and its audit event are one transaction. Audit payloads hold keys, versions,
 // status codes and hashes only: never the model name or the owner.

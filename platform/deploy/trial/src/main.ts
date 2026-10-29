@@ -36,7 +36,13 @@ import {
 } from './passphrase.js';
 import { preflight } from './preflight.js';
 import { SecretBag } from './secrets.js';
-import { credentialsFile, parseSettings, SettingsError, type TrialSettings } from './settings.js';
+import {
+  credentialsFile,
+  credentialsFiles,
+  parseSettings,
+  SettingsError,
+  type TrialSettings,
+} from './settings.js';
 import {
   START_ERROR_KEYS,
   START_REFUSAL_KEYS,
@@ -209,7 +215,9 @@ async function down(args: string[]): Promise<number> {
     envFile: file,
     project,
     wipe: values.wipe === true,
-    credentialsFiles: settings ? [settings.personA, settings.personB].map(credentialsFile) : [],
+    credentialsFiles: settings
+      ? [settings.personA, settings.personB].flatMap(credentialsFiles)
+      : [],
     apiUrl: trialApiUrl(text ?? ''),
     exec,
   });

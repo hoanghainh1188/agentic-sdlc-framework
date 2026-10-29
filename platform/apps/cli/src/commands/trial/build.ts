@@ -1,4 +1,4 @@
-// Step 2 of `sdlc trial report` (task V01, ADR-M65 §2.3): the report, built only from allowed
+// Step 2 of `adlc trial report` (task V01, ADR-M65 §2.3): the report, built only from allowed
 // fields. Nothing from an API answer is spread or copied whole: each value is picked by name and
 // passed through `known` (a list of `@sdlc/contracts`, the stop reasons of D-05, the gateway models),
 // a count or an amount.

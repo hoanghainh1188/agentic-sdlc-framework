@@ -195,7 +195,7 @@ export interface CreateIntentInput {
   readonly issue_number?: number;
 }
 
-/** U08: Creates an intent (the first call of `sdlc intent create`). */
+/** U08: Creates an intent (the first call of `adlc intent create`). */
 export async function createIntent(body: CreateIntentInput): Promise<IntentView> {
   const answer = await send(apiPath('/v1/intents'), 'POST', intentSchema, body);
   return answer!;
@@ -207,7 +207,7 @@ export interface LinkSpecInput {
   readonly source_tool?: 'spec-kit' | 'bmad' | 'manual';
 }
 
-/** U08: Links the spec of an intent (the second call of `sdlc intent create --spec`, U03). */
+/** U08: Links the spec of an intent (the second call of `adlc intent create --spec`, U03). */
 export async function linkSpec(intent: string, body: LinkSpecInput): Promise<LinkedSpecView> {
   const answer = await send(
     apiPath(`/v1/intents/${segment(intent)}/specs`),
@@ -218,7 +218,7 @@ export async function linkSpec(intent: string, body: LinkSpecInput): Promise<Lin
   return answer!;
 }
 
-/** U08: Submits the plan file of an intent, as it is on the default branch (`sdlc plan submit`). */
+/** U08: Submits the plan file of an intent, as it is on the default branch (`adlc plan submit`). */
 export async function submitPlan(intent: string, commitSha?: string): Promise<SubmittedPlanView> {
   const answer = await send(
     apiPath(`/v1/intents/${segment(intent)}/plans`),

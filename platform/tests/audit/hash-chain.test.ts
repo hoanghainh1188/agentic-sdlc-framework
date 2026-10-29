@@ -1,5 +1,5 @@
 // D-08 A07 AC2 (pure part): per-tenant hash chain with RFC 8785 canonical JSON and SHA-256
-// (design/D-05 section 7.1), and the chain check behind `sdlc audit verify` (section 7.3).
+// (design/D-05 section 7.1), and the chain check behind `adlc audit verify` (section 7.3).
 import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';

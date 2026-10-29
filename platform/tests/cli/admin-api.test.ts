@@ -1,4 +1,4 @@
-// `sdlc admin project|user|identity|role|config|tenant-admin …` over the API (B13 AC2–AC4,
+// `adlc admin project|user|identity|role|config|tenant-admin …` over the API (B13 AC2–AC4,
 // ADR-M37 §2.7) against a mocked API: the same login and client as B04, usage errors, the e-mail
 // lookup, the config file, and a sweep that the token never reaches the output.
 import { writeFile } from 'node:fs/promises';
@@ -25,7 +25,7 @@ const USERS: Routes = {
   'GET /v1/admin/users': { status: 200, body: { items: [userBody()] } },
 };
 
-describe('sdlc admin (through the API)', () => {
+describe('adlc admin (through the API)', () => {
   it('creates a project with the bearer token of the saved login', async () => {
     const h = await harness({
       routes: { 'POST /v1/admin/projects': { status: 201, body: projectBody() } },

@@ -1,4 +1,4 @@
-// `sdlc ops retention report --tenant <slug>`: the evidence retention report on the server (task
+// `adlc ops retention report --tenant <slug>`: the evidence retention report on the server (task
 // E05, design/ADR-M51). Counts only, from the database (SDLC_DB_URL, `platform_app`): per project,
 // rows stored, purged, held, open, and due for the purge now. It deletes nothing and reads no
 // evidence file; the worker's retention loop does the purge (`SDLC_WORKER_RETENTION_MODE`).

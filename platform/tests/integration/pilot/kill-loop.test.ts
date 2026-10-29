@@ -1,6 +1,6 @@
 // D-08 C09 AC4 on a live run (see stack.ts), run with `pnpm test:pilot`: the real Agent Server in a
 // node24 sandbox, driven by the real runner through the workflow.
-// - The kill switch (FR-34, D-02 §10 item 5d): Person B runs `sdlc run kill <INT>` while the agent
+// - The kill switch (FR-34, D-02 §10 item 5d): Person B runs `adlc run kill <INT>` while the agent
 //   waits for a slow model reply; the run ends `stopped_killed`, the sandbox, its network and volume
 //   are gone, the run's key is revoked, the escalation is raised, the intent is paused at G4. The
 //   time from the command to the clean-up is measured (target: under 5 minutes).
@@ -29,7 +29,7 @@ describePilot(
       await s?.stopPilot();
     }, 120_000);
 
-    it('AC4: `sdlc run kill` stops a running agent; sandbox, network, volume and key gone in under 5 minutes', async () => {
+    it('AC4: `adlc run kill` stops a running agent; sandbox, network, volume and key gone in under 5 minutes', async () => {
       const intent = await s.throughG3('medium', {
         specPath: SPECS.T01,
         paths: T01_PATHS,

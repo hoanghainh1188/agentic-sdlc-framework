@@ -1,4 +1,4 @@
-// `sdlc next <INT>` (task V06, D-08 V06 AC1–AC4): the advice per waiting reason, gate and role,
+// `adlc next <INT>` (task V06, D-08 V06 AC1–AC4): the advice per waiting reason, gate and role,
 // producers never told to approve (QUESTIONS #368), every text from the catalog, and the command
 // against a mocked API that reads `GET /v1/me` and `GET /v1/intents/:intent` only.
 import { WAITING_CAUSE_KEYS } from '@sdlc/api-schemas';
@@ -131,14 +131,14 @@ describe('AC3/AC4: every waiting reason and cause has advice, every advice a cat
 
 describe('AC1: gate decisions name the command for the role holder', () => {
   it.each([
-    ['G1', 'decide_gate', 'sdlc gate approve G1 INT-2026-0007'],
-    ['G2', 'decide_gate', 'sdlc gate approve G2 INT-2026-0007'],
-    ['G3', 'decide_gate', 'sdlc gate approve G3 INT-2026-0007'],
-    ['G4', 'decide_g4', 'sdlc gate approve G4 INT-2026-0007'],
-    ['G5', 'decide_g5', 'sdlc gate approve G5 INT-2026-0007'],
-    ['G6', 'decide_g6', 'sdlc gate approve G6 INT-2026-0007'],
+    ['G1', 'decide_gate', 'adlc gate approve G1 INT-2026-0007'],
+    ['G2', 'decide_gate', 'adlc gate approve G2 INT-2026-0007'],
+    ['G3', 'decide_gate', 'adlc gate approve G3 INT-2026-0007'],
+    ['G4', 'decide_g4', 'adlc gate approve G4 INT-2026-0007'],
+    ['G5', 'decide_g5', 'adlc gate approve G5 INT-2026-0007'],
+    ['G6', 'decide_g6', 'adlc gate approve G6 INT-2026-0007'],
     ['G7', 'review_g7', 'pull request #31'],
-    ['G8', 'decide_g8', 'sdlc evidence show INT-2026-0007'],
+    ['G8', 'decide_g8', 'adlc evidence show INT-2026-0007'],
   ])('%s → %s', (gate, code, command) => {
     const next = adviseNext(
       detail({
@@ -205,7 +205,7 @@ describe('AC2: the advice follows the caller roles; producers never approve', ()
     );
     expect(next).toMatchObject({ kind: 'waits_for', code: 'waits_role', roles: ['person_b'] });
     expect(adviceText(next)).toContain('person_b');
-    expect(adviceText(next)).not.toContain('sdlc gate approve');
+    expect(adviceText(next)).not.toContain('adlc gate approve');
   });
 
   it.each([[['viewer']], [[]]])('roles %j: waits for the gate roles', (roles) => {
@@ -227,7 +227,7 @@ describe('AC2: the advice follows the caller roles; producers never approve', ()
       me(['person_b'], USER),
     );
     expect(next).toMatchObject({ kind: 'waits_for', code: 'producer', producer: true });
-    expect(adviceText(next)).not.toContain('sdlc gate approve');
+    expect(adviceText(next)).not.toContain('adlc gate approve');
   });
 
   it.each(['G5', 'G6', 'G7', 'G8'])(
@@ -335,7 +335,7 @@ describe('AC2: the advice follows the caller roles; producers never approve', ()
     it.each(['G5', 'G6'])('%s: the latest G4 approver is never told to approve', (gate) => {
       const next = adviseNext(at(gate), me(['person_b']));
       expect(next).toMatchObject({ kind: 'waits_for', code: 'producer', producer: true });
-      expect(adviceText(next)).not.toContain('sdlc gate approve');
+      expect(adviceText(next)).not.toContain('adlc gate approve');
     });
 
     it.each([
@@ -389,14 +389,14 @@ describe('holds: inputs, escalations, the platform, the set-up', () => {
     detail({ intent: { waiting_reason: reason, current_gate: gate as never, ...extra } });
 
   it.each([
-    ['input_missing', 'G2', ['person_a'], 'link_spec', 'sdlc spec link INT-2026-0007'],
-    ['input_missing', 'G3', ['person_a'], 'write_plan', 'sdlc plan submit INT-2026-0007'],
-    ['new_plan_needed', 'G3', ['person_a'], 'new_plan', 'sdlc plan submit'],
-    ['plan_resubmit_needed', 'G4', ['person_a'], 'resubmit_plan', 'sdlc plan submit'],
-    ['spec_unavailable', 'G2', ['pm_brse'], 'fix_spec', 'sdlc spec link'],
+    ['input_missing', 'G2', ['person_a'], 'link_spec', 'adlc spec link INT-2026-0007'],
+    ['input_missing', 'G3', ['person_a'], 'write_plan', 'adlc plan submit INT-2026-0007'],
+    ['new_plan_needed', 'G3', ['person_a'], 'new_plan', 'adlc plan submit'],
+    ['plan_resubmit_needed', 'G4', ['person_a'], 'resubmit_plan', 'adlc plan submit'],
+    ['spec_unavailable', 'G2', ['pm_brse'], 'fix_spec', 'adlc spec link'],
     ['spec_unclear', 'G2', ['person_a'], 'spec_unclear', 'acceptance criteria'],
-    ['ai_record', 'G1', ['pm_brse'], 'ai_record', 'sdlc ai-record show pilot'],
-    ['proposal_review', 'G4', ['person_a'], 'proposal', 'sdlc evidence proposal INT-2026-0007'],
+    ['ai_record', 'G1', ['pm_brse'], 'ai_record', 'adlc ai-record show pilot'],
+    ['proposal_review', 'G4', ['person_a'], 'proposal', 'adlc evidence proposal INT-2026-0007'],
   ])('%s at %s for %j → %s', (reason, gate, roles, code, text) => {
     const next = adviseNext(at(reason, gate), me(roles));
     expect(next).toMatchObject({ kind: 'you_act', code });
@@ -410,14 +410,14 @@ describe('holds: inputs, escalations, the platform, the set-up', () => {
   });
 
   it.each(['frozen', 'run_review', 'g5_review', 'publish_review', 'g7_review', 'g8_review'])(
-    'QUESTIONS #369: %s points to sdlc escalation list --intent',
+    'QUESTIONS #369: %s points to adlc escalation list --intent',
     (reason) => {
       const owner = adviseNext(at(reason), me(['person_b']));
       expect(owner.code).toBe('escalation');
-      expect(adviceText(owner)).toContain('sdlc escalation list --intent INT-2026-0007');
+      expect(adviceText(owner)).toContain('adlc escalation list --intent INT-2026-0007');
       const other = adviseNext(at(reason), me(['viewer']));
       expect(other.code).toBe('waits_escalation');
-      expect(adviceText(other)).toContain('sdlc escalation list --intent INT-2026-0007');
+      expect(adviceText(other)).toContain('adlc escalation list --intent INT-2026-0007');
     },
   );
 
@@ -495,12 +495,12 @@ describe('finished and unknown intents', () => {
     expect(next.code).toBe('blocked');
   });
 
-  it('a reason this CLI does not know yet: its code and sdlc intent show', () => {
+  it('a reason this CLI does not know yet: its code and adlc intent show', () => {
     const intent = { ...detail(), waiting_reason: 'future_reason' };
     const next = adviseNext(intent, me(['person_a']));
     expect(next.code).toBe('unknown');
     expect(adviceText(next)).toContain('"future_reason"');
-    expect(adviceText(next)).toContain('sdlc intent show INT-2026-0007');
+    expect(adviceText(next)).toContain('adlc intent show INT-2026-0007');
   });
 
   it('no recorded reason (an API before U02): decides from waiting_for', () => {
@@ -512,7 +512,7 @@ describe('finished and unknown intents', () => {
   });
 });
 
-describe('sdlc next (command, mocked API)', () => {
+describe('adlc next (command, mocked API)', () => {
   const harness = useHarness();
   const routes = (intent: IntentDetail, roles = ['person_a']) => ({
     'GET /v1/me': { status: 200, body: me(roles) },
@@ -525,7 +525,7 @@ describe('sdlc next (command, mocked API)', () => {
     expect(h.out[0]).toBe(
       t('cli.next.header', { intent: CODE, project: 'pilot', status: 'in_gate', gate: 'G2' }),
     );
-    expect(h.out.join('\n')).toContain('Next: Decide G2: sdlc gate approve G2 INT-2026-0007');
+    expect(h.out.join('\n')).toContain('Next: Decide G2: adlc gate approve G2 INT-2026-0007');
     expect(h.requests.map((r) => `${r.method} ${r.url.pathname}`).sort()).toEqual([
       'GET /v1/intents/INT-2026-0007',
       'GET /v1/me',
@@ -588,7 +588,7 @@ describe('sdlc next (command, mocked API)', () => {
     expect(h.requests).toEqual([]);
   });
 
-  it('cli.usage lists sdlc next', () => {
-    expect(t('cli.usage')).toContain('    sdlc next <INT-…>');
+  it('cli.usage lists adlc next', () => {
+    expect(t('cli.usage')).toContain('    adlc next <INT-…>');
   });
 });

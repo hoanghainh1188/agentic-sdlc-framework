@@ -86,7 +86,7 @@ test('U08 AC1: a refused spec link keeps the intent and says why', async ({ page
   await expect(dialog.getByRole('alert')).toHaveText(
     /^The spec cannot be read \(cause: missing\)\./,
   );
-  await expect(dialog.getByText(/sdlc spec link INT-2026-0009 --path/)).toBeVisible();
+  await expect(dialog.getByText(/adlc spec link INT-2026-0009 --path/)).toBeVisible();
   await dialog.getByRole('button', { name: 'Open the intent' }).click();
   await expect(page).toHaveURL(/#\/intents\/INT-2026-0009$/);
   expect(w.writes).toEqual(['POST /v1/intents', 'POST /v1/intents/INT-2026-0009/specs']);
@@ -181,7 +181,7 @@ test('U08 AC2: the L1 proposal is saved with the CLI; the page never asks for it
   await page.goto(`${LOCAL}/dashboard/#/intents/INT-2026-0010`);
   await expect(
     page.getByText(
-      'sdlc evidence proposal INT-2026-0010 --run 00000000-0000-4000-8000-000000000604 --output <file>',
+      'adlc evidence proposal INT-2026-0010 --run 00000000-0000-4000-8000-000000000604 --output <file>',
     ),
   ).toBeVisible();
   expect(asked).toEqual([]);

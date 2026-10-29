@@ -1,4 +1,4 @@
-// `pnpm db:migrate` and `pnpm db:status` (task A06). Operator command, not part of the `sdlc` CLI.
+// `pnpm db:migrate` and `pnpm db:status` (task A06). Operator command, not part of the `adlc` CLI.
 // Reads SDLC_DB_MIGRATION_URL: a URL for the database owner role `platform`. With `--url-stdin`,
 // the URL is the first line of standard input instead, so a caller that holds the password
 // (`pnpm server:setup`, `pnpm trial:up`: D-08 V16) never puts it into a child's environment.

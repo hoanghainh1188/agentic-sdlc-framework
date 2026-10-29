@@ -1,4 +1,4 @@
-// `sdlc spec link|list` over the API (D-08 B08 AC1, D-02 FR-02; ADR-M39 §2.2, handbook Ch.19
+// `adlc spec link|list` over the API (D-08 B08 AC1, D-02 FR-02; ADR-M39 §2.2, handbook Ch.19
 // §19.8e). The platform reads the file from the Git host and keeps its SHA-256 only; the content
 // stays in the repository. The spec is the file on the default branch: `--commit` is optional and
 // must hold the same content as the head (409 `spec_not_on_default_branch`). Who may link:

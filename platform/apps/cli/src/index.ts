@@ -1,8 +1,8 @@
-// The sdlc command-line tool. See design/D-03 section 5.1.
-// A07 adds `sdlc audit verify`, B03 the operator commands `sdlc admin …` (database, on the
+// The adlc command-line tool. See design/D-03 section 5.1.
+// A07 adds `adlc audit verify`, B03 the operator commands `adlc admin …` (database, on the
 // server). B04 adds the user commands (through the API, design/ADR-M36): login, logout, whoami,
-// intent, gate, escalation, ai-record. B08 adds `sdlc spec`, B09 `sdlc plan`, C11 `sdlc run`, E04 `sdlc cost`, E06 `sdlc metrics`, E02 `sdlc evidence`, V01 `sdlc trial`, V05 `sdlc --version`, V06 `sdlc next`, V07 `sdlc doctor`. B13 adds the admin commands, `sdlc token` and
-// `sdlc audit verify` through the API, and moves the operator commands to `sdlc ops` (ADR-M37).
+// intent, gate, escalation, ai-record. B08 adds `adlc spec`, B09 `adlc plan`, C11 `adlc run`, E04 `adlc cost`, E06 `adlc metrics`, E02 `adlc evidence`, V01 `adlc trial`, V05 `adlc --version`, V06 `adlc next`, V07 `adlc doctor`. B13 adds the admin commands, `adlc token` and
+// `adlc audit verify` through the API, and moves the operator commands to `adlc ops` (ADR-M37).
 import { t } from '@sdlc/messages';
 
 import { renderBanner } from './banner.js';
@@ -34,7 +34,7 @@ export { EXIT, processApiIo, processContext, type ApiIo, type CliContext } from 
 export { renderBanner } from './banner.js';
 export { InputAbortedError, readHiddenLine } from './credentials/prompt.js';
 
-/** User commands: through the API, with the login of `sdlc login` (task B04, ADR-M36). */
+/** User commands: through the API, with the login of `adlc login` (task B04, ADR-M36). */
 const USER_COMMANDS: Readonly<
   Record<string, (args: readonly string[], ctx: CliContext) => Promise<number>>
 > = {
@@ -62,20 +62,20 @@ const USER_COMMANDS: Readonly<
 /** The command groups that go through the API; `cli.usage` lists them (test `cli/usage-texts.test.ts`). */
 export const USER_COMMAND_GROUPS: readonly string[] = Object.keys(USER_COMMANDS);
 
-/** Runs one `sdlc` command and returns its exit code. */
+/** Runs one `adlc` command and returns its exit code. */
 export async function runCli(argv: readonly string[], ctx: CliContext): Promise<number> {
   const [group, command, ...rest] = argv;
-  // V05: the published package (`agentic-sdlc-cli`) and a checkout print the same version.
+  // V05: the published package (`@hoanghainh/governed-adlc`, ADR-M100) and a checkout print the same version.
   if (argv.length === 1 && (group === '--version' || group === '-V')) {
     ctx.stdout(PLATFORM_VERSION);
     return EXIT.ok;
   }
-  // Print ASCII banner: `sdlc banner` or `sdlc --banner`.
+  // Print ASCII banner: `adlc banner` or `adlc --banner`.
   if (argv.length === 1 && (group === 'banner' || group === '--banner')) {
     ctx.stdout(renderBanner(ctx.env));
     return EXIT.ok;
   }
-  // V10: `sdlc help …`, `sdlc --help`, and `sdlc <group> … --help` print help and do nothing else.
+  // V10: `adlc help …`, `adlc --help`, and `adlc <group> … --help` print help and do nothing else.
   if (group === undefined || group === 'help' || isHelpFlag(group)) {
     if (group === undefined) {
       ctx.stderr(t('cli.usage'));

@@ -1,5 +1,5 @@
-// `sdlc plan submit|list|show` over the API (D-08 B09 AC2, ADR-M40 §2.3, handbook Ch.19 §19.8c);
-// `sdlc plan draft` works on local files only (task S02, ADR-M62, `plan-draft.ts`).
+// `adlc plan submit|list|show` over the API (D-08 B09 AC2, ADR-M40 §2.3, handbook Ch.19 §19.8c);
+// `adlc plan draft` works on local files only (task S02, ADR-M62, `plan-draft.ts`).
 // The plan is the file `.sdlc/plans/<INT-…>.yaml` on the default branch (template T13). The
 // platform reads it from the Git host and keeps its SHA-256, path patterns, tools and change flags
 // only; the text stays in the repository. `--commit` is optional and must hold the same file as

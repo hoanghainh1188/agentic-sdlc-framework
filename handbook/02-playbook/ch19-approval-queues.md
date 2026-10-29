@@ -105,7 +105,7 @@ If anything differs → **cancel and ask again**. Three rules always hold:
 
 > **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B06, 2026-09-27, updated with task B07 (the gate workflow and status comments; session 2: HOTL gates, block windows, gate deadlines) and task B12 (the project AI record before G1), and kept in line with the platform code (`design/ADR-M27-github-poller.md`, `design/ADR-M30-intent-workflow.md`, `design/ADR-M32-project-ai-record.md`). The rest of this chapter is Draft 0.1 and is written outside Claude Code.
 
-You can decide a gate by writing a comment on the GitHub issue or pull request of the intent. The platform reads new comments about every 30 seconds (project setting `github.poll_interval_seconds`). The CLI does the same through the API: `sdlc gate approve|reject|request-changes <gate> <intent>` (§19.8c).
+You can decide a gate by writing a comment on the GitHub issue or pull request of the intent. The platform reads new comments about every 30 seconds (project setting `github.poll_interval_seconds`). The CLI does the same through the API: `adlc gate approve|reject|request-changes <gate> <intent>` (§19.8c).
 
 **Commands.** Write the command on the **first line of a new comment**:
 
@@ -169,7 +169,7 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - Every gate that waits for a person's decision has a deadline, at any of G1–G8: 1 working day by default (project setting `oversight.hitl_gate_deadline`). The clock starts when the intent enters the gate, and starts again at each request for changes. It also runs while the gate waits for its spec or plan.
 - When the deadline passes, the platform raises **one escalation** (Chapter 18 §18.8b): Medium, level Notify by default (project setting `oversight.gate_overdue`). It goes to Person A when Person A holds the gate's role (route `intent`, for example G1, G2 below High risk, G4 at High risk), otherwise to Person B (route `technical`, for example G3, G6, G7, G8).
 - When the gate is decided (approved, rejected, changes requested, passed), the platform closes that escalation itself. You do not need to `/ack` or `/decide` it.
-- The platform records how long each gate waited for the person who decided (`waited_seconds`). The report: `sdlc metrics gates` ([§19.8c](#gate-metrics)).
+- The platform records how long each gate waited for the person who decided (`waited_seconds`). The report: `adlc metrics gates` ([§19.8c](#gate-metrics)).
 
 **Scopes.** An approval of G1, G2 or G3 has no scope. The API refuses an approval that sends one (`scope_not_allowed`).
 
@@ -180,72 +180,72 @@ You can decide a gate by writing a comment on the GitHub issue or pull request o
 - When the check fails, the intent stays a draft and the platform posts one status comment with the reason code, mentioning the people who may write the record. When the record is fixed, the intent enters G1 by itself within a few minutes.
 - Who may write the record: Person A and PM / BrSE by default (project setting `access.ai_record_write_roles`; the viewer role never may). Every change is a new version; the platform keeps every version and records who made it.
 - How to write it:
-  - through the API: `GET` and `PUT /v1/projects/<project>/ai-record` with your API token. `PUT` needs `expected_version` (the version you read; `0` for the first version). The CLI does the same: `sdlc ai-record show|set` (§19.8c).
-  - the platform operator, on the server, for a new project: `sdlc ops ai-record set --tenant <slug> --project <slug> --on-behalf-of <email> --expected-version <n> --ai-allowed <…> --classes <a,b | none> --prod-logs <…> --disclosure <…> [--confirmed-at YYYY-MM-DD] [--record-ref https://…]` and `sdlc ops ai-record show --tenant <slug> --project <slug>`. The person named with `--on-behalf-of` must hold a write role on the project: they are accountable for the content.
+  - through the API: `GET` and `PUT /v1/projects/<project>/ai-record` with your API token. `PUT` needs `expected_version` (the version you read; `0` for the first version). The CLI does the same: `adlc ai-record show|set` (§19.8c).
+  - the platform operator, on the server, for a new project: `adlc ops ai-record set --tenant <slug> --project <slug> --on-behalf-of <email> --expected-version <n> --ai-allowed <…> --classes <a,b | none> --prod-logs <…> --disclosure <…> [--confirmed-at YYYY-MM-DD] [--record-ref https://…]` and `adlc ops ai-record show --tenant <slug> --project <slug>`. The person named with `--on-behalf-of` must hold a write role on the project: they are accountable for the content.
 
 ---
 
-## 19.8c. Using the platform: the `sdlc` command
+## 19.8c. Using the platform: the `adlc` command
 
 > **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task B04, 2026-10-03, and kept in line with the platform code (`design/ADR-M36-cli-api-client.md`).
 
-The `sdlc` command does through the API what the comment commands do on GitHub, and more: create and read intents, decide gates, act on escalations, keep the project AI record.
+The `adlc` command does through the API what the comment commands do on GitHub, and more: create and read intents, decide gates, act on escalations, keep the project AI record.
 
-**Install it.** `npm install -g agentic-sdlc-cli` (Node.js 24; from release v0.1.1 on), at the version of your platform; `sdlc --version` prints it. From a checkout of the repository, `pnpm sdlc …` works too ([USER-GUIDE §2](../../platform/USER-GUIDE.md#install-the-sdlc-command)).
+**Install it.** `npm install -g @hoanghainh/governed-adlc` (Node.js 24; from release v0.9.0 on), at the version of your platform; `adlc --version` prints it. Up to v0.8.0 the package was `agentic-sdlc-cli` and the command `sdlc`; until v0.10.0 `sdlc` still works and prints a note, and `adlc` uses the login that `sdlc` saved. From a checkout of the repository, `pnpm adlc …` works too ([USER-GUIDE §2](../../platform/USER-GUIDE.md#install-the-adlc-command)).
 
 **Log in once.**
 
-1. Get your first API token (`sdlc_pat_…`) from a tenant admin (it lasts at most 7 days) or, for the first person of a tenant, from the platform operator. Keep it in your password manager. After you log in, create your own API token (`sdlc token create`), log in again with it, and revoke the first one.
-2. Run `sdlc login --api-url https://<platform address>` and paste the API token at the prompt. The prompt does not show what you type.
+1. Get your first API token (`sdlc_pat_…`) from a tenant admin (it lasts at most 7 days) or, for the first person of a tenant, from the platform operator. Keep it in your password manager. After you log in, create your own API token (`adlc token create`), log in again with it, and revoke the first one.
+2. Run `adlc login --api-url https://<platform address>` and paste the API token at the prompt. The prompt does not show what you type.
    - The platform checks the API token first. Only a valid API token is saved.
    - The address must use `https://`. `http://` works only for a platform on your own machine (`http://127.0.0.1:8090`).
    - From another machine, use the team address of the platform's TLS proxy, for example `https://sdlc.example.internal:8443` (team access, task V09: `platform/deploy/README.md` "Team access (operator)"). Use the host name, not an IP address, unless the operator lists the address in the certificate.
-   - If your company uses its own certificate authority, add it with the standard Node setting `NODE_EXTRA_CA_CERTS=<file>` (the `ca.pem` the operator gives you). The command never runs with certificate checks turned off. When `sdlc doctor` says the machine does not know the CA, this is the fix.
-3. `sdlc whoami` shows who you are and your roles per project.
-4. `sdlc doctor` checks your login and the API, and says what to fix (task V07): certificate checks on, the saved login file private, the API reachable over TLS and ready, your API token accepted and not near its end (a warning at 14 days or less), your roles per project, and the CLI's version against the API's. It reads only (`GET /health/live`, `/health/ready`, `/v1/me`, `/v1/me/tokens`), changes nothing and never prints your API token. One line per check (ok, warning, failed, skipped) and, for each problem, the fix; `--json` gives the same. Exit 1 when a check failed. When the API is down or you are not logged in, it says so. A problem on the server: the operator runs `pnpm doctor` there.
+   - If your company uses its own certificate authority, add it with the standard Node setting `NODE_EXTRA_CA_CERTS=<file>` (the `ca.pem` the operator gives you). The command never runs with certificate checks turned off. When `adlc doctor` says the machine does not know the CA, this is the fix.
+3. `adlc whoami` shows who you are and your roles per project.
+4. `adlc doctor` checks your login and the API, and says what to fix (task V07): certificate checks on, the saved login file private, the API reachable over TLS and ready, your API token accepted and not near its end (a warning at 14 days or less), your roles per project, and the CLI's version against the API's. It reads only (`GET /health/live`, `/health/ready`, `/v1/me`, `/v1/me/tokens`), changes nothing and never prints your API token. One line per check (ok, warning, failed, skipped) and, for each problem, the fix; `--json` gives the same. Exit 1 when a check failed. When the API is down or you are not logged in, it says so. A problem on the server: the operator runs `pnpm doctor` there.
 
-- The API token is saved in `~/.config/sdlc/credentials.json` (or under `$XDG_CONFIG_HOME`), readable only by you. It is stored as plain text, so protect your account and your disk. If the file can be read by others, the command stops until you fix it (`chmod 600`) and log in again.
+- The API token is saved in `~/.config/adlc/credentials.json` (or under `$XDG_CONFIG_HOME`), readable only by you. A login saved by `sdlc` before v0.9.0 (`~/.config/sdlc/`) is read until `adlc` saves its own; `adlc logout` deletes both. It is stored as plain text, so protect your account and your disk. If the file can be read by others, the command stops until you fix it (`chmod 600`) and log in again.
 - **Never put the API token on the command line**, in a script, in a chat or in a ticket. There is no `--token` option. To pipe an API token in (for example from a password manager), use `--token-stdin`.
-- `sdlc logout` revokes the API token on the server, then deletes the saved login on your machine. If the server cannot be reached, it still deletes the login and says the API token is still valid: revoke it later with `sdlc token revoke` from another login.
-- Your own API tokens: `sdlc token create --name <name> [--days <n>]` (the new API token is shown once), `sdlc token list`, `sdlc token revoke --id <ID>`. Use one API token per machine.
+- `adlc logout` revokes the API token on the server, then deletes the saved login on your machine. If the server cannot be reached, it still deletes the login and says the API token is still valid: revoke it later with `adlc token revoke` from another login.
+- Your own API tokens: `adlc token create --name <name> [--days <n>]` (the new API token is shown once), `adlc token list`, `adlc token revoke --id <ID>`. Use one API token per machine.
 - In CI only, set `SDLC_API_URL` and `SDLC_API_TOKEN` (as CI secrets) instead of logging in. Do not use them on your own machine: environment variables can leak into process lists and logs.
 
 **Commands.** Add `--json` to any command for machine-readable output.
 
 | Command | Does |
 |---|---|
-| `sdlc intent create --project <slug> --title <text> --risk <tier> --data-class <class> [--description <text> \| --description-file <file>] [--budget <USD>] [--issue <number>] [--spec <path/to/spec.md> [--spec-commit <SHA>] [--spec-tool spec-kit\|bmad\|manual]]` | Creates an intent; you become its intent owner (Person A). With `--spec`, also links its spec, as `sdlc spec link` does (task U03). When the link is refused, the intent stays: the command names it, exits 1 and says how to link again |
-| `sdlc intent list [--project <slug>] [--status <status>] [--limit <n>] [--cursor <c>]` | Lists the intents you can read, newest first |
-| `sdlc intent show <INT-…>` | Shows an intent with its spec, plan and gate decisions, and **what holds it** when the platform holds it ("Held: …", the cause, until when) |
-| `sdlc next <INT>` | What you do next for this intent (task V06): the gate, who it waits for, why it is held (the reason the workflow recorded), and one advice for you: the command or comment to type, or the roles it waits for. It reads only the intent and your roles (`GET /v1/intents/:intent`, `GET /v1/me`) and changes nothing. A producer of the change (the intent's creator at G7 and G8, the person who approved G4 at G5, G7 and G8) is never told to approve; at G3 it reminds you that the person who submitted the plan cannot approve it. For an escalation it points to `sdlc escalation list --intent <INT>`. For actions outside a gate (link a spec, submit a plan, the AI record) it uses the default access roles and says so |
-| `sdlc help [topic\|command]`, `sdlc <command> --help` | Short guides (getting started, roles and the two-person rule, the gates, the comment commands, troubleshooting) and every command with its options and one example (task V10). After `intent create`, `gate approve\|reject\|request-changes`, `spec link`, `plan submit`, `escalation decide` and `run kill`, the CLI prints one line with the next step (the advice of `sdlc next`; never with `--json`). After a failure it prints what to do (for example `sdlc login`, `sdlc doctor`, `sdlc whoami`). No colours |
-| `sdlc doctor` | Checks your login and the API, and what to fix (task V07; step 4 above). Read only |
-| `sdlc gate approve <gate> <INT-…>` | Approves the gate the intent waits at |
-| `sdlc gate reject <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Rejects the gate |
-| `sdlc gate request-changes <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Requests changes |
-| `sdlc escalation list\|show\|ack\|decide …` | Chapter 18 §18.8b |
-| `sdlc run list <INT-…>` / `sdlc run kill <run ID\|INT-…>` | Lists the intent's agent runs / stops a run with the kill switch: Chapter 18 §18.8d |
-| `sdlc spec link <INT-…> --path <path/to/spec.md> [--commit <SHA>] [--tool spec-kit\|bmad\|manual]` | Links the intent's spec (below) |
-| `sdlc spec list <INT-…>` | Lists the linked spec versions: path, commit and SHA-256 |
-| `sdlc plan submit <INT-…> [--commit <SHA>]` | Submits the intent's plan file (below) |
-| `sdlc plan list <INT-…>` / `sdlc plan show <INT-…>` | Lists the submitted plan versions / shows the latest one with its path patterns, tools and change flags |
-| `sdlc plan draft <INT-…> --from <file> --tool spec-kit\|bmad [--output <file>] [--force]` | Writes a plan file draft on your machine from a Spec Kit `tasks.md` or a BMAD story file (below). Sends nothing |
-| `sdlc ai-record show --project <slug>` | Shows the project AI record |
-| `sdlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
-| `sdlc cost report [--project <slug> \| --intent <INT-…>] [--from <time>] [--to <time>] [--by project\|intent\|model\|status]` | Shows tokens and cost (below) |
-| `sdlc metrics gates [--project <slug>] [--gate G1..G8] [--mode HITL\|HOTL\|AUDIT\|POLICY] [--risk low\|medium\|high\|critical] [--from <time>] [--to <time>]` | Shows how long gates waited for people (below) |
-| `sdlc metrics agents [--project <slug>] [--agent <key>] [--model <name>] [--from <time>] [--to <time>]` | Shows whether agents and models are worth it, from real runs (below) |
-| `sdlc trial report [--project <slug>] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--max-intents <n>] [--json]` | The community trial's report (`TRIAL.md` §6): gate waits, runs, decisions, escalations, tokens and cost of the intents created in the range, **anonymous** (projects become `project-1`…, intents `intent-1`…; never a code, title, person, repository or link). Default range: the last 90 days. Built from the reads above with the same access rules; nothing is printed when the report fails its safety check (`design/ADR-M65-trial-report.md`) |
-| `sdlc evidence build <INT-…>` | Builds a new version of the intent's Evidence Pack, or returns the latest one when nothing changed: Chapter 15 §15.10.2 |
-| `sdlc evidence list <INT-…>` / `sdlc evidence show <INT-…> [--version <n>]` | Lists the pack's versions / shows one (default: the latest), with its release SHA-256 (what a G8 approval is bound to) |
-| `sdlc gate approve G8 <INT-…>` / `sdlc gate reject G8 <INT-…> --reason-code <code>` | Approves or rejects the release at G8 (Person B; at Critical risk also the second approver). The platform seals the pack and closes the intent: Chapter 15 §15.10.3 |
-| `sdlc evidence export <INT-…> [--version <n>] [--manifest] [--output <file>]` | Prints or saves the readable pack (`pack.md`), or the manifest with `--manifest`, after checking its SHA-256; `--output` never overwrites a file |
-| `sdlc evidence proposal <INT-…> [--run <run ID>] --output <file> [--force]` | Saves the patch of a High-risk (L1) run after checking its SHA-256 (client code: mode 600, never printed; every download audited). Then end the intent with `sdlc gate reject G4`: Chapter 13 §13.10.4 |
+| `adlc intent create --project <slug> --title <text> --risk <tier> --data-class <class> [--description <text> \| --description-file <file>] [--budget <USD>] [--issue <number>] [--spec <path/to/spec.md> [--spec-commit <SHA>] [--spec-tool spec-kit\|bmad\|manual]]` | Creates an intent; you become its intent owner (Person A). With `--spec`, also links its spec, as `adlc spec link` does (task U03). When the link is refused, the intent stays: the command names it, exits 1 and says how to link again |
+| `adlc intent list [--project <slug>] [--status <status>] [--limit <n>] [--cursor <c>]` | Lists the intents you can read, newest first |
+| `adlc intent show <INT-…>` | Shows an intent with its spec, plan and gate decisions, and **what holds it** when the platform holds it ("Held: …", the cause, until when) |
+| `adlc next <INT>` | What you do next for this intent (task V06): the gate, who it waits for, why it is held (the reason the workflow recorded), and one advice for you: the command or comment to type, or the roles it waits for. It reads only the intent and your roles (`GET /v1/intents/:intent`, `GET /v1/me`) and changes nothing. A producer of the change (the intent's creator at G7 and G8, the person who approved G4 at G5, G7 and G8) is never told to approve; at G3 it reminds you that the person who submitted the plan cannot approve it. For an escalation it points to `adlc escalation list --intent <INT>`. For actions outside a gate (link a spec, submit a plan, the AI record) it uses the default access roles and says so |
+| `adlc help [topic\|command]`, `adlc <command> --help` | Short guides (getting started, roles and the two-person rule, the gates, the comment commands, troubleshooting) and every command with its options and one example (task V10). After `intent create`, `gate approve\|reject\|request-changes`, `spec link`, `plan submit`, `escalation decide` and `run kill`, the CLI prints one line with the next step (the advice of `adlc next`; never with `--json`). After a failure it prints what to do (for example `adlc login`, `adlc doctor`, `adlc whoami`). No colours |
+| `adlc doctor` | Checks your login and the API, and what to fix (task V07; step 4 above). Read only |
+| `adlc gate approve <gate> <INT-…>` | Approves the gate the intent waits at |
+| `adlc gate reject <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Rejects the gate |
+| `adlc gate request-changes <gate> <INT-…> --reason-code <code> [--reason-ref <https://…>]` | Requests changes |
+| `adlc escalation list\|show\|ack\|decide …` | Chapter 18 §18.8b |
+| `adlc run list <INT-…>` / `adlc run kill <run ID\|INT-…>` | Lists the intent's agent runs / stops a run with the kill switch: Chapter 18 §18.8d |
+| `adlc spec link <INT-…> --path <path/to/spec.md> [--commit <SHA>] [--tool spec-kit\|bmad\|manual]` | Links the intent's spec (below) |
+| `adlc spec list <INT-…>` | Lists the linked spec versions: path, commit and SHA-256 |
+| `adlc plan submit <INT-…> [--commit <SHA>]` | Submits the intent's plan file (below) |
+| `adlc plan list <INT-…>` / `adlc plan show <INT-…>` | Lists the submitted plan versions / shows the latest one with its path patterns, tools and change flags |
+| `adlc plan draft <INT-…> --from <file> --tool spec-kit\|bmad [--output <file>] [--force]` | Writes a plan file draft on your machine from a Spec Kit `tasks.md` or a BMAD story file (below). Sends nothing |
+| `adlc ai-record show --project <slug>` | Shows the project AI record |
+| `adlc ai-record set --project <slug> --expected-version <n> …` | Saves a new version (same options as the operator command above, without `--tenant` and `--on-behalf-of`: you are the accountable person) |
+| `adlc cost report [--project <slug> \| --intent <INT-…>] [--from <time>] [--to <time>] [--by project\|intent\|model\|status]` | Shows tokens and cost (below) |
+| `adlc metrics gates [--project <slug>] [--gate G1..G8] [--mode HITL\|HOTL\|AUDIT\|POLICY] [--risk low\|medium\|high\|critical] [--from <time>] [--to <time>]` | Shows how long gates waited for people (below) |
+| `adlc metrics agents [--project <slug>] [--agent <key>] [--model <name>] [--from <time>] [--to <time>]` | Shows whether agents and models are worth it, from real runs (below) |
+| `adlc trial report [--project <slug>] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--max-intents <n>] [--json]` | The community trial's report (`TRIAL.md` §6): gate waits, runs, decisions, escalations, tokens and cost of the intents created in the range, **anonymous** (projects become `project-1`…, intents `intent-1`…; never a code, title, person, repository or link). Default range: the last 90 days. Built from the reads above with the same access rules; nothing is printed when the report fails its safety check (`design/ADR-M65-trial-report.md`) |
+| `adlc evidence build <INT-…>` | Builds a new version of the intent's Evidence Pack, or returns the latest one when nothing changed: Chapter 15 §15.10.2 |
+| `adlc evidence list <INT-…>` / `adlc evidence show <INT-…> [--version <n>]` | Lists the pack's versions / shows one (default: the latest), with its release SHA-256 (what a G8 approval is bound to) |
+| `adlc gate approve G8 <INT-…>` / `adlc gate reject G8 <INT-…> --reason-code <code>` | Approves or rejects the release at G8 (Person B; at Critical risk also the second approver). The platform seals the pack and closes the intent: Chapter 15 §15.10.3 |
+| `adlc evidence export <INT-…> [--version <n>] [--manifest] [--output <file>]` | Prints or saves the readable pack (`pack.md`), or the manifest with `--manifest`, after checking its SHA-256; `--output` never overwrites a file |
+| `adlc evidence proposal <INT-…> [--run <run ID>] --output <file> [--force]` | Saves the patch of a High-risk (L1) run after checking its SHA-256 (client code: mode 600, never printed; every download audited). Then end the intent with `adlc gate reject G4`: Chapter 13 §13.10.4 |
 
 - Gate decisions take **codes only**: a reason code (§19.8b) and, if you want, `--reason-ref` with an `https://` link to a comment that explains it. The platform never stores your words, because its records are kept for years.
 - The rules are the same as for comments (§19.8b): you need the gate's role, you can decide only the gate the intent waits at, and a producer never approves.
 
-<a id="spec-link"></a>**Linking a spec (G2 input).** G2 checks the intent's spec. Link it with `sdlc spec link` (task B08, `design/ADR-M39-spec-linking.md`):
+<a id="spec-link"></a>**Linking a spec (G2 input).** G2 checks the intent's spec. Link it with `adlc spec link` (task B08, `design/ADR-M39-spec-linking.md`):
 
 - Who: Person A and PM / BrSE by default (project setting `access.spec_link_roles`; the viewer role never may).
 - When: while the intent is a draft or waits at G1, G2, G3 or G4.
@@ -254,7 +254,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **If someone edits the spec on the default branch after G2**, the platform notices it at the next step: it links the new version, takes the intent back to G2 and posts a comment (`spec_changed`). Approvals of the old spec no longer count. At Low risk G2 is HOTL, so the platform may pass the new spec again, with its block window; at other tiers a person approves it again.
 - If the file is removed, renamed or cannot be read, the intent goes back to G2 and waits (`spec_unavailable`) until you restore it or link another spec.
 - If GitHub cannot be reached, the intent waits; it never passes a gate without the check.
-- <a id="g2-acceptance-criteria"></a>**G2 needs acceptance criteria** (task S01, `design/ADR-M61-spec-structure.md`). This is the one description of the G2 condition; other documents link here. When the platform reads the spec, it counts its acceptance criteria and shows the count (`sdlc spec link`, `sdlc spec list`). It keeps the count, never the text. G2 passes only when a spec is linked and has at least one criterion, at every risk tier and in every oversight mode: the platform's HOTL pass at Low risk needs it too. Otherwise the platform records `fail spec_unclear`, posts a comment, and the intent waits at G2 (`spec_unclear`); nobody can approve G2 until the spec has criteria. Person A may still reject G2 or request changes.
+- <a id="g2-acceptance-criteria"></a>**G2 needs acceptance criteria** (task S01, `design/ADR-M61-spec-structure.md`). This is the one description of the G2 condition; other documents link here. When the platform reads the spec, it counts its acceptance criteria and shows the count (`adlc spec link`, `adlc spec list`). It keeps the count, never the text. G2 passes only when a spec is linked and has at least one criterion, at every risk tier and in every oversight mode: the platform's HOTL pass at Low risk needs it too. Otherwise the platform records `fail spec_unclear`, posts a comment, and the intent waits at G2 (`spec_unclear`); nobody can approve G2 until the spec has criteria. Person A may still reject G2 or request changes.
 - Name the tool with `--tool` so the platform reads the right structure:
 
   | `--tool` | Where the platform finds the criteria | One criterion |
@@ -264,9 +264,9 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
   | `manual`, or no `--tool` | a heading with "Acceptance criteria" or 受入基準, for example `## 受入基準 / Acceptance criteria` | each top-level list item under it |
 
   If the tool's structure is not found, the platform tries the other structures. Template text that was never filled in (`[initial state]`, `{{precondition}}`) and text that is not a list item do not count.
-- A spec linked before this rule existed has no count: link it again (`sdlc spec link` with the same path) and the platform counts it.
+- A spec linked before this rule existed has no count: link it again (`adlc spec link` with the same path) and the platform counts it.
 
-<a id="plan-file"></a>**Submitting a plan (G3 input).** G3 checks the intent's task plan (template T13). Submit it with `sdlc plan submit` (task B09, `design/ADR-M40-plan-submission.md`):
+<a id="plan-file"></a>**Submitting a plan (G3 input).** G3 checks the intent's task plan (template T13). Submit it with `adlc plan submit` (task B09, `design/ADR-M40-plan-submission.md`):
 
 - Where: the file `.sdlc/plans/<intent code>.yaml`, for example `.sdlc/plans/INT-2026-0007.yaml`, **merged into the default branch** first. The platform reads it from GitHub and keeps its SHA-256, path patterns, tools and change flags; summaries and other text stay in the repository.
 - Who: Person A by default (project setting `access.plan_submit_roles`; the viewer role never may). **Whoever submits a plan never approves it at G3**: Person B does.
@@ -292,10 +292,10 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - The run gets the agent's registered tools that the plan lists. If none is in common, G4 fails (`plan_tools_not_registered`).
 - **Register tools** (Chapter 20 §20.5c) are listed as `tool:<key>`, for example `tools: [file_editor, tool:project-docs]`. A register tool the plan lists must be given to the run: if the run cannot have it (the tool does not exist, the agent is not registered for it, it is not active, it may not see the intent's data class, or the agent software cannot use it), G4 fails with `tool_not_runnable` and the exact cause, and the intent waits at G4. Fix the cause, or submit a plan without the tool.
 - Leave out `--commit`, or give a commit that holds the same file as the default branch; otherwise the platform refuses (`plan_not_on_default_branch`). The platform always records the head of the default branch it read as the plan's commit, also when you name an older commit (QUESTIONS #212). A refused file answers `plan_invalid` with the reason, for example `pattern_too_broad` or `platform_field`.
-- **If someone edits the plan file on the default branch after you submitted it**, G3 or G4 waits (`plan_resubmit_needed`) and the platform posts a comment. It never takes the new file by itself: submit it again with `sdlc plan submit`. At G4 a new plan takes the intent back to G3, where Person B approves it again; earlier approvals no longer count.
+- **If someone edits the plan file on the default branch after you submitted it**, G3 or G4 waits (`plan_resubmit_needed`) and the platform posts a comment. It never takes the new file by itself: submit it again with `adlc plan submit`. At G4 a new plan takes the intent back to G3, where Person B approves it again; earlier approvals no longer count.
 - If GitHub cannot be reached, the intent waits; it never passes G3 or starts a run without the check.
 
-<a id="plan-draft"></a>**Drafting a plan from Spec Kit or BMAD.** If the team already has a task list, `sdlc plan draft` writes the plan file for you to complete (task S02, `design/ADR-M62-plan-draft.md`). It runs on your machine only: it calls no API, runs no Git command and never submits, commits or pushes.
+<a id="plan-draft"></a>**Drafting a plan from Spec Kit or BMAD.** If the team already has a task list, `adlc plan draft` writes the plan file for you to complete (task S02, `design/ADR-M62-plan-draft.md`). It runs on your machine only: it calls no API, runs no Git command and never submits, commits or pushes.
 
 - Sources (the pinned versions): a Spec Kit `tasks.md` (`--tool spec-kit`) or a BMAD **story** file (`--tool bmad`). A BMAD epics file is refused: one intent is one story, so draft from the story file. The file must be UTF-8 text of at most 256 KiB.
 - What it writes:
@@ -304,10 +304,10 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **What you decide.** Each task's `allowed_paths` and `tools`, and the plan's `change_flags`, are written as `null` under a comment `PERSON MUST FILL` or `PERSON MUST DECIDE`. The platform refuses the file (`schema_invalid`) until you fill them. Write `change_flags: []` when no flag applies. Paths that a Spec Kit task names are listed in comments as suggestions only: check them before you copy them.
 - A task list that still holds template text (`[Entity1]`, `Task 1 (AC: #)`) is refused: fill it first.
 - Where: `.sdlc/plans/<INT-…>.yaml` at the root of your repository (the nearest folder with `.git`, also when you run the command in a sub-folder), or the file you name with `--output`. An existing file is replaced only with `--force`.
-- Then: check every task, fill the marked fields, commit the file to the default branch and run `sdlc plan submit <INT-…>`. You are the producer of the plan, as if you had written it by hand.
+- Then: check every task, fill the marked fields, commit the file to the default branch and run `adlc plan submit <INT-…>`. You are the producer of the plan, as if you had written it by hand.
 
 
-<a id="cost-report"></a>**Reading the cost report.** `sdlc cost report` shows what the model calls cost (task E04, `design/ADR-M45-cost-report.md`, D-02 FR-53):
+<a id="cost-report"></a>**Reading the cost report.** `adlc cost report` shows what the model calls cost (task E04, `design/ADR-M45-cost-report.md`, D-02 FR-53):
 
 - Who: the whole tenant (no `--project`, no `--intent`): tenant admins only. One project or one intent: a tenant admin, or a role in the project setting `access.cost_read_roles` (by default Person A, Person B, PM / BrSE, governance and admin). The viewer role never may.
 - When: times are UTC, written `YYYY-MM-DD` (00:00 that day) or `YYYY-MM-DDThh:mm:ssZ`. `--from` is included and `--to` is excluded: `--from 2026-10-01 --to 2026-11-01` is all of October. Without them, the report covers the current month until now. At most 366 days. A range that is empty (`--to` not after `--from`) or longer than 366 days is refused: the API answers 400 `invalid_request` with the reason `range_empty` or `range_too_long`, and the command exits with code 2. So does a time in another format, or `--project` together with `--intent`.
@@ -315,7 +315,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - **Wasted** = tokens and cost of runs that ended failed, cancelled or stopped (budget, scope, time, stalled, killed). Runs that succeeded, and L1 runs that produced a proposal, are not wasted. Runs sent back later by G6 or G7 are not counted as wasted yet.
 - **The numbers are as fresh as the last copy from the model gateway.** The platform copies spend every few minutes (5 by default) and again when a run ends, so a run still in progress shows its cost so far. Calls of the last few minutes may not be shown yet. Every report ends with the time of the latest recorded call, the time of the last copy, and the number of runs still in progress.
 
-<a id="gate-metrics"></a>**Reading the gate waiting times.** `sdlc metrics gates` shows how long the gates waited for a person's decision (task E06, `design/ADR-M47-gate-metrics.md`, D-02 FR-12). Use it to see whether the gates slow the team down.
+<a id="gate-metrics"></a>**Reading the gate waiting times.** `adlc metrics gates` shows how long the gates waited for a person's decision (task E06, `design/ADR-M47-gate-metrics.md`, D-02 FR-12). Use it to see whether the gates slow the team down.
 
 - Who: the whole tenant (no `--project`): tenant admins only. One project: a tenant admin, or a role in the project setting `access.metrics_read_roles` (by default Person A, Person B, the second approver, PM / BrSE, governance and admin). The viewer role never may.
 - When: the same time formats as the cost report. `--from` is included, `--to` is excluded. Without them, the last 30 days until now. At most 366 days; a bad range is refused with 400 and exit code 2. The range selects the decisions by the time they were recorded.
@@ -330,7 +330,7 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 - The report never shows who decided: it is about the gates, not about people.
 - `--gate`, `--mode` (the oversight mode of the decision) and `--risk` (the intent's risk tier) narrow the rows. At most 500 rows are shown.
 
-<a id="agent-metrics"></a>**Reading the agent report.** `sdlc metrics agents` shows how agents and models did in real work, per project, agent version and model (task V13, `design/ADR-M79-agent-metrics.md`, D-02 FR-53, D-07 §5). It reads runs, gate decisions and cost records the platform already holds. It answers "is this agent worth its cost?". For a controlled comparison of agents and models on fixed tasks, see the evaluation harness (task L02, not built yet).
+<a id="agent-metrics"></a>**Reading the agent report.** `adlc metrics agents` shows how agents and models did in real work, per project, agent version and model (task V13, `design/ADR-M79-agent-metrics.md`, D-02 FR-53, D-07 §5). It reads runs, gate decisions and cost records the platform already holds. It answers "is this agent worth its cost?". For a controlled comparison of agents and models on fixed tasks, see the evaluation harness (task L02, not built yet).
 
 - Who: a tenant admin for the whole tenant (no `--project`). For one project: a tenant admin, or a role that is in **both** `access.cost_read_roles` and `access.metrics_read_roles` (by default Person A, Person B, PM / BrSE, governance and admin; not the second approver, not the viewer). A role in only one list gets 403; no role on the project gets 404.
 - When: the same time formats and limits as the gate times. The report counts the runs created in the range (`--from` included, `--to` excluded); without them, the last 30 days. At most 366 days.
@@ -343,14 +343,14 @@ The `sdlc` command does through the API what the comment commands do on GitHub, 
 
 | Command | What it does |
 |---|---|
-| `sdlc eval plan list --project <slug>` | The project's plans: status, next run, a run that waits, the last refusal |
-| `sdlc eval plan show <plan-id>` | One plan: what it runs, when, its budgets, its versions and evaluations |
-| `sdlc eval plan create --project <slug> --file <plan.json>` | A new plan from a JSON file (at most 64 KB) |
-| `sdlc eval plan change <plan-id> --file <plan.json> --expected-version <n>` | A new version; refused when someone changed it since you read it |
-| `sdlc eval plan archive <plan-id>` | Ends the plan for good |
-| `sdlc eval run <plan-id>` | Run now: the platform starts the evaluation within a minute |
-| `sdlc eval list --project <slug>` / `--plan <plan-id>`, `sdlc eval show <EVAL-…>` | Evaluations: status, runs by status, spend |
-| `sdlc eval report <EVAL-…>` | The report of one evaluation: each configuration's resolved rate with its 95% interval, pass@k and pass^k, CI on the first try, cost per resolved run; the comparisons on the same tasks; the recommendations; for people with a role in both `access.cost_read_roles` and `access.metrics_read_roles`, the real runs of the same models in the last 30 days |
+| `adlc eval plan list --project <slug>` | The project's plans: status, next run, a run that waits, the last refusal |
+| `adlc eval plan show <plan-id>` | One plan: what it runs, when, its budgets, its versions and evaluations |
+| `adlc eval plan create --project <slug> --file <plan.json>` | A new plan from a JSON file (at most 64 KB) |
+| `adlc eval plan change <plan-id> --file <plan.json> --expected-version <n>` | A new version; refused when someone changed it since you read it |
+| `adlc eval plan archive <plan-id>` | Ends the plan for good |
+| `adlc eval run <plan-id>` | Run now: the platform starts the evaluation within a minute |
+| `adlc eval list --project <slug>` / `--plan <plan-id>`, `adlc eval show <EVAL-…>` | Evaluations: status, runs by status, spend |
+| `adlc eval report <EVAL-…>` | The report of one evaluation: each configuration's resolved rate with its 95% interval, pass@k and pass^k, CI on the first try, cost per resolved run; the comparisons on the same tasks; the recommendations; for people with a role in both `access.cost_read_roles` and `access.metrics_read_roles`, the real runs of the same models in the last 30 days |
 
 The plan file holds codes, numbers and amounts only: `code`, `data_class`, `task_set_version`, `task_ids` (empty: every task), `runs_per_task`, `budget_per_run_usd`, `monthly_cap_usd`, `trigger` (`once`, `schedule`, `on_change`), `schedule` (`every` `daily` or `weekly`, `hour` in UTC, `weekday` 1–7) and `configurations`. A configuration names an agent of the register (`agent_key`) or a model (`model`, `provider_type`) run by the project's default agent, its caps (`max_iterations`, `max_duration_min`), and optionally `prompt_path`: **a file on the project's default branch** to try instead of `AGENTS.md`. The platform keeps that file's path, commit and SHA-256, never its text, and reads it again when a run starts. The agent of the register may be `proposed`, `active` or `suspended`, never `quarantined` or `retired`: test a new version before it is approved (Chapter 20 §20.5b). In the runs, the agent gets its own tools from the register (a model: the tools of the project's default agent). Budgets: each run has `budget_per_run_usd`; the plan spends at most `monthly_cap_usd` per UTC month (then its schedule pauses until next month); the tenant's monthly budget applies too. Amounts change only by a new version, never below what the plan spent this month. When the platform cannot start a run (a model the gateway no longer lists, a missing task, the cap used up), the plan shows the reason as its last refusal.
 
@@ -358,18 +358,18 @@ The plan file holds codes, numbers and amounts only: `code`, `data_class`, `task
 
 | Command | What it does |
 |---|---|
-| `sdlc eval task draft <INT-…> --project <slug> --task <id>` | Writes the task card `.sdlc/eval-tasks/<id>.yaml` on your machine (never over a file without `--force`). It says when the test commands are missing: write them in the card |
-| `sdlc eval task register <id> --project <slug>` | After a person merged the card through a normal pull request: the platform reads it from the default branch and stores its path, commit and SHA-256 |
-| `sdlc eval task list --project <slug>` | The project's tasks: status, the code of a failed check, the card's SHA-256 |
-| `sdlc eval task approve <task-uuid> --card <sha256>` | Approves a task whose check passed |
-| `sdlc eval task reject <task-uuid> --card <sha256> --reason <code>` | Rejects it: `not_representative`, `tests_weak`, `too_large`, `needs_environment` or `other` |
+| `adlc eval task draft <INT-…> --project <slug> --task <id>` | Writes the task card `.sdlc/eval-tasks/<id>.yaml` on your machine (never over a file without `--force`). It says when the test commands are missing: write them in the card |
+| `adlc eval task register <id> --project <slug>` | After a person merged the card through a normal pull request: the platform reads it from the default branch and stores its path, commit and SHA-256 |
+| `adlc eval task list --project <slug>` | The project's tasks: status, the code of a failed check, the card's SHA-256 |
+| `adlc eval task approve <task-uuid> --card <sha256>` | Approves a task whose check passed |
+| `adlc eval task reject <task-uuid> --card <sha256> --reason <code>` | Rejects it: `not_representative`, `tests_weak`, `too_large`, `needs_environment` or `other` |
 
 - **The check.** The server checks every registered task before anybody reviews it, with no agent and no cost. It installs the repository with `pnpm install --frozen-lockfile` (other package managers are not supported yet), with no network for the tests. The hidden tests must **fail** on the commit before the change and **pass** with the reference solution. A failed check has a code: `passes_without_change`, `solution_fails`, `install_failed`, `card_changed`, `spec_changed`, `hidden_test_missing`, or `check_lost` (the server could not finish it three times). Tests that need a browser or a database fail the check.
 - **The review.** A person with a role in `access.eval_roles` approves or rejects the task. That person never worked on the intent: not its creator, not the person who started its runs or submitted its plan, not an author of its commits. The approval is bound to the card's SHA-256: a changed card is checked and reviewed again (register it again).
 - **A removed card** makes its task `gone`: it never runs again; its past results stay.
 - **Running it.** In a plan file, write `"task_set_kind": "project"` and `"task_set_version": null` (in the dashboard, write `project` in the task set field). `task_ids` may name some approved tasks; empty means every approved task. When the evaluation starts, the platform reads the cards on the default branch. A card that changed since its approval is left out. The evaluation records that commit with the task IDs: this is the version of the set, and the report shows both. Each run starts at its own task's commit.
 - **Data class.** The plan's data class is never below the data class of an intent its tasks came from (`data_class_below_tasks`). `client_restricted` data goes to self-hosted models only. A plan with no approved task to run is refused (`task_set_empty`).
-- `sdlc ops eval start` runs the numbered task sets only. A project's own task set runs through a plan.
+- `adlc ops eval start` runs the numbered task sets only. A project's own task set runs through a plan.
 
 <a id="exit-codes"></a>**When a command fails.** The message says why. The exit code tells scripts what happened (this is the one list; other documents link here):
 
@@ -379,7 +379,7 @@ The plan file holds codes, numbers and amounts only: `code`, `data_class`, `task
 | 1 | The platform refused (no role, not found, conflict, rule broken, too many requests) |
 | 2 | Wrong command or options, not logged in, unsafe saved login, or a request the API refuses as malformed (HTTP 400, for example a bad time range) |
 | 3 | The platform could not be reached, failed (HTTP 5xx) or answered something unexpected |
-| 4 | Your API token is missing, expired or revoked: get a new one and run `sdlc login` |
+| 4 | Your API token is missing, expired or revoked: get a new one and run `adlc login` |
 
 ## 19.8d. Using the platform: setting up a team (admins)
 
@@ -395,7 +395,7 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 
 **The rules the platform enforces.**
 
-- **Nobody gives a role to themselves**, and nobody disables themselves. Ask another admin. A team with only one admin asks the platform operator, who does it on the server (`sdlc ops role grant`).
+- **Nobody gives a role to themselves**, and nobody disables themselves. Ask another admin. A team with only one admin asks the platform operator, who does it on the server (`adlc ops role grant`).
 - <a id="conflicting-roles"></a>**Person A and Person B are never the same person on a project.** Some other pairs of roles are kept apart too; the project configuration lists them (`access.conflicting_roles`). The defaults are two pairs: Person A and Person B (rule M21: a project can never remove it), and Person B and the second approver. A project may add or remove the other pairs. A role that would break a pair is refused.
 - **The tenant always keeps one tenant admin.** The last one cannot be removed or disabled: make someone else a tenant admin first.
 - A role is never deleted: it is revoked, and the history stays. A GitHub account is unlinked, not deleted.
@@ -404,16 +404,16 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
 
 **Set up a new project, step by step** (all commands take `--json`):
 
-1. Create the project: `sdlc admin project create --slug <slug> --name <name> --repo <owner/name> [--default-branch <branch>]`.
-2. Add each person: `sdlc admin user create --email <email> --name <name>`.
-3. Link each person's GitHub account: `sdlc admin identity link --user <email> --github-id <numeric ID> --github-login <login>`. Without it, the person's `/approve` comments are refused.
-4. Give the roles: `sdlc admin role grant --project <slug> --user <email> --role <role>`, for example `person_a`, `person_b`, `second_approver`, `pm_brse`, `governance`, `admin` or `viewer` (Chapter 5).
-5. If the project needs settings other than the defaults, upload its configuration: `sdlc admin config show --project <slug>` shows the version in force (0 = the defaults), then `sdlc admin config set --project <slug> --file <config.yaml> --expected-version <version>`.
+1. Create the project: `adlc admin project create --slug <slug> --name <name> --repo <owner/name> [--default-branch <branch>]`.
+2. Add each person: `adlc admin user create --email <email> --name <name>`.
+3. Link each person's GitHub account: `adlc admin identity link --user <email> --github-id <numeric ID> --github-login <login>`. Without it, the person's `/approve` comments are refused.
+4. Give the roles: `adlc admin role grant --project <slug> --user <email> --role <role>`, for example `person_a`, `person_b`, `second_approver`, `pm_brse`, `governance`, `admin` or `viewer` (Chapter 5).
+5. If the project needs settings other than the defaults, upload its configuration: `adlc admin config show --project <slug>` shows the version in force (0 = the defaults), then `adlc admin config set --project <slug> --file <config.yaml> --expected-version <version>`.
    - The platform refuses a configuration that loosens a mandatory rule, and says which line and which rule.
    - It accepts other loosening (for example HOTL instead of HITL at G2 for Medium risk), shows a warning for each, and records the warnings in the audit log.
-6. Ask the PM / BrSE or Person A to save the project AI record (`sdlc ai-record set`, §19.8b). Intents wait before G1 until it exists.
+6. Ask the PM / BrSE or Person A to save the project AI record (`adlc ai-record set`, §19.8b). Intents wait before G1 until it exists.
 
-<a id="project-file"></a>**Set up a project from one file** (task V17). Steps 1–5 above can also come from one YAML file: `sdlc admin project apply --file project.yaml [--dry-run] [--yes]`. Keep the file outside the application repository. It holds no secret: the platform refuses a file with an unknown key. A commented example: [`platform/deploy/project.example.yaml`](../../platform/deploy/project.example.yaml).
+<a id="project-file"></a>**Set up a project from one file** (task V17). Steps 1–5 above can also come from one YAML file: `adlc admin project apply --file project.yaml [--dry-run] [--yes]`. Keep the file outside the application repository. It holds no secret: the platform refuses a file with an unknown key. A commented example: [`platform/deploy/project.example.yaml`](../../platform/deploy/project.example.yaml).
 
 ```yaml
 format: 1
@@ -458,33 +458,33 @@ A refused file writes nothing. Running the same file again changes nothing. If a
 
 What the command never does, because it belongs to a person:
 
-- It never revokes a role. A role the file does not list is shown and kept; revoke it with `sdlc admin role revoke`.
-- It never changes a registered agent. A difference is shown; an agent change needs `sdlc admin agent update` with a new version and new approvals.
+- It never revokes a role. A role the file does not list is shown and kept; revoke it with `adlc admin role revoke`.
+- It never changes a registered agent. A difference is shown; an agent change needs `adlc admin agent update` with a new version and new approvals.
 - It never approves the agent, never writes the project AI record and never issues a token.
 - It never gives you a role: nobody gives a role to themselves. Ask another admin.
 
-At the end it prints, per person, the commands that are still theirs: first tokens (`sdlc admin token issue`), the agent approvals of the owner and Person B, and the project AI record by Person A. For GitHub Enterprise Server, set `SDLC_GITHUB_API_URL` (for example `https://github.example.com/api/v3`).
+At the end it prints, per person, the commands that are still theirs: first tokens (`adlc admin token issue`), the agent approvals of the owner and Person B, and the project AI record by Person A. For GitHub Enterprise Server, set `SDLC_GITHUB_API_URL` (for example `https://github.example.com/api/v3`).
 
 **Other admin commands.**
 
 | Command | Does |
 |---|---|
-| `sdlc admin project list`, `show`, `update`, `archive` | An archived project takes no new roles or configuration. An archive is refused while the project has open intents (`project_has_open_intents`): finish or cancel them first. About 7 days after the archive the platform deletes the project's evidence files, except held ones (below). There is no un-archive command |
-| `sdlc admin evidence hold <INT-…> [--ref <https link>]`, `release <INT-…>`, `show <INT-…>` | Puts an intent's evidence on hold: the platform keeps its evidence files until the hold is released, also past the retention and after an archive. For a dispute, an incident or a client request. Tenant admins, or the roles in `access.evidence_hold_roles` (by default governance and admin; never viewer). Write the reason where it can be edited and give its link with `--ref`: the platform keeps no text |
-| `sdlc admin user list`, `show`, `update`, `disable`, `enable --user <id or email>` | A disabled person's tokens stop working at once |
-| `sdlc admin user sign-out --user <id or email>` | Ends every dashboard session of the person, in every browser (§19.8e) |
-| `sdlc admin passkey list --user <id or email> [--all]`, `revoke --user <id or email> --id <passkey-id>` | A person's dashboard passkeys; remove one, for example after a device was lost (§19.8e). `--all` also shows removed ones. People add passkeys in the dashboard only |
-| `sdlc admin identity list --user <id or email> [--all]`, `unlink --user <id or email> --id <identity ID>` | `--all` also shows unlinked accounts |
-| `sdlc admin role list --project <slug> [--all]`, `revoke --project <slug> --id <role ID>` | `--all` also shows revoked roles |
-| `sdlc admin tenant-admin grant --user <id or email>`, `list [--all]`, `revoke --id <ID>` | Tenant admins only |
-| `sdlc admin token issue --user <id or email> --name <name> [--days <1-7>]` | A first API token for a new person, shown once. It lasts at most 7 days: the person creates their own API token and revokes this one |
-| `sdlc admin token list\|revoke --user <id or email> …` | Anyone's API tokens, for example after a laptop was lost |
-| `sdlc admin agent …` | The agent register, Chapter 20 §20.5b |
-| `sdlc audit verify` | Checks your tenant's audit log (exit code 1 when a record was changed) |
+| `adlc admin project list`, `show`, `update`, `archive` | An archived project takes no new roles or configuration. An archive is refused while the project has open intents (`project_has_open_intents`): finish or cancel them first. About 7 days after the archive the platform deletes the project's evidence files, except held ones (below). There is no un-archive command |
+| `adlc admin evidence hold <INT-…> [--ref <https link>]`, `release <INT-…>`, `show <INT-…>` | Puts an intent's evidence on hold: the platform keeps its evidence files until the hold is released, also past the retention and after an archive. For a dispute, an incident or a client request. Tenant admins, or the roles in `access.evidence_hold_roles` (by default governance and admin; never viewer). Write the reason where it can be edited and give its link with `--ref`: the platform keeps no text |
+| `adlc admin user list`, `show`, `update`, `disable`, `enable --user <id or email>` | A disabled person's tokens stop working at once |
+| `adlc admin user sign-out --user <id or email>` | Ends every dashboard session of the person, in every browser (§19.8e) |
+| `adlc admin passkey list --user <id or email> [--all]`, `revoke --user <id or email> --id <passkey-id>` | A person's dashboard passkeys; remove one, for example after a device was lost (§19.8e). `--all` also shows removed ones. People add passkeys in the dashboard only |
+| `adlc admin identity list --user <id or email> [--all]`, `unlink --user <id or email> --id <identity ID>` | `--all` also shows unlinked accounts |
+| `adlc admin role list --project <slug> [--all]`, `revoke --project <slug> --id <role ID>` | `--all` also shows revoked roles |
+| `adlc admin tenant-admin grant --user <id or email>`, `list [--all]`, `revoke --id <ID>` | Tenant admins only |
+| `adlc admin token issue --user <id or email> --name <name> [--days <1-7>]` | A first API token for a new person, shown once. It lasts at most 7 days: the person creates their own API token and revokes this one |
+| `adlc admin token list\|revoke --user <id or email> …` | Anyone's API tokens, for example after a laptop was lost |
+| `adlc admin agent …` | The agent register, Chapter 20 §20.5b |
+| `adlc audit verify` | Checks your tenant's audit log (exit code 1 when a record was changed) |
 
-**Operator commands on the server.** The platform operator keeps a few commands that work straight on the database, for the first person of a tenant and for when the API is down: `sdlc ops bootstrap`, `sdlc ops token …`, `sdlc ops audit verify`, `sdlc ops tenant-admin …`, `sdlc ops role grant|revoke` (for a team with only one admin), `sdlc ops ai-record …`, `sdlc ops agent show|list|suspend|quarantine`, and `sdlc ops retention report --tenant <slug>` (counts only: per project, the evidence files stored, due for deletion, held, purged; runbook T11 §5j). `sdlc ops eval start --tenant <slug> --project <slug> --config <file> --budget <USD> [--n <runs>]` queues an evaluation: the platform runs agent configurations on a fixed task set through the deployed runner and keeps numbers and codes per tenant (deployment README "Evaluations on the server"; it prints the evaluation code and the counts only, and is recorded in the audit log as done by the platform; reading the results by command comes with a later task). They are recorded in the audit log as done by the platform.
+**Operator commands on the server.** The platform operator keeps a few commands that work straight on the database, for the first person of a tenant and for when the API is down: `adlc ops bootstrap`, `adlc ops token …`, `adlc ops audit verify`, `adlc ops tenant-admin …`, `adlc ops role grant|revoke` (for a team with only one admin), `adlc ops ai-record …`, `adlc ops agent show|list|suspend|quarantine`, and `adlc ops retention report --tenant <slug>` (counts only: per project, the evidence files stored, due for deletion, held, purged; runbook T11 §5j). `adlc ops eval start --tenant <slug> --project <slug> --config <file> --budget <USD> [--n <runs>]` queues an evaluation: the platform runs agent configurations on a fixed task set through the deployed runner and keeps numbers and codes per tenant (deployment README "Evaluations on the server"; it prints the evaluation code and the counts only, and is recorded in the audit log as done by the platform; reading the results by command comes with a later task). They are recorded in the audit log as done by the platform.
 
-**The daily audit anchor.** Once a day the platform copies the latest hash of your tenant's audit log to storage that nobody can change or delete for two years, and checks the earlier copies against the log. `sdlc audit verify` finds a changed record; the daily check also finds a log that was rewritten as a whole. A difference appears in your audit log as `audit.anchor_mismatch`, and the operator follows runbook T11 §5k.
+**The daily audit anchor.** Once a day the platform copies the latest hash of your tenant's audit log to storage that nobody can change or delete for two years, and checks the earlier copies against the log. `adlc audit verify` finds a changed record; the daily check also finds a log that was rewritten as a whole. A difference appears in your audit log as `audit.anchor_mismatch`, and the operator follows runbook T11 §5k.
 
 **How long evidence is kept.** Evidence files (the agent's changes, the Evidence Packs) are kept `retention.evidence_retention_days` after the intent ends: 180 days by default, never less, at most 3650 (mandatory rule M31). The intent's records in the platform (decisions, hashes, the audit log) are never deleted. The platform starts deleting only when the operator turns it on (runbook T11 §5j).
 
@@ -502,15 +502,15 @@ The dashboard shows in one page what the CLI shows one command at a time. With a
 
 1. Type your tenant's name (for example `acme`) and choose **Sign in with GitHub**.
 2. GitHub asks you to confirm the platform's App the first time. Then you are back on the dashboard, signed in.
-3. Only an active user whose GitHub account is linked by a tenant admin gets in (`sdlc admin identity link`). Every other case shows the same message: **Sign-in with GitHub was refused**. Check the tenant's name, then ask a tenant admin.
+3. Only an active user whose GitHub account is linked by a tenant admin gets in (`adlc admin identity link`). Every other case shows the same message: **Sign-in with GitHub was refused**. Check the tenant's name, then ask a tenant admin.
 4. The platform reads only your GitHub account number and gives up GitHub's access at once: it never acts on GitHub as you.
-5. The session ends after **30 minutes without use**, and after **8 hours** at most. A reload keeps it. **Sign out** ends it in this browser; **Sign out everywhere** ends every session you have, in every browser. A tenant admin can sign a person out everywhere: `sdlc admin user sign-out --user <id or email>`. Disabling a user or unlinking their GitHub account ends their sessions too.
+5. The session ends after **30 minutes without use**, and after **8 hours** at most. A reload keeps it. **Sign out** ends it in this browser; **Sign out everywhere** ends every session you have, in every browser. A tenant admin can sign a person out everywhere: `adlc admin user sign-out --user <id or email>`. Disabling a user or unlinking their GitHub account ends their sessions too.
 6. On `http://localhost`, **Safari cannot sign in with GitHub**: WebKit, Safari's engine, keeps no `Secure` cookie there, so the sign-in is refused (tested 2026-10-12). Use Chrome or Firefox on the platform machine; Safari works on the HTTPS team address (team access, task V09). The personal token works in Safari too.
 
 **Sign in with your API token** (always possible).
 
-1. Paste your API token (`sdlc_pat_…`, the one you use for the CLI; create one with `sdlc token create`) and choose **Sign in**.
-2. The API token stays in the memory of that browser tab only. A reload, closing the tab or **Sign out** forgets it. The dashboard never puts it in the address, in browser storage or in a cookie. **Sign out** does not revoke the API token: `sdlc token revoke` does.
+1. Paste your API token (`sdlc_pat_…`, the one you use for the CLI; create one with `adlc token create`) and choose **Sign in**.
+2. The API token stays in the memory of that browser tab only. A reload, closing the tab or **Sign out** forgets it. The dashboard never puts it in the address, in browser storage or in a cookie. **Sign out** does not revoke the API token: `adlc token revoke` does.
 
 With the API token the dashboard only reads: it changes nothing but your own sign-out. The actions below need a GitHub sign-in, actions on, and for decisions a passkey.
 
@@ -519,7 +519,7 @@ With the API token the dashboard only reads: it changes nothing but your own sig
 1. Sign in **with GitHub** (the personal token has no passkey screen). The menu then shows **Passkeys**.
 2. Within **5 minutes** of signing in, open **Passkeys** and choose **Add a passkey**. Your browser asks your device; confirm with your fingerprint, face or PIN. After 5 minutes the platform refuses: sign out, sign in with GitHub again, and add it at once.
 3. Add one on each device you use; at most 10. The list shows when each was added and last used, and the authenticator's model number when the device reports one. The platform keeps only the public part of the key, never a name or a secret.
-4. **Remove** a passkey you no longer use (a lost or replaced device): choose **Remove**, then **Remove this passkey**. A tenant admin can list and remove a person's passkeys: `sdlc admin passkey list --user <id or email> [--all]`, `sdlc admin passkey revoke --user <id or email> --id <passkey-id>`.
+4. **Remove** a passkey you no longer use (a lost or replaced device): choose **Remove**, then **Remove this passkey**. A tenant admin can list and remove a person's passkeys: `adlc admin passkey list --user <id or email> [--all]`, `adlc admin passkey revoke --user <id or email> --id <passkey-id>`.
 5. A passkey belongs to the address you made it on: one made on `http://localhost:8090` does not work on the team address, and the other way round. Add one where you work.
 6. Each change the page sends carries a security token of your session and comes from the dashboard's own address; the platform refuses anything else. If a change fails with "did not come from the dashboard page", reload the page.
 7. Without a passkey you can still read in the dashboard and decide with the CLI or a comment on GitHub.
@@ -528,24 +528,24 @@ With the API token the dashboard only reads: it changes nothing but your own sig
 
 | Action | Where | Confirmed with | Same as |
 |---|---|---|---|
-| **Approve**, **Reject**, **Request changes** a gate (G1–G6, G8) | An intent, under **Who decides this gate** | Your passkey | `sdlc gate approve\|reject\|request-changes` |
+| **Approve**, **Reject**, **Request changes** a gate (G1–G6, G8) | An intent, under **Who decides this gate** | Your passkey | `adlc gate approve\|reject\|request-changes` |
 | Open the pull request (G7) | An intent at G7 | (review and merge on GitHub) | the GitHub review |
-| **Kill run** | An intent, in the runs table, while a run is provisioning or running | A question in the browser | `sdlc run kill` |
-| **Acknowledge** an escalation | **Escalations** | Nothing more | `sdlc escalation ack` |
-| **Decide** an escalation | **Escalations** | Your passkey | `sdlc escalation decide` |
-| Create an intent (**New intent**), and link its spec | **Intents and gates** | Nothing more | `sdlc intent create --spec` |
-| **Submit plan** | An intent, under **Execution Plan (G3)** | Nothing more | `sdlc plan submit` |
-| **Build Evidence Pack** | An intent, under **Evidence Packs** | Nothing more | `sdlc evidence build` |
-| Save the proposal of a High-risk (L1) run | An intent: the page shows the command | (the CLI only) | `sdlc evidence proposal` |
+| **Kill run** | An intent, in the runs table, while a run is provisioning or running | A question in the browser | `adlc run kill` |
+| **Acknowledge** an escalation | **Escalations** | Nothing more | `adlc escalation ack` |
+| **Decide** an escalation | **Escalations** | Your passkey | `adlc escalation decide` |
+| Create an intent (**New intent**), and link its spec | **Intents and gates** | Nothing more | `adlc intent create --spec` |
+| **Submit plan** | An intent, under **Execution Plan (G3)** | Nothing more | `adlc plan submit` |
+| **Build Evidence Pack** | An intent, under **Evidence Packs** | Nothing more | `adlc evidence build` |
+| Save the proposal of a High-risk (L1) run | An intent: the page shows the command | (the CLI only) | `adlc evidence proposal` |
 
 1. Before a gate decision, the page shows what you decide on: the hash of the gate's input (the spec, the plan or the diff) and, when there is one, the spec and plan hashes. The decision is bound to that input. If the input changed while you were reading, the platform refuses with "The input to this gate changed while you were reviewing": reload the page and look again.
 2. A refused decision shows the same sentence as a refused comment command: for example "You produced this change, so you cannot approve it (separation of duties)", "You do not hold a role that may decide this gate", or "You already approved this: dual approval needs two different people".
 3. A reject or a request for changes asks for a reason code. Write the explanation where it can be edited or deleted (a GitHub comment) and give its link as the reason link.
 4. A decision made in the dashboard is recorded with the source `web` and your user ID, the same as a decision from the CLI. The platform never records your session or passkey there.
-5. A new intent created in the dashboard is a draft, the same as one from `sdlc intent create`. To link its spec at once, fill **Spec path in the repository** (a Markdown file on the default branch), and optionally a commit and the spec tool. The page then makes the two calls of `sdlc intent create --spec`. If the platform refuses the spec, **the intent stays**: the page says why (for example "The spec cannot be read (cause: missing)") and shows the command to link it again, `sdlc spec link`.
+5. A new intent created in the dashboard is a draft, the same as one from `adlc intent create`. To link its spec at once, fill **Spec path in the repository** (a Markdown file on the default branch), and optionally a commit and the spec tool. The page then makes the two calls of `adlc intent create --spec`. If the platform refuses the spec, **the intent stays**: the page says why (for example "The spec cannot be read (cause: missing)") and shows the command to link it again, `adlc spec link`.
 6. **Submit plan** sends the plan file `.sdlc/plans/<INT-…>.yaml` as it is on the default branch (§19.8c). With a commit, the file at that commit must be the same as the head. Whoever submits a plan never approves it at G3. A refused file shows why, in the same words as the CLI.
 7. **Build Evidence Pack** makes a new version when the recorded data changed; otherwise the page says "Nothing changed since version N" and makes none.
-8. The proposal of a High-risk (L1) run is never downloaded in the browser: the page shows the command, for example `sdlc evidence proposal INT-2026-0010 --run <run ID> --output <file>`. The CLI checks the file's SHA-256 and writes it with mode 600.
+8. The proposal of a High-risk (L1) run is never downloaded in the browser: the page shows the command, for example `adlc evidence proposal INT-2026-0010 --run <run ID> --output <file>`. The CLI checks the file's SHA-256 and writes it with mode 600.
 9. Who may do each action comes from the project's roles, the same as for the CLI (by default only Person A creates intents, links specs and submits plans; Person A, Person B, PM / BrSE, governance and admin build packs; never a viewer). A refusal says which role list decides, for example `access.plan_submit_roles`.
 
 Never publish the API's port 8090 to other machines. People on other machines use team access, the operator's TLS proxy on one LAN port (`platform/deploy/README.md`, "Team access").
@@ -554,16 +554,16 @@ Never publish the API's port 8090 to other machines. People on other machines us
 
 | Screen | What it shows | Same as |
 |---|---|---|
-| **Intents and gates** | The open intents, one row per gate, the longest wait first. Each card shows how long the intent has waited at its gate, the links to its issue and pull request, and two marks: **past deadline** (an overdue escalation) and **frozen** (an escalation freezes the intent). **Finished** lists the closed intents | `sdlc intent list` |
-| **An intent** | Where it stands on G1–G8; **who decides this gate** (the oversight mode, the approver roles and how many approvals, as the workflow resolves it); its decisions, runs, open escalations and Evidence Packs, with the pack files to download | `sdlc intent show`, `sdlc run list`, `sdlc evidence list\|export` |
-| **Escalations** | Open and acknowledged escalations, the nearest deadline first: severity, route, the role that holds the current step, the acknowledge or resolve clock | `sdlc escalation list` |
-| **Cost and gate times** | Per project (or the whole tenant, for tenant admins): how long each gate waits for people (average, 90th percentile, longest, waiting now), and the model cost by intent, model or run status, with the wasted part | `sdlc metrics gates`, `sdlc cost report` |
-| **Audit check** | Tenant admins only: checks the tenant's audit chain, on request | `sdlc audit verify` |
-| **Passkeys** | With a GitHub sign-in and actions on: your passkeys; add and remove them | `sdlc admin passkey list` (tenant admins, for a person) |
+| **Intents and gates** | The open intents, one row per gate, the longest wait first. Each card shows how long the intent has waited at its gate, the links to its issue and pull request, and two marks: **past deadline** (an overdue escalation) and **frozen** (an escalation freezes the intent). **Finished** lists the closed intents | `adlc intent list` |
+| **An intent** | Where it stands on G1–G8; **who decides this gate** (the oversight mode, the approver roles and how many approvals, as the workflow resolves it); its decisions, runs, open escalations and Evidence Packs, with the pack files to download | `adlc intent show`, `adlc run list`, `adlc evidence list\|export` |
+| **Escalations** | Open and acknowledged escalations, the nearest deadline first: severity, route, the role that holds the current step, the acknowledge or resolve clock | `adlc escalation list` |
+| **Cost and gate times** | Per project (or the whole tenant, for tenant admins): how long each gate waits for people (average, 90th percentile, longest, waiting now), and the model cost by intent, model or run status, with the wasted part | `adlc metrics gates`, `adlc cost report` |
+| **Audit check** | Tenant admins only: checks the tenant's audit chain, on request | `adlc audit verify` |
+| **Passkeys** | With a GitHub sign-in and actions on: your passkeys; add and remove them | `adlc admin passkey list` (tenant admins, for a person) |
 
-**"Who decides this gate" and "what holds it".** "Who decides this gate" names the people (or the platform) that decide the gate. **What holds it** shows why the platform keeps the intent where it is, as the workflow recorded it the last time it looked: a failed G4 check and which one, a plan to submit again, a spec that cannot be read, a frozen intent, CI still running, a HOTL block window and when it closes. The board shows it on the card as **held**. A plain wait for a person's decision is not a hold. The same reason is printed by `sdlc intent show`.
+**"Who decides this gate" and "what holds it".** "Who decides this gate" names the people (or the platform) that decide the gate. **What holds it** shows why the platform keeps the intent where it is, as the workflow recorded it the last time it looked: a failed G4 check and which one, a plan to submit again, a spec that cannot be read, a frozen intent, CI still running, a HOTL block window and when it closes. The board shows it on the card as **held**. A plain wait for a person's decision is not a hold. The same reason is printed by `adlc intent show`.
 
-**Evaluations** (task L05). Pick a project to see its evaluation plans and latest evaluations. With a role in `access.eval_roles`, a GitHub sign-in and actions on, you create a plan (the same fields as the plan file of §19.8c; a prompt variant is a path on the default branch, never text), change it (a new version), archive it (asked twice), and press **Run now**. Run now is always confirmed with your passkey; so is a plan that runs on a schedule or on a change, or a higher budget. One evaluation's screen shows its runs by status, what it spent of its budget, and its **report** (task L06), read-only and the same as `sdlc eval report`. Each rate comes with its 95% interval: a wide interval means few tasks. Two configurations are called different only when McNemar's test and the intervals both show it; otherwise the report says "no difference found on N tasks", which is not the same as "as good as". The recommendations come from fixed rules and quote the numbers they rest on. They are proposals only: a change of model or prompt still goes through the agent register, as a new version with its approvals. The Evaluations page also lists the evaluations that ended in the last 7 days in your projects (with a role in `access.eval_roles`); `sdlc next` without an intent prints the same list.
+**Evaluations** (task L05). Pick a project to see its evaluation plans and latest evaluations. With a role in `access.eval_roles`, a GitHub sign-in and actions on, you create a plan (the same fields as the plan file of §19.8c; a prompt variant is a path on the default branch, never text), change it (a new version), archive it (asked twice), and press **Run now**. Run now is always confirmed with your passkey; so is a plan that runs on a schedule or on a change, or a higher budget. One evaluation's screen shows its runs by status, what it spent of its budget, and its **report** (task L06), read-only and the same as `adlc eval report`. Each rate comes with its 95% interval: a wide interval means few tasks. Two configurations are called different only when McNemar's test and the intervals both show it; otherwise the report says "no difference found on N tasks", which is not the same as "as good as". The recommendations come from fixed rules and quote the numbers they rest on. They are proposals only: a change of model or prompt still goes through the agent register, as a new version with its approvals. The Evaluations page also lists the evaluations that ended in the last 7 days in your projects (with a role in `access.eval_roles`); `adlc next` without an intent prints the same list.
 
 **Times.** Waiting times are wall-clock time, not working hours. A deadline in the next hour shows in amber, a missed one in red.
 

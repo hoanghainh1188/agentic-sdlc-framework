@@ -109,7 +109,7 @@ export function intakeErrorKey(
 
 /** The CLI command that saves an L1 run's proposal (ADR-M64: never a browser download). */
 export function proposalCommand(intent: string, runId: string): string {
-  return `sdlc evidence proposal ${intent} --run ${runId} --output <file>`;
+  return `adlc evidence proposal ${intent} --run ${runId} --output <file>`;
 }
 
 const SHA = /^[0-9a-f]{40}$/;

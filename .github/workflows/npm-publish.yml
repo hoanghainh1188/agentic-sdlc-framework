@@ -1,4 +1,5 @@
-# Publishes the CLI to npm as `agentic-sdlc-cli` (task V05, design/ADR-M72, QUESTIONS #365–#367).
+# Publishes the CLI to npm as `@hoanghainh/governed-adlc` (task V05, design/ADR-M72, QUESTIONS
+# #365–#367; the name since v0.9.0: ADR-M100, QUESTIONS #631; before it `agentic-sdlc-cli`).
 #
 # Only a released tag `vX.Y.Z` starts it: release.yml dispatches it on the tag after the GitHub
 # Release exists (ADR-M94 §2.3), and a person always makes the tag. The job runs in the
@@ -81,7 +82,7 @@ jobs:
         run: platform/tools/release/verify-images.sh "$RUNNER_TEMP/images.txt" "$TAG"
 
   publish:
-    name: publish agentic-sdlc-cli
+    name: publish @hoanghainh/governed-adlc
     needs: verify-images
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -116,7 +117,7 @@ jobs:
       - name: Keep the checked tarball
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: agentic-sdlc-cli
+          name: governed-adlc-npm
           path: ${{ runner.temp }}/npm/*.tgz
           retention-days: 30
       - name: Publish with provenance

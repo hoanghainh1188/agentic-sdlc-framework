@@ -1,4 +1,4 @@
-// `sdlc escalation …` (B04 AC4, ADR-M28 §2.7) and `sdlc ai-record …` (B04 AC5, ADR-M32 §2.4)
+// `adlc escalation …` (B04 AC4, ADR-M28 §2.7) and `adlc ai-record …` (B04 AC5, ADR-M32 §2.4)
 // against a mocked API, and a sweep that the token never reaches the output.
 import { t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
@@ -10,7 +10,7 @@ import { apiError, TOKEN, useHarness, type Routes } from './harness.js';
 const harness = useHarness();
 const ESC = '/v1/escalations/ESC-2026-0003';
 
-describe('sdlc escalation', () => {
+describe('adlc escalation', () => {
   it('lists with filters', async () => {
     const h = await harness({
       routes: { 'GET /v1/escalations': { status: 200, body: { items: [escalationBody()] } } },
@@ -151,7 +151,7 @@ describe('sdlc escalation', () => {
   });
 });
 
-describe('sdlc ai-record', () => {
+describe('adlc ai-record', () => {
   const PATH = '/v1/projects/pilot/ai-record';
   const SET = [
     'ai-record',

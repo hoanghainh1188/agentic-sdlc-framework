@@ -1,6 +1,6 @@
 // Who does an admin change, and may they (task B13, QUESTIONS #150, ADR-M37 §2.1).
 // A person acts through the API with their own token. The operator acts on the server with the
-// database (`sdlc admin bootstrap`, later `sdlc ops …`): actor `system`, no role check, and the
+// database (`adlc admin bootstrap`, later `adlc ops …`): actor `system`, no role check, and the
 // audit event has no actor ID (ADR-M26 §2.2). Separation-of-duties rules apply to both.
 import type { Project } from '../db/schema.js';
 import type { TenantScope } from '../db/tenant-scope.js';

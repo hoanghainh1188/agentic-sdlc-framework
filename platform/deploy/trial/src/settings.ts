@@ -13,7 +13,7 @@ export interface TrialPerson {
   /** Numeric GitHub account ID (QUESTIONS #45): never the login. */
   readonly githubId: string;
   readonly githubLogin: string;
-  /** The person's `XDG_CONFIG_HOME`: their credentials file is `<configHome>/sdlc/credentials.json`. */
+  /** The person's `XDG_CONFIG_HOME`: their credentials file is `<configHome>/adlc/credentials.json`. */
   readonly configHome: string;
 }
 
@@ -152,7 +152,12 @@ export function parseSettings(yamlText: string, home: string): TrialSettings {
 
 /** The credentials file the CLI writes for a person (`apps/cli/src/credentials/store.ts`). */
 export function credentialsFile(p: TrialPerson): string {
-  return path.join(p.configHome, 'sdlc', 'credentials.json');
+  return path.join(p.configHome, 'adlc', 'credentials.json');
+}
+
+/** The new file and the one of the old command `sdlc`, which the CLI still reads (ADR-M100 §2.3). */
+export function credentialsFiles(p: TrialPerson): string[] {
+  return [credentialsFile(p), path.join(p.configHome, 'sdlc', 'credentials.json')];
 }
 
 /** The files that hold secrets: they must exist and be readable by their owner only. */

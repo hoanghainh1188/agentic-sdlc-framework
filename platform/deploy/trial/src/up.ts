@@ -11,7 +11,7 @@
 //   `ops role grant` gives them `person_a` (nobody grants a role to themselves through the API);
 // - Person B's token comes from `ops token issue` (90 days): a token a tenant admin issues for
 //   someone else lives at most 7 days (B13), shorter than a trial;
-// - each person's token goes only into their own credentials file, through `sdlc login`.
+// - each person's token goes only into their own credentials file, through `adlc login`.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -62,7 +62,7 @@ const STEP_MESSAGES = {
 /** The agent's tools (handbook Ch.20; ADR-M29: the only tools the adapter allows). */
 const AGENT_TOOLS = 'file_editor,task_tracker,terminal';
 
-/** One `sdlc …` command in this process (`runCli`); stdout is its `--json` answer. */
+/** One `adlc …` command in this process (`runCli`); stdout is its `--json` answer. */
 export type Sdlc = (
   argv: readonly string[],
   env: Readonly<Record<string, string>>,
@@ -210,19 +210,19 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
     return JSON.parse(r.stdout) as Record<string, unknown>;
   };
   const ops = (argv: readonly string[]) =>
-    sdlcJson(['ops', ...argv], { SDLC_DB_URL: opsUrl }, `sdlc ops ${argv[0]}`);
+    sdlcJson(['ops', ...argv], { SDLC_DB_URL: opsUrl }, `adlc ops ${argv[0]}`);
   const tokens = { a: '', b: '' };
   const asA = (argv: readonly string[]) =>
     sdlcJson(
       argv,
       { SDLC_API_URL: apiUrl, SDLC_API_TOKEN: tokens.a },
-      `sdlc ${argv.slice(0, 3).join(' ')}`,
+      `adlc ${argv.slice(0, 3).join(' ')}`,
     );
   const asB = (argv: readonly string[]) =>
     sdlcJson(
       argv,
       { SDLC_API_URL: apiUrl, SDLC_API_TOKEN: tokens.b },
-      `sdlc ${argv.slice(0, 3).join(' ')}`,
+      `adlc ${argv.slice(0, 3).join(' ')}`,
     );
   const { personA: a, personB: b, tenant, project } = settings;
 
@@ -437,7 +437,7 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
   await login(b, tokens.b);
   return { apiUrl, project, composeProject, model, sandboxImage: image };
 
-  /** `sdlc login --token-stdin` into the person's own config folder (mode 600, by the CLI). */
+  /** `adlc login --token-stdin` into the person's own config folder (mode 600, by the CLI). */
   async function login(p: TrialPerson, token: string): Promise<void> {
     fs.mkdirSync(p.configHome, { recursive: true, mode: 0o700 });
     ok(
@@ -446,7 +446,7 @@ export async function trialUp(settings: TrialSettings, deps: UpDeps): Promise<Up
         { XDG_CONFIG_HOME: p.configHome },
         token,
       ),
-      'sdlc login',
+      'adlc login',
     );
   }
 }

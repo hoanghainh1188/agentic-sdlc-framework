@@ -1,4 +1,4 @@
-// ASCII banner with professional gradient colours for the `sdlc` CLI and terminal output.
+// ASCII banner with professional gradient colours for the `adlc` CLI and terminal output.
 import { PLATFORM_VERSION } from './version.js';
 
 export const BANNER_LINES: readonly string[] = [

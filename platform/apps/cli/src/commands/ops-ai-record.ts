@@ -1,9 +1,9 @@
-// `sdlc admin ai-record set|show`: the project AI record (task B12, handbook Ch.2 §2.5, template
+// `adlc admin ai-record set|show`: the project AI record (task B12, handbook Ch.2 §2.5, template
 // T7, design/ADR-M32 §2.4). Operator commands, run on the server with SDLC_DB_URL (`platform_app`),
-// like `sdlc admin agent`. There is no user login: the audit event uses actor `system`, and the
+// like `adlc admin agent`. There is no user login: the audit event uses actor `system`, and the
 // change is recorded on behalf of `--on-behalf-of`, who must hold a write role on the project
 // (config `access.ai_record_write_roles`). The API (`PUT /v1/projects/:project/ai-record`) is the
-// path with a logged-in user; B04 adds `sdlc ai-record` over it.
+// path with a logged-in user; B04 adds `adlc ai-record` over it.
 import { parseArgs } from 'node:util';
 
 import {

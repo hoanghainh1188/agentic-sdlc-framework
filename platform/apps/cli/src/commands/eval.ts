@@ -1,12 +1,12 @@
-// `sdlc eval …`: evaluation plans and evaluations over the API (task L05, design/ADR-M82 §2.7).
-// - `sdlc eval plan list --project <slug>` and `sdlc eval plan show <plan-id>`;
-// - `sdlc eval plan create --project <slug> --file <plan.json>` and
-//   `sdlc eval plan change <plan-id> --file <plan.json> --expected-version <n>`: the file holds the
+// `adlc eval …`: evaluation plans and evaluations over the API (task L05, design/ADR-M82 §2.7).
+// - `adlc eval plan list --project <slug>` and `adlc eval plan show <plan-id>`;
+// - `adlc eval plan create --project <slug> --file <plan.json>` and
+//   `adlc eval plan change <plan-id> --file <plan.json> --expected-version <n>`: the file holds the
 //   plan's fields as the API takes them (codes, numbers, amounts, a prompt variant's path; never a
 //   prompt text), at most 64 KB;
-// - `sdlc eval plan archive <plan-id>`; `sdlc eval run <plan-id>` (Run now: the worker starts it);
-// - `sdlc eval list --project <slug> | --plan <plan-id>` and `sdlc eval show <EVAL-…>`;
-// - `sdlc eval report <EVAL-…>` (task L06, ADR-M83): the report with its recommendations by rules
+// - `adlc eval plan archive <plan-id>`; `adlc eval run <plan-id>` (Run now: the worker starts it);
+// - `adlc eval list --project <slug> | --plan <plan-id>` and `adlc eval show <EVAL-…>`;
+// - `adlc eval report <EVAL-…>` (task L06, ADR-M83): the report with its recommendations by rules
 //   and the real-run numbers of V13 for the same models; every text from the catalog.
 // A role in the project's `access.eval_roles` changes and runs plans; a role on the project reads.
 import fs from 'node:fs';

@@ -1,5 +1,5 @@
-// `sdlc` command line: argument handling without a database, for the operator commands
-// (`sdlc ops …`, renamed from `sdlc admin …` in B13, ADR-M37 §2.8). The audit check itself runs
+// `adlc` command line: argument handling without a database, for the operator commands
+// (`adlc ops …`, renamed from `sdlc admin …` in B13, ADR-M37 §2.8). The audit check itself runs
 // against PostgreSQL in tests/integration/db/audit-log.test.ts.
 import { t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
@@ -20,7 +20,7 @@ function context(env: Record<string, string> = {}) {
   return { ctx, out, err };
 }
 
-describe('sdlc', () => {
+describe('adlc', () => {
   it.each([[[]], [['audit']], [['unknown']]])(
     'prints the usage and exits 2 for %j',
     async (argv) => {

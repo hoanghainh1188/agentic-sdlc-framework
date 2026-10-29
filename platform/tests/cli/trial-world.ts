@@ -1,4 +1,4 @@
-// A mocked API for `sdlc trial report` (task V01, ADR-M65): every answer is built with the API's
+// A mocked API for `adlc trial report` (task V01, ADR-M65): every answer is built with the API's
 // own presenters, so the mock cannot drift from the real API. The world holds slugs, intent codes,
 // titles, UUIDs, an e-mail and a repository on purpose: none of them may reach the report.
 import { presentCostReport } from '../../apps/api/src/cost/present.js';

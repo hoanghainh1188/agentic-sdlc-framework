@@ -144,6 +144,15 @@ function firstPositional(args) {
   return args.find((a) => !a.startsWith('-'));
 }
 
+/** The CLI's command names: `adlc`, and `sdlc` (the old name, ADR-M100 §2.5). */
+const CLI_NAMES = new Set(['adlc', 'sdlc']);
+
+/** `ops bootstrap …` and `ops token …` print a token once (rule R035). */
+function printsOperatorSecret(cliArgs) {
+  const [ops, action] = cliArgs.filter((a) => !a.startsWith('-'));
+  return ops === 'ops' && (action === 'bootstrap' || action === 'token');
+}
+
 function checkPackageManager(cmd, args) {
   const first = firstPositional(args);
   if (first === 'publish') return 'R040';
@@ -159,10 +168,8 @@ function checkPackageManager(cmd, args) {
     if (['init', 'unseal', 'root-token'].includes(action) || action.endsWith('-credentials'))
       return 'R035';
   }
-  if (script === 'sdlc') {
-    const [ops, action] = scriptArgs.filter((a) => !a.startsWith('-'));
-    if (ops === 'ops' && (action === 'bootstrap' || action === 'token')) return 'R035';
-  }
+  // `pnpm adlc …`; `pnpm sdlc …` is its alias until v0.10.0 and stays refused (ADR-M100 §2.5).
+  if (CLI_NAMES.has(script) && printsOperatorSecret(scriptArgs)) return 'R035';
   if (script === 'github-app:create') return 'R035';
   // `pnpm server:setup` shows key shares and asks for tokens (D-08 V16, QUESTIONS #616).
   if (script === 'server:setup') return 'R035';
@@ -191,6 +198,7 @@ function checkSegment(segment) {
   if (cmd === 'git') return checkGit(args);
   if (cmd === 'npm' || cmd === 'pnpm' || cmd === 'yarn') return checkPackageManager(cmd, args);
   if (cmd === 'gh') return checkGh(args);
+  if (CLI_NAMES.has(cmd) && printsOperatorSecret(args)) return 'R035';
   if (cmd === 'node' && args.some((a) => /server-setup\/(?:dist|src)\/main\.[jt]s$/.test(a)))
     return 'R035';
   if (cmd === 'bootstrap.sh') {

@@ -1,4 +1,4 @@
-// The checks of `sdlc doctor` (task V07 AC2): pure functions from the facts `doctor.ts` gathered
+// The checks of `adlc doctor` (task V07 AC2): pure functions from the facts `doctor.ts` gathered
 // to one result per check, each with a catalog text and, when it is not ok, the fix to run. No
 // check ever sees the token: the facts hold the API address, the API's answers and the dates only.
 import type { Me } from '@sdlc/api-schemas';

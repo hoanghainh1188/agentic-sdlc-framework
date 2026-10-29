@@ -5,7 +5,8 @@
 // 2. no packed file holds an absolute path of the build machine, a source map reference, an API
 //    token or a private key;
 // 3. the tarball installs into an empty folder outside the repository (`npm install -g --prefix`)
-//    and `sdlc --version` prints the version, `sdlc` alone prints the usage text (exit 2).
+//    and `adlc --version` prints the version, `adlc` alone prints the usage text (exit 2), and the
+//    old name `sdlc --version` prints the same version with the rename note on stderr (ADR-M100).
 // `--out <dir>` keeps the tarball there (the tag workflow uploads it). Never publishes.
 import { execFile } from 'node:child_process';
 import { access, copyFile, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -22,6 +23,7 @@ const PACKED_FILES = [
   'LICENSE',
   'README.md',
   'THIRD-PARTY-NOTICES',
+  'bin/adlc.cjs',
   'bin/sdlc.cjs',
   'defaults/project-config.default.yaml',
   'package.json',
@@ -67,7 +69,7 @@ async function checkContents(files) {
 }
 
 /** Runs the installed command with a clean environment and an empty home folder. */
-async function sdlc(bin, args, home) {
+async function runBin(bin, args, home) {
   const env = { PATH: process.env.PATH, HOME: home, XDG_CONFIG_HOME: path.join(home, '.config') };
   try {
     const { stdout, stderr } = await run(bin, args, { cwd: home, env });
@@ -78,7 +80,7 @@ async function sdlc(bin, args, home) {
 }
 
 async function checkInstall(version, outDir) {
-  const work = await mkdtemp(path.join(tmpdir(), 'sdlc-cli-check-'));
+  const work = await mkdtemp(path.join(tmpdir(), 'adlc-cli-check-'));
   try {
     const { stdout } = await run(
       'npm',
@@ -97,18 +99,26 @@ async function checkInstall(version, outDir) {
       ['install', '-g', '--prefix', prefix, '--ignore-scripts', '--no-audit', '--no-fund', tarball],
       { cwd: home, env: { ...process.env, HOME: home } },
     );
-    const bin = path.join(prefix, 'bin', 'sdlc');
-    const installed = path.join(prefix, 'lib', 'node_modules', 'agentic-sdlc-cli');
+    const bin = path.join(prefix, 'bin', 'adlc');
+    const legacyBin = path.join(prefix, 'bin', 'sdlc');
+    const installed = path.join(prefix, 'lib', 'node_modules', '@hoanghainh', 'governed-adlc');
     await access(path.join(installed, 'defaults', 'project-config.default.yaml'));
 
-    const versionRun = await sdlc(bin, ['--version'], home);
+    const versionRun = await runBin(bin, ['--version'], home);
     if (versionRun.code !== 0 || versionRun.stdout.trim() !== version) {
-      fail(`sdlc --version: exit ${versionRun.code}, output "${versionRun.stdout.trim()}"`);
+      fail(`adlc --version: exit ${versionRun.code}, output "${versionRun.stdout.trim()}"`);
     }
-    const usageRun = await sdlc(bin, [], home);
-    if (usageRun.code !== 2 || !usageRun.stderr.startsWith('Usage: sdlc')) {
-      fail(`sdlc without arguments: exit ${usageRun.code}, no usage text`);
+    if (versionRun.stderr !== '') fail('adlc --version wrote to stderr');
+    const usageRun = await runBin(bin, [], home);
+    if (usageRun.code !== 2 || !usageRun.stderr.startsWith('Usage: adlc')) {
+      fail(`adlc without arguments: exit ${usageRun.code}, no usage text`);
     }
+    // ADR-M100 §2.2: the old name runs the same command and says once that it is now `adlc`.
+    const legacyRun = await runBin(legacyBin, ['--version'], home);
+    if (legacyRun.code !== 0 || legacyRun.stdout.trim() !== version) {
+      fail(`sdlc --version: exit ${legacyRun.code}, output "${legacyRun.stdout.trim()}"`);
+    }
+    if (!legacyRun.stderr.includes('`sdlc` is now `adlc`')) fail('sdlc printed no rename note');
     if (outDir !== undefined) await copyFile(tarball, path.join(outDir, filename));
     process.stdout.write(`cli-package check: ${filename} (${size} bytes) installs and runs\n`);
   } finally {

@@ -263,7 +263,7 @@ describe.skipIf(!enabled)(
             ['openbao.sealed', 'worker.runs_off'].includes(e),
         );
         expect(problems).toEqual([]);
-        // `sdlc ops audit verify` (every tenant, as the operator) exits non-zero on a broken chain.
+        // `adlc ops audit verify` (every tenant, as the operator) exits non-zero on a broken chain.
         expect(current.sdlc('operator', ['ops', 'audit', 'verify'])).toEqual([
           expect.objectContaining({ tenant: 'fresh', ok: true, broken: null }),
         ]);
@@ -293,7 +293,7 @@ describe.skipIf(!enabled)(
       expect(worker.stdout).not.toMatch(/nondetermin|workflow task failed/i);
 
       expect(current.sdlc('admin', ['audit', 'verify'])).toMatchObject({ ok: true, broken: null });
-      // `sdlc ops audit verify` (every tenant, as the operator) exits non-zero on a broken chain.
+      // `adlc ops audit verify` (every tenant, as the operator) exits non-zero on a broken chain.
       expect(current.sdlc('operator', ['ops', 'audit', 'verify'])).toEqual([
         expect.objectContaining({ tenant: 'fresh', ok: true, broken: null }),
       ]);

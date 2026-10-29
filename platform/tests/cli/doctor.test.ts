@@ -1,4 +1,4 @@
-// `sdlc doctor` (task V07 AC2–AC4): the pure checks, the health probe's failure names, and the
+// `adlc doctor` (task V07 AC2–AC4): the pure checks, the health probe's failure names, and the
 // command against a mocked API. Read only: GET requests only, never the token in the output, and
 // every case of a missing login, a down API or a refused token gives a result instead of failing.
 import { PLATFORM_VERSION } from '@sdlc/api-schemas';
@@ -45,7 +45,7 @@ const byId = (results: readonly CheckResult[]) =>
 const statuses = (results: readonly CheckResult[]) =>
   Object.fromEntries(results.map((r) => [r.id, r.status]));
 
-describe('sdlc doctor: the checks (pure)', () => {
+describe('adlc doctor: the checks (pure)', () => {
   it('gives every check once, in a fixed order, all ok on a good login', () => {
     const results = evaluate(facts());
     expect(results.map((r) => r.id)).toEqual([...CHECK_IDS]);
@@ -87,7 +87,7 @@ describe('sdlc doctor: the checks (pure)', () => {
     expect(results.slice(1).every((r) => r.status === 'skipped')).toBe(true);
   });
 
-  it('no login: fails with sdlc login, and skips the API checks', () => {
+  it('no login: fails with adlc login, and skips the API checks', () => {
     const r = byId(evaluate(facts({ login: { source: 'none' } })));
     expect(r['cli.api_url']).toMatchObject({
       status: 'failed',
@@ -228,7 +228,7 @@ describe('sdlc doctor: the checks (pure)', () => {
   });
 });
 
-describe('sdlc doctor: the health probe', () => {
+describe('adlc doctor: the health probe', () => {
   const failing = (cause: Record<string, unknown>) =>
     Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('x'), cause) });
 
@@ -271,7 +271,7 @@ describe('sdlc doctor: the health probe', () => {
   });
 });
 
-describe('sdlc doctor: the command', () => {
+describe('adlc doctor: the command', () => {
   const harness = useHarness();
   const later = (days: number) => new Date(Date.now() + days * DAY);
 
@@ -358,7 +358,7 @@ describe('sdlc doctor: the command', () => {
     noToken(h);
   });
 
-  it('a refused token: exit 1 with sdlc login; a warning alone exits 0', async () => {
+  it('a refused token: exit 1 with adlc login; a warning alone exits 0', async () => {
     const refused = await harness({
       routes: goodRoutes({ 'GET /v1/me': apiError(401, 'unauthorized') }),
     });
@@ -393,6 +393,6 @@ describe('sdlc doctor: the command', () => {
   });
 
   it('cli.usage names it', () => {
-    expect(t('cli.usage')).toMatch(/^ {4}sdlc doctor /m);
+    expect(t('cli.usage')).toMatch(/^ {4}adlc doctor /m);
   });
 });

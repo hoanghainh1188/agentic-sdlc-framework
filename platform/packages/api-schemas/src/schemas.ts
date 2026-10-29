@@ -36,7 +36,7 @@ export const meSchema = z.object({
   token_id: id.nullable(),
   auth: z.enum(['token', 'session']).optional(),
   tenant_admin: z.boolean().optional(),
-  // V07 (QUESTIONS #401): the API's release version; missing from APIs before it (`sdlc doctor`).
+  // V07 (QUESTIONS #401): the API's release version; missing from APIs before it (`adlc doctor`).
   platform_version: z.string().max(64).optional(),
   roles: z
     .array(z.object({ project: z.object({ id, slug: code.nullable() }), role: code }))

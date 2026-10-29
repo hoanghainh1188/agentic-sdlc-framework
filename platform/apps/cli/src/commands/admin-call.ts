@@ -1,4 +1,4 @@
-// Shared parts of the `sdlc admin …` commands over the API (task B13, ADR-M37 §2.7).
+// Shared parts of the `adlc admin …` commands over the API (task B13, ADR-M37 §2.7).
 import type { ParseArgsConfig } from 'node:util';
 
 import type { ApiClient } from '../api/client.js';
@@ -11,7 +11,7 @@ export interface AdminApiCommand {
   readonly options: NonNullable<ParseArgsConfig['options']>;
   /** Options that must be given. */
   readonly required: readonly string[];
-  /** Positional arguments after the command (E05: `sdlc admin evidence hold <INT>`); default 0. */
+  /** Positional arguments after the command (E05: `adlc admin evidence hold <INT>`); default 0. */
   readonly positionals?: number;
   readonly run: (call: AdminCall) => Promise<number>;
 }

@@ -1,4 +1,4 @@
-// `sdlc ai-record show|set` over the API (D-08 B04 AC5; ADR-M32 §2.4, handbook Ch.19 §19.8b).
+// `adlc ai-record show|set` over the API (D-08 B04 AC5; ADR-M32 §2.4, handbook Ch.19 §19.8b).
 // The caller is the accountable person: they need a write role on the project for `set`
 // (config `access.ai_record_write_roles`). `--expected-version` is the version read (0 creates
 // the record); a stale version is refused (409 `ai_record_version_conflict`).

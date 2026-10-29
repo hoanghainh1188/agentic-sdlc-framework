@@ -1,4 +1,4 @@
-// `sdlc doctor [--json]` (task V07 AC2, AC3): checks this machine's login and the API it talks
+// `adlc doctor [--json]` (task V07 AC2, AC3): checks this machine's login and the API it talks
 // to, and says what to fix. Read only: `GET /health/live`, `GET /health/ready`, `GET /v1/me`,
 // `GET /v1/me/tokens`; no new endpoint (QUESTIONS #401 adds `platform_version` to `/v1/me`).
 // It never prints the token, and works when the API is down or the login is missing (it says so).

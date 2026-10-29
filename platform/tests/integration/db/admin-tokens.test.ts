@@ -1,7 +1,7 @@
 // D-08 B13 AC5 on a live PostgreSQL, through the Nest app and Fastify `inject()` (no port):
 // personal API tokens through the API (own tokens; a tenant admin's first token for another user,
 // at most 7 days, audited with the issuer, QUESTIONS #152), `DELETE /v1/me/tokens/current` for
-// `sdlc logout`, and `sdlc audit verify` through the API for tenant admins. No token in the logs.
+// `adlc logout`, and `adlc audit verify` through the API for tenant admins. No token in the logs.
 import { createHash } from 'node:crypto';
 
 import { sql } from 'kysely';
@@ -157,7 +157,7 @@ describeDb('B13 AC5: tokens and the audit check through the API', () => {
       status(await inject('GET', '/v1/me', created.token), 401, 'unauthorized');
     });
 
-    it('revokes the token of the request (sdlc logout)', async () => {
+    it('revokes the token of the request (adlc logout)', async () => {
       const created = status(
         await inject('POST', '/v1/me/tokens', user.token, { name: 'session' }),
         201,

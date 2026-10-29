@@ -1,7 +1,7 @@
-// `sdlc ops agent show|list|suspend|quarantine`: the agent register on the server (task C10,
+// `adlc ops agent show|list|suspend|quarantine`: the agent register on the server (task C10,
 // ADR-M31 §2.2; task B13, QUESTIONS #153, ADR-M37 §2.8). Operator commands with SDLC_DB_URL
 // (`platform_app`), audited as actor `system`. Registering, changing, approving, activating and
-// retiring an agent go through the API (`sdlc admin agent …`), where handbook Ch.20's approval
+// retiring an agent go through the API (`adlc admin agent …`), where handbook Ch.20's approval
 // rules are enforced. Only the two safety moves stay here, for when the API is down; an agent is
 // never activated through ops.
 import { parseArgs } from 'node:util';
@@ -41,7 +41,7 @@ const SPECS = {
 } as const;
 type Command = keyof typeof SPECS;
 
-/** The `sdlc ops agent` commands; `cli.ops.usage` lists them (test `cli/usage-texts.test.ts`). */
+/** The `adlc ops agent` commands; `cli.ops.usage` lists them (test `cli/usage-texts.test.ts`). */
 export const OPS_AGENT_COMMANDS: readonly string[] = Object.keys(SPECS);
 type AgentStatus = Agent['status'];
 

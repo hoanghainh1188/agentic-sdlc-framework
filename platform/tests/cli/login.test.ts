@@ -1,4 +1,4 @@
-// `sdlc login|logout|whoami` against a mocked API (B04 AC1–AC3, design/ADR-M36 §2.1–§2.3).
+// `adlc login|logout|whoami` against a mocked API (B04 AC1–AC3, design/ADR-M36 §2.1–§2.3).
 import { chmod, stat } from 'node:fs/promises';
 
 import { t } from '@sdlc/messages';
@@ -12,7 +12,7 @@ import { API_URL, apiError, TOKEN, useHarness } from './harness.js';
 const harness = useHarness();
 const ME = { 'GET /v1/me': { status: 200, body: meBody() } };
 
-describe('sdlc login', () => {
+describe('adlc login', () => {
   it('reads the token from a hidden prompt, checks it with /v1/me and saves it (mode 600)', async () => {
     const h = await harness({ routes: ME, loggedIn: false, tty: true, hidden: `${TOKEN}\n` });
     expect(await h.run(['login', '--api-url', `${API_URL}/`])).toBe(EXIT.ok);
@@ -144,7 +144,7 @@ describe('sdlc login', () => {
   });
 });
 
-describe('sdlc logout', () => {
+describe('adlc logout', () => {
   // B13 (ADR-M36 §4, ADR-M37 §2.8): the token is revoked on the server first.
   it('revokes the token on the server, then deletes the saved login', async () => {
     const h = await harness({
@@ -182,7 +182,7 @@ describe('sdlc logout', () => {
   });
 });
 
-describe('sdlc whoami and the login sources', () => {
+describe('adlc whoami and the login sources', () => {
   it('shows the user and roles with the saved login', async () => {
     const h = await harness({ routes: ME });
     expect(await h.run(['whoami'])).toBe(EXIT.ok);

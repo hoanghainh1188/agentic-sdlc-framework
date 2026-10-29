@@ -16,6 +16,7 @@ import { preflight, type HostFacts } from '../../deploy/trial/src/preflight.js';
 import { parseInitOutput, SecretBag } from '../../deploy/trial/src/secrets.js';
 import {
   credentialsFile,
+  credentialsFiles,
   parseSettings,
   SettingsError,
   type TrialSettings,
@@ -89,7 +90,12 @@ describe('V02 AC1: the settings file', () => {
     // A numeric ID written without quotes is read as its digits (QUESTIONS #45).
     expect(s.personA.githubId).toBe('1001');
     expect(s.personB.githubId).toBe('1002');
-    expect(credentialsFile(s.personB)).toBe('/home/tester/.config/b/sdlc/credentials.json');
+    expect(credentialsFile(s.personB)).toBe('/home/tester/.config/b/adlc/credentials.json');
+    // ADR-M100 §2.3: the old command's file counts too, because the CLI still reads it.
+    expect(credentialsFiles(s.personB)).toEqual([
+      '/home/tester/.config/b/adlc/credentials.json',
+      '/home/tester/.config/b/sdlc/credentials.json',
+    ]);
   });
 
   it('defaults the Ollama address to Docker Desktop host name', () => {
@@ -187,7 +193,7 @@ describe('V02 AC2: refusals before anything is touched', () => {
     ['no AGENTS.md on main', { forkInstructions: false }, 'trial.refused.fork_instructions'],
     [
       'a saved login',
-      { existingCredentials: ['/c/sdlc/credentials.json'] },
+      { existingCredentials: ['/c/adlc/credentials.json'] },
       'trial.refused.credentials_exist',
     ],
   ] as const)('refuses %s', (_name, over, key) => {

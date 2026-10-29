@@ -19,7 +19,7 @@
 // default 60) until Person B, with their own GitHub account, approved the pull request and merged
 // it on GitHub: a person merges, never the platform or the App. Then G8: the worker builds the
 // release pack, Person B approves the release (CLI), the pack is sealed, the intent is `done`, and
-// `sdlc audit verify` passes. The merged change is one fixed, fictional line appended to
+// `adlc audit verify` passes. The merged change is one fixed, fictional line appended to
 // `docs/live-test/RUNS.md` (the plan allows `docs/live-test/**` only; never application code).
 // Prerequisite (QUESTIONS #230): the plan file `.sdlc/plans/INT-<UTC year>-0001.yaml` on `main`,
 // merged once by a person (content: `fixtures/live-plan.yaml`). The intents get no issue, so the

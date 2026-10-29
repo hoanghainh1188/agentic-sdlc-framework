@@ -314,7 +314,7 @@ describeDb('B03: API app on PostgreSQL', () => {
       expect(me.roles).toEqual([
         { project: { id: tenantA.projectId, slug: 'shop' }, role: 'person_a' },
       ]);
-      // V07 (QUESTIONS #401): the API's version, read by `sdlc doctor`; the CLI's schema accepts it.
+      // V07 (QUESTIONS #401): the API's version, read by `adlc doctor`; the CLI's schema accepts it.
       expect(me.platform_version).toBe(PLATFORM_VERSION);
       expect(meSchema.safeParse(me).success).toBe(true);
     });

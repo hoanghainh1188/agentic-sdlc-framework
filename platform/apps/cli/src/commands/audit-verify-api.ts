@@ -1,6 +1,6 @@
-// `sdlc audit verify` through the API (task B13 AC5, D-02 FR-41, ADR-M37 §2.8): the caller's
+// `adlc audit verify` through the API (task B13 AC5, D-02 FR-41, ADR-M37 §2.8): the caller's
 // tenant chain, for tenant admins. Exit 1 when the chain is broken. The operator's check of every
-// tenant on the server is `sdlc ops audit verify`.
+// tenant on the server is `adlc ops audit verify`.
 import { t } from '@sdlc/messages';
 
 import { chainSchema } from '../api/schemas.js';

@@ -1,4 +1,4 @@
-// A small in-memory platform and GitHub for `sdlc admin project apply` (task V17): the admin
+// A small in-memory platform and GitHub for `adlc admin project apply` (task V17): the admin
 // endpoints answer from a world that the writes change, so a second run sees the first one's
 // work. Bodies come from the API's own presenters (fixtures.ts).
 import { createHash } from 'node:crypto';

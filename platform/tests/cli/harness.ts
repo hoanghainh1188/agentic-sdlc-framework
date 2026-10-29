@@ -35,7 +35,7 @@ export interface HarnessOptions {
   readonly stdin?: string;
   readonly tty?: boolean;
   readonly hidden?: string;
-  /** The folder relative paths start from (`sdlc plan draft`). */
+  /** The folder relative paths start from (`adlc plan draft`). */
   readonly cwd?: string;
 }
 

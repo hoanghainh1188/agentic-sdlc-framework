@@ -1,5 +1,5 @@
-// The content flags of the project AI record, shared by `sdlc ai-record set` (API, task B04) and
-// `sdlc admin ai-record set` (operator, task B12). Codes only (ADR-M32 §2.2).
+// The content flags of the project AI record, shared by `adlc ai-record set` (API, task B04) and
+// `adlc admin ai-record set` (operator, task B12). Codes only (ADR-M32 §2.2).
 
 export const AI_RECORD_CONTENT_OPTIONS = {
   'expected-version': { type: 'string' },

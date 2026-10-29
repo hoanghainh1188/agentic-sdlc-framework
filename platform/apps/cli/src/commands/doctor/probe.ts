@@ -1,4 +1,4 @@
-// The health probe of `sdlc doctor`: `GET /health/live` or `/health/ready` without a token (both
+// The health probe of `adlc doctor`: `GET /health/live` or `/health/ready` without a token (both
 // are public), with the same rules as the API client (TLS verified by Node, redirects refused, a
 // time limit), and a failure named precisely enough to fix it: a TLS error keeps Node's error code
 // (from a fixed form), never its message.

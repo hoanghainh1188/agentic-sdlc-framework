@@ -123,7 +123,7 @@ server {
     limit_req zone=sdlc_api burst=${SDLC_ACCESS_RATE_BURST} nodelay;
     proxy_pass $sdlc_api;
   }
-  # Status only, no data: `sdlc doctor` calls it (V07, cli.api_ready).
+  # Status only, no data: `adlc doctor` calls it (V07, cli.api_ready).
   location = /health/ready {
     limit_req zone=sdlc_api burst=${SDLC_ACCESS_RATE_BURST} nodelay;
     proxy_pass $sdlc_api;

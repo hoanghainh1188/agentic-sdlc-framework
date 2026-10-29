@@ -1,7 +1,7 @@
-// `sdlc next <INT> [--json]` (task V06): where an intent is and what the signed-in person does
+// `adlc next <INT> [--json]` (task V06): where an intent is and what the signed-in person does
 // next. Reads `GET /v1/me` and `GET /v1/intents/:intent` only (no new endpoint; QUESTIONS #368,
 // #369); the advice comes from `next/advice.ts`, every text from the catalog (`cli.next.*`).
-// `sdlc next` without an intent (task L06, QUESTIONS #482): the evaluations that ended in the last 7
+// `adlc next` without an intent (task L06, QUESTIONS #482): the evaluations that ended in the last 7
 // days in the projects where the person has a role in `access.eval_roles`
 // (`GET /v1/evaluations/recent`), each with the command that shows its report.
 import { isHold, WAITING_CAUSE_KEYS, WAITING_REASON_KEYS } from '@sdlc/api-schemas';

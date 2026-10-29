@@ -1,4 +1,4 @@
-// `sdlc intent create … --spec` (D-08 U03) against a mocked API: the intent is created, then the
+// `adlc intent create … --spec` (D-08 U03) against a mocked API: the intent is created, then the
 // spec is linked with the existing call (no new endpoint); a refused link keeps the intent and
 // says how to link again; a refused create links nothing; bad spec options make no call at all.
 import { t } from '@sdlc/messages';
@@ -37,8 +37,8 @@ const created = () =>
     budget: '2.500000',
   });
 
-describe('sdlc intent create --spec (U03)', () => {
-  it('creates the intent, then links the spec with the same request as `sdlc spec link`', async () => {
+describe('adlc intent create --spec (U03)', () => {
+  it('creates the intent, then links the spec with the same request as `adlc spec link`', async () => {
     const h = await harness({
       routes: {
         'POST /v1/intents': { status: 201, body: intentBody() },
@@ -105,7 +105,7 @@ describe('sdlc intent create --spec (U03)', () => {
     expect(h.err.at(-1)).toBe(
       t('cli.intent.spec_link_refused', { code: 'INT-2026-0007', path: 'docs/specs/T01.md' }),
     );
-    expect(h.err.at(-1)).toContain('sdlc spec link INT-2026-0007 --path docs/specs/T01.md');
+    expect(h.err.at(-1)).toContain('adlc spec link INT-2026-0007 --path docs/specs/T01.md');
   });
 
   it('a refused create links nothing', async () => {

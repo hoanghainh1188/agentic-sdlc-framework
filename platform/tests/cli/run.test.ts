@@ -1,5 +1,5 @@
-// `sdlc run list|kill` (C11 AC1, D-02 FR-34, ADR-M42 §2.6) against a mocked API, and the parsing of
-// the operator command `sdlc ops run kill`. A kill by intent code stops the intent's current run;
+// `adlc run list|kill` (C11 AC1, D-02 FR-34, ADR-M42 §2.6) against a mocked API, and the parsing of
+// the operator command `adlc ops run kill`. A kill by intent code stops the intent's current run;
 // refusals come back with their code; the token never reaches the output.
 import { t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
@@ -13,7 +13,7 @@ const harness = useHarness();
 const LIST = '/v1/intents/INT-2026-0007/runs';
 const KILL = `/v1/runs/${RUN_ID}/kill`;
 
-describe('sdlc run', () => {
+describe('adlc run', () => {
   it('kills a run by its ID', async () => {
     const h = await harness({ routes: { [`POST ${KILL}`]: { status: 202, body: killBody() } } });
     expect(await h.run(['run', 'kill', RUN_ID])).toBe(EXIT.ok);
@@ -112,7 +112,7 @@ describe('sdlc run', () => {
   });
 });
 
-describe('sdlc ops run kill (parsing)', () => {
+describe('adlc ops run kill (parsing)', () => {
   it('needs the tenant and a run ID', () => {
     expect(parseRunCommand(['kill', '--tenant', 'internal', '--run', RUN_ID])).toEqual({
       command: 'kill',

@@ -1,4 +1,4 @@
-// `sdlc run list|kill` over the API (task C11, D-08 C11 AC1, D-02 FR-34, ADR-M42 §2.6, handbook
+// `adlc run list|kill` over the API (task C11, D-08 C11 AC1, D-02 FR-34, ADR-M42 §2.6, handbook
 // Ch.18 §18.8d). `kill` takes a run ID or an intent code (its current run). Who may kill: project
 // config `access.kill_roles` (Person A, Person B and governance always; never `viewer`). The
 // platform records the kill at once; the run stops and its keys and tokens are revoked within

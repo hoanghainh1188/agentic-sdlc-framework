@@ -1,5 +1,5 @@
 // The next-step hint (task V10 AC2): after a command that moves an intent, one line with the
-// advice of `sdlc next` for the signed-in person. Two reads (`GET /v1/me`, `GET /v1/intents/:intent`),
+// advice of `adlc next` for the signed-in person. Two reads (`GET /v1/me`, `GET /v1/intents/:intent`),
 // never in `--json`, never a reason for the command to fail: any error leaves the hint out.
 import type { ApiClient } from '../../api/client.js';
 import { intentDetailSchema, meSchema } from '../../api/schemas.js';

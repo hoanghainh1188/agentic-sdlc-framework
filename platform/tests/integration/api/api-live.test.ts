@@ -5,7 +5,7 @@
 // It runs like the server: OpenBao initialised, unsealed and configured with the bootstrap script;
 // `bootstrap.sh api-credentials` stores the platform_app password at kv/api/database and delivers
 // the AppRole credentials; sdlc-api (profile "platform") reads its database password from OpenBao.
-// The first admin and its token come from `sdlc admin bootstrap`. Key shares, tokens and passwords
+// The first admin and its token come from `adlc admin bootstrap`. Key shares, tokens and passwords
 // are THROW-AWAY TEST KEYS: kept in variables, never printed, never in an assertion message.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -204,7 +204,7 @@ describe.skipIf(!enabled)('sdlc-api container (live)', { timeout: 120_000 }, () 
       'Admin',
       '--json',
     ]);
-    if (boot.code !== 0) throw new Error('sdlc admin bootstrap failed');
+    if (boot.code !== 0) throw new Error('adlc admin bootstrap failed');
     apiToken = keep((JSON.parse(boot.out) as { token: string }).token);
   }, SETUP_TIMEOUT_MS);
 

@@ -1,4 +1,4 @@
-// `sdlc eval task …` (task L07, design/ADR-M85 §2.2, §2.6) against a mocked API:
+// `adlc eval task …` (task L07, design/ADR-M85 §2.2, §2.6) against a mocked API:
 // - `draft` writes the card `.sdlc/eval-tasks/<id>.yaml` in the repository folder from the API's
 //   fields (AC4), never over an existing file without `--force`, never through a link;
 // - `register`, `list`, `approve` and `reject` call their endpoints; `approve` and `reject` send
@@ -56,7 +56,7 @@ async function repo(): Promise<string> {
   return dir;
 }
 
-describe('sdlc eval task draft (AC4)', () => {
+describe('adlc eval task draft (AC4)', () => {
   it('writes the card in the repository folder from the API fields', async () => {
     const dir = await repo();
     const h = await harness({
@@ -158,7 +158,7 @@ describe('sdlc eval task draft (AC4)', () => {
   });
 });
 
-describe('sdlc eval task register|list|approve|reject (AC1)', () => {
+describe('adlc eval task register|list|approve|reject (AC1)', () => {
   it('registers a card and prints the task', async () => {
     const h = await harness({
       routes: {
@@ -251,6 +251,6 @@ describe('sdlc eval task register|list|approve|reject (AC1)', () => {
   it('prints the usage for an unknown subcommand', async () => {
     const h = await harness();
     expect(await h.run(['eval', 'task'])).toBe(EXIT.usage);
-    expect(h.err.join('\n')).toContain('sdlc eval task draft');
+    expect(h.err.join('\n')).toContain('adlc eval task draft');
   });
 });

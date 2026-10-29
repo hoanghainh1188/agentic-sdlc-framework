@@ -1,8 +1,8 @@
-// `sdlc ops run kill`: the kill switch on the server (task C11, D-02 FR-34 "or the platform",
+// `adlc ops run kill`: the kill switch on the server (task C11, D-02 FR-34 "or the platform",
 // ADR-M42 §2.6). An operator command with SDLC_DB_URL (`platform_app`), audited as actor
 // `system`, for when nobody with a kill role is reachable or the API is down. It records the kill
 // in the database: the runner stops the run within a poll, and the worker's reconcile loop sends
-// the kill signal (a run waiting in Temporal never starts). People use `sdlc run kill`.
+// the kill signal (a run waiting in Temporal never starts). People use `adlc run kill`.
 import { parseArgs } from 'node:util';
 
 import { KillError, requestRunKill, type KillErrorCode, type TenantScope } from '@sdlc/core';

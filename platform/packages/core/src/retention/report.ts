@@ -1,4 +1,4 @@
-// The operator's retention report (task E05, design/ADR-M51): `pnpm sdlc ops retention report`.
+// The operator's retention report (task E05, design/ADR-M51): `pnpm adlc ops retention report`.
 // Counts only, from the database (no evidence store access): per project, how many rows are
 // stored, purged, held, open, waiting for their retention, and due now. The worker's loop decides
 // for itself; this report reads the same rules with the same clock.

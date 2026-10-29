@@ -48,7 +48,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R034b | Secrets in OpenBao, AppRole, files not env | test | tests/deploy/worker-static.test.ts:43 | full | move:platform/deploy | CLAUDE.md |
 | R034c | Sandboxes never reach OpenBao | runtime+test | apps/runner/src/docker/guard.ts:138 | full | pointer-only | CLAUDE.md |
 | R034d | Never write key shares/root tokens to files | test | tests/deploy/openbao-static.test.ts:72 | partial | keep-root | CLAUDE.md |
-| R035 | Secret commands only in owner's Terminal | hook | platform/tools/claude-hooks/guard-bash.mjs; tests/workspace/claude-hook.test.ts | partial (the commands listed in CLAUDE.md) | pointer-only | CLAUDE.md |
+| R035 | Secret commands only in owner's Terminal | hook | platform/tools/claude-hooks/guard-bash.mjs; tests/workspace/claude-hook.test.ts | partial (the commands listed in CLAUDE.md; `pnpm adlc`/`pnpm sdlc` and the `adlc`/`sdlc` binaries, ADR-M100) | pointer-only | CLAUDE.md |
 | R036 | Run Contracts signed by OpenBao Transit | test | tests/deploy/openbao-static.test.ts:132 | full | pointer-only | CLAUDE.md |
 | R037a | Polling now, webhooks later, same handler | test | tests/worker/poller-loop.test.ts:70 | partial | move:platform/packages/adapters/git-github | CLAUDE.md |
 | R037b | Users by numeric GitHub ID; bots never decide | test | tests/admin/onboarding.test.ts:117 | full | pointer-only | CLAUDE.md |
@@ -279,3 +279,4 @@ Some rows group several rules with the same check (for example R082a–f).
 | 0.14 | 2026-10-29 | Claude (task U07) | R085b: the routes a session may write to since U07 and U08; the step-up test |
 | 0.15 | 2026-10-29 | Claude (task V16) | New row R143 (`pnpm server:setup`, `platform/deploy/CLAUDE.md`); R081c and R081e point at the shared steps `platform/deploy/steps` |
 | 0.16 | 2026-10-29 | Claude (task U08) | R085b: the spec link, plan submission and Evidence Pack build of U08; the U08 database test |
+| 0.17 | 2026-10-29 | Claude (CLI rename, ADR-M100) | R035: the hook refuses `pnpm adlc ops bootstrap\|token` and the bare `adlc`/`sdlc` binaries as it refuses `pnpm sdlc …` |

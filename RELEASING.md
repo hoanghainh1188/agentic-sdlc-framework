@@ -6,9 +6,9 @@ How the platform is versioned and released (D-08 tasks V12 and V15, QUESTIONS #3
 
 | Rule | What it means |
 |---|---|
-| [Semantic Versioning](https://semver.org/) `X.Y.Z` | One version for the whole repository: the root `package.json`, `PLATFORM_VERSION` (`platform/packages/api-schemas/src/version.ts`, shared by the API, the CLI and the dashboard), the images on GHCR and the npm package `agentic-sdlc-cli` |
+| [Semantic Versioning](https://semver.org/) `X.Y.Z` | One version for the whole repository: the root `package.json`, `PLATFORM_VERSION` (`platform/packages/api-schemas/src/version.ts`, shared by the API, the CLI and the dashboard), the images on GHCR and the npm package `@hoanghainh/governed-adlc` (`agentic-sdlc-cli` up to v0.8.0) |
 | Before v1.0 | A **minor** release (`0.2.0`) may break things: a migration, a changed setting, a credentials command to run again. Its "Upgrade notes" say exactly what to do. A **patch** release (`0.1.2`) never needs an upgrade step |
-| A patch release `v0.x.y` | When something useful lands and nothing must be done to upgrade (for example v0.1.1: the CLI on npm and `sdlc next`) |
+| A patch release `v0.x.y` | When something useful lands and nothing must be done to upgrade (for example v0.1.1: the CLI on npm and `adlc next`) |
 | The next minor `v0.x.0` | As soon as a change needs an upgrade step (for example v0.2.0: two migrations and rebuilt images). The roadmap names what goes into which release; the owner decides when to release (QUESTIONS #420) |
 | v1.0 | When the platform runs on a team server (milestone Server). From then on only a major release breaks things |
 | Support | **The latest release only.** A fix, also a security fix, comes in a new release; older releases get no patches |
@@ -22,7 +22,7 @@ Every CHANGELOG release section from 0.1.1 on has a `### Upgrade notes` list (a 
 - the database migrations (`pnpm db:migrate`), or "no migration";
 - the credentials commands to run again (`pnpm openbao:bootstrap …-credentials`);
 - new, changed or removed settings (`SDLC_*`, project configuration);
-- images to pull or rebuild, and the `sdlc` command to update (`npm install -g agentic-sdlc-cli@X.Y.Z`).
+- images to pull or rebuild, and the `adlc` command to update (`npm install -g @hoanghainh/governed-adlc@X.Y.Z`).
 
 "No migration, no changed setting, no credentials command to run again." is a valid list.
 
@@ -37,7 +37,7 @@ The images are built **on the tag**, by the release workflow itself (ADR-M94). T
 | 2. The tag | 🧑 owner | Tag **the merge commit of step 1** and push it: `git tag vX.Y.Z <commit> && git push origin vX.Y.Z` |
 | 3. The release | `release.yml` | `check`: the release gate and the commit is on `main`. `images`: `release-images.yml` with `push: true` builds and scans all six images on both architectures, and only then pushes them by digest, scans each pushed digest again, tags, signs and attests them, and writes `images.lock`. `verify-images`: every image's cosign signature and build provenance attestation (signer: `release-images.yml` at `refs/tags/vX.Y.Z`). `release`: the GitHub Release from the CHANGELOG section, as a draft with the asset `images.lock`, then published, then checked to be immutable. `npm`: starts `npm-publish.yml` on the tag |
 | 4. npm | `npm-publish.yml`, 🧑 owner approves | Refuses a ref that is not a tag `vX.Y.Z` with a published Release; runs the release gate and the image check on the Release's own `images.lock` (job `verify-images`); only then does GitHub ask the owner to approve the environment `npm`. Then it builds and checks the package and publishes with provenance |
-| 5. Check | 🧑 owner | The GitHub Release exists, is marked immutable and has the asset `images.lock`; `npm view agentic-sdlc-cli version` shows `X.Y.Z`; on a clean checkout of the tag `pnpm images mode` prints `published` (it downloads `images.lock` once) |
+| 5. Check | 🧑 owner | The GitHub Release exists, is marked immutable and has the asset `images.lock`; `npm view @hoanghainh/governed-adlc version` shows `X.Y.Z`; on a clean checkout of the tag `pnpm images mode` prints `published` (it downloads `images.lock` once) |
 
 The release gate is `platform/tools/release/release-check.mjs`. `release-check.mjs tag vX.Y.Z` refuses the tag when:
 
@@ -63,11 +63,11 @@ The first release made this way checks two things the documentation does not sta
 | `release` fails with "is not immutable" | The Release is published but not immutable, and npm was not started. Turn on immutable releases (§4); a Release published before that stays changeable, so compare its asset `images.lock` with the artifact `images-lock-X.Y.Z` of the run. Then start npm-publish by hand on the tag (next row) |
 | `npm-publish` was not started, or must run again | Actions → **npm-publish** → Run workflow, **on the tag** `vX.Y.Z` (not on `main`): the same checks apply |
 | `npm-publish` fails | Fix the cause, then re-run the workflow. A version is never published twice |
-| `npm-publish` fails with `ENEEDAUTH` | The trusted publisher on npmjs.com is wrong or **expired**: delete it and add it again (GETTING-STARTED, "Publishing the CLI on npm"), then re-run the failed jobs and approve `npm` again. If npm refuses a dispatched run (ADR-M94 §2.3): publish this version by hand from the checked tarball (the artifact `agentic-sdlc-cli`), as for 0.1.1, and add a question to `design/QUESTIONS.md` |
+| `npm-publish` fails with `ENEEDAUTH` | The trusted publisher on npmjs.com is wrong or **expired**: delete it and add it again (GETTING-STARTED, "Publishing the CLI on npm"), then re-run the failed jobs and approve `npm` again. If npm refuses a dispatched run (ADR-M94 §2.3): publish this version by hand from the checked tarball (the artifact `governed-adlc-npm`), as for 0.1.1, and add a question to `design/QUESTIONS.md` |
 | npm shows the new version as "validating" | Normal for a few minutes after the publish; then it appears (approve it on npmjs.com if it waits as a staged version) |
 | A workflow fails while it installs cosign (a network error from GitHub) | `platform/tools/release/install-cosign.sh` already retried for about three minutes: re-run the failed jobs later. A new cosign version changes `COSIGN_VERSION` in the three release workflows and the SHA-256 pins in the script together (a test checks both) |
 | A release checkout says it could not download `images.lock` | The machine cannot reach `github.com`: download `images.lock` from the release page elsewhere, copy it to the machine, and set `SDLC_IMAGES_LOCK=<file>` (deploy README) |
-| A released version is broken | Release the fix as the next patch version; `npm deprecate agentic-sdlc-cli@X.Y.Z "<reason>"` |
+| A released version is broken | Release the fix as the next patch version; `npm deprecate @hoanghainh/governed-adlc@X.Y.Z "<reason>"` |
 
 ## 4. Repository settings (owner, once)
 
@@ -75,7 +75,7 @@ The first release made this way checks two things the documentation does not sta
 - The environment `npm` with the owner as required reviewer, tags `v*` only (GETTING-STARTED, "Publishing the CLI on npm").
 - A **tag ruleset** for `v*`: only the owner may create tags; nobody may update or delete them. The owner is the ruleset's only **bypass actor**, used for one case only: deleting a refused tag before any GitHub Release, npm publish or image push of it (§3).
 - The six GHCR packages are public. A new image's package starts private: after its first push the owner sets it to public once (v0.6.0: `tool-project-docs`). The first release after the rename to `governed-adlc-fw` (ADR-M99) pushes all six under the new path `ghcr.io/hoanghainh1188/governed-adlc-fw/`: set each one to public once.
-- npm's trusted publisher of `agentic-sdlc-cli` names the repository: after the rename (ADR-M99), change it to `governed-adlc-fw` on npmjs.com before the next npm publish.
+- The CLI's npm package is `@hoanghainh/governed-adlc` from v0.9.0 (ADR-M100); up to v0.8.0 it was `agentic-sdlc-cli`. **v0.9.0 only:** the new package's first version is published by hand from the checked tarball, then the trusted publisher is added with "Allow npm publish" ticked, then `agentic-sdlc-cli` is deprecated (GETTING-STARTED, "Publishing the CLI on npm", in this order).
 - Never rename `npm-publish.yml` or the environment `npm`: npm's trusted publisher names both (ADR-M72 §2.3).
 
 ## Version history

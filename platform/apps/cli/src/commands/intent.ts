@@ -1,5 +1,5 @@
-// `sdlc intent create|list|show` over the API (D-08 B04 AC1, FR-20; ADR-M26 §2.8).
-// `create --spec` (U03) links the spec right after, with the same call as `sdlc spec link`; a
+// `adlc intent create|list|show` over the API (D-08 B04 AC1, FR-20; ADR-M26 §2.8).
+// `create --spec` (U03) links the spec right after, with the same call as `adlc spec link`; a
 // refused link keeps the intent and says how to link again.
 import { readFile } from 'node:fs/promises';
 

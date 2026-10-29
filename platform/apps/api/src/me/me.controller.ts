@@ -1,5 +1,5 @@
-// `GET /v1/me`: who the token belongs to (for `sdlc login`, task B04). Only the caller's own data,
-// and the platform version (V07, for `sdlc doctor`).
+// `GET /v1/me`: who the token belongs to (for `adlc login`, task B04). Only the caller's own data,
+// and the platform version (V07, for `adlc doctor`).
 import { Controller, Get } from '@nestjs/common';
 import { PLATFORM_VERSION } from '@sdlc/api-schemas';
 
@@ -26,7 +26,7 @@ export class MeController {
       auth: p.credential.kind,
       /** B13 (QUESTIONS #150): the caller may use the admin endpoints. */
       tenant_admin: tenantAdmin,
-      /** V07 (QUESTIONS #401): the API's release version, for `sdlc doctor`. */
+      /** V07 (QUESTIONS #401): the API's release version, for `adlc doctor`. */
       platform_version: PLATFORM_VERSION,
       roles: bindings.map((binding) => ({
         project: { id: binding.project_id, slug: slugs.get(binding.project_id) ?? null },

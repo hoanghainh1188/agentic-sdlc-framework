@@ -348,7 +348,7 @@ export const projectConfigSchema = z.strictObject({
   }),
   // L06 (ADR-M83 §2.3, QUESTIONS #481): thresholds of the evaluation recommendation rules.
   evaluation: z.strictObject({
-    // L07 (ADR-M85 §2.4, QUESTIONS #485): how `sdlc eval task draft` finds the hidden tests of a
+    // L07 (ADR-M85 §2.4, QUESTIONS #485): how `adlc eval task draft` finds the hidden tests of a
     // merged pull request and which commands it proposes for the task card.
     tasks: z.strictObject({
       test_globs: uniqueList(z.string().regex(TEST_GLOB)).min(1).max(20),

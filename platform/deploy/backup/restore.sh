@@ -147,5 +147,5 @@ restore: next (runbook T11 section 7):
   1. Two key holders unseal with their ORIGINAL shares: pnpm openbao:bootstrap unseal
   2. Deliver the credentials of every process again (platform/deploy/README.md, Fresh deployment
      step 5; their volumes are not in the backup), then start the rest: platform/deploy/scripts/up.sh core models platform sandbox
-  3. Check: pnpm sdlc ops audit verify, curl -s http://127.0.0.1:8090/health/ready
+  3. Check: pnpm adlc ops audit verify, curl -s http://127.0.0.1:8090/health/ready
 EOF

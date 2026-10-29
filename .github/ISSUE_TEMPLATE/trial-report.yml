@@ -51,7 +51,7 @@ body:
   - type: textarea
     id: report
     attributes:
-      label: The output of `sdlc trial report --json`
+      label: The output of `adlc trial report --json`
       description: Counts and codes only. Read it before you paste it.
       render: json
     validations:
