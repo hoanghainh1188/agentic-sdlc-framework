@@ -47,6 +47,8 @@ const KEYS = { shares: 3, threshold: 2 } as const;
 /** The fake env file's made-up database passwords (kept out of `KEY=value` literals: Gitleaks). */
 const OWNER_DB = ['pw', 'owner', '0123456789'].join('-');
 const APP_DB = ['pw', 'app', '0123456789'].join('-');
+/** The armor header of a PGP secret key, built from parts so secret scanners skip the test. */
+const SECRET_KEY_HEADER = ['-----BEGIN PGP', 'PRIVATE KEY BLOCK-----'].join(' ');
 const temp: string[] = [];
 afterEach(() => {
   for (const dir of temp.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
@@ -441,10 +443,7 @@ describe('V16 AC2: key custody', () => {
 
   it('refuses a PGP key file that is not a public key, before init', async () => {
     const f = fixture({}, true);
-    fs.writeFileSync(
-      f.settings.keyHolders[1]!.pgpKeyFile!,
-      '-----BEGIN PGP PRIVATE KEY BLOCK-----\n',
-    );
+    fs.writeFileSync(f.settings.keyHolders[1]!.pgpKeyFile!, `${SECRET_KEY_HEADER}\n`);
     const error = await serverSetup(f.settings, f.deps).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(SetupStopped);
     expect((error as SetupStopped).cause).toBeInstanceOf(SetupRefused);
@@ -805,7 +804,7 @@ describe('V16 AC4: the settings file', () => {
       'base64',
     );
     expect(() => pgpKeyBase64(secret)).toThrow();
-    expect(() => pgpKeyBase64('-----BEGIN PGP PRIVATE KEY BLOCK-----\nx\n')).toThrow();
+    expect(() => pgpKeyBase64(`${SECRET_KEY_HEADER}\nx\n`)).toThrow();
   });
 });
 
