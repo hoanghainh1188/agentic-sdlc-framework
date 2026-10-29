@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.65 |
+| Version | 1.67 |
 | Date | 2026-10-29 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -44,14 +44,14 @@
 | M-D | G7–G8 + evidence + cost | 8 | S×5 · M×3 |
 | Pre-M-E | Before the trial M-E: spec tools and document knowledge (QUESTIONS #285) | 4 | S×2 · M×2 |
 | M-E | The trial, run by the community (QUESTIONS #340) | 3 | S×1 · M×2 |
-| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) | 15 | S×3 · M×10 · L×2 |
+| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help`; V17 in v0.8.0 (QUESTIONS #355, #364, #420, #424) | 15 | S×3 · M×10 · L×2 |
 | DEV | Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479) | 1 | M×1 |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 7 | S×2 · M×4 · L×1 |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike) | 9 | S×5 · M×2 · L×2 |
 | Models | Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424) | 3 | S×2 · M×1 |
-| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; toward v1.0 (QUESTIONS #363) | 13 | S×3 · M×10 |
-| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) | 16 | S×4 · M×6 · L×6 |
-| **Total** | | **119** | |
+| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; toward v1.0 (QUESTIONS #363) | 16 | S×5 · M×11 |
+| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done; U07 and U08 are done in v0.8.0) | 16 | S×4 · M×6 · L×6 |
+| **Total** | | **122** | |
 
 ### Order and dependencies between milestones
 
@@ -63,13 +63,13 @@ flowchart LR
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
-    ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
+    ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0), V17 (v0.8.0)"]
     UX --> EV["EVAL L04–L10: evaluations, reports, recommendations for managers"]
     EV --> EXT["EXT X09 (v0.5.0), X01–X04, X14, X07, X11 (v0.6.0), X12 (v0.7.0)"]
     EXT --> MO["Models L01 PR 1, L03 (v0.6.0), then L01 PR 2, L03b"]
-    MO --> SV["Server O01, O02, H04, H05, V15 (v0.7.0), then A10, O03 (v1.0)"]
+    MO --> SV["Server O01, O02, H04, H05, V15 (v0.7.0), H02, H03, V16 (v0.8.0), then A10, O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
-    MD --> MU["U01–U03 read-only dashboard, done (Later)"]
+    MD --> MU["U01–U03 read-only dashboard, done; U07, U08 decisions in the dashboard (v0.8.0) (Later)"]
 ```
 
 - M-0 lives in a **separate repo** (`pilot-order-inventory`). Done at the end of M-B, before C09.
@@ -878,7 +878,7 @@ flowchart LR
 > Note: QUESTIONS #342 (Harry, 2026-10-09): before v0.1.0. GitHub's manifest flow: https://docs.github.com/apps/sharing-github-apps/registering-a-github-app-from-a-manifest
 
 
-### UX — Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)
+### UX — Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help`; V17 in v0.8.0 (QUESTIONS #355, #364, #420, #424)
 
 #### V04. Publish the platform's images to GHCR for each release
 
@@ -1430,7 +1430,7 @@ flowchart LR
 > Note: QUESTIONS #566, #567 (Harry, 2026-10-24): the harness gets a `vllm` provider; only the model service runs on the rented machine; fictional sample repository only, never client data; the owner runs it (R035)
 
 
-### Server — A team on a server: v0.7.0 with O01, O02, H04, H05, V15; toward v1.0 (QUESTIONS #363)
+### Server — A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; toward v1.0 (QUESTIONS #363)
 
 #### A10. Resource measurement + backup / restore drill + internal CA / TLS
 
@@ -1510,7 +1510,49 @@ flowchart LR
 - [ ] AC2: How it fits the append-only rule and the hash chain: no row of an append-only table is changed or deleted
 - [ ] AC3: No code in this task; the implementation tasks follow Harry's approval
 
-> Note: QUESTIONS #440: D-05 §10 says this needs its own design; there was no task. Done: ADR-M97, QUESTIONS #611–#615 (H03 design)
+> Note: QUESTIONS #440: D-05 §10 says this needs its own design; there was no task. Done: ADR-M97, QUESTIONS #611–#615 (H03 design). The implementation: H03a, H03b, H03c
+
+#### H03a. Client data deletion 1: tenant states and the anonymization of people
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | H03 | FR-44 | platform/packages/core (db, migrations), platform/tests/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: A migration adds the tenant states `pending_deletion` and `purged` (ADR-M97 §2)
+- [ ] AC2: `anonymizeUser()` replaces a person's personal data in `users`, `user_identities` and `project_configs` in one transaction (`deleted-<id>@redacted.invalid`); foreign keys stay valid
+- [ ] AC3: Tests: the rows of `gate_decisions` and `audit_log` and the hash chain are unchanged after the anonymization; no append-only table gets an UPDATE or DELETE path
+
+> Note: ADR-M97 §3 item 1 (QUESTIONS #611–#615)
+
+#### H03b. Client data deletion 2: the worker's purge of files, traces and indexes
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| M | H03a | FR-44 | platform/apps/worker, platform/packages/core (retention), platform/packages/adapters (evidence-s3, traces-langfuse), platform/tests/* |
+
+**Acceptance criteria**
+
+- [ ] AC1: `RetentionLoop` gains `runClientPurgePass()`: after the 14-day grace period it deletes the tenant's evidence files, Langfuse traces and knowledge schemas, then anonymizes the people (H03a)
+- [ ] AC2: An active hold (`evidence_holds`) or an open intent stops the purge of what it holds; the purge checks that S3 and Langfuse hold nothing more before it records the end
+- [ ] AC3: The last audit event is `client_data.deleted` (IDs and counts only), the daily anchor is updated and the tenant becomes `purged`
+
+> Note: ADR-M97 §2 phases 1–4, §3 item 2
+
+#### H03c. Client data deletion 3: the request, the approval and the status commands
+
+| Size | Depends on | Requirements | Code area |
+|---|---|---|---|
+| S | H03b | FR-44, NFR-08 | platform/apps/cli, platform/apps/api (admin), platform/packages/messages, platform/tests/*, handbook Ch.19 |
+
+**Acceptance criteria**
+
+- [ ] AC1: A tenant admin asks and cancels: `sdlc client request-data-deletion`, `sdlc client cancel-data-deletion`
+- [ ] AC2: A platform operator approves and follows: `pnpm sdlc ops client-data-deletion approve|list|status`; the requester never approves (two-person rule)
+- [ ] AC3: An audit event for each step of the request; every text from the message catalog
+
+> Note: ADR-M97 §2 (two-person rule, 14-day grace period), §3 item 3
 
 #### H04. A secret scan of a run's diff before G5
 
@@ -1625,7 +1667,7 @@ flowchart LR
 > Note: QUESTIONS #440: D-03 §8 says rotation and revocation come later; there was no task
 
 
-### Later — Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done)
+### Later — Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done; U07 and U08 are done in v0.8.0)
 
 #### U01. Read-only web dashboard
 
@@ -1966,6 +2008,8 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.63 | 2026-10-29 | Claude Code (task U07), approved by Harry | U07 done (PR #462 and the U07 finish PR); U08 in part: create an intent (PR #462) |
 | 1.64 | 2026-10-29 | Claude Code (task V16), approved by Harry | V16 done: `pnpm server:setup`, a guided fresh deployment on a server (ADR-M98, QUESTIONS #616) |
 | 1.65 | 2026-10-29 | Claude Code (task U08), approved by Harry | U08 done: create an intent with its spec, submit a plan, build an Evidence Pack in the dashboard |
+| 1.66 | 2026-10-29 | Claude, approved by Harry | New tasks H03a, H03b, H03c: the implementation of client data deletion, as ADR-M97 §3 splits it |
+| 1.67 | 2026-10-29 | Claude, approved by Harry | Release v0.8.0 with H02, H03, U07, U08, V16 and V17 |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

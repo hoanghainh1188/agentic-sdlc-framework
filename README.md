@@ -12,7 +12,7 @@
 **Human-in-the-Loop AI Software Delivery Platform**  
 *Autonomous AI Agents • 8 Quality Gates • Cryptographic Audit Trail • Multi-Agent Sandboxes*
 
-[![Release](https://img.shields.io/badge/release-v0.7.0-blue.svg)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v0.8.0-blue.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Docs: CC BY 4.0](https://img.shields.io/badge/Docs-CC%20BY%204.0-lightgrey.svg)](LICENSE-docs.md)
 [![Node: 24 LTS](https://img.shields.io/badge/node-24%20LTS-brightgreen.svg)](package.json)
@@ -33,7 +33,7 @@ The handbook says **what must happen and why**. The platform **makes sure it hap
 
 Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
-**Status (2026-10-26): v0.7.0 is released ([CHANGELOG](CHANGELOG.md)); built, tested, and trial-ready.** The platform supports multiple agent adapters (OpenHands, OpenCode), an isolated MCP tool gateway, a runner running on its own rootless Docker Engine or VM, pre-review secret scanning (Gitleaks), review diff size limits, and an automated upgrade verification suite.
+**Status (2026-10-29): v0.8.0 is released ([CHANGELOG](CHANGELOG.md)); built, tested, and trial-ready.** The platform supports multiple agent adapters (OpenHands, OpenCode), an isolated MCP tool gateway, a runner on its own rootless Docker Engine or VM, secret scanning and a size limit before review, a dependency check of every agent change, decisions in the dashboard confirmed with a passkey, and a guided server set-up (`pnpm server:setup`).
 
 ---
 
@@ -120,17 +120,18 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 
 ## 4. Supported Capabilities & Architecture
 
-| Area | Supported today (v0.7.0) |
+| Area | Supported today (v0.8.0) |
 |---|---|
 | **Agents** | OpenHands, OpenCode (pluggable via Agent Adapter Kit) |
 | **Agent Tools** | MCP Gateway (`agentgateway`) per run with isolated containers (`read_documents`) |
 | **Runner Isolation** | Shared Docker Engine or **Independent Rootless Engine / VM** (prevents volume mounting attacks) |
-| **Security Gates** | Pre-G5 secret scanning via Gitleaks, diff review size threshold enforcement |
+| **Security Gates** | Pre-G5 secret scanning via Gitleaks, diff review size threshold enforcement; before G6, a check of the dependencies an agent adds (licences, install scripts, look-alike names) |
 | **Git Hosts** | GitHub (GitLab, Bitbucket designed in Milestone EXT) |
 | **Sandboxes** | Node.js / TypeScript (`node24`), network restricted to LiteLLM & package proxy |
 | **Models** | Cloud LLMs via LiteLLM; self-hosted local models via vLLM on server GPU |
+| **Set-up** | `pnpm server:setup` (a guided fresh deployment on a server), `pnpm trial:up` (a trial on one machine), `sdlc admin project apply` (a project and its team from one file) |
 | **Audit & Evidence** | RFC 8785 canonical JSON + SHA-256 tamper-evident hash chain; exportable sealed Evidence Pack |
-| **Dashboard** | Preact SPA with GitHub OAuth, server-side sessions, CSRF protection, and passkey step-up |
+| **Dashboard** | Preact SPA with GitHub OAuth, server-side sessions and CSRF protection; gate and escalation decisions confirmed with a passkey, the kill switch, intents with their spec, plans and Evidence Packs |
 
 ## 5. Technology Stack
 

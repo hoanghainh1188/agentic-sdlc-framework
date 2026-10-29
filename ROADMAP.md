@@ -5,13 +5,13 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 | Milestone | Goal |
 |---|---|
 | M-E | The trial, run by the community (QUESTIONS #340) |
-| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424) |
+| UX | Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help`; V17 in v0.8.0 (QUESTIONS #355, #364, #420, #424) |
 | DEV | Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479) |
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike) |
 | Models | Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424) |
-| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; toward v1.0 (QUESTIONS #363) |
-| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done) |
+| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; toward v1.0 (QUESTIONS #363) |
+| Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done; U07 and U08 are done in v0.8.0) |
 | M-F | Adjust gates, budgets and rules from the trial data, then a trial on a real internal tool (D-02 §13.3) |
 
 ## M-E: The trial, run by the community (QUESTIONS #340)
@@ -20,7 +20,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V02** `pnpm trial:up`: the whole trial set-up on a developer machine in one command (done, v0.1.0)
 - **V03** Create the GitHub App from a manifest (done, v0.1.0)
 
-## UX: Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)
+## UX: Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help`; V17 in v0.8.0 (QUESTIONS #355, #364, #420, #424)
 
 - **V04** Publish the platform's images to GHCR for each release (done, v0.1.1)
 - **V05** Install the `sdlc` command with one command (npm package `agentic-sdlc-cli`) (done, v0.1.1)
@@ -35,7 +35,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **V12** Release process: SemVer, a tag-driven release workflow, upgrade notes (done, v0.2.0)
 - **L02** Evaluation harness: agents, models and prompts measured on a fixed task set (data for the GPU decision) (done, v0.3.0)
 - **V13** Agent efficiency report from real runs: `sdlc metrics agents` (done, v0.3.0)
-- **V17** `sdlc admin project apply`: a project and its team from one file
+- **V17** `sdlc admin project apply`: a project and its team from one file (done, v0.8.0)
 - **H01** Threat model for agent runs and attack tests (done, v0.3.0)
 
 ## DEV: Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479)
@@ -70,13 +70,16 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **L03** GPU sizing note for leadership (done, v0.6.0)
 - **L03b** Measure a 30B-class model on a rented GPU
 
-## Server: A team on a server: v0.7.0 with O01, O02, H04, H05, V15; toward v1.0 (QUESTIONS #363)
+## Server: A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; toward v1.0 (QUESTIONS #363)
 
 - **A10** Resource measurement + backup / restore drill + internal CA / TLS
 - **V15** Release on the tag: one workflow builds the images, the lock file is a release asset (done, v0.7.0)
-- **V16** `pnpm server:setup`: a guided fresh deployment on a server (steps 2–7)
-- **H02** Dependencies an agent adds: licence, known vulnerabilities, name checks
-- **H03** Design: deleting a client's data on request
+- **V16** `pnpm server:setup`: a guided fresh deployment on a server (steps 2–7) (done, v0.8.0)
+- **H02** Dependencies an agent adds: licence, known vulnerabilities, name checks (done, v0.8.0)
+- **H03** Design: deleting a client's data on request (done, v0.8.0)
+- **H03a** Client data deletion 1: tenant states and the anonymization of people
+- **H03b** Client data deletion 2: the worker's purge of files, traces and indexes
+- **H03c** Client data deletion 3: the request, the approval and the status commands
 - **H04** A secret scan of a run's diff before G5 (done, v0.7.0)
 - **H05** A size bound for a change a person must review (done, v0.7.0)
 - **H07** A Docker authorization plugin that checks the body of container requests
@@ -86,10 +89,10 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **O04** Data that only grows: run events, sessions, challenges, partitions
 - **O05** Key rotation: the Run Contract signing key and the processes' secret IDs
 
-## Later: Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done)
+## Later: Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done; U07 and U08 are done in v0.8.0)
 
-- **U07** Dashboard wave 1: kill a run, gate decisions, escalations
-- **U08** Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs
+- **U07** Dashboard wave 1: kill a run, gate decisions, escalations (done, v0.8.0)
+- **U08** Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs (done, v0.8.0)
 - **U09** Dashboard wave 3: administration
 - **V14** Human-effort baseline for the agent report
 - **H06** An optional stronger sandbox runtime (gVisor or Kata)
