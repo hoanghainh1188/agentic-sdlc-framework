@@ -62,7 +62,7 @@ Best: two people. If you are alone, you may use a second GitHub account for Pers
 
 What `trial:up` refuses and keeps safe:
 
-- It refuses a machine with another stack of the platform (`platform/deploy/.env` or `sdlc_*` volumes), `NODE_ENV=production`, no Docker, too little memory, a key file others can read, or an existing login in a config folder. It never removes or overwrites them.
+- It refuses a machine with another stack of the platform (`platform/deploy/.env` or `sdlc_*` volumes), `NODE_ENV=production`, no Docker, too little memory, no OpenSSL 3 as `openssl` (on macOS the default is LibreSSL: [Requirements](platform/deploy/README.md#requirements)), a key file others can read, or an existing login in a config folder. It never removes or overwrites them.
 - The OpenBao keys are **throw-away**. The root token is kept in memory only and revoked at the end. The two key shares that unseal OpenBao are kept in the **key file** `trial-openbao-keys.age` next to the env file (`platform/deploy/trial-openbao-keys.age`), encrypted with your passphrase (age, scrypt), mode 600, ignored by Git; they never reach the terminal or a log (`design/QUESTIONS.md` #356, `design/ADR-M76-trial-key-file.md`).
 - **After a reboot or `pnpm trial:down`**, start the stack again, in a terminal:
   ```bash

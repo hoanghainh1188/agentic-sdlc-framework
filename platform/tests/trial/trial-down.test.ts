@@ -188,6 +188,7 @@ people:
     existingVolumes: [],
     docker: { composeVersion: '2.39.1', memoryBytes: 12 * 1024 ** 3 },
     hostMemoryBytes: 32 * 1024 ** 3,
+    opensslVersion: 'OpenSSL 3.5.1 1 Jul 2025',
     ollamaTags: undefined,
     secretFiles: [
       { path: '/secure/app.pem', mode: 0o100600 },
