@@ -20,6 +20,7 @@ import path from 'node:path';
 import { loadDashboardFiles, registerDashboard } from '../../apps/api/dist/dashboard/static.js';
 import { WebAuthnCeremonies } from '../../apps/api/dist/passkeys/webauthn.js';
 import { stepUpRequestSha256 } from '../../packages/core/dist/passkeys/index.js';
+import { decisionWrite, isDecisionPath } from './decisions-stub.mjs';
 import { evalPlans } from './eval-stub.mjs';
 import { fixtures } from './fixtures.mjs';
 
@@ -240,14 +241,18 @@ async function passkeyRoutes(req, res, url) {
   return false;
 }
 
-/** Step-up challenges: ID → { challenge SHA-256, action, request SHA-256 }. */
+/** Step-up challenges: ID → { challenge SHA-256, action, request SHA-256, bound input hash }. */
 const stepUps = new Map();
 
-/** Checks a step-up answer like the API: the challenge, the binding, the passkey, once. */
-async function stepUpHolds(answer, action, requestSha256) {
+/**
+ * Checks a step-up answer like the API: the challenge, the binding, the passkey, once. U07:
+ * `expected`, when given, is the input hash the decision carries; the challenge must hold it.
+ */
+async function stepUpHolds(answer, action, requestSha256, expected) {
   const open = answer && stepUps.get(answer.challenge_id);
   stepUps.delete(answer?.challenge_id);
   if (!open || open.action !== action || open.requestSha256 !== requestSha256) return false;
+  if (expected !== undefined && open.expected !== expected) return false;
   const passkey = passkeys.find(
     (p) => p.revoked_at === null && p.credentialId === answer.response?.id,
   );
@@ -276,9 +281,24 @@ async function stepUpAndPlans(req, res, url) {
       sha: sha256(challenge),
       action: body?.action,
       requestSha256: stepUpRequestSha256(body?.request ?? {}),
+      expected: body?.expected_input_sha256 ?? null,
     });
     const options = await ceremonies.authenticationOptions({ challenge, allow });
     return (json(res, 200, { challenge_id: id, options, expires_in_seconds: 120 }), true);
+  }
+  // U07: gate decisions, kills, escalation acknowledgements and decisions, from a session.
+  if (req.method === 'POST' && local && isDecisionPath(url.pathname)) {
+    if (!secret || !sessions.has(secret)) return (json(res, 401, error('session_ended')), true);
+    if (!writeAllowed(req, secret)) return (json(res, 403, error('csrf_refused')), true);
+    const body = (await readBody(req)) ?? {};
+    const answer = await decisionWrite(url, body, (action, expected) => {
+      // The API binds the body without the step-up and the hash (`stepUpRequestSha256`).
+      const rest = { ...body };
+      delete rest.step_up;
+      delete rest.expected_input_sha256;
+      return stepUpHolds(body.step_up, action, stepUpRequestSha256(rest), expected);
+    });
+    return (json(res, answer.status, answer.body), true);
   }
   const isPlanPath =
     url.pathname.startsWith('/v1/eval-plans/') ||

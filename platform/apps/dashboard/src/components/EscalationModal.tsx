@@ -3,10 +3,10 @@ import type { EscalationView } from '@sdlc/api-schemas';
 import { cleanText } from '@sdlc/api-schemas';
 import { useState } from 'preact/hooks';
 
-import { ApiError } from '../api/client.js';
 import { decideEscalation } from '../api/writes.js';
 import { t } from '../i18n.js';
-import { confirmEscalationWithPasskey, PasskeyCancelled } from '../views/step-up.js';
+import { actionErrorText, DECISION_REASON_CODES } from '../model/decisions.js';
+import { confirmEscalationWithPasskey } from '../views/step-up.js';
 
 export interface EscalationModalProps {
   readonly escalation: EscalationView;
@@ -42,24 +42,16 @@ export function EscalationModal({ escalation, onClose, onSuccess }: EscalationMo
 
       const stepUp = await confirmEscalationWithPasskey(escalation.code, packetSha, decisionBody);
 
+      // The decision carries the hash its step-up is bound to (the escalation's packet).
       await decideEscalation(escalation.code, {
         ...decisionBody,
+        ...(packetSha ? { expected_input_sha256: packetSha } : {}),
         step_up: stepUp,
       });
 
       onSuccess();
     } catch (err: unknown) {
-      if (err instanceof PasskeyCancelled) {
-        setErrorMsg(t('dashboard.action.cancelled'));
-      } else if (err instanceof ApiError && err.status === 409) {
-        setErrorMsg(t('dashboard.action.conflict'));
-      } else if (err instanceof ApiError) {
-        setErrorMsg(err.reason ? `${err.code}: ${err.reason}` : err.code);
-      } else if (err instanceof Error) {
-        setErrorMsg(err.message);
-      } else {
-        setErrorMsg('An unexpected error occurred.');
-      }
+      setErrorMsg(actionErrorText(err));
     } finally {
       setBusy(false);
     }
@@ -98,13 +90,18 @@ export function EscalationModal({ escalation, onClose, onSuccess }: EscalationMo
 
         <div class="field">
           <label for="escalation-reason-code">{t('dashboard.action.reason_code')}</label>
-          <input
+          <select
             id="escalation-reason-code"
-            type="text"
-            placeholder="e.g. approved_exception"
             value={reasonCode}
-            onInput={(e) => setReasonCode((e.target as HTMLInputElement).value)}
-          />
+            onChange={(e) => setReasonCode((e.target as HTMLSelectElement).value)}
+          >
+            <option value="">{t('dashboard.action.reason_none')}</option>
+            {DECISION_REASON_CODES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div class="field">
@@ -123,7 +120,7 @@ export function EscalationModal({ escalation, onClose, onSuccess }: EscalationMo
           <input
             id="escalation-budget"
             type="text"
-            placeholder="e.g. 5.00"
+            placeholder="5.00"
             value={budgetIncrease}
             onInput={(e) => setBudgetIncrease((e.target as HTMLInputElement).value)}
           />
@@ -143,7 +140,7 @@ export function EscalationModal({ escalation, onClose, onSuccess }: EscalationMo
               void handleConfirm();
             }}
           >
-            {busy ? 'Verifying passkey…' : t('dashboard.action.confirm_passkey')}
+            {busy ? t('dashboard.action.verifying') : t('dashboard.action.confirm_passkey')}
           </button>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { codeClass, Due, Empty, Show, Txt, When } from '../components/common.js'
 import { EscalationModal } from '../components/EscalationModal.js';
 import { t } from '../i18n.js';
 import { roleName } from '../labels.js';
+import { actionErrorText } from '../model/decisions.js';
 import { escalationRows } from '../model/escalations.js';
 import { intentHref } from '../router.js';
 import { session } from '../session.js';
@@ -40,7 +41,7 @@ export function Escalations() {
         reload();
       })
       .catch((err: unknown) => {
-        setActionError(err instanceof Error ? err.message : String(err));
+        setActionError(actionErrorText(err));
       })
       .finally(() => {
         setAckingCode(null);

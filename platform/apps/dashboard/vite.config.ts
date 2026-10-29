@@ -27,6 +27,8 @@ export function dashboardCatalog(): Plugin {
           ([key]) =>
             key.startsWith('dashboard.') ||
             key.startsWith('intent.waiting') ||
+            // U07: the refusal reasons of a gate decision, as in the comment replies.
+            key.startsWith('gate.reason.') ||
             // L05: the refusals of evaluation plans, by the reason the API gives.
             key.startsWith('evaluation.error.') ||
             // L06: the recommendations of an evaluation report, by rule (ADR-M83 §2.3).
