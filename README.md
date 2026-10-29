@@ -120,17 +120,18 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 
 ## 4. Supported Capabilities & Architecture
 
-| Area | Supported today (v0.7.0) |
+| Area | Supported today (v0.8.0) |
 |---|---|
 | **Agents** | OpenHands, OpenCode (pluggable via Agent Adapter Kit) |
 | **Agent Tools** | MCP Gateway (`agentgateway`) per run with isolated containers (`read_documents`) |
 | **Runner Isolation** | Shared Docker Engine or **Independent Rootless Engine / VM** (prevents volume mounting attacks) |
-| **Security Gates** | Pre-G5 secret scanning via Gitleaks, diff review size threshold enforcement |
+| **Security Gates** | Pre-G5 secret scanning via Gitleaks, diff review size threshold enforcement; before G6, a check of the dependencies an agent adds (licences, install scripts, look-alike names) |
 | **Git Hosts** | GitHub (GitLab, Bitbucket designed in Milestone EXT) |
 | **Sandboxes** | Node.js / TypeScript (`node24`), network restricted to LiteLLM & package proxy |
 | **Models** | Cloud LLMs via LiteLLM; self-hosted local models via vLLM on server GPU |
+| **Set-up** | `pnpm server:setup` (a guided fresh deployment on a server), `pnpm trial:up` (a trial on one machine), `sdlc admin project apply` (a project and its team from one file) |
 | **Audit & Evidence** | RFC 8785 canonical JSON + SHA-256 tamper-evident hash chain; exportable sealed Evidence Pack |
-| **Dashboard** | Preact SPA with GitHub OAuth, server-side sessions, CSRF protection, and passkey step-up |
+| **Dashboard** | Preact SPA with GitHub OAuth, server-side sessions and CSRF protection; gate and escalation decisions confirmed with a passkey, the kill switch, intents with their spec, plans and Evidence Packs |
 
 ## 5. Technology Stack
 

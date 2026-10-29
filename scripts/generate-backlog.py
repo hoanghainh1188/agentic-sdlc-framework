@@ -552,7 +552,25 @@ t("H03","Server","Design: deleting a client's data on request","S",["E05","E08"]
  ["A design for a client's request to delete its data (for example under Japan's APPI or a contract): what is deleted (evidence files, Langfuse traces, personal data in `users`), what stays (hashes, codes and IDs in append-only tables, kept at least 2 years) and how the audit log records the deletion",
   "How it fits the append-only rule and the hash chain: no row of an append-only table is changed or deleted",
   "No code in this task; the implementation tasks follow Harry's approval"],
- "QUESTIONS #440: D-05 §10 says this needs its own design; there was no task. Done: ADR-M97, QUESTIONS #611–#615 (H03 design)")
+ "QUESTIONS #440: D-05 §10 says this needs its own design; there was no task. Done: ADR-M97, QUESTIONS #611–#615 (H03 design). The implementation: H03a, H03b, H03c")
+t("H03a","Server","Client data deletion 1: tenant states and the anonymization of people","S",["H03"],"FR-44",
+ "platform/packages/core (db, migrations), platform/tests/*",
+ ["A migration adds the tenant states `pending_deletion` and `purged` (ADR-M97 §2)",
+  "`anonymizeUser()` replaces a person's personal data in `users`, `user_identities` and `project_configs` in one transaction (`deleted-<id>@redacted.invalid`); foreign keys stay valid",
+  "Tests: the rows of `gate_decisions` and `audit_log` and the hash chain are unchanged after the anonymization; no append-only table gets an UPDATE or DELETE path"],
+ "ADR-M97 §3 item 1 (QUESTIONS #611–#615)")
+t("H03b","Server","Client data deletion 2: the worker's purge of files, traces and indexes","M",["H03a"],"FR-44",
+ "platform/apps/worker, platform/packages/core (retention), platform/packages/adapters (evidence-s3, traces-langfuse), platform/tests/*",
+ ["`RetentionLoop` gains `runClientPurgePass()`: after the 14-day grace period it deletes the tenant's evidence files, Langfuse traces and knowledge schemas, then anonymizes the people (H03a)",
+  "An active hold (`evidence_holds`) or an open intent stops the purge of what it holds; the purge checks that S3 and Langfuse hold nothing more before it records the end",
+  "The last audit event is `client_data.deleted` (IDs and counts only), the daily anchor is updated and the tenant becomes `purged`"],
+ "ADR-M97 §2 phases 1–4, §3 item 2")
+t("H03c","Server","Client data deletion 3: the request, the approval and the status commands","S",["H03b"],"FR-44, NFR-08",
+ "platform/apps/cli, platform/apps/api (admin), platform/packages/messages, platform/tests/*, handbook Ch.19",
+ ["A tenant admin asks and cancels: `sdlc client request-data-deletion`, `sdlc client cancel-data-deletion`",
+  "A platform operator approves and follows: `pnpm sdlc ops client-data-deletion approve|list|status`; the requester never approves (two-person rule)",
+  "An audit event for each step of the request; every text from the message catalog"],
+ "ADR-M97 §2 (two-person rule, 14-day grace period), §3 item 3")
 t("H04","Server","A secret scan of a run's diff before G5","S",["C07"],"FR-33, NFR-03",
  "platform/apps/runner (changes step), platform/packages/core (workflow G5), platform/packages/config, platform/tests/*, handbook Ch.14",
  ["The runner scans the stored diff (added lines only) for secret patterns (keys, tokens, private keys) outside the sandbox, with the rules of the repository's Gitleaks configuration or a built-in set; the run event holds a count and rule codes, never a match or a path",
@@ -792,13 +810,13 @@ def lp(k):
         if c[0]>b[0]: b=c
     return (b[0]+W[IDX[k]['size']],b[1]+[k])
 CP=" → ".join(max((lp(k) for k in IDX),key=lambda x:x[0])[1])
-MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help` (QUESTIONS #355, #364, #420, #424)"),("DEV","Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479)"),("EVAL","Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)"),("EXT","Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike)"),("Models","Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424)"),("Server","A team on a server: v0.7.0 with O01, O02, H04, H05, V15; toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done)")]
+MS=[("M-A","Foundation: infrastructure, security, audit"),("M-B","Intent + G1–G3"),("M-0","Sample pilot repo (separate repo, right before M-C)"),("M-C","Run + G4–G6"),("M-D","G7–G8 + evidence + cost"),("Pre-M-E","Before the trial M-E: spec tools and document knowledge (QUESTIONS #285)"),("M-E","The trial, run by the community (QUESTIONS #340)"),("UX","Friendlier for users and deployers: v0.1.1, v0.2.0, then v0.3.0 with the agent measures and `sdlc help`; V17 in v0.8.0 (QUESTIONS #355, #364, #420, #424)"),("DEV","Rules as checks for contributors and Claude Code: a rules register, hooks, lint and tests (QUESTIONS #479)"),("EVAL","Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450)"),("EXT","Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike)"),("Models","Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424)"),("Server","A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; toward v1.0 (QUESTIONS #363)"),("Later","Not scheduled yet (was \"MVP+1\"; U01–U03 were started early there and are done; U07 and U08 are done in v0.8.0)")]
 o=[];w=o.append
 w(f"""# D-08. Platform backlog
 
 | Item | Value |
 |---|---|
-| Version | 1.65 |
+| Version | 1.67 |
 | Date | 2026-10-29 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -847,13 +865,13 @@ flowchart LR
     MC --> MD["M-D G7–G8 + evidence"]
     MD --> MP["Pre-M-E S01, S02, K01, C13<br/>spec tools, WeKnora spike (K02 deferred), L1 proposal"]
     MP --> ME["M-E Trial by the community (V01–V03, release v0.1.0)"]
-    ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0)"]
+    ME --> UX["UX V04–V13, U05, U06, L02: friendlier (v0.1.1, v0.2.0, v0.3.0), V17 (v0.8.0)"]
     UX --> EV["EVAL L04–L10: evaluations, reports, recommendations for managers"]
     EV --> EXT["EXT X09 (v0.5.0), X01–X04, X14, X07, X11 (v0.6.0), X12 (v0.7.0)"]
     EXT --> MO["Models L01 PR 1, L03 (v0.6.0), then L01 PR 2, L03b"]
-    MO --> SV["Server O01, O02, H04, H05, V15 (v0.7.0), then A10, O03 (v1.0)"]
+    MO --> SV["Server O01, O02, H04, H05, V15 (v0.7.0), H02, H03, V16 (v0.8.0), then A10, O03 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
-    MD --> MU["U01–U03 read-only dashboard, done (Later)"]
+    MD --> MU["U01–U03 read-only dashboard, done; U07, U08 decisions in the dashboard (v0.8.0) (Later)"]
 ```
 
 - M-0 lives in a **separate repo** (`pilot-order-inventory`). Done at the end of M-B, before C09.
@@ -990,6 +1008,8 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.63 | 2026-10-29 | Claude Code (task U07), approved by Harry | U07 done (PR #462 and the U07 finish PR); U08 in part: create an intent (PR #462) |
 | 1.64 | 2026-10-29 | Claude Code (task V16), approved by Harry | V16 done: `pnpm server:setup`, a guided fresh deployment on a server (ADR-M98, QUESTIONS #616) |
 | 1.65 | 2026-10-29 | Claude Code (task U08), approved by Harry | U08 done: create an intent with its spec, submit a plan, build an Evidence Pack in the dashboard |
+| 1.66 | 2026-10-29 | Claude, approved by Harry | New tasks H03a, H03b, H03c: the implementation of client data deletion, as ADR-M97 §3 splits it |
+| 1.67 | 2026-10-29 | Claude, approved by Harry | Release v0.8.0 with H02, H03, U07, U08, V16 and V17 |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
@@ -1012,7 +1032,8 @@ DONE={**{t:"v0.1.0" for t in ("V01","V02","V03")},
       **{t:"v0.4.0" for t in ("L04","L05")},
       **{t:"v0.5.0" for t in ("L06","L07","L08","L09","L10","W01","X09")},
       **{t:"v0.6.0" for t in ("X01","X02","X03","X04","X07","X11","X14","L03")},
-      **{t:"v0.7.0" for t in ("X12","O01","O02","H04","H05","V15")}}
+      **{t:"v0.7.0" for t in ("X12","O01","O02","H04","H05","V15")},
+      **{t:"v0.8.0" for t in ("H02","H03","U07","U08","V16","V17")}}
 r=[]; a=r.append
 a("""# Roadmap
 
