@@ -2,6 +2,7 @@
 // switch. Every handler works on the caller's tenant scope.
 import { Controller, Get, HttpCode, Inject, Param, Post } from '@nestjs/common';
 
+import { SessionAction } from '../auth/auth.guard.js';
 import { CurrentPrincipal, type Principal } from '../auth/principal.js';
 import { intentRefSchema } from '../intents/schemas.js';
 import { RUNS } from '../tokens.js';
@@ -23,6 +24,7 @@ export class RunsController {
 
   /** 202: the kill is recorded; the run stops within minutes. `already`: it was killed before. */
   @Post('runs/:run/kill')
+  @SessionAction('actions')
   @HttpCode(202)
   kill(
     @CurrentPrincipal() p: Principal,

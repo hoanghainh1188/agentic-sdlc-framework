@@ -1,6 +1,7 @@
 // Intent and gate endpoints (D-08 B03 AC3). Every handler works on the caller's tenant scope.
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
 
+import { SessionAction } from '../auth/auth.guard.js';
 import { CurrentPrincipal, type Principal } from '../auth/principal.js';
 import { INTENTS } from '../tokens.js';
 import { parseRequest } from '../validation.js';
@@ -19,6 +20,7 @@ export class IntentsController {
   constructor(@Inject(INTENTS) private readonly intents: IntentsService) {}
 
   @Post()
+  @SessionAction('actions')
   @HttpCode(201)
   create(@CurrentPrincipal() p: Principal, @Body() body: unknown): Promise<IntentBody> {
     return this.intents.create(p, parseRequest(createIntentSchema, body, 'body'));
@@ -38,6 +40,7 @@ export class IntentsController {
   }
 
   @Post(':intent/gates/:gate/decisions')
+  @SessionAction('actions')
   @HttpCode(201)
   decide(
     @CurrentPrincipal() p: Principal,

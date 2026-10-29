@@ -44,6 +44,7 @@ import { migration0041ContextSnapshotEvidence } from './0041-context-snapshot-ev
 import { migration0042DiffScan } from './0042-diff-scan.js';
 import { migration0043ReviewLimits } from './0043-review-limits.js';
 import { migration0044DependencyChecks } from './0044-dependency-checks.js';
+import { migration0045WebDecisionSource } from './0045-web-decision-source.js';
 import type { SqlMigration } from './define.js';
 
 export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
@@ -91,4 +92,5 @@ export const MIGRATIONS: Readonly<Record<string, SqlMigration>> = {
   '0042-diff-scan': migration0042DiffScan,
   '0043-review-limits': migration0043ReviewLimits,
   '0044-dependency-checks': migration0044DependencyChecks,
+  '0045-web-decision-source': migration0045WebDecisionSource,
 };

@@ -279,14 +279,9 @@ describeDb('L05 PR 5: evaluation plan actions from a dashboard session', () => {
       expect(archived.json()).toMatchObject({ status: 'archived', can_change: false });
     });
 
-    it('the other business routes stay closed to sessions until U07', async () => {
+    it('unmarked routes stay closed to sessions', async () => {
       expectError(
-        await inject(app, 'POST', '/v1/intents', page(a), {
-          project: 'shop',
-          title: 'x',
-          risk_tier: 'low',
-          data_class: 'internal',
-        }),
+        await inject(app, 'POST', '/v1/me/tokens', page(a), { name: 'laptop' }),
         403,
         'session_write_not_allowed',
       );

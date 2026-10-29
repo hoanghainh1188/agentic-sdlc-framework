@@ -117,6 +117,8 @@ const specRefSchema = z.object({
 });
 
 export const intentDetailSchema = intentSchema.extend({
+  /** U07: the current gate input hash the confirmation step shows. */
+  gate_input_sha256: code.nullable().optional(),
   /** U01 (QUESTIONS #261): who the current gate waits for, as the workflow resolves it. */
   waiting_for: z
     .object({

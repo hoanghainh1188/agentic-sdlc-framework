@@ -140,23 +140,26 @@ code {
   min-height: 2.25rem;
   padding: 0 var(--space-4);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--radius-chip);
-  background: transparent;
+  border-radius: 8px;
+  background: var(--paper-raised);
   color: var(--ink);
   font: inherit;
   font-size: var(--text-small);
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
   cursor: pointer;
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
   transition:
     background-color var(--duration-fast) var(--ease-out),
     border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
     transform var(--duration-fast) var(--ease-out);
 }
 
 .button:hover {
   background: var(--paper-sunk);
   border-color: var(--ink-muted);
+  box-shadow: 0 2px 4px 0 rgba(15, 23, 42, 0.08);
 }
 
 .button:active {
@@ -181,7 +184,9 @@ code {
 }
 
 .button-quiet {
+  background: transparent;
   border-color: var(--rule);
+  box-shadow: none;
 }
 
 .button-row {
@@ -190,50 +195,63 @@ code {
   gap: var(--space-2);
 }
 
-/* Chips: codes as they appear in the handbook */
+/* Chips: Linear pastel badges */
 .chip {
   display: inline-block;
-  padding: 0 0.4em;
+  padding: 0.1rem 0.5rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius-chip);
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  line-height: 1.6;
+  line-height: 1.5;
   white-space: nowrap;
   color: var(--ink);
+  background: var(--paper-sunk);
 }
 
 .chip-alert,
 .sev-chip-critical {
   border-color: var(--alert);
   color: var(--alert);
+  background: rgba(185, 28, 28, 0.08);
 }
 
 .chip-warn,
 .sev-chip-high {
   border-color: var(--warn);
   color: var(--warn);
+  background: rgba(180, 83, 9, 0.08);
+}
+
+.chip-success {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: rgba(21, 128, 61, 0.08);
 }
 
 .risk-high,
 .risk-critical {
   border-color: var(--alert);
   color: var(--alert);
+  background: rgba(185, 28, 28, 0.08);
 }
 
 .risk-medium {
   border-color: var(--warn);
   color: var(--warn);
+  background: rgba(180, 83, 9, 0.08);
 }
 
 .mode-hitl {
   border-color: var(--accent);
   color: var(--accent);
+  background: rgba(3, 105, 161, 0.08);
 }
 
 .mode-hotl {
   border-color: var(--hotl);
   color: var(--hotl);
+  background: rgba(29, 78, 216, 0.08);
 }
 
 .decision-approve,
@@ -241,6 +259,7 @@ code {
 .status-done {
   border-color: var(--ok);
   color: var(--ok);
+  background: rgba(21, 128, 61, 0.08);
 }
 
 .decision-reject,
@@ -250,12 +269,14 @@ code {
 .status-blocked {
   border-color: var(--alert);
   color: var(--alert);
+  background: rgba(185, 28, 28, 0.08);
 }
 
 /* Notices */
 .notice {
   padding: var(--space-3) var(--space-4);
   border-left: 3px solid var(--rule-strong);
+  border-radius: 0 6px 6px 0;
   background: var(--paper-sunk);
   font-size: var(--text-small);
   margin-block: var(--space-3);

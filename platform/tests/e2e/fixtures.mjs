@@ -192,6 +192,7 @@ function detail(base) {
       structure: 'manual_heading',
       acceptance_criteria: 3,
     },
+    gate_input_sha256: hash('a'),
     plan: { version: 2, plan_sha256: hash('e'), change_flags: six ? ['core_business_rule'] : [] },
     decisions: six
       ? [

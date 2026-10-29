@@ -11,8 +11,11 @@ import {
 import { COMMAND_DECISIONS, INTENT_CODE_PATTERN, MAX_INTENT_PAGE } from '@sdlc/core';
 import { z } from 'zod';
 
+import { stepUpAnswerSchema } from '../passkeys/schemas.js';
+
 const slug = z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/);
 const scopeCode = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.:/@-]{0,127}$/);
+const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
 
 export const createIntentSchema = z.strictObject({
   project: slug,
@@ -54,4 +57,8 @@ export const decisionSchema = z.strictObject({
       actions: z.array(scopeCode).max(50).optional(),
     })
     .optional(),
+  /** U07: the gate input hash the confirmation step showed; 409 when changed. */
+  expected_input_sha256: sha256.optional(),
+  /** U07: passkey answer when sent from a session. */
+  step_up: stepUpAnswerSchema.optional(),
 });

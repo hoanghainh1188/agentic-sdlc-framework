@@ -448,10 +448,8 @@ describeDb('U05: dashboard sign-in with GitHub and sessions', () => {
 
     it('a session writes only to marked routes: every other write is refused, even from the origin (U06)', async () => {
       for (const [method, url] of [
-        ['POST', '/v1/intents'],
         ['POST', '/v1/me/tokens'],
         ['DELETE', '/v1/me/tokens/current'],
-        ['POST', '/v1/runs/00000000-0000-4000-8000-000000000000/kill'],
       ] as const) {
         const reply = await inject(
           app,

@@ -60,6 +60,7 @@ export const API_ERROR_CODES = [
   'decision_not_allowed',
   'gate_not_supported',
   'gate_input_missing',
+  'gate_input_conflict',
   'gate_not_current',
   'scope_not_allowed',
   'plan_refused',
@@ -148,6 +149,7 @@ const ERROR_MESSAGE_KEYS: Readonly<Record<ApiErrorCode, MessageKey>> = {
   decision_not_allowed: 'api.error.decision_not_allowed',
   gate_not_supported: 'api.error.gate_not_supported',
   gate_input_missing: 'api.error.gate_input_missing',
+  gate_input_conflict: 'api.error.gate_input_conflict',
   gate_not_current: 'api.error.gate_not_current',
   scope_not_allowed: 'api.error.scope_not_allowed',
   plan_refused: 'api.error.plan_refused',
@@ -257,6 +259,7 @@ const REGISTRY: Readonly<Record<RegistryErrorCode, [number, ApiErrorCode]>> = {
 const COMMAND: Readonly<Record<CommandErrorCode, [number, ApiErrorCode]>> = {
   gate_not_supported: [422, 'gate_not_supported'],
   gate_input_missing: [409, 'gate_input_missing'],
+  gate_input_conflict: [409, 'gate_input_conflict'],
   gate_not_current: [409, 'gate_not_current'],
   scope_not_allowed: [422, 'scope_not_allowed'],
   plan_refused: [409, 'plan_refused'],

@@ -30,7 +30,11 @@ export class RunsService {
     const result = await requestRunKill(
       p.scope,
       { now: () => this.registry.now() },
-      { runId, actor: { type: 'human', id: p.userId }, source: 'api' },
+      {
+        runId,
+        actor: { type: 'human', id: p.userId },
+        source: p.credential.kind === 'session' ? 'web' : 'api',
+      },
     );
     const intent = await p.scope.intents.getById(result.intentId);
     if (!result.already) {

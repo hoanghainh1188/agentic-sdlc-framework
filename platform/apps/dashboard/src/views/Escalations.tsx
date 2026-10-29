@@ -1,12 +1,18 @@
 // Open escalations (U01 AC4): severity, route, the role that holds the current step, and the
 // acknowledge or resolve clock, overdue first. `freezes_intent` comes from the API (isFreezing).
+import { useState } from 'preact/hooks';
+import type { EscalationView } from '@sdlc/api-schemas';
+
 import { readOpenEscalations } from '../api/reads.js';
+import { ackEscalation } from '../api/writes.js';
 import { useApi } from '../api/use-api.js';
 import { codeClass, Due, Empty, Show, Txt, When } from '../components/common.js';
+import { EscalationModal } from '../components/EscalationModal.js';
 import { t } from '../i18n.js';
 import { roleName } from '../labels.js';
 import { escalationRows } from '../model/escalations.js';
 import { intentHref } from '../router.js';
+import { session } from '../session.js';
 
 const STEP_KEYS: Readonly<Record<string, string>> = {
   owner: 'dashboard.esc.step_owner',
@@ -21,6 +27,26 @@ const CLOCK_KEYS = {
 
 export function Escalations() {
   const { result, reload } = useApi((signal) => readOpenEscalations(undefined, { signal }), []);
+  const [decideTarget, setDecideTarget] = useState<EscalationView | null>(null);
+  const [ackingCode, setAckingCode] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const canAct = session.actions();
+
+  const handleAck = (code: string) => {
+    setAckingCode(code);
+    setActionError(null);
+    void ackEscalation(code)
+      .then(() => {
+        reload();
+      })
+      .catch((err: unknown) => {
+        setActionError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        setAckingCode(null);
+      });
+  };
+
   return (
     <section class="screen" aria-labelledby="esc-screen-title">
       <div class="screen-head">
@@ -34,6 +60,7 @@ export function Escalations() {
           </button>
         </div>
       </div>
+      {actionError && <p class="error">{actionError}</p>}
       <Show loaded={result}>
         {({ items, truncated }, at) => {
           const rows = escalationRows(items, at);
@@ -52,6 +79,7 @@ export function Escalations() {
                       <th scope="col">{t('dashboard.col.holder')}</th>
                       <th scope="col">{t('dashboard.col.clock')}</th>
                       <th scope="col">{t('dashboard.col.intent')}</th>
+                      {canAct && <th scope="col">{t('dashboard.action.title')}</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -99,6 +127,29 @@ export function Escalations() {
                               <Txt value={e.intent.code} />
                             </a>
                           </td>
+                          {canAct && (
+                            <td data-label={t('dashboard.action.title')}>
+                              <div class="row-actions">
+                                {e.acknowledged_at === null && (
+                                  <button
+                                    type="button"
+                                    class="button button-quiet button-small"
+                                    disabled={ackingCode === e.code}
+                                    onClick={() => handleAck(e.code)}
+                                  >
+                                    {t('dashboard.action.ack')}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  class="button button-quiet button-small"
+                                  onClick={() => setDecideTarget(e)}
+                                >
+                                  {t('dashboard.action.decide')}
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -109,6 +160,16 @@ export function Escalations() {
           );
         }}
       </Show>
+      {decideTarget && (
+        <EscalationModal
+          escalation={decideTarget}
+          onClose={() => setDecideTarget(null)}
+          onSuccess={() => {
+            setDecideTarget(null);
+            reload();
+          }}
+        />
+      )}
     </section>
   );
 }

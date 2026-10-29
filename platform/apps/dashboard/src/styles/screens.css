@@ -2,6 +2,7 @@
 .masthead {
   background: var(--masthead);
   color: var(--masthead-ink);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .masthead-inner,
@@ -259,11 +260,18 @@ select {
   border-left: 3px solid var(--accent-fill);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
-  transition: transform var(--duration-fast) var(--ease-out);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
 }
 
 .card:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  border-color: var(--rule-strong);
+  box-shadow:
+    0 10px 25px -5px rgba(15, 23, 42, 0.08),
+    0 0 0 1px var(--rule-strong);
 }
 
 .card-overdue {
@@ -992,4 +1000,84 @@ tbody th.mono {
 .recent-evals h2 {
   margin-top: 0;
   font-size: 1rem;
+}
+
+/* U07: Decision modal and gate action buttons */
+.gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-4);
+}
+
+.modal-card {
+  background: var(--paper-raised);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  padding: var(--space-6);
+  max-width: 34rem;
+  width: 100%;
+  box-shadow:
+    0 25px 50px -12px rgba(15, 23, 42, 0.25),
+    0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+.modal-card h3 {
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+}
+
+.modal-card .binding-info {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  font-size: 0.85rem;
+}
+
+.modal-card .binding-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+
+.modal-card .field {
+  margin-bottom: var(--space-4);
+}
+
+.modal-card .field label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.modal-card .field input,
+.modal-card .field select {
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  color: inherit;
+}
+
+.modal-card .modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
 }

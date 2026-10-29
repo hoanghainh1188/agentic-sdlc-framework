@@ -140,6 +140,7 @@ export const GATE_DECISION_SOURCES = [
   'github_comment',
   'github_review',
   'workflow',
+  'web',
 ] as const;
 export type GateDecisionSource = (typeof GATE_DECISION_SOURCES)[number];
 

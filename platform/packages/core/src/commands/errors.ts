@@ -5,6 +5,8 @@ export type CommandErrorCode =
   | 'gate_not_supported'
   /** The gate has no input to bind the decision to yet (no spec for G2, no plan for G3). */
   | 'gate_input_missing'
+  /** The input to this gate changed since it was read (expectedInputSha256 mismatch). */
+  | 'gate_input_conflict'
   /**
    * The intent is not waiting at this gate (task B07): a decision counts only for the gate the
    * workflow is at, so an early or late decision is refused instead of being ignored.

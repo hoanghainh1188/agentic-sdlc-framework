@@ -9,6 +9,10 @@ import {
 import { ESCALATION_CODE_PATTERN, INTENT_CODE_PATTERN } from '@sdlc/core';
 import { z } from 'zod';
 
+import { stepUpAnswerSchema } from '../passkeys/schemas.js';
+
+const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
+
 export const MAX_ESCALATION_PAGE = 100;
 
 export const escalationCodeSchema = z.string().regex(ESCALATION_CODE_PATTERN);
@@ -35,4 +39,8 @@ export const escalationDecisionSchema = z.strictObject({
     .string()
     .regex(/^\d{1,12}(\.\d{1,6})?$/)
     .optional(),
+  /** U07: the escalation subject hash the confirmation step showed; 409 when changed. */
+  expected_input_sha256: sha256.optional(),
+  /** U07: passkey answer when sent from a session. */
+  step_up: stepUpAnswerSchema.optional(),
 });

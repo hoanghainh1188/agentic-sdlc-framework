@@ -33,7 +33,7 @@ import { KillError } from './errors.js';
 export type KillActor =
   { readonly type: 'human'; readonly id: string } | { readonly type: 'system' };
 
-export type KillSource = 'api' | 'github_comment' | 'ops';
+export type KillSource = 'api' | 'github_comment' | 'ops' | 'web';
 
 /** The stop reason of every killed run (migration 0020). */
 export const KILLED = 'killed';
