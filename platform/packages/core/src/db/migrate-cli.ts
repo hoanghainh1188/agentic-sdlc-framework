@@ -1,16 +1,19 @@
 // `pnpm db:migrate` and `pnpm db:status` (task A06). Operator command, not part of the `sdlc` CLI.
-// Reads SDLC_DB_MIGRATION_URL: a URL for the database owner role `platform`.
+// Reads SDLC_DB_MIGRATION_URL: a URL for the database owner role `platform`. With `--url-stdin`,
+// the URL is the first line of standard input instead, so a caller that holds the password
+// (`pnpm server:setup`, `pnpm trial:up`: D-08 V16) never puts it into a child's environment.
 import { t } from '@sdlc/messages';
 
 import { createKysely } from './connection.js';
 import { migrateToLatest, migrationStatus } from './migrator.js';
 
-async function main(command: string | undefined): Promise<number> {
-  if (command !== 'latest' && command !== 'status') {
+async function main(command: string | undefined, options: readonly string[]): Promise<number> {
+  const urlStdin = options.length === 1 && options[0] === '--url-stdin';
+  if ((command !== 'latest' && command !== 'status') || (options.length > 0 && !urlStdin)) {
     console.error(t('db.migrate.usage'));
     return 2;
   }
-  const connectionString = process.env.SDLC_DB_MIGRATION_URL;
+  const connectionString = urlStdin ? await firstStdinLine() : process.env.SDLC_DB_MIGRATION_URL;
   if (!connectionString) {
     console.error(t('db.migrate.missing_url'));
     return 2;
@@ -47,11 +50,20 @@ async function main(command: string | undefined): Promise<number> {
   }
 }
 
+async function firstStdinLine(): Promise<string> {
+  let text = '';
+  for await (const chunk of process.stdin as AsyncIterable<Buffer>) {
+    text += chunk.toString('utf8');
+    if (text.includes('\n') || text.length > 4096) break;
+  }
+  return text.split('\n')[0]!.replace(/\r$/, '').trim();
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-main(process.argv[2]).then(
+main(process.argv[2], process.argv.slice(3)).then(
   (code) => {
     process.exitCode = code;
   },

@@ -25,7 +25,9 @@
     { "path": "platform/apps/tool-project-docs" },
     { "path": "platform/apps/cli" },
     { "path": "platform/apps/dashboard" },
+    { "path": "platform/deploy/steps" },
     { "path": "platform/deploy/trial" },
+    { "path": "platform/deploy/server-setup" },
     { "path": "platform/deploy/doctor" },
     { "path": "platform/eval" },
     { "path": "platform/deploy/github-app" }

@@ -1,42 +1,19 @@
 // The real machine for `trial:up` and `trial:down`: child processes (output captured, never
 // inherited), the `sdlc` command in this process, and the facts `preflight` decides on.
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 import { processApiIo, processContext, runCli, type CliContext } from '@sdlc/cli';
 
+import { exec } from '../../steps/dist/exec.js';
+
 import { keyFileFor } from './keys.js';
 import { OLLAMA_TAG, type FileFact, type HostFacts } from './preflight.js';
 import { credentialsFile, secretFiles, type TrialSettings } from './settings.js';
-import type { Exec, ExecResult, Sdlc } from './up.js';
+import type { Sdlc } from './up.js';
 
-/** Runs a command with stdin from `input`; stdout and stderr are captured, never shown. */
-export const exec: Exec = (cmd, args, opts = {}) =>
-  new Promise<ExecResult>((resolve) => {
-    // Without COMPOSE_PROJECT_NAME of the shell: Compose would prefer it to the env file's.
-    const inherited = { ...process.env };
-    delete inherited.COMPOSE_PROJECT_NAME;
-    const child = spawn(cmd, args, {
-      env: { ...inherited, ...opts.env },
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    const out: Buffer[] = [];
-    const err: Buffer[] = [];
-    child.stdout.on('data', (d: Buffer) => out.push(d));
-    child.stderr.on('data', (d: Buffer) => err.push(d));
-    child.on('error', (e) => resolve({ status: null, stdout: '', stderr: e.message }));
-    child.on('close', (status) =>
-      resolve({
-        status,
-        stdout: Buffer.concat(out).toString('utf8'),
-        stderr: Buffer.concat(err).toString('utf8'),
-      }),
-    );
-    child.stdin.on('error', () => undefined);
-    child.stdin.end(opts.input ?? '');
-  });
+export { exec };
 
 /**
  * One `sdlc …` command in this process. The environment is only what the call names (an API URL

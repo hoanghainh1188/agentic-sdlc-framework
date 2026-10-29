@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.64 |
+| Version | 1.65 |
 | Date | 2026-10-29 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -1480,7 +1480,7 @@ flowchart LR
 - [ ] AC5: It can start again after a failure: each step checks the state (initialised, sealed, pending migrations, delivered credentials) and skips what is done; a failure names the step and the README section; it ends with `doctor`; messages go through the catalog
 - [ ] AC6: Tests: the step order against the README, the refusal without a terminal, the root-token revocation on a stop, a second start after each step; `pnpm test:fresh-deploy` runs through the command with throw-away keys; the deploy README, runbook T11 and an ADR updated in the same task
 
-> Note: QUESTIONS #616 and #618 (Harry, 2026-10-28). Must be done before A10 PR 3 (the company server's first real run). Still by hand: the company CA certificate (T11 §3c), the GitHub App, the key holders' presence. Bugs from trial reports come first (R123)
+> Note: QUESTIONS #616 and #618 (Harry, 2026-10-28). Must be done before A10 PR 3 (the company server's first real run). Still by hand: the company CA certificate (T11 §3c), the GitHub App, the key holders' presence. Bugs from trial reports come first (R123). Done: `pnpm server:setup` (ADR-M98; the shared steps in `platform/deploy/steps`; runbook T11 §3.2)
 
 #### H02. Dependencies an agent adds: licence, known vulnerabilities, name checks
 
@@ -1964,7 +1964,8 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.61 | 2026-10-27 | Claude Code (task H03), approved by Harry | H03 design done: deleting a client's data on request (ADR-M97, QUESTIONS #611–#615) |
 | 1.62 | 2026-10-28 | Claude Code (task V17), approved by Harry | V17 done: `sdlc admin project apply`, a project and its team from one file (QUESTIONS #617) |
 | 1.63 | 2026-10-29 | Claude Code (task U07), approved by Harry | U07 done (PR #462 and the U07 finish PR); U08 in part: create an intent (PR #462) |
-| 1.64 | 2026-10-29 | Claude Code (task U08), approved by Harry | U08 done: create an intent with its spec, submit a plan, build an Evidence Pack in the dashboard |
+| 1.64 | 2026-10-29 | Claude Code (task V16), approved by Harry | V16 done: `pnpm server:setup`, a guided fresh deployment on a server (ADR-M98, QUESTIONS #616) |
+| 1.65 | 2026-10-29 | Claude Code (task U08), approved by Harry | U08 done: create an intent with its spec, submit a plan, build an Evidence Pack in the dashboard |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

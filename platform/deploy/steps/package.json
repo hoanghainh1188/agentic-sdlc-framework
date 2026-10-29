@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "The steps of platform/deploy/README.md \"Fresh deployment\" shared by pnpm trial:up, pnpm server:setup and pnpm test:fresh-deploy (D-08 V16). Not a workspace package: built by tsc -b from the root tsconfig."
+}

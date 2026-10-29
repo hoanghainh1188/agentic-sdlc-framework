@@ -5,9 +5,15 @@
 #
 # Runs INSIDE the openbao container. Called by platform/deploy/openbao/bootstrap.sh configure.
 #
-# Usage: configure.sh <secret-id-bound-cidrs> [--keep-token] [--runner-cidr <cidr>]
+# Usage: configure.sh <secret-id-bound-cidrs> [--keep-token | --issue-admin-token] [--runner-cidr <cidr>]
 #   stdin: one line with a root token. Never an argument or environment variable of the caller.
 #   --keep-token   do not revoke the token at the end (default: revoke it, D-03 section 10.2)
+#   --issue-admin-token
+#                  just before the root token is revoked, create one admin token (role
+#                  platform-admin, at most 1 hour) and print it as the last line,
+#                  `admin-token: <token>`. Only for `pnpm server:setup` and `pnpm trial:up`, which
+#                  read it from a pipe: the root token is used for nothing but this script
+#                  (D-08 V16, QUESTIONS #616, design/ADR-M98)
 #   --runner-cidr  the runner host's address (SDLC_RUNNER_SOURCE_CIDR): the AppRole "runner" also
 #                  accepts it; every other role does not (O01, design/ADR-M91 §2.7, QUESTIONS #596)
 set -eu
@@ -26,14 +32,16 @@ setting() {
   printf '%s' "$value"
 }
 
-[ "$#" -ge 1 ] || fail "usage: configure.sh <secret-id-bound-cidrs> [--keep-token] [--runner-cidr <cidr>]"
+[ "$#" -ge 1 ] || fail "usage: configure.sh <secret-id-bound-cidrs> [--keep-token | --issue-admin-token] [--runner-cidr <cidr>]"
 cidrs="$1"
 shift
 keep_token=no
+issue_admin=no
 runner_cidr=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --keep-token) keep_token=yes ;;
+    --issue-admin-token) issue_admin=yes ;;
     --runner-cidr)
       [ "$#" -ge 2 ] || fail "--runner-cidr needs a value"
       runner_cidr="$2"
@@ -43,6 +51,8 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
+
+[ "$keep_token$issue_admin" != yesyes ] || fail "--keep-token and --issue-admin-token exclude each other"
 
 IFS= read -r BAO_TOKEN || true
 [ -n "${BAO_TOKEN:-}" ] || fail "no token on stdin"
@@ -154,6 +164,16 @@ bao write auth/token/roles/platform-admin \
   token_explicit_max_ttl="$admin_max_ttl" >/dev/null
 say "token role platform-admin written (max $admin_max_ttl)"
 
+# --- The admin token of steps 4 and 5 (D-08 V16): made by the root token, which is then revoked --
+admin_token=""
+if [ "$issue_admin" = yes ]; then
+  admin_token="$(bao token create -role=platform-admin -field=token)" || admin_token=""
+  if [ -z "$admin_token" ]; then
+    bao token revoke -self >/dev/null 2>&1 || true
+    fail "could not create the admin token; the root token is revoked"
+  fi
+fi
+
 # --- Root token: revoke after use (D-03 section 10.2) -------------------------------------------
 if [ "$keep_token" = yes ]; then
   say "done; the token was NOT revoked (--keep-token). Revoke it as soon as you finish"
@@ -161,3 +181,5 @@ else
   bao token revoke -self >/dev/null
   say "done; the root token is revoked"
 fi
+# Last line, read from a pipe by the caller (bootstrap.sh refuses it on a terminal).
+[ -z "$admin_token" ] || printf 'admin-token: %s\n' "$admin_token"

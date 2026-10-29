@@ -25,10 +25,13 @@ Commands:
                        token ONE time, to the terminal only. Refuses when output is not a
                        terminal and when OpenBao is already initialised.
   unseal               Ask for key shares (hidden) until OpenBao is unsealed.
-  configure [--keep-token]
+  configure [--keep-token | --issue-admin-token]
                        Ask for a root token (hidden) and apply the configuration: KV v2,
                        Transit key, policies, AppRoles, admin token role. Safe to run again.
                        Revokes the root token at the end unless --keep-token is given.
+                       --issue-admin-token: also create one admin token just before the root
+                       token is revoked and print it as the last line; refused when the output
+                       is a terminal (pnpm server:setup reads it from a pipe, D-08 V16).
   root-token           Ask for key shares (hidden) and create a new root token. Prints it
                        ONE time, to the terminal only. Revoke it after use.
   litellm-credentials  Ask for an admin token (hidden), issue a new secret ID for the AppRole
@@ -139,12 +142,20 @@ setting() {
 command="$1"
 shift
 keep_token=no
+issue_admin=no
 allow_non_tty=no
 for arg in "$@"; do
   case "$arg" in
     --keep-token)
       [ "$command" = configure ] || fail "unknown option: $arg"
       keep_token=yes
+      ;;
+    # The admin token of `pnpm server:setup` and `pnpm trial:up` (D-08 V16, design/ADR-M98): to a
+    # pipe only, never to a terminal or the screen's scroll-back.
+    --issue-admin-token)
+      [ "$command" = configure ] || fail "unknown option: $arg"
+      [ ! -t 1 ] || fail "--issue-admin-token prints a token; it is for a pipe only, never a terminal"
+      issue_admin=yes
       ;;
     # Lets a caller keep the printed secrets in memory: the live tests (SDLC_OPENBAO_TEST=1) and
     # `pnpm trial:up` (SDLC_OPENBAO_THROWAWAY=1, throw-away keys of a trial stack on a developer
@@ -307,6 +318,7 @@ cmd_configure() {
   [ -n "$token" ] || fail "no root token given"
   set -- "$cidrs"
   [ "$keep_token" = yes ] && set -- "$@" --keep-token
+  [ "$issue_admin" = yes ] && set -- "$@" --issue-admin-token
   # The runner on its own Engine (O01, ADR-M91 §2.7, QUESTIONS #596): its source address, for the
   # AppRole "runner" only.
   runner_cidr="$(sed -n 's/^SDLC_RUNNER_SOURCE_CIDR=//p' "$env_file" | tail -n 1)"
