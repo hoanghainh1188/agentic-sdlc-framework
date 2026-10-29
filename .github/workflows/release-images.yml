@@ -58,7 +58,7 @@ env:
   TRIVY_ARM64_SHA256: b94ce1976bbf3c15b514b605ee88be7c6d94a29be2302847ff01cb794d47aad5
   COSIGN_VERSION: v3.1.3
   # The one registry path (ADR-M66 §2.1). platform/deploy/images.lock uses the same.
-  IMAGE_PREFIX: ghcr.io/hoanghainh1188/agentic-sdlc-framework
+  IMAGE_PREFIX: ghcr.io/hoanghainh1188/governed-adlc-fw
 
 jobs:
   check:

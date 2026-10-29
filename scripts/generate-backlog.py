@@ -1037,7 +1037,7 @@ DONE={**{t:"v0.1.0" for t in ("V01","V02","V03")},
 r=[]; a=r.append
 a("""# Roadmap
 
-Generated from the backlog (`scripts/generate-backlog.py`, the same source as [design/D-08](design/D-08-mvp-backlog.md)); do not edit by hand. The platform grows release by release; **v0.1.0 is the baseline**: the whole G1–G8 flow with evidence, audit and token cost ([what it includes](design/MVP-DONE.md)). Each task gets its own plan before it is built, so the order can change. Ideas and questions: [GitHub Discussions](https://github.com/hoanghainh1188/agentic-sdlc-framework/discussions).
+Generated from the backlog (`scripts/generate-backlog.py`, the same source as [design/D-08](design/D-08-mvp-backlog.md)); do not edit by hand. The platform grows release by release; **v0.1.0 is the baseline**: the whole G1–G8 flow with evidence, audit and token cost ([what it includes](design/MVP-DONE.md)). Each task gets its own plan before it is built, so the order can change. Ideas and questions: [GitHub Discussions](https://github.com/hoanghainh1188/governed-adlc-fw/discussions).
 
 | Milestone | Goal |
 |---|---|""")

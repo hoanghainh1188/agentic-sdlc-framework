@@ -4,7 +4,7 @@
 # not given is asked for at a hidden prompt.
 
 # The env file of step 2. Default: platform/deploy/.env of this checkout.
-# env_file: /opt/agentic-sdlc-framework/platform/deploy/.env
+# env_file: /opt/governed-adlc-fw/platform/deploy/.env
 
 # One key holder per OpenBao key share (BAO_KEY_SHARES in openbao/bootstrap/bootstrap.conf: 3), in
 # the order the shares are shown. With a PGP public key for every holder (the default and the

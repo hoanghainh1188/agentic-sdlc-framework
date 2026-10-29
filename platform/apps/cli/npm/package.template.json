@@ -3,13 +3,13 @@
   "version": "0.0.0",
   "description": "The sdlc command of the Agentic SDLC Framework: intents, gates G1–G8, escalations, evidence and cost through the platform's API.",
   "license": "MIT",
-  "homepage": "https://github.com/hoanghainh1188/agentic-sdlc-framework/blob/main/platform/USER-GUIDE.md",
+  "homepage": "https://github.com/hoanghainh1188/governed-adlc-fw/blob/main/platform/USER-GUIDE.md",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hoanghainh1188/agentic-sdlc-framework.git",
+    "url": "git+https://github.com/hoanghainh1188/governed-adlc-fw.git",
     "directory": "platform/apps/cli"
   },
-  "bugs": "https://github.com/hoanghainh1188/agentic-sdlc-framework/issues",
+  "bugs": "https://github.com/hoanghainh1188/governed-adlc-fw/issues",
   "keywords": ["agentic", "sdlc", "ai-agents", "governance", "cli"],
   "bin": {
     "sdlc": "bin/sdlc.cjs"

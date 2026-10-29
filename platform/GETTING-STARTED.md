@@ -20,7 +20,7 @@ A new test App can also be made from the manifest: `pnpm github-app:create --org
 | Field | Value |
 |---|---|
 | GitHub App name | `harryforge-sdlc-dev` |
-| Homepage URL | `https://github.com/hoanghainh1188/agentic-sdlc-framework` (any URL works; the App was created with the old one) |
+| Homepage URL | `https://github.com/hoanghainh1188/governed-adlc-fw` (any URL works; the App was created with the old one) |
 | Callback URL | empty |
 | Webhook → Active | **off** (v0.1 polls, QUESTIONS #43, ADR-M11) |
 | Where can this App be installed | Only on this account |
@@ -291,7 +291,7 @@ The `sdlc` command is published as `agentic-sdlc-cli` by `.github/workflows/npm-
 2. Download the artifact and check it: `tar -tzf agentic-sdlc-cli-0.1.1.tgz` lists only `package/` with `bin/sdlc.cjs`, `defaults/project-config.default.yaml`, `LICENSE`, `README.md`, `THIRD-PARTY-NOTICES` and `package.json`.
 3. In the macOS Terminal: `npm login`, then `npm publish agentic-sdlc-cli-0.1.1.tgz --access public --provenance=false`. The package asks for provenance (`publishConfig.provenance`), which only a CI run can give, so without `--provenance=false` npm stops with `Automatic provenance generation not supported for provider: null`. This one version has no provenance.
 4. npm uses **staged publishing** for a new package: the command uploads the version to a waiting area and creates a placeholder version `0.0.0-stage` (tagged `latest` until then). On npmjs.com, open the package and approve the waiting version (2FA again); `npm view agentic-sdlc-cli dist-tags` must then show `latest: 0.1.1`. Mark the placeholder deprecated: `npm deprecate agentic-sdlc-cli@0.0.0-stage "Placeholder of staged publishing; install agentic-sdlc-cli@0.1.1 or later"`.
-5. npmjs.com → the package → **Settings** → **Trusted publishing** → GitHub Actions: organisation or user `hoanghainh1188`, repository `agentic-sdlc-framework`, workflow `npm-publish.yml`, environment `npm`. On the same page, under **Publishing access**, choose "Require two-factor authentication and disallow tokens".
+5. npmjs.com → the package → **Settings** → **Trusted publishing** → GitHub Actions: organisation or user `hoanghainh1188`, repository `governed-adlc-fw`, workflow `npm-publish.yml`, environment `npm`. On the same page, under **Publishing access**, choose "Require two-factor authentication and disallow tokens".
 6. Check: `npm install -g agentic-sdlc-cli && sdlc --version` in a new terminal.
 
 Done for v0.1.1 on 2026-10-10. The images on GHCR need no step: the packages are linked to this public repository and are public already (check: an anonymous pull of a release image works).
@@ -363,19 +363,19 @@ Building the platform is **internal work** with no client data, so Claude Code m
 
 ### Step 1. Create the repo on GitHub and push
 
-1. Create a repository `agentic-sdlc-framework` (it was private until 2026-10-08, public since). Do not add a README, licence or `.gitignore` (the repo already has them).
+1. Create a repository `governed-adlc-fw` (it was private until 2026-10-08, public since). Do not add a README, licence or `.gitignore` (the repo already has them).
    - Where the repository is today, and the risks of a personal account: [CONTRIBUTING.md §2](../CONTRIBUTING.md#2-the-repository).
 2. Unzip, copy the folder where you want it, and push **one initial commit** (the repository history starts here):
 
 ```bash
-cd agentic-sdlc-framework
+cd governed-adlc-fw
 git config --global user.name  "<your name>"      # once per machine; commits fail without it
 git config --global user.email "<your email>"
 git init
 git add .
 git commit -m "Initial commit: handbook v1.0 (in review), design v1.0 (approved)"
 git branch -M main
-git remote add origin git@github.com:hoanghainh1188/agentic-sdlc-framework.git
+git remote add origin git@github.com:hoanghainh1188/governed-adlc-fw.git
 git push -u origin main
 
 # mark the approved design on this first commit
@@ -396,10 +396,10 @@ Do this **after** the first push, so protection does not block it. The settings 
 
 ```bash
 # Dry run: shows what would be created, creates nothing
-python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework --dry-run
+python3 scripts/create-issues.py --repo hoanghainh1188/governed-adlc-fw --dry-run
 
 # Create: 5 milestones (M-A, M-B, M-0, M-C, M-D), labels, 49 issues
-python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework
+python3 scripts/create-issues.py --repo hoanghainh1188/governed-adlc-fw
 ```
 
 - Safe to run again: issues that already exist (same `[ID] ` title prefix) are skipped.

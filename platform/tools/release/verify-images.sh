@@ -21,9 +21,9 @@ if ! [[ "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
   exit 2
 fi
 
-SIGNER_IDENTITY="https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/tags/$tag"
+SIGNER_IDENTITY="https://github.com/hoanghainh1188/governed-adlc-fw/.github/workflows/release-images.yml@refs/tags/$tag"
 SIGNER_ISSUER='https://token.actions.githubusercontent.com'
-REPO='hoanghainh1188/agentic-sdlc-framework'
+REPO='hoanghainh1188/governed-adlc-fw'
 
 count=0
 while read -r ref; do

@@ -45,9 +45,9 @@ interface Workflow {
 const root = repoRoot();
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8');
 const CHECK = path.join(root, 'platform/tools/release/release-check.mjs');
-const PREFIX = 'ghcr.io/hoanghainh1188/agentic-sdlc-framework';
+const PREFIX = 'ghcr.io/hoanghainh1188/governed-adlc-fw';
 const SIGNER =
-  'https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/tags/$tag';
+  'https://github.com/hoanghainh1188/governed-adlc-fw/.github/workflows/release-images.yml@refs/tags/$tag';
 const IMAGES: Record<string, string> = {
   API: 'sdlc-api',
   WORKER: 'sdlc-worker',

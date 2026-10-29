@@ -7,11 +7,11 @@ Requirements:
   - Run from the repo root.
 
 Usage:
-  python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework --dry-run
-  python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework
-  python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework --only A01,A02
-  python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework --update --dry-run
-  python3 scripts/create-issues.py --repo <owner>/agentic-sdlc-framework --update
+  python3 scripts/create-issues.py --repo <owner>/governed-adlc-fw --dry-run
+  python3 scripts/create-issues.py --repo <owner>/governed-adlc-fw
+  python3 scripts/create-issues.py --repo <owner>/governed-adlc-fw --only A01,A02
+  python3 scripts/create-issues.py --repo <owner>/governed-adlc-fw --update --dry-run
+  python3 scripts/create-issues.py --repo <owner>/governed-adlc-fw --update
 
 Idempotent: skips issues that already exist (matched by the "[ID] " title prefix).
 --update also brings the OPEN issues of existing tasks in line with the CSV after

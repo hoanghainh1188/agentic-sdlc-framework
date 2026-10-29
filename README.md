@@ -45,8 +45,8 @@ The trial runs the whole platform on your own machine with a fictional sample pr
 
 ```bash
 # 1. Get the latest release and its tools
-git clone https://github.com/hoanghainh1188/agentic-sdlc-framework.git
-cd agentic-sdlc-framework
+git clone https://github.com/hoanghainh1188/governed-adlc-fw.git
+cd governed-adlc-fw
 git checkout v0.8.0
 corepack enable && pnpm install
 
@@ -179,8 +179,8 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 
 ## 8. Help & Community
 
-- **Questions & Discussions**: [GitHub Discussions](https://github.com/hoanghainh1188/agentic-sdlc-framework/discussions)
-- **Issues & Bug Reports**: [Open an issue](https://github.com/hoanghainh1188/agentic-sdlc-framework/issues/new/choose) (never include tokens, credentials, or client code).
+- **Questions & Discussions**: [GitHub Discussions](https://github.com/hoanghainh1188/governed-adlc-fw/discussions)
+- **Issues & Bug Reports**: [Open an issue](https://github.com/hoanghainh1188/governed-adlc-fw/issues/new/choose) (never include tokens, credentials, or client code).
 - **Security Inquiries**: Follow the coordinated disclosure guidelines in [SECURITY.md](SECURITY.md).
 - **Operator Runbooks**: [Troubleshooting](platform/deploy/README.md#troubleshooting) & [OpenBao Runbook (T11)](handbook/03-templates/T11-openbao-runbook.md).
 

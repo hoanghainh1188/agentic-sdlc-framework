@@ -14,7 +14,7 @@
 # never changes). The tagged commit holds no lock file. The script reads, in this order:
 #   1. the file named by SDLC_IMAGES_LOCK (a server without access to github.com);
 #   2. platform/deploy/.images/vX.Y.Z.lock (ignored by Git), downloaded once over HTTPS from
-#      https://github.com/hoanghainh1188/agentic-sdlc-framework/releases/download/vX.Y.Z/images.lock
+#      https://github.com/hoanghainh1188/governed-adlc-fw/releases/download/vX.Y.Z/images.lock
 #      (a public repository: no token).
 # Every lock file must be complete: SDLC_IMAGES_VERSION equal to the root package.json and the six
 # images pinned by digest on the one registry path. On a release checkout a lock file that is
@@ -28,8 +28,8 @@
 set -eu
 
 NAMES="API WORKER RUNNER OTEL_COLLECTOR SANDBOX_NODE24 TOOL_PROJECT_DOCS"
-PREFIX="ghcr.io/hoanghainh1188/agentic-sdlc-framework"
-RELEASES="https://github.com/hoanghainh1188/agentic-sdlc-framework/releases/download"
+PREFIX="ghcr.io/hoanghainh1188/governed-adlc-fw"
+RELEASES="https://github.com/hoanghainh1188/governed-adlc-fw/releases/download"
 
 root="$(cd "$(dirname "$0")/../../.." && pwd)"
 

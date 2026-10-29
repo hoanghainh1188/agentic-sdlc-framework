@@ -16,7 +16,7 @@ This section is the one description of the repository's settings and CI; other d
 
 | Item | Value |
 |---|---|
-| Location | `github.com/hoanghainh1188/agentic-sdlc-framework`, **public** since 2026-10-08, on the personal account `hoanghainh1188` (moved from the organization `harryforge` on 2026-10-06) |
+| Location | `github.com/hoanghainh1188/governed-adlc-fw` (named `agentic-sdlc-framework` until 2026-10-29, ADR-M99; GitHub forwards the old URLs), **public** since 2026-10-08, on the personal account `hoanghainh1188` (moved from the organization `harryforge` on 2026-10-06) |
 | The sample repository | `harryforge/pilot-order-inventory` (public, fictional data), with the test GitHub App `harryforge-sdlc-dev` |
 | Plan | GitHub Free, public repository: GitHub Actions on standard runners at no cost; branch protection available. Security reports: [SECURITY.md](SECURITY.md) (private vulnerability reporting is on) |
 | Access | Public read; write access for the maintainers only |

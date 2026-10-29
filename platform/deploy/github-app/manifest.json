@@ -1,5 +1,5 @@
 {
-  "url": "https://github.com/hoanghainh1188/agentic-sdlc-framework",
+  "url": "https://github.com/hoanghainh1188/governed-adlc-fw",
   "description": "Agentic SDLC Framework platform (D-08 V03). Polls GitHub; no webhook.",
   "public": false,
   "hook_attributes": {

@@ -1,12 +1,12 @@
 # agentic-sdlc-cli
 
-The `sdlc` command of the [Agentic SDLC Framework](https://github.com/hoanghainh1188/agentic-sdlc-framework), a self-hosted platform that runs AI coding agents through eight checkpoints (gates G1–G8) with the right people approving each one. With `sdlc` you create intents, decide gates, handle escalations, and read evidence and cost.
+The `sdlc` command of the [Agentic SDLC Framework](https://github.com/hoanghainh1188/governed-adlc-fw), a self-hosted platform that runs AI coding agents through eight checkpoints (gates G1–G8) with the right people approving each one. With `sdlc` you create intents, decide gates, handle escalations, and read evidence and cost.
 
 **`sdlc` is a client: it needs a running platform.** Installing it does not install the platform.
 
-- **No platform yet, and you want to try it?** Set one up on your own machine with one command: [TRIAL.md](https://github.com/hoanghainh1188/agentic-sdlc-framework/blob/main/TRIAL.md) (Docker, about 20–40 minutes; fictional data only).
+- **No platform yet, and you want to try it?** Set one up on your own machine with one command: [TRIAL.md](https://github.com/hoanghainh1188/governed-adlc-fw/blob/main/TRIAL.md) (Docker, about 20–40 minutes; fictional data only).
 - **Your team runs a platform?** Ask its operator for the address and ask a tenant admin for your account (steps 2 and 3 below).
-- **You deploy it on a server?** Follow [Fresh deployment](https://github.com/hoanghainh1188/agentic-sdlc-framework/blob/main/platform/deploy/README.md#fresh-deployment-operator).
+- **You deploy it on a server?** Follow [Fresh deployment](https://github.com/hoanghainh1188/governed-adlc-fw/blob/main/platform/deploy/README.md#fresh-deployment-operator).
 
 ## 1. Install
 
@@ -58,7 +58,7 @@ sdlc intent list
 sdlc next INT-2026-0001
 ```
 
-`sdlc next` tells you where an intent is and what you can do now. The [user guide](https://github.com/hoanghainh1188/agentic-sdlc-framework/blob/main/platform/USER-GUIDE.md) explains the whole path from an intent to a release.
+`sdlc next` tells you where an intent is and what you can do now. The [user guide](https://github.com/hoanghainh1188/governed-adlc-fw/blob/main/platform/USER-GUIDE.md) explains the whole path from an intent to a release.
 
 ## Good to know
 
