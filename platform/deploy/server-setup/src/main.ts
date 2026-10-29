@@ -18,7 +18,8 @@ import { SecretBag } from '../../steps/dist/secrets.js';
 
 import { parseSettings, SettingsError, type ServerSettings } from './settings.js';
 import { README_SECTIONS, serverSetup, SetupRefused, SetupStopped } from './setup.js';
-import { processTerminal, terminalRefusal } from './terminal.js';
+import { processTerminal } from './process-terminal.js';
+import { terminalRefusal } from './terminal.js';
 
 const EXIT = { ok: 0, failed: 1, usage: 2, interrupted: 130 } as const;
 const repoRoot = path.resolve(import.meta.dirname, '../../../..');

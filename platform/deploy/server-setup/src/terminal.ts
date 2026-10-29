@@ -1,10 +1,9 @@
-// The terminal of `pnpm server:setup` (D-08 V16 AC2): the only place that writes to the screen and
-// reads the keyboard. Key shares are shown here only, one holder at a time; after each holder
-// confirms the copy, the screen AND its scroll-back are cleared (QUESTIONS #616 (b)). The command
-// refuses to run when stdin or stdout is not a terminal, so a share or a prompt never goes to a
-// file or a pipe.
-import { InputAbortedError, readHiddenLine } from '@sdlc/cli';
-import { t, type MessageKey, type MessageParams } from '@sdlc/messages';
+// The terminal of `pnpm server:setup` (D-08 V16 AC2): what the command may do with the screen and
+// the keyboard; the process's own terminal is `process-terminal.ts`. Key shares are shown through
+// it only, one holder at a time; after each holder confirms the copy, the screen AND its
+// scroll-back are cleared (QUESTIONS #616 (b)). The command refuses to run when stdin or stdout is
+// not a terminal, so a share or a prompt never goes to a file or a pipe.
+import type { MessageKey, MessageParams } from '@sdlc/messages';
 
 /**
  * Clears the scroll-back (`ESC [3J`), moves the cursor home and clears the screen (`ESC [H`,
@@ -42,29 +41,4 @@ export function terminalRefusal(
   if (!stdoutIsTTY) return 'stdout_not_terminal';
   if (!stdinIsTTY) return 'stdin_not_terminal';
   return undefined;
-}
-
-async function hiddenLine(prompt: string): Promise<string> {
-  try {
-    return await readHiddenLine(prompt);
-  } catch (error) {
-    if (error instanceof InputAbortedError) throw new PromptAborted();
-    throw error;
-  }
-}
-
-/** The process's terminal. Only `main.ts` builds it, after `terminalRefusal`. */
-export function processTerminal(): Terminal {
-  const line = (key: MessageKey, params?: MessageParams) => `${t(key, params)}\n`;
-  return {
-    say: (key, params) => process.stdout.write(line(key, params)),
-    warn: (key, params) => process.stderr.write(line(key, params)),
-    print: (text) => process.stdout.write(text.endsWith('\n') ? text : `${text}\n`),
-    hidden: (key, params) => hiddenLine(`${t(key, params)} `),
-    pause: async (key, params) => {
-      await hiddenLine(`${t(key, params)} `);
-    },
-    showSecret: (text) => process.stdout.write(`\n    ${text}\n\n`),
-    clear: () => process.stdout.write(CLEAR_SCREEN),
-  };
 }

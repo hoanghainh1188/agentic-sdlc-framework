@@ -26,9 +26,14 @@ const catalog = JSON.parse(read('platform/packages/messages/src/locales/en.json'
   string,
   string
 >;
-const SOURCES = ['main.ts', 'setup.ts', 'settings.ts', 'progress.ts', 'terminal.ts'].map(
-  (f) => `platform/deploy/server-setup/src/${f}`,
-);
+const SOURCES = [
+  'main.ts',
+  'setup.ts',
+  'settings.ts',
+  'progress.ts',
+  'terminal.ts',
+  'process-terminal.ts',
+].map((f) => `platform/deploy/server-setup/src/${f}`);
 const STEP_SOURCES = ['exec.ts', 'env-file.ts', 'fresh-deployment.ts', 'secrets.ts'].map(
   (f) => `platform/deploy/steps/src/${f}`,
 );
@@ -102,7 +107,7 @@ describe('V16 AC2, AC3: nothing secret reaches the screen, a file or a command l
       const src = read(file);
       expect(src, file).not.toMatch(/console\./);
       expect(src, file).not.toMatch(/stdio:\s*'inherit'|'inherit'/);
-      if (!file.endsWith('terminal.ts') && !file.endsWith('main.ts'))
+      if (!file.endsWith('process-terminal.ts') && !file.endsWith('main.ts'))
         expect(src, file).not.toMatch(/process\.std(out|err)\.write/);
     }
     expect(setupSource).toContain('bag.redact(');
