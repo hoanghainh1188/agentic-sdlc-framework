@@ -2,11 +2,15 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-29
+
+**The CLI's new name: `adlc`, from the npm package `@hoanghainh/governed-adlc`** (ADR-M100), to match the repository's name `governed-adlc-fw` (ADR-M99). Existing logins keep working, and `sdlc` still works until v0.10.0. Nothing changes on a running stack.
+
 ### Upgrade notes
+- **On a running stack:** (1) `pnpm install`; (2) `pnpm compose:env --add-missing` (this release adds no `SDLC_*` key; the command then changes nothing); (3) no migration and no credentials command to run again; (4) on a checkout of the tag `v0.9.0` the published images are pulled (`pnpm images mode` downloads the release's `images.lock` once; without access to `github.com` set `SDLC_IMAGES_LOCK`); on any other checkout rebuild `sdlc-api`, `sdlc-worker` and `sdlc-runner`, and deploy the three together; (5) start the platform again as usual (`platform/deploy/scripts/up.sh …`): volumes are kept; (6) the command: `npm uninstall -g agentic-sdlc-cli`, then `npm install -g @hoanghainh/governed-adlc@0.9.0` (next bullet). The `SDLC_*` settings, the services and images `sdlc-api`, `sdlc-worker`, `sdlc-runner`, the database names, the token prefix `sdlc_pat_` and the plan folder `.sdlc/plans/` keep their names.
 - **The CLI has a new name** (ADR-M100, QUESTIONS #631): the npm package is `@hoanghainh/governed-adlc` and the command `adlc`. Each person runs `npm uninstall -g agentic-sdlc-cli`, then `npm install -g @hoanghainh/governed-adlc@0.9.0`. Both packages install an `sdlc` command, so remove the old one first.
 - You stay logged in: `adlc` reads the login that `sdlc` saved (`~/.config/sdlc/`, or under `$XDG_CONFIG_HOME`) until it saves its own in `~/.config/adlc/`. `adlc logout` deletes both.
 - `sdlc` keeps working until v0.10.0: it prints one note on stderr and runs the same command; standard output and exit codes do not change. Move scripts to `adlc` before v0.10.0. In a checkout, `pnpm adlc …` replaces `pnpm sdlc …` (the alias stays until v0.10.0).
-- On a running stack: no migration, no changed setting, no credentials command to run again. The `SDLC_*` settings, the services and images `sdlc-api`, `sdlc-worker`, `sdlc-runner`, the database names, the token prefix `sdlc_pat_` and the plan folder `.sdlc/plans/` keep their names.
 
 ### Changed
 - The CLI is renamed (ADR-M100, QUESTIONS #631): npm package `agentic-sdlc-cli` → `@hoanghainh/governed-adlc`, command `sdlc` → `adlc`, root script `pnpm sdlc` → `pnpm adlc`, saved login folder `…/sdlc` → `…/adlc` (the old one is read with the same checks). The package installs `adlc` and, until v0.10.0, `sdlc` with a note from the message catalog (`cli.renamed`). The messages, the help texts, the user and operator guides and the handbook's platform usage parts (Ch.13–16, Ch.18–20, T11) say `adlc`. The Claude Code hook refuses `pnpm adlc ops bootstrap|token` and the bare `adlc`/`sdlc` binaries with those commands, as it refuses `pnpm sdlc …` (R035, R132). `npm-publish.yml`, the pack check, `RELEASING.md` and GETTING-STARTED "Publishing the CLI on npm" use the new name; the first version of the new package is published by hand by the owner.
