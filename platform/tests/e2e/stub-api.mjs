@@ -21,6 +21,7 @@ import { loadDashboardFiles, registerDashboard } from '../../apps/api/dist/dashb
 import { WebAuthnCeremonies } from '../../apps/api/dist/passkeys/webauthn.js';
 import { stepUpRequestSha256 } from '../../packages/core/dist/passkeys/index.js';
 import { decisionWrite, isDecisionPath } from './decisions-stub.mjs';
+import { intakeWrite, isIntakePath } from './intake-stub.mjs';
 import { evalPlans } from './eval-stub.mjs';
 import { fixtures } from './fixtures.mjs';
 
@@ -298,6 +299,13 @@ async function stepUpAndPlans(req, res, url) {
       delete rest.expected_input_sha256;
       return stepUpHolds(body.step_up, action, stepUpRequestSha256(rest), expected);
     });
+    return (json(res, answer.status, answer.body), true);
+  }
+  // U08: create an intent, link its spec, submit the plan, build a pack; no step-up.
+  if (req.method === 'POST' && local && isIntakePath(url.pathname)) {
+    if (!secret || !sessions.has(secret)) return (json(res, 401, error('session_ended')), true);
+    if (!writeAllowed(req, secret)) return (json(res, 403, error('csrf_refused')), true);
+    const answer = intakeWrite(url, (await readBody(req)) ?? {});
     return (json(res, answer.status, answer.body), true);
   }
   const isPlanPath =

@@ -157,6 +157,7 @@ export type PlanVersionView = z.infer<typeof planVersionSchema>;
 
 /** `POST /v1/intents/:intent/plans` (B09, ADR-M40 §2.3). */
 export const submittedPlanSchema = planVersionSchema.extend({ intent: code });
+export type SubmittedPlanView = z.infer<typeof submittedPlanSchema>;
 
 /** `GET /v1/intents/:intent/plans` (B09). */
 export const planListSchema = z.object({
@@ -649,6 +650,7 @@ export type EvidencePackView = z.infer<typeof evidencePackSchema>;
 
 /** `POST /v1/intents/:intent/evidence-packs` (E02). */
 export const evidenceBuildSchema = z.object({ pack: evidencePackSchema, created: z.boolean() });
+export type EvidenceBuildView = z.infer<typeof evidenceBuildSchema>;
 /** `GET /v1/intents/:intent/evidence-packs/:version` (E02). */
 export const evidenceShowSchema = z.object({ pack: evidencePackSchema });
 /** `GET /v1/intents/:intent/evidence-packs` (E02). */

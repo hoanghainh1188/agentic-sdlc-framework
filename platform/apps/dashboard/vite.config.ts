@@ -32,7 +32,12 @@ export function dashboardCatalog(): Plugin {
             // L05: the refusals of evaluation plans, by the reason the API gives.
             key.startsWith('evaluation.error.') ||
             // L06: the recommendations of an evaluation report, by rule (ADR-M83 §2.3).
-            key.startsWith('eval.recommendation.'),
+            key.startsWith('eval.recommendation.') ||
+            // U08: the refusals of a spec link, a plan submission and the API's own sentences.
+            key.startsWith('spec.error.') ||
+            key.startsWith('plan.error.') ||
+            key.startsWith('plan.refusal.') ||
+            key.startsWith('api.error.'),
         ),
       );
       return `export default ${JSON.stringify(own)};`;

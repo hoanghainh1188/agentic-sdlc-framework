@@ -1,9 +1,10 @@
 // One intent (U01 AC4): where it stands, who decides its gate, its decisions, runs, open
-// escalations and evidence packs. Downloads read the pack files through the API (GET).
+// escalations and evidence packs. Downloads read the pack files through the API (GET). U08: submit
+// the plan, build a pack, and the CLI command for an L1 run's proposal (`IntakeActions`).
 import type { EvidencePackView, IntentDetail as Detail } from '@sdlc/api-schemas';
 import { cleanText } from '@sdlc/api-schemas';
 import type { ComponentChildren } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 
 import { ApiError } from '../api/client.js';
 import { killRun } from '../api/writes.js';
@@ -16,6 +17,7 @@ import {
 } from '../api/reads.js';
 import { useApi } from '../api/use-api.js';
 import { DecisionModal } from '../components/DecisionModal.js';
+import { BuildPack, ProposalCommand, SubmitPlan } from '../components/IntakeActions.js';
 import {
   codeClass,
   Due,
@@ -59,6 +61,14 @@ export function IntentDetail({ code }: { readonly code: string }) {
     [code],
   );
 
+  // U08: the message of a plan submitted or a pack built, kept above the data loaded again.
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => setNotice(null), [code]);
+  const done = (message: string) => {
+    setNotice(message);
+    reload();
+  };
+
   const handleKillRun = (runId: string) => {
     if (!window.confirm(t('dashboard.action.kill_confirm'))) return;
     void killRun(runId)
@@ -76,6 +86,11 @@ export function IntentDetail({ code }: { readonly code: string }) {
         <a href={href('intents')}>{t('dashboard.nav.intents')}</a> /{' '}
         <span class="mono">{code}</span>
       </p>
+      {notice !== null && (
+        <p class="notice notice-success" role="status">
+          {notice}
+        </p>
+      )}
       <Show loaded={result}>
         {({ intent, runs, escalations, packs }, at) => (
           <>
@@ -114,7 +129,7 @@ export function IntentDetail({ code }: { readonly code: string }) {
                 </ul>
               )}
             </section>
-            <SpecAndPlan intent={intent} />
+            <SpecAndPlan intent={intent} onDone={done} />
             <Decisions intent={intent} />
             <section aria-labelledby="runs-title" class="panel">
               <h2 id="runs-title">{t('dashboard.detail.runs')}</h2>
@@ -176,8 +191,9 @@ export function IntentDetail({ code }: { readonly code: string }) {
                   </table>
                 </div>
               )}
+              <LatestProposal intent={intent.code} runs={runs.items} />
             </section>
-            {packs !== null && <Packs code={intent.code} packs={packs.packs} />}
+            {packs !== null && <Packs code={intent.code} packs={packs.packs} onDone={done} />}
           </>
         )}
       </Show>
@@ -463,7 +479,27 @@ function Decisions({ intent }: { intent: Detail }) {
   );
 }
 
-function Packs({ code, packs }: { code: string; packs: readonly EvidencePackView[] }) {
+/** An L1 run left a proposal: the page shows the CLI command that saves it (ADR-M64). */
+function LatestProposal({
+  intent,
+  runs,
+}: {
+  intent: string;
+  runs: readonly { readonly id: string; readonly status: string }[];
+}) {
+  const run = runs.filter((r) => r.status === 'succeeded_proposal_only').at(-1);
+  return run === undefined ? null : <ProposalCommand intent={intent} runId={run.id} />;
+}
+
+function Packs({
+  code,
+  packs,
+  onDone,
+}: {
+  code: string;
+  packs: readonly EvidencePackView[];
+  onDone: (message: string) => void;
+}) {
   const [error, setError] = useState<ApiError | null>(null);
   const download = async (version: number, file: 'manifest' | 'markdown') => {
     setError(null);
@@ -483,6 +519,7 @@ function Packs({ code, packs }: { code: string; packs: readonly EvidencePackView
   return (
     <section aria-labelledby="packs-title" class="panel">
       <h2 id="packs-title">{t('dashboard.detail.packs')}</h2>
+      {session.actions() && <BuildPack intent={code} onDone={onDone} />}
       {error && <ErrorMessage error={error} />}
       {packs.length === 0 ? (
         <Empty messageKey="dashboard.detail.no_packs" />
@@ -543,7 +580,7 @@ function Packs({ code, packs }: { code: string; packs: readonly EvidencePackView
   );
 }
 
-function SpecAndPlan({ intent }: { intent: Detail }) {
+function SpecAndPlan({ intent, onDone }: { intent: Detail; onDone: (message: string) => void }) {
   const spec = intent.spec;
   const plan = intent.plan;
 
@@ -617,6 +654,7 @@ function SpecAndPlan({ intent }: { intent: Detail }) {
               </div>
             </dl>
           )}
+          {session.actions() && <SubmitPlan intent={intent.code} onDone={onDone} />}
         </div>
       </div>
     </section>

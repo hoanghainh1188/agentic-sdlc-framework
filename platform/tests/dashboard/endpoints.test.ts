@@ -92,7 +92,7 @@ describe('U06: the dashboard writes existing routes only, with their method', ()
     // U06: sign out (2), passkeys (3); L05: the step-up and the four plan actions (5);
     // U07: kill run (1), gate decision (1), escalation ack (1), escalation decision (1);
     // U08: create intent (1).
-    expect(calls.length).toBe(15);
+    expect(calls.length).toBe(18);
     for (const call of calls) {
       const routes = routesOf(call.method === 'POST' ? 'Post' : 'Delete');
       expect(

@@ -286,8 +286,28 @@ const RUNS = (code) => ({
               finished_at: null,
             },
           ]
-        : [],
+        : code === 'INT-2026-0010'
+          ? [
+              // U08: a High-risk (L1) run left a proposal; the page shows the CLI command only.
+              {
+                id: uuid(604),
+                attempt: 1,
+                status: 'succeeded_proposal_only',
+                stop_reason: null,
+                agent_version: 'v5',
+                iterations: 6,
+                killed_by: null,
+                created_at: at(-49 * HOUR),
+                started_at: at(-49 * HOUR),
+                finished_at: at(-48 * HOUR),
+              },
+            ]
+          : [],
 });
+
+/** U08: the stub's writes answer with these. */
+export const intentOf = (code) => INTENTS().find((i) => i.code === code);
+export const packOf = (code) => PACK(code);
 
 const PACK = (code) => ({
   intent: code,

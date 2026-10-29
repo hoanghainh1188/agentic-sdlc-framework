@@ -125,6 +125,7 @@ The test App is `harryforge-sdlc-dev` (Client ID `Iv23liQtMQBwNyVYZuJt`), instal
 - `e2e/sign-in.e2e.ts`: the stub API plays GitHub on `localhost`. `SDLC_DASHBOARD_E2E_ALL_BROWSERS=1` adds Firefox and WebKit once `pnpm exec playwright install firefox webkit` ran.
 - `e2e/passkeys.e2e.ts`: Chromium's virtual authenticator on `localhost`; the stub checks with the api's built WebAuthn code.
 - `e2e/decisions.e2e.ts`: the U07 writes of the stub (`e2e/decisions-stub.mjs`) check the step-up's action, request and bound input hash; each test removes the passkey it added.
+- `e2e/intake.e2e.ts`: the U08 writes of the stub (`e2e/intake-stub.mjs`) refuse as the default `access.*` roles do (the demo person is Person A in `shop`, Person B in `pilot`); no passkey is added.
 - Unit tests in `platform/tests/dashboard/`: data mapping, static checks of source and build, the no-new-endpoint check, colour contrast.
 
 ---
@@ -250,6 +251,7 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 | Sign-in with GitHub, sessions | U05; ADR-M73 §2.2b | unit: `api/sign-in-pieces.test.ts`, `git-github/sign-in.test.ts`, `api/settings.test.ts`, `deploy/github-app.test.ts`, `deploy/api-static.test.ts`; db: `web-sessions.test.ts`; `pnpm test:dashboard` (`e2e/sign-in.e2e.ts`) |
 | Dashboard writes, CSRF, passkeys | U06; ADR-M73 §2.3b, §2.4b | unit: `passkeys/ceremonies.test.ts`, `api/settings.test.ts`, `deploy/api-static.test.ts`; db: `dashboard-writes.test.ts`; `pnpm test:dashboard` (`e2e/passkeys.e2e.ts`) |
 | Dashboard decisions: gates, kills, escalations | U07; ADR-M73 §2.4b, §2.6 | unit: `commands/gate-web-decision.test.ts` (the input hash, source `web`), `dashboard/endpoints.test.ts`; db: `dashboard-decisions.test.ts` (the step-up, the 409, the sources, no session ID in append-only tables); `pnpm test:dashboard` (`e2e/decisions.e2e.ts`: N5 refusals, the kill, escalations, screens at 375–1440 px) |
+| Dashboard wave 2: intent and spec, plan, Evidence Pack | U08; ADR-M73 §2.1 | unit: `dashboard/intake.test.ts` (refusal keys, the proposal command), `dashboard/endpoints.test.ts`, `api/session-actions.test.ts`; db: `dashboard-intake.test.ts` (roles, a refused link keeps the intent, CSRF, actions off); `pnpm test:dashboard` (`e2e/intake.e2e.ts`) |
 
 ---
 

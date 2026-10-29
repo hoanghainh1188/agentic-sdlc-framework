@@ -494,7 +494,7 @@ At the end it prints, per person, the commands that are still theirs: first toke
 
 > **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task U01, 2026-10-07, and kept in line with the platform code (`design/ADR-M54-read-only-dashboard.md`).
 
-The dashboard shows in one page what the CLI shows one command at a time. With a GitHub sign-in and actions on, you can also decide a gate, stop a run, and acknowledge and decide an escalation there (task U07, below), create an intent, and act on evaluation plans. Comments, reviews and the CLI still work as before (§19.8b, §19.8c). **G7 is never decided in the dashboard**: it is the review and the merge on GitHub.
+The dashboard shows in one page what the CLI shows one command at a time. With a GitHub sign-in and actions on, you can also decide a gate, stop a run, and acknowledge and decide an escalation there (task U07, below), create an intent with its spec, submit its plan, build an Evidence Pack (task U08), and act on evaluation plans. Comments, reviews and the CLI still work as before (§19.8b, §19.8c). **G7 is never decided in the dashboard**: it is the review and the merge on GitHub.
 
 **Open it.** With team access (task V09), open the team address the operator gives you, for example `https://sdlc.example.internal:8443/dashboard/`, from your own machine; your browser must trust the company's certificate authority. Without it, open `http://127.0.0.1:8090/dashboard/` on the machine that runs the platform (the API's own address; no other port); with GitHub sign-in on there, open `http://localhost:8090/dashboard/` instead: the sign-in works on `localhost`, not on `127.0.0.1`. With team access, the GitHub sign-in works on the team address only. Then sign in one of two ways.
 
@@ -533,13 +533,20 @@ With the API token the dashboard only reads: it changes nothing but your own sig
 | **Kill run** | An intent, in the runs table, while a run is provisioning or running | A question in the browser | `sdlc run kill` |
 | **Acknowledge** an escalation | **Escalations** | Nothing more | `sdlc escalation ack` |
 | **Decide** an escalation | **Escalations** | Your passkey | `sdlc escalation decide` |
-| Create an intent (**New intent**) | **Intents and gates** | Nothing more | `sdlc intent create` |
+| Create an intent (**New intent**), and link its spec | **Intents and gates** | Nothing more | `sdlc intent create --spec` |
+| **Submit plan** | An intent, under **Execution Plan (G3)** | Nothing more | `sdlc plan submit` |
+| **Build Evidence Pack** | An intent, under **Evidence Packs** | Nothing more | `sdlc evidence build` |
+| Save the proposal of a High-risk (L1) run | An intent: the page shows the command | (the CLI only) | `sdlc evidence proposal` |
 
 1. Before a gate decision, the page shows what you decide on: the hash of the gate's input (the spec, the plan or the diff) and, when there is one, the spec and plan hashes. The decision is bound to that input. If the input changed while you were reading, the platform refuses with "The input to this gate changed while you were reviewing": reload the page and look again.
 2. A refused decision shows the same sentence as a refused comment command: for example "You produced this change, so you cannot approve it (separation of duties)", "You do not hold a role that may decide this gate", or "You already approved this: dual approval needs two different people".
 3. A reject or a request for changes asks for a reason code. Write the explanation where it can be edited or deleted (a GitHub comment) and give its link as the reason link.
 4. A decision made in the dashboard is recorded with the source `web` and your user ID, the same as a decision from the CLI. The platform never records your session or passkey there.
-5. A new intent created in the dashboard is a draft, the same as one from `sdlc intent create`. Link its spec and submit its plan with the CLI (§19.8c).
+5. A new intent created in the dashboard is a draft, the same as one from `sdlc intent create`. To link its spec at once, fill **Spec path in the repository** (a Markdown file on the default branch), and optionally a commit and the spec tool. The page then makes the two calls of `sdlc intent create --spec`. If the platform refuses the spec, **the intent stays**: the page says why (for example "The spec cannot be read (cause: missing)") and shows the command to link it again, `sdlc spec link`.
+6. **Submit plan** sends the plan file `.sdlc/plans/<INT-…>.yaml` as it is on the default branch (§19.8c). With a commit, the file at that commit must be the same as the head. Whoever submits a plan never approves it at G3. A refused file shows why, in the same words as the CLI.
+7. **Build Evidence Pack** makes a new version when the recorded data changed; otherwise the page says "Nothing changed since version N" and makes none.
+8. The proposal of a High-risk (L1) run is never downloaded in the browser: the page shows the command, for example `sdlc evidence proposal INT-2026-0010 --run <run ID> --output <file>`. The CLI checks the file's SHA-256 and writes it with mode 600.
+9. Who may do each action comes from the project's roles, the same as for the CLI (by default only Person A creates intents, links specs and submits plans; Person A, Person B, PM / BrSE, governance and admin build packs; never a viewer). A refusal says which role list decides, for example `access.plan_submit_roles`.
 
 Never publish the API's port 8090 to other machines. People on other machines use team access, the operator's TLS proxy on one LAN port (`platform/deploy/README.md`, "Team access").
 
@@ -636,6 +643,7 @@ Never publish the API's port 8090 to other machines. People on other machines us
 | 0.45 | 2026-10-22 | Claude (task X04, PR 1) | §19.8c: the plan lists register tools as `tool:<key>`; G4 fails with `tool_not_runnable` when the run cannot have one (ADR-M69 §2.1, §2.3) |
 | 0.46 | 2026-10-28 | Claude (task V17) | §19.8d: set up a project from one file, `sdlc admin project apply` (QUESTIONS #617) |
 | 0.47 | 2026-10-29 | Claude (task U07) | §19.8e: decide a gate, kill a run, acknowledge and decide an escalation, and create an intent in the dashboard; the passkey before each decision; refusals in the words of the comment replies (ADR-M73) |
+| 0.48 | 2026-10-29 | Claude (task U08) | §19.8e: create an intent and link its spec, submit the plan, build an Evidence Pack in the dashboard; a refused link keeps the intent; the L1 proposal command (ADR-M73) |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

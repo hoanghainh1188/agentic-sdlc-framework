@@ -2,6 +2,7 @@
 // caller's tenant scope.
 import { Body, Controller, Get, HttpCode, Inject, Param, Post } from '@nestjs/common';
 
+import { SessionAction } from '../auth/auth.guard.js';
 import { CurrentPrincipal, type Principal } from '../auth/principal.js';
 import { intentRefSchema } from '../intents/schemas.js';
 import { PLANS } from '../tokens.js';
@@ -22,6 +23,7 @@ export class PlansController {
   }
 
   @Post()
+  @SessionAction('actions')
   @HttpCode(201)
   submit(
     @CurrentPrincipal() p: Principal,

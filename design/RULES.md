@@ -215,7 +215,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R084d | api/worker import telemetry first | test | tests/observability/load-order.test.ts:23 | full | pointer-only | CLAUDE.md |
 | R084e | otel-collector rules | test | tests/deploy/observability-static.test.ts:31 | full | pointer-only | CLAUDE.md |
 | R085a | Dashboard writes only via writes.ts | test+lint | tests/dashboard/static.test.ts:36 | full | pointer-only | platform/apps/dashboard/CLAUDE.md |
-| R085b | `@SessionAction` only on the listed routes (L05, U07, U08) | test | tests/integration/db/web-sessions.test.ts:449; tests/api/session-actions.test.ts (the marked routes, by file); tests/integration/db/dashboard-decisions.test.ts (the step-up) | full | pointer-only | platform/apps/dashboard/CLAUDE.md |
+| R085b | `@SessionAction` only on the listed routes (L05, U07, U08) | test | tests/integration/db/web-sessions.test.ts:449; tests/api/session-actions.test.ts (the marked routes, by file); tests/integration/db/dashboard-decisions.test.ts (the step-up); tests/integration/db/dashboard-intake.test.ts (U08, no step-up) | full | pointer-only | platform/apps/dashboard/CLAUDE.md |
 | R085c–e | Passkey step-up, bearer XOR cookie, CSRF | test | tests/integration/db/web-sessions.test.ts:440 | full | pointer-only | platform/apps/dashboard/CLAUDE.md |
 | R086a–e,g | Cookie, token, no inline/innerHTML/storage, reads.ts, sign-in nav | lint+test | eslint.config.mjs:89; tests/dashboard/static.test.ts | full | pointer-only | platform/apps/dashboard/CLAUDE.md |
 | R086f | Server text via cleanText | lint+test | tests/dashboard/static.test.ts:138 | partial | move:platform/apps/dashboard | platform/apps/dashboard/CLAUDE.md |
@@ -278,3 +278,4 @@ Some rows group several rules with the same check (for example R082a–f).
 | 0.13 | 2026-10-26 | Claude (task H05) | New row R142 (the review size of every run's change, `platform/apps/runner/CLAUDE.md`) |
 | 0.14 | 2026-10-29 | Claude (task U07) | R085b: the routes a session may write to since U07 and U08; the step-up test |
 | 0.15 | 2026-10-29 | Claude (task V16) | New row R143 (`pnpm server:setup`, `platform/deploy/CLAUDE.md`); R081c and R081e point at the shared steps `platform/deploy/steps` |
+| 0.16 | 2026-10-29 | Claude (task U08) | R085b: the spec link, plan submission and Evidence Pack build of U08; the U08 database test |

@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Status | **Accepted** (Harry, 2026-10-10). Built by tasks U05–U07 (UX) and U08–U09 (Later). Version 1.1: U05's details (§2.2b, QUESTIONS #385–#389); 1.2: wording; 1.3: U06's details (§2.3b, §2.4b, QUESTIONS #410–#414) |
+| Status | **Accepted** (Harry, 2026-10-10). Built by tasks U05–U07 (UX) and U08–U09 (Later). Version 1.1: U05's details (§2.2b, QUESTIONS #385–#389); 1.2: wording; 1.3: U06's details (§2.3b, §2.4b, QUESTIONS #410–#414); 1.6: U08 as built (§2.1) |
 | Date | 2026-10-12 |
 | Decided by | Harry (V11: `design/MVP1-UI-SCOPE.md` 1.0 approved 2026-10-10; QUESTIONS #375–#380) |
 | Related | `design/MVP1-UI-SCOPE.md` 1.2 (the plan); ADR-M54 (the read-only dashboard); ADR-M03 (approvals through comments and the CLI); ADR-M26 (the API); ADR-M37 (admin); ADR-M41 (G7); ADR-M42 (kill switch); ADR-M28 (escalations); [ADR-M67](ADR-M67-team-access.md) (V09, team access); D-02 §4.2 (1.10); D-03 §5.1, §9, §12 (1.40); D-05 (1.40); D-08 U05–U09, V03 |
@@ -20,6 +20,7 @@ Writes from a browser need what the read-only dashboard avoids: a sign-in that i
 - Actions in three waves, all through **existing API endpoints and core handlers** (MVP1-UI-SCOPE §3). Wave 1 (U07): kill a run; approve, reject or request changes at a gate, never at G7; acknowledge and decide an escalation. Wave 2 (U08): create an intent with its spec, submit a plan, evidence packs. Wave 3 (U09): administration.
 - No new business endpoint. New endpoints only for sign-in, the session and passkeys; they change no intent, gate, run or escalation.
 - The L1 proposal download stays in the CLI (hash checked again, file mode 600, ADR-M64); a browser download would land in the Downloads folder with the usual permissions. The page shows the command.
+- **As built by U08** (2026-10-29): wave 2 marks `POST /v1/intents/:intent/specs`, `/plans` and `/evidence-packs` `@SessionAction('actions')` (create was marked by PR #462), with no step-up; the services and their `access.*` roles are unchanged. The page creates the intent, then links the spec; a refused link keeps the intent. Refusals use the catalog keys of the API and the CLI.
 - Never in the dashboard: merging, approving or requesting changes at G7, editing append-only rows, entering secrets, a self-grant, getting around a refusal, showing a new API token (MVP1-UI-SCOPE §4).
 
 ### 2.2. Sign-in and session (QUESTIONS #375)
@@ -119,6 +120,7 @@ Writes from a browser need what the read-only dashboard avoids: a sign-in that i
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 1.3 | 2026-10-12 | Claude (task U06, PR 1), approved by Harry | §2.3b, §2.4b: U06 as built: the CSRF token derived from the session secret, one guard rule for session writes, the actions setting, the ceremonies, the two tables, the endpoints, the binding with the request's hash, the use in the decision's transaction for U07; the library versions (QUESTIONS #410–#414) |
+| 1.6 | 2026-10-29 | Claude (task U08) | §2.1: U08 as built: the three wave 2 routes take a session write, with no step-up; meaning unchanged |
 | 1.5 | 2026-10-15 | Claude (task L05, PR 5) | §2.4b: the step-up actions `eval_plan.create`, `eval_plan.change`, `eval_plan.run` (no intent or escalation; the request SHA-256 names the plan or project) are the first used (ADR-M82 §2.7) |
 | 1.4 | 2026-10-14 | Claude (task L05, PR 1) | §2.3b: the four evaluation plan actions of L05 as a named exception before U07 (ADR-M82 §2.7, QUESTIONS #470) |
 | 1.2 | 2026-10-12 | Claude (task V09, PR 1) | Wording only: the "Related" row links ADR-M67 (no longer "not written yet"); meaning unchanged |

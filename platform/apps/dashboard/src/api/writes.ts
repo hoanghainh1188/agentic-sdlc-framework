@@ -1,25 +1,31 @@
-// Every write the dashboard sends (U05, U06, design/ADR-M73 §2.3, §2.4), with a fixed path:
-// sign out, the person's own passkeys, the passkey step-up, and the four evaluation plan actions
-// of L05 (ADR-M82 §2.7, QUESTIONS #470). Nothing here changes an intent, gate, run or escalation;
-// those come with U07. A static test checks that these are the only writes and that each is a
-// route of the API.
+// Every write the dashboard sends (U05–U08, design/ADR-M73 §2.3, §2.4), with a fixed path:
+// sign out, the person's own passkeys, the passkey step-up, the four evaluation plan actions of
+// L05 (ADR-M82 §2.7, QUESTIONS #470), the decisions, kill and escalation actions of U07, and the
+// intent, spec, plan and evidence pack actions of U08 (no step-up). A static test checks that these
+// are the only writes and that each is a route of the API.
 import {
   decisionSchema,
   endedSessionsSchema,
   escalationSchema,
   evalPlanSchema,
+  evidenceBuildSchema,
   intentSchema,
   killResultSchema,
+  linkedSpecSchema,
   stepUpOptionsSchema,
   passkeyRegistrationOptionsSchema,
   passkeySchema,
+  submittedPlanSchema,
   type DecisionView,
   type EscalationView,
   type EvalPlanView,
+  type EvidenceBuildView,
   type IntentView,
+  type LinkedSpecView,
   type PasskeyRegistrationOptions,
   type StepUpOptions,
   type PasskeyView,
+  type SubmittedPlanView,
 } from '@sdlc/api-schemas';
 
 import { apiPath, segment, send } from './client.js';
@@ -189,8 +195,47 @@ export interface CreateIntentInput {
   readonly issue_number?: number;
 }
 
-/** U08: Creates a new intent directly from the dashboard. */
+/** U08: Creates an intent (the first call of `sdlc intent create`). */
 export async function createIntent(body: CreateIntentInput): Promise<IntentView> {
-  const answer = await send(apiPath('/v1/intents'), 'POST', intentSchema, { body });
+  const answer = await send(apiPath('/v1/intents'), 'POST', intentSchema, body);
+  return answer!;
+}
+
+export interface LinkSpecInput {
+  readonly path: string;
+  readonly commit_sha?: string;
+  readonly source_tool?: 'spec-kit' | 'bmad' | 'manual';
+}
+
+/** U08: Links the spec of an intent (the second call of `sdlc intent create --spec`, U03). */
+export async function linkSpec(intent: string, body: LinkSpecInput): Promise<LinkedSpecView> {
+  const answer = await send(
+    apiPath(`/v1/intents/${segment(intent)}/specs`),
+    'POST',
+    linkedSpecSchema,
+    body,
+  );
+  return answer!;
+}
+
+/** U08: Submits the plan file of an intent, as it is on the default branch (`sdlc plan submit`). */
+export async function submitPlan(intent: string, commitSha?: string): Promise<SubmittedPlanView> {
+  const answer = await send(
+    apiPath(`/v1/intents/${segment(intent)}/plans`),
+    'POST',
+    submittedPlanSchema,
+    commitSha === undefined ? {} : { commit_sha: commitSha },
+  );
+  return answer!;
+}
+
+/** U08: Builds an Evidence Pack version, or returns the latest when nothing changed. */
+export async function buildEvidencePack(intent: string): Promise<EvidenceBuildView> {
+  const answer = await send(
+    apiPath(`/v1/intents/${segment(intent)}/evidence-packs`),
+    'POST',
+    evidenceBuildSchema,
+    {},
+  );
   return answer!;
 }

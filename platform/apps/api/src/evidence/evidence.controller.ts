@@ -2,6 +2,7 @@
 // works on the caller's tenant scope.
 import { Controller, Get, Inject, Param, Post, Res } from '@nestjs/common';
 
+import { SessionAction } from '../auth/auth.guard.js';
 import { CurrentPrincipal, type Principal } from '../auth/principal.js';
 import { intentRefSchema } from '../intents/schemas.js';
 import { EVIDENCE } from '../tokens.js';
@@ -15,6 +16,7 @@ export class EvidenceController {
 
   /** Builds a new version (201), or returns the latest when nothing changed (200). */
   @Post()
+  @SessionAction('actions')
   async build(
     @CurrentPrincipal() p: Principal,
     @Param('intent') ref: string,
