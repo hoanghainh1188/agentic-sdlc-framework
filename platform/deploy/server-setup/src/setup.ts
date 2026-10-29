@@ -168,16 +168,19 @@ export async function serverSetup(settings: ServerSettings, deps: SetupDeps): Pr
   };
 
   try {
-    // Step 2: the settings file. `compose:env` never overwrites (R078).
+    // Step 2: the settings file. `compose:env` never overwrites (R078), so a new start keeps the
+    // env file of the first run and does not call it again.
     begin('2');
     const existed = fs.existsSync(deps.envFile);
-    const initEnv = await deps.exec(
-      path.join(deps.repoRoot, 'platform/deploy/scripts/init-env.sh'),
-      [deps.envFile],
-      { env: { SDLC_ENV_FILE: deps.envFile } },
-    );
-    if (initEnv.status !== 0) {
-      throw new DeployStepError('compose:env', bag.redact(initEnv.stderr).trim());
+    if (!existed) {
+      const initEnv = await deps.exec(
+        path.join(deps.repoRoot, 'platform/deploy/scripts/init-env.sh'),
+        [deps.envFile],
+        { env: { SDLC_ENV_FILE: deps.envFile } },
+      );
+      if (initEnv.status !== 0) {
+        throw new DeployStepError('compose:env', bag.redact(initEnv.stderr).trim());
+      }
     }
     let envText = fs.readFileSync(deps.envFile, 'utf8');
     for (const value of envSecrets(envText)) bag.keep(value);
