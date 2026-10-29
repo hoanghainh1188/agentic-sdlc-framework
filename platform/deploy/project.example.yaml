@@ -1,0 +1,39 @@
+# A project and its team from one file: `sdlc admin project apply --file <this file> --dry-run`,
+# then without `--dry-run` (D-08 V17; handbook Ch.19 §19.8d "Set up a project from one file";
+# platform/deploy/README.md step 9). Copy it OUTSIDE the application repository and change every
+# value. It holds no secret: the command refuses an unknown key, so a token cannot be added.
+format: 1
+project:
+  slug: pilot
+  name: Pilot
+  repository: harryforge/pilot-order-inventory # owner/name on GitHub
+  # default_branch: main
+# One entry per person. The command looks up each login's numeric GitHub ID and shows it for you to
+# check: people are matched by that ID only. Person A and Person B are never the same person.
+team:
+  - email: person-a@example.com
+    name: Person A
+    github_login: person-a-login
+    roles: [person_a]
+  - email: person-b@example.com
+    name: Person B
+    github_login: person-b-login
+    roles: [person_b]
+# Optional: the agent to register (handbook Ch.20 §20.5b). The owner and Person B still approve it.
+# agent:
+#   key: coder
+#   version: 1.0.0
+#   owner: person-a@example.com
+#   model: <the gateway model, with its version>
+#   instructions: AGENTS.md@v1
+#   instructions_file: AGENTS.md # next to this file; the command hashes it
+#   tools: [file_editor, terminal]
+#   max_autonomy: L2
+#   environments: [sandbox]
+# Optional: only the settings that differ from the defaults
+# (platform/packages/config/defaults/project-config.default.yaml).
+# config:
+#   run:
+#     agent_key: coder
+#   budget:
+#     warn_percent: 70

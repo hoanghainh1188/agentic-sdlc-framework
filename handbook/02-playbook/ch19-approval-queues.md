@@ -413,7 +413,7 @@ Before anyone can approve a gate, an admin sets up the project and the team: the
    - It accepts other loosening (for example HOTL instead of HITL at G2 for Medium risk), shows a warning for each, and records the warnings in the audit log.
 6. Ask the PM / BrSE or Person A to save the project AI record (`sdlc ai-record set`, §19.8b). Intents wait before G1 until it exists.
 
-<a id="project-file"></a>**Set up a project from one file** (task V17). Steps 1–5 above can also come from one YAML file: `sdlc admin project apply --file project.yaml [--dry-run] [--yes]`. Keep the file outside the application repository. It holds no secret: the platform refuses a file with an unknown key.
+<a id="project-file"></a>**Set up a project from one file** (task V17). Steps 1–5 above can also come from one YAML file: `sdlc admin project apply --file project.yaml [--dry-run] [--yes]`. Keep the file outside the application repository. It holds no secret: the platform refuses a file with an unknown key. A commented example: [`platform/deploy/project.example.yaml`](../../platform/deploy/project.example.yaml).
 
 ```yaml
 format: 1
@@ -644,6 +644,7 @@ Never publish the API's port 8090 to other machines. People on other machines us
 | 0.46 | 2026-10-28 | Claude (task V17) | §19.8d: set up a project from one file, `sdlc admin project apply` (QUESTIONS #617) |
 | 0.47 | 2026-10-29 | Claude (task U07) | §19.8e: decide a gate, kill a run, acknowledge and decide an escalation, and create an intent in the dashboard; the passkey before each decision; refusals in the words of the comment replies (ADR-M73) |
 | 0.48 | 2026-10-29 | Claude (task U08) | §19.8e: create an intent and link its spec, submit the plan, build an Evidence Pack in the dashboard; a refused link keeps the intent; the L1 proposal command (ADR-M73) |
+| 0.49 | 2026-10-29 | Claude (docs, newcomer review) | §19.8d: a link to the commented example `platform/deploy/project.example.yaml` |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

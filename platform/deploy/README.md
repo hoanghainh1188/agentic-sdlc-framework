@@ -83,7 +83,7 @@ The development machine uses a separate **test App** on the fictional sample rep
 
 How to bring up the whole platform on a new machine with Docker Compose, from an empty checkout to the first intent at G1 (D-08 E07 AC3). Run every step **yourself, in a terminal, from the repo root**. Several steps print or ask for key shares, tokens or keys at a hidden prompt: never run them through a chat tool, and never paste their output anywhere except your password manager. `pnpm test:fresh-deploy` runs the same steps on a throw-away Compose project with throw-away keys, steps 2–7 through `pnpm server:setup`'s code (section [Tests](#tests)).
 
-**On a server: `pnpm server:setup --settings <file>` runs steps 2–7 for you** (D-08 V16, [ADR-M98](../../design/ADR-M98-server-setup.md), runbook [T11 §3.2](../../handbook/03-templates/T11-openbao-runbook.md#32-on-the-internal-server-real-keys-described-not-yet-done)). Copy [`server-setup/server-settings.example.yaml`](server-setup/server-settings.example.yaml) outside the repository and fill it in: the three key holders (with their PGP public keys, the default), the GitHub App, the model providers and the optional parts of step 7. Run it in a terminal on the server, with the key holders present; it refuses to run with its output or input redirected. What it does differently from the steps below:
+**On a server: `pnpm server:setup --settings <file>` runs steps 2–7 for you** (D-08 V16, [ADR-M98](../../design/ADR-M98-server-setup.md), runbook [T11 §3.2](../../handbook/03-templates/T11-openbao-runbook.md#32-on-the-internal-server-real-keys)). Copy [`server-setup/server-settings.example.yaml`](server-setup/server-settings.example.yaml) outside the repository and fill it in: the three key holders (with their PGP public keys, the default), the GitHub App, the model providers and the optional parts of step 7. Run it in a terminal on the server, with the key holders present; it refuses to run with its output or input redirected. What it does differently from the steps below:
 
 - `init` encrypts each key share with its holder's PGP key (`-pgp-keys`), so the command never sees a share in clear. Without PGP keys it shows the shares one holder at a time, and after each holder confirms the copy it clears the screen and the scroll-back. Nothing is written to a file.
 - The root token is used only for `configure`, which revokes it and hands the command one admin token for steps 4, 5 and 7, revoked at the end. A stop before `configure` (Ctrl-C, an error) revokes the root token. No token goes into an environment variable, a command line or a log.
@@ -103,7 +103,22 @@ After the first deployment: [Restart after a reboot](#restart-after-a-reboot), [
 
 - The [Requirements](#requirements) above (Docker Compose v2.24+, Node.js 24, pnpm 10 with `corepack enable`, OpenSSL 3).
 - A GitHub App installed on the project's repository only, and its private key in a file outside the repo. The App's settings are below; how to create one, step by step: [Create the GitHub App](#create-the-github-app-operator).
-- On the internal server: the three OpenBao key holders are named (runbook T11 §3.2, task A10), and OpenBao's certificate is issued with the company CA ([T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal)). Until then, use this procedure on a development machine with throw-away keys only.
+- On a team server: everything in **Before you start on a server** below. The procedure and `pnpm server:setup` are ready for a server. What a server needs first is people and certificates: until you have them, use this procedure on a development machine, with throw-away keys only.
+
+<a id="before-you-start-on-a-server"></a>**Before you start on a server.** Have all of these before step 2; most of them take other people's time.
+
+| Item | Who | Why |
+|---|---|---|
+| A Linux server with Docker Compose v2.24+ ([Where to run it](#where-to-run-it)) | Infrastructure operator | The platform's Engine |
+| **Three key holders**, each with a PGP public key, present when OpenBao starts (steps 3 and 5) | Leadership names them; runbook [T11 §3.2](../../handbook/03-templates/T11-openbao-runbook.md#32-on-the-internal-server-real-keys) | Two of the three key shares unseal OpenBao; the PGP keys keep each share encrypted |
+| **OpenBao's certificate from the company CA**, before step 3 | Infrastructure operator; [T11 §3c](../../handbook/03-templates/T11-openbao-runbook.md#3c-tls-on-port-8200-the-ca-the-certificate-renewal) | `server:setup` stops after step 2 until it is in place |
+| The host name people will use (team access, the dashboard's passkeys), chosen **before** you create the GitHub App | Operator | The App's callback URL and a passkey belong to that address ([Team access](#team-access-operator)) |
+| A GitHub App on the project's repository, and a model provider key or a local model | Operator | Steps 4 and 9 |
+| A Linux VM, or a second rootless Engine on the server, for the runner, and the link between the two | Infrastructure operator | Required before the first real agent run ([The runner on its own Docker Engine](#the-runner-on-its-own-docker-engine-operator)) |
+| Person A and Person B for the project, never the same person | Leadership | Separation of duties (2+N); `sdlc admin project apply` refuses one person in both roles |
+| An encrypted backup target outside the server | Operator | [Backup and restore](#backup-and-restore) |
+
+**The runner's Engine and the key holders.** To keep the key holders to one meeting, put `SDLC_RUNNER_SOURCE_CIDR` (the runner host's address as OpenBao sees it, for example `10.66.0.2/32`) in `platform/deploy/.env` after step 2 and before step 3: `configure` then already accepts it, and the runner section's own `configure` is not needed. Set `SDLC_RUNNER_LINK_ADDR` and `SDLC_RUNNER_DOCKER_HOST` only after `server:setup` has finished, because its step 7 starts the profile `sandbox`, which `up.sh` refuses while `SDLC_RUNNER_LINK_ADDR` is set.
 - `pnpm install` and `pnpm build`.
 
 <a id="github-app-permissions"></a>**The GitHub App's settings.** This is the one list of the App's permissions; other documents link here. One App per installation of the platform (`design/ADR-M23-github-adapter.md` §2.2).
@@ -267,7 +282,7 @@ pnpm sdlc admin token issue --user <person-a> --name <token-name>
 
 Do the same for Person B (`--role person_b`) and every other role you need (the rules and every command: [handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)). Person A and Person B are always two different people with two GitHub accounts. The numeric ID comes from `gh api users/<login> --jq .id`. Each person replaces the issued token with their own (`sdlc token create`, then `sdlc token revoke`).
 
-**Or from one file (V17).** Steps 9, 11 and 12 can come from one YAML file outside the repository: `pnpm sdlc admin project apply --file <project.yaml> --dry-run`, then the same without `--dry-run`. The file holds the project, the team with each person's GitHub login, the agent and the configuration ([handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#project-file)). The command looks up each numeric GitHub ID and shows it for you to confirm, refuses a file that would make one person Person A and Person B, and makes one API call per change. It issues no token, approves no agent and writes no AI record: at the end it prints these commands, per person. A role for yourself goes to another admin (`sdlc ops role grant` on the server for a one-admin tenant, as in step 8).
+**Or from one file (V17).** Steps 9, 11 and 12 can come from one YAML file outside the repository: `pnpm sdlc admin project apply --file <project.yaml> --dry-run`, then the same without `--dry-run`. The file holds the project, the team with each person's GitHub login, the agent and the configuration; start from [`project.example.yaml`](project.example.yaml) ([handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#project-file)). The command looks up each numeric GitHub ID and shows it for you to confirm, refuses a file that would make one person Person A and Person B, and makes one API call per change. It issues no token, approves no agent and writes no AI record: at the end it prints these commands, per person. A role for yourself goes to another admin (`sdlc ops role grant` on the server for a one-admin tenant, as in step 8).
 
 ### 10. The sandbox image
 
@@ -454,7 +469,7 @@ The runner's settings do not change: it reaches `postgres`, `openbao`, `temporal
    SDLC_RUNNER_DOCKER_HOST=ssh://sdlc-runner@10.66.0.2   # the same server: unix:///run/user/<uid>/docker.sock
    ```
 
-   Then, in the owner's terminal: `pnpm openbao:bootstrap configure` (a root token; only the AppRole `runner` also accepts `SDLC_RUNNER_SOURCE_CIDR`). On the same server, any process of the host that connects from the link address looks like the runner to OpenBao: keep the link address for the two Engines only.
+   Then, in the owner's terminal: `pnpm openbao:bootstrap configure` (a root token; only the AppRole `runner` also accepts `SDLC_RUNNER_SOURCE_CIDR`). Skip this when `SDLC_RUNNER_SOURCE_CIDR` was already in `.env` at the first `configure` ([Before you start on a server](#before-you-start-on-a-server)). On the same server, any process of the host that connects from the link address looks like the runner to OpenBao: keep the link address for the two Engines only.
 4. **Move the runner off the platform's Engine.** Stop and remove the old runner, then start the platform with the profile `runner-link` instead of `sandbox`; `up.sh` refuses `sandbox` while `SDLC_RUNNER_LINK_ADDR` is set:
 
    ```bash
@@ -499,7 +514,7 @@ All published ports bind to `127.0.0.1` by default (`SDLC_BIND_ADDR`), except th
 | LiteLLM | 4000 | Models only with the profile `models` (keys from OpenBao). Without it: no models, development keys from `.env` |
 | SeaweedFS S3 | 8333 | Anonymous access denied. The only SeaweedFS port reachable from outside its container (A12) |
 | Langfuse | 3000 | `observability` profile only |
-| API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI. Also serves the read-only dashboard at `/dashboard/` (U01, `SDLC_API_DASHBOARD_DIR`, built into the image; `off` turns it off). Keep it on `127.0.0.1`: other machines use the proxy of the profile `access` (ADR-M54 §2.2, ADR-M67; how people use it: [handbook Ch.19 §19.8e](../../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) |
+| API (`sdlc-api`) | 8090 | `platform` profile only. 8080 is taken by the Temporal UI. Also serves the read-only dashboard at `/dashboard/` (U01, `SDLC_API_DASHBOARD_DIR`, built into the image; `off` turns it off). Keep it on `127.0.0.1`: other machines use the proxy of the profile `access` (ADR-M54 §2.2, ADR-M67; how people use it: [handbook Ch.19 §19.8e](../../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard)) |
 | Team access proxy (`sdlc-access`) | 8443 | `access` profile only. **The only port on another address**: `SDLC_ACCESS_BIND_ADDR`, the server's LAN address ([Team access](#team-access-operator)); without it the profile does not start |
 | Sandbox image registry | 5050 | `sandbox` profile only. **Always 127.0.0.1** (not `SDLC_BIND_ADDR`): it has no authentication. Not 5000: macOS uses it |
 | The runner's link | 5432, 8200, 7233, 8333, 4000, 5433, 5050 | Only with `SDLC_RUNNER_LINK_ADDR` (profile `runner-link`, overlay `docker-compose.runner-link.yml`): PostgreSQL, OpenBao (TLS), Temporal, SeaweedFS S3, LiteLLM, knowledge-db and the registry, **on the link address only**, for a runner on its own Engine ([The runner on its own Docker Engine](#the-runner-on-its-own-docker-engine-operator)) |

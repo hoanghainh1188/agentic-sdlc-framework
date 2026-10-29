@@ -82,7 +82,9 @@ The community trial's stack (`pnpm trial:up`, `TRIAL.md` §3.2) runs on a develo
 - **Its limits:** a forgotten passphrase means the stack cannot be unsealed again (wipe it: `pnpm trial:down --wipe`, then `pnpm trial:up`). The processes' secret IDs end after 90 days and a trial stack cannot renew them (no root token): `trial:start` warns from day 80. `pnpm trial:down --wipe` deletes the key file with the volumes.
 - **Never on a server.** The internal server keeps the key-holder rules of sections 3.2 and 4: three holders, two shares to unseal, never a share in a file, a log or a chat. Never copy a trial key file, or its way of working, to a server.
 
-### 3.2. On the internal server (real keys): described, not yet done
+### 3.2. On the internal server (real keys)
+
+The procedure and `pnpm server:setup` are ready. The company server has not been initialised yet: it waits for the key holders and the CA certificate below (task A10, PR 3).
 
 Preconditions:
 - leadership has named the three key holders (section 2);
@@ -1037,6 +1039,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.42 | 2026-10-23 | Claude Code (task X04, PR 3a) | New section 5o: the worker's index of project documents in `knowledge-db` (profile `knowledge`), `kv/worker/knowledge-db`, `worker-knowledge-credentials`, rotation, retention and `knowledge.purged` (ADR-M89) |
 | 0.43 | 2026-10-24 | Claude Code (task L01, PR 1) | New section 5d.1: the provider entry `vllm` of the self-hosted model (profile `models-local`, ADR-M71); no key, two values that are not secrets |
 | 0.45 | 2026-10-29 | Claude Code (task V16) | Section 3.2: `pnpm server:setup` runs the initialisation, the shared secrets and every credentials command in one pass: PGP-encrypted shares by default, the screen and scroll-back cleared after each share, the root token only for `configure`, one admin token; the manual steps stay as the fallback |
+| 0.46 | 2026-10-29 | Claude Code (docs, newcomer review) | Section 3.2: heading without "described, not yet done"; the procedure is ready, the company server waits for the key holders and the CA certificate (A10 PR 3) |
 | 0.44 | 2026-10-24 | Claude Code (task O01, PR 2) | Section 5g step 3: the runner on its own Docker Engine (`SDLC_RUNNER_DOCKER_HOST`, `SDLC_RUNNER_SOURCE_CIDR`, `runner-host.sh restart`; ADR-M91) |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |

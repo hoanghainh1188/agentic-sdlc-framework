@@ -2,11 +2,14 @@
 // in-memory platform and GitHub: a new project, a second run, a changed file, M21 within the file
 // and against the bindings already held, an unknown or bot GitHub login, `--dry-run`, the
 // confirmation, and that it never approves the agent, writes the AI record or issues a token.
+import { join } from 'node:path';
+
 import { projectFileSchema } from '@sdlc/api-schemas';
 import { t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
+import { readProjectFile } from '../../apps/cli/src/commands/project-apply/file.js';
 import {
   githubApiUrl,
   lookupGithubLogin,
@@ -367,5 +370,13 @@ describe('the GitHub lookup of project apply (V17 AC2)', () => {
     expect(
       await lookupGithubLogin(reply(200, { id: 7, login: 'Ana', type: 'User' }), base, 'ana'),
     ).toEqual({ kind: 'found', id: '7', login: 'Ana' });
+  });
+});
+
+describe('platform/deploy/project.example.yaml (the example the docs link to)', () => {
+  it('is a valid project file as the command reads it', async () => {
+    const example = join(__dirname, '..', '..', 'deploy', 'project.example.yaml');
+    const read = await readProjectFile(example);
+    expect(read.ok, JSON.stringify(read)).toBe(true);
   });
 });
