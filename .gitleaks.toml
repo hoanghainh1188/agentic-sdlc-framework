@@ -89,3 +89,18 @@ condition = "AND"
 paths = ['''^platform/tests/integration/agent/agent-api\.test\.ts$''']
 regexTarget = "line"
 regexes = ['''^const MODEL = process\.env\.SDLC_AGENT_API_MODEL \|\| 'claude-haiku-4-5-20251001';$''']
+
+# Approval pending: Person B (Harry) in PR #464 (task V16).
+# False positive: generic-api-key reads one line of the fake env file in the server:setup unit
+# test (commit c405c52) as a key: `PLATFORM_DB_PASSWORD=` followed by the made-up value
+# `pw-owner-0123456789`. It is in the history, which CI scans, so it cannot be removed without
+# rewriting history (CLAUDE.md R125). The next commit builds the value from a constant. Only this
+# exact line in that one file is skipped; any other value on it, or in any other file, is still
+# reported.
+[[allowlists]]
+description = "The made-up PLATFORM_DB_PASSWORD line in server-setup.test.ts is not a secret (PR #464)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^platform/tests/deploy/server-setup\.test\.ts$''']
+regexTarget = "line"
+regexes = ['''^\s*'PLATFORM_DB_PASSWORD=pw-owner-0123456789',$''']

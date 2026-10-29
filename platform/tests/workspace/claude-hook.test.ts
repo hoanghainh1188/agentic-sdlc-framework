@@ -72,6 +72,9 @@ const REFUSED: [string, string][] = [
   ['pnpm sdlc ops bootstrap --tenant t1', 'R035'],
   ['pnpm sdlc ops token issue', 'R035'],
   ['pnpm github-app:create --out /tmp/app.json', 'R035'],
+  ['pnpm server:setup --settings /srv/settings.yaml', 'R035'],
+  ['pnpm run server:setup --settings /srv/settings.yaml', 'R035'],
+  ['node platform/deploy/server-setup/dist/main.js --settings /srv/s.yaml', 'R035'],
   ['pnpm test:pilot-live', 'R035'],
   ['pnpm test:sandbox-live', 'R035'],
   // R074e

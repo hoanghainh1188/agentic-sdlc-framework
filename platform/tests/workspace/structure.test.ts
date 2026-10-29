@@ -47,12 +47,15 @@ describe('workspace structure (D-03 section 11)', () => {
     const { references } = readJson<{ references: { path: string }[] }>(
       path.join(root, 'tsconfig.json'),
     );
-    // Plus `pnpm trial:up` (D-08 V02), `pnpm github-app:create` (V03), `pnpm doctor` (V07):
-    // TypeScript projects, not workspace packages.
+    // Plus `pnpm trial:up` (D-08 V02), `pnpm github-app:create` (V03), `pnpm doctor` (V07),
+    // `pnpm server:setup` and the deployment steps it shares with `trial:up` (V16): TypeScript
+    // projects, not workspace packages.
     expect(references.map((r) => r.path).sort()).toEqual(
       [
         ...EXPECTED_PACKAGES.map((p) => p.dir),
+        'platform/deploy/steps',
         'platform/deploy/trial',
+        'platform/deploy/server-setup',
         'platform/deploy/doctor',
         'platform/deploy/github-app',
       ].sort(),

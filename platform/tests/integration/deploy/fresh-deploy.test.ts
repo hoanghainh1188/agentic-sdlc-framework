@@ -5,17 +5,50 @@
 // dispatch only). The static test `platform/tests/deploy/fresh-deploy-readme.test.ts` keeps the
 // README and this test in step: every credentials command the README names runs here.
 //
+// Steps 2–7 run through `pnpm server:setup`'s own code (`serverSetup`, D-08 V16 AC6) with throw-away
+// keys: a scripted terminal plays the three key holders (it reads each share the command shows and
+// types two of them back at the hidden prompts); the GitHub App key and the model key are
+// throw-away files. Steps 8–14 follow `deploy-steps.ts` (shared with `pnpm test:upgrade`, O02).
+//
 // Own Compose project (own name, subnet, ports +31000, random env file), removed afterwards. The
-// steps and what differs from a real deployment: `deploy-steps.ts` (shared with `pnpm
-// test:upgrade`, O02). The sandbox image: SDLC_SANDBOX_IMAGE when set, else `build.sh node24`.
+// sandbox image: SDLC_SANDBOX_IMAGE when set, else `build.sh node24`.
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import type { MessageKey } from '@sdlc/messages';
+
+import { serverSetup } from '../../../deploy/server-setup/src/setup';
+import type { Terminal } from '../../../deploy/server-setup/src/terminal';
+import { exec } from '../../../deploy/steps/dist/exec.js';
+import { SecretBag } from '../../../deploy/steps/dist/secrets.js';
 import { repoRoot } from '../../workspace/helpers';
 import { CREDENTIALS_COMMANDS, Deployment } from './deploy-steps';
+
+/** Plays the key holders: keeps each share it is shown, types them back at the share prompts. */
+function keyHolders(d: Deployment): Terminal {
+  const shares: string[] = [];
+  let next = 0;
+  return {
+    say: () => undefined,
+    warn: () => undefined,
+    print: () => undefined,
+    pause: () => Promise.resolve(),
+    clear: () => undefined,
+    showSecret: (text) => {
+      shares.push(d.keep(text));
+    },
+    hidden: (key: MessageKey) => {
+      if (key !== 'server_setup.share.prompt') return Promise.reject(new Error(`prompt ${key}`));
+      const share = shares[next % 2]!;
+      next += 1;
+      return Promise.resolve(share);
+    },
+  };
+}
 
 const enabled = process.env.SDLC_FRESH_DEPLOY_TEST === '1';
 const PORT_OFFSET = 31000;
@@ -44,22 +77,54 @@ describe.skipIf(!enabled)(
       timings[step] = Math.round((Date.now() - started) / 1000);
     };
 
-    beforeAll(() => {
-      d.settingsFile(); // step 2
+    beforeAll(async () => {
+      // Step 2 of the throw-away project (own name, subnet and ports); server:setup then finds the
+      // env file in server mode and goes on from there.
+      d.settingsFile();
       mark('env');
-      // Step 3: OpenBao, PostgreSQL and SeaweedFS only (the whole `core` cannot be healthy before
-      // step 7: LiteLLM has no keys in .env on the server).
-      d.startStores();
-      d.initOpenBao();
-      mark('openbao');
-      d.sharedSecrets(); // step 4
-      mark('secrets');
-      for (const command of CREDENTIALS_COMMANDS) d.credentials(command); // step 5
-      mark('credentials');
-      d.migrate(); // step 6
-      mark('migrate');
-      d.up(); // step 7
-      mark('up');
+      const file = (name: string, text: string) => {
+        const p = path.join(tmp, name);
+        fs.writeFileSync(p, text, { mode: 0o600 });
+        return p;
+      };
+      const pem = d.keep(
+        generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({
+          type: 'pkcs1',
+          format: 'pem',
+        }) as string,
+      );
+      const providerKey = d.keep(`sk-${randomBytes(24).toString('hex')}`);
+      // Steps 2–7: the command's own code, with every credentials command of README step 5.
+      const result = await serverSetup(
+        {
+          envFile: d.options.envFile,
+          keyHolders: [{ name: 'Holder 1' }, { name: 'Holder 2' }, { name: 'Holder 3' }],
+          appClientId: 'Iv23fresh0deploy0test',
+          appKeyFile: file('app.pem', pem),
+          providers: [{ provider: 'anthropic', apiKeyFile: file('anthropic.key', providerKey) }],
+          optional: [],
+          throwawayTls: true,
+        },
+        {
+          repoRoot: repoRoot(),
+          envFile: d.options.envFile,
+          exec,
+          terminal: keyHolders(d),
+          bag: new SecretBag(),
+          keys: { shares: 3, threshold: 2 },
+          stopRequested: () => false,
+          now: () => new Date(),
+        },
+      ).catch((error: unknown) => {
+        const cause = (error as { cause?: { step?: string; detail?: string } }).cause;
+        throw new Error(
+          `server:setup stopped: ${cause?.step ?? ''} ${d.redact(cause?.detail ?? '')}`,
+        );
+      });
+      expect(result.outcome).toBe('done');
+      expect(CREDENTIALS_COMMANDS.length).toBe(10);
+      mark('server_setup');
+      d.adoptDatabase();
       d.tenant(); // step 8
     }, SETUP_TIMEOUT_MS);
 

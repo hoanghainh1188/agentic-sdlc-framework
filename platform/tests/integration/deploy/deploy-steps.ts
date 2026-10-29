@@ -300,6 +300,17 @@ export class Deployment {
     this.state.appUrl = this.keep(pgUrl('platform_app', env.get('PLATFORM_APP_DB_PASSWORD')!));
   }
 
+  /**
+   * After steps 2–7 ran elsewhere (`pnpm server:setup` in `fresh-deploy.test.ts`, D-08 V16): the
+   * operator's database URL of step 8, built from the env file as the README says.
+   */
+  adoptDatabase(): void {
+    const env = this.env();
+    this.state.appUrl = this.keep(
+      `postgres://platform_app:${encodeURIComponent(env.get('PLATFORM_APP_DB_PASSWORD')!)}@127.0.0.1:${5432 + this.options.project.portOffset}/platform`,
+    );
+  }
+
   /** README step 7: `up.sh` with every profile of the server; the logs on a failure. */
   up(): Result {
     const up = this.run(path.join(this.deployDir, 'scripts/up.sh'), [...SERVER_PROFILES], '', {

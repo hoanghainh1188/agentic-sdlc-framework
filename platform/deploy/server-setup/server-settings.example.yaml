@@ -1,0 +1,56 @@
+# Settings of `pnpm server:setup` (D-08 V16; platform/deploy/README.md "Fresh deployment", steps 2-7;
+# runbook T11 §3.2). Copy this file OUTSIDE the repository, for example to /srv/sdlc/setup.yaml
+# (mode 600), and change every value. It holds paths only, never a secret: a secret whose file is
+# not given is asked for at a hidden prompt.
+
+# The env file of step 2. Default: platform/deploy/.env of this checkout.
+# env_file: /opt/agentic-sdlc-framework/platform/deploy/.env
+
+# One key holder per OpenBao key share (BAO_KEY_SHARES in openbao/bootstrap/bootstrap.conf: 3), in
+# the order the shares are shown. With a PGP public key for every holder (the default and the
+# better way), `init` encrypts each share with its holder's key: the command never sees a share in
+# clear. Make the file with `gpg --export --armor <the holder's key ID>`. Give either all three
+# keys or none: without them, each holder sees their share in clear, one holder at a time.
+key_holders:
+  - name: Key holder 1
+    pgp_public_key_file: /srv/sdlc/keys/holder-1.asc
+  - name: Key holder 2
+    pgp_public_key_file: /srv/sdlc/keys/holder-2.asc
+  - name: Key holder 3
+    pgp_public_key_file: /srv/sdlc/keys/holder-3.asc
+
+# Step 4: the GitHub App (README "Create the GitHub App"); its private key file, mode 600.
+github_app:
+  client_id: Iv23liEXAMPLE
+  private_key_file: /srv/sdlc/secrets/github-app.pem
+
+# Step 4: one entry per model provider of platform/deploy/litellm/config.ctmpl.
+# anthropic: the API key from `api_key_file`, or at a hidden prompt when it is left out.
+# ollama: the address LiteLLM reaches Ollama at.
+model_providers:
+  - provider: anthropic
+    api_key_file: /srv/sdlc/secrets/anthropic.key
+  # - provider: ollama
+  #   api_base: http://ollama.internal:11434
+
+# Step 7: the optional parts. Each runs its credentials commands and writes its .env keys.
+#   observability      Langfuse (profile observability); asks for the worker's Langfuse key
+#   knowledge          the index of project documents (profile knowledge)
+#   dashboard-signin   dashboard sign-in with GitHub (needs `dashboard` below)
+#   dashboard-actions  actions in the dashboard (needs dashboard-signin)
+optional: []
+#  - observability
+#  - knowledge
+#  - dashboard-signin
+#  - dashboard-actions
+
+# With dashboard-signin: the public origin, and the GitHub App's client secret
+# (`pnpm github-app:create` wrote it to <key file>.client-secret; a hidden prompt without it).
+# dashboard:
+#   public_origin: https://sdlc.example.com
+#   client_secret_file: /srv/sdlc/secrets/github-app.pem.client-secret
+
+# Only on a development machine: go on to step 3 with the throw-away certificate of compose:env.
+# On a server, leave it out: a new env file stops the command after step 2, so OpenBao's
+# certificate comes from the company CA first (runbook T11 §3c).
+# throwaway_tls: true

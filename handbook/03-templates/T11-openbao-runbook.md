@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.43. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.45. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -91,7 +91,28 @@ Preconditions:
 - a room with no cameras, and screens that nobody else can see;
 - the operations log (section 10) is open.
 
+**With `pnpm server:setup` (the default, D-08 V16).** The command runs `platform/deploy/README.md` "Fresh deployment" steps 2–7, this section included, in one pass ([ADR-M98](../../design/ADR-M98-server-setup.md)). Its settings file names the three key holders, in the order the shares are shown.
+
+Before the day:
+- Each key holder makes a PGP key pair on their own computer (for example `gpg --full-generate-key`) and gives the operator the **public** key only: `gpg --export --armor <key ID> > holder-1.asc`. The settings file names the three files (`pgp_public_key_file`). This is the default and the better way: `init` encrypts each share with its holder's key (`-pgp-keys`), so neither the command nor the screen ever shows a share in clear.
+- Without PGP keys (all three files left out), the command shows each share in clear, to one holder at a time.
+- The settings file lives outside the repository, mode 600, next to the GitHub App key and the model key files (example: `platform/deploy/server-setup/server-settings.example.yaml`).
+
 Steps:
+1. The operator runs `pnpm server:setup --settings <file>` in a terminal on the server (the server's console, or SSH from the macOS Terminal app). It refuses to run when its output or input is redirected or piped. On a new `.env` it stops after step 2: replace OpenBao's certificate with the company CA's (section 3c), then run it again.
+2. The command starts OpenBao, PostgreSQL and SeaweedFS only, then asks whether all key holders are present and the operations log is open. Press Enter to initialise.
+3. For each share, the command clears the screen and the scroll-back and calls one key holder by name. Only that holder looks at the screen and presses Enter. The holder copies **only their own share** into their password manager and onto paper for their envelope, then presses Enter. The command clears the screen and the scroll-back again before it calls the next holder. With PGP keys the share shown is encrypted for that holder only. The holder copies the encrypted text into their password manager; only their private key opens it. They decrypt it on their own computer when it is needed (to unseal, to make a root token): `echo '<share>' | base64 -d | gpg -dq`. The paper copy for the envelope is the decrypted share, written by the holder on their own computer, never on the server.
+4. Two key holders unseal: each types their own share (in clear) at the hidden prompt.
+5. The command gives the initial root token, which it holds in memory only, to `configure`. `configure` creates one admin token (role `platform-admin`, section 5.1) and revokes the root token. Nobody sees either token. The command never uses the root token for anything else.
+6. With that admin token, in the same pass, the command stores the shared secrets (section 5b, 5d) and runs every credentials command (sections 5d–5k). Then it runs the migrations, starts the platform, runs the credentials commands of the optional parts, revokes the admin token and ends with `pnpm doctor`.
+7. Do not stop the command while the shares are handed out: they exist only in its memory, and a stop there means a new `init` on wiped volumes. A Ctrl-C there asks again before it stops. If the command stops before `configure` (Ctrl-C, an error, a closed terminal), it revokes the root token and says so. While OpenBao is still sealed it cannot revoke anything: it says so, and the next start revokes that root token (by its accessor) before it runs `configure`. If it stops later, the admin token is revoked. A new start says where the last run stopped and skips what is done. When it needs an admin token again, two key holders type their shares: the command makes a new root token, runs `configure` again (safe to run again) and gets a new admin token; `configure` revokes the new root token.
+8. If the command says it could not revoke a root token, run it again soon (it revokes the old root token first) and record it in the operations log.
+9. Close the terminal window. Check that no session recording kept the output (the command already cleared the scroll-back after each share; inside `tmux` or `screen`, also clear their history, for example `tmux clear-history`).
+10. Each key holder seals their envelope, signs it across the seal, dates it, and puts it in the safe. Record it in the safe log.
+11. Record the initialisation in the operations log: date, time, people present, PGP or clear shares, "root token revoked: yes".
+
+**By hand (the fallback, and what the command does).**
+
 1. The operator starts OpenBao, PostgreSQL and SeaweedFS only: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core up -d --wait openbao postgres seaweedfs`. Check: `pnpm openbao:bootstrap status` says `uninitialised`.
    - Not `pnpm compose:core`: on the server `.env` holds no LiteLLM keys (section 5d), so LiteLLM cannot become healthy before the profile `models` runs. The whole stack starts later (`platform/deploy/README.md`, "Fresh deployment", step 7).
    - SeaweedFS must run because the credentials commands of sections 5g–5k create SeaweedFS identities.
@@ -1015,6 +1036,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.43 | 2026-10-24 | Claude Code (task X04, PR 3b) | Section 5o: the tools' short-lived logins to `knowledge-db` (database secrets engine, one role per run `kdocs-<run_id>`, the issuer `kdocs_issuer`, `knowledge-issuer-credentials`, revocation by prefix), restart of `sdlc-runner`, building the tool image (ADR-M89 §2.7, QUESTIONS #540) |
 | 0.42 | 2026-10-23 | Claude Code (task X04, PR 3a) | New section 5o: the worker's index of project documents in `knowledge-db` (profile `knowledge`), `kv/worker/knowledge-db`, `worker-knowledge-credentials`, rotation, retention and `knowledge.purged` (ADR-M89) |
 | 0.43 | 2026-10-24 | Claude Code (task L01, PR 1) | New section 5d.1: the provider entry `vllm` of the self-hosted model (profile `models-local`, ADR-M71); no key, two values that are not secrets |
+| 0.45 | 2026-10-29 | Claude Code (task V16) | Section 3.2: `pnpm server:setup` runs the initialisation, the shared secrets and every credentials command in one pass: PGP-encrypted shares by default, the screen and scroll-back cleared after each share, the root token only for `configure`, one admin token; the manual steps stay as the fallback |
 | 0.44 | 2026-10-24 | Claude Code (task O01, PR 2) | Section 5g step 3: the runner on its own Docker Engine (`SDLC_RUNNER_DOCKER_HOST`, `SDLC_RUNNER_SOURCE_CIDR`, `runner-host.sh restart`; ADR-M91) |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |

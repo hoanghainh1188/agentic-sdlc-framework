@@ -164,6 +164,8 @@ function checkPackageManager(cmd, args) {
     if (ops === 'ops' && (action === 'bootstrap' || action === 'token')) return 'R035';
   }
   if (script === 'github-app:create') return 'R035';
+  // `pnpm server:setup` shows key shares and asks for tokens (D-08 V16, QUESTIONS #616).
+  if (script === 'server:setup') return 'R035';
   if (/^test:.*-live$/.test(script ?? '')) return 'R035';
   if (
     script === 'compose:down' &&
@@ -189,6 +191,8 @@ function checkSegment(segment) {
   if (cmd === 'git') return checkGit(args);
   if (cmd === 'npm' || cmd === 'pnpm' || cmd === 'yarn') return checkPackageManager(cmd, args);
   if (cmd === 'gh') return checkGh(args);
+  if (cmd === 'node' && args.some((a) => /server-setup\/(?:dist|src)\/main\.[jt]s$/.test(a)))
+    return 'R035';
   if (cmd === 'bootstrap.sh') {
     const action = firstPositional(args) ?? '';
     if (['init', 'unseal', 'root-token'].includes(action) || action.endsWith('-credentials'))

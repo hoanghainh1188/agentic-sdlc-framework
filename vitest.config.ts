@@ -43,6 +43,12 @@ export default defineConfig({
           `platform/packages/adapters/${name}/src/index.ts`,
         ),
       })),
+      // The shared deployment steps (D-08 V16): `trial:up` and `server:setup` import their built
+      // files (`../../steps/dist/x.js`, the layout at run time); tests read the sources.
+      {
+        find: /^(?:\.\.\/)+(?:deploy\/)?steps\/dist\/(.+)\.js$/,
+        replacement: path.resolve(import.meta.dirname, 'platform/deploy/steps/src/$1.ts'),
+      },
     ],
   },
   test: {

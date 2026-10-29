@@ -1,0 +1,51 @@
+# ADR-M98. `pnpm server:setup`: a guided fresh deployment on a server
+
+| Item | Value |
+|---|---|
+| Status | **Accepted** (task V16) |
+| Date | 2026-10-29 |
+| Decided by | Harry (QUESTIONS #616–#618 accepted with changes, 2026-10-28, PR #453; V16 plan approved 2026-10-29) |
+| Related | D-08 task V16; QUESTIONS #616, #618; ADR-M19 (OpenBao bootstrap); ADR-M76 (the trial key file); ADR-M63 (TLS); runbook T11 §3.2, §5, §5.1; `platform/deploy/README.md` "Fresh deployment"; rules R035, R081 |
+
+## 1. Context
+
+A fresh deployment on a server takes 14 steps by hand. Steps 3–5 alone are OpenBao `init`, `unseal`, `configure`, a new root token, an admin token that lives one hour, and ten credentials commands; step 6 needs a database URL built by hand from `.env`. `pnpm trial:up` already runs these steps, but only with throw-away keys on a developer machine (ADR-M76). QUESTIONS #616 asked for one guided command for steps 2–7 on a server, and Harry accepted it with binding changes: the root token only for `configure`; one admin token for steps 4 and 5; no token in an environment variable, a command line or a log; a revoked root token on any stop before `configure`; a refusal without a terminal; the screen and scroll-back cleared after each share; `-pgp-keys` by default.
+
+## 2. Decision
+
+### 2.1 One sequence, three callers
+
+The step code of README steps 3–7 moves from `platform/deploy/trial/src/up.ts` into `platform/deploy/steps/` (a TypeScript project like `trial/`, not a workspace package). `pnpm server:setup` (`platform/deploy/server-setup/`), `pnpm trial:up` and the live test `pnpm test:fresh-deploy` use it, so the three keep one sequence (R081). `trial:up` and `server:setup` import its built files (`../../steps/dist/*.js`, the layout at run time); the tests read its sources through a Vitest alias, so `pnpm test` needs no build. `test:fresh-deploy` runs steps 2–7 through `serverSetup()` itself, with a scripted terminal that plays the three key holders and throw-away keys; steps 8–14 stay in `deploy-steps.ts`, which `test:upgrade` also uses on older release checkouts.
+
+### 2.2 Key custody (T11 §3.2)
+
+- The command calls `bao operator init -format=json` itself, through `docker compose exec`, and holds the output in memory only.
+- When the settings name a PGP public key for every key holder, `init` gets `-pgp-keys` (the default). The public keys go to a temporary folder of the container on stdin, and are removed at once. Each share comes back encrypted for its holder: the command never sees a share in clear. Either all three keys or none: a mix is a settings error.
+- Each share is shown to one named holder at a time. Before and after each one, the command clears the screen and the scroll-back (`ESC [3J ESC [H ESC [2J`); the holder confirms the copy with Enter. No share is written to a file.
+- The command refuses to run when stdout or stdin is not a terminal, so a share or a prompt can never go to a file or a pipe. The Claude Code hook refuses `pnpm server:setup` and its `node … server-setup/dist/main.js` form (R035).
+
+### 2.3 Tokens
+
+- `configure` gets a new option, `--issue-admin-token`: just before it revokes the root token, it creates one admin token (role `platform-admin`, at most 1 hour) and prints it as its last line, `admin-token: <token>`. `bootstrap.sh` refuses the option when its stdout is a terminal, and with `--keep-token`. So the root token is used for `configure` and nothing else, and one admin token covers steps 4 and 5 and the credentials commands of step 7. `trial:up` uses the same option, so it no longer keeps the root token for steps 4 and 5.
+- In the run that initialises OpenBao, `configure` gets init's own root token. In any other run (a new start after a stop, or an admin token close to its hour), two key holders type their shares at a hidden prompt; the command makes a new root token in memory (`root-token.sh`), runs `configure` again (safe to run again), and gets a new admin token. `configure` revokes the new root token.
+- A stop before `configure` succeeds (Ctrl-C at a prompt, SIGINT, SIGTERM or SIGHUP between steps, a failed child) revokes the root token. A token counts as revoked only when OpenBao revokes it or answers "permission denied"; a sealed or unreachable OpenBao is no answer. While OpenBao is still sealed (between `init` and `unseal`) nothing can revoke a token: the command says so and records it in the progress file (`leftoverRoot`), and the next start, once it holds a new root token from two shares, revokes every other root token by its accessor before it runs `configure`. A sealed OpenBao accepts no token, so the old one is of no use until then.
+- A `configure` that fails after it made the admin token revokes that token. The admin token is revoked when the command stops or ends; when OpenBao does not confirm it, the command says so (it expires within the hour).
+- While the shares are handed out they exist only in the command's memory: a Ctrl-C there warns that a stop means a new `init` on wiped volumes and shows the share again; a second Ctrl-C stops. `init` output that holds the shares is used even when the child then exits with an error.
+- Every secret file the settings name must be readable by its owner only (mode 600 or stricter), or the command refuses it.
+- Every token, share, password and key reaches a child on stdin. None goes into an argument or an environment variable. Every value is kept in a `SecretBag`, so a failure shows the end of a child's output redacted. The migrations read the owner's URL from standard input (`migrate-cli --url-stdin`, new), not from `SDLC_DB_MIGRATION_URL`.
+- `api-github-oauth-credentials` reads its token from `/dev/tty` when it can. The command starts it in a new session without a controlling terminal (`detached`), so it reads the token from stdin.
+
+### 2.4 Settings, steps and starting again
+
+- The settings file is YAML outside the repository (`server-settings.example.yaml`). It holds paths and public keys, never a secret: the key holders, the GitHub App, the model providers (`anthropic` with a key file or a hidden prompt, `ollama` with its address), the optional parts of step 7 (`observability`, `knowledge`, `dashboard-signin`, `dashboard-actions`) and `throwaway_tls` (development machines and tests only).
+- Step 2 runs `compose:env`, which never overwrites. A new `.env` gets empty LiteLLM keys (server mode). An existing one with LiteLLM keys, or with a trial project, is refused. A new `.env` stops the command after step 2, so OpenBao's certificate comes from the company CA first (T11 §3c), unless `throwaway_tls` is set.
+- Each step checks the state before it acts: OpenBao uninitialised, sealed or unsealed; the migrations (running them when none is pending changes nothing); the credentials already delivered. A progress file next to `.env` (`server-setup-progress.json`, mode 600, ignored by Git) records the steps and commands done and where the last run stopped, with step names, codes and times only. A new start says where the last run stopped.
+- A failure names the step, the child that failed and the README section; it ends with `pnpm doctor`. Every message goes through the catalog (`serverSetup.*`).
+
+## 3. Consequences
+
+- One sequence for the server, the trial and the live test: a change of a README "Fresh deployment" step changes `platform/deploy/steps` and the tests that check it.
+- The real initialisation (A10 PR 3) needs fewer hand-made commands, and no person sees a root or admin token.
+- Still by hand: the company CA certificate (T11 §3c), the GitHub App, the key holders' presence, and steps 8–14.
+- With PGP keys, a key holder's copy of their share is encrypted text that only their private key opens; the paper copy is the decrypted share, written on their own computer (T11 §3.2).
+- Not covered: the self-hosted model provider (`vllm`, ADR-M71) stays a manual step 4 entry; the profile `models-local` is not started by the command.
