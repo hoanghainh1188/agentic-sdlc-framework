@@ -24,6 +24,7 @@ The name is also part of the release chain:
 3. **Images.** From v0.8.0, the images are published at `ghcr.io/hoanghainh1188/governed-adlc-fw/<image>`. `release-images.yml`, `images.sh`, `release-check.mjs` and `verify-images.sh` use the new name. The images of v0.1.0–v0.7.0 stay where they are, under the old name.
 4. **Old releases need nothing extra.** A checkout of a tag runs that tag's own `images.sh` and `verify-images.sh`, with the old path and the old signer; `pnpm test:upgrade` uses the old release's scripts the same way. So the scripts on `main` check only the new name.
 5. **npm.** The package keeps the name `agentic-sdlc-cli`, so `npm install -g agentic-sdlc-cli@X.Y.Z` stays the same. Its page points to the new repository. The owner changes the repository of its trusted publisher on npmjs.com before the next npm publish.
+   > **Changed by ADR-M100** (QUESTIONS #631, Harry 2026-10-29): from v0.9.0 the package is `@hoanghainh/governed-adlc` and the command `adlc`.
 6. **History stays as written.** The accepted ADRs (M66, M72, M94), `design/QUESTIONS.md` and the CHANGELOG sections of past releases keep the old name, because they describe what was true then. This ADR replaces the repository name in ADR-M66 §2.1, §2.4 and §2.5, ADR-M72 §2.3 and ADR-M94 §2.4 and §2.6 from v0.8.0 on. Current documents and code use the new name.
 
 ## 3. Consequences

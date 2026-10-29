@@ -49,6 +49,8 @@ Task V12 may fold this job into the release workflow; V04 (images on GHCR) has i
 
 > **Changed by ADR-M94 §2.3** (QUESTIONS #594, Harry 2026-10-26; built by V15): the file name, the environment `npm` and the trusted publisher stay; the trigger becomes `workflow_dispatch` on the tag, started by `release.yml` after the GitHub Release exists.
 
+> **Changed by ADR-M100 §2.6** (QUESTIONS #631, Harry 2026-10-29): from v0.9.0 the package is `@hoanghainh/governed-adlc` and the command `adlc`. Its first version is again published by hand, then the trusted publisher is added with "Allow npm publish" ticked; `agentic-sdlc-cli` is deprecated.
+
 ## 3. Consequences
 
 - `npm install -g agentic-sdlc-cli` gives `sdlc` on Node.js 24 without a checkout (USER-GUIDE §2). `pnpm sdlc` from a checkout stays for developers and operators.
