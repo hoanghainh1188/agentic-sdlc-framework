@@ -409,14 +409,9 @@ describeDb('U06: CSRF, the actions switch, passkeys and the step-up', () => {
       expectError(await inject(app, 'POST', '/v1/auth/sign-out', page(s)), 403, 'csrf_refused');
     });
 
-    it('decisions, kills and acknowledgements stay closed to sessions until U07', async () => {
+    it('unmarked routes stay closed to sessions; decisions need a step-up (U07)', async () => {
       const s = await open('alice');
       for (const [method, url] of [
-        ['POST', `/v1/intents/${intentCode}/gates/G1/decisions`],
-        ['POST', '/v1/intents'],
-        ['POST', `/v1/runs/${intentId}/kill`],
-        ['POST', '/v1/escalations/ESC-2026-0001/ack'],
-        ['POST', '/v1/escalations/ESC-2026-0001/decisions'],
         ['POST', '/v1/me/tokens'],
         ['DELETE', `/v1/admin/users/${people.bob!.id}/passkeys/${people.bob!.id}`],
       ] as const) {
@@ -424,6 +419,16 @@ describeDb('U06: CSRF, the actions switch, passkeys and the step-up', () => {
           await inject(app, method, url, page(s), { decision: 'approve' }),
           403,
           'session_write_not_allowed',
+        );
+      }
+      for (const [url, decision] of [
+        [`/v1/intents/${intentCode}/gates/G1/decisions`, 'approve'],
+        ['/v1/escalations/ESC-2026-0001/decisions', 'resume'],
+      ] as const) {
+        expectError(
+          await inject(app, 'POST', url, page(s), { decision }),
+          403,
+          'step_up_refused',
         );
       }
       // Nothing was recorded.
