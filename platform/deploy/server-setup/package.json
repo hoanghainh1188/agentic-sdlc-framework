@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "pnpm server:setup (D-08 V16): README \"Fresh deployment\" steps 2-7 on a server. Not a workspace package: built by tsc -b from the root tsconfig."
+}

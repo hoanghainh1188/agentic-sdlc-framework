@@ -63,12 +63,12 @@ describe('V02: pnpm trial:up follows the README "Fresh deployment"', () => {
     const markers = [
       'scripts/init-env.sh',
       "'init', '--stdout-not-tty'",
-      "['unseal']",
-      "['configure', '--keep-token']",
-      'shared/github-app',
+      'deploy.unseal(',
+      'deploy.configure(rootToken)',
+      'deploy.storeGithubApp(',
       'CREDENTIALS_COMMANDS)',
-      'migrate-cli.js',
-      'scripts/up.sh',
+      'deploy.migrate(',
+      'deploy.up(PROFILES)',
       "'--tenant-name'",
       'settings.forkRepo',
       "'person_b'",
@@ -96,9 +96,11 @@ describe('V02: pnpm trial:up follows the README "Fresh deployment"', () => {
       expect(src, file).not.toMatch(/console\./);
       expect(src, file).not.toMatch(/stdio:\s*'inherit'|inherit'\]/);
     }
-    // A step's output reaches the terminal only through the bag's redaction.
-    expect(upSource).toContain('bag.redact(');
+    // A step's output reaches the terminal only through the bag's redaction (the shared steps).
+    expect(read('platform/deploy/steps/src/fresh-deployment.ts')).toContain('.redact(');
     expect(upSource).toMatch(/bag\.drop\(rootToken\)/);
+    // The root token is used only for `configure`, which revokes it (V16): never --keep-token.
+    expect(upSource).not.toContain('--keep-token');
   });
 });
 
@@ -212,9 +214,9 @@ describe('V08: the key file and pnpm trial:start', () => {
   });
 
   it('trial:up writes the key file right after the first unseal, before configure', () => {
-    const unseal = upSource.indexOf("['unseal']");
+    const unseal = upSource.indexOf('deploy.unseal(');
     const write = upSource.indexOf('writeKeyFile(');
-    const configure = upSource.indexOf("['configure', '--keep-token']");
+    const configure = upSource.indexOf('deploy.configure(rootToken)');
     expect(unseal).toBeGreaterThan(0);
     expect(write).toBeGreaterThan(unseal);
     expect(configure).toBeGreaterThan(write);
