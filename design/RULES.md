@@ -215,7 +215,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R084d | api/worker import telemetry first | test | tests/observability/load-order.test.ts:23 | full | pointer-only | CLAUDE.md |
 | R084e | otel-collector rules | test | tests/deploy/observability-static.test.ts:31 | full | pointer-only | CLAUDE.md |
 | R085a | Dashboard writes only via writes.ts | test+lint | tests/dashboard/static.test.ts:36 | full | pointer-only | platform/apps/dashboard/CLAUDE.md |
-| R085b | `@SessionAction` limit before U07 | test | tests/integration/db/web-sessions.test.ts:449; tests/api/session-actions.test.ts (the marked routes, by file) | full | keep-root (until U07) | platform/apps/dashboard/CLAUDE.md |
+| R085b | `@SessionAction` only on the listed routes (L05, U07, U08) | test | tests/integration/db/web-sessions.test.ts:449; tests/api/session-actions.test.ts (the marked routes, by file); tests/integration/db/dashboard-decisions.test.ts (the step-up) | full | pointer-only | platform/apps/dashboard/CLAUDE.md |
 | R085c–e | Passkey step-up, bearer XOR cookie, CSRF | test | tests/integration/db/web-sessions.test.ts:440 | full | pointer-only | platform/apps/dashboard/CLAUDE.md |
 | R086a–e,g | Cookie, token, no inline/innerHTML/storage, reads.ts, sign-in nav | lint+test | eslint.config.mjs:89; tests/dashboard/static.test.ts | full | pointer-only | platform/apps/dashboard/CLAUDE.md |
 | R086f | Server text via cleanText | lint+test | tests/dashboard/static.test.ts:138 | partial | move:platform/apps/dashboard | platform/apps/dashboard/CLAUDE.md |
@@ -245,7 +245,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 
 - R067a: no code reads LiteLLM's status today; the runner reads the key's spend (ADR-M24 §2.2). The rule stays for any code that reads the status later.
 - R060b: the rule is about the logins mentioned in notice comments (ADR-M28, ADR-M30). The login of an admin identity (`user_identities.external_login`, ADR-M37) is a different case. The wording in `CLAUDE.md` now says so.
-- R085b ("before U07") and R123, R126, R127 hold dates or task names and will become wrong; W01 PR 4 moves them out of the root `CLAUDE.md`.
+- R123, R126, R127 hold dates or task names and will become wrong; W01 PR 4 moves them out of the root `CLAUDE.md`. R085b no longer names "before U07" (task U07, 2026-10-29).
 - Same rule twice: R067b and R071b (money as a decimal string); R044c and R053g (plain loops, never Temporal schedules). PR 4 keeps one line each.
 
 ## 6. Totals (2026-10-20)
@@ -276,4 +276,5 @@ Some rows group several rules with the same check (for example R082a–f).
 | 0.11 | 2026-10-24 | Claude (task O02) | New row R081f (the README "Upgrade" and `pnpm test:upgrade` in step; `compose:env --add-missing` only appends) |
 | 0.12 | 2026-10-24 | Claude (task O01, PR 2) | New row R141 (the runner on its own Docker Engine: the runner host's file, the relays, the link ports, `platform/deploy/CLAUDE.md`) |
 | 0.13 | 2026-10-26 | Claude (task H05) | New row R142 (the review size of every run's change, `platform/apps/runner/CLAUDE.md`) |
-| 0.14 | 2026-10-29 | Claude (task V16) | New row R143 (`pnpm server:setup`, `platform/deploy/CLAUDE.md`); R081c and R081e point at the shared steps `platform/deploy/steps` |
+| 0.14 | 2026-10-29 | Claude (task U07) | R085b: the routes a session may write to since U07 and U08; the step-up test |
+| 0.15 | 2026-10-29 | Claude (task V16) | New row R143 (`pnpm server:setup`, `platform/deploy/CLAUDE.md`); R081c and R081e point at the shared steps `platform/deploy/steps` |

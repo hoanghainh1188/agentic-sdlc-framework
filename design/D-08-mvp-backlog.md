@@ -2,8 +2,8 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.60 |
-| Date | 2026-10-28 |
+| Version | 1.63 |
+| Date | 2026-10-29 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
 | Related documents | D-02 (FR/NFR), D-03 (architecture), D-05 (data), D-07 (tokens), D-09 (sample repo) |
@@ -1706,7 +1706,7 @@ flowchart LR
 - [ ] AC4: G7 is a link to the pull request only (no approve, no request changes); refusals are shown with their catalog code (producer, missing role, same person twice, frozen); the page has no rule set of its own
 - [ ] AC5: Playwright: the producer, a wrong role and the same person twice are refused through the page (N5); screenshots at 375, 768, 1440 px, light and dark; `pnpm test:db` for the 409 and the source
 
-> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378). U06 built the mechanism (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414): mark the decision, kill and acknowledgement routes `@SessionAction('actions')` (they refuse sessions until then); in the gate and escalation decisions call `PasskeysService.verifyStepUp` on the body's `step_up`, then core `consumeStepUp` inside the decision's transaction with the binding (`stepUpRequestSha256` of the body without `step_up`); the page asks `POST /v1/auth/step-up` with the same body. QUESTIONS #424 (Harry, 2026-10-12): deferred from v0.3.0 until people in the trial or a team ask for decisions in the dashboard; the comments and the CLI already decide every gate
+> Note: ADR-M73, MVP1-UI-SCOPE 1.2 §3.2, §5.5–§5.7 (QUESTIONS #377, #378). U06 built the mechanism (ADR-M73 §2.3b, §2.4b, QUESTIONS #410–#414): mark the decision, kill and acknowledgement routes `@SessionAction('actions')` (they refuse sessions until then); in the gate and escalation decisions call `PasskeysService.verifyStepUp` on the body's `step_up`, then core `consumeStepUp` inside the decision's transaction with the binding (`stepUpRequestSha256` of the body without `step_up`); the page asks `POST /v1/auth/step-up` with the same body. QUESTIONS #424 (Harry, 2026-10-12): deferred from v0.3.0 until people in the trial or a team ask for decisions in the dashboard; the comments and the CLI already decide every gate. Done 2026-10-29: PR #462, then the tests, the refusal texts, the escalation step-up fix and the handbook in the U07 finish PR
 
 #### U08. Dashboard wave 2: create an intent with its spec, submit a plan, evidence packs
 
@@ -1720,7 +1720,7 @@ flowchart LR
 - [ ] AC2: Submit the plan file; build an evidence pack; the L1 proposal download stays in the CLI (the page shows the `sdlc evidence proposal` command)
 - [ ] AC3: Refusals from the catalog; no step-up (ADR-M73); Playwright tests per action and role
 
-> Note: MVP1-UI-SCOPE 1.2 §3.3. Ordered again from `design/M-E-REPORT.md` (§9)
+> Note: MVP1-UI-SCOPE 1.2 §3.3. Ordered again from `design/M-E-REPORT.md` (§9). In part (PR #462, 2026-10-29): create an intent, without its spec; still to do: link the spec, submit the plan, build an evidence pack, the Playwright tests
 
 #### U09. Dashboard wave 3: administration
 
@@ -1963,7 +1963,8 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.60 | 2026-10-27 | Claude Code (task H02), approved by Harry | H02 done: agent dependency checks (licence, install scripts, typosquatting; ADR-M96, QUESTIONS #606–#608) |
 | 1.61 | 2026-10-27 | Claude Code (task H03), approved by Harry | H03 design done: deleting a client's data on request (ADR-M97, QUESTIONS #611–#615) |
 | 1.62 | 2026-10-28 | Claude Code (task V17), approved by Harry | V17 done: `sdlc admin project apply`, a project and its team from one file (QUESTIONS #617) |
-| 1.63 | 2026-10-29 | Claude Code (task V16), approved by Harry | V16 done: `pnpm server:setup`, a guided fresh deployment on a server (ADR-M98, QUESTIONS #616) |
+| 1.63 | 2026-10-29 | Claude Code (task U07), approved by Harry | U07 done (PR #462 and the U07 finish PR); U08 in part: create an intent (PR #462) |
+| 1.64 | 2026-10-29 | Claude Code (task V16), approved by Harry | V16 done: `pnpm server:setup`, a guided fresh deployment on a server (ADR-M98, QUESTIONS #616) |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |

@@ -494,7 +494,7 @@ At the end it prints, per person, the commands that are still theirs: first toke
 
 > **Platform usage section, owned by Claude Code** (CLAUDE.md "Documentation rules"). Written with task U01, 2026-10-07, and kept in line with the platform code (`design/ADR-M54-read-only-dashboard.md`).
 
-The dashboard shows in one page what the CLI shows one command at a time. **It decides no gate.** You still decide gates with comments, reviews and the CLI (§19.8b, §19.8c). The only business actions it has are those of evaluation plans (below).
+The dashboard shows in one page what the CLI shows one command at a time. With a GitHub sign-in and actions on, you can also decide a gate, stop a run, and acknowledge and decide an escalation there (task U07, below), create an intent, and act on evaluation plans. Comments, reviews and the CLI still work as before (§19.8b, §19.8c). **G7 is never decided in the dashboard**: it is the review and the merge on GitHub.
 
 **Open it.** With team access (task V09), open the team address the operator gives you, for example `https://sdlc.example.internal:8443/dashboard/`, from your own machine; your browser must trust the company's certificate authority. Without it, open `http://127.0.0.1:8090/dashboard/` on the machine that runs the platform (the API's own address; no other port); with GitHub sign-in on there, open `http://localhost:8090/dashboard/` instead: the sign-in works on `localhost`, not on `127.0.0.1`. With team access, the GitHub sign-in works on the team address only. Then sign in one of two ways.
 
@@ -512,9 +512,9 @@ The dashboard shows in one page what the CLI shows one command at a time. **It d
 1. Paste your API token (`sdlc_pat_…`, the one you use for the CLI; create one with `sdlc token create`) and choose **Sign in**.
 2. The API token stays in the memory of that browser tab only. A reload, closing the tab or **Sign out** forgets it. The dashboard never puts it in the address, in browser storage or in a cookie. **Sign out** does not revoke the API token: `sdlc token revoke` does.
 
-Either way the dashboard decides nothing yet: decisions in the dashboard come with task U07 (ADR-M73). Its only changes are your own session (sign out) and, with actions on, your own passkeys.
+With the API token the dashboard only reads: it changes nothing but your own sign-out. The actions below need a GitHub sign-in, actions on, and for decisions a passkey.
 
-**Passkeys** (task U06, when the operator turned actions on: `SDLC_API_DASHBOARD_ACTIONS=on`). A passkey is a key that your device keeps and unlocks with your fingerprint, face or PIN. The dashboard will ask for it before each decision you make there (task U07), so a stolen session alone cannot decide.
+**Passkeys** (task U06, when the operator turned actions on: `SDLC_API_DASHBOARD_ACTIONS=on`). A passkey is a key that your device keeps and unlocks with your fingerprint, face or PIN. The dashboard asks for it before each gate or escalation decision you make there, so a stolen session alone cannot decide.
 
 1. Sign in **with GitHub** (the personal token has no passkey screen). The menu then shows **Passkeys**.
 2. Within **5 minutes** of signing in, open **Passkeys** and choose **Add a passkey**. Your browser asks your device; confirm with your fingerprint, face or PIN. After 5 minutes the platform refuses: sign out, sign in with GitHub again, and add it at once.
@@ -523,6 +523,23 @@ Either way the dashboard decides nothing yet: decisions in the dashboard come wi
 5. A passkey belongs to the address you made it on: one made on `http://localhost:8090` does not work on the team address, and the other way round. Add one where you work.
 6. Each change the page sends carries a security token of your session and comes from the dashboard's own address; the platform refuses anything else. If a change fails with "did not come from the dashboard page", reload the page.
 7. Without a passkey you can still read in the dashboard and decide with the CLI or a comment on GitHub.
+
+**Decisions and actions** (task U07, ADR-M73). They need a GitHub sign-in and actions on. The page sends the same requests as the CLI, and the platform applies the same rules: the dashboard has no rules of its own.
+
+| Action | Where | Confirmed with | Same as |
+|---|---|---|---|
+| **Approve**, **Reject**, **Request changes** a gate (G1–G6, G8) | An intent, under **Who decides this gate** | Your passkey | `sdlc gate approve\|reject\|request-changes` |
+| Open the pull request (G7) | An intent at G7 | (review and merge on GitHub) | the GitHub review |
+| **Kill run** | An intent, in the runs table, while a run is provisioning or running | A question in the browser | `sdlc run kill` |
+| **Acknowledge** an escalation | **Escalations** | Nothing more | `sdlc escalation ack` |
+| **Decide** an escalation | **Escalations** | Your passkey | `sdlc escalation decide` |
+| Create an intent (**New intent**) | **Intents and gates** | Nothing more | `sdlc intent create` |
+
+1. Before a gate decision, the page shows what you decide on: the hash of the gate's input (the spec, the plan or the diff) and, when there is one, the spec and plan hashes. The decision is bound to that input. If the input changed while you were reading, the platform refuses with "The input to this gate changed while you were reviewing": reload the page and look again.
+2. A refused decision shows the same sentence as a refused comment command: for example "You produced this change, so you cannot approve it (separation of duties)", "You do not hold a role that may decide this gate", or "You already approved this: dual approval needs two different people".
+3. A reject or a request for changes asks for a reason code. Write the explanation where it can be edited or deleted (a GitHub comment) and give its link as the reason link.
+4. A decision made in the dashboard is recorded with the source `web` and your user ID, the same as a decision from the CLI. The platform never records your session or passkey there.
+5. A new intent created in the dashboard is a draft, the same as one from `sdlc intent create`. Link its spec and submit its plan with the CLI (§19.8c).
 
 Never publish the API's port 8090 to other machines. People on other machines use team access, the operator's TLS proxy on one LAN port (`platform/deploy/README.md`, "Team access").
 
@@ -618,6 +635,7 @@ Never publish the API's port 8090 to other machines. People on other machines us
 | 0.44 | 2026-10-20 | Claude (task L09, PR 1) | §19.8c: a plan configuration may name a `proposed` or `suspended` agent of the register; the agent gets its own tools in the runs (ADR-M86 §2.2, QUESTIONS #501) |
 | 0.45 | 2026-10-22 | Claude (task X04, PR 1) | §19.8c: the plan lists register tools as `tool:<key>`; G4 fails with `tool_not_runnable` when the run cannot have one (ADR-M69 §2.1, §2.3) |
 | 0.46 | 2026-10-28 | Claude (task V17) | §19.8d: set up a project from one file, `sdlc admin project apply` (QUESTIONS #617) |
+| 0.47 | 2026-10-29 | Claude (task U07) | §19.8e: decide a gate, kill a run, acknowledge and decide an escalation, and create an intent in the dashboard; the passkey before each decision; refusals in the words of the comment replies (ADR-M73) |
 | 0.26 | 2026-10-09 | Claude (docs review E2) | §19.8d points to the set-up order of the deployment guide |
 | 0.25 | 2026-10-09 | Claude (docs review fixes) | §19.8b: what reject and request-changes do at G5–G7; the HOTL gates with a block window besides G2 and G3 |
 | 0.24 | 2026-10-09 | Claude (docs review PR C2) | §19.8c: what counts as one acceptance criterion for Spec Kit and BMAD (each top-level list item; ROLLOUT-GUIDE said "every Given / When / Then item"); anchors for linking a spec, the plan file, plan drafts, the cost report, the gate times, the block window and the AI record |

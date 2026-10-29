@@ -124,6 +124,7 @@ The test App is `harryforge-sdlc-dev` (Client ID `Iv23liQtMQBwNyVYZuJt`), instal
 - Screenshots at 375, 768 and 1440 px, light and dark, in `platform/tests/e2e/screenshots/` (Git-ignored).
 - `e2e/sign-in.e2e.ts`: the stub API plays GitHub on `localhost`. `SDLC_DASHBOARD_E2E_ALL_BROWSERS=1` adds Firefox and WebKit once `pnpm exec playwright install firefox webkit` ran.
 - `e2e/passkeys.e2e.ts`: Chromium's virtual authenticator on `localhost`; the stub checks with the api's built WebAuthn code.
+- `e2e/decisions.e2e.ts`: the U07 writes of the stub (`e2e/decisions-stub.mjs`) check the step-up's action, request and bound input hash; each test removes the passkey it added.
 - Unit tests in `platform/tests/dashboard/`: data mapping, static checks of source and build, the no-new-endpoint check, colour contrast.
 
 ---
@@ -248,6 +249,7 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 | What holds an intent | U02; ADR-M54 §2.4b | unit: `workflow/waiting-reason.test.ts`; db: `gate-g4.test.ts` (U02 block) and assertions in the gate tests, `plan-submission.test.ts`; `pnpm test:dashboard` |
 | Sign-in with GitHub, sessions | U05; ADR-M73 §2.2b | unit: `api/sign-in-pieces.test.ts`, `git-github/sign-in.test.ts`, `api/settings.test.ts`, `deploy/github-app.test.ts`, `deploy/api-static.test.ts`; db: `web-sessions.test.ts`; `pnpm test:dashboard` (`e2e/sign-in.e2e.ts`) |
 | Dashboard writes, CSRF, passkeys | U06; ADR-M73 §2.3b, §2.4b | unit: `passkeys/ceremonies.test.ts`, `api/settings.test.ts`, `deploy/api-static.test.ts`; db: `dashboard-writes.test.ts`; `pnpm test:dashboard` (`e2e/passkeys.e2e.ts`) |
+| Dashboard decisions: gates, kills, escalations | U07; ADR-M73 §2.4b, §2.6 | unit: `commands/gate-web-decision.test.ts` (the input hash, source `web`), `dashboard/endpoints.test.ts`; db: `dashboard-decisions.test.ts` (the step-up, the 409, the sources, no session ID in append-only tables); `pnpm test:dashboard` (`e2e/decisions.e2e.ts`: N5 refusals, the kill, escalations, screens at 375–1440 px) |
 
 ---
 

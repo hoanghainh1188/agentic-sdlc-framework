@@ -270,7 +270,23 @@ const RUNS = (code) => ({
             finished_at: at(-27 * HOUR - 20 * MIN),
           },
         ]
-      : [],
+      : code === 'INT-2026-0003'
+        ? [
+            // U07: a run in progress, so the page offers the kill switch.
+            {
+              id: uuid(603),
+              attempt: 1,
+              status: 'running',
+              stop_reason: null,
+              agent_version: 'v5',
+              iterations: 4,
+              killed_by: null,
+              created_at: at(-30 * MIN),
+              started_at: at(-25 * MIN),
+              finished_at: null,
+            },
+          ]
+        : [],
 });
 
 const PACK = (code) => ({
@@ -447,6 +463,11 @@ function gates(url) {
       truncated: false,
     },
   };
+}
+
+/** U07: an escalation of the fixtures by its code, for the stub's writes. */
+export function escalationOf(code) {
+  return ESCALATIONS().find((e) => e.code === code);
 }
 
 /** The answer for a GET path, or undefined (404). */
