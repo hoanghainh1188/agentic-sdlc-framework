@@ -115,7 +115,11 @@ class FakeHost {
     const input = (opts.input ?? '').split('\n');
     const base = path.basename(cmd);
     if (base === 'init-env.sh') {
-      if (!fs.existsSync(this.envFile)) {
+      // Like the real script (R078): it never overwrites an env file.
+      if (fs.existsSync(this.envFile)) {
+        return fail(`init-env: ${this.envFile} already exists; not overwriting.`);
+      }
+      {
         fs.writeFileSync(
           this.envFile,
           [
@@ -368,6 +372,19 @@ describe('V16 AC1–AC5: a whole run', () => {
     expect(last.args[0]).toMatch(/doctor\/dist\/main\.js$/);
     expect(last.args).toContain('--env');
     expect(f.term.said('server_setup.doctor')).toBe(true);
+  });
+
+  it('a second run keeps the env file of the first one and goes on (no init-env)', async () => {
+    const f = fixture();
+    await serverSetup(f.settings, f.deps);
+    const before = fs.readFileSync(f.envFile, 'utf8');
+    const first = f.host.calls.length;
+    const again = new ScriptedTerminal(f.host);
+    const result = await serverSetup(f.settings, { ...f.deps, terminal: again });
+    expect(result.outcome).toBe('done');
+    const second = f.host.calls.slice(first);
+    expect(second.some((c) => path.basename(c.cmd) === 'init-env.sh')).toBe(false);
+    expect(fs.readFileSync(f.envFile, 'utf8')).toBe(before);
   });
 
   it('makes the env file in server mode: no LiteLLM keys in it, mode 600', async () => {
