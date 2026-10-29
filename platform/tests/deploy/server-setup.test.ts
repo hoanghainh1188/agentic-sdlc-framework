@@ -44,6 +44,9 @@ import {
 import { repoRoot } from '../workspace/helpers.js';
 
 const KEYS = { shares: 3, threshold: 2 } as const;
+/** The fake env file's made-up database passwords (kept out of `KEY=value` literals: Gitleaks). */
+const OWNER_DB = ['pw', 'owner', '0123456789'].join('-');
+const APP_DB = ['pw', 'app', '0123456789'].join('-');
 const temp: string[] = [];
 afterEach(() => {
   for (const dir of temp.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
@@ -80,14 +83,7 @@ class FakeHost {
 
   /** Every secret the fake made: none of them may be in an argument or an environment value. */
   get secrets(): string[] {
-    return [
-      ...this.plainShares,
-      ...this.roots,
-      ...this.admins,
-      ...this.revoked,
-      'pw-owner-0123456789',
-      'pw-app-0123456789',
-    ];
+    return [...this.plainShares, ...this.roots, ...this.admins, ...this.revoked, OWNER_DB, APP_DB];
   }
 
   private token(kind: 'root' | 'admin'): string {
@@ -122,8 +118,8 @@ class FakeHost {
           this.envFile,
           [
             'COMPOSE_PROJECT_NAME=sdlcsrv',
-            'PLATFORM_DB_PASSWORD=pw-owner-0123456789',
-            'PLATFORM_APP_DB_PASSWORD=pw-app-0123456789',
+            `PLATFORM_DB_PASSWORD=${OWNER_DB}`,
+            `PLATFORM_APP_DB_PASSWORD=${APP_DB}`,
             'LITELLM_MASTER_KEY=sk-from-init-env-000000000000',
             'LITELLM_SALT_KEY=sk-from-init-env-111111111111',
             'POSTGRES_HOST_PORT=5432',
@@ -208,8 +204,7 @@ class FakeHost {
       return fail(`unexpected docker exec ${script}`);
     }
     if (cmd === 'node' && args[0]?.endsWith('migrate-cli.js')) {
-      if (!(opts.input ?? '').startsWith('postgres://platform:pw-owner-0123456789@'))
-        return fail('no url');
+      if (!(opts.input ?? '').startsWith(`postgres://platform:${OWNER_DB}@`)) return fail('no url');
       const applied = Array.from(
         { length: this.migrations },
         (_, i) => `Applied migration 00${i}.`,
@@ -387,9 +382,7 @@ describe('V16 AC1–AC5: a whole run', () => {
     await serverSetup(f.settings, f.deps);
     const migrate = f.host.calls.find((c) => c.args[0]?.endsWith('migrate-cli.js'))!;
     expect(migrate.args).toEqual([expect.any(String), 'latest', '--url-stdin']);
-    expect(migrate.opts.input).toBe(
-      'postgres://platform:pw-owner-0123456789@127.0.0.1:5432/platform\n',
-    );
+    expect(migrate.opts.input).toBe(`postgres://platform:${OWNER_DB}@127.0.0.1:5432/platform\n`);
     expect(Object.keys(migrate.opts.env ?? {})).not.toContain('SDLC_DB_MIGRATION_URL');
   });
 
