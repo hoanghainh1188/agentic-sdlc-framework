@@ -1,4 +1,4 @@
-// `sdlc plan draft <INT-…> --from <file> --tool spec-kit|bmad [--output <file>] [--force] [--json]`
+// `adlc plan draft <INT-…> --from <file> --tool spec-kit|bmad [--output <file>] [--force] [--json]`
 // (task S02, D-08 S02, design/ADR-M62, handbook Ch.19 §19.8c). Writes a plan file draft
 // (schema version 1) from a Spec Kit `tasks.md` or a BMAD story file on this machine. No API call,
 // no Git command: the draft is never submitted, committed or pushed (QUESTIONS #167). The fields a

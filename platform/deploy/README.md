@@ -21,7 +21,7 @@ Three one-shot jobs run at every start and then exit: `temporal-schema` (creates
 
 - Docker Engine with Docker Compose v2.24 or later.
 - OpenSSL 3 or later as `openssl` on the `PATH` (for `init-env.sh`, OpenBao's TLS certificates and the TLS tests of `@sdlc/secrets`). On macOS, `/usr/bin/openssl` is LibreSSL, and the TLS tests stop with a message when they find it: install OpenSSL 3 (`brew install openssl@3`) and put it first (`export PATH="$(brew --prefix openssl@3)/bin:$PATH"`).
-- Node.js 24 + pnpm 10 (`corepack enable` once). The fresh deployment below needs them (`pnpm install`, `pnpm openbao:bootstrap`, `pnpm db:migrate`, `pnpm sdlc ops …`), and so do the `pnpm` shortcuts and the tests. Only starting and stopping the containers works without them (`init-env.sh`, `up.sh`).
+- Node.js 24 + pnpm 10 (`corepack enable` once). The fresh deployment below needs them (`pnpm install`, `pnpm openbao:bootstrap`, `pnpm db:migrate`, `pnpm adlc ops …`), and so do the `pnpm` shortcuts and the tests. Only starting and stopping the containers works without them (`init-env.sh`, `up.sh`).
 
 ## Where to run it
 
@@ -115,7 +115,7 @@ After the first deployment: [Restart after a reboot](#restart-after-a-reboot), [
 | The host name people will use (team access, the dashboard's passkeys), chosen **before** you create the GitHub App | Operator | The App's callback URL and a passkey belong to that address ([Team access](#team-access-operator)) |
 | A GitHub App on the project's repository, and a model provider key or a local model | Operator | Steps 4 and 9 |
 | A Linux VM, or a second rootless Engine on the server, for the runner, and the link between the two | Infrastructure operator | Required before the first real agent run ([The runner on its own Docker Engine](#the-runner-on-its-own-docker-engine-operator)) |
-| Person A and Person B for the project, never the same person | Leadership | Separation of duties (2+N); `sdlc admin project apply` refuses one person in both roles |
+| Person A and Person B for the project, never the same person | Leadership | Separation of duties (2+N); `adlc admin project apply` refuses one person in both roles |
 | An encrypted backup target outside the server | Operator | [Backup and restore](#backup-and-restore) |
 
 **The runner's Engine and the key holders.** To keep the key holders to one meeting, put `SDLC_RUNNER_SOURCE_CIDR` (the runner host's address as OpenBao sees it, for example `10.66.0.2/32`) in `platform/deploy/.env` after step 2 and before step 3: `configure` then already accepts it, and the runner section's own `configure` is not needed. Set `SDLC_RUNNER_LINK_ADDR` and `SDLC_RUNNER_DOCKER_HOST` only after `server:setup` has finished, because its step 7 starts the profile `sandbox`, which `up.sh` refuses while `SDLC_RUNNER_LINK_ADDR` is set.
@@ -237,52 +237,52 @@ Optional, dashboard sign-in with GitHub (U05, [ADR-M73](../../design/ADR-M73-das
 pnpm openbao:bootstrap api-github-oauth-credentials < <key file>.client-secret  # T11 §5n
 ```
 
-Optional, actions in the dashboard (U06, ADR-M73 §2.3): with the sign-in on, set `SDLC_API_DASHBOARD_ACTIONS=on` and start `sdlc-api` again. The api refuses to start with actions on and the sign-in off. Every write from the page needs the session's CSRF token and the public origin; each person adds a passkey in the dashboard within 5 minutes of a GitHub sign-in, and confirms each decision with it (decisions in the dashboard come with U07). A tenant admin lists and removes a person's passkeys with `sdlc admin passkey list|revoke --user <id or email>`.
+Optional, actions in the dashboard (U06, ADR-M73 §2.3): with the sign-in on, set `SDLC_API_DASHBOARD_ACTIONS=on` and start `sdlc-api` again. The api refuses to start with actions on and the sign-in off. Every write from the page needs the session's CSRF token and the public origin; each person adds a passkey in the dashboard within 5 minutes of a GitHub sign-in, and confirms each decision with it (decisions in the dashboard come with U07). A tenant admin lists and removes a person's passkeys with `adlc admin passkey list|revoke --user <id or email>`.
 
 ### 8. The tenant and its first admin
 
 ```bash
 export SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform"
-pnpm sdlc ops bootstrap --tenant <slug> --tenant-name "<name>" --email <you> --name "<your name>"
-pnpm sdlc login --api-url http://127.0.0.1:8090
+pnpm adlc ops bootstrap --tenant <slug> --tenant-name "<name>" --email <you> --name "<your name>"
+pnpm adlc login --api-url http://127.0.0.1:8090
 ```
 
-The bootstrap creates the tenant, its first user and that user's first personal API token (`sdlc_pat_…`, [ADR-M26](../../design/ADR-M26-api-app.md) §2.2), and makes the user the first **tenant admin** (task B13). `sdlc login` reads the token at a hidden prompt. From here on, everything goes through the API: people set up projects, users and roles with `sdlc admin …` and their own tokens with `sdlc token …` (handbook [Ch.19 §19.8c](../../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command) and [§19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)).
+The bootstrap creates the tenant, its first user and that user's first personal API token (`sdlc_pat_…`, [ADR-M26](../../design/ADR-M26-api-app.md) §2.2), and makes the user the first **tenant admin** (task B13). `adlc login` reads the token at a hidden prompt. From here on, everything goes through the API: people set up projects, users and roles with `adlc admin …` and their own tokens with `adlc token …` (handbook [Ch.19 §19.8c](../../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-adlc-command) and [§19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)).
 
 - The token is printed **once**. Store it in a password manager; never paste it into a chat, a ticket or a file in a repository.
 - The bootstrap runs once per tenant; a second run with the same slug is refused.
 - Tokens last 90 days by default, at most 365. Only their SHA-256 hash is stored. Every issue and revocation is written to the audit log (IDs only).
-- The operator's commands on the server are `sdlc ops …`: they connect to the database with `SDLC_DB_URL` as the actor `system`. Besides `bootstrap`:
+- The operator's commands on the server are `adlc ops …`: they connect to the database with `SDLC_DB_URL` as the actor `system`. Besides `bootstrap`:
 
   | Command | Use |
   |---|---|
-  | `sdlc ops token issue\|list\|revoke` | API tokens for an existing user |
-  | `sdlc ops audit verify` | Check the audit log's hash chain ([Checking the audit log](#checking-the-audit-log)) |
-  | `sdlc ops tenant-admin grant\|revoke\|list`, `sdlc ops role grant\|revoke` | A tenant with one admin, or a tenant that lost its admins |
-  | `sdlc ops ai-record set\|show` | The project AI record, on behalf of a person with a write role |
-  | `sdlc ops agent show\|list\|suspend\|quarantine` | Safety moves on the agent register when the API is down |
-  | `sdlc ops run kill` | The kill switch as the system |
-  | `sdlc ops retention report` | What the retention loop would purge |
+  | `adlc ops token issue\|list\|revoke` | API tokens for an existing user |
+  | `adlc ops audit verify` | Check the audit log's hash chain ([Checking the audit log](#checking-the-audit-log)) |
+  | `adlc ops tenant-admin grant\|revoke\|list`, `adlc ops role grant\|revoke` | A tenant with one admin, or a tenant that lost its admins |
+  | `adlc ops ai-record set\|show` | The project AI record, on behalf of a person with a write role |
+  | `adlc ops agent show\|list\|suspend\|quarantine` | Safety moves on the agent register when the API is down |
+  | `adlc ops run kill` | The kill switch as the system |
+  | `adlc ops retention report` | What the retention loop would purge |
 
   For example, a token for an existing user:
 
 ```bash
-pnpm sdlc ops token issue --tenant <slug> --email <email> --name <token name> --days 90
+pnpm adlc ops token issue --tenant <slug> --email <email> --name <token name> --days 90
 ```
 
 ### 9. The project and its team
 
 ```bash
-pnpm sdlc admin project create --slug <project> --name "<name>" --repo <owner/name>
-pnpm sdlc admin user create --email <person-a> --name "<name>"
-pnpm sdlc admin identity link --user <person-a> --github-id <numeric ID> --github-login <login>
-pnpm sdlc admin role grant --project <project> --user <person-a> --role person_a
-pnpm sdlc admin token issue --user <person-a> --name <token-name>
+pnpm adlc admin project create --slug <project> --name "<name>" --repo <owner/name>
+pnpm adlc admin user create --email <person-a> --name "<name>"
+pnpm adlc admin identity link --user <person-a> --github-id <numeric ID> --github-login <login>
+pnpm adlc admin role grant --project <project> --user <person-a> --role person_a
+pnpm adlc admin token issue --user <person-a> --name <token-name>
 ```
 
-Do the same for Person B (`--role person_b`) and every other role you need (the rules and every command: [handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)). Person A and Person B are always two different people with two GitHub accounts. The numeric ID comes from `gh api users/<login> --jq .id`. Each person replaces the issued token with their own (`sdlc token create`, then `sdlc token revoke`).
+Do the same for Person B (`--role person_b`) and every other role you need (the rules and every command: [handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)). Person A and Person B are always two different people with two GitHub accounts. The numeric ID comes from `gh api users/<login> --jq .id`. Each person replaces the issued token with their own (`adlc token create`, then `adlc token revoke`).
 
-**Or from one file (V17).** Steps 9, 11 and 12 can come from one YAML file outside the repository: `pnpm sdlc admin project apply --file <project.yaml> --dry-run`, then the same without `--dry-run`. The file holds the project, the team with each person's GitHub login, the agent and the configuration; start from [`project.example.yaml`](project.example.yaml) ([handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#project-file)). The command looks up each numeric GitHub ID and shows it for you to confirm, refuses a file that would make one person Person A and Person B, and makes one API call per change. It issues no token, approves no agent and writes no AI record: at the end it prints these commands, per person. A role for yourself goes to another admin (`sdlc ops role grant` on the server for a one-admin tenant, as in step 8).
+**Or from one file (V17).** Steps 9, 11 and 12 can come from one YAML file outside the repository: `pnpm adlc admin project apply --file <project.yaml> --dry-run`, then the same without `--dry-run`. The file holds the project, the team with each person's GitHub login, the agent and the configuration; start from [`project.example.yaml`](project.example.yaml) ([handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#project-file)). The command looks up each numeric GitHub ID and shows it for you to confirm, refuses a file that would make one person Person A and Person B, and makes one API call per change. It issues no token, approves no agent and writes no AI record: at the end it prints these commands, per person. A role for yourself goes to another admin (`adlc ops role grant` on the server for a one-admin tenant, as in step 8).
 
 ### 10. The sandbox image
 
@@ -311,17 +311,17 @@ NODE24=<the node24 image by digest> pnpm sandbox-image:build node24-opencode
 ### 11. The agent
 
 ```bash
-pnpm sdlc admin agent register --key <agent-key> --version 1.0.0 --owner <person-a> \
+pnpm adlc admin agent register --key <agent-key> --version 1.0.0 --owner <person-a> \
   --model <gateway model with version> --instructions AGENTS.md@<label> \
   --instructions-file <the repository's AGENTS.md> --tools file_editor,terminal \
   --max-autonomy L2 --environments sandbox
 ```
 
-Then the agent's owner (`--as owner`) and Person B (`--as person_b`) each run `pnpm sdlc admin agent approve --key <agent-key> --purpose activate` (handbook Ch.20 §20.5b). The model is a gateway model name from `litellm/config.ctmpl`, for example `claude-haiku-4-5-20251001`.
+Then the agent's owner (`--as owner`) and Person B (`--as person_b`) each run `pnpm adlc admin agent approve --key <agent-key> --purpose activate` (handbook Ch.20 §20.5b). The model is a gateway model name from `litellm/config.ctmpl`, for example `claude-haiku-4-5-20251001`.
 
 ### 12. The project configuration
 
-`pnpm sdlc admin config show --project <project>` shows the current configuration version; `config set` below needs it as `--expected-version`. Write the settings that differ from the defaults into a YAML file outside the repo, at least:
+`pnpm adlc admin config show --project <project>` shows the current configuration version; `config set` below needs it as `--expected-version`. Write the settings that differ from the defaults into a YAML file outside the repo, at least:
 
 ```yaml
 run:
@@ -332,25 +332,25 @@ verification:
   required_checks: [<the repository's required CI check>]
 ```
 
-Then `pnpm sdlc admin config set --project <project> --file <file> --expected-version <version>` ([handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)).
+Then `pnpm adlc admin config set --project <project> --file <file> --expected-version <version>` ([handbook Ch.19 §19.8d](../../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)).
 
 ### 13. The project AI record
 
 Person A (or the PM / BrSE) records the client's consent (handbook Ch.2 §2.5, template T7):
 
 ```bash
-pnpm sdlc ai-record set --project <project> --expected-version 0 --ai-allowed yes \
+pnpm adlc ai-record set --project <project> --expected-version 0 --ai-allowed yes \
   --classes public,internal --prod-logs no --disclosure standard_note
 ```
 
 ### 14. The first intent
 
 ```bash
-pnpm sdlc intent create --project <project> --title "<title>" --risk low --data-class internal
-pnpm sdlc intent show <INT-YYYY-NNNN>
+pnpm adlc intent create --project <project> --title "<title>" --risk low --data-class internal
+pnpm adlc intent show <INT-YYYY-NNNN>
 ```
 
-The intent is `in_gate` at `G1`: Person A approves it with `pnpm sdlc gate approve G1 <INT-…>` or `/approve G1` on its issue (handbook Ch.19 §19.8c).
+The intent is `in_gate` at `G1`: Person A approves it with `pnpm adlc gate approve G1 <INT-…>` or `/approve G1` on its issue (handbook Ch.19 §19.8c).
 
 ## Start and stop
 
@@ -425,7 +425,7 @@ People on other machines of the company LAN use the CLI and the dashboard throug
 4. **Start** with the profiles you use and `access` in the same call, for example `platform/deploy/scripts/up.sh core models platform sandbox access` (development: `pnpm compose:access`). `up.sh` checks the settings first (the bind address, the host name, the network `access`, `SDLC_API_TRUSTED_PROXY`, the public origin, the certificate) and starts nothing when one is wrong; a certificate ending within 30 days only warns.
 5. **Check**: `pnpm doctor` (the `access.*` lines), then from another machine `curl --cacert ca.pem https://sdlc.example.internal:8443/health/ready`.
 
-**People** sign in with `sdlc login --api-url https://sdlc.example.internal:8443`, and, when the company CA is not in their system, set `NODE_EXTRA_CA_CERTS=<path to ca.pem>` (never `NODE_TLS_REJECT_UNAUTHORIZED=0`); the dashboard is at `https://sdlc.example.internal:8443/dashboard/` ([USER-GUIDE §2](../USER-GUIDE.md#account-and-login), handbook Ch.19 §19.8c). `sdlc doctor` names `NODE_EXTRA_CA_CERTS` when it cannot verify the certificate.
+**People** sign in with `adlc login --api-url https://sdlc.example.internal:8443`, and, when the company CA is not in their system, set `NODE_EXTRA_CA_CERTS=<path to ca.pem>` (never `NODE_TLS_REJECT_UNAUTHORIZED=0`); the dashboard is at `https://sdlc.example.internal:8443/dashboard/` ([USER-GUIDE §2](../USER-GUIDE.md#account-and-login), handbook Ch.19 §19.8c). `adlc doctor` names `NODE_EXTRA_CA_CERTS` when it cannot verify the certificate.
 
 **Turn it off:** stop the proxy (`docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile access stop sdlc-access`), empty `SDLC_ACCESS_BIND_ADDR`, `SDLC_ACCESS_HOSTNAME` and `SDLC_API_TRUSTED_PROXY`, and set `SDLC_API_PUBLIC_ORIGIN` back if the sign-in is on.
 
@@ -569,14 +569,14 @@ docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/
 The audit log is append-only and hash-chained per tenant (ADR-M09 section 2.8). Check every tenant's chain (exit code 1 when a record was changed or removed):
 
 ```bash
-SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm sdlc ops audit verify
+SDLC_DB_URL="postgres://platform_app:<PLATFORM_APP_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm adlc ops audit verify
 ```
 
-Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. The command connects straight to the database. Tenant admins run the same check through the API with `sdlc audit verify` (task B13, `design/ADR-M37-admin-onboarding.md`).
+Add `--tenant <slug>` for one tenant, `--json` for machine-readable output. The command connects straight to the database. Tenant admins run the same check through the API with `adlc audit verify` (task B13, `design/ADR-M37-admin-onboarding.md`).
 
 ### First admin and API tokens (task B03)
 
-The first admin, the bootstrap token and the operator's `sdlc ops …` commands: [Fresh deployment, step 8](#8-the-tenant-and-its-first-admin). How people log in and manage their own tokens: handbook [Ch.19 §19.8c](../../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command).
+The first admin, the bootstrap token and the operator's `adlc ops …` commands: [Fresh deployment, step 8](#8-the-tenant-and-its-first-admin). How people log in and manage their own tokens: handbook [Ch.19 §19.8c](../../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-adlc-command).
 
 ### Reset after a change to migration 0001 (development only)
 
@@ -652,7 +652,7 @@ Design: [ADR-M81](../../design/ADR-M81-server-evaluations.md). An evaluation run
 **Before the first evaluation**
 - The worker runs the evaluation loop when it has the `cost-controller` AppRole and Temporal (the same condition as agent runs and the spend sync). Without it the worker logs `worker.runs_off` and no evaluation starts.
 - Install the GitHub App on the sample repository `pilot-order-inventory` (the task set clones it at a pinned commit), and create it as a project of the tenant with that repository name. The project needs an AI record that allows the data class of the evaluation (default `internal`).
-- The task set v1 and the configuration files are packed in the runner image (`/app/eval-tasks`, `/app/eval-configs`; the reference solutions are removed). A private task set: mount a folder and set `SDLC_EVAL_TASKS_DIR` (runner and the `sdlc` command); other configuration files: `SDLC_EVAL_CONFIG_DIR`.
+- The task set v1 and the configuration files are packed in the runner image (`/app/eval-tasks`, `/app/eval-configs`; the reference solutions are removed). A private task set: mount a folder and set `SDLC_EVAL_TASKS_DIR` (runner and the `adlc` command); other configuration files: `SDLC_EVAL_CONFIG_DIR`.
 - Every model of a configuration must be listed by LiteLLM and allowed for the data class by the project's policy. `client_restricted` data goes to self-hosted models only. The worker checks the model again when each run is issued.
 
 **Settings (technical, no handbook rule)**
@@ -660,7 +660,7 @@ Design: [ADR-M81](../../design/ADR-M81-server-evaluations.md). An evaluation run
 | Setting | Process | Default | Bounds | Meaning |
 |---|---|---|---|---|
 | `SDLC_RUNNER_MAX_EVAL_SANDBOXES` | runner | 1 | 0 – `SDLC_RUNNER_MAX_SANDBOXES` | Evaluation runs at one time; 0 turns evaluations off. A waiting real run takes the slot back |
-| `SDLC_EVAL_TASKS_DIR`, `SDLC_EVAL_CONFIG_DIR` | runner, worker (tasks only, L05), `sdlc ops eval` | the image | a folder | Another task set, other configuration files. The worker's plan loop reads the task set's version, commit and task IDs; give the worker and the runner the same folder |
+| `SDLC_EVAL_TASKS_DIR`, `SDLC_EVAL_CONFIG_DIR` | runner, worker (tasks only, L05), `adlc ops eval` | the image | a folder | Another task set, other configuration files. The worker's plan loop reads the task set's version, commit and task IDs; give the worker and the runner the same folder |
 | `SDLC_RUNNER_GPU` | runner | none | a name | The GPU name written in the hardware block of each result |
 | `SDLC_WORKER_EVAL_TICK_SECONDS` | worker | 15 | 5–300 | Time between two passes of the evaluation loop |
 | `SDLC_WORKER_EVAL_MAX_IN_FLIGHT` | worker | 2 | 1–16 | Runs handed to the runner at one time (running, or waiting for a slot) |
@@ -668,16 +668,16 @@ Design: [ADR-M81](../../design/ADR-M81-server-evaluations.md). An evaluation run
 **Start one (operator, on the server, `SDLC_DB_URL` set)**
 
 ```bash
-pnpm sdlc ops eval start --tenant <slug> --project <slug> --config platform/eval/configs/local.yaml --budget 5 --n 3
+pnpm adlc ops eval start --tenant <slug> --project <slug> --config platform/eval/configs/local.yaml --budget 5 --n 3
 ```
 
-It prints the evaluation code (`EVAL-YYYY-NNNN`) and the counts, and writes `evaluation.started` in the audit log as done by the platform. Options: `--configurations a,b`, `--tasks t1,t2`, `--data-class <class>`, `--tasks-dir <folder>`, `--json`. The budget is the evaluation's own: each run's virtual key is capped at what is left of it, and when it is used up the evaluation ends `stopped_budget`. Its cost is a separate line in the cost report, never inside an intent. People follow evaluations with `sdlc eval list|show` and in the dashboard (Evaluations); the full report comes with L06. The tables `evaluations`, `evaluation_runs` and `evaluation_run_results` hold numbers and codes only: no prompt, task text or diff.
+It prints the evaluation code (`EVAL-YYYY-NNNN`) and the counts, and writes `evaluation.started` in the audit log as done by the platform. Options: `--configurations a,b`, `--tasks t1,t2`, `--data-class <class>`, `--tasks-dir <folder>`, `--json`. The budget is the evaluation's own: each run's virtual key is capped at what is left of it, and when it is used up the evaluation ends `stopped_budget`. Its cost is a separate line in the cost report, never inside an intent. People follow evaluations with `adlc eval list|show` and in the dashboard (Evaluations); the full report comes with L06. The tables `evaluations`, `evaluation_runs` and `evaluation_run_results` hold numbers and codes only: no prompt, task text or diff.
 
 **Logs.** `worker.evaluation_run_handed_over`, `worker.evaluation_requeued` (a run without a live workflow got its next attempt), `worker.evaluation_refused` (`reason`: `budget_used`, `tenant_budget_used`, `model_not_allowed`, `not_startable`), `worker.evaluation_failed` (`step`, an error code; a run that fails to be handed over five times in a row is cancelled with `prepare_failed`), and on the runner `runner.evaluation_started` and `runner.evaluation_ended`. A run lost with its runner is queued again and fails with `runner_lost` after three attempts.
 
 ## Evaluation plans (L05)
 
-Design: [ADR-M82](../../design/ADR-M82-evaluation-plans.md). People with a role in the project's `access.eval_roles` (default `person_a`, `person_b`, `governance`, `admin`; never `viewer`) make **evaluation plans** themselves, in the dashboard (Evaluations) or with `sdlc eval plan …`, instead of asking the operator. Each run of a plan is an evaluation of [Evaluations on the server](#evaluations-on-the-server-l04).
+Design: [ADR-M82](../../design/ADR-M82-evaluation-plans.md). People with a role in the project's `access.eval_roles` (default `person_a`, `person_b`, `governance`, `admin`; never `viewer`) make **evaluation plans** themselves, in the dashboard (Evaluations) or with `adlc eval plan …`, instead of asking the operator. Each run of a plan is an evaluation of [Evaluations on the server](#evaluations-on-the-server-l04).
 
 **What the deployment needs.** Everything of L04, and:
 - `pnpm db:migrate` (migrations `0031` and `0032`).
@@ -700,9 +700,9 @@ Design: [ADR-M85](../../design/ADR-M85-project-task-sets.md); usage: handbook Ch
 - At least one evaluation slot on the runner (`SDLC_RUNNER_MAX_EVAL_SANDBOXES` 1 or more). The check of a new task uses that slot, with no agent, no model and no cost; a real run takes the slot back.
 - A sandbox image (`sandbox.image` of the project configuration) that can install the project with `pnpm install --frozen-lockfile` through the package proxy. Other package managers fail the check with `install_failed`.
 
-**How it runs.** The worker's check loop (every `SDLC_WORKER_EVAL_TICK_SECONDS`) hands each registered task to the runner with a signed contract of kind `evaluation_task_check`. The runner scores twice: the commit before the change (the hidden tests must fail), then with the reference solution (everything must pass). A check that does not end is handed over again, at most 3 times (then `check_lost`). An evaluation of a plan on the task set `project` reads the cards on the default branch when it starts; each run starts at its own task's commit. `sdlc ops eval start` runs the numbered task sets only.
+**How it runs.** The worker's check loop (every `SDLC_WORKER_EVAL_TICK_SECONDS`) hands each registered task to the runner with a signed contract of kind `evaluation_task_check`. The runner scores twice: the commit before the change (the hidden tests must fail), then with the reference solution (everything must pass). A check that does not end is handed over again, at most 3 times (then `check_lost`). An evaluation of a plan on the task set `project` reads the cards on the default branch when it starts; each run starts at its own task's commit. `adlc ops eval start` runs the numbered task sets only.
 
-**Logs.** `worker.task_check_handed_over`, `worker.task_check_requeued`, `worker.task_check_refused` and `worker.task_check_failed` (codes and IDs only). The task's status and check code are in `sdlc eval task list`.
+**Logs.** `worker.task_check_handed_over`, `worker.task_check_requeued`, `worker.task_check_refused` and `worker.task_check_failed` (codes and IDs only). The task's status and check code are in `adlc eval task list`.
 
 ## Self-hosted model (operator)
 
@@ -779,7 +779,7 @@ Upgrade to a **release tag** (`vX.Y.Z`), and follow the "Upgrade notes" of every
 Before you start, let the running intents reach a gate: an intent that waits at a gate goes on after the upgrade, while a run that is going on may be refused by the new release (the Upgrade notes say when). `pnpm test:upgrade` runs these steps on a throw-away stack, from the previous release to the new one (section [Tests](#tests)).
 
 1. **Backup.** `pnpm backup` ([above](#backup-and-restore)), still on the old release. It holds OpenBao's snapshot, the way back after an OpenBao image change ([T11 §4b](../../handbook/03-templates/T11-openbao-runbook.md#4b-upgrading-the-openbao-image)).
-2. **The new release.** `git fetch --tags`, then `git checkout vX.Y.Z`, then `pnpm install && pnpm build`. Update the `sdlc` command of each person to the same version: `npm install -g agentic-sdlc-cli@<version>`.
+2. **The new release.** `git fetch --tags`, then `git checkout vX.Y.Z`, then `pnpm install && pnpm build`. Update the `adlc` command of each person to the same version: `npm install -g @hoanghainh/governed-adlc@<version>` (before v0.9.0: `agentic-sdlc-cli@<version>`).
 3. **New settings.** Add the keys that are new in `.env.example`; a line that is already in `.env` is never changed:
 
    ```bash
@@ -800,7 +800,7 @@ Before you start, let the running intents reach a gate: an intent that waits at 
 7. **Migrations.** `pnpm db:migrate` ([Fresh deployment, step 6](#6-database)); `pnpm db:status` lists no pending migration afterwards.
 8. **Credentials.** Run the `pnpm openbao:bootstrap …` commands that the first bullet of the Upgrade notes names, release by release, in their order (none when it says so). `configure` needs a root token: make one from two key shares with `pnpm openbao:bootstrap root-token` (`configure` revokes it again). The credentials commands take the admin token of [Fresh deployment, step 3](#3-openbao).
 9. **Start.** `platform/deploy/scripts/up.sh core models platform sandbox` ([step 7](#7-start-the-platform); add your optional profiles). It starts `sdlc-worker` and `sdlc-runner` together, from the same release.
-10. **Check.** `curl -s http://127.0.0.1:8090/health/ready`, no `…_missing` line in the logs ([Troubleshooting](#troubleshooting)), `pnpm sdlc ops audit verify` (the audit chain is intact), and the intents that waited at a gate go on (`pnpm sdlc intent show <INT-…>`). `pnpm doctor` checks the rest.
+10. **Check.** `curl -s http://127.0.0.1:8090/health/ready`, no `…_missing` line in the logs ([Troubleshooting](#troubleshooting)), `pnpm adlc ops audit verify` (the audit chain is intact), and the intents that waited at a gate go on (`pnpm adlc intent show <INT-…>`). `pnpm doctor` checks the rest.
 
 Never run `docker volume prune` or `docker system prune --volumes`: they delete the platform's data.
 
@@ -849,11 +849,11 @@ A tag (`0.2.0`, `sha-<commit>`) never moves, but use the digest anyway: the plat
 | `images.mode` | `pnpm images mode` (`local` or `published`) |
 | `access.proxy`, `access.tls_files`, `access.tls_expiry`, `access.tls_names`, `access.ports`, `access.public_origin`, `access.trusted_proxy` | Team access (V09): `sdlc-access` runs and is healthy; its CA and certificate in `SDLC_ACCESS_TLS_DIR`, their end dates (a warning within 30 days) and whether the certificate names `SDLC_ACCESS_HOSTNAME` and `SDLC_ACCESS_IPS` (never the key file); every published port of the project on `127.0.0.1` except the proxy's on `SDLC_ACCESS_BIND_ADDR` (a warning on `0.0.0.0`); `SDLC_API_PUBLIC_ORIGIN` is the proxy's origin; `SDLC_API_TRUSTED_PROXY` is the proxy's address. Without team access: one line says it is off, and the ports are still checked |
 
-**Read only.** It runs only the commands of its allowlist (`platform/deploy/doctor/src/commands.ts`): no `up`, `down`, `rm`, `prune`, no OpenBao command other than `status`, no SQL that writes. It prints no secret (never a token, key share, password or key) and works on a stopped or sealed stack: it says so instead of failing. It may run anywhere a person runs commands for the stack, including through Claude Code. Exit 0 when no check failed (warnings included), 1 when one did, 2 for a usage error. A person checks their own login with `sdlc doctor` (handbook Ch.19 §19.8c).
+**Read only.** It runs only the commands of its allowlist (`platform/deploy/doctor/src/commands.ts`): no `up`, `down`, `rm`, `prune`, no OpenBao command other than `status`, no SQL that writes. It prints no secret (never a token, key share, password or key) and works on a stopped or sealed stack: it says so instead of failing. It may run anywhere a person runs commands for the stack, including through Claude Code. Exit 0 when no check failed (warnings included), 1 when one did, 2 for a usage error. A person checks their own login with `adlc doctor` (handbook Ch.19 §19.8c).
 
 ## Troubleshooting
 
-Run `pnpm doctor` first ([Doctor](#doctor-pnpm-doctor)): it checks the rows of this table and prints the fix. A person's own login and the API: `sdlc doctor`.
+Run `pnpm doctor` first ([Doctor](#doctor-pnpm-doctor)): it checks the rows of this table and prints the fix. A person's own login and the API: `adlc doctor`.
 
 | You see | Cause | Do |
 |---|---|---|
@@ -901,7 +901,7 @@ This deletes every intent, the evidence, the audit log and the secrets. Keep a b
 | `pnpm test:runner-compose` | The `sdlc-runner` container in the profile `sandbox` on a throw-away Compose project: `runner-credentials`, socket proxy, clean-up at start, health check, no secret in the container. About 1 minute | Yes |
 | `pnpm test:sandbox-image` | Builds the sandbox images `node24` and `node24-opencode` and runs them hardened with the real Verdaccio: Node 24, pnpm through corepack and the proxy, no other way out. Needs internet | Yes |
 | `pnpm test:observability` | A08 AC3: `core + models + observability` on a throw-away Compose project (ports +27000) with a stub model and throw-away OpenBao keys. One model call through LiteLLM must give a Langfuse trace with all seven labels; a span of a platform process must reach Langfuse through the collector; the collector has no host port. About 2 minutes | Yes |
-| `pnpm test:fresh-deploy` | E07 AC3: follows the section [Fresh deployment](#fresh-deployment-operator) on a throw-away Compose project (ports +31000, throw-away keys): `compose:env`, OpenBao init, unseal and configure, the shared secrets, every credentials command, the migrations, `up.sh core models platform sandbox`, `ops bootstrap`, the team, the sandbox image, the agent, the configuration, the AI record and the first intent at G1, then `sdlc audit verify`. CI: weekly and manual runs only. Prints `e07:fresh_deploy_seconds` | Yes |
+| `pnpm test:fresh-deploy` | E07 AC3: follows the section [Fresh deployment](#fresh-deployment-operator) on a throw-away Compose project (ports +31000, throw-away keys): `compose:env`, OpenBao init, unseal and configure, the shared secrets, every credentials command, the migrations, `up.sh core models platform sandbox`, `ops bootstrap`, the team, the sandbox image, the agent, the configuration, the AI record and the first intent at G1, then `adlc audit verify`. CI: weekly and manual runs only. Prints `e07:fresh_deploy_seconds` | Yes |
 | `pnpm test:upgrade` | O02: follows the section [Upgrade](#upgrade) on a throw-away Compose project (ports +34000, throw-away keys): the previous release (a git worktree of its tag, its published images by digest) deployed like [Fresh deployment](#fresh-deployment-operator) with an intent waiting at G1, then the ten steps to this checkout (or `SDLC_UPGRADE_TO=<tag>`) with the credentials commands of the Upgrade notes; the intent goes on to G2, a new intent reaches G1, and the audit chain verifies. Needs `age` and the release tags. About 15 minutes between two releases with published images. CI: weekly and manual runs only. Prints `o02:upgrade_seconds` | Yes |
-| `pnpm test:access` | V09: the profile `access` on a throw-away Compose project (ports +36000, throw-away OpenBao keys and CA): from a container on another network only the proxy answers, TLS verified with the CA and refused without it, the routes (`/health/ready` included), plain HTTP `400`, another host `421`, a large body `413`, the headers and the dashboard's CSP unchanged, the proxy's rate limit, a forged `X-Forwarded-For` does not escape the api's limit, the proxy cannot reach PostgreSQL, OpenBao or SeaweedFS, `sdlc whoami` through it, a renewal without a restart. A few minutes | Yes |
+| `pnpm test:access` | V09: the profile `access` on a throw-away Compose project (ports +36000, throw-away OpenBao keys and CA): from a container on another network only the proxy answers, TLS verified with the CA and refused without it, the routes (`/health/ready` included), plain HTTP `400`, another host `421`, a large body `413`, the headers and the dashboard's CSP unchanged, the proxy's rate limit, a forged `X-Forwarded-For` does not escape the api's limit, the proxy cannot reach PostgreSQL, OpenBao or SeaweedFS, `adlc whoami` through it, a renewal without a restart. A few minutes | Yes |
 | `pnpm test:compose` | Starts `core`, then `core + observability`, with a throw-away env file, its own project name and ports shifted by 20000. Checks health, databases, namespace, buckets, Valkey policy, OpenBao state, Langfuse sign-up and trace upload. Removes everything afterwards. Takes about 2–5 minutes | Yes |

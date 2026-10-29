@@ -41,8 +41,8 @@ function world() {
   fs.writeFileSync(path.join(deploy, 'trial-openbao-keys.age'), 'ciphertext', { mode: 0o600 });
   const other = path.join(deploy, 'other-file');
   fs.writeFileSync(other, 'keep me');
-  const credA = path.join(root, 'a/sdlc/credentials.json');
-  const credB = path.join(root, 'b/sdlc/credentials.json');
+  const credA = path.join(root, 'a/adlc/credentials.json');
+  const credB = path.join(root, 'b/adlc/credentials.json');
   for (const f of [credA, credB]) fs.mkdirSync(path.dirname(f), { recursive: true });
   fs.writeFileSync(credA, login(`${API}/`));
   fs.writeFileSync(credB, login('https://sdlc.other-company.example'));

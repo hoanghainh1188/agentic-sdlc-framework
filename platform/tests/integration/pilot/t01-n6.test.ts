@@ -10,7 +10,7 @@
 // - E07 AC1 (D-02 §10 items 1–4 and 6): the same intent goes on through G7 (Person B's review of
 //   the pushed commit, then Person B merges on the Git host: the platform never merges), G8 (the
 //   worker builds the release pack, Person B approves the release on the CLI), the sealed pack
-//   and `done`; then `sdlc audit verify` passes, no agent decided any gate, and every model call
+//   and `done`; then `adlc audit verify` passes, no agent decided any gate, and every model call
 //   the stub model counted has one labelled cost record (the run-end sync, C12).
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
@@ -305,7 +305,7 @@ describePilot(
       expect(manifest.cost.calls).toBe(calls);
       expect(Number(manifest.cost.cost_usd)).toBeGreaterThan(0);
 
-      // Item 4: the tenant admin's `sdlc audit verify` finds the chain intact (exit 0).
+      // Item 4: the tenant admin's `adlc audit verify` finds the chain intact (exit 0).
       const chain = await s.cliJson<{ ok: boolean; checked: number; broken: unknown }>('admin', [
         'audit',
         'verify',

@@ -1,4 +1,4 @@
-// `sdlc intent …` and `sdlc gate …` against a mocked API (B04 AC1–AC3, FR-20).
+// `adlc intent …` and `adlc gate …` against a mocked API (B04 AC1–AC3, FR-20).
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -25,7 +25,7 @@ const CREATE = [
   'internal',
 ];
 
-describe('sdlc intent create', () => {
+describe('adlc intent create', () => {
   it('posts the intent and prints the summary', async () => {
     const h = await harness({
       routes: { 'POST /v1/intents': { status: 201, body: intentBody() } },
@@ -134,7 +134,7 @@ describe('sdlc intent create', () => {
   });
 });
 
-describe('sdlc intent list and show', () => {
+describe('adlc intent list and show', () => {
   it('lists with filters and shows the next cursor', async () => {
     const h = await harness({
       routes: {
@@ -262,7 +262,7 @@ describe('sdlc intent list and show', () => {
   });
 });
 
-describe('sdlc gate', () => {
+describe('adlc gate', () => {
   const PATH = 'POST /v1/intents/INT-2026-0007/gates/G2/decisions';
 
   it.each([

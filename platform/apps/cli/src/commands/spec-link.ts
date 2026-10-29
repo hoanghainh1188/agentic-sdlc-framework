@@ -1,5 +1,5 @@
-// The spec link request and its output, shared by `sdlc spec link` (B08) and
-// `sdlc intent create --spec` (U03): one validation, one body, one way to print the result.
+// The spec link request and its output, shared by `adlc spec link` (B08) and
+// `adlc intent create --spec` (U03): one validation, one body, one way to print the result.
 import { SPEC_SOURCE_TOOLS } from '@sdlc/core';
 
 import { linkedSpecSchema } from '../api/schemas.js';

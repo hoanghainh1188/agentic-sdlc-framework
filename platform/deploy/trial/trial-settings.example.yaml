@@ -37,12 +37,12 @@ people:
     name: Person A
     github_id: 1000001
     github_login: your-login
-    # Person A's config folder (XDG_CONFIG_HOME): the login is saved in <folder>/sdlc/credentials.json.
+    # Person A's config folder (XDG_CONFIG_HOME): the login is saved in <folder>/adlc/credentials.json.
     config_home: ~/.config
   person_b:
     email: b@example.com
     name: Person B
     github_id: 1000002
     github_login: second-login
-    # Another folder: run Person B's commands as XDG_CONFIG_HOME=<folder> pnpm sdlc …
+    # Another folder: run Person B's commands as XDG_CONFIG_HOME=<folder> pnpm adlc …
     config_home: ~/.config/sdlc-trial-person-b

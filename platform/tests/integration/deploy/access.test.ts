@@ -315,7 +315,7 @@ async function forgedRun() {
       ],
       ctx,
     );
-    if (code !== 0) throw new Error('sdlc ops bootstrap failed');
+    if (code !== 0) throw new Error('adlc ops bootstrap failed');
     apiToken = keep((JSON.parse(out.join('\n')) as { token: string }).token);
 
     ok(

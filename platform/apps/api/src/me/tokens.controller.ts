@@ -1,5 +1,5 @@
 // The caller's own personal API tokens (task B13 AC5, ADR-M37 §2.8). `DELETE current` revokes the
-// token of this request: `sdlc logout` calls it before it deletes the saved login (ADR-M36 §4).
+// token of this request: `adlc logout` calls it before it deletes the saved login (ADR-M36 §4).
 // A new token is in the response body once and never logged.
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post } from '@nestjs/common';
 import { issueTokenFor, listTokensOf, revokeTokenOf } from '@sdlc/core';

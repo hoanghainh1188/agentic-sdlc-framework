@@ -1,5 +1,5 @@
-// `sdlc audit verify` through the API for tenant admins (task B13 AC5, ADR-M37 §2.8). The
-// operator keeps the database path (`sdlc ops audit verify`) for when the API is down.
+// `adlc audit verify` through the API for tenant admins (task B13 AC5, ADR-M37 §2.8). The
+// operator keeps the database path (`adlc ops audit verify`) for when the API is down.
 import type { ChainState } from '../audit/hash-chain.js';
 import type { TenantScope } from '../db/tenant-scope.js';
 import { assertTenantAdmin, type AdminActor } from './actor.js';

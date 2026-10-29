@@ -1,7 +1,10 @@
-// The saved login of `sdlc login` (design/ADR-M36 §2.1): `<config>/sdlc/credentials.json`, where
+// The saved login of `adlc login` (design/ADR-M36 §2.1): `<config>/adlc/credentials.json`, where
 // <config> is $XDG_CONFIG_HOME or ~/.config. The token is stored in plain text, so the folder is
 // mode 700 and the file mode 600, written through a temporary file that is never readable by
 // others; a file that group or others can read is refused, like ssh does.
+// ADR-M100 §2.3: until the new file exists, the login of the old command, `<config>/sdlc/`, is read
+// with the same checks, so nobody logs in again; a save writes the new folder only, and a logout
+// deletes both.
 import { randomBytes } from 'node:crypto';
 import { constants } from 'node:fs';
 import { chmod, lstat, mkdir, open, readdir, rename, unlink } from 'node:fs/promises';
@@ -39,24 +42,47 @@ const fileSchema = z.strictObject({
   token: z.string().max(128),
 });
 
-/** The folder of the saved login, from the environment. Undefined: no usable home folder. */
-export function credentialsDir(env: Readonly<Record<string, string | undefined>>): string {
+const FOLDER = 'adlc';
+/** The folder of the command `sdlc` before v0.9.0 (ADR-M100 §2.3): read only, never written. */
+const LEGACY_FOLDER = 'sdlc';
+const FILE_NAME = 'credentials.json';
+
+/** $XDG_CONFIG_HOME or ~/.config. Throws when there is no usable home folder. */
+function configHome(env: Readonly<Record<string, string | undefined>>): string {
   const xdg = env.XDG_CONFIG_HOME;
-  if (xdg !== undefined && xdg !== '' && isAbsolute(xdg)) return join(xdg, 'sdlc');
+  if (xdg !== undefined && xdg !== '' && isAbsolute(xdg)) return xdg;
   const home = env.HOME;
-  if (home !== undefined && home !== '' && isAbsolute(home)) return join(home, '.config', 'sdlc');
+  if (home !== undefined && home !== '' && isAbsolute(home)) return join(home, '.config');
   throw new CredentialsError('no_config_dir', '');
 }
 
-export function credentialsPath(env: Readonly<Record<string, string | undefined>>): string {
-  return join(credentialsDir(env), 'credentials.json');
+/** The folder of the saved login, from the environment. */
+export function credentialsDir(env: Readonly<Record<string, string | undefined>>): string {
+  return join(configHome(env), FOLDER);
 }
 
-/** Reads the saved login. Undefined when there is none. Throws `CredentialsError` when unsafe. */
+/** The folder of the old command's saved login (ADR-M100 §2.3). */
+export function legacyCredentialsDir(env: Readonly<Record<string, string | undefined>>): string {
+  return join(configHome(env), LEGACY_FOLDER);
+}
+
+export function credentialsPath(env: Readonly<Record<string, string | undefined>>): string {
+  return join(credentialsDir(env), FILE_NAME);
+}
+
+/**
+ * Reads the saved login: the new file, or the old command's file while the new one does not exist.
+ * Undefined when there is none. Throws `CredentialsError` when unsafe.
+ */
 export async function readSavedLogin(
   env: Readonly<Record<string, string | undefined>>,
 ): Promise<SavedLogin | undefined> {
-  const path = credentialsPath(env);
+  const current = await readLoginFile(credentialsPath(env));
+  if (current !== undefined) return current;
+  return readLoginFile(join(legacyCredentialsDir(env), FILE_NAME));
+}
+
+async function readLoginFile(path: string): Promise<SavedLogin | undefined> {
   let handle;
   try {
     // O_NOFOLLOW: a symbolic link is refused (ELOOP); the checks below run on the opened file.
@@ -104,7 +130,7 @@ export async function writeSavedLogin(
   if (!stats.isDirectory()) throw new CredentialsError('not_a_file', dir);
   if (!ownedByMe(stats.uid)) throw new CredentialsError('not_owner', dir);
   await chmod(dir, DIR_MODE);
-  const path = join(dir, 'credentials.json');
+  const path = join(dir, FILE_NAME);
   const temp = join(dir, `.credentials.${randomBytes(8).toString('hex')}.tmp`);
   const body = `${JSON.stringify({ version: 1, api_url: login.apiUrl, token: login.token }, null, 2)}\n`;
   const handle = await open(temp, 'wx', FILE_MODE);
@@ -123,11 +149,21 @@ export async function writeSavedLogin(
   return path;
 }
 
-/** Deletes the saved login, and temporary files a killed `sdlc login` left. False: there was none. */
+/**
+ * Deletes the saved login in the new and the old folder (ADR-M100 §2.3), and temporary files a
+ * killed `adlc login` left. False: there was none.
+ */
 export async function deleteSavedLogin(
   env: Readonly<Record<string, string | undefined>>,
 ): Promise<boolean> {
-  const dir = credentialsDir(env);
+  const deleted = await Promise.all([
+    deleteLoginIn(credentialsDir(env)),
+    deleteLoginIn(legacyCredentialsDir(env)),
+  ]);
+  return deleted.includes(true);
+}
+
+async function deleteLoginIn(dir: string): Promise<boolean> {
   const names = await readdir(dir).catch((error: unknown) => {
     if (isNotFound(error)) return [] as string[];
     throw error;
@@ -136,7 +172,7 @@ export async function deleteSavedLogin(
     names.filter((name) => TEMP_FILE.test(name)).map((name) => unlink(join(dir, name))),
   );
   try {
-    await unlink(join(dir, 'credentials.json'));
+    await unlink(join(dir, FILE_NAME));
     return true;
   } catch (error) {
     if (isNotFound(error)) return false;

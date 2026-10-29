@@ -1,5 +1,5 @@
-// What `sdlc admin project apply` leaves to people, per person (task V17 AC5, QUESTIONS #617 (5)):
-// tokens stay with `sdlc admin token issue` (shown once), the agent's owner and Person B each
+// What `adlc admin project apply` leaves to people, per person (task V17 AC5, QUESTIONS #617 (5)):
+// tokens stay with `adlc admin token issue` (shown once), the agent's owner and Person B each
 // approve the agent (handbook Ch.20 §20.5b), Person A writes the project AI record, and a role the
 // operator would give themselves goes to another admin or the platform operator.
 import type { MessageKey } from '@sdlc/messages';

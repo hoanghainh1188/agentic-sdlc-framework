@@ -1,4 +1,4 @@
-// `sdlc plan submit|list|show` (B09 AC2, ADR-M40 §2.3) against a mocked API: the request carries
+// `adlc plan submit|list|show` (B09 AC2, ADR-M40 §2.3) against a mocked API: the request carries
 // the commit only when given (the platform reads the file `.sdlc/plans/<INT>.yaml` from the Git
 // host); refusals come back with their code and reason; the token never reaches the output.
 import { t } from '@sdlc/messages';
@@ -12,7 +12,7 @@ const harness = useHarness();
 const PATH = '/v1/intents/INT-2026-0007/plans';
 const COMMIT = 'e'.repeat(40);
 
-describe('sdlc plan', () => {
+describe('adlc plan', () => {
   it('submits the plan file at a commit', async () => {
     const h = await harness({
       routes: { [`POST ${PATH}`]: { status: 201, body: submittedPlanBody() } },

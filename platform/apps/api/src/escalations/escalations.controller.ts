@@ -1,5 +1,5 @@
 // Escalation endpoints (D-08 B11 AC5, design/ADR-M28 §2.7). Every handler works on the caller's
-// tenant scope. The CLI commands `sdlc escalation …` come with B04 (QUESTIONS #77).
+// tenant scope. The CLI commands `adlc escalation …` come with B04 (QUESTIONS #77).
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
 
 import { SessionAction } from '../auth/auth.guard.js';

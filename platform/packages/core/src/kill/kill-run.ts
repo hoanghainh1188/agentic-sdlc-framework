@@ -5,7 +5,7 @@
 // the workflow act on it:
 // - who: config `access.kill_roles` (Person A, Person B and governance always, rule M25; never
 //   `viewer`). The producer of the run may kill it: killing is containment, never an approval
-//   (QUESTIONS #180). An operator kills as `system` (`sdlc ops run kill`);
+//   (QUESTIONS #180). An operator kills as `system` (`adlc ops run kill`);
 // - a `queued` run (no runner took it) ends `stopped_killed` at once; a run a runner holds
 //   (`provisioning`, `running`) goes to `stopping` with `killed_by`. The runner sees `stopping`
 //   within one poll, stops the agent (interrupt, then kill), ends the run `stopped_killed` and

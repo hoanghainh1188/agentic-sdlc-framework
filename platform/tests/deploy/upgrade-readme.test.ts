@@ -79,8 +79,8 @@ describe('O02 AC2: README "Upgrade" and the live test', () => {
       ['Start', 'up.sh core models platform sandbox', 'current.up()'],
       ['Check', '/health/ready', '/health/ready'],
       ['Check', '_missing', "endsWith('_missing')"],
-      ['Check', 'pnpm sdlc ops audit verify', "['ops', 'audit', 'verify']"],
-      ['Check', 'pnpm sdlc intent show', "'gate', 'approve', 'G1'"],
+      ['Check', 'pnpm adlc ops audit verify', "['ops', 'audit', 'verify']"],
+      ['Check', 'pnpm adlc intent show', "'gate', 'approve', 'G1'"],
     ];
     for (const [name, inReadme, inLive] of pairs) {
       expect(stepText(name), `${name}: ${inReadme}`).toContain(inReadme);

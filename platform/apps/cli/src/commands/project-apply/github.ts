@@ -1,4 +1,4 @@
-// The numeric GitHub account ID of a login, for `sdlc admin project apply` (task V17 AC2). The login
+// The numeric GitHub account ID of a login, for `adlc admin project apply` (task V17 AC2). The login
 // is only a help at setup time: the platform matches people by the numeric ID (R037). The lookup
 // is the public `GET /users/<login>` of the GitHub API, without a token; TLS checks stay on and a
 // redirect (a renamed login) is refused, so the operator always confirms the ID of the login typed.

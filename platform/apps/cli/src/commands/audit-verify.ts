@@ -1,6 +1,6 @@
-// `sdlc ops audit verify` (D-02 FR-41, D-08 A07 AC4, design/D-05 section 7.3): the operator's
+// `adlc ops audit verify` (D-02 FR-41, D-08 A07 AC4, design/D-05 section 7.3): the operator's
 // check on the server, straight on the platform database as `platform_app` (SDLC_DB_URL), for
-// every tenant or one. Tenant admins use `sdlc audit verify` through the API (B13, ADR-M37 §2.8;
+// every tenant or one. Tenant admins use `adlc audit verify` through the API (B13, ADR-M37 §2.8;
 // audit-verify-api.ts); this stays for when the API is down.
 import { parseArgs } from 'node:util';
 

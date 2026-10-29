@@ -119,7 +119,7 @@ describe('U08: the plan commit and the L1 proposal (AC2)', () => {
 
   it('the proposal is saved with the CLI, never downloaded by the page', () => {
     expect(proposalCommand('INT-7', 'r-1')).toBe(
-      'sdlc evidence proposal INT-7 --run r-1 --output <file>',
+      'adlc evidence proposal INT-7 --run r-1 --output <file>',
     );
     const page = fs.readFileSync(path.join(dashboardSrc, 'views/IntentDetail.tsx'), 'utf8');
     expect(page).not.toMatch(/\/proposal\b/);

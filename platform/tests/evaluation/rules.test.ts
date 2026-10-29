@@ -219,7 +219,7 @@ describe('the audit events of an evaluation hold IDs and codes only', () => {
   });
 });
 
-describe('sdlc ops eval start: arguments', () => {
+describe('adlc ops eval start: arguments', () => {
   const base = [
     'start',
     '--tenant',

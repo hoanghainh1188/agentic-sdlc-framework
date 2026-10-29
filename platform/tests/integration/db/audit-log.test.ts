@@ -1,5 +1,5 @@
 // D-08 A07 on a live PostgreSQL: append-only audit log (AC1), per-tenant hash chain (AC2),
-// concurrent writers (AC3), `sdlc audit verify` detects a modified record (AC4), audited config
+// concurrent writers (AC3), `adlc audit verify` detects a modified record (AC4), audited config
 // and AI record saves, and QUESTIONS #12 (a revoked role binding never changes again).
 import { createHash } from 'node:crypto';
 
@@ -235,7 +235,7 @@ describeDb('A07: audit log on PostgreSQL', () => {
     }, 30_000);
   });
 
-  describe('AC4: sdlc audit verify detects a modified record', () => {
+  describe('AC4: adlc audit verify detects a modified record', () => {
     it('reports an intact chain with exit code 0', async () => {
       const s = await seed();
       await appendMany(s, 3);

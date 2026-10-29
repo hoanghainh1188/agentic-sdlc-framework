@@ -1,4 +1,4 @@
-// `sdlc evidence build|list|show|export` (E02 AC1–AC4, D-02 FR-40, FR-42, ADR-M48) against a
+// `adlc evidence build|list|show|export` (E02 AC1–AC4, D-02 FR-40, FR-42, ADR-M48) against a
 // mocked API: the right endpoints, a new version or an unchanged one, the latest version by
 // default, the exported file checked against its SHA-256 before it is printed or saved, never an
 // overwritten file, refusals with their code, and the usage.
@@ -16,7 +16,7 @@ const harness = useHarness();
 const BASE = '/v1/intents/INT-2026-0007/evidence-packs';
 const MD = '# Evidence Pack INT\\-2026\\-0007 (version 2)\n\n## Intent\n';
 
-describe('sdlc evidence', () => {
+describe('adlc evidence', () => {
   it('build: POST, and says whether a new version was made', async () => {
     const h = await harness({
       routes: {

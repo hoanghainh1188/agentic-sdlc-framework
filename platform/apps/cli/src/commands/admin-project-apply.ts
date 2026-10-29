@@ -1,5 +1,5 @@
-// `sdlc admin project apply --file project.yaml [--dry-run] [--yes]` (task V17, QUESTIONS #617):
-// a project and its team from one file, instead of about 15 `sdlc admin` commands (deploy README
+// `adlc admin project apply --file project.yaml [--dry-run] [--yes]` (task V17, QUESTIONS #617):
+// a project and its team from one file, instead of about 15 `adlc admin` commands (deploy README
 // steps 9–12). Order: read and check the file → look up each GitHub login's numeric ID → read the
 // platform's state → check the whole file, M21 included, against the file and the bindings
 // already in the database → show the changes → confirm → one API call per change → print, per

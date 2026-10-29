@@ -1,4 +1,4 @@
-// Reading and checking the project file of `sdlc admin project apply` (task V17 AC1, AC3). Every
+// Reading and checking the project file of `adlc admin project apply` (task V17 AC1, AC3). Every
 // check here runs before the first API call that writes; a problem is a `Refusal` (a catalog key
 // and its values), and all of them are printed together.
 import { createHash } from 'node:crypto';

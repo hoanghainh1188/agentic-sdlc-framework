@@ -6,7 +6,7 @@
 //   evaluation costs never appear in the cost report of intents;
 // - AC4 data classes: `prohibited` never, the project's AI record decides, `client_restricted` goes
 //   to self-hosted models only, a model the policy does not allow is refused;
-// - `sdlc ops eval start` queues an evaluation as the system, with an audit event of IDs and codes.
+// - `adlc ops eval start` queues an evaluation as the system, with an audit event of IDs and codes.
 import path from 'node:path';
 
 import { createSimplePolicyEngine } from '@sdlc/adapter-policy-simple';
@@ -571,7 +571,7 @@ describeDb('L04 PR 3: evaluations on PostgreSQL', () => {
     });
   });
 
-  describe('sdlc ops eval start (QUESTIONS #464)', () => {
+  describe('adlc ops eval start (QUESTIONS #464)', () => {
     async function cli(argv: string[]) {
       const out: string[] = [];
       const err: string[] = [];

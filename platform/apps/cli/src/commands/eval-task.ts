@@ -1,4 +1,4 @@
-// `sdlc eval task …`: a project's own evaluation tasks (task L07, design/ADR-M85 §2.2, §2.6).
+// `adlc eval task …`: a project's own evaluation tasks (task L07, design/ADR-M85 §2.2, §2.6).
 // - `draft <INT-…> --project <slug> --task <id> [--output <file>] [--force]`: asks the API for the
 //   facts of the merged intent and writes the card on this machine (default
 //   `.sdlc/eval-tasks/<id>.yaml` in the repository folder). Nothing is sent back: the person adds the

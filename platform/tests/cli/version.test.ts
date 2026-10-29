@@ -1,4 +1,4 @@
-// `sdlc --version` (task V05): the platform version, the same in a checkout and in the npm package.
+// `adlc --version` (task V05): the platform version, the same in a checkout and in the npm package.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -23,7 +23,7 @@ function context() {
   return { ctx, out, err };
 }
 
-describe('sdlc --version', () => {
+describe('adlc --version', () => {
   it.each(['--version', '-V'])('%s prints the platform version and exits 0', async (flag) => {
     const { ctx, out, err } = context();
     expect(await runCli([flag], ctx)).toBe(EXIT.ok);
@@ -39,7 +39,7 @@ describe('sdlc --version', () => {
   });
 
   it('cli.usage names it', () => {
-    expect(t('cli.usage')).toMatch(/^ {2}sdlc --version /m);
+    expect(t('cli.usage')).toMatch(/^ {2}adlc --version /m);
   });
 
   it('equals the version of the root package.json', () => {

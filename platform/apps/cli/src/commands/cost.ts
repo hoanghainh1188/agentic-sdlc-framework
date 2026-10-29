@@ -1,4 +1,4 @@
-// `sdlc cost report` over the API (task E04, D-08 E04 AC1, AC2, D-02 FR-53, ADR-M45, handbook
+// `adlc cost report` over the API (task E04, D-08 E04 AC1, AC2, D-02 FR-53, ADR-M45, handbook
 // Ch.19 §19.8c). The whole tenant needs a tenant admin; `--project` or `--intent` needs a role in
 // project config `access.cost_read_roles` (never `viewer`). The range is half-open UTC
 // [--from, --to); default: the current UTC month. Money is printed as the API sends it (decimal

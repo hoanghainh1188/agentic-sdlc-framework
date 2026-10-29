@@ -1,4 +1,4 @@
-// The changes `sdlc admin project apply` makes, from the file and the platform's current state
+// The changes `adlc admin project apply` makes, from the file and the platform's current state
 // (task V17 AC3–AC5). Pure: no API call. A `Write` is one call to the same endpoint as the manual
 // command; a `Note` is a difference the command shows but never changes (a role the file does not
 // list, a changed agent, a role the operator cannot give themselves). The separation-of-duties

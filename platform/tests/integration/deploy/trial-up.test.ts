@@ -76,7 +76,7 @@ describe.skipIf(!enabled)(
         );
       });
 
-    /** `sdlc …` as a person: the saved login of their config folder, nothing else. */
+    /** `adlc …` as a person: the saved login of their config folder, nothing else. */
     async function sdlc(
       configHome: string,
       argv: readonly string[],
@@ -151,7 +151,7 @@ describe.skipIf(!enabled)(
       expect(up.output).not.toContain('PRIVATE KEY');
       expect(up.output).not.toContain(passphrase);
       for (const dir of [configA, configB]) {
-        const file = path.join(dir, 'sdlc', 'credentials.json');
+        const file = path.join(dir, 'adlc', 'credentials.json');
         expect(fs.statSync(file).mode & 0o777, file).toBe(0o600);
         expect(fs.statSync(path.dirname(file)).mode & 0o777).toBe(0o700);
       }

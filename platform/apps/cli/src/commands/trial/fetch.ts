@@ -1,4 +1,4 @@
-// Step 1 of `sdlc trial report` (task V01, ADR-M65 §2.2): reads the API with the existing GET
+// Step 1 of `adlc trial report` (task V01, ADR-M65 §2.2): reads the API with the existing GET
 // endpoints only. The answers are raw: they hold slugs, codes, titles and IDs, and never leave
 // this process; `build.ts` copies only the allowed fields out of them.
 //

@@ -1,5 +1,5 @@
 // Task L07 (ADR-M85 §2.4): `evaluation.tasks` names the hidden tests of a merged pull request and
-// the commands `sdlc eval task draft` proposes. Globs stay inside the repository; commands are
+// the commands `adlc eval task draft` proposes. Globs stay inside the repository; commands are
 // plain words for `sh -c` in the scoring container (no shell syntax).
 import { describe, expect, it } from 'vitest';
 

@@ -362,7 +362,7 @@ jobs:
       # runner-credentials, clean-up at start), on its own throw-away Compose project.
       - run: pnpm test:runner-compose
       # B03: the sdlc-api image, its database password from OpenBao (api-credentials) and a token
-      # from `sdlc admin bootstrap`, on its own throw-away Compose project (throw-away test keys).
+      # from `adlc admin bootstrap`, on its own throw-away Compose project (throw-away test keys).
       - run: pnpm test:api
       # V09: team access through the TLS proxy (profile access): from another network only the
       # proxy answers, TLS, routes, limits, headers; own throw-away project and throw-away CA.

@@ -1,4 +1,4 @@
-// `sdlc admin tool …`: the tool register through the API (task X04, ADR-M69 §2.2). A tool is
+// `adlc admin tool …`: the tool register through the API (task X04, ADR-M69 §2.2). A tool is
 // activated or retired only by approvals: `approve --as <capacity>`; the approval that completes a
 // set (the owner and Person B, or the owner and governance) changes the status. `--owner` takes a
 // user ID or an e-mail address.

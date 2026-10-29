@@ -4,7 +4,7 @@
 // One anchor per tenant and UTC day, at `<tenant id>/<YYYY-MM-DD>.json` in the bucket
 // `audit-anchors` (object lock COMPLIANCE): the RFC 8785 canonical JSON of
 // `{anchored_at, hash, hash_version, seq, tenant_id}` of the tenant's last audit row. If someone
-// with database access rewrites a whole chain (`sdlc audit verify` then passes), an older anchor
+// with database access rewrites a whole chain (`adlc audit verify` then passes), an older anchor
 // no longer matches the row at its `seq`.
 import { canonicalJson } from '@sdlc/config';
 

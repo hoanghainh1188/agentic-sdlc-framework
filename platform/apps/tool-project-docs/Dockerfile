@@ -2,7 +2,7 @@
 # Image of the first register tool, `read_documents` (task X04 PR 3b, design/ADR-M89, ADR-M69 §2.4).
 # Build context: the repo root.
 #   pnpm tool-image:build project-docs          # local build, prints the image by digest
-# A tenant registers the image by digest (`sdlc admin tool register … --image-digest sha256:…`).
+# A tenant registers the image by digest (`adlc admin tool register … --image-digest sha256:…`).
 # The runner starts it as user 10001, with a read-only root, no capability and no environment value;
 # the health check below is required (the runner waits for "healthy").
 

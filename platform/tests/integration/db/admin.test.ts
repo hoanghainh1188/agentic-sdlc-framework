@@ -1,6 +1,6 @@
 // B03 operator commands on a live PostgreSQL (QUESTIONS.md #58, #63; ADR-M26 section 2.2):
-// `sdlc admin bootstrap` creates a tenant, its first user and token once, with audit events;
-// `sdlc admin token issue|list|revoke` manage tokens. The raw token is printed once and stored
+// `adlc admin bootstrap` creates a tenant, its first user and token once, with audit events;
+// `adlc admin token issue|list|revoke` manage tokens. The raw token is printed once and stored
 // only as its SHA-256 hash; audit payloads never hold names, e-mail addresses or tokens.
 import { createHash } from 'node:crypto';
 
@@ -14,7 +14,7 @@ import { createTestDatabase, describeDb, urlFor, type TestDatabase } from './hel
 
 const TOKEN = /sdlc_pat_[A-Za-z0-9_-]{43}/g;
 
-describeDb('B03: sdlc admin on PostgreSQL', () => {
+describeDb('B03: adlc admin on PostgreSQL', () => {
   let db: TestDatabase;
 
   beforeAll(async () => {

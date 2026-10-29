@@ -22,7 +22,7 @@ export interface SaveProjectAiRecord extends AiRecordContent {
   readonly expectedVersion: number;
   /**
    * Who records the change in the audit log: `human` (the API: `updatedBy` is the logged-in
-   * user) or `system` (the operator's `sdlc admin ai-record` command, on behalf of `updatedBy`).
+   * user) or `system` (the operator's `adlc admin ai-record` command, on behalf of `updatedBy`).
    */
   readonly actorType: 'human' | 'system';
   /** Today (`YYYY-MM-DD`, UTC) for the confirmation-date check. Default: the current date. */

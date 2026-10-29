@@ -1,4 +1,4 @@
-// `sdlc ops tenant-admin grant|revoke|list` and `sdlc ops role grant|revoke` (task B13,
+// `adlc ops tenant-admin grant|revoke|list` and `adlc ops role grant|revoke` (task B13,
 // QUESTIONS #151, ADR-M37 §2.2): role changes on the server, for a tenant with one admin (nobody
 // grants a role to themselves through the API) or to recover a tenant that lost its admins.
 // Audited as actor `system`. The other rules still hold: conflicting roles (rule M21), active

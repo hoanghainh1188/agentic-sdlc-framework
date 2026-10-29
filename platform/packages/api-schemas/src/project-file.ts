@@ -1,4 +1,4 @@
-// The project file of `sdlc admin project apply --file project.yaml` (task V17, QUESTIONS #617):
+// The project file of `adlc admin project apply --file project.yaml` (task V17, QUESTIONS #617):
 // a project, its team, the agent to register and the project configuration that differs from the
 // defaults. Every object is strict: an unknown key is refused, so a token, a key or a password
 // cannot be added to the file by mistake. The file lives outside the application repository.

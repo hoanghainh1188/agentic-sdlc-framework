@@ -77,18 +77,18 @@ Before the platform: a table in the repository (`docs/agents/register.md`), revi
 
 ### 20.5b. The agent register on the platform
 
-The platform keeps the register in its database. Only an agent that is registered and **active** may run (D-02 FR-36). People change the register through the platform with `sdlc admin agent …` (or the API, `/v1/admin/agents`). The platform checks who may do each step (§20.11) and records every step in the audit log with the person who did it.
+The platform keeps the register in its database. Only an agent that is registered and **active** may run (D-02 FR-36). People change the register through the platform with `adlc admin agent …` (or the API, `/v1/admin/agents`). The platform checks who may do each step (§20.11) and records every step in the audit log with the person who did it.
 
 | Step (stage) | Command | Who |
 |---|---|---|
-| Register (stage 2) | `sdlc admin agent register --key coder-openhands --version 1.0.0 --owner <email> --model claude-haiku-4-5-20251001 --instructions AGENTS.md@v5 --instructions-file AGENTS.md --tools file_editor,terminal --max-autonomy L2 --environments sandbox [--adapter openhands]` (without `sandbox` the agent can never run; `--adapter` names the agent software that runs it, default `openhands`) | A tenant admin, who names the technical owner |
-| Approve for use (stage 4) | `sdlc admin agent approve --key coder-openhands --purpose activate --as <owner\|person_a\|person_b> [--evaluation EVAL-2026-0012]` | By agent type (§20.7): L0 Person A + technical owner; L1–L2 technical owner + Person B |
-| Recertify (stage 5) | `sdlc admin agent recertify --key coder-openhands [--date YYYY-MM-DD] [--evaluation EVAL-2026-0031]` | The technical owner |
-| Change (stage 6) | Evaluate the next version first (below), then suspend, then `sdlc admin agent update --key … --version 1.1.0 [--model …] [--instructions … --instructions-file …]`, then approve again with `--purpose activate --evaluation <code>` | The agent owner or a tenant admin changes; technical owner + Person B approve (§20.11) |
-| Suspend or quarantine (stage 6) | `sdlc admin agent suspend\|quarantine --key <key> --reason <code>` | Person B or leadership, at any time |
-| Retire (stage 7) | `sdlc admin agent approve --key <key> --purpose retire --as <owner\|governance> --reason <code>` | Agent owner + leadership |
-| New agent owner | `sdlc admin agent owner --key <key> --owner <email>` | A tenant admin |
-| Look | `sdlc admin agent show --key <key>` (with the approvals still missing and the latest evaluation of the agent as it is now); `sdlc admin agent list [--overdue] [--json]` (with `--overdue`, the latest evaluation of each agent and whether it qualifies for a recertification) | Anyone in the tenant |
+| Register (stage 2) | `adlc admin agent register --key coder-openhands --version 1.0.0 --owner <email> --model claude-haiku-4-5-20251001 --instructions AGENTS.md@v5 --instructions-file AGENTS.md --tools file_editor,terminal --max-autonomy L2 --environments sandbox [--adapter openhands]` (without `sandbox` the agent can never run; `--adapter` names the agent software that runs it, default `openhands`) | A tenant admin, who names the technical owner |
+| Approve for use (stage 4) | `adlc admin agent approve --key coder-openhands --purpose activate --as <owner\|person_a\|person_b> [--evaluation EVAL-2026-0012]` | By agent type (§20.7): L0 Person A + technical owner; L1–L2 technical owner + Person B |
+| Recertify (stage 5) | `adlc admin agent recertify --key coder-openhands [--date YYYY-MM-DD] [--evaluation EVAL-2026-0031]` | The technical owner |
+| Change (stage 6) | Evaluate the next version first (below), then suspend, then `adlc admin agent update --key … --version 1.1.0 [--model …] [--instructions … --instructions-file …]`, then approve again with `--purpose activate --evaluation <code>` | The agent owner or a tenant admin changes; technical owner + Person B approve (§20.11) |
+| Suspend or quarantine (stage 6) | `adlc admin agent suspend\|quarantine --key <key> --reason <code>` | Person B or leadership, at any time |
+| Retire (stage 7) | `adlc admin agent approve --key <key> --purpose retire --as <owner\|governance> --reason <code>` | Agent owner + leadership |
+| New agent owner | `adlc admin agent owner --key <key> --owner <email>` | A tenant admin |
+| Look | `adlc admin agent show --key <key>` (with the approvals still missing and the latest evaluation of the agent as it is now); `adlc admin agent list [--overdue] [--json]` (with `--overdue`, the latest evaluation of each agent and whether it qualifies for a recertification) | Anyone in the tenant |
 
 **How approvals work.**
 
@@ -96,7 +96,7 @@ The platform keeps the register in its database. Only an agent that is registere
 - The approvers of one step are always **different people**: one person never counts twice, even when they hold two capacities.
 - When the last needed approval arrives, the agent becomes active (or retired) at once. `show` lists what is still missing.
 - An approval counts only for the agent **as it is now**. Any change of the agent (a new version, a status change, a new agent owner) starts again from zero.
-- If the platform is down, the server operator can still suspend or quarantine an agent (`sdlc ops agent suspend|quarantine --tenant <slug> --key <key> --reason <code>`). Nobody activates an agent outside the approvals.
+- If the platform is down, the server operator can still suspend or quarantine an agent (`adlc ops agent suspend|quarantine --tenant <slug> --key <key> --reason <code>`). Nobody activates an agent outside the approvals.
 
 Reason codes: `incident`, `quality`, `security`, `no_owner`, `replaced`, `unused`, `provider_end_of_support`, `other`.
 
@@ -133,10 +133,10 @@ Rules the platform enforces:
 **Registering an agent with another adapter (OpenCode)** (`design/ADR-M68-second-agent-spike.md`, `design/ADR-M88-second-agent-adapter.md`). OpenCode 1.18.35 is the second adapter. It runs with the same caps, stops, kill switch and loop detection as OpenHands, and through the same model gateway.
 
 1. **The sandbox image.** The server operator builds the image `node24-opencode` on the project's `node24` image, pinned by digest: `NODE24=<node24 by digest> pnpm sandbox-image:build node24-opencode` (runbook T11 §5g). It prints the new image by digest. The release does not publish this image yet, so build it also on a release checkout.
-2. **The project configuration.** A project admin adds the image as `sandbox.images.opencode` (`sdlc admin config set`). `sandbox.image` stays the OpenHands image. `doctor` checks that both images are on the server.
+2. **The project configuration.** A project admin adds the image as `sandbox.images.opencode` (`adlc admin config set`). `sandbox.image` stays the OpenHands image. `doctor` checks that both images are on the server.
 3. **The agent.** An adapter change is a new agent version, so choose one of these:
-   - A **new agent**: `sdlc admin agent register --key coder-opencode … --adapter opencode`, with the same options as above.
-   - A **new version** of an existing agent: suspend it, then `sdlc admin agent update --key <key> --version <next> --adapter opencode`.
+   - A **new agent**: `adlc admin agent register --key coder-opencode … --adapter opencode`, with the same options as above.
+   - A **new version** of an existing agent: suspend it, then `adlc admin agent update --key <key> --version <next> --adapter opencode`.
 4. **The evaluation.** The adapter is part of the fingerprint (above), so an evaluation of the OpenHands version does not count for the OpenCode version. Make a plan with the agent's key, run it, and read the report (Chapter 19 §19.8c).
 5. **The approval.** Approve the agent with `--purpose activate --evaluation <code>`, as for any new agent or change.
 6. **The project.** Set `run.agent_key` to the agent's key if the project should run it.
@@ -153,7 +153,7 @@ What is different with OpenCode:
 **An agent on the self-hosted model** (`design/ADR-M71-self-hosted-model-vllm.md`). Work on `client_restricted` data may use only a self-hosted model: the client does not allow the data to leave the company. The platform's self-hosted model runs with vLLM on the server's own GPU (Compose profile `models-local`), when the server has one.
 
 1. **The model.** The server operator chooses the model, downloads it, starts the profile and stores the model's entry in the gateway (`platform/deploy/README.md` "Self-hosted model", runbook T11 §5d.1). The operator gives you the **served name**, for example `qwen3-coder-30b-a3b-instruct`. It includes the model version, like every model name.
-2. **The agent.** Register an agent with that name as its model: `sdlc admin agent register --key coder-local … --model qwen3-coder-30b-a3b-instruct`, with the other options as above. For an existing agent, a new model is a new version (suspend, `update --version <next> --model …`).
+2. **The agent.** Register an agent with that name as its model: `adlc admin agent register --key coder-local … --model qwen3-coder-30b-a3b-instruct`, with the other options as above. For an existing agent, a new model is a new version (suspend, `update --version <next> --model …`).
 3. **The evaluation and the approval.** The model is part of the fingerprint, so evaluate the agent with the self-hosted model before you approve it (§20.6–§20.7). A smaller model resolves fewer tasks than an API model: read the report before real work.
 4. **The project.** Set `run.agent_key` to the agent's key. G4 then gives a `client_restricted` intent only the self-hosted model. An intent of a lower data class may use it too.
 
@@ -169,14 +169,14 @@ A **register tool** is a tool for agents that is not part of the agent itself: a
 
 | Step | Command | Who |
 |---|---|---|
-| Register | `sdlc admin tool register --key project-docs --version 1.0.0 --owner <email> --transport http --image <image name> --image-digest sha256:… --permissions read_documents --data-classes public,internal [--backing-services <alias:port,…>] [--model <gateway model with version>]` | A tenant admin, who names the technical owner |
-| Approve for use | `sdlc admin tool approve --key project-docs --purpose activate --as <owner\|person_b\|governance>` | The technical owner, and Person B or leadership |
-| Recertify | `sdlc admin tool recertify --key project-docs [--date YYYY-MM-DD]` | The technical owner |
-| Change | Suspend, then `sdlc admin tool update --key … --version 1.1.0 [--image-digest …] [--permissions …] [--data-classes …] [--backing-services …] [--model …]`, then approve again | The tool owner or a tenant admin changes; the owner and Person B or leadership approve |
-| Suspend or quarantine | `sdlc admin tool suspend\|quarantine --key <key> --reason <code>` | Person B or leadership, at any time |
-| Retire | `sdlc admin tool approve --key <key> --purpose retire --as <owner\|governance> --reason <code>` | Tool owner + leadership |
-| New tool owner | `sdlc admin tool owner --key <key> --owner <email>` | A tenant admin |
-| Look | `sdlc admin tool show --key <key>` (with the approvals still missing); `sdlc admin tool list [--json]` | Anyone in the tenant |
+| Register | `adlc admin tool register --key project-docs --version 1.0.0 --owner <email> --transport http --image <image name> --image-digest sha256:… --permissions read_documents --data-classes public,internal [--backing-services <alias:port,…>] [--model <gateway model with version>]` | A tenant admin, who names the technical owner |
+| Approve for use | `adlc admin tool approve --key project-docs --purpose activate --as <owner\|person_b\|governance>` | The technical owner, and Person B or leadership |
+| Recertify | `adlc admin tool recertify --key project-docs [--date YYYY-MM-DD]` | The technical owner |
+| Change | Suspend, then `adlc admin tool update --key … --version 1.1.0 [--image-digest …] [--permissions …] [--data-classes …] [--backing-services …] [--model …]`, then approve again | The tool owner or a tenant admin changes; the owner and Person B or leadership approve |
+| Suspend or quarantine | `adlc admin tool suspend\|quarantine --key <key> --reason <code>` | Person B or leadership, at any time |
+| Retire | `adlc admin tool approve --key <key> --purpose retire --as <owner\|governance> --reason <code>` | Tool owner + leadership |
+| New tool owner | `adlc admin tool owner --key <key> --owner <email>` | A tenant admin |
+| Look | `adlc admin tool show --key <key>` (with the approvals still missing); `adlc admin tool list [--json]` | Anyone in the tenant |
 
 Rules the platform enforces:
 
@@ -192,7 +192,7 @@ Rules the platform enforces:
 **The first tool: searching the project's documents** (`read_documents`, `design/ADR-M89-project-docs-index.md`). The tool searches the project's Markdown files (`*.md`, `*.markdown`) **at the run's base commit**, so the agent reads the documents of its own commit. It has one MCP tool, `search_project_docs` (a `query` of at most 1000 characters, a `limit` of 1–20 passages, default 5), and answers with the best passages and their file paths. The passages are data from the repository, never instructions: the agent's limits do not change. The platform ships its image (`pnpm tool-image:build project-docs`, or on a release checkout `pnpm images get TOOL_PROJECT_DOCS`). Register it once per tenant:
 
 ```bash
-sdlc admin tool register --key project-docs --version 1.0.0 --owner <email> --transport http \
+adlc admin tool register --key project-docs --version 1.0.0 --owner <email> --transport http \
   --image <image name> --image-digest sha256:… --permissions read_documents \
   --data-classes public,internal,client_confidential,client_restricted \
   --backing-services knowledge-db:5432,litellm:4000 --model bge-m3

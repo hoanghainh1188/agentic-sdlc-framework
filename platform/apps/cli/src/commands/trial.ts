@@ -1,4 +1,4 @@
-// `sdlc trial report` (task V01, D-08 V01 AC3, ADR-M65, handbook Ch.19 §19.8c): the report a
+// `adlc trial report` (task V01, D-08 V01 AC3, ADR-M65, handbook Ch.19 §19.8c): the report a
 // community trial team sends as a GitHub issue (TRIAL.md §6). It reads the existing GET endpoints
 // only (no new endpoint, the same access rules: the whole tenant needs a tenant admin; `--project`
 // needs a role in `access.metrics_read_roles` and `access.cost_read_roles`), then builds an

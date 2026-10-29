@@ -1,4 +1,4 @@
-// `sdlc plan draft` (S02 AC1–AC4, ADR-M62): the draft is written on this machine only. No API call
+// `adlc plan draft` (S02 AC1–AC4, ADR-M62): the draft is written on this machine only. No API call
 // and no Git command; the default file is `.sdlc/plans/<INT>.yaml` in the nearest folder that holds
 // `.git`; an existing file is replaced only with `--force`; refusals use the catalog (exit 1).
 import { execFileSync } from 'node:child_process';
@@ -34,7 +34,7 @@ async function inRepo(): Promise<{ h: Harness; root: string; sub: string }> {
   return { h, root, sub };
 }
 
-describe('sdlc plan draft', () => {
+describe('adlc plan draft', () => {
   it('writes .sdlc/plans/<INT>.yaml at the repository root, from a sub-folder, with no request', async () => {
     const { h, root } = await inRepo();
     expect(

@@ -60,7 +60,7 @@ pnpm trial:up --settings ~/trial-settings.yaml
 
 # 4. Check the stack and your login (Person A's config folder from the settings file)
 pnpm doctor
-XDG_CONFIG_HOME=<Person A's config folder> pnpm sdlc doctor
+XDG_CONFIG_HOME=<Person A's config folder> pnpm adlc doctor
 ```
 Then take the first sample task through the gates: [TRIAL.md §5](TRIAL.md#5-run-the-tasks). The step-by-step guide, with what each step does and how to start the stack again after a reboot: [TRIAL.md](TRIAL.md).
 
@@ -137,7 +137,7 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 | **Git Hosts** | GitHub (GitLab, Bitbucket designed in Milestone EXT) |
 | **Sandboxes** | Node.js / TypeScript (`node24`), network restricted to LiteLLM & package proxy |
 | **Models** | Cloud LLMs via LiteLLM; self-hosted local models via vLLM on server GPU |
-| **Set-up** | `pnpm server:setup` (a guided fresh deployment on a server), `pnpm trial:up` (a trial on one machine), `sdlc admin project apply` (a project and its team from one file) |
+| **Set-up** | `pnpm server:setup` (a guided fresh deployment on a server), `pnpm trial:up` (a trial on one machine), `adlc admin project apply` (a project and its team from one file) |
 | **Audit & Evidence** | RFC 8785 canonical JSON + SHA-256 tamper-evident hash chain; exportable sealed Evidence Pack |
 | **Dashboard** | Preact SPA with GitHub OAuth, server-side sessions and CSRF protection; gate and escalation decisions confirmed with a passkey, the kill switch, intents with their spec, plans and Evidence Packs |
 
@@ -145,7 +145,7 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 
 | Layer | Choice |
 |---|---|
-| Platform Services | TypeScript: NestJS (API), Temporal (Workflow Engine), Sandbox Runner, CLI (`sdlc`), Dashboard (Preact) |
+| Platform Services | TypeScript: NestJS (API), Temporal (Workflow Engine), Sandbox Runner, CLI (`adlc`), Dashboard (Preact) |
 | Infrastructure | PostgreSQL, Temporal, LiteLLM, Langfuse, SeaweedFS (S3-compatible storage), Valkey, OpenBao (Vault-compatible secrets & transit signing) |
 | Runner Security | Rootless Docker Engine / HAProxy relays, Gitleaks, kernel cgroup limits, `NoNewPrivs` |
 | Deployment | Docker Compose on self-hosted servers; no mandatory cloud vendor lock-in |

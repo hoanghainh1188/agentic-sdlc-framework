@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Upgrade notes
+- **The CLI has a new name** (ADR-M100, QUESTIONS #631): the npm package is `@hoanghainh/governed-adlc` and the command `adlc`. Each person runs `npm uninstall -g agentic-sdlc-cli`, then `npm install -g @hoanghainh/governed-adlc@0.9.0`. Both packages install an `sdlc` command, so remove the old one first.
+- You stay logged in: `adlc` reads the login that `sdlc` saved (`~/.config/sdlc/`, or under `$XDG_CONFIG_HOME`) until it saves its own in `~/.config/adlc/`. `adlc logout` deletes both.
+- `sdlc` keeps working until v0.10.0: it prints one note on stderr and runs the same command; standard output and exit codes do not change. Move scripts to `adlc` before v0.10.0. In a checkout, `pnpm adlc …` replaces `pnpm sdlc …` (the alias stays until v0.10.0).
+- On a running stack: no migration, no changed setting, no credentials command to run again. The `SDLC_*` settings, the services and images `sdlc-api`, `sdlc-worker`, `sdlc-runner`, the database names, the token prefix `sdlc_pat_` and the plan folder `.sdlc/plans/` keep their names.
+
+### Changed
+- The CLI is renamed (ADR-M100, QUESTIONS #631): npm package `agentic-sdlc-cli` → `@hoanghainh/governed-adlc`, command `sdlc` → `adlc`, root script `pnpm sdlc` → `pnpm adlc`, saved login folder `…/sdlc` → `…/adlc` (the old one is read with the same checks). The package installs `adlc` and, until v0.10.0, `sdlc` with a note from the message catalog (`cli.renamed`). The messages, the help texts, the user and operator guides and the handbook's platform usage parts (Ch.13–16, Ch.18–20, T11) say `adlc`. The Claude Code hook refuses `pnpm adlc ops bootstrap|token` and the bare `adlc`/`sdlc` binaries with those commands, as it refuses `pnpm sdlc …` (R035, R132). `npm-publish.yml`, the pack check, `RELEASING.md` and GETTING-STARTED "Publishing the CLI on npm" use the new name; the first version of the new package is published by hand by the owner.
+
 ## [0.8.0] - 2026-10-29
 
 **A simpler set-up, decisions in the dashboard, and a dependency check of every agent change.** `pnpm server:setup` runs a fresh deployment on a server (README steps 2–7) with the key holders' PGP keys, and the root token is used for `configure` only (V16; ADR-M98). `sdlc admin project apply` sets up a project and its team from one file (V17). In the dashboard, people now decide gates (G7 stays the review on GitHub), kill runs, acknowledge and decide escalations, create an intent with its spec, submit a plan and build an Evidence Pack; each gate or escalation decision is confirmed with a passkey (U07, U08; ADR-M73). Before G6 the runner checks the dependencies an agent added: licences, install scripts and look-alike package names (H02; ADR-M96). Also the design of deleting a client's data on request (H03; ADR-M97). The first release under the repository's new name, `governed-adlc-fw` (ADR-M99). A minor release: two migrations, rebuilt images, a new project setting.

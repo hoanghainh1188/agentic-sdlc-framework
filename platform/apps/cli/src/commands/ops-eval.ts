@@ -1,4 +1,4 @@
-// `sdlc ops eval start`: an evaluation on the server (task L04, design/ADR-M81 §2.7, QUESTIONS
+// `adlc ops eval start`: an evaluation on the server (task L04, design/ADR-M81 §2.7, QUESTIONS
 // #464). An operator command with SDLC_DB_URL (`platform_app`), audited as actor `system`. The API,
 // the CLI for people and the schedules come with L05. It reads the configuration file and the task
 // set, checks the project, the data class and the models (`startEvaluation`), and queues one run

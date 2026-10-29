@@ -453,7 +453,7 @@ async function worseThanBaseline(
 
 /**
  * The latest completed evaluation with the agent's current fingerprint in its projects (any
- * active project when it has none), and its verdict for an approval (`sdlc admin agent show`) or a
+ * active project when it has none), and its verdict for an approval (`adlc admin agent show`) or a
  * recertification (`list --overdue`, L10).
  */
 export async function latestAgentEvaluation(

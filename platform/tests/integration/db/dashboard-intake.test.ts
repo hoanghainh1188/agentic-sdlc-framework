@@ -150,7 +150,7 @@ describeDb('U08: create, spec link, plan and Evidence Pack from a dashboard sess
     return { secret: started.secret, csrf: deriveCsrfToken(started.secret) };
   }
 
-  /** The body of `sdlc intent create` as the page sends it. */
+  /** The body of `adlc intent create` as the page sends it. */
   const intentBody = (title: string) => ({
     project: 'shop',
     title,

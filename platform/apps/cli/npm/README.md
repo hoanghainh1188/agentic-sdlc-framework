@@ -1,8 +1,8 @@
-# agentic-sdlc-cli
+# @hoanghainh/governed-adlc
 
-The `sdlc` command of the [Agentic SDLC Framework](https://github.com/hoanghainh1188/governed-adlc-fw), a self-hosted platform that runs AI coding agents through eight checkpoints (gates G1–G8) with the right people approving each one. With `sdlc` you create intents, decide gates, handle escalations, and read evidence and cost.
+The `adlc` command of [governed-adlc-fw](https://github.com/hoanghainh1188/governed-adlc-fw), a self-hosted platform that runs AI coding agents through eight checkpoints (gates G1–G8) with the right people approving each one. With `adlc` you create intents, decide gates, handle escalations, and read evidence and cost.
 
-**`sdlc` is a client: it needs a running platform.** Installing it does not install the platform.
+**`adlc` is a client: it needs a running platform.** Installing it does not install the platform.
 
 - **No platform yet, and you want to try it?** Set one up on your own machine with one command: [TRIAL.md](https://github.com/hoanghainh1188/governed-adlc-fw/blob/main/TRIAL.md) (Docker, about 20–40 minutes; fictional data only).
 - **Your team runs a platform?** Ask its operator for the address and ask a tenant admin for your account (steps 2 and 3 below).
@@ -13,11 +13,11 @@ The `sdlc` command of the [Agentic SDLC Framework](https://github.com/hoanghainh
 You need Node.js 24 (`node --version` prints `v24.…`).
 
 ```bash
-npm install -g agentic-sdlc-cli
-sdlc --version
+npm install -g @hoanghainh/governed-adlc
+adlc --version
 ```
 
-Use the **same version as your platform**. If it runs an older release, install that one: `npm install -g agentic-sdlc-cli@<its version>` (ask its operator; `sdlc doctor` compares the two for you in step 4).
+Use the **same version as your platform**. If it runs an older release, install that one: `npm install -g @hoanghainh/governed-adlc@<its version>` (a platform older than v0.9.0: `agentic-sdlc-cli@<its version>`) (ask its operator; `adlc doctor` compares the two for you in step 4).
 
 ## 2. Find your platform's address
 
@@ -35,36 +35,37 @@ Use the **same version as your platform**. If it runs an older release, install 
 You need a personal API token. It starts with `sdlc_pat_` and a tenant admin of your platform gives you the first one (they create your user and your roles; you cannot give roles to yourself). Keep it in your password manager, never in a chat or a ticket.
 
 ```bash
-sdlc login --api-url <address from step 2>
+adlc login --api-url <address from step 2>
 ```
 
-`sdlc login` asks for the token and does not show it while you type. It checks the token with the platform before it saves the login (in `~/.config/sdlc/`, readable by you only). Never put the token on the command line.
+`adlc login` asks for the token and does not show it while you type. It checks the token with the platform before it saves the login (in `~/.config/adlc/`, readable by you only). Never put the token on the command line.
 
-The first token a tenant admin issues for you lives at most 7 days. Once logged in, create your own (`sdlc token create --name laptop`), log in again with it, then revoke the first one (`sdlc token list`, `sdlc token revoke --id <ID>`).
+The first token a tenant admin issues for you lives at most 7 days. Once logged in, create your own (`adlc token create --name laptop`), log in again with it, then revoke the first one (`adlc token list`, `adlc token revoke --id <ID>`).
 
 ## 4. Check, then start
 
 ```bash
-sdlc whoami
-sdlc doctor
+adlc whoami
+adlc doctor
 ```
 
-`sdlc doctor` checks the address, the certificate, your token and when it ends, your roles per project, and that your `sdlc` matches the platform's version. For every problem it prints what to do.
+`adlc doctor` checks the address, the certificate, your token and when it ends, your roles per project, and that your `adlc` matches the platform's version. For every problem it prints what to do.
 
 Then, for example:
 
 ```bash
-sdlc intent list
-sdlc next INT-2026-0001
+adlc intent list
+adlc next INT-2026-0001
 ```
 
-`sdlc next` tells you where an intent is and what you can do now. The [user guide](https://github.com/hoanghainh1188/governed-adlc-fw/blob/main/platform/USER-GUIDE.md) explains the whole path from an intent to a release.
+`adlc next` tells you where an intent is and what you can do now. The [user guide](https://github.com/hoanghainh1188/governed-adlc-fw/blob/main/platform/USER-GUIDE.md) explains the whole path from an intent to a release.
 
 ## Good to know
 
-- The operator commands (`sdlc ops …`) work only on the platform server, with `SDLC_DB_URL`.
+- The operator commands (`adlc ops …`) work only on the platform server, with `SDLC_DB_URL`.
 - From v0.2.0 on, every release is published from a tag of the repository by GitHub Actions, with npm provenance (npm shows the commit and the workflow that built it). Version 0.1.1 was published by hand, without provenance.
 - The platform's web dashboard is at `<address from step 2>/dashboard/`; on the platform machine itself use `http://localhost:8090/dashboard/` (`localhost`, not `127.0.0.1`, for the GitHub sign-in).
-- To update: `npm install -g agentic-sdlc-cli@<new version>`. To remove: `npm uninstall -g agentic-sdlc-cli`.
+- To update: `npm install -g @hoanghainh/governed-adlc@<new version>`. To remove: `npm uninstall -g @hoanghainh/governed-adlc`.
+- **Coming from `agentic-sdlc-cli`** (the name up to v0.8.0, command `sdlc`): run `npm uninstall -g agentic-sdlc-cli`, then install this package. You stay logged in: `adlc` reads the login that `sdlc` saved in `~/.config/sdlc/` until it saves its own in `~/.config/adlc/`. Until v0.10.0 this package also installs `sdlc`, which prints a note and runs `adlc`.
 
 MIT licence. The bundled third-party packages and their licences are listed in `THIRD-PARTY-NOTICES`.

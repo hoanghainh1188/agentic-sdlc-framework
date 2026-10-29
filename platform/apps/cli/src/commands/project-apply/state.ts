@@ -1,5 +1,5 @@
 // What the platform holds today for a project file (task V17 AC3, AC4): read only, through the
-// same API endpoints as `sdlc admin … list|show`. Nothing here writes.
+// same API endpoints as `adlc admin … list|show`. Nothing here writes.
 import type { ProjectFile } from '@sdlc/api-schemas';
 
 import { ApiCallError, type ApiClient } from '../../api/client.js';

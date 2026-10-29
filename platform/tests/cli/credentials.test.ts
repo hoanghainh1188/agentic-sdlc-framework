@@ -1,4 +1,4 @@
-// The saved login of `sdlc login` (B04, design/ADR-M36 §2.1): file modes, refusal of unsafe files,
+// The saved login of `adlc login` (B04, design/ADR-M36 §2.1): file modes, refusal of unsafe files,
 // atomic replacement, and the API address rules (§2.3).
 import { chmod, mkdir, mkdtemp, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -12,6 +12,7 @@ import {
   credentialsDir,
   credentialsPath,
   deleteSavedLogin,
+  legacyCredentialsDir,
   readSavedLogin,
   writeSavedLogin,
 } from '../../apps/cli/src/credentials/store.js';
@@ -21,7 +22,7 @@ let home: string;
 let env: Record<string, string>;
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'sdlc-cred-'));
+  home = await mkdtemp(join(tmpdir(), 'adlc-cred-'));
   env = { HOME: home };
 });
 afterEach(async () => {
@@ -37,12 +38,14 @@ async function expectProblem(problem: string): Promise<void> {
 }
 
 describe('saved login (ADR-M36 §2.1)', () => {
-  it('uses ~/.config/sdlc, or $XDG_CONFIG_HOME/sdlc when it is absolute', () => {
-    expect(credentialsDir({ HOME: '/home/a' })).toBe('/home/a/.config/sdlc');
-    expect(credentialsDir({ HOME: '/home/a', XDG_CONFIG_HOME: '/x' })).toBe('/x/sdlc');
+  it('uses ~/.config/adlc, or $XDG_CONFIG_HOME/adlc when it is absolute', () => {
+    expect(credentialsDir({ HOME: '/home/a' })).toBe('/home/a/.config/adlc');
+    expect(credentialsDir({ HOME: '/home/a', XDG_CONFIG_HOME: '/x' })).toBe('/x/adlc');
     expect(credentialsDir({ HOME: '/home/a', XDG_CONFIG_HOME: 'relative' })).toBe(
-      '/home/a/.config/sdlc',
+      '/home/a/.config/adlc',
     );
+    expect(legacyCredentialsDir({ HOME: '/home/a' })).toBe('/home/a/.config/sdlc');
+    expect(legacyCredentialsDir({ HOME: '/home/a', XDG_CONFIG_HOME: '/x' })).toBe('/x/sdlc');
     expect(() => credentialsDir({})).toThrow(CredentialsError);
     expect(() => credentialsDir({ HOME: 'relative' })).toThrow(CredentialsError);
   });
@@ -119,6 +122,72 @@ describe('saved login (ADR-M36 §2.1)', () => {
     await writeSavedLogin(env, login);
     expect(await deleteSavedLogin(env)).toBe(true);
     expect(await deleteSavedLogin(env)).toBe(false);
+    expect(await readSavedLogin(env)).toBeUndefined();
+  });
+});
+
+/** A login saved by the old command `sdlc` (before v0.9.0): the same file in `<config>/sdlc/`. */
+async function writeLegacyLogin(value: { apiUrl: string; token: string }, mode = 0o600) {
+  const dir = legacyCredentialsDir(env);
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  const path = join(dir, 'credentials.json');
+  const body = { version: 1, api_url: value.apiUrl, token: value.token };
+  await writeFile(path, JSON.stringify(body), { mode });
+  return path;
+}
+
+describe("the old command's login folder (ADR-M100 §2.3)", () => {
+  it('reads the login of `sdlc` while the new folder has none, and never writes there', async () => {
+    const path = await writeLegacyLogin(login);
+    expect(await readSavedLogin(env)).toEqual(login);
+    await writeSavedLogin(env, { ...login, apiUrl: 'https://other.example.test' });
+    expect((await readSavedLogin(env))?.apiUrl).toBe('https://other.example.test');
+    expect((await stat(path)).isFile()).toBe(true); // the old file is left as it was
+  });
+
+  it('prefers the new login when both exist', async () => {
+    await writeLegacyLogin({ ...login, apiUrl: 'https://old.example.test' });
+    await writeSavedLogin(env, login);
+    expect(await readSavedLogin(env)).toEqual(login);
+  });
+
+  it('checks the old file like the new one: a file others can read is refused', async () => {
+    const path = await writeLegacyLogin(login, 0o644);
+    await expect(readSavedLogin(env)).rejects.toSatisfy(
+      (e) => e instanceof CredentialsError && e.problem === 'unsafe_mode' && e.path === path,
+    );
+  });
+
+  it('refuses a symbolic link in the old folder', async () => {
+    const elsewhere = join(home, 'elsewhere.json');
+    const body = { version: 1, api_url: login.apiUrl, token: login.token };
+    await writeFile(elsewhere, JSON.stringify(body), { mode: 0o600 });
+    await mkdir(legacyCredentialsDir(env), { recursive: true, mode: 0o700 });
+    await symlink(elsewhere, join(legacyCredentialsDir(env), 'credentials.json'));
+    await expect(readSavedLogin(env)).rejects.toSatisfy(
+      (e) => e instanceof CredentialsError && e.problem === 'not_a_file',
+    );
+  });
+
+  it('never puts the token in an error', async () => {
+    await writeLegacyLogin({ apiUrl: 'not a url', token: login.token });
+    const error = await readSavedLogin(env).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(CredentialsError);
+    expect(JSON.stringify(error)).not.toContain(login.token);
+    expect(String((error as Error).message)).not.toContain(login.token);
+  });
+
+  it('a logout deletes the login in both folders, so the old one never comes back', async () => {
+    await writeLegacyLogin(login);
+    await writeSavedLogin(env, login);
+    expect(await deleteSavedLogin(env)).toBe(true);
+    expect(await readSavedLogin(env)).toBeUndefined();
+    expect(await deleteSavedLogin(env)).toBe(false);
+  });
+
+  it('a logout with only the old login deletes it', async () => {
+    await writeLegacyLogin(login);
+    expect(await deleteSavedLogin(env)).toBe(true);
     expect(await readSavedLogin(env)).toBeUndefined();
   });
 });

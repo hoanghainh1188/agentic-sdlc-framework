@@ -175,31 +175,31 @@ The password goes from `.env` into the command without being printed. `up.sh` en
 
 ## Step 12. Create the first admin and the pilot project (dev)
 
-The development version of [deploy/README, Fresh deployment steps 8–9](deploy/README.md#8-the-tenant-and-its-first-admin), which explains the bootstrap, the token and the `sdlc ops …` commands; how people log in and use tokens: handbook [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command). Run the commands below yourself, in a terminal: they print a token **once**. Never run them through a chat tool, and never paste the token anywhere except your password manager.
+The development version of [deploy/README, Fresh deployment steps 8–9](deploy/README.md#8-the-tenant-and-its-first-admin), which explains the bootstrap, the token and the `adlc ops …` commands; how people log in and use tokens: handbook [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-adlc-command). Run the commands below yourself, in a terminal: they print a token **once**. Never run them through a chat tool, and never paste the token anywhere except your password manager.
 
 1. Step 11b is done: the API answers `curl -s http://127.0.0.1:8090/health/ready` and the database is migrated (Step 11b part 6).
 2. Create your tenant, your user and your first token. `SDLC_DB_URL` is the `platform_app` URL (deploy/README step 8):
    ```bash
-   pnpm sdlc ops bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
+   pnpm adlc ops bootstrap --tenant internal --tenant-name "Internal" --email you@example.com --name "Your Name"
    ```
 3. Check the token: `curl -s -H "Authorization: Bearer <token>" http://127.0.0.1:8090/v1/me`.
-4. Log in with the CLI (task B04, [ADR-M36](../design/ADR-M36-cli-api-client.md)) and paste the token at the hidden prompt. The login is saved in `~/.config/sdlc/credentials.json`, readable only by you:
+4. Log in with the CLI (task B04, [ADR-M36](../design/ADR-M36-cli-api-client.md)) and paste the token at the hidden prompt. The login is saved in `~/.config/adlc/credentials.json`, readable only by you:
    ```bash
-   pnpm sdlc login --api-url http://127.0.0.1:8090
-   pnpm sdlc whoami
+   pnpm adlc login --api-url http://127.0.0.1:8090
+   pnpm adlc whoami
    ```
-   Then every `pnpm sdlc …` command works through the API (handbook Ch.19 §19.8c).
+   Then every `pnpm adlc …` command works through the API (handbook Ch.19 §19.8c).
 
 5. Set up a project and its team through the API. The rules (nobody gives a role to themselves; [roles that conflict](../handbook/02-playbook/ch19-approval-queues.md#conflicting-roles)) and every command: handbook [Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins). On a development machine:
    ```bash
-   pnpm sdlc admin project create --slug pilot --name "Pilot" --repo harryforge/pilot-order-inventory
-   pnpm sdlc admin user create --email colleague@example.com --name "Colleague"
-   pnpm sdlc admin identity link --user colleague@example.com --github-id <numeric ID> --github-login <login>
-   pnpm sdlc admin role grant --project pilot --user colleague@example.com --role person_b
-   pnpm sdlc admin config show --project pilot
+   pnpm adlc admin project create --slug pilot --name "Pilot" --repo harryforge/pilot-order-inventory
+   pnpm adlc admin user create --email colleague@example.com --name "Colleague"
+   pnpm adlc admin identity link --user colleague@example.com --github-id <numeric ID> --github-login <login>
+   pnpm adlc admin role grant --project pilot --user colleague@example.com --role person_b
+   pnpm adlc admin config show --project pilot
    ```
-   The numeric GitHub ID comes from `gh api users/<login> --jq .id`. A role for yourself comes from a second tenant admin, or from the operator on the server (`pnpm sdlc ops role grant --tenant internal --project pilot --email you@example.com --role person_a`, with `SDLC_DB_URL`).
-6. Replace the bootstrap token with your own: `pnpm sdlc token create --name laptop-you`, log in again with it (`pnpm sdlc login`), then revoke the bootstrap token (`pnpm sdlc token list`, `pnpm sdlc token revoke --id <ID>`).
+   The numeric GitHub ID comes from `gh api users/<login> --jq .id`. A role for yourself comes from a second tenant admin, or from the operator on the server (`pnpm adlc ops role grant --tenant internal --project pilot --email you@example.com --role person_a`, with `SDLC_DB_URL`).
+6. Replace the bootstrap token with your own: `pnpm adlc token create --name laptop-you`, log in again with it (`pnpm adlc login`), then revoke the bootstrap token (`pnpm adlc token list`, `pnpm adlc token revoke --id <ID>`).
 
 ## Step 13. Restart the dev stack after a break (dev)
 
@@ -213,8 +213,8 @@ Use this after a reboot, after Docker Desktop restarted, or when `sdlc-api` and 
 | 4 | Apply new migrations, if `main` has new ones: `SDLC_DB_MIGRATION_URL="postgres://platform:<PLATFORM_DB_PASSWORD>@127.0.0.1:5432/platform" pnpm db:migrate` (the password is in `platform/deploy/.env`) | `pnpm db:status` (same variable) lists no pending migration |
 | 5 | When `main` has new code since the last start, rebuild the platform images and add new `.env` variables first (Step 11b part 1, items 2–3). Then start the rest: `platform/deploy/scripts/up.sh core models platform sandbox` (add `observability` for Langfuse) | The script ends without an error; Step 11b part 7 shows no missing credential |
 | 6 | `curl -s http://127.0.0.1:8090/health/ready` | Ready |
-| 7 | `pnpm sdlc whoami` (if the login was removed: `pnpm sdlc login --api-url http://127.0.0.1:8090`) | Shows your user |
-| 8 | 🤖 `pnpm doctor` (read only, prints no secret: Claude Code may run it), and `pnpm sdlc doctor` for your login | No `failed` line; each warning names its fix ([deploy/README, Doctor](deploy/README.md#doctor-pnpm-doctor)) |
+| 7 | `pnpm adlc whoami` (if the login was removed: `pnpm adlc login --api-url http://127.0.0.1:8090`) | Shows your user |
+| 8 | 🤖 `pnpm doctor` (read only, prints no secret: Claude Code may run it), and `pnpm adlc doctor` for your login | No `failed` line; each warning names its fix ([deploy/README, Doctor](deploy/README.md#doctor-pnpm-doctor)) |
 
 Start `core` alone first: `sdlc-api`, `sdlc-worker`, `sdlc-runner` and `litellm-agent` cannot become healthy while OpenBao is sealed, so `up.sh` with those profiles would wait until it times out.
 
@@ -248,10 +248,10 @@ Live tests run the platform against the real `harryforge/pilot-order-inventory` 
 | # | What | How | Check |
 |---|---|---|---|
 | 1 | Test App permissions | App settings (Step 11) as listed in [deploy/README](deploy/README.md#github-app-permissions). Then accept the new permissions on the installation (organization settings → GitHub Apps → Configure) | `gh api /orgs/harryforge/installations --jq '.installations[]\|select(.app_slug=="harryforge-sdlc-dev")\|.permissions'` |
-| 2 | The pilot project, its team and AI record | Step 12 item 5; `pnpm sdlc ai-record set …` (handbook Ch.19 §19.8b). Person A and Person B are two different people with two GitHub accounts | `pnpm sdlc admin config show --project pilot`, `pnpm sdlc ai-record show --project pilot` |
+| 2 | The pilot project, its team and AI record | Step 12 item 5; `pnpm adlc ai-record set …` (handbook Ch.19 §19.8b). Person A and Person B are two different people with two GitHub accounts | `pnpm adlc admin config show --project pilot`, `pnpm adlc ai-record show --project pilot` |
 | 3 | The sandbox image | `pnpm sandbox-image:build node24` prints the reference by digest; on Docker Desktop use `platform/sandbox-images/build.sh node24 --no-push` (runbook T11 §5g). Put it in `sandbox.image`. For an agent with the adapter `opencode`, also build `node24-opencode` on it and put that in `sandbox.images.opencode` (handbook Ch.20 §20.5b) | The reference ends in `@sha256:…` |
-| 4 | A registered, active agent | `pnpm sdlc admin agent register …`, then the approvals (handbook Ch.20 §20.5b). Its `instructions_ref` points at the pilot's `AGENTS.md` | `pnpm sdlc admin agent show --key <key>` says `active` |
-| 5 | The project configuration | `pnpm sdlc admin config show --project pilot` gives the version; write the settings that differ from the defaults into a YAML file outside the repo, then `pnpm sdlc admin config set --project pilot --file <file> --expected-version <version>` (handbook Ch.19 §19.8d). For the pilot: `verification.required_checks: [ci-ok]` (G6 waits only for the pilot's `ci-ok`, handbook Ch.14), `sandbox.image` (item 3) and `run.agent_key` (item 4) | `config show` prints the new version and values |
+| 4 | A registered, active agent | `pnpm adlc admin agent register …`, then the approvals (handbook Ch.20 §20.5b). Its `instructions_ref` points at the pilot's `AGENTS.md` | `pnpm adlc admin agent show --key <key>` says `active` |
+| 5 | The project configuration | `pnpm adlc admin config show --project pilot` gives the version; write the settings that differ from the defaults into a YAML file outside the repo, then `pnpm adlc admin config set --project pilot --file <file> --expected-version <version>` (handbook Ch.19 §19.8d). For the pilot: `verification.required_checks: [ci-ok]` (G6 waits only for the pilot's `ci-ok`, handbook Ch.14), `sandbox.image` (item 3) and `run.agent_key` (item 4) | `config show` prints the new version and values |
 | 6 | A model | A provider key in OpenBao (runbook T11 §5d), or on a dev machine the local Ollama model `gpt-oss:20b` (QUESTIONS #78). One real run with an API model is needed before M-F (QUESTIONS #81; the trial M-E runs with the local model) (QUESTIONS #81): `pnpm test:agent-api` (runbook T11 §5d, "The real API-model run") | `curl -s -H "Authorization: Bearer <master key>" http://127.0.0.1:4000/v1/models` lists it (run in the terminal; never paste the key) |
 | 7 | The plan file of the C09 / E07 live test (QUESTIONS #230) | Once a year: open a pull request on the pilot that adds `.sdlc/plans/INT-<UTC year>-0001.yaml` with the content of `platform/tests/integration/pilot/fixtures/live-plan.yaml` (change the year in `intent_id` too), let `ci-ok` pass and merge it yourself. The App and the platform never merge. The plan allows `docs/live-test/**` only: a live run never changes the application code. A file merged before E07 (`allowed_paths: [apps/web/src/features/products/**]`, `[stub:append]`) must be replaced by the new content | `gh api repos/harryforge/pilot-order-inventory/contents/.sdlc/plans/INT-2026-0001.yaml --jq .path` |
 | 8 | Person B's GitHub account (E07 live G8 only) | A second person with their own GitHub account and write access to the pilot (they review and merge). Add to the settings file of the test App (Step 11 item 7): `"person_b_github_id": <numeric ID>` (`gh api users/<login> --jq .id`) and `"person_b_login": "<login>"` | `gh api repos/harryforge/pilot-order-inventory/collaborators/<login>/permission --jq .permission` says `write` or more |
@@ -272,37 +272,39 @@ The fifth (E07, D-08 E07 AC1) is the same run taken on to G8; it needs items 7 a
 
 1. Person B opens the pull request on GitHub with their own account, reviews it and approves it.
 2. Person B merges it (merge commit or squash). Only Person B: the platform counts a merge by a producer, a bot or an account it does not know as a merge before approval (security escalation). The App and the platform never merge.
-3. The test sees the merge on its next poll. The worker builds the release pack, Person B's user approves G8 through the CLI, the pack is sealed, the intent ends `done`, and `sdlc audit verify` passes. The test prints `e07-live: INT-… done`.
+3. The test sees the merge on its next poll. The worker builds the release pack, Person B's user approves G8 through the CLI, the pack is sealed, the intent ends `done`, and `adlc audit verify` passes. The test prints `e07-live: INT-… done`.
 
 The merged change is one fixed, fictional line appended to `docs/live-test/RUNS.md` on the pilot's `main`. Each live G8 run adds one more line there; nothing under `apps/` changes, so the pilot stays clean for the T01–T10 trials. Do not revert it.
 
 ## Publishing the CLI on npm (owner)
 
-The `sdlc` command is published as `agentic-sdlc-cli` by `.github/workflows/npm-publish.yml`, only on a release tag: `release.yml` starts it on the tag after the GitHub Release exists (tasks V05, V15, `design/ADR-M72-cli-npm-package.md`, `design/ADR-M94-release-on-the-tag.md`). Tags, releases and npm publishes are public actions: only the owner starts them. Claude never pushes a tag or publishes.
+The `adlc` command is published as `@hoanghainh/governed-adlc` by `.github/workflows/npm-publish.yml`, only on a release tag: `release.yml` starts it on the tag after the GitHub Release exists (tasks V05, V15, `design/ADR-M72-cli-npm-package.md`, `design/ADR-M94-release-on-the-tag.md`). Up to v0.8.0 the package was `agentic-sdlc-cli` and the command `sdlc` (ADR-M100). Tags, releases and npm publishes are public actions: only the owner starts them. Claude never pushes a tag or publishes.
 
-**Once, before the first tag** (🧑):
+**Once, before the first tag** (🧑; done for v0.1.1, kept for a new machine or a new owner):
 
 1. GitHub → the repository → Settings → Environments → **New environment** `npm`. Add yourself under **Required reviewers**, and under **Deployment branches and tags** allow only tags `v*`. Create it before the first tag: a workflow that names a missing environment creates it without protection.
-2. Turn on two-factor authentication on your npm account first (npmjs.com → Account → Two-Factor Authentication; a passkey or an authenticator app; mode **Authorization and writes**; keep the recovery codes in your password manager). Without it `npm publish` answers `403 … Two-factor authentication … is required`; never create a token that bypasses 2FA. Check that the name `agentic-sdlc-cli` is still free (`npm view agentic-sdlc-cli` answers 404).
+2. Turn on two-factor authentication on your npm account first (npmjs.com → Account → Two-Factor Authentication; a passkey or an authenticator app; mode **Authorization and writes**; keep the recovery codes in your password manager). Without it `npm publish` answers `403 … Two-factor authentication … is required`; never create a token that bypasses 2FA.
 
-**The first version** (npm adds a trusted publisher only to a package that exists; QUESTIONS #365):
+**The first version of `@hoanghainh/governed-adlc` (v0.9.0)** (npm adds a trusted publisher only to a package that exists; QUESTIONS #365, #631). The steps are the ones of `agentic-sdlc-cli` v0.1.1, in this order:
 
-1. Release as usual, then push the tag (for example `v0.1.1`). Approve the `npm` environment when GitHub asks. The workflow builds and checks the package and keeps it as the artifact `agentic-sdlc-cli`; its last step (`npm publish`) fails, because npm does not know the workflow yet.
-2. Download the artifact and check it: `tar -tzf agentic-sdlc-cli-0.1.1.tgz` lists only `package/` with `bin/sdlc.cjs`, `defaults/project-config.default.yaml`, `LICENSE`, `README.md`, `THIRD-PARTY-NOTICES` and `package.json`.
-3. In the macOS Terminal: `npm login`, then `npm publish agentic-sdlc-cli-0.1.1.tgz --access public --provenance=false`. The package asks for provenance (`publishConfig.provenance`), which only a CI run can give, so without `--provenance=false` npm stops with `Automatic provenance generation not supported for provider: null`. This one version has no provenance.
-4. npm uses **staged publishing** for a new package: the command uploads the version to a waiting area and creates a placeholder version `0.0.0-stage` (tagged `latest` until then). On npmjs.com, open the package and approve the waiting version (2FA again); `npm view agentic-sdlc-cli dist-tags` must then show `latest: 0.1.1`. Mark the placeholder deprecated: `npm deprecate agentic-sdlc-cli@0.0.0-stage "Placeholder of staged publishing; install agentic-sdlc-cli@0.1.1 or later"`.
-5. npmjs.com → the package → **Settings** → **Trusted publishing** → GitHub Actions: organisation or user `hoanghainh1188`, repository `governed-adlc-fw`, workflow `npm-publish.yml`, environment `npm`. On the same page, under **Publishing access**, choose "Require two-factor authentication and disallow tokens".
-6. Check: `npm install -g agentic-sdlc-cli && sdlc --version` in a new terminal.
+1. Check that the name is still free: `npm view @hoanghainh/governed-adlc` answers 404. The scope `@hoanghainh` is your npm user.
+2. Release v0.9.0 as usual ([RELEASING.md](../RELEASING.md)). Approve the `npm` environment when GitHub asks. The workflow builds and checks the package and keeps it as the artifact `governed-adlc-npm`; its last step (`npm publish`) fails, because npm does not know the package or the workflow yet.
+3. Download the artifact and check it: `tar -tzf hoanghainh-governed-adlc-0.9.0.tgz` lists only `package/` with `bin/adlc.cjs`, `bin/sdlc.cjs`, `defaults/project-config.default.yaml`, `LICENSE`, `README.md`, `THIRD-PARTY-NOTICES` and `package.json`.
+4. In the macOS Terminal: `npm login`, then `npm publish hoanghainh-governed-adlc-0.9.0.tgz --access public --provenance=false`. The package asks for provenance (`publishConfig.provenance`), which only a CI run can give, so without `--provenance=false` npm stops with `Automatic provenance generation not supported for provider: null`. This one version has no provenance. A scoped package is private unless `--access public` is given.
+5. npm uses **staged publishing** for a new package: the command uploads the version to a waiting area and may create a placeholder version `0.0.0-stage` (tagged `latest` until then). On npmjs.com, open the package and approve the waiting version (2FA again); `npm view @hoanghainh/governed-adlc dist-tags` must then show `latest: 0.9.0`. If there is a placeholder, mark it deprecated: `npm deprecate @hoanghainh/governed-adlc@0.0.0-stage "Placeholder of staged publishing; install 0.9.0 or later"`.
+6. npmjs.com → the package → **Settings** → **Trusted publishing** → GitHub Actions: organisation or user `hoanghainh1188`, repository `governed-adlc-fw`, workflow `npm-publish.yml`, environment `npm`. **Tick "Allow npm publish"** (the allowed actions): without it, the workflow's publish fails with `ENEEDAUTH` (this happened at v0.8.0). On the same page, under **Publishing access**, choose "Require two-factor authentication and disallow tokens".
+7. Deprecate the old package: `npm deprecate agentic-sdlc-cli "moved to @hoanghainh/governed-adlc"`. Installs of an old version still work and show the message.
+8. Check: `npm install -g @hoanghainh/governed-adlc@0.9.0 && adlc --version` in a new terminal; `sdlc --version` prints the same version and a note on stderr.
 
-Done for v0.1.1 on 2026-10-10. The images on GHCR need no step: the packages are linked to this public repository and are public already (check: an anonymous pull of a release image works).
+The images on GHCR need no step for the CLI.
 
 **Every later release:** follow [RELEASING.md](../RELEASING.md) (the whole release); for npm, approve the `npm` environment when GitHub asks, and the workflow publishes with provenance after the same release gate as `release.yml`. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
 
-What v0.2.0 (2026-10-12, the first publish by the workflow) taught:
+What v0.2.0 (2026-10-12, the first publish by the workflow) and v0.8.0 taught:
 
-- **`npm error code ENEEDAUTH` in the step `npm publish`**: npm did not accept the workflow, so it asked for a login. Check the trusted publisher (npmjs.com → the package → **Settings** → **Trusted publishing**). It can **expire**: the page then says "This trusted publisher configuration has expired. Delete it and create a new one." Delete it and add it again with exactly the values of step 5 above; if the form asks for **allowed actions**, choose publish only. Then **Re-run failed jobs** and approve the `npm` environment again. Nothing was published, so the re-run is safe.
-- **After a successful publish** npm answers "Your package is being processed" and shows the version as **validating** on npmjs.com for a few minutes (about 15 for v0.2.0). Wait: the version then appears (`npm view agentic-sdlc-cli dist-tags`). If npmjs.com shows it as waiting for approval (staged publishing), approve it.
-- Check the new version: `npm view agentic-sdlc-cli@X.Y.Z dist.attestations.provenance.predicateType` prints `https://slsa.dev/provenance/v1`, and after an install `npm audit signatures` reports a verified attestation.
+- **`npm error code ENEEDAUTH` in the step `npm publish`**: npm did not accept the workflow, so it asked for a login. Check the trusted publisher (npmjs.com → the package → **Settings** → **Trusted publishing**). It can **expire**: the page then says "This trusted publisher configuration has expired. Delete it and create a new one." Delete it and add it again with exactly the values of step 6 above, with "Allow npm publish" ticked. Then **Re-run failed jobs** and approve the `npm` environment again. Nothing was published, so the re-run is safe.
+- **After a successful publish** npm answers "Your package is being processed" and shows the version as **validating** on npmjs.com for a few minutes (about 15 for v0.2.0). Wait: the version then appears (`npm view @hoanghainh/governed-adlc dist-tags`). If npmjs.com shows it as waiting for approval (staged publishing), approve it.
+- Check the new version: `npm view @hoanghainh/governed-adlc@X.Y.Z dist.attestations.provenance.predicateType` prints `https://slsa.dev/provenance/v1`, and after an install `npm audit signatures` reports a verified attestation.
 
 ## Sending handbook comments
 

@@ -430,7 +430,7 @@ The API (service `sdlc-api`, task B03) logs in with the AppRole `api` and reads 
    Record it in the operations log (role `api`, date, reason; not the secret ID).
 3. Start. On the server every profile starts at once, after the migrations (`platform/deploy/README.md`, Fresh deployment steps 6–7); on a development machine `pnpm compose:platform` (profiles `core` and `platform`). The API listens on `127.0.0.1:8090`.
 4. Check: `curl -s http://127.0.0.1:8090/health/ready` answers `{"status":"ok"}`.
-5. The tenant and its first tenant admin: `platform/deploy/README.md`, Fresh deployment step 8 (`sdlc ops bootstrap`, after the migrations; the token is printed once, so run it in a terminal). Operator commands on the database are `sdlc ops …` (task B13, `design/ADR-M37-admin-onboarding.md`); everything else is done through the API (handbook Ch.19 §19.8d).
+5. The tenant and its first tenant admin: `platform/deploy/README.md`, Fresh deployment step 8 (`adlc ops bootstrap`, after the migrations; the token is printed once, so run it in a terminal). Operator commands on the database are `adlc ops …` (task B13, `design/ADR-M37-admin-onboarding.md`); everything else is done through the API (handbook Ch.19 §19.8d).
 
 ### Rotation
 
@@ -540,9 +540,9 @@ So the API can now read client code (proposals and diffs). It reads one file at 
    ```
    Record it in the operations log (identity `api-evidence`, date, reason; not the keys).
 3. Restart the API: `docker compose -f platform/deploy/docker-compose.yml --env-file platform/deploy/.env --profile core --profile platform restart sdlc-api`.
-4. Check: the API's log has no line with `api.evidence_missing`. `sdlc evidence build <INT-…>` on an intent you may build answers with a version.
+4. Check: the API's log has no line with `api.evidence_missing`. `adlc evidence build <INT-…>` on an intent you may build answers with a version.
 
-Without it the API still starts (log line `api.evidence_missing`), but `sdlc evidence build` and `sdlc evidence export` answer `evidence_unavailable`. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys. Admin work in SeaweedFS: section 5l.
+Without it the API still starts (log line `api.evidence_missing`), but `adlc evidence build` and `adlc evidence export` answer `evidence_unavailable`. Never run `weed shell s3.config.show` or `s3.configure` without `-apply` on the server: they print the keys. Admin work in SeaweedFS: section 5l.
 
 ### Rotation
 
@@ -611,7 +611,7 @@ The loop starts in `report` mode: it counts what it would purge and deletes noth
 
 1. Read the report for each tenant on the server:
    ```bash
-   SDLC_DB_URL=<platform_app URL> pnpm sdlc ops retention report --tenant <slug>
+   SDLC_DB_URL=<platform_app URL> pnpm adlc ops retention report --tenant <slug>
    ```
    For each project it shows the retention days, how many files are stored, due now, held, of open intents, and purged.
 2. Compare it with what you expect (the projects' `evidence_retention_days`, the holds).
@@ -620,16 +620,16 @@ The loop starts in `report` mode: it counts what it would purge and deletes noth
 
 ### Archived projects and Langfuse
 
-- **Archiving.** A tenant admin archives a project with `sdlc admin project archive --project <slug>`. It is refused while the project has open intents. The first pass in `purge` mode after the archive schedules the purge (audit `project.purge_scheduled`, log `retention.archive_purge_scheduled`); the worker purges the project's evidence files `SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS` (default 7) later. A project archived before you turned on `purge` gets the same 7 days from then. Held intents stay. When nothing is left, the audit log gets `project.purged`.
+- **Archiving.** A tenant admin archives a project with `adlc admin project archive --project <slug>`. It is refused while the project has open intents. The first pass in `purge` mode after the archive schedules the purge (audit `project.purge_scheduled`, log `retention.archive_purge_scheduled`); the worker purges the project's evidence files `SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS` (default 7) later. A project archived before you turned on `purge` gets the same 7 days from then. Held intents stay. When nothing is left, the audit log gets `project.purged`.
 - **A mistaken archive.** There is no un-archive command. Within the grace period, set `projects.status` back to `active` on the server with the owner role, and record it in the operations log.
 - **Langfuse** (task E08, `design/ADR-M53-langfuse-purge.md`). The same loop deletes the model-call traces of the intents it purges, by the same rules (open and held intents never), when the worker's Langfuse purge is on (section 5m). Langfuse deletes a few seconds later; the next pass confirms (`langfuse.purged` in the audit log). An archived project gets `project.purged` only after every finished, not held intent is confirmed, with `langfuse: purged`. With `SDLC_WORKER_LANGFUSE_URL=off` it records `langfuse: not_deployed`.
 - **What the log says.**
-  - `retention.langfuse_tag_mismatch`: a trace found by an intent's run tags carries another tenant, project or intent tag. Nothing of that intent is deleted, and its purge waits. Look at the trace in the Langfuse UI (filter by the tag `run_id:<run ID>`; the run IDs are in `sdlc run list <INT>`). If the trace is the intent's, delete it by hand as below; the next pass confirms.
+  - `retention.langfuse_tag_mismatch`: a trace found by an intent's run tags carries another tenant, project or intent tag. Nothing of that intent is deleted, and its purge waits. Look at the trace in the Langfuse UI (filter by the tag `run_id:<run ID>`; the run IDs are in `adlc run list <INT>`). If the trace is the intent's, delete it by hand as below; the next pass confirms.
   - `retention.langfuse_guard_tripped`: one intent has more than 5,000 traces. Check it the same way; delete by hand if right.
   - `retention.langfuse_purge_pending`: Langfuse still shows traces after a request. Check that `langfuse-worker` runs.
   - `retention.langfuse_failed`, `retention.project_purge_waits_langfuse`: Langfuse cannot be reached, or the worker has no Langfuse credential (section 5m).
   - `retention.langfuse_project_mismatch`: the worker's Langfuse key belongs to another Langfuse project. Nothing is purged in Langfuse until it is fixed (section 5m step 1).
-  - `retention.langfuse_tenant_guard_tripped`: too many intents of a tenant are due at once (the evidence guard settings). Check `pnpm sdlc ops retention report --tenant <slug>`; raise `SDLC_WORKER_RETENTION_GUARD_PERCENT` for one pass if right.
+  - `retention.langfuse_tenant_guard_tripped`: too many intents of a tenant are due at once (the evidence guard settings). Check `pnpm adlc ops retention report --tenant <slug>`; raise `SDLC_WORKER_RETENTION_GUARD_PERCENT` for one pass if right.
 - **Deleting traces by hand** (the cases above, or `project.purged` events from before E08 with `langfuse: manual`): on the server, never from a chat tool.
   1. In the Langfuse UI, filter the traces by the tag `run_id:<run ID>` of each run of the intent (or `tenant:<tenant slug>` and `project:<project slug>`), and check them.
   2. Delete them in the UI, or with `DELETE /api/public/traces` and the worker's Langfuse key.
@@ -644,7 +644,7 @@ The loop starts in `report` mode: it counts what it would purge and deletes noth
 
 ## 5k. The daily audit anchor
 
-Once a day the worker writes each tenant's latest audit hash to SeaweedFS, outside the database (task E05 PR 2, `design/ADR-M51-evidence-retention.md` §2.9, D-05 §7.4). `sdlc audit verify` finds a changed row, but not a whole chain that someone with database access rewrote with new hashes. An older anchor still shows that.
+Once a day the worker writes each tenant's latest audit hash to SeaweedFS, outside the database (task E05 PR 2, `design/ADR-M51-evidence-retention.md` §2.9, D-05 §7.4). `adlc audit verify` finds a changed row, but not a whole chain that someone with database access rewrote with new hashes. An older anchor still shows that.
 
 **What is written.** One file per tenant and UTC day, `audit-anchors/<tenant ID>/<YYYY-MM-DD>.json`: the tenant ID, the `seq` and `hash` of its last audit row, the hash version and the time. The bucket `audit-anchors` is versioned and carries object lock **COMPLIANCE, 731 days** (`seaweedfs-init`, `SEAWEEDFS_LOCKED_BUCKETS`): nobody can delete an anchor or shorten its lock through S3, the admin included. The lock cannot be turned off.
 
@@ -688,7 +688,7 @@ The line names the tenant, the anchor's date, its `seq` and a reason. It never h
 Treat every mismatch as a security incident (handbook Ch.6, level `incident`):
 
 1. Stop writers: stop `sdlc-api` and `sdlc-worker` so the chain does not grow while you look.
-2. Check the chain on the server: `SDLC_DB_URL=<platform_app URL> pnpm sdlc ops audit verify --tenant <slug>`. A broken chain names its first broken `seq`. A chain that verifies but does not match the anchor was rewritten as a whole.
+2. Check the chain on the server: `SDLC_DB_URL=<platform_app URL> pnpm adlc ops audit verify --tenant <slug>`. A broken chain names its first broken `seq`. A chain that verifies but does not match the anchor was rewritten as a whole.
 3. Read the anchor of that day with the admin identity, on the server, never from a chat tool. Compare its `seq` and `hash` with the row in the database and with the last database backup that is older than the anchor's date.
 4. For `anchor_versions`: rotate the anchor key at once (below). List the key's versions; the oldest version is the real anchor.
 5. Restore the database from the last good backup (section 7 and task A10) if rows were changed or deleted. Record the incident (template T9).
@@ -794,7 +794,7 @@ Needs `core` running and OpenBao unsealed.
    ```
    Both ask for an admin token at a hidden prompt first. The answer is `stored: kv/api/github-oauth (client_secret)`. Delete the `.client-secret` file afterwards.
 3. **Turn it on.** In `platform/deploy/.env`: `SDLC_API_WEB_SIGNIN=github` and `SDLC_API_PUBLIC_ORIGIN=http://localhost:8090` (the address people open; `https://…` behind a proxy; plain `http://` only on `localhost`, never `127.0.0.1`). Restart `sdlc-api` (`pnpm compose:platform`). The start log has no `api.web_signin_off`.
-4. **Check.** Open `http://localhost:8090/dashboard/`, choose the tenant and **Sign in with GitHub**. Only active users with a linked GitHub identity get in (`sdlc admin identity link`). A refusal shows the same message whatever the cause; the api logs `api.signin_refused` with a code (`cause`).
+4. **Check.** Open `http://localhost:8090/dashboard/`, choose the tenant and **Sign in with GitHub**. Only active users with a linked GitHub identity get in (`adlc admin identity link`). A refusal shows the same message whatever the cause; the api logs `api.signin_refused` with a code (`cause`).
 5. Record the date in the operations log.
 
 ### Rotation
@@ -802,7 +802,7 @@ Needs `core` running and OpenBao unsealed.
 | What | Steps |
 |---|---|
 | The client secret (every 90 days, or when it may have leaked) | On GitHub, generate a new client secret, store it as in step 2. The api reads it again within 10 minutes; no restart. Then delete the old client secret on GitHub |
-| Everyone signed in must sign in again (an incident) | A tenant admin: `sdlc admin user sign-out --user <id or email>` for each person; a person: **Sign out everywhere** in the dashboard |
+| Everyone signed in must sign in again (an incident) | A tenant admin: `adlc admin user sign-out --user <id or email>` for each person; a person: **Sign out everywhere** in the dashboard |
 
 ### Notes
 
@@ -889,9 +889,9 @@ The whole platform is backed up by one command, `pnpm backup` (`platform/deploy/
 4. Deliver the credentials of every process again (`platform/deploy/README.md`, "Fresh deployment" step 5; their volumes are not in the backup), then `platform/deploy/scripts/up.sh core models platform sandbox`.
 5. Check:
    - `pnpm openbao:bootstrap status` says `unsealed`; the Transit key `run-contract` exists;
-   - `SDLC_DB_URL=… pnpm sdlc ops audit verify` passes for every tenant;
+   - `SDLC_DB_URL=… pnpm adlc ops audit verify` passes for every tenant;
    - `curl -s http://127.0.0.1:8090/health/ready` answers;
-   - an Evidence Pack of a closed intent opens (`sdlc evidence show`).
+   - an Evidence Pack of a closed intent opens (`adlc evidence show`).
 6. On a test machine, destroy everything afterwards (`docker compose … down -v`, the env file, the TLS folder). Record the drill, its date and the people in the operations log (section 10).
 
 ## 8. Changing a key holder, rotating secret IDs
@@ -977,8 +977,8 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 | `sdlc-api` restarts with "Cannot read SDLC_OPENBAO_ROLE_ID_FILE" or "no password field" | `api-credentials` was not run, or the volume was removed | Section 5e, step 2 |
 | `sdlc-runner` restarts with `runner.start_failed` ("no password field", "Cannot read SDLC_OPENBAO_ROLE_ID_FILE") | `runner-credentials` was not run, or the volume was removed | Section 5g, step 3 |
 | The runner logs `runner.evidence_missing`, or High-risk runs fail with `agent_proposal_unavailable` or `agent_proposal_failed`, or runs fail with `agent_changes_unavailable` | `runner-evidence-credentials` was not run, SeaweedFS was reset, or the bucket `evidence` is missing. Or the sandbox's workspace was larger than `SDLC_RUNNER_EXPORT_MAX_MB` (everything, `node_modules` included, default 8192), or its files outside the ignore rules were larger than `SDLC_RUNNER_WORKSPACE_MAX_MB` | Section 5g, step 3b; check that `seaweedfs-init` completed; raise the limit only if the workspace is really that large |
-| The API logs `api.evidence_missing`, or `sdlc evidence build` / `export` answers `evidence_unavailable` | `api-evidence-credentials` was not run, SeaweedFS was reset, or the API was not restarted after the command | Section 5h |
-| `sdlc evidence build` answers `evidence_hash_mismatch` or `evidence_missing` | A stored evidence file (a proposal or a diff) was changed or deleted in SeaweedFS after it was recorded. The audit log has an `evidence.check_failed` event | **Treat it as a possible security incident** (handbook Ch.18): do not "fix" the file; tell Person B. SeaweedFS keeps older versions of the bucket `evidence`: the original can be found by its SHA-256 |
+| The API logs `api.evidence_missing`, or `adlc evidence build` / `export` answers `evidence_unavailable` | `api-evidence-credentials` was not run, SeaweedFS was reset, or the API was not restarted after the command | Section 5h |
+| `adlc evidence build` answers `evidence_hash_mismatch` or `evidence_missing` | A stored evidence file (a proposal or a diff) was changed or deleted in SeaweedFS after it was recorded. The audit log has an `evidence.check_failed` event | **Treat it as a possible security incident** (handbook Ch.18): do not "fix" the file; tell Person B. SeaweedFS keeps older versions of the bucket `evidence`: the original can be found by its SHA-256 |
 | `docker-socket-proxy` stays unhealthy, or the runner says it cannot reach the Docker socket (`EACCES`) | `SDLC_DOCKER_GID` is not the group of the host's Docker socket | Section 5g, step 2; then `pnpm compose:sandbox` again |
 | A run fails with `image_unavailable` | `sandbox.image` names a digest the local registry does not have, or the registry is down | Section 5g, sandbox images: push the image again and check the digest |
 | A run fails with `image_not_configured` | The agent's adapter is `opencode`, and the project configuration has no `sandbox.images.opencode` | Section 5g, sandbox images: build the OpenCode image and set it |

@@ -1,4 +1,4 @@
-// `sdlc login`, `sdlc logout`, `sdlc whoami` (D-08 B04 AC1, design/ADR-M36 §2.1–§2.2).
+// `adlc login`, `adlc logout`, `adlc whoami` (D-08 B04 AC1, design/ADR-M36 §2.1–§2.2).
 // The token is read from a hidden prompt or from standard input, never from an argument, and it
 // is checked with `GET /v1/me` before it is saved. It is never printed.
 import { t } from '@sdlc/messages';

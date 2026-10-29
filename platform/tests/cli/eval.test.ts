@@ -1,4 +1,4 @@
-// `sdlc eval …` (task L05, ADR-M82 §2.7) against a mocked API: the paths and bodies it sends, the
+// `adlc eval …` (task L05, ADR-M82 §2.7) against a mocked API: the paths and bodies it sends, the
 // plan file (JSON, at most 64 KB, never printed back), Run now, and refusals with their code.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,7 +21,7 @@ function planFile(content: string): string {
   return file;
 }
 
-describe('sdlc eval', () => {
+describe('adlc eval', () => {
   it('creates a plan from the file and prints its code', async () => {
     const h = await harness({
       routes: { 'POST /v1/projects/shop/eval-plans': { status: 201, body: evalPlanBody() } },

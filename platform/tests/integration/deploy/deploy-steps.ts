@@ -1,6 +1,6 @@
 // The steps of `platform/deploy/README.md` "Fresh deployment (operator)" on a throw-away Compose
 // project, for the live tests `pnpm test:fresh-deploy` (E07 AC3) and `pnpm test:upgrade` (O02).
-// Every step runs the scripts, the compose file and the `sdlc` command of one checkout: this
+// Every step runs the scripts, the compose file and the `adlc` command of one checkout: this
 // repository, or a release tag checked out as a git worktree (`at(root)` switches; the upgrade test
 // deploys a release, then upgrades to another checkout on the same project and volumes).
 //
@@ -160,7 +160,7 @@ export class Deployment {
   }
 
   /**
-   * `sdlc … --json` of this checkout, like a person: the API with a token, or (`operator`) the
+   * `adlc … --json` of this checkout, like a person: the API with a token, or (`operator`) the
    * database. A clean environment: nothing of the shell's `SDLC_*` reaches it.
    */
   sdlc(who: Who | 'operator', argv: readonly string[]): Record<string, unknown> {

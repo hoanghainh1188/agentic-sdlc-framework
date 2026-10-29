@@ -1,4 +1,4 @@
-// `sdlc cost report` (E04 AC1, AC2, D-02 FR-53, ADR-M45) against a mocked API: the filters go to
+// `adlc cost report` (E04 AC1, AC2, D-02 FR-53, ADR-M45) against a mocked API: the filters go to
 // the API as query parameters, the table shows tokens in and out, cached tokens, cost and wasted
 // tokens and cost, money stays the API's decimal string, the freshness notice ends every report,
 // refusals come back with their code, and a malformed body is refused.
@@ -14,7 +14,7 @@ import { apiError, TOKEN, useHarness } from './harness.js';
 const harness = useHarness();
 const REPORT = 'GET /v1/cost/report';
 
-describe('sdlc cost report', () => {
+describe('adlc cost report', () => {
   it('sends the scope, range and grouping as query parameters (AC1)', async () => {
     const h = await harness({ routes: { [REPORT]: { status: 200, body: costReportBody() } } });
     const args = ['cost', 'report', '--project', 'pilot', '--from', '2026-10-01'];

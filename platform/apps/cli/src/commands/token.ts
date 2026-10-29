@@ -1,6 +1,6 @@
-// `sdlc token create|list|revoke`: the caller's own personal API tokens through the API (task B13
+// `adlc token create|list|revoke`: the caller's own personal API tokens through the API (task B13
 // AC5, ADR-M37 §2.8). A new token is printed once, to stdout; it is never logged and never put in
-// an error. `sdlc admin token …` does the same for another user (tenant admins).
+// an error. `adlc admin token …` does the same for another user (tenant admins).
 import { t } from '@sdlc/messages';
 
 import type { ApiClient } from '../api/client.js';

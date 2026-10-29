@@ -116,7 +116,7 @@ export class SystemScope {
     );
   }
 
-  /** Operator commands (`sdlc audit verify`): every tenant, ordered by slug. */
+  /** Operator commands (`adlc audit verify`): every tenant, ordered by slug. */
   listTenants(): Promise<Tenant[]> {
     return run(this.db.selectFrom('tenants').selectAll().orderBy('slug').execute());
   }

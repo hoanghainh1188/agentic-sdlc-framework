@@ -21,7 +21,7 @@ Version 1.0, 2026-10-29. Written by Claude Code from the set-up and the trial pl
 
 Every document by reader, outside the rollout too: [README §2](../README.md#2-where-to-start).
 
-The dashboard (on the platform machine, or from other machines through team access: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard)) shows everyone what waits for whom. With a GitHub sign-in and actions on, people also decide gates there (G7 stays the review on GitHub), confirmed with a passkey; GitHub comments, GitHub reviews and the `sdlc` command work as before (USER-GUIDE).
+The dashboard (on the platform machine, or from other machines through team access: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard)) shows everyone what waits for whom. With a GitHub sign-in and actions on, people also decide gates there (G7 stays the review on GitHub), confirmed with a passkey; GitHub comments, GitHub reviews and the `adlc` command work as before (USER-GUIDE).
 
 ## 2. The rules to know before you start
 
@@ -76,7 +76,7 @@ Each step names who does it, a usual duration and a check. Do not start a step b
 | 0.1 | Choose the project: clear scope, Low or Medium risk work, no client data at first (handbook Ch.9 §9.7) | The project is named in the rollout notes |
 | 0.2 | Name the people: Person A, Person B, PM / BrSE, a second approver if flagged changes are likely, governance (leadership) | Template T5 (RACI) filled in |
 | 0.3 | Run the readiness assessment with the team (half a day) | Template T17: **Go** or **Conditional Go** (handbook Ch.9 §9.6) |
-| 0.4 | Set the budget: per month for the tenant, per intent and per run (the defaults and how they apply: [handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#budgets)) | The amounts written down; leadership agrees. There is no measured cost per intent yet: the trial M-E produces the first numbers; until then, start small and read `sdlc cost report` ([handbook Ch.19](../handbook/02-playbook/ch19-approval-queues.md#cost-report)) every week |
+| 0.4 | Set the budget: per month for the tenant, per intent and per run (the defaults and how they apply: [handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#budgets)) | The amounts written down; leadership agrees. There is no measured cost per intent yet: the trial M-E produces the first numbers; until then, start small and read `adlc cost report` ([handbook Ch.19](../handbook/02-playbook/ch19-approval-queues.md#cost-report)) every week |
 | 0.5 | Choose the model: an API model, or a self-hosted one for `client_restricted` data (D-07) | The model is in the platform's gateway list |
 
 ### Step 1. Prepare the repository (Person A, the repository owner; 1–2 days)
@@ -90,7 +90,7 @@ The platform and your application live in **two separate repositories**. The pla
 **Repo 1, the platform (this repository):**
 
 - A tool, like a CI server: installed once on a server, it serves many projects and many tenants.
-- Team members never change it. They use it through the `sdlc` command, `/approve` comments on GitHub and the dashboard.
+- Team members never change it. They use it through the `adlc` command, `/approve` comments on GitHub and the dashboard.
 
 **Repo 2, your project's repository (one per team or project):**
 
@@ -99,7 +99,7 @@ The platform and your application live in **two separate repositories**. The pla
 
 **How the two connect:**
 
-1. The tenant admin registers the project and names its repository: `sdlc admin project create --slug <slug> --name <name> --repo <org>/<name>`.
+1. The tenant admin registers the project and names its repository: `adlc admin project create --slug <slug> --name <name> --repo <org>/<name>`.
 2. The operator installs the platform's GitHub App on that repository.
 3. When an intent's agent runs, the runner **clones the repository into a temporary sandbox**. The agent writes code there; the runner pushes the branch `agent/INT-…` and opens the pull request, then **removes the sandbox**. The platform keeps no working copy of the code. It keeps each run's diff as evidence (in SeaweedFS, at least 180 days, then purged unless held), hashes and logs; with the optional `observability` profile, Langfuse also keeps the model prompts and answers, which contain code, until the retention purge (ADR-M53).
 4. People review and merge the pull request **on GitHub, in the project's repository**.
@@ -165,7 +165,7 @@ From a spec to a submitted plan:
 
 ![From a spec to a submitted plan](../diagrams/svg/d15-spec-to-plan.svg)
 
-- `sdlc plan draft <INT-…> --from <file> --tool spec-kit|bmad` reads a Spec Kit `tasks.md` or **one** BMAD story file (an epics file is refused). It leaves `allowed_paths`, `tools` and `change_flags` for a person: submission refuses the draft until they are filled. It never submits, commits or pushes.
+- `adlc plan draft <INT-…> --from <file> --tool spec-kit|bmad` reads a Spec Kit `tasks.md` or **one** BMAD story file (an epics file is refused). It leaves `allowed_paths`, `tools` and `change_flags` for a person: submission refuses the draft until they are filled. It never submits, commits or pushes.
 - The plan file is named after the intent code, so create the intent first.
 - Details: handbook Ch.19 §19.8c, [drafting a plan](../handbook/02-playbook/ch19-approval-queues.md#plan-draft) and [submitting it](../handbook/02-playbook/ch19-approval-queues.md#plan-file).
 
@@ -174,23 +174,23 @@ From a spec to a submitted plan:
 | # | Who | Do | Check |
 |---|---|---|---|
 | 2.1 | Operator | Install the platform, or use the existing one. On a server: first [Before you start on a server](deploy/README.md#before-you-start-on-a-server) (the key holders, the CA certificate, the runner's Engine), then `pnpm server:setup` for steps 2–7 of [deploy/README, Fresh deployment](deploy/README.md#fresh-deployment-operator). On a developer machine: [GETTING-STARTED Step 11b](GETTING-STARTED.md#step-11b-set-up-the-dev-stack-from-scratch-dev) | On the platform server, `curl http://127.0.0.1:8090/health/ready` answers ok |
-| 2.2 | Operator | Create the tenant and its first tenant admin, in a terminal: the API token is printed once ([deploy/README step 8](deploy/README.md#8-the-tenant-and-its-first-admin)) | The tenant admin logs in: `sdlc whoami` |
-| 2.3 | Tenant admin | Create the project. The short way does 2.3, 2.4 and 2.8 from one file: copy [`deploy/project.example.yaml`](deploy/project.example.yaml), fill it in, then `sdlc admin project apply --file <file> --dry-run` and again without `--dry-run` ([handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#project-file)). The commands one by one: [deploy/README step 9](deploy/README.md#9-the-project-and-its-team) | `sdlc admin project show --project <slug>` |
-| 2.4 | Tenant admin | Add each person, link their GitHub account by its numeric ID, give the roles of T5 ([handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)). The admin's own role comes from a second admin or from the operator | `sdlc admin role list --project <slug>`: Person A and Person B are different people |
-| 2.5 | PM / BrSE or Person A | Save the project AI record: the client's written consent as codes, and the link to the human record ([handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#ai-record), template T7) | `sdlc ai-record show --project <slug>` |
+| 2.2 | Operator | Create the tenant and its first tenant admin, in a terminal: the API token is printed once ([deploy/README step 8](deploy/README.md#8-the-tenant-and-its-first-admin)) | The tenant admin logs in: `adlc whoami` |
+| 2.3 | Tenant admin | Create the project. The short way does 2.3, 2.4 and 2.8 from one file: copy [`deploy/project.example.yaml`](deploy/project.example.yaml), fill it in, then `adlc admin project apply --file <file> --dry-run` and again without `--dry-run` ([handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#project-file)). The commands one by one: [deploy/README step 9](deploy/README.md#9-the-project-and-its-team) | `adlc admin project show --project <slug>` |
+| 2.4 | Tenant admin | Add each person, link their GitHub account by its numeric ID, give the roles of T5 ([handbook Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins)). The admin's own role comes from a second admin or from the operator | `adlc admin role list --project <slug>`: Person A and Person B are different people |
+| 2.5 | PM / BrSE or Person A | Save the project AI record: the client's written consent as codes, and the link to the human record ([handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#ai-record), template T7) | `adlc ai-record show --project <slug>` |
 | 2.6 | Operator, tenant admin | Build the sandbox image for the project's toolchain and pin it by digest ([deploy/README step 10](deploy/README.md#10-the-sandbox-image); other toolchains need a new image) | The reference ends in `@sha256:…` |
-| 2.7 | Tenant admin, agent owner, Person B | Register the agent, then the agent owner and Person B approve it ([handbook Ch.20 §20.5b](../handbook/02-playbook/ch20-agent-and-model-lifecycle.md#205b-the-agent-register-on-the-platform)) | `sdlc admin agent show --key <key>` says `active` |
-| 2.8 | Tenant admin | Upload the project configuration: at least `run.agent_key`, `sandbox.image`, `verification.required_checks` (the aggregate check of 1.2); the budgets of 0.4 ([deploy/README step 12](deploy/README.md#12-the-project-configuration)) | `sdlc admin config show --project <slug>` shows the new version |
-| 2.9 | Operator (optional) | **Team access and dashboard sign-in.** So that people use the API and the dashboard from their own machines, turn on team access: one LAN port over TLS ([deploy/README, Team access](deploy/README.md#team-access-operator)). To let them sign in to the dashboard with GitHub, store the App's client secret and turn the sign-in on ([runbook T11 §5n](../handbook/03-templates/T11-openbao-runbook.md#5n-the-dashboards-github-sign-in-the-apps-client-secret)). Tell the team the address, `https://<server name>:8443`, and give them the CA's `ca.pem` when it is not a company CA their machines trust | From another machine, `sdlc doctor` after `sdlc login --api-url https://<server name>:8443` is ok |
+| 2.7 | Tenant admin, agent owner, Person B | Register the agent, then the agent owner and Person B approve it ([handbook Ch.20 §20.5b](../handbook/02-playbook/ch20-agent-and-model-lifecycle.md#205b-the-agent-register-on-the-platform)) | `adlc admin agent show --key <key>` says `active` |
+| 2.8 | Tenant admin | Upload the project configuration: at least `run.agent_key`, `sandbox.image`, `verification.required_checks` (the aggregate check of 1.2); the budgets of 0.4 ([deploy/README step 12](deploy/README.md#12-the-project-configuration)) | `adlc admin config show --project <slug>` shows the new version |
+| 2.9 | Operator (optional) | **Team access and dashboard sign-in.** So that people use the API and the dashboard from their own machines, turn on team access: one LAN port over TLS ([deploy/README, Team access](deploy/README.md#team-access-operator)). To let them sign in to the dashboard with GitHub, store the App's client secret and turn the sign-in on ([runbook T11 §5n](../handbook/03-templates/T11-openbao-runbook.md#5n-the-dashboards-github-sign-in-the-apps-client-secret)). Tell the team the address, `https://<server name>:8443`, and give them the CA's `ca.pem` when it is not a company CA their machines trust | From another machine, `adlc doctor` after `adlc login --api-url https://<server name>:8443` is ok |
 
-**A second project or tenant.** One installation serves many projects: the operator skips 2.1, and 2.2 is needed only for a new tenant (a client or unit with its own data and budget: `pnpm sdlc ops bootstrap`, deploy/README step 8). For each new project: install the GitHub App on its repository too (selected repositories), then 2.3–2.8. A project with another toolchain than Node.js needs a new sandbox image (2.6), which does not exist yet.
+**A second project or tenant.** One installation serves many projects: the operator skips 2.1, and 2.2 is needed only for a new tenant (a client or unit with its own data and budget: `pnpm adlc ops bootstrap`, deploy/README step 8). For each new project: install the GitHub App on its repository too (selected repositories), then 2.3–2.8. A project with another toolchain than Node.js needs a new sandbox image (2.6), which does not exist yet.
 
 ### Step 3. Prepare the people (each team member; half a day)
 
 | # | Do | Check |
 |---|---|---|
 | 3.1 | Read [the platform in five minutes](PLATFORM-IN-5-MINUTES.md) and the [tutorial](TUTORIAL-FIRST-FEATURE.md) (about 20 minutes), then `platform/USER-GUIDE.md` and the handbook chapters of your role (section 1) | — |
-| 3.2 | Install the `sdlc` command ([USER-GUIDE §2, "Install the sdlc command"](USER-GUIDE.md#install-the-sdlc-command)). Get a first API token from the tenant admin, log in (`sdlc login --api-url` with the team address of 2.9 when it is set, else on the platform server), create your own API token and revoke the first one (USER-GUIDE §2) | `sdlc whoami` shows your roles |
+| 3.2 | Install the `adlc` command ([USER-GUIDE §2, "Install the adlc command"](USER-GUIDE.md#install-the-adlc-command)). Get a first API token from the tenant admin, log in (`adlc login --api-url` with the team address of 2.9 when it is set, else on the platform server), create your own API token and revoke the first one (USER-GUIDE §2) | `adlc whoami` shows your roles |
 | 3.3 | Open the dashboard: through team access `https://<server name>:8443/dashboard/`, or on the platform server `http://localhost:8090/dashboard/`; sign in with GitHub (when 2.9 turned it on) or with your API token ([handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard)) | You see the project's (empty) board |
 | 3.4 | A 30-minute walk-through together: the eight gates, who decides each, how comment commands work (first line of a new comment), what an escalation is | Everyone can say who approves G3 and G7 on this project |
 
@@ -203,13 +203,13 @@ Run real intents, one at a time at first. The trial plan of the sample repositor
 | 4.1 | First intent: **Low risk**, small, clear acceptance criteria. Follow USER-GUIDE §3 from G1 to G8 | The intent ends `done`; its Evidence Pack is sealed |
 | 4.2 | Then Low and Medium intents one after another; then two at the same time | No platform problem left open between intents |
 | 4.3 | Keep a short manual log per intent: minutes of human work per gate, whether the result met the spec, problems, notes (M-E plan §7.2) | One row per intent |
-| 4.4 | Use the stop rules: a `security` escalation, a broken audit chain (`sdlc audit verify`), the budget reached, anything that looks like real client data → stop and tell governance (M-E plan §9) | — |
+| 4.4 | Use the stop rules: a `security` escalation, a broken audit chain (`adlc audit verify`), the budget reached, anything that looks like real client data → stop and tell governance (M-E plan §9) | — |
 
 ### Step 5. Review, then widen (tech lead, leadership; at the end of the pilot)
 
 | # | Do | Check |
 |---|---|---|
-| 5.1 | Collect the numbers: `sdlc metrics gates --project <slug>` (waiting time per gate), `sdlc cost report --project <slug>` (tokens, cost, wasted cost), the share of pull requests that needed changes (Evidence Packs) | A short report, like the M-E report (M-E plan §8) |
+| 5.1 | Collect the numbers: `adlc metrics gates --project <slug>` (waiting time per gate), `adlc cost report --project <slug>` (tokens, cost, wasted cost), the share of pull requests that needed changes (Evidence Packs) | A short report, like the M-E report (M-E plan §8) |
 | 5.2 | Decide what to change: gate deadlines, oversight at a gate, budgets, retries (a configuration change, audited); never the mandatory rules | The new configuration uploaded, or "no change" recorded |
 | 5.3 | Decide the next step with leadership: more kinds of change, Medium-risk work, a second project, or client work with written consent (handbook Ch.9 §9.5, gate between steps) | Leadership's decision recorded |
 
@@ -233,10 +233,10 @@ Run real intents, one at a time at first. The trial plan of the sample repositor
 | A GitHub account linked by login, or not at all | That person's `/approve` comments are refused | Link by numeric ID (`gh api users/<login> --jq .id`) |
 | No project AI record | Intents wait before G1 (`ai_record_missing`) | Step 2.5 before the first intent |
 | The spec or the plan is not on the default branch | The spec cannot be linked; the plan cannot be submitted | Merge them first: the platform reads `main` |
-| The plan file changed after it was submitted | G3 or G4 waits for "plan resubmit needed" | Submit it again with `sdlc plan submit` |
+| The plan file changed after it was submitted | G3 or G4 waits for "plan resubmit needed" | Submit it again with `adlc plan submit` |
 | `verification.required_checks` does not match the repository's CI | G6 waits for a check that never comes, then escalates | Use the aggregate check of step 1.2 |
 | Merging before "ready to merge", or by the producer | A `security` escalation; the intent pauses | Person B merges, after the platform's notice |
-| An API token pasted into chat or a ticket | Anyone who reads it acts as you | Revoke it (`sdlc token revoke --id <ID>`, the ID from `sdlc token list`) and create a new one |
+| An API token pasted into chat or a ticket | Anyone who reads it acts as you | Revoke it (`adlc token revoke --id <ID>`, the ID from `adlc token list`) and create a new one |
 | Nobody answers an escalation | It moves to the backup owner, then to governance; the work stays frozen | Name a backup for each role in T5 |
 
 ## 6. Where to read more

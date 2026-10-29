@@ -1,4 +1,4 @@
-// `sdlc admin project apply --file project.yaml` (task V17 AC1–AC6, QUESTIONS #617) against an
+// `adlc admin project apply --file project.yaml` (task V17 AC1–AC6, QUESTIONS #617) against an
 // in-memory platform and GitHub: a new project, a second run, a changed file, M21 within the file
 // and against the bindings already held, an unknown or bot GitHub login, `--dry-run`, the
 // confirmation, and that it never approves the agent, writes the AI record or issues a token.
@@ -66,7 +66,7 @@ const edit = (from: string, to: string): string => {
   return PROJECT_FILE.replace(from, to);
 };
 
-describe('sdlc admin project apply (V17)', () => {
+describe('adlc admin project apply (V17)', () => {
   it('AC1: the file schema is strict, so no token or secret field can be added', () => {
     const file = parse(PROJECT_FILE) as Record<string, unknown>;
     expect(projectFileSchema.safeParse(file).success).toBe(true);

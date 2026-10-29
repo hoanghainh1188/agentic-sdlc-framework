@@ -1,4 +1,4 @@
-// `sdlc eval report` and `sdlc next` without an intent (task L06, ADR-M83 §2.2, QUESTIONS #482)
+// `adlc eval report` and `adlc next` without an intent (task L06, ADR-M83 §2.2, QUESTIONS #482)
 // against a mocked API, with the body built by the api's own report code: the summaries, the
 // comparison, the recommendations as catalog texts with the agent register note, the real-run
 // numbers or the note that they are hidden. Also the api's mapping of stored results.
@@ -102,7 +102,7 @@ describe('the api report of stored results (ADR-M83 §2.2)', () => {
   });
 });
 
-describe('sdlc eval report', () => {
+describe('adlc eval report', () => {
   it('prints the summaries, the comparison and the recommendation with the register note', async () => {
     const h = await harness({
       routes: {
@@ -195,7 +195,7 @@ describe('sdlc eval report', () => {
   });
 });
 
-describe('sdlc next without an intent (QUESTIONS #482)', () => {
+describe('adlc next without an intent (QUESTIONS #482)', () => {
   it('lists the evaluations that ended in the last 7 days with the report command', async () => {
     const ended = {
       ...evaluationBody(),

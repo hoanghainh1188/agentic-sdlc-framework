@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "description": "The sdlc command-line tool. See design/D-03 section 5.1.",
+  "description": "The adlc command-line tool. See design/D-03 section 5.1 and design/ADR-M100.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "sdlc": "dist/main.js"
+    "adlc": "dist/main.js",
+    "sdlc": "dist/sdlc.js"
   },
   "files": [
     "dist"

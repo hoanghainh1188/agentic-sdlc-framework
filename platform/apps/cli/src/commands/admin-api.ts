@@ -1,8 +1,8 @@
-// `sdlc admin …` through the API (task B13, ADR-M37 §2.7–§2.8). These are user commands: they use
-// the login of `sdlc login` (or SDLC_API_URL and SDLC_API_TOKEN in CI) and the B04 client
+// `adlc admin …` through the API (task B13, ADR-M37 §2.7–§2.8). These are user commands: they use
+// the login of `adlc login` (or SDLC_API_URL and SDLC_API_TOKEN in CI) and the B04 client
 // (ADR-M36). The caller needs the tenant role `tenant_admin`, or the project role `admin` for a
 // project's roles and configuration; the agent register follows handbook Ch.20. The operator's
-// commands on the server are `sdlc ops …` (ops.ts).
+// commands on the server are `adlc ops …` (ops.ts).
 import { t } from '@sdlc/messages';
 
 import { parseCommand, withApi } from '../api/session.js';
@@ -14,7 +14,7 @@ import { PROJECT_COMMANDS } from './admin-projects.js';
 import { TOOL_COMMANDS } from './admin-tools.js';
 import { USER_COMMANDS } from './admin-users.js';
 
-/** Groups of `sdlc admin` that go through the API. */
+/** Groups of `adlc admin` that go through the API. */
 export const ADMIN_API_GROUPS = [
   'project',
   'user',

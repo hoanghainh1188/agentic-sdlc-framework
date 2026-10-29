@@ -1,4 +1,4 @@
-// Step 3 of `sdlc trial report` (task V01, ADR-M65 §2.4): the last check before anything is
+// Step 3 of `adlc trial report` (task V01, ADR-M65 §2.4): the last check before anything is
 // printed, independent of `build.ts`. Every object is strict (an unknown field fails) and every
 // string is either a value of a closed list (the same lists `build.ts` uses, plus `other`) or one
 // of a few fixed shapes: `project-N`, `intent-N`, a date, a version, a token sum or a USD amount.

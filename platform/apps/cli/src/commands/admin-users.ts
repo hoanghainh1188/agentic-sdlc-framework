@@ -1,4 +1,4 @@
-// `sdlc admin user|identity|tenant-admin …` through the API (task B13 AC2, AC3; ADR-M37 §2.7).
+// `adlc admin user|identity|tenant-admin …` through the API (task B13 AC2, AC3; ADR-M37 §2.7).
 // `--user` takes a user ID or an e-mail address (looked up in the tenant's user list).
 import { t } from '@sdlc/messages';
 
@@ -188,7 +188,7 @@ export const USER_COMMANDS: Readonly<Record<string, AdminApiCommand>> = {
     },
   },
   // Tokens of another user (B13 AC5, QUESTIONS #152): a token issued for someone else lives at
-  // most 7 days; the user creates their own with `sdlc token create` and revokes that one.
+  // most 7 days; the user creates their own with `adlc token create` and revokes that one.
   'token issue': {
     options: { ...user, name: { type: 'string' }, days: { type: 'string' } },
     required: ['user', 'name'],

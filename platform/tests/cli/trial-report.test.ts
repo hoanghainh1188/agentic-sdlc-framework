@@ -1,4 +1,4 @@
-// `sdlc trial report` (task V01, D-08 V01 AC3, AC4, ADR-M65) against a mocked API built with the
+// `adlc trial report` (task V01, D-08 V01 AC3, AC4, ADR-M65) against a mocked API built with the
 // API's presenters (`trial-world.ts`). What it proves: the report holds counts, codes, durations,
 // amounts and model names only; no slug, intent code, title, UUID, e-mail, repository or URL ever
 // reaches it, also when every free field of every answer carries a marker or an answer gains a
@@ -110,7 +110,7 @@ function assertAnonymous(text: string): void {
   expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/);
 }
 
-describe('sdlc trial report (V01, ADR-M65)', () => {
+describe('adlc trial report (V01, ADR-M65)', () => {
   it('builds the anonymous report from the existing GET endpoints only', async () => {
     const r = await run(new TrialWorld());
     expect(r.code).toBe(EXIT.ok);

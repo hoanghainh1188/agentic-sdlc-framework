@@ -1,4 +1,4 @@
-// `sdlc admin agent …` over the API (B13 AC7, handbook Ch.20, ADR-M37 §2.8) against a mocked
+// `adlc admin agent …` over the API (B13 AC7, handbook Ch.20, ADR-M37 §2.8) against a mocked
 // API: registering with a hashed instructions file, approving (the last approval changes the
 // status), stopping, usage errors.
 import { writeFile } from 'node:fs/promises';
@@ -29,7 +29,7 @@ const REGISTER = [
   'L2',
 ];
 
-describe('sdlc admin agent', () => {
+describe('adlc admin agent', () => {
   it('registers with the hash of a local instructions file', async () => {
     const h = await harness({
       routes: { 'POST /v1/admin/agents': { status: 201, body: agentBody() } },

@@ -1,6 +1,6 @@
 // Create an intent from the dashboard, then link its spec (U08 AC1, design/ADR-M73 §2.1): the two
-// calls of `sdlc intent create --spec` (U03), with no step-up. A refused link keeps the intent and
-// says so; the person links the spec again with `sdlc spec link`. Who may create and link comes
+// calls of `adlc intent create --spec` (U03), with no step-up. A refused link keeps the intent and
+// says so; the person links the spec again with `adlc spec link`. Who may create and link comes
 // from the project's `access.*` roles: the page has no rule set and shows the API's refusal.
 import type { IntentView } from '@sdlc/api-schemas';
 import { useState } from 'preact/hooks';

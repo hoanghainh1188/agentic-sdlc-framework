@@ -1,5 +1,5 @@
-// `sdlc admin evidence hold|release|show <INT>` over the API (E05, ADR-M51, QUESTIONS #235) against
-// a mocked API, and the parser of `sdlc ops retention report` (counts only).
+// `adlc admin evidence hold|release|show <INT>` over the API (E05, ADR-M51, QUESTIONS #235) against
+// a mocked API, and the parser of `adlc ops retention report` (counts only).
 import { t } from '@sdlc/messages';
 import { describe, expect, it } from 'vitest';
 
@@ -17,7 +17,7 @@ const HOLD = {
   released_by: null,
 };
 
-describe('sdlc admin evidence', () => {
+describe('adlc admin evidence', () => {
   it('holds an intent with an optional link', async () => {
     const h = await harness({
       routes: {
@@ -78,7 +78,7 @@ describe('sdlc admin evidence', () => {
   });
 });
 
-describe('sdlc ops retention report (parser)', () => {
+describe('adlc ops retention report (parser)', () => {
   it('needs a tenant; the grace is a number', () => {
     expect(parseRetentionCommand(['report', '--tenant', 'internal'])).toMatchObject({
       command: 'report',

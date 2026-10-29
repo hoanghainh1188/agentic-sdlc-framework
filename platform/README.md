@@ -9,7 +9,7 @@ The code and guides of the [Agentic SDLC Framework](../README.md) platform: the 
 | Understand the platform quickly | [PLATFORM-IN-5-MINUTES.md](PLATFORM-IN-5-MINUTES.md) |
 | Follow one feature from idea to release | [TUTORIAL-FIRST-FEATURE.md](TUTORIAL-FIRST-FEATURE.md) |
 | Try the platform on your own machine (the community trial) | [TRIAL.md](../TRIAL.md) |
-| Use the platform (install `sdlc`, log in, take a task through G1–G8) | [USER-GUIDE.md](USER-GUIDE.md) |
+| Use the platform (install `adlc`, log in, take a task through G1–G8) | [USER-GUIDE.md](USER-GUIDE.md) |
 | Bring a project team onto the platform | [ROLLOUT-GUIDE.md](ROLLOUT-GUIDE.md) |
 | Install, restart, upgrade or remove the platform (operator) | [deploy/README.md](deploy/README.md); [runbook T11](../handbook/03-templates/T11-openbao-runbook.md) (OpenBao) |
 | Develop the platform itself | [CONTRIBUTING.md](../CONTRIBUTING.md), [GETTING-STARTED.md](GETTING-STARTED.md), [CLAUDE.md](../CLAUDE.md) |
@@ -19,7 +19,7 @@ The code and guides of the [Agentic SDLC Framework](../README.md) platform: the 
 
 ```text
 platform/
-├── apps/             # api (NestJS), worker (Temporal, GitHub poller), runner (sandboxes, agent), cli (sdlc), dashboard (read only)
+├── apps/             # api (NestJS), worker (Temporal, GitHub poller), runner (sandboxes, agent), cli (adlc), dashboard (read only)
 ├── packages/         # core, contracts, config, messages, secrets, telemetry, api-schemas, workflow-client
 │   └── adapters/     # git-github, agent-openhands, model-litellm, evidence-s3, policy-simple, traces-langfuse
 ├── deploy/           # docker-compose.yml and its profiles, OpenBao bootstrap, scripts

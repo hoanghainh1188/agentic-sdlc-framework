@@ -2,7 +2,7 @@
 # Builds the image of a first-party register tool (task X04 PR 3b, design/ADR-M89, ADR-M69 §2.2)
 # and pushes it to the local registry of the Compose profile "sandbox", like the sandbox images
 # (runbook T11 §5g). Prints the reference pinned by digest: its name goes into
-# `sdlc admin tool register --image`, its digest into `--image-digest`.
+# `adlc admin tool register --image`, its digest into `--image-digest`.
 #
 #   pnpm tool-image:build project-docs              # registry localhost:5000
 #   pnpm tool-image:build project-docs --no-push    # build only (CI scans it)

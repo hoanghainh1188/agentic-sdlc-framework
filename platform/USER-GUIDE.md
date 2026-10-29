@@ -33,21 +33,22 @@ Risk tiers decide how far the agent may go: Low and Medium → it changes code (
 
 ## 2. Before your first intent
 
-### Install the sdlc command
+### Install the adlc command
 
-From release v0.1.1 on, the `sdlc` command is on npm as **`agentic-sdlc-cli`**. You need Node.js 24 only; no checkout, pnpm or build:
+From release v0.9.0 on, the `adlc` command is on npm as **`@hoanghainh/governed-adlc`**. You need Node.js 24 only; no checkout, pnpm or build:
 
 ```bash
-npm install -g agentic-sdlc-cli
-sdlc --version
+npm install -g @hoanghainh/governed-adlc
+adlc --version
 ```
 
-- **Use the platform's version.** `sdlc --version` prints the release; install the one your platform runs (ask your operator): `npm install -g agentic-sdlc-cli@<version>`, for example `@0.2.0`. To update: the same command with the new version.
+- **Use the platform's version.** `adlc --version` prints the release; install the one your platform runs (ask your operator): `npm install -g @hoanghainh/governed-adlc@<version>`, for example `@0.9.0`. To update: the same command with the new version.
+- **Before v0.9.0** the package was `agentic-sdlc-cli` and the command `sdlc`. For a platform older than v0.9.0, install `agentic-sdlc-cli@<version>`. To move: `npm uninstall -g agentic-sdlc-cli`, then install the new package. Your login stays: `adlc` reads the old one (`~/.config/sdlc/`) until it saves its own (`~/.config/adlc/`). Until v0.10.0, `sdlc` still works: it prints a note on stderr and runs the same command (ADR-M100).
 - **Trust.** From v0.2.0 on, every version is published by this repository's GitHub Actions from a release tag, with npm provenance (npm shows the commit and the workflow that built it). Version 0.1.1 was published by hand, without provenance. The package has no dependencies: everything it needs is in one file, and `THIRD-PARTY-NOTICES` lists the bundled open-source packages.
-- **Operator commands.** `sdlc ops …` is in the package too, but works only on the platform server, with `SDLC_DB_URL` ([deploy/README.md](deploy/README.md)).
-- To remove it: `npm uninstall -g agentic-sdlc-cli`.
+- **Operator commands.** `adlc ops …` is in the package too, but works only on the platform server, with `SDLC_DB_URL` ([deploy/README.md](deploy/README.md)).
+- To remove it: `npm uninstall -g @hoanghainh/governed-adlc`.
 
-**From a checkout (developers, and before v0.1.1).** Run the CLI from a checkout of this repository (Node.js 24, pnpm 10; `corepack enable` once):
+**From a checkout (developers).** Run the CLI from a checkout of this repository (Node.js 24, pnpm 10; `corepack enable` once):
 
 ```bash
 git clone https://github.com/hoanghainh1188/governed-adlc-fw.git
@@ -57,8 +58,8 @@ pnpm install && pnpm build
 
 Then choose one way to call it:
 
-- **From the repository root, without installing:** `pnpm sdlc <command>`, for example `pnpm sdlc whoami`. It compiles the CLI first when needed.
-- **As `sdlc` everywhere, with pnpm:** run `pnpm setup` once (it creates pnpm's global folder and adds it to your shell profile; open a new terminal after it), then link the CLI:
+- **From the repository root, without installing:** `pnpm adlc <command>`, for example `pnpm adlc whoami`. It compiles the CLI first when needed.
+- **As `adlc` everywhere, with pnpm:** run `pnpm setup` once (it creates pnpm's global folder and adds it to your shell profile; open a new terminal after it), then link the CLI:
 
   ```bash
   cd platform/apps/cli
@@ -66,9 +67,9 @@ Then choose one way to call it:
   ```
 
   `pnpm --filter @sdlc/cli link --global` does not work (pnpm refuses `--filter` here). To remove the link: `pnpm uninstall --global @sdlc/cli`.
-- **As `sdlc` everywhere, with an alias:** add `alias sdlc='node <checkout>/platform/apps/cli/dist/main.js'` to your shell profile.
+- **As `adlc` everywhere, with an alias:** add `alias adlc='node <checkout>/platform/apps/cli/dist/main.js'` to your shell profile.
 
-After a `git pull`, run `pnpm install && pnpm build` again. The examples in this guide write `sdlc …`; with the first way, write `pnpm sdlc …`.
+After a `git pull`, run `pnpm install && pnpm build` again. The examples in this guide write `adlc …`; with the first way, write `pnpm adlc …`.
 
 ### Account and login
 
@@ -83,33 +84,33 @@ After a `git pull`, run `pnpm install && pnpm build` again. The examples in this
    | On the server itself | `http://127.0.0.1:8090` | The operator, if they changed the port |
    | On a team server, from your computer (team access, [deploy/README.md](deploy/README.md#team-access-operator)) | `https://<server name>:8443` | The operator; with a company or test certificate authority also its `ca.pem`: `export NODE_EXTRA_CA_CERTS=<path to ca.pem>` |
 
-   Plain `http://` works only for this machine; every other address is `https://`, and the certificate is always checked: never turn certificate checks off. Without team access, run `sdlc` on the server. Comment commands and reviews on GitHub work from anywhere.
+   Plain `http://` works only for this machine; every other address is `https://`, and the certificate is always checked: never turn certificate checks off. Without team access, run `adlc` on the server. Comment commands and reviews on GitHub work from anywhere.
 
    ```bash
-   sdlc login --api-url http://127.0.0.1:8090
-   sdlc whoami
-   sdlc doctor
-   sdlc token create --name laptop
+   adlc login --api-url http://127.0.0.1:8090
+   adlc whoami
+   adlc doctor
+   adlc token create --name laptop
    ```
 
-   - **Log in:** `sdlc login` asks for the API token at a hidden prompt.
-   - **Check:** `sdlc doctor` checks your login and the API (TLS, your API token and when it ends, your roles, the CLI's version against the API's) and says what to fix. It changes nothing and never prints your token.
-   - **Your own token:** the first token a tenant admin issues for you lives at most 7 days. `sdlc token create --name laptop` prints a new token of your own once. Log in again with it.
-   - **Revoke the first token:** `sdlc token list`, then `sdlc token revoke --id <ID>`. Details: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command).
-3. **The project AI record** (the client's recorded consent to AI use) must allow the data class of your work (how sensitive its information is). Person A or the PM / BrSE writes it once per project with `sdlc ai-record set …` ([handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#ai-record)); check it with `sdlc ai-record show --project <slug>`. Without it, intents cannot enter G1.
+   - **Log in:** `adlc login` asks for the API token at a hidden prompt.
+   - **Check:** `adlc doctor` checks your login and the API (TLS, your API token and when it ends, your roles, the CLI's version against the API's) and says what to fix. It changes nothing and never prints your token.
+   - **Your own token:** the first token a tenant admin issues for you lives at most 7 days. `adlc token create --name laptop` prints a new token of your own once. Log in again with it.
+   - **Revoke the first token:** `adlc token list`, then `adlc token revoke --id <ID>`. Details: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-adlc-command).
+3. **The project AI record** (the client's recorded consent to AI use) must allow the data class of your work (how sensitive its information is). Person A or the PM / BrSE writes it once per project with `adlc ai-record set …` ([handbook Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#ai-record)); check it with `adlc ai-record show --project <slug>`. Without it, intents cannot enter G1.
 
 ## 3. One intent, step by step
 
 The example is task T01 of the sample repo, Low risk. Where Medium or High risk differs, it says so.
 
-**Lost? Ask the platform.** `sdlc help` lists the guides and the commands; after a command that moves an intent, the CLI prints the likely next step, and after a failure, what to do. At any step, `sdlc next <INT>` prints where the intent is, who it waits for, why it is held, and what **you** do now: the command or comment to type, or that it waits for someone else. It reads the intent and your roles only and changes nothing; it never tells a producer of a change to approve it.
+**Lost? Ask the platform.** `adlc help` lists the guides and the commands; after a command that moves an intent, the CLI prints the likely next step, and after a failure, what to do. At any step, `adlc next <INT>` prints where the intent is, who it waits for, why it is held, and what **you** do now: the command or comment to type, or that it waits for someone else. It reads the intent and your roles only and changes nothing; it never tells a producer of a change to approve it.
 
 ### Step 1. Create the intent (Person A)
 
 Open a GitHub issue for the change, then:
 
 ```bash
-sdlc intent create --project pilot --title "Japanese labels on the product list" \
+adlc intent create --project pilot --title "Japanese labels on the product list" \
   --risk low --data-class internal --issue <issue number>
 ```
 
@@ -123,19 +124,19 @@ Check the goal, scope and risk, then approve on the issue:
 /approve G1
 ```
 
-(or `sdlc gate approve G1 INT-2026-0007`). Write commands on the **first line of a new comment**; editing a comment never changes a decision.
+(or `adlc gate approve G1 INT-2026-0007`). Write commands on the **first line of a new comment**; editing a comment never changes a decision.
 
 ### Step 3. Link the spec → G2 (Person A, or PM / BrSE)
 
 The spec is a Markdown file **on the default branch** (`main`); the rules: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#spec-link):
 
 ```bash
-sdlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.md
+adlc spec link INT-2026-0007 --path docs/specs/T01-product-list-japanese-labels.md
 ```
 
-Or in one step when you create the intent: add `--spec docs/specs/T01-product-list-japanese-labels.md` to `sdlc intent create`. If the link is refused, the intent is still created; run `sdlc spec link` as above.
+Or in one step when you create the intent: add `--spec docs/specs/T01-product-list-japanese-labels.md` to `adlc intent create`. If the link is refused, the intent is still created; run `adlc spec link` as above.
 
-- **The spec needs at least one acceptance criterion**, at every risk tier; `sdlc spec link` shows the count. How the platform finds them: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria).
+- **The spec needs at least one acceptance criterion**, at every risk tier; `adlc spec link` shows the count. How the platform finds them: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#g2-acceptance-criteria).
 - **Low risk:** the platform passes G2 by itself (HOTL) and says until when it can be blocked (4 working hours by default).
 - **Medium:** Person A approves G2. **High and Critical:** Person B approves G2.
 - If the spec on `main` changes later, the intent goes back to G2 by itself.
@@ -157,9 +158,9 @@ Or in one step when you create the intent: add `--spec docs/specs/T01-product-li
    - `allowed_paths` are the only files the agent may change.
    - `change_flags`: add one when the change is of that kind. Some flags make G3 a human decision (for example `migration`, `new_service_boundary`); some make G7 need two approvals (for example `migration`, `payment`, `personal_data`). The two lists: [codes table §4](../handbook/00-introduction/05-codes.md#4-eight-gates-g1g8-with-risk-based-oversight).
    - Every field, what the platform refuses, and how the agent reads the task text: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#plan-file).
-   - From a Spec Kit or BMAD task list, `sdlc plan draft` writes the file for you to complete ([§19.8c](../handbook/02-playbook/ch19-approval-queues.md#plan-draft)).
+   - From a Spec Kit or BMAD task list, `adlc plan draft` writes the file for you to complete ([§19.8c](../handbook/02-playbook/ch19-approval-queues.md#plan-draft)).
 2. Open a pull request with the file, let Person B review it, and merge it into `main`.
-3. Submit it: `sdlc plan submit INT-2026-0007`.
+3. Submit it: `adlc plan submit INT-2026-0007`.
 
 - **Low risk without flags:** the platform passes G3 (HOTL). **Otherwise:** Person B checks the plan and its change flags, then `/approve G3`. The person who submitted the plan never approves G3.
 - If the plan file on `main` changes later, G3 or G4 waits until you submit it again.
@@ -168,10 +169,10 @@ Or in one step when you create the intent: add `--spec docs/specs/T01-product-li
 
 When G3 is passed and every block window is closed (section 1), the platform checks the agent, the limits and the budget, and starts the run. You see **run started** on the issue.
 
-- **High risk:** Person A approves the run first: `/approve G4`. The agent then writes only a **proposal** (a patch, stored as evidence; nothing is pushed), and the intent pauses. Person A saves the patch with `sdlc evidence proposal <INT> --output <file>`, takes it forward as a person (for example a pull request written by a person, or a new intent), then ends the intent with `sdlc gate reject G4 <INT> --reason-code other --reason-ref <link>` ([handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#l1-proposal)). The platform starts no new run by itself.
+- **High risk:** Person A approves the run first: `/approve G4`. The agent then writes only a **proposal** (a patch, stored as evidence; nothing is pushed), and the intent pauses. Person A saves the patch with `adlc evidence proposal <INT> --output <file>`, takes it forward as a person (for example a pull request written by a person, or a new intent), then ends the intent with `adlc gate reject G4 <INT> --reason-code other --reason-ref <link>` ([handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#l1-proposal)). The platform starts no new run by itself.
 - **Critical risk:** the platform **blocks** the intent; the agent never runs.
 - At 80 % of the run's budget a warning comment appears; at 100 % the run stops ([budgets: handbook Ch.13 §13.10.4](../handbook/02-playbook/ch13-p3-coding.md#budgets)).
-- To stop a run at any time: `/kill` on the issue, or `sdlc run kill INT-2026-0007` (who may, and what happens: [handbook Ch.18 §18.8d](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188d-using-the-platform-the-kill-switch)).
+- To stop a run at any time: `/kill` on the issue, or `adlc run kill INT-2026-0007` (who may, and what happens: [handbook Ch.18 §18.8d](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188d-using-the-platform-the-kill-switch)).
 
 ### Step 6. G5 and G6 (the platform)
 
@@ -195,9 +196,9 @@ Merging too early, or by a producer or a bot, stops the intent with a security e
 The platform builds the **Evidence Pack** (what it holds: [handbook Ch.15 §15.10.2](../handbook/02-playbook/ch15-p5-release.md#15102-the-evidence-pack)) and asks for the release approval (how G8 decides: [§15.10.3](../handbook/02-playbook/ch15-p5-release.md#15103-gate-g8-release)).
 
 ```bash
-sdlc evidence show INT-2026-0007     # what your approval is bound to
-sdlc evidence export INT-2026-0007 --output INT-2026-0007.md
-sdlc gate approve G8 INT-2026-0007   # or /approve G8 on the issue
+adlc evidence show INT-2026-0007     # what your approval is bound to
+adlc evidence export INT-2026-0007 --output INT-2026-0007.md
+adlc gate approve G8 INT-2026-0007   # or /approve G8 on the issue
 ```
 
 The platform seals the pack, records the metrics and closes the intent (status `done`; the comment says **released**). The client's AI disclosure note is in the pack; for a client that has its own format, your approval confirms that the note is ready.
@@ -220,35 +221,35 @@ Reason codes: `spec_unclear`, `tests_insufficient`, `security_finding`, `out_of_
 
 | Command | Use |
 |---|---|
-| `sdlc next <INT>` | What do I do now: the next command or comment for you, or who it waits for |
-| `sdlc doctor` | Is my login and the API all right, and what do I fix |
-| `sdlc help [topic\|command]` | Short guides (getting started, roles, gates, comment commands, troubleshooting) and every command with an example; `sdlc <command> --help` too |
-| `sdlc intent list` / `sdlc intent show <INT>` | Where is my intent, what waits for whom |
-| `sdlc gate approve\|reject\|request-changes <G> <INT>` | Decide a gate (codes only; `--reason-code`) |
-| `sdlc spec link` / `sdlc plan submit` | Inputs of G2 and G3 |
-| `sdlc escalation list` / `show` / `ack` / `decide` | Escalations |
-| `sdlc run list <INT>` / `sdlc run kill <INT>` | Runs, kill switch |
-| `sdlc cost report --project <slug>` | Tokens and cost |
-| `sdlc metrics gates --project <slug>` | How long gates wait for people |
-| `sdlc metrics agents --project <slug>` | How agents and models did: ended well, CI first try, cost per merged intent |
-| `sdlc evidence build\|list\|show\|export <INT>` | The Evidence Pack |
-| `sdlc eval plan list\|show\|create\|change\|archive`, `sdlc eval run <plan-id>`, `sdlc eval list\|show` | Evaluation plans: agents, models and prompt variants measured on a fixed task set ([handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md)) |
+| `adlc next <INT>` | What do I do now: the next command or comment for you, or who it waits for |
+| `adlc doctor` | Is my login and the API all right, and what do I fix |
+| `adlc help [topic\|command]` | Short guides (getting started, roles, gates, comment commands, troubleshooting) and every command with an example; `adlc <command> --help` too |
+| `adlc intent list` / `adlc intent show <INT>` | Where is my intent, what waits for whom |
+| `adlc gate approve\|reject\|request-changes <G> <INT>` | Decide a gate (codes only; `--reason-code`) |
+| `adlc spec link` / `adlc plan submit` | Inputs of G2 and G3 |
+| `adlc escalation list` / `show` / `ack` / `decide` | Escalations |
+| `adlc run list <INT>` / `adlc run kill <INT>` | Runs, kill switch |
+| `adlc cost report --project <slug>` | Tokens and cost |
+| `adlc metrics gates --project <slug>` | How long gates wait for people |
+| `adlc metrics agents --project <slug>` | How agents and models did: ended well, CI first try, cost per merged intent |
+| `adlc evidence build\|list\|show\|export <INT>` | The Evidence Pack |
+| `adlc eval plan list\|show\|create\|change\|archive`, `adlc eval run <plan-id>`, `adlc eval list\|show` | Evaluation plans: agents, models and prompt variants measured on a fixed task set ([handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md)) |
 
 Every command takes `--json`. Exit code 0 means done; 4 means log in again with a new API token. The other codes: [handbook Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#exit-codes).
 
 ### The dashboard
 
-The dashboard shows intents by gate, escalations, cost and gate waiting times, and evaluation plans. With a GitHub sign-in and actions on, you can also decide a gate (except G7, which is the review and merge on GitHub), kill a run, acknowledge and decide an escalation, create an intent and link its spec, submit a plan, build an Evidence Pack, and act on evaluation plans. The proposal of a High-risk (L1) run is saved with `sdlc evidence proposal` only; the page shows the command. Each gate or escalation decision is confirmed with a passkey. Its address: on the platform machine `http://localhost:8090/dashboard/` (write `localhost`, not `127.0.0.1`: the GitHub sign-in needs it); from another machine, through team access, `https://<server name>:8443/dashboard/`. With a GitHub sign-in and actions on, add a **passkey** there within 5 minutes of signing in: the dashboard asks for it before each gate or escalation decision. Where to open it, how to sign in, passkeys and what each screen shows: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard).
+The dashboard shows intents by gate, escalations, cost and gate waiting times, and evaluation plans. With a GitHub sign-in and actions on, you can also decide a gate (except G7, which is the review and merge on GitHub), kill a run, acknowledge and decide an escalation, create an intent and link its spec, submit a plan, build an Evidence Pack, and act on evaluation plans. The proposal of a High-risk (L1) run is saved with `adlc evidence proposal` only; the page shows the command. Each gate or escalation decision is confirmed with a passkey. Its address: on the platform machine `http://localhost:8090/dashboard/` (write `localhost`, not `127.0.0.1`: the GitHub sign-in needs it); from another machine, through team access, `https://<server name>:8443/dashboard/`. With a GitHub sign-in and actions on, add a **passkey** there within 5 minutes of signing in: the dashboard asks for it before each gate or escalation decision. Where to open it, how to sign in, passkeys and what each screen shows: [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard).
 
 ## 5. When something goes wrong
 
 | You see | What it means | What to do |
 |---|---|---|
-| **A command fails to reach the API**, or `sdlc` says you are not logged in | The login, the API address, a certificate or the API itself | `sdlc doctor` names the problem and the fix; a problem on the server goes to the operator (`pnpm doctor`) |
+| **A command fails to reach the API**, or `adlc` says you are not logged in | The login, the API address, a certificate or the API itself | `adlc doctor` names the problem and the fix; a problem on the server goes to the operator (`pnpm doctor`) |
 | **Cannot enter G1** (`ai_record_missing`, `data_class_not_allowed`) | The project's AI record is missing or does not allow the data class | Person A or PM / BrSE fixes the record; the intent enters G1 by itself |
 | Your command gets a **reply** instead of a status comment | It was refused (wrong gate, no role, you are a producer, bad syntax) | Read the reason, write a new comment |
-| **Plan resubmit needed** | The plan file on `main` is not the one you submitted | `sdlc plan submit <INT>` again (Person B approves G3 again if it was at G4) |
-| **Your intent does not move** | The platform holds it | `sdlc next <INT>` says what to do about it; `sdlc intent show <INT>` prints "Held: …" with the reason (and for a failed G4 check, which one); the dashboard shows the same under "What holds it" |
+| **Plan resubmit needed** | The plan file on `main` is not the one you submitted | `adlc plan submit <INT>` again (Person B approves G3 again if it was at G4) |
+| **Your intent does not move** | The platform holds it | `adlc next <INT>` says what to do about it; `adlc intent show <INT>` prints "Held: …" with the reason (and for a failed G4 check, which one); the dashboard shows the same under "What holds it" |
 | **Back at G2** (spec changed) | Someone edited the spec on `main` | Approve G2 again (passed by itself at Low risk) |
 | **Budget warning** | The run used 80 % of its budget | Nothing yet; at 100 % it stops and escalates |
 | **An escalation** (ESC-…) | A run or a gate needs a person: over budget, out of scope, overdue gate, CI timeout, early merge… | The escalation owner named in the notice: `/ack ESC-…`, look at the cause, then `/decide ESC-… <decision>`. Who may, and what each decision does: [handbook Ch.18 §18.8b](../handbook/02-playbook/ch18-timeouts-rollback-and-containment.md#188b-using-the-platform-escalations-ack-and-decide) |
@@ -273,7 +274,7 @@ Your habits; what the platform itself never does (merge, deploy, give an agent a
 | Topic | Handbook |
 |---|---|
 | Comment commands, HOTL gates, deadlines, the AI record | [Ch.19 §19.8b](../handbook/02-playbook/ch19-approval-queues.md#198b-using-the-platform-gate-commands-in-comments) |
-| The `sdlc` command, specs, plans, cost and gate reports | [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-sdlc-command) |
+| The `adlc` command, specs, plans, cost and gate reports | [Ch.19 §19.8c](../handbook/02-playbook/ch19-approval-queues.md#198c-using-the-platform-the-adlc-command) |
 | Setting up a team (admins) | [Ch.19 §19.8d](../handbook/02-playbook/ch19-approval-queues.md#198d-using-the-platform-setting-up-a-team-admins) |
 | G4, the run, G5 | [Ch.13 §13.10](../handbook/02-playbook/ch13-p3-coding.md#1310-using-the-platform) |
 | The push, the pull request, G6 | [Ch.14 §14.10](../handbook/02-playbook/ch14-p4-testing.md#1410-using-the-platform) |

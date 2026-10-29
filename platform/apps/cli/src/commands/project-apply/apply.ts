@@ -1,4 +1,4 @@
-// Runs the writes of `sdlc admin project apply` (task V17 AC4), one API call per change, with the
+// Runs the writes of `adlc admin project apply` (task V17 AC4), one API call per change, with the
 // same endpoints and bodies as the manual commands (`project create|update`, `user create|update`,
 // `identity link`, `role grant`, `agent register`, `config set`), so the audit log is the same.
 // It never calls an approval, the AI record or a token endpoint (AC5).
@@ -96,7 +96,7 @@ export async function applyWrites(
   }
 }
 
-/** The body of `sdlc admin agent register`. */
+/** The body of `adlc admin agent register`. */
 function agentBody(checked: CheckedFile, ownerId: string): Record<string, unknown> {
   const agent = checked.file.agent;
   if (!agent || checked.instructionsSha256 === undefined) throw new Error('agent_missing');

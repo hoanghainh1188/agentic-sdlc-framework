@@ -1,4 +1,4 @@
-// `sdlc token …`, `sdlc admin token …` and `sdlc audit verify` over the API (B13 AC5, ADR-M37
+// `adlc token …`, `adlc admin token …` and `adlc audit verify` over the API (B13 AC5, ADR-M37
 // §2.8) against a mocked API. A new token is printed once, to stdout, never on stderr; a token
 // issued for someone else says it must be replaced. The issued token is built at run time.
 import { t } from '@sdlc/messages';
@@ -11,7 +11,7 @@ import { TOKEN, useHarness } from './harness.js';
 const harness = useHarness();
 const NEW_TOKEN = `sdlc_pat_${'n'.repeat(40)}xyz`;
 
-describe('sdlc token', () => {
+describe('adlc token', () => {
   it('creates a token and prints it once, on stdout only', async () => {
     const h = await harness({
       routes: { 'POST /v1/me/tokens': { status: 201, body: issuedTokenBody(NEW_TOKEN) } },
@@ -55,7 +55,7 @@ describe('sdlc token', () => {
   });
 });
 
-describe('sdlc admin token (another user, QUESTIONS #152)', () => {
+describe('adlc admin token (another user, QUESTIONS #152)', () => {
   it('issues a token for another user and says it must be replaced', async () => {
     const h = await harness({
       routes: {
@@ -110,7 +110,7 @@ describe('sdlc admin token (another user, QUESTIONS #152)', () => {
   });
 });
 
-describe('sdlc audit verify (tenant admins)', () => {
+describe('adlc audit verify (tenant admins)', () => {
   it('reports an intact chain (exit 0) and a broken one (exit 1)', async () => {
     const intact = await harness({
       routes: { 'GET /v1/admin/audit/verify': { status: 200, body: chainBody() } },

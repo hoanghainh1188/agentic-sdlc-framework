@@ -1,4 +1,4 @@
-// `sdlc metrics agents` (task V13, ADR-M79) is further down. `sdlc metrics gates` over the API (task E06, D-08 E06 AC1, D-02 FR-12, ADR-M47, handbook Ch.19
+// `adlc metrics agents` (task V13, ADR-M79) is further down. `adlc metrics gates` over the API (task E06, D-08 E06 AC1, D-02 FR-12, ADR-M47, handbook Ch.19
 // §19.8c). Per project and gate: the waits that people ended (first round, and after a request for
 // changes), the platform's HOTL and AUDIT passes, and the intents at the gate now. Wall-clock time
 // from the gate's entry, never working hours, never per person. The whole tenant needs a tenant

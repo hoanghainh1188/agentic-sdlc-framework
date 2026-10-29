@@ -1,16 +1,16 @@
-// `sdlc ops …`: operator commands, run on the server (task B03, ADR-M26 §2.2; renamed from
-// `sdlc admin …` in task B13, ADR-M37 §2.8). They connect straight to the platform database as
+// `adlc ops …`: operator commands, run on the server (task B03, ADR-M26 §2.2; renamed from
+// `adlc admin …` in task B13, ADR-M37 §2.8). They connect straight to the platform database as
 // `platform_app` (SDLC_DB_URL) and are audited as actor `system`. People use the API instead
-// (`sdlc admin …`, `sdlc token …`, `sdlc audit verify`); these stay for the first tenant, for a
+// (`adlc admin …`, `adlc token …`, `adlc audit verify`); these stay for the first tenant, for a
 // one-admin tenant (QUESTIONS #151) and for when the API is down.
-// - `sdlc ops bootstrap`, `sdlc ops token issue|list|revoke` (here);
-// - `sdlc ops audit verify` (audit-verify.ts);
-// - `sdlc ops tenant-admin …`, `sdlc ops role …` (ops-roles.ts);
-// - `sdlc ops agent show|list|suspend|quarantine` (ops-agent.ts);
-// - `sdlc ops ai-record set|show` (ops-ai-record.ts);
-// - `sdlc ops run kill` (ops-run.ts, C11);
-// - `sdlc ops retention report` (ops-retention.ts, E05): counts only;
-// - `sdlc ops eval start` (ops-eval.ts, L04): queues an evaluation on the server.
+// - `adlc ops bootstrap`, `adlc ops token issue|list|revoke` (here);
+// - `adlc ops audit verify` (audit-verify.ts);
+// - `adlc ops tenant-admin …`, `adlc ops role …` (ops-roles.ts);
+// - `adlc ops agent show|list|suspend|quarantine` (ops-agent.ts);
+// - `adlc ops ai-record set|show` (ops-ai-record.ts);
+// - `adlc ops run kill` (ops-run.ts, C11);
+// - `adlc ops retention report` (ops-retention.ts, E05): counts only;
+// - `adlc ops eval start` (ops-eval.ts, L04): queues an evaluation on the server.
 // A token is printed once, to stdout, and never logged. Run these in a terminal, not in a chat.
 import { parseArgs } from 'node:util';
 
@@ -146,7 +146,7 @@ export async function runOps(args: readonly string[], ctx: CliContext): Promise<
 }
 
 /**
- * `sdlc ops agent|ai-record|tenant-admin|role …`: same connection and tenant lookup as the token
+ * `adlc ops agent|ai-record|tenant-admin|role …`: same connection and tenant lookup as the token
  * commands.
  */
 async function runScoped<C extends string>(

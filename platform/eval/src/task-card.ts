@@ -172,7 +172,7 @@ function yamlList(items: readonly string[]): string {
  */
 export function renderTaskCard(card: TaskCard): string {
   return [
-    `# Evaluation task (design/ADR-M85). Made by \`sdlc eval task draft\` from ${card.intent}.`,
+    `# Evaluation task (design/ADR-M85). Made by \`adlc eval task draft\` from ${card.intent}.`,
     '# Commit it to the default branch through a pull request, then register it.',
     `schema: ${String(TASK_CARD_SCHEMA)}`,
     `id: ${card.id}`,

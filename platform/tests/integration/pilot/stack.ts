@@ -670,12 +670,12 @@ export class PilotStack extends Stack {
     return intent;
   }
 
-  /** `sdlc gate approve <gate> <INT>` as `who`. */
+  /** `adlc gate approve <gate> <INT>` as `who`. */
   async approve(who: 'a' | 'b', gate: string, intent: Pick<Intent, 'code'>): Promise<void> {
     await this.cliJson(who, ['gate', 'approve', gate, intent.code]);
   }
 
-  /** The tenant admin uploads the pilot configuration with `extra` (`sdlc admin config set`). */
+  /** The tenant admin uploads the pilot configuration with `extra` (`adlc admin config set`). */
   async setConfig(
     extra: string,
     options: { agentKey?: string; run?: readonly string[] } = {},
