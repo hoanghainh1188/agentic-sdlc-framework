@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Docs for newcomers (a review of v0.8.0): the README Quickstart now lists what you need and the real steps (the release checkout, `pnpm install`, the fork and the GitHub App, `trial:up --settings`) and the real time; `TRIAL.md` names the latest release; the deploy README has a "Before you start on a server" checklist and the order that keeps the key holders to one meeting with the runner on its own Engine; runbook T11 §3.2 says the procedure is ready; `ROLLOUT-GUIDE.md` uses `pnpm server:setup` and `sdlc admin project apply`; new commented example `platform/deploy/project.example.yaml`, checked by a test.
+
 ## [0.8.0] - 2026-10-29
 
 **A simpler set-up, decisions in the dashboard, and a dependency check of every agent change.** `pnpm server:setup` runs a fresh deployment on a server (README steps 2–7) with the key holders' PGP keys, and the root token is used for `configure` only (V16; ADR-M98). `sdlc admin project apply` sets up a project and its team from one file (V17). In the dashboard, people now decide gates (G7 stays the review on GitHub), kill runs, acknowledge and decide escalations, create an intent with its spec, submit a plan and build an Evidence Pack; each gate or escalation decision is confirmed with a passkey (U07, U08; ADR-M73). Before G6 the runner checks the dependencies an agent added: licences, install scripts and look-alike package names (H02; ADR-M96). Also the design of deleting a client's data on request (H03; ADR-M97). A minor release: two migrations, rebuilt images, a new project setting.

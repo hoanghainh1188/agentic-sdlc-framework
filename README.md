@@ -37,24 +37,32 @@ Built for small and medium software companies, including those working for Japan
 
 ---
 
-## Quickstart: Try it in 3 minutes
+## Quickstart: try it on one machine
 
-Experience the 8-gate workflow on a sample project using Docker Compose on your local machine:
+The trial runs the whole platform on your own machine with a fictional sample project. Plan **a few hours to one day** for the set-up; the set-up command itself takes 20 to 40 minutes.
+
+**What you need first:** macOS or Linux with Docker Compose v2.24+, 16 GB of memory (32 GB with a local model), about 30 GB of disk, Node.js 24, pnpm 10, OpenSSL 3, Git, **two GitHub accounts** (Person A asks for a change, Person B reviews it), and a model: Ollama, or an Anthropic API key. Details: [TRIAL.md §1](TRIAL.md#1-what-you-need).
 
 ```bash
-# 1. Install the CLI
-npm install -g agentic-sdlc-cli
-
-# 2. Clone and start the trial stack
+# 1. Get the latest release and its tools
 git clone https://github.com/hoanghainh1188/agentic-sdlc-framework.git
 cd agentic-sdlc-framework
-pnpm trial:up
+git checkout v0.8.0
+corepack enable && pnpm install
 
-# 3. Check health and get your next step
-sdlc doctor
-sdlc next
+# 2. On GitHub: fork harryforge/pilot-order-inventory, turn on Actions,
+#    protect main, add Person B (TRIAL.md §3.1). Then create your GitHub App:
+pnpm github-app:create --out ~/secrets/sdlc-trial-app.private-key.pem
+
+# 3. Fill in the settings file (a copy outside the repository), then set up everything
+cp platform/deploy/trial/trial-settings.example.yaml ~/trial-settings.yaml
+pnpm trial:up --settings ~/trial-settings.yaml
+
+# 4. Check the stack and your login (Person A's config folder from the settings file)
+pnpm doctor
+XDG_CONFIG_HOME=<Person A's config folder> pnpm sdlc doctor
 ```
-*For the complete step-by-step trial walkthrough with sample tasks, see [TRIAL.md](TRIAL.md).*
+Then take the first sample task through the gates: [TRIAL.md §5](TRIAL.md#5-run-the-tasks). The step-by-step guide, with what each step does and how to start the stack again after a reboot: [TRIAL.md](TRIAL.md).
 
 ---
 

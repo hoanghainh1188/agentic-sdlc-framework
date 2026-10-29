@@ -190,7 +190,7 @@ The feature is merged, and the record of how it was made is sealed. `sdlc eviden
 
 ## What the dashboard shows along the way
 
-At any moment, anyone on the team opens the dashboard (read only, [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard-read-only)) and sees where each intent waits, for how long, and who must act:
+At any moment, anyone on the team opens the dashboard (read only, [handbook Ch.19 §19.8e](../handbook/02-playbook/ch19-approval-queues.md#198e-using-the-platform-the-dashboard)) and sees where each intent waits, for how long, and who must act:
 
 ![The dashboard: intents by gate](docs-images/dashboard-board.png)
 
