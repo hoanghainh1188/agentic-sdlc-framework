@@ -1,7 +1,8 @@
 // D-08 W01 AC3 (R085b in design/RULES.md, ADR-M73, ADR-M82 §2.7): a session writes only to the
-// routes marked `@SessionAction`. Before U07 these are the sign-in routes, the passkey routes and
-// the four evaluation plan actions of L05 (create, change, archive, Run now). A new mark fails
-// here until its task's ADR allows it and this list changes with it.
+// routes marked `@SessionAction`: the sign-in routes, the passkey routes, the four evaluation plan
+// actions of L05 (create, change, archive, Run now), the decisions, kill and escalation actions of
+// U07, and the intent create, spec link, plan submission and Evidence Pack build of U08. A new mark
+// fails here until its task's ADR allows it and this list changes with it.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -18,6 +19,9 @@ const ALLOWED: Record<string, number> = {
   'intents/intents.controller.ts': 2,
   'runs/runs.controller.ts': 1,
   'escalations/escalations.controller.ts': 2,
+  'specs/specs.controller.ts': 1,
+  'plans/plans.controller.ts': 1,
+  'evidence/evidence.controller.ts': 1,
 };
 
 function sourceFiles(dir: string): string[] {

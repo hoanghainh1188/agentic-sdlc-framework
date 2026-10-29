@@ -79,8 +79,11 @@ describe('the dashboard writes only its own session and passkeys (AC1; U05, U06)
         'POST /v1/escalations/X/ack',
         'POST /v1/escalations/X/decisions',
         'POST /v1/runs/X/kill',
-        // U08: create intent.
+        // U08: create an intent, link its spec, submit the plan, build an Evidence Pack.
         'POST /v1/intents',
+        'POST /v1/intents/X/specs',
+        'POST /v1/intents/X/plans',
+        'POST /v1/intents/X/evidence-packs',
       ].sort(),
     );
     expect([...writes.matchAll(/\bsend\(/g)]).toHaveLength(calls.length);

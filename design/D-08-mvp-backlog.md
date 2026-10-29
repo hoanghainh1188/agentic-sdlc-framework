@@ -2,7 +2,7 @@
 
 | Item | Value |
 |---|---|
-| Version | 1.63 |
+| Version | 1.64 |
 | Date | 2026-10-29 |
 | Status | **Approved** (Harry, 2026-09-24) — version 1.0, aligned with the handbook (tag `design-v1.0`) |
 | Readers | Tech lead, developers, Claude Code |
@@ -1720,7 +1720,7 @@ flowchart LR
 - [ ] AC2: Submit the plan file; build an evidence pack; the L1 proposal download stays in the CLI (the page shows the `sdlc evidence proposal` command)
 - [ ] AC3: Refusals from the catalog; no step-up (ADR-M73); Playwright tests per action and role
 
-> Note: MVP1-UI-SCOPE 1.2 §3.3. Ordered again from `design/M-E-REPORT.md` (§9). In part (PR #462, 2026-10-29): create an intent, without its spec; still to do: link the spec, submit the plan, build an evidence pack, the Playwright tests
+> Note: MVP1-UI-SCOPE 1.2 §3.3. Ordered again from `design/M-E-REPORT.md` (§9). Done 2026-10-29: create an intent in PR #462; its spec link, the plan submission, the Evidence Pack build, the proposal command, the refusal texts and the tests in the U08 PR (ADR-M73 1.6)
 
 #### U09. Dashboard wave 3: administration
 
@@ -1964,6 +1964,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.61 | 2026-10-27 | Claude Code (task H03), approved by Harry | H03 design done: deleting a client's data on request (ADR-M97, QUESTIONS #611–#615) |
 | 1.62 | 2026-10-28 | Claude Code (task V17), approved by Harry | V17 done: `sdlc admin project apply`, a project and its team from one file (QUESTIONS #617) |
 | 1.63 | 2026-10-29 | Claude Code (task U07), approved by Harry | U07 done (PR #462 and the U07 finish PR); U08 in part: create an intent (PR #462) |
+| 1.64 | 2026-10-29 | Claude Code (task U08), approved by Harry | U08 done: create an intent with its spec, submit a plan, build an Evidence Pack in the dashboard |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
