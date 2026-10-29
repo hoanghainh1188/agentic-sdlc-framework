@@ -12,7 +12,7 @@
 **Human-in-the-Loop AI Software Delivery Platform**  
 *Autonomous AI Agents • 8 Quality Gates • Cryptographic Audit Trail • Multi-Agent Sandboxes*
 
-[![Release](https://img.shields.io/badge/release-v0.7.0-blue.svg)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v0.8.0-blue.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Docs: CC BY 4.0](https://img.shields.io/badge/Docs-CC%20BY%204.0-lightgrey.svg)](LICENSE-docs.md)
 [![Node: 24 LTS](https://img.shields.io/badge/node-24%20LTS-brightgreen.svg)](package.json)
@@ -33,7 +33,7 @@ The handbook says **what must happen and why**. The platform **makes sure it hap
 
 Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
-**Status (2026-10-26): v0.7.0 is released ([CHANGELOG](CHANGELOG.md)); built, tested, and trial-ready.** The platform supports multiple agent adapters (OpenHands, OpenCode), an isolated MCP tool gateway, a runner running on its own rootless Docker Engine or VM, pre-review secret scanning (Gitleaks), review diff size limits, and an automated upgrade verification suite.
+**Status (2026-10-29): v0.8.0 is released ([CHANGELOG](CHANGELOG.md)); built, tested, and trial-ready.** The platform supports multiple agent adapters (OpenHands, OpenCode), an isolated MCP tool gateway, a runner on its own rootless Docker Engine or VM, secret scanning and a size limit before review, a dependency check of every agent change, decisions in the dashboard confirmed with a passkey, and a guided server set-up (`pnpm server:setup`).
 
 ---
 
