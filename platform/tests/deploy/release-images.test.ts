@@ -49,7 +49,7 @@ interface MatrixEntry {
   ignorefile: string;
 }
 
-const PREFIX = 'ghcr.io/hoanghainh1188/agentic-sdlc-framework';
+const PREFIX = 'ghcr.io/hoanghainh1188/governed-adlc-fw';
 const IMAGES = [
   'sdlc-api',
   'sdlc-worker',
@@ -416,7 +416,7 @@ describe('V04, V15: scripts/images.sh (ADR-M94 §2.4)', () => {
     expect(first.out).toBe('published');
     expect(first.calls).toContain('--proto =https');
     expect(first.calls).toContain(
-      'https://github.com/hoanghainh1188/agentic-sdlc-framework/releases/download/v0.7.0/images.lock',
+      'https://github.com/hoanghainh1188/governed-adlc-fw/releases/download/v0.7.0/images.lock',
     );
     expect(fs.readFileSync(cachedLock(dir, '0.7.0'), 'utf8')).toBe(lock);
     // The second time it reads the kept file: no download, and the checkout stays clean.
@@ -535,12 +535,12 @@ describe('V04: the README says how to verify the published images', () => {
     expect(start).toBeGreaterThan(0);
     expect(section).toContain('cosign verify');
     expect(section).toContain(
-      "--certificate-identity-regexp '^https://github\\.com/hoanghainh1188/agentic-sdlc-framework/\\.github/workflows/release-images\\.yml@'",
+      "--certificate-identity-regexp '^https://github\\.com/hoanghainh1188/governed-adlc-fw/\\.github/workflows/release-images\\.yml@'",
     );
     expect(section).toContain(
       '--certificate-oidc-issuer https://token.actions.githubusercontent.com',
     );
     expect(section).toContain('gh attestation verify');
-    expect(section).toContain('--repo hoanghainh1188/agentic-sdlc-framework');
+    expect(section).toContain('--repo hoanghainh1188/governed-adlc-fw');
   });
 });

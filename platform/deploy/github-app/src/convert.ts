@@ -74,7 +74,7 @@ export async function convertManifestCode(
       headers: {
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'agentic-sdlc-framework-github-app-create',
+        'User-Agent': 'governed-adlc-fw-github-app-create',
       },
       redirect: 'error',
       signal: AbortSignal.timeout(30_000),

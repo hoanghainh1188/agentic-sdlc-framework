@@ -104,7 +104,7 @@ The platform and your application live in **two separate repositories**. The pla
 3. When an intent's agent runs, the runner **clones the repository into a temporary sandbox**. The agent writes code there; the runner pushes the branch `agent/INT-…` and opens the pull request, then **removes the sandbox**. The platform keeps no working copy of the code. It keeps each run's diff as evidence (in SeaweedFS, at least 180 days, then purged unless held), hashes and logs; with the optional `observability` profile, Langfuse also keeps the model prompts and answers, which contain code, until the retention purge (ADR-M53).
 4. People review and merge the pull request **on GitHub, in the project's repository**.
 
-**Today:** Repo 1 is `hoanghainh1188/agentic-sdlc-framework` (public). Repo 2 for the trial is `harryforge/pilot-order-inventory`, a fictional order and inventory application (Vue, NestJS, PostgreSQL). Each real project later uses its own repository with the same platform.
+**Today:** Repo 1 is `hoanghainh1188/governed-adlc-fw` (public). Repo 2 for the trial is `harryforge/pilot-order-inventory`, a fictional order and inventory application (Vue, NestJS, PostgreSQL). Each real project later uses its own repository with the same platform.
 
 So "what your repository needs" below is about **Repo 2**. Repo 1 is installed by the operator; team members do not touch it.
 

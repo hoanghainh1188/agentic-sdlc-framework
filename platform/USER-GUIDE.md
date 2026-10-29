@@ -50,8 +50,8 @@ sdlc --version
 **From a checkout (developers, and before v0.1.1).** Run the CLI from a checkout of this repository (Node.js 24, pnpm 10; `corepack enable` once):
 
 ```bash
-git clone https://github.com/hoanghainh1188/agentic-sdlc-framework.git
-cd agentic-sdlc-framework
+git clone https://github.com/hoanghainh1188/governed-adlc-fw.git
+cd governed-adlc-fw
 pnpm install && pnpm build
 ```
 

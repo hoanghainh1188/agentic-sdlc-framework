@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- The repository is renamed `hoanghainh1188/governed-adlc-fw` (ADR-M99, QUESTIONS #626): the name says what the framework offers, control and evidence when AI writes code. From the next release the images are published at `ghcr.io/hoanghainh1188/governed-adlc-fw/<image>`; `images.sh`, `release-check.mjs` and `verify-images.sh` check the new name. Releases v0.1.0–v0.8.0 keep their images under the old name, and a checkout of their tags uses their own scripts. The npm package keeps its name, `agentic-sdlc-cli`. GitHub forwards the old URLs; `git remote set-url origin git@github.com:hoanghainh1188/governed-adlc-fw.git` updates a clone. The default server path in the examples is now `/opt/governed-adlc-fw`.
 - Docs for newcomers (a review of v0.8.0): the README Quickstart now lists what you need and the real steps (the release checkout, `pnpm install`, the fork and the GitHub App, `trial:up --settings`) and the real time; `TRIAL.md` names the latest release; the deploy README has a "Before you start on a server" checklist and the order that keeps the key holders to one meeting with the runner on its own Engine; runbook T11 §3.2 says the procedure is ready; `ROLLOUT-GUIDE.md` uses `pnpm server:setup` and `sdlc admin project apply`; new commented example `platform/deploy/project.example.yaml`, checked by a test.
 
 ## [0.8.0] - 2026-10-29

@@ -44,7 +44,7 @@ The release gate is `platform/tools/release/release-check.mjs`. `release-check.m
 - the tag is not `vX.Y.Z`, or differs from `package.json` or `PLATFORM_VERSION`;
 - the CHANGELOG has no `## [X.Y.Z] - YYYY-MM-DD` section, or its Upgrade notes are missing or empty.
 
-`release-check.mjs lock <file> X.Y.Z` refuses a lock file that is for another version, or does not pin all six images by digest on `ghcr.io/hoanghainh1188/agentic-sdlc-framework`. Both workflows run it on the release's `images.lock` (`release.yml` on the artifact of `release-images.yml`, `npm-publish.yml` on the Release's asset).
+`release-check.mjs lock <file> X.Y.Z` refuses a lock file that is for another version, or does not pin all six images by digest on `ghcr.io/hoanghainh1188/governed-adlc-fw`. Both workflows run it on the release's `images.lock` (`release.yml` on the artifact of `release-images.yml`, `npm-publish.yml` on the Release's asset).
 
 Both workflows also verify every image with `platform/tools/release/verify-images.sh <images> vX.Y.Z`: a cosign signature and a build provenance attestation whose certificate names exactly `release-images.yml` at `refs/tags/vX.Y.Z`. npm never publishes a release whose images fail this check.
 
@@ -74,7 +74,8 @@ The first release made this way checks two things the documentation does not sta
 - **Immutable releases** on (repository Settings → General, section "Releases"), before the first release made on the tag. Then a published Release, its tag and its assets never change (ADR-M94 §2.4). `release.yml` cannot read this setting (it needs admin access), so it checks each published Release instead.
 - The environment `npm` with the owner as required reviewer, tags `v*` only (GETTING-STARTED, "Publishing the CLI on npm").
 - A **tag ruleset** for `v*`: only the owner may create tags; nobody may update or delete them. The owner is the ruleset's only **bypass actor**, used for one case only: deleting a refused tag before any GitHub Release, npm publish or image push of it (§3).
-- The six GHCR packages are public. A new image's package starts private: after its first push the owner sets it to public once (v0.6.0: `tool-project-docs`).
+- The six GHCR packages are public. A new image's package starts private: after its first push the owner sets it to public once (v0.6.0: `tool-project-docs`). The first release after the rename to `governed-adlc-fw` (ADR-M99) pushes all six under the new path `ghcr.io/hoanghainh1188/governed-adlc-fw/`: set each one to public once.
+- npm's trusted publisher of `agentic-sdlc-cli` names the repository: after the rename (ADR-M99), change it to `governed-adlc-fw` on npmjs.com before the next npm publish.
 - Never rename `npm-publish.yml` or the environment `npm`: npm's trusted publisher names both (ADR-M72 §2.3).
 
 ## Version history
@@ -87,3 +88,4 @@ The first release made this way checks two things the documentation does not sta
 | 1.3 | 2026-10-24 | Claude, for the owner's approval | Six images: `tool-project-docs` (X04 PR 3b, ADR-M89) is in the release gate and in `verify-images.sh`, not only in `release-images.yml`; §4: a new package is set to public after its first push |
 | 1.4 | 2026-10-24 | Claude (task O02), approved by Harry | §2 step 1b: the upgrade test from the last release on the version branch before the images (QUESTIONS #585) |
 | 2.0 | 2026-10-26 | Claude (task V15), for the owner's approval | The release on the tag (ADR-M94, QUESTIONS #591–#595): three steps for the owner; `release.yml` builds the images and attaches `images.lock` to an immutable Release; npm is dispatched on the tag; no lock file pull request and no `pnpm release:lock` |
+| 2.1 | 2026-10-29 | Claude (repository rename, ADR-M99) | §4: the new GHCR packages after the rename start private; the npm trusted publisher names the new repository |

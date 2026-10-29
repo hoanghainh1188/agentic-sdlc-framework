@@ -806,18 +806,18 @@ Never run `docker volume prune` or `docker system prune --volumes`: they delete 
 
 ## Verify the published images
 
-Each release publishes six images on GHCR (D-08 V04, `design/ADR-M66-ghcr-images.md`), for `linux/amd64` and `linux/arm64`: `sdlc-api`, `sdlc-worker`, `sdlc-runner`, `sdlc-otel-collector`, `sandbox-node24` and, from v0.6.0, `tool-project-docs`, under `ghcr.io/hoanghainh1188/agentic-sdlc-framework/`. The release's `images.lock` pins each one by digest. They are built on the release tag by `.github/workflows/release-images.yml` (called by `release.yml`), all six scanned with Trivy before the first push and each one again by digest after it (no CRITICAL finding), signed with cosign keyless (GitHub OIDC, Sigstore's public transparency log), and carry an SPDX SBOM and SLSA build provenance.
+Each release publishes six images on GHCR (D-08 V04, `design/ADR-M66-ghcr-images.md`), for `linux/amd64` and `linux/arm64`: `sdlc-api`, `sdlc-worker`, `sdlc-runner`, `sdlc-otel-collector`, `sandbox-node24` and, from v0.6.0, `tool-project-docs`, under `ghcr.io/hoanghainh1188/governed-adlc-fw/`. The release's `images.lock` pins each one by digest. They are built on the release tag by `.github/workflows/release-images.yml` (called by `release.yml`), all six scanned with Trivy before the first push and each one again by digest after it (no CRITICAL finding), signed with cosign keyless (GitHub OIDC, Sigstore's public transparency log), and carry an SPDX SBOM and SLSA build provenance.
 
 Check an image before you deploy it; `pnpm images get <NAME>` prints its reference (`API`, `WORKER`, `RUNNER`, `OTEL_COLLECTOR`, `SANDBOX_NODE24`, `TOOL_PROJECT_DOCS`). `pnpm images verify` checks all six at once with the release workflow's own check (it needs `cosign` and a signed-in `gh`). With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3.x:
 
 ```bash
-cosign verify --certificate-identity-regexp '^https://github\.com/hoanghainh1188/agentic-sdlc-framework/\.github/workflows/release-images\.yml@' --certificate-oidc-issuer https://token.actions.githubusercontent.com "$(pnpm --silent images get API)"
+cosign verify --certificate-identity-regexp '^https://github\.com/hoanghainh1188/governed-adlc-fw/\.github/workflows/release-images\.yml@' --certificate-oidc-issuer https://token.actions.githubusercontent.com "$(pnpm --silent images get API)"
 ```
 
-The certificate must name that workflow file: a signature from any other workflow or person fails. The exact identity ends with the ref the release was built on: `release-images.yml@refs/tags/vX.Y.Z` from the release after v0.6.0, `release-images.yml@refs/heads/main` for v0.6.0 and before. To pin it exactly, use `--certificate-identity https://github.com/hoanghainh1188/agentic-sdlc-framework/.github/workflows/release-images.yml@refs/tags/vX.Y.Z` instead of the pattern. With the GitHub CLI, the build provenance:
+The certificate must name that workflow file: a signature from any other workflow or person fails. The exact identity ends with the ref the release was built on: `release-images.yml@refs/tags/vX.Y.Z` from the release after v0.6.0, `release-images.yml@refs/heads/main` for v0.6.0 and before. To pin it exactly, use `--certificate-identity https://github.com/hoanghainh1188/governed-adlc-fw/.github/workflows/release-images.yml@refs/tags/vX.Y.Z` instead of the pattern. With the GitHub CLI, the build provenance:
 
 ```bash
-gh attestation verify "oci://$(pnpm --silent images get API)" --repo hoanghainh1188/agentic-sdlc-framework
+gh attestation verify "oci://$(pnpm --silent images get API)" --repo hoanghainh1188/governed-adlc-fw
 ```
 
 The SBOM (the packages inside, SPDX JSON) and BuildKit's provenance:

@@ -9,7 +9,7 @@
 > Order: M-A → M-B → M-0 (sample repo, separate repo, right before M-C) → M-C → M-D. Task IDs: A, B, R (M-0), C, E (M-D).
 
 ## What this repo is
-Repository name: `agentic-sdlc-framework`.
+Repository name: `governed-adlc-fw`.
 The **Agentic SDLC Framework = Handbook + Platform**, in one repo:
 - `handbook/` — the process for humans (policies, 6 phases, 8 gates, roles, templates, runbooks). It defines *what must happen*.
 - `platform/` — a self-hosted system that *enforces* the handbook: runs AI coding agents through 8 human/automatic gates (G1–G8),
@@ -85,7 +85,7 @@ Claude Code reads a folder's `CLAUDE.md` when it opens a file in that folder. Be
 
 ## Documentation rules
 - Design docs in `design/` are APPROVED. Do not change their meaning silently. If code must differ from a design doc: stop, add the question to `design/QUESTIONS.md`, and wait. Approved changes go in a separate PR with a short ADR. [R091]
-- D-08 and its CSV are generated: edit `scripts/generate-backlog.py`, then run it. Never edit the generated files by hand. Then sync the open GitHub issues: `python3 scripts/create-issues.py --repo hoanghainh1188/agentic-sdlc-framework --update` (try `--dry-run` first). [R092]
+- D-08 and its CSV are generated: edit `scripts/generate-backlog.py`, then run it. Never edit the generated files by hand. Then sync the open GitHub issues: `python3 scripts/create-issues.py --repo hoanghainh1188/governed-adlc-fw --update` (try `--dry-run` first). [R092]
 - Diagrams D9–D13 mirror Mermaid blocks in design docs: if you change one, update the other. After editing a `.mmd`, run `pnpm diagrams:render` and commit the SVG in the same PR (CI only checks it; `diagrams/README.md`). [R093]
 - Handbook split: policies and generic process chapters are written outside Claude Code. **You own** the handbook parts that describe platform behaviour: Ch.13–16 and Ch.18–20 usage sections (CLI, `/approve` commands, config, troubleshooting) and runbooks (e.g. T11 OpenBao). When a task changes user-visible behaviour, update the matching handbook chapter in the same PR. Never edit template T13 or the policy chapters. [R094]
 - Keep `CHANGELOG.md` updated for notable changes. [R095]
@@ -128,7 +128,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - State (2026-10-29): **v0.8.0 in release** (version PR; then the tag and the `npm` approval by Harry, `RELEASING.md` 2.0): H02, H03 (design, ADR-M97), U07, U08, V16, V17; v0.7.0 (2026-10-26): X12, O01, O02, H04, H05, V15; earlier releases: `CHANGELOG.md`. Next: O03, O04, O05, H03a–H03c, H07; L01 PR 2 (QUESTIONS #546). Waiting: E07 (API-model run, QUESTIONS #81), L03b and L01 PR 1 (no GPU run yet), A10 PR 3 (the company server's first real run, with `pnpm server:setup`), X10 (a real project). Parked: K02. No trial report yet; bugs from trial reports come first. The two-person rule stays (no single-person mode). Plan: `ROADMAP.md`, D-08. [R123]
 - Open docs follow-ups: align D-02 §3 and handbook Ch.2 §2.5 on who owns the project AI record (QUESTIONS #103); align template T13 with the plan schema v1 (handbook authors, never in Claude Code). [R124]
 - Conflicts with `main` on a branch under review: merge `origin/main` into the branch. Never rebase or force-push it. [R125]
-- `design/QUESTIONS.md` and ADR numbers: each session gets its own block when it is queued and uses only numbers from that block (history: `design/README.md` "Number blocks"; update both places). **Next free: QUESTIONS #626–#630; ADR-M99**. [R126]
+- `design/QUESTIONS.md` and ADR numbers: each session gets its own block when it is queued and uses only numbers from that block (history: `design/README.md` "Number blocks"; update both places). **Next free: QUESTIONS #631–#635; ADR-M100**. [R126]
 - Development uses throw-away OpenBao keys only. The real OpenBao initialisation on the internal server waits until the three key holders are named and the company CA's certificate is issued (QUESTIONS #20, task A10 PR 3; runbook T11 §3c) (remove this line when both are done). [R127]
 
 ## Decisions (see design/D-02 section 11)

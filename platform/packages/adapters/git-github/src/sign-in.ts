@@ -48,7 +48,7 @@ interface Credentials {
 const CLIENT_ID = /^[A-Za-z0-9.]{1,64}$/;
 const CLIENT_SECRET = /^[A-Za-z0-9_.-]{20,255}$/;
 const ACCESS_TOKEN = /^[A-Za-z0-9_.-]{20,255}$/;
-const USER_AGENT = 'agentic-sdlc-framework-api';
+const USER_AGENT = 'governed-adlc-fw-api';
 const API_VERSION = '2022-11-28';
 
 function baseUrl(value: string, allowPlaintext: boolean, field: string): URL {

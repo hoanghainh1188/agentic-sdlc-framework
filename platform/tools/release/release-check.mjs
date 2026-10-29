@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const PREFIX = 'ghcr.io/hoanghainh1188/agentic-sdlc-framework';
+const PREFIX = 'ghcr.io/hoanghainh1188/governed-adlc-fw';
 // images.lock key → image name; equal to release-images.yml and scripts/images.sh.
 const LOCK_IMAGES = {
   SDLC_IMAGE_API: 'sdlc-api',

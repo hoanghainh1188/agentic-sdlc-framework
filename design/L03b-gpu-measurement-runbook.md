@@ -64,8 +64,8 @@ Run these on the rented machine, over SSH. Use `tmux` or `screen` so a lost conn
 2. Tools: Git, OpenSSL 3, Node.js 24 and pnpm 10 (`corepack enable`). Check: `node --version`, `openssl version`.
 3. The repository (public, MIT), the branch with the `vllm` provider, and its packages:
    ```bash
-   git clone https://github.com/hoanghainh1188/agentic-sdlc-framework.git
-   cd agentic-sdlc-framework
+   git clone https://github.com/hoanghainh1188/governed-adlc-fw.git
+   cd governed-adlc-fw
    git checkout main   # after the L03b PRs are merged; else the branch task/L03b-runbook
    corepack enable && pnpm install --frozen-lockfile && pnpm build
    ```
