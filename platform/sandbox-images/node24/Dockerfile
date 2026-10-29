@@ -23,6 +23,12 @@ USER root
 #   §4.1) and VS Code is disabled in every sandbox (OH_ENABLE_VSCODE=false, ADR-M25 §2.4). They
 #   carried most CRITICAL findings of the base image and most GPL/LGPL packages (Harry,
 #   2026-09-27, C04 session 3). Two findings without a fix stay listed in .trivyignore.
+# - uv and uvx are removed: the sandbox reaches only the npm package proxy, so they could never
+#   fetch a Python package there, and the base's build of uv carries the zip crate 8.x
+#   (CVE-2026-115905, release scan of v0.8.0, PR #466).
+# - libbrotli1 is upgraded to Debian's fixed package (CVE-2026-111497, the same scan) from the
+#   dated Debian security snapshot of 2026-10-27; the base reads a snapshot of 2026-09-13. The extra
+#   source is removed again. Remove this step when the pinned base image ships the fix.
 # - The Agent Server keeps its own state (conversations, bash events) under the relative path
 #   `workspace/…` of its working directory by default. The runner starts the sandbox in
 #   /workspace, which is the repository, so the state would show up as changed files. The OH_*
@@ -30,6 +36,16 @@ USER root
 RUN node --version | grep -Eq '^v24\.' \
   && dpkg --purge chromium chromium-common \
   && rm -rf /openhands/.openvscode-server \
+  && rm -f /usr/bin/uv /usr/bin/uvx \
+  && printf '%s\n' 'Types: deb' \
+       'URIs: http://snapshot.debian.org/archive/debian-security/20261027T000000Z/' \
+       'Suites: trixie-security' 'Components: main' \
+       'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' 'Check-Valid-Until: no' \
+       > /etc/apt/sources.list.d/sdlc-security-fix.sources \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends --only-upgrade libbrotli1=1.1.0-2+deb13u1 \
+  && rm -f /etc/apt/sources.list.d/sdlc-security-fix.sources \
+  && rm -rf /var/lib/apt/lists/* \
   && corepack enable pnpm \
   && rm -rf /workspace/project \
   && chown 10001:10001 /workspace \
