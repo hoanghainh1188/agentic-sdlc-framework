@@ -3,10 +3,10 @@ import type { IntentDetail as Detail } from '@sdlc/api-schemas';
 import { cleanText } from '@sdlc/api-schemas';
 import { useState } from 'preact/hooks';
 
-import { ApiError } from '../api/client.js';
 import { decideGate } from '../api/writes.js';
 import { t } from '../i18n.js';
-import { confirmGateDecisionWithPasskey, PasskeyCancelled } from '../views/step-up.js';
+import { actionErrorText, DECISION_REASON_CODES } from '../model/decisions.js';
+import { confirmGateDecisionWithPasskey } from '../views/step-up.js';
 
 export interface DecisionModalProps {
   readonly intent: Detail;
@@ -64,17 +64,7 @@ export function DecisionModal({
 
       onSuccess();
     } catch (err: unknown) {
-      if (err instanceof PasskeyCancelled) {
-        setErrorMsg(t('dashboard.action.cancelled'));
-      } else if (err instanceof ApiError && err.status === 409) {
-        setErrorMsg(t('dashboard.action.conflict'));
-      } else if (err instanceof ApiError) {
-        setErrorMsg(err.reason ? `${err.code}: ${err.reason}` : err.code);
-      } else if (err instanceof Error) {
-        setErrorMsg(err.message);
-      } else {
-        setErrorMsg('An unexpected error occurred.');
-      }
+      setErrorMsg(actionErrorText(err));
     } finally {
       setBusy(false);
     }
@@ -90,8 +80,10 @@ export function DecisionModal({
         <div class="binding-info">
           <div class="binding-row">
             <span>{t('dashboard.action.input_hash')}:</span>
-            <span class="mono" title={intent.gate_input_sha256 ?? 'none'}>
-              {intent.gate_input_sha256 ? `${intent.gate_input_sha256.slice(0, 16)}…` : 'none'}
+            <span class="mono" title={intent.gate_input_sha256 ?? t('dashboard.action.no_input')}>
+              {intent.gate_input_sha256
+                ? `${intent.gate_input_sha256.slice(0, 16)}…`
+                : t('dashboard.action.no_input')}
             </span>
           </div>
           {intent.spec && (
@@ -121,12 +113,12 @@ export function DecisionModal({
                 value={reasonCode}
                 onChange={(e) => setReasonCode((e.target as HTMLSelectElement).value)}
               >
-                <option value="">{'-- select reason --'}</option>
-                <option value="spec_unclear">{'spec_unclear'}</option>
-                <option value="tests_insufficient">{'tests_insufficient'}</option>
-                <option value="out_of_scope">{'out_of_scope'}</option>
-                <option value="policy_denied">{'policy_denied'}</option>
-                <option value="other">{t('dashboard.action.reason_other')}</option>
+                <option value="">{t('dashboard.action.reason_choose')}</option>
+                {DECISION_REASON_CODES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
               </select>
             </div>
             <div class="field">
@@ -156,7 +148,7 @@ export function DecisionModal({
               void handleConfirm();
             }}
           >
-            {busy ? 'Verifying passkey…' : t('dashboard.action.confirm_passkey')}
+            {busy ? t('dashboard.action.verifying') : t('dashboard.action.confirm_passkey')}
           </button>
         </div>
       </div>

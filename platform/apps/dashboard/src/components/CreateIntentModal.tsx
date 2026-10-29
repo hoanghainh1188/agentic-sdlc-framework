@@ -2,9 +2,9 @@
 import { useState } from 'preact/hooks';
 import type { IntentView } from '@sdlc/api-schemas';
 
-import { ApiError } from '../api/client.js';
 import { createIntent, type CreateIntentInput } from '../api/writes.js';
 import { t } from '../i18n.js';
+import { actionErrorText } from '../model/decisions.js';
 
 export interface CreateIntentModalProps {
   readonly projects: readonly string[];
@@ -31,11 +31,11 @@ export function CreateIntentModal({
 
   const handleSubmit = async () => {
     if (!project) {
-      setErrorMsg('Please select a project');
+      setErrorMsg(t('dashboard.intent.error.project'));
       return;
     }
     if (!title.trim()) {
-      setErrorMsg('Please enter a title');
+      setErrorMsg(t('dashboard.intent.error.title'));
       return;
     }
 
@@ -53,13 +53,7 @@ export function CreateIntentModal({
       });
       onSuccess(created);
     } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        setErrorMsg(err.reason ? `${err.code}: ${err.reason}` : err.code);
-      } else if (err instanceof Error) {
-        setErrorMsg(err.message);
-      } else {
-        setErrorMsg('An unexpected error occurred.');
-      }
+      setErrorMsg(actionErrorText(err));
     } finally {
       setBusy(false);
     }
@@ -111,7 +105,7 @@ export function CreateIntentModal({
             maxLength={10000}
             value={description}
             onInput={(e) => setDescription(e.currentTarget.value)}
-            placeholder="Objectives, scope or markdown specification..."
+            placeholder={t('dashboard.intent.desc_placeholder')}
           />
         </div>
 

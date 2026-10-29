@@ -30,6 +30,7 @@ import {
 } from '../components/common.js';
 import { t } from '../i18n.js';
 import { modeMeaning, roleName } from '../labels.js';
+import { actionErrorText } from '../model/decisions.js';
 import { escalationRows } from '../model/escalations.js';
 import { holdOf } from '../model/hold.js';
 import { intentLinks } from '../model/intents.js';
@@ -65,7 +66,7 @@ export function IntentDetail({ code }: { readonly code: string }) {
         reload();
       })
       .catch((err: unknown) => {
-        alert(err instanceof Error ? err.message : 'Kill failed');
+        alert(actionErrorText(err));
       });
   };
 
@@ -159,8 +160,7 @@ export function IntentDetail({ code }: { readonly code: string }) {
                               {run.status === 'provisioning' || run.status === 'running' ? (
                                 <button
                                   type="button"
-                                  class="button button-danger"
-                                  style="padding: var(--space-1) var(--space-2); font-size: 0.8rem;"
+                                  class="button button-danger button-small"
                                   onClick={() => handleKillRun(run.id)}
                                 >
                                   {t('dashboard.action.kill_run')}
@@ -575,15 +575,11 @@ function SpecAndPlan({ intent }: { intent: Detail }) {
               </div>
               <div>
                 <dt>{t('dashboard.detail.content_hash')}</dt>
-                <dd class="mono" style="font-size: 0.8rem; word-break: break-all;">
-                  {cleanText(spec.content_sha256)}
-                </dd>
+                <dd class="mono hash-value">{cleanText(spec.content_sha256)}</dd>
               </div>
               <div>
                 <dt>{t('dashboard.detail.commit_sha')}</dt>
-                <dd class="mono" style="font-size: 0.8rem;">
-                  {cleanText(spec.commit_sha)}
-                </dd>
+                <dd class="mono small-value">{cleanText(spec.commit_sha)}</dd>
               </div>
             </dl>
           )}
@@ -601,9 +597,7 @@ function SpecAndPlan({ intent }: { intent: Detail }) {
               </div>
               <div>
                 <dt>{t('dashboard.action.plan_hash')}</dt>
-                <dd class="mono" style="font-size: 0.8rem; word-break: break-all;">
-                  {cleanText(plan.plan_sha256)}
-                </dd>
+                <dd class="mono hash-value">{cleanText(plan.plan_sha256)}</dd>
               </div>
               <div>
                 <dt>{t('dashboard.detail.change_flags')}</dt>
@@ -611,7 +605,7 @@ function SpecAndPlan({ intent }: { intent: Detail }) {
                   {plan.change_flags.length === 0 ? (
                     '—'
                   ) : (
-                    <div style="display: flex; gap: var(--space-1); flex-wrap: wrap;">
+                    <div class="chip-row">
                       {plan.change_flags.map((flag) => (
                         <span key={flag} class="chip chip-warn">
                           {cleanText(flag)}
