@@ -45,6 +45,11 @@ export default defineConfig({
       })),
       // The shared deployment steps (D-08 V16): `trial:up` and `server:setup` import their built
       // files (`../../steps/dist/x.js`, the layout at run time); tests read the sources.
+      // `pnpm alerts` (O03) imports doctor's built files the same way.
+      {
+        find: /^(?:\.\.\/)+(?:deploy\/)?doctor\/dist\/(.+)\.js$/,
+        replacement: path.resolve(import.meta.dirname, 'platform/deploy/doctor/src/$1.ts'),
+      },
       {
         find: /^(?:\.\.\/)+(?:deploy\/)?steps\/dist\/(.+)\.js$/,
         replacement: path.resolve(import.meta.dirname, 'platform/deploy/steps/src/$1.ts'),

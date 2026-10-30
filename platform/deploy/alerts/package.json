@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "pnpm alerts (D-08 O03): doctor's results sent to the operator. Not a workspace package: built by tsc -b from the root tsconfig."
+}

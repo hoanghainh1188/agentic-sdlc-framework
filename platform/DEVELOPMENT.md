@@ -238,7 +238,8 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 | Published images | V04, V15; ADR-M66, ADR-M94 | unit: `deploy/release-images.test.ts` (scan before push, `images.sh` with a fake download); CI job `release-images` on a version pull request |
 | The release on the tag | V12, V15; ADR-M94 | unit: `workspace/release.test.ts` (`release.yml`, `npm-publish.yml`, the release gate, `verify-images.sh`), `workspace/ci-workflow.test.ts` |
 | The CLI on npm | V05; ADR-M72 | `pnpm cli:pack-check` (CI job `checks`) |
-| `pnpm doctor` | V07 PR 2 | unit: `doctor/checks.test.ts`, `no-secrets.test.ts`, `host-readonly.test.ts`, `github-permissions.test.ts`, `deploy/doctor-troubleshooting.test.ts` (every README "Troubleshooting" row has an entry; services, jobs and AppRole folders follow the compose file), `worker/doctor-github.test.ts` |
+| `pnpm doctor` | V07 PR 2 | unit: `doctor/checks.test.ts` (with `backup.recent`, O03), `doctor/backup-facts.test.ts`, `no-secrets.test.ts`, `host-readonly.test.ts`, `github-permissions.test.ts`, `deploy/doctor-troubleshooting.test.ts` (every README "Troubleshooting" row has an entry; services, jobs and AppRole folders follow the compose file), `worker/doctor-github.test.ts` |
+| `pnpm alerts` | O03; ADR-M101 | unit: `alerts/decide.test.ts` (when a problem is sent, reminded, resolved), `alerts/message.test.ts`, `alerts/channels.test.ts` (a recorded POST, a fake `sendmail`), `alerts/settings.test.ts`, `alerts/run.test.ts` (a whole run, the state file, no env value in any output), `alerts/static.test.ts` (R144) |
 | Team access | V09; ADR-M67 | unit: `deploy/access-static.test.ts`, `doctor/access.test.ts`, `api/settings.test.ts`, `cli/doctor.test.ts`, `trial/trial-up.test.ts`; `pnpm test:access` |
 | Releases | V12; `RELEASING.md` | unit: `workspace/release.test.ts` (the release gate on fixtures, "Upgrade notes" from 0.1.1 on, the tag workflows) |
 

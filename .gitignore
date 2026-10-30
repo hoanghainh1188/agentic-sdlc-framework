@@ -17,6 +17,8 @@ trial-openbao-keys.age
 # `pnpm server:setup` progress (D-08 V16): step names only, no secret, but local to the machine.
 server-setup-progress.json
 server-setup-progress.json.tmp
+# `pnpm alerts` state (D-08 O03): check IDs, statuses and times, no secret, but local to the machine.
+alerts-state.json
 # The team access proxy's certificates made by platform/deploy/access/tls.sh dev (V09): never committed.
 access-tls/
 

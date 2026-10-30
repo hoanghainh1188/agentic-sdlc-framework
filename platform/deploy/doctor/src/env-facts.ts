@@ -8,6 +8,9 @@ export const ENV_ALLOWLIST = [
   'COMPOSE_PROJECT_NAME',
   'SDLC_OPENBAO_TLS_DIR',
   'SDLC_BACKUP_DIR',
+  // O03 (design/ADR-M101): how old the newest backup may be, in hours.
+  'SDLC_BACKUP_WARN_HOURS',
+  'SDLC_BACKUP_FAIL_HOURS',
   // Team access (V09, design/ADR-M67): addresses, names, a folder and an origin; none is secret.
   'SDLC_ACCESS_BIND_ADDR',
   'SDLC_ACCESS_HOST_PORT',
@@ -48,13 +51,20 @@ export function requiredSecrets(exampleText: string): string[] {
     .sort();
 }
 
-export function parseEnvFacts(text: string, required: readonly string[]): EnvFacts {
+/** The non-empty values of the named keys only; every other value of the file is dropped. */
+export function allowedValues(text: string, keys: readonly string[]): Record<string, string> {
   const all = entries(text);
   const values: Record<string, string> = {};
-  for (const key of ENV_ALLOWLIST) {
+  for (const key of keys) {
     const value = all.get(key);
     if (value !== undefined && value !== '') values[key] = value;
   }
+  return values;
+}
+
+export function parseEnvFacts(text: string, required: readonly string[]): EnvFacts {
+  const all = entries(text);
+  const values = allowedValues(text, ENV_ALLOWLIST);
   const secrets: Record<string, SecretState> = {};
   for (const key of required) {
     const value = all.get(key);

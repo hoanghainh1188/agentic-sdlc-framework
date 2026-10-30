@@ -71,6 +71,57 @@ function freeBytes(dir: string): number | null {
 }
 
 /** `docker compose ps --format json`: one array, or one object per line (Compose versions). */
+/** A complete backup of `backup.sh`: its `<UTC time>` folder (`.partial` until every part is done). */
+const BACKUP_FOLDER = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/;
+export const BACKUP_WARN_HOURS = 26;
+export const BACKUP_FAIL_HOURS = 50;
+
+/**
+ * The newest complete backup in a folder (O03, ADR-M101): only names are listed and `MANIFEST`
+ * is only tested for existence; no backup file is opened.
+ */
+export function newestBackup(dir: string): { readable: boolean; newest: string | null } {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return { readable: false, newest: null };
+  }
+  const complete = names
+    .map(folderTime)
+    .filter(
+      (iso, i): iso is string =>
+        iso !== null && fs.existsSync(path.join(dir, names[i]!, 'MANIFEST')),
+    )
+    .sort();
+  return { readable: true, newest: complete.at(-1) ?? null };
+}
+
+/** The ISO time of a backup folder name, or null when it is not one (or not a real UTC time). */
+function folderTime(name: string): string | null {
+  const m = BACKUP_FOLDER.exec(name);
+  if (!m) return null;
+  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}.000Z`;
+  const time = Date.parse(iso);
+  return !Number.isNaN(time) && new Date(time).toISOString() === iso ? iso : null;
+}
+
+function hours(value: string | undefined, fallback: number): number {
+  if (value === undefined || value === '') return fallback;
+  return /^[1-9]\d*$/.test(value) ? Number(value) : Number.NaN;
+}
+
+/** `SDLC_BACKUP_WARN_HOURS` and `SDLC_BACKUP_FAIL_HOURS`; NaN when a value is not a whole number. */
+export function backupHours(values: Readonly<Record<string, string>>): {
+  warnHours: number;
+  failHours: number;
+} {
+  return {
+    warnHours: hours(values.SDLC_BACKUP_WARN_HOURS, BACKUP_WARN_HOURS),
+    failHours: hours(values.SDLC_BACKUP_FAIL_HOURS, BACKUP_FAIL_HOURS),
+  };
+}
+
 export function parsePs(text: string): ServiceState[] | null {
   const trimmed = text.trim();
   if (trimmed === '') return [];
@@ -285,7 +336,23 @@ export async function gatherFacts(
       ? (mode.stdout.trim() as 'local' | 'published')
       : 'failed';
   const access = accessFact(envFacts?.values ?? {});
-  const base: OperatorFacts = { now, envFile, docker, disk, manifest, imagesMode, access };
+  const backup = envFacts
+    ? {
+        dir: backupDir || null,
+        ...(backupDir ? newestBackup(backupDir) : { readable: true, newest: null }),
+        ...backupHours(envFacts.values),
+      }
+    : undefined;
+  const base: OperatorFacts = {
+    now,
+    envFile,
+    docker,
+    disk,
+    ...(backup ? { backup } : {}),
+    manifest,
+    imagesMode,
+    access,
+  };
   const tlsDir = envFacts?.values.SDLC_OPENBAO_TLS_DIR ?? null;
   const tls = {
     dir: tlsDir,
