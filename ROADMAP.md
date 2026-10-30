@@ -10,7 +10,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike) |
 | Models | Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424) |
-| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; toward v1.0 (QUESTIONS #363) |
+| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; O03 in v0.10.0; toward v1.0 (QUESTIONS #363) |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done; U07 and U08 are done in v0.8.0) |
 | M-F | Adjust gates, budgets and rules from the trial data, then a trial on a real internal tool (D-02 §13.3) |
 
@@ -70,7 +70,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **L03** GPU sizing note for leadership (done, v0.6.0)
 - **L03b** Measure a 30B-class model on a rented GPU
 
-## Server: A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; toward v1.0 (QUESTIONS #363)
+## Server: A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; O03 in v0.10.0; toward v1.0 (QUESTIONS #363)
 
 - **A10** Resource measurement + backup / restore drill + internal CA / TLS
 - **V15** Release on the tag: one workflow builds the images, the lock file is a release asset (done, v0.7.0)
@@ -85,7 +85,7 @@ Generated from the backlog (`scripts/generate-backlog.py`, the same source as [d
 - **H07** A Docker authorization plugin that checks the body of container requests
 - **O01** The runner in its own VM or with rootless Docker (done, v0.7.0)
 - **O02** A tested upgrade between two releases (done, v0.7.0)
-- **O03** Operational alerts
+- **O03** Operational alerts (done, v0.10.0)
 - **O04** Data that only grows: run events, sessions, challenges, partitions
 - **O05** Key rotation: the Run Contract signing key and the processes' secret IDs
 

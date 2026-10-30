@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-30
+
+**Operational alerts (O03), and the old command name `sdlc` is gone.** `pnpm alerts` tells the operator, by a chat webhook or e-mail, when a service is not healthy, OpenBao is sealed, a disk or the backup target fills up, a backup did not run or a certificate nears its end. `pnpm doctor` gains the check `backup.recent`. As announced in 0.9.0, only `adlc` is installed now.
+
+### Upgrade notes
+- **On a running stack:** (1) `pnpm install`; (2) `pnpm compose:env --add-missing`: it appends the new optional keys `SDLC_BACKUP_WARN_HOURS`, `SDLC_BACKUP_FAIL_HOURS` and `SDLC_ALERT_*`, empty or with their defaults; nothing else changes until you set a channel; (3) no migration and no credentials command to run again; (4) on a checkout of the tag `v0.10.0` the published images are pulled (`pnpm images mode`); on any other checkout rebuild `sdlc-api`, `sdlc-worker` and `sdlc-runner` and deploy the three together; (5) start the platform again as usual (`platform/deploy/scripts/up.sh …`): volumes are kept.
+- **`pnpm doctor` may now warn about backups:** on a server with `SDLC_BACKUP_DIR`, the newest complete backup older than 26 hours is a warning and older than 50 hours a failure. Without `SDLC_BACKUP_DIR` the check is skipped.
+- **Alerts (optional, on a server):** put the webhook URL alone in a file of mode 600 and set `SDLC_ALERT_WEBHOOK_FILE`, or set `SDLC_ALERT_EMAIL_TO`; then `pnpm alerts --test`, and install the timer `platform/deploy/alerts/sdlc-alerts.timer` (deploy README "Alerts", runbook T11 §6b).
+- **The command:** `npm install -g @hoanghainh/governed-adlc@0.10.0`. **`sdlc` is removed**: write `adlc` in every script, and `pnpm adlc …` instead of `pnpm sdlc …` in a checkout. Your login stays: `adlc` still reads one that `sdlc` saved in `~/.config/sdlc/`. Coming from `agentic-sdlc-cli`: `npm uninstall -g agentic-sdlc-cli` first.
+- **The trial:** `pnpm trial:up` now refuses at the start without OpenSSL 3 as `openssl` (on macOS: `brew install openssl@3`, then put it first on the `PATH`). A running trial stack is not affected.
+
+### Removed
+- **The old command name `sdlc`** (ADR-M100, as announced in 0.9.0): the npm package installs only `adlc`, and a checkout has only `pnpm adlc` (no `pnpm sdlc`). The note `sdlc` printed is gone. `adlc` still reads a login that `sdlc` saved in `~/.config/sdlc/`.
+
 ### Added
 - **Operational alerts: `pnpm alerts`** (task O03, ADR-M101). It runs the checks of `pnpm doctor` on the server and sends what changed to the operator: a chat webhook (the URL in a file of mode 600, `SDLC_ALERT_WEBHOOK_FILE`; formats `text` for Slack, Google Chat, Mattermost and Rocket.Chat, or `json`), e-mail through the server's `sendmail` (`SDLC_ALERT_EMAIL_TO`), or both. A problem is sent when it is new or changes, again every 24 hours while it stays, and as "resolved" when it is fixed. A message holds the host, the check, its subject, doctor's text and fix: never a secret, an env value or a log line. It works while the platform is down or OpenBao is sealed. `--test` sends a test message, `--dry-run` shows what would be sent. The server's timer runs it: `platform/deploy/alerts/sdlc-alerts.service` and `.timer` (every 10 minutes), or cron. Deploy README "Alerts", runbook T11 §6b.
 - `pnpm doctor` checks that a backup ran: `backup.recent` reads the newest complete folder in `SDLC_BACKUP_DIR` and warns after `SDLC_BACKUP_WARN_HOURS` (26), failed after `SDLC_BACKUP_FAIL_HOURS` (50).
