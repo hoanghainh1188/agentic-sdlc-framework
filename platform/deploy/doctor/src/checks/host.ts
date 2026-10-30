@@ -20,6 +20,8 @@ const requirements = text('doctor.fix.readme', { section: 'Requirements' });
 
 const HOUR_MS = 3_600_000;
 const backupFix = text('doctor.fix.backup');
+/** A threshold as the env file means it; `-` for a value that is not a whole number. */
+const shown = (hours: number): number | string => (Number.isInteger(hours) ? hours : '-');
 
 /** O03 (ADR-M101): the newest complete backup is younger than the warning and failure hours. */
 function backupCheck(f: OperatorFacts): CheckResult {
@@ -31,7 +33,7 @@ function backupCheck(f: OperatorFacts): CheckResult {
     return problem(
       'backup.recent',
       'warning',
-      text('doctor.backup.bad_hours', { warn, fail }),
+      text('doctor.backup.bad_hours', { warn: shown(warn), fail: shown(fail) }),
       text('doctor.fix.readme', { section: 'Alerts' }),
     );
   }

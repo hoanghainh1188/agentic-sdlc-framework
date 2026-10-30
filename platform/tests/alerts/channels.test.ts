@@ -86,6 +86,17 @@ describe('sendWebhook', () => {
     expect(r.calls).toEqual([]);
   });
 
+  it("refuses a link at the URL file (the file itself must be the operator's, mode 600)", async () => {
+    const r = recorder();
+    const real = urlFile(URL_TEXT);
+    const link = path.join(path.dirname(real), 'link');
+    fs.symlinkSync(real, link);
+    expect(await sendWebhook({ file: link, format: 'text' }, MESSAGE, r.post)).toBe(
+      'webhook_file_missing',
+    );
+    expect(r.calls).toEqual([]);
+  });
+
   it('a non-2xx answer or no answer is a failure, never "sent"', async () => {
     const file = urlFile(URL_TEXT);
     expect(await sendWebhook({ file, format: 'text' }, MESSAGE, recorder(500).post)).toBe(

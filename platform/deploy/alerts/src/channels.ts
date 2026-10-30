@@ -40,16 +40,32 @@ export const httpsPost: Post = async (url, body, contentType) => {
   }
 };
 
-function readUrl(file: string): { url: string } | { problem: ChannelProblem } {
-  let mode: number;
-  let text: string;
+/**
+ * Opens the file once, never through a link, and checks that very file: a regular file of this
+ * account with no rights for others (mode 600).
+ */
+function readFileOnce(file: string): { mode: number; uid: number; text: string } | null {
+  let fd: number | undefined;
   try {
-    mode = fs.statSync(file).mode;
-    text = fs.readFileSync(file, 'utf8');
+    fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    const st = fs.fstatSync(fd);
+    if (!st.isFile()) return null;
+    return { mode: st.mode, uid: st.uid, text: fs.readFileSync(fd, 'utf8') };
   } catch {
-    return { problem: 'webhook_file_missing' };
+    return null;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
   }
-  if ((mode & 0o077) !== 0) return { problem: 'webhook_file_mode' };
+}
+
+function readUrl(file: string): { url: string } | { problem: ChannelProblem } {
+  const read = readFileOnce(file);
+  if (read === null) return { problem: 'webhook_file_missing' };
+  const owner = process.getuid?.();
+  if ((read.mode & 0o077) !== 0 || (owner !== undefined && read.uid !== owner)) {
+    return { problem: 'webhook_file_mode' };
+  }
+  const text = read.text;
   let url: URL;
   try {
     url = new URL(text.trim());

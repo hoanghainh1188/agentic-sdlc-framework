@@ -88,12 +88,22 @@ export function newestBackup(dir: string): { readable: boolean; newest: string |
     return { readable: false, newest: null };
   }
   const complete = names
-    .filter((n) => BACKUP_FOLDER.test(n) && fs.existsSync(path.join(dir, n, 'MANIFEST')))
+    .map(folderTime)
+    .filter(
+      (iso, i): iso is string =>
+        iso !== null && fs.existsSync(path.join(dir, names[i]!, 'MANIFEST')),
+    )
     .sort();
-  const last = complete.at(-1);
-  if (last === undefined) return { readable: true, newest: null };
-  const [, y, mo, d, h, mi, se] = BACKUP_FOLDER.exec(last)!;
-  return { readable: true, newest: `${y}-${mo}-${d}T${h}:${mi}:${se}.000Z` };
+  return { readable: true, newest: complete.at(-1) ?? null };
+}
+
+/** The ISO time of a backup folder name, or null when it is not one (or not a real UTC time). */
+function folderTime(name: string): string | null {
+  const m = BACKUP_FOLDER.exec(name);
+  if (!m) return null;
+  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}.000Z`;
+  const time = Date.parse(iso);
+  return !Number.isNaN(time) && new Date(time).toISOString() === iso ? iso : null;
 }
 
 function hours(value: string | undefined, fallback: number): number {

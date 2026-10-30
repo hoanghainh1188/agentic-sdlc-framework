@@ -78,8 +78,65 @@ describe('decide', () => {
     expect(decide(before, [skippedBao], NOW, 24)).toEqual({ items: [], next: before });
   });
 
-  it('a problem whose check or subject is gone is forgotten without a message', () => {
+  it('a problem whose check is gone from the results is forgotten without a message', () => {
     const before = { 'host.disk|/old': { status: 'warning' as const, sentAt: hoursAgo(2) } };
     expect(decide(before, [unsealed], NOW, 24)).toEqual({ items: [], next: {} });
+  });
+
+  // services.health gives one line per unhealthy service, but one ok line without a subject.
+  const unhealthy = (service: string): CheckResult => ({
+    id: 'services.health',
+    subject: service,
+    status: 'failed',
+    text: { key: 'doctor.services.unhealthy', params: { state: 'running', health: 'unhealthy' } },
+    fix: { key: 'doctor.fix.logs', params: { service } },
+  });
+  const servicesOk: CheckResult = {
+    id: 'services.health',
+    status: 'ok',
+    text: { key: 'doctor.services.ok', params: { count: 12 } },
+  };
+  const servicesSkipped: CheckResult = {
+    id: 'services.health',
+    status: 'skipped',
+    text: { key: 'doctor.skipped.stopped' },
+  };
+  const sentWorker = {
+    'services.health|sdlc-worker': { status: 'failed' as const, sentAt: hoursAgo(2) },
+  };
+
+  it('a subject that is no longer a problem is resolved, also when the ok line has no subject', () => {
+    const { items, next } = decide(sentWorker, [servicesOk], NOW, 24);
+    expect(items).toEqual([
+      {
+        kind: 'resolved',
+        result: {
+          id: 'services.health',
+          subject: 'sdlc-worker',
+          status: 'ok',
+          text: { key: 'alerts.resolved_line' },
+        },
+      },
+    ]);
+    expect(next).toEqual({});
+  });
+
+  it('one service healthy again while another is still unhealthy: resolved and kept', () => {
+    const before = {
+      ...sentWorker,
+      'services.health|sdlc-api': { status: 'failed' as const, sentAt: hoursAgo(2) },
+    };
+    const { items, next } = decide(before, [unhealthy('sdlc-api')], NOW, 24);
+    expect(items.map((i) => [i.kind, i.result.subject])).toEqual([['resolved', 'sdlc-worker']]);
+    expect(Object.keys(next)).toEqual(['services.health|sdlc-api']);
+  });
+
+  it('a skipped check keeps every subject it had (a stopped stack does not reset problems)', () => {
+    expect(decide(sentWorker, [servicesSkipped], NOW, 24)).toEqual({ items: [], next: sentWorker });
+    // Back up, still unhealthy: not a new problem, no new reminder clock.
+    expect(decide(sentWorker, [unhealthy('sdlc-worker')], NOW, 24)).toEqual({
+      items: [],
+      next: sentWorker,
+    });
   });
 });

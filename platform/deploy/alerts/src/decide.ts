@@ -24,14 +24,35 @@ export function keyOf(r: CheckResult): string {
   return `${r.id}|${r.subject ?? ''}`;
 }
 
+function parts(key: string): { id: string; subject: string } {
+  const at = key.indexOf('|');
+  return { id: key.slice(0, at), subject: key.slice(at + 1) };
+}
+
 function due(sent: SentAlert, now: Date, remindHours: number): boolean {
   return now.getTime() - Date.parse(sent.sentAt) >= remindHours * HOUR_MS;
 }
 
+/** The resolved line of a remembered problem: its own ok line, or a generic one for its subject. */
+function resolvedLine(key: string, byKey: ReadonlyMap<string, CheckResult>): CheckResult {
+  const own = byKey.get(key);
+  if (own?.status === 'ok') return own;
+  const { id, subject } = parts(key);
+  return {
+    id: id as CheckResult['id'],
+    ...(subject ? { subject } : {}),
+    status: 'ok',
+    text: { key: 'alerts.resolved_line' },
+  };
+}
+
 /**
- * A problem is sent when it is new or its status changed, and again after `remindHours`; an ok
- * check that was a problem is sent as resolved. A skipped check keeps what was known (a stopped
- * stack proves nothing); a problem whose line is gone is forgotten without a message.
+ * A problem is sent when it is new or its status changed, and again after `remindHours`. A
+ * remembered problem is resolved when its check gave lines this run that are not skipped and it is
+ * not among the problems; this also covers checks whose ok line has no subject (one line per
+ * unhealthy service, one ok line for all). A check whose lines are all skipped (a stopped stack, a
+ * sealed OpenBao) keeps every subject it had: it proves nothing. A check gone from the results is
+ * forgotten without a message.
  */
 export function decide(
   prev: AlertState,
@@ -42,14 +63,15 @@ export function decide(
   const items: AlertItem[] = [];
   const next: Record<string, SentAlert> = {};
   const sentAt = now.toISOString();
+  const byKey = new Map(results.map((r) => [keyOf(r), r]));
+  const seen = new Set(results.map((r) => r.id as string));
+  const decided = new Set(results.filter((r) => r.status !== 'skipped').map((r) => r.id as string));
+
   for (const result of results) {
+    if (result.status !== 'warning' && result.status !== 'failed') continue;
     const key = keyOf(result);
     const before = prev[key];
-    if (result.status === 'skipped') {
-      if (before) next[key] = before;
-    } else if (result.status === 'ok') {
-      if (before) items.push({ kind: 'resolved', result });
-    } else if (!before || before.status !== result.status) {
+    if (!before || before.status !== result.status) {
       items.push({ kind: 'problem', result });
       next[key] = { status: result.status, sentAt };
     } else if (due(before, now, remindHours)) {
@@ -57,6 +79,15 @@ export function decide(
       next[key] = { status: result.status, sentAt };
     } else {
       next[key] = before;
+    }
+  }
+  for (const [key, before] of Object.entries(prev)) {
+    if (next[key]) continue;
+    const { id } = parts(key);
+    if (byKey.get(key)?.status === 'skipped' || (seen.has(id) && !decided.has(id))) {
+      next[key] = before;
+    } else if (decided.has(id)) {
+      items.push({ kind: 'resolved', result: resolvedLine(key, byKey) });
     }
   }
   return { items, next };

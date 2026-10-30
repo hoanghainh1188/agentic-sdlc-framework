@@ -36,6 +36,15 @@ describe('newestBackup', () => {
     expect(newestBackup(dir)).toEqual({ readable: true, newest: '2026-10-11T02:30:00.000Z' });
   });
 
+  it('a folder name that is not a real UTC time does not count', () => {
+    const dir = target({
+      '20261011T023000Z': true,
+      '20269999T999999Z': true,
+      '20261301T000000Z': true,
+    });
+    expect(newestBackup(dir)).toEqual({ readable: true, newest: '2026-10-11T02:30:00.000Z' });
+  });
+
   it('an empty folder has no backup; a missing folder is unreadable', () => {
     expect(newestBackup(target({}))).toEqual({ readable: true, newest: null });
     expect(newestBackup('/nonexistent/doctor-backup')).toEqual({ readable: false, newest: null });

@@ -67,7 +67,7 @@ describe('runAlerts', () => {
     expect(fs.statSync(s.stateFile).mode & 0o777).toBe(0o600);
     expect(JSON.parse(fs.readFileSync(s.stateFile, 'utf8'))).toEqual({
       version: 1,
-      alerts: { 'openbao.state|': { status: 'failed', sentAt: NOW.toISOString() } },
+      channels: { webhook: { 'openbao.state|': { status: 'failed', sentAt: NOW.toISOString() } } },
     });
     expect(await runAlerts([], s.deps([sealed]))).toBe(0);
     expect(s.bodies).toHaveLength(1);
@@ -77,7 +77,7 @@ describe('runAlerts', () => {
     const s = setup();
     s.fail(503);
     expect(await runAlerts([], s.deps([sealed]))).toBe(1);
-    expect(fs.existsSync(s.stateFile)).toBe(false);
+    expect(JSON.parse(fs.readFileSync(s.stateFile, 'utf8'))).toEqual({ version: 1, channels: {} });
     s.fail(200);
     expect(await runAlerts([], s.deps([sealed]))).toBe(0);
     expect(s.bodies).toHaveLength(2);
@@ -115,10 +115,44 @@ describe('runAlerts', () => {
     expect(await runAlerts(['--unknown'], s.deps([sealed]))).toBe(2);
   });
 
+  it('two channels, one down: only that one is tried again; the other does not repeat', async () => {
+    const mailLog = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'alerts-mail-')), 'count');
+    dirs.push(path.dirname(mailLog));
+    const sendmail = path.join(path.dirname(mailLog), 'sendmail');
+    fs.writeFileSync(sendmail, `#!/bin/sh\ncat >/dev/null\necho sent >> "${mailLog}"\n`, {
+      mode: 0o700,
+    });
+    const s = setup(`SDLC_ALERT_EMAIL_TO=ops@example.test\nSDLC_ALERT_SENDMAIL=${sendmail}`);
+    s.fail(null);
+    expect(await runAlerts([], s.deps([sealed]))).toBe(1);
+    expect(await runAlerts([], s.deps([sealed]))).toBe(1);
+    expect(fs.readFileSync(mailLog, 'utf8').trim().split('\n')).toEqual(['sent']);
+    // The webhook was tried on both runs (no answer), and once more when it is back.
+    expect(s.bodies).toHaveLength(2);
+    s.fail(200);
+    expect(await runAlerts([], s.deps([sealed]))).toBe(0);
+    expect(s.bodies).toHaveLength(3);
+    expect(fs.readFileSync(mailLog, 'utf8').trim().split('\n')).toEqual(['sent']);
+  });
+
+  it('a state folder that cannot be written is refused before anything is sent', async () => {
+    const s = setup('SDLC_ALERT_STATE_FILE=/nonexistent-folder/alerts-state.json');
+    expect(await runAlerts([], s.deps([sealed]))).toBe(2);
+    expect(s.out.join('\n')).toContain('SDLC_ALERT_STATE_FILE');
+    expect(s.bodies).toEqual([]);
+  });
+
   it('no value of the env file reaches a message, stdout or the state file', async () => {
     const s = setup();
-    await runAlerts([], s.deps([sealed]));
-    await runAlerts(['--dry-run'], s.deps([sealed]));
+    const disk: CheckResult = {
+      id: 'host.disk',
+      subject: '/mnt/backup',
+      status: 'warning',
+      text: { key: 'doctor.disk.low', params: { gib: '3.0' } },
+      fix: { key: 'doctor.fix.disk' },
+    };
+    await runAlerts([], s.deps([sealed, disk]));
+    await runAlerts(['--dry-run'], s.deps([sealed, disk]));
     const all = [...s.bodies, ...s.out, fs.readFileSync(s.stateFile, 'utf8')].join('\n');
     expect(all).not.toContain(SECRET);
     expect(all).not.toContain('hooks.example.test');

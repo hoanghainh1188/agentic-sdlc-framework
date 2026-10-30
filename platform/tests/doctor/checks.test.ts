@@ -143,7 +143,10 @@ describe('pnpm doctor: the checks', () => {
         status: 'warning',
         text: { key: 'doctor.backup.bad_hours', params: { warn: 50, fail: 26 } },
       });
-      expect(backup({ warnHours: Number.NaN }).text.key).toBe('doctor.backup.bad_hours');
+      expect(backup({ warnHours: Number.NaN }).text).toEqual({
+        key: 'doctor.backup.bad_hours',
+        params: { warn: '-', fail: 50 },
+      });
     });
 
     it('skipped without SDLC_BACKUP_DIR (a trial or a dev stack) or without an env file', () => {

@@ -861,13 +861,13 @@ A tag (`0.2.0`, `sha-<commit>`) never moves, but use the digest anyway: the plat
 
 - a problem when it is new or its status changes (warning to failed);
 - the same problem again after `SDLC_ALERT_REMIND_HOURS` (24) while it stays;
-- a "resolved" line when its check is ok again. A skipped check (for example while the stack is stopped) changes nothing.
+- a "resolved" line when it is no longer a problem. A skipped check (for example while the stack is stopped) changes nothing.
 
-A message holds the host name, the check, its subject (a service, a certificate, a folder), doctor's text and its fix. Never an env value, a secret, a log line or a command's output. What was sent is kept in the state file (`alerts-state.json` next to the env file, mode 600: check IDs, statuses and times only). The state is written only when every channel took the message, so a failed delivery is tried again on the next run.
+A message holds the host name, the check, its subject (a service, a certificate, a folder), doctor's text and its fix. Never an env value, a secret, a log line or a command's output. What was sent is kept per channel in the state file (`alerts-state.json` next to the env file, mode 600: channel names, check IDs, statuses and times only). A channel's state changes only when that channel took the message, so a channel that is down is tried again on the next run and the others do not repeat.
 
 | Setting (env file) | Meaning |
 |---|---|
-| `SDLC_ALERT_WEBHOOK_FILE` | A file, mode 600 and outside the repository, that holds the webhook URL alone. Never the URL itself in the env file: it holds a token. Only `https://`; redirects are not followed |
+| `SDLC_ALERT_WEBHOOK_FILE` | A file of the operator account, mode 600, outside the repository and not a link, that holds the webhook URL alone. Never the URL itself in the env file: it holds a token. Only `https://`; redirects are not followed |
 | `SDLC_ALERT_WEBHOOK_FORMAT` | `text` (default): `{"text": "…"}` for Slack, Google Chat, Mattermost and Rocket.Chat. `json`: `{version, host, sent_at, items: [{kind, check, subject, status, message, fix}]}` for your own receiver |
 | `SDLC_ALERT_EMAIL_TO`, `SDLC_ALERT_EMAIL_FROM` | Addresses, comma-separated, and an optional sender. The mail goes through the server's `sendmail` (`SDLC_ALERT_SENDMAIL`, default `/usr/sbin/sendmail`): the platform holds no SMTP password |
 | `SDLC_ALERT_REMIND_HOURS` | When a problem that stays is sent again (default 24) |
@@ -881,7 +881,7 @@ Set up once, on the server ([runbook T11 §6b](../../handbook/03-templates/T11-o
 2. `pnpm alerts --test`: a test message through every channel, without running the checks. `pnpm alerts --dry-run` prints what would be sent and changes nothing.
 3. The schedule is the server's, never the platform's: the systemd timer `alerts/sdlc-alerts.service` and `.timer` (every 10 minutes), or the cron line in the unit file.
 
-Exit 0 when the run is done (sent, or nothing to send), 1 when a channel failed (the line says which one and why, as a code; never the URL), 2 for a usage error or a bad setting (the line names the key).
+Exit 0 when the run is done (sent, or nothing to send), 1 when a channel failed (the line says which one and why, as a code; never the URL) or the state could not be written, 2 for a usage error or a bad setting (the line names the key; also a state folder that cannot be written).
 
 ## Troubleshooting
 
