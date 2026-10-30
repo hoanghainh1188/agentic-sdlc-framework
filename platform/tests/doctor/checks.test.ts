@@ -9,6 +9,7 @@ import {
   isTrialProject,
   parseAppRole,
   parseOpenBaoStatus,
+  parseTableSizes,
   parsePs,
   parseValkeyMemory,
   parseWorkerGitHub,
@@ -313,6 +314,71 @@ describe('pnpm doctor: the checks', () => {
         'db.migrations',
       ).status,
     ).toBe('warning');
+  });
+
+  describe('db.table_size (O04, ADR-M103): the append-only tables against SDLC_DB_TABLE_WARN_GB', () => {
+    const sized = (
+      tableSizes: OperatorFacts['tableSizes'],
+      values: Record<string, string> = {},
+    ) => {
+      const base = healthyFacts();
+      return evaluate(
+        healthyFacts({
+          envFile: {
+            ...base.envFile,
+            facts: { ...base.envFile.facts!, values: { ...base.envFile.facts!.values, ...values } },
+          },
+          tableSizes,
+        }),
+      );
+    };
+
+    it('one ok line with the largest table while every table is below the warning', () => {
+      expect(one(sized([{ table: 'audit_log', bytes: 3 * GIB }]), 'db.table_size')).toMatchObject({
+        status: 'ok',
+        text: { key: 'doctor.db.tables_ok', params: { table: 'audit_log', gib: '3.0', max: 20 } },
+      });
+    });
+
+    it('a warning for each table at or above SDLC_DB_TABLE_WARN_GB, with the fix', () => {
+      const results = sized(
+        [
+          { table: 'audit_log', bytes: 25 * GIB },
+          { table: 'run_events', bytes: 5 * GIB },
+        ],
+        { SDLC_DB_TABLE_WARN_GB: '4' },
+      );
+      expect(of(results, 'db.table_size').map((r) => [r.subject, r.status])).toEqual([
+        ['audit_log', 'warning'],
+        ['run_events', 'warning'],
+      ]);
+      expect(one(results, 'db.table_size', 'audit_log')).toMatchObject({
+        text: { key: 'doctor.db.table_large', params: { gib: '25.0', max: 4 } },
+        fix: { key: 'doctor.fix.readme', params: { section: 'Database growth' } },
+      });
+    });
+
+    it('a bad SDLC_DB_TABLE_WARN_GB is a warning of its own; the default is used', () => {
+      const results = sized([{ table: 'audit_log', bytes: GIB }], { SDLC_DB_TABLE_WARN_GB: 'big' });
+      expect(one(results, 'db.table_size', 'SDLC_DB_TABLE_WARN_GB').text.key).toBe(
+        'doctor.db.bad_warn_gb',
+      );
+      // 1 GiB is below the default 20 GiB: the ok line comes too.
+      expect(of(results, 'db.table_size').map((r) => r.status)).toEqual(['warning', 'ok']);
+    });
+
+    it('skipped when the sizes could not be read or the database is stopped', () => {
+      expect(one(sized(null), 'db.table_size').status).toBe('skipped');
+      expect(one(sized(undefined), 'db.table_size').status).toBe('skipped');
+    });
+
+    it('parses the query result; anything else is null', () => {
+      expect(parseTableSizes('[{"table":"audit_log","bytes":123}]\n')).toEqual([
+        { table: 'audit_log', bytes: 123 },
+      ]);
+      expect(parseTableSizes('not json')).toBeNull();
+      expect(parseTableSizes('[{"table":1}]')).toBeNull();
+    });
   });
 
   describe('secret ID age (O05, ADR-M102): a warning 14 days before the 90 days end', () => {

@@ -187,3 +187,93 @@ const anchorCounts = {
   unlocked: 0,
   failed: 0,
 };
+
+describe('O04: housekeeping in the retention loop (ADR-M103)', () => {
+  const housekeepingCounts = { tenants: 2, sessions: 3, challenges: 5, failed: 0 };
+
+  it('runs under the same lock, also without the evidence identities', async () => {
+    const order: string[] = [];
+    const logs: { level: string; event: string; fields: Record<string, unknown> }[] = [];
+    const loop = new RetentionLoop({
+      housekeeping: () => {
+        order.push('housekeeping');
+        return Promise.resolve({ ...housekeepingCounts });
+      },
+      housekeepingMode: 'remove',
+      withLock: async (fn) => {
+        order.push('lock');
+        return { ran: true, value: await fn() };
+      },
+      logger: { log: (level, event, fields = {}) => logs.push({ level, event, fields }) },
+      mode: 'report',
+      intervalMs: 60_000,
+    });
+    const pass = await loop.tick();
+    expect(order).toEqual(['lock', 'housekeeping']);
+    expect(pass).toMatchObject({ outcome: 'done', result: null, housekeeping: housekeepingCounts });
+    expect(logs.find((l) => l.event === 'worker.housekeeping_pass')).toEqual({
+      level: 'info',
+      event: 'worker.housekeeping_pass',
+      fields: { mode: 'remove', ...housekeepingCounts },
+    });
+  });
+
+  it('a failed housekeeping pass is logged by its code and never stops the evidence pass', async () => {
+    const order: string[] = [];
+    const logs: { level: string; event: string; fields: Record<string, unknown> }[] = [];
+    const loop = new RetentionLoop({
+      pass: () => {
+        order.push('pass');
+        return Promise.resolve({ ...counts, orphanCursor: null });
+      },
+      housekeeping: () => {
+        order.push('housekeeping');
+        return Promise.reject(Object.assign(new Error('secret text'), { code: 'db_unavailable' }));
+      },
+      housekeepingMode: 'remove',
+      withLock: async (fn) => ({ ran: true, value: await fn() }),
+      logger: { log: (level, event, fields = {}) => logs.push({ level, event, fields }) },
+      mode: 'purge',
+      intervalMs: 60_000,
+    });
+    const pass = await loop.tick();
+    expect(order).toEqual(['housekeeping', 'pass']);
+    expect(pass).toMatchObject({ outcome: 'done', housekeeping: null });
+    expect(logs.find((l) => l.event === 'worker.housekeeping_failed')?.fields).toEqual({
+      error: 'db_unavailable',
+    });
+    expect(JSON.stringify(logs)).not.toContain('secret text');
+  });
+
+  it('a failing evidence pass (S3 down) never stops housekeeping: it runs first', async () => {
+    let cleaned = 0;
+    const loop = new RetentionLoop({
+      pass: () => Promise.reject(Object.assign(new Error('x'), { code: 'evidence_unavailable' })),
+      housekeeping: () => {
+        cleaned += 1;
+        return Promise.resolve({ ...housekeepingCounts });
+      },
+      housekeepingMode: 'remove',
+      withLock: async (fn) => ({ ran: true, value: await fn() }),
+      logger: { log: () => undefined },
+      mode: 'purge',
+      intervalMs: 60_000,
+    });
+    expect((await loop.tick()).outcome).toBe('failed');
+    expect(cleaned).toBe(1);
+  });
+
+  it('a tenant that failed makes the line a warning', async () => {
+    const logs: { level: string; event: string }[] = [];
+    const loop = new RetentionLoop({
+      housekeeping: () => Promise.resolve({ ...housekeepingCounts, failed: 1 }),
+      housekeepingMode: 'report',
+      withLock: async (fn) => ({ ran: true, value: await fn() }),
+      logger: { log: (level, event) => logs.push({ level, event }) },
+      mode: 'report',
+      intervalMs: 60_000,
+    });
+    await loop.tick();
+    expect(logs.find((l) => l.event === 'worker.housekeeping_pass')?.level).toBe('warn');
+  });
+});

@@ -57,11 +57,34 @@ describe('worker settings', () => {
         secretPath: 'worker/anchor',
         intervalMs: 3_600_000,
       },
+      // O04 (ADR-M103): the session tables, in the retention loop; on by default.
+      housekeeping: { mode: 'remove', sessionDays: 30, challengeHours: 24, intervalMs: 3_600_000 },
       // E08: off unless up.sh (profile observability) or .env sets it.
       langfuse: null,
       // X04 PR 3a: off unless up.sh (profile knowledge) or .env sets it.
       knowledge: null,
     });
+  });
+
+  it('O04: housekeeping of the session tables: modes, keep times with their floors, off', () => {
+    expect(
+      loadSettings({
+        SDLC_WORKER_HOUSEKEEPING_MODE: 'report',
+        SDLC_WORKER_SESSION_KEEP_DAYS: '7',
+        SDLC_WORKER_CHALLENGE_KEEP_HOURS: '1',
+        SDLC_WORKER_RETENTION_INTERVAL_MINUTES: '15',
+      }).housekeeping,
+    ).toEqual({ mode: 'report', sessionDays: 7, challengeHours: 1, intervalMs: 900_000 });
+    expect(loadSettings({ SDLC_WORKER_HOUSEKEEPING_MODE: 'off' }).housekeeping).toBeNull();
+    // Runs without the evidence identities too: retention off leaves it on.
+    expect(loadSettings({ SDLC_WORKER_RETENTION_URL: 'off' }).housekeeping?.mode).toBe('remove');
+    for (const bad of [
+      { SDLC_WORKER_SESSION_KEEP_DAYS: '6' },
+      { SDLC_WORKER_CHALLENGE_KEEP_HOURS: '0' },
+      { SDLC_WORKER_HOUSEKEEPING_MODE: 'purge' },
+    ]) {
+      expect(() => loadSettings(bad), JSON.stringify(bad)).toThrow(SettingsError);
+    }
   });
 
   it('E08: the Langfuse purge (origins, the worker KV path, limits; off by default)', () => {

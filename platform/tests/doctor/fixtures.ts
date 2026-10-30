@@ -82,6 +82,11 @@ export function healthyFacts(overrides: Partial<OperatorFacts> = {}): OperatorFa
       ],
     },
     migrations: { expected: ['0001-a', '0002-b'], applied: ['0001-a', '0002-b'] },
+    // O04: the append-only tables, far below the warning (20 GiB).
+    tableSizes: [
+      { table: 'audit_log', bytes: 2 * GIB },
+      { table: 'run_events', bytes: 1 * GIB },
+    ],
     approles: [
       { service: 'sdlc-api', credentials: 'api-credentials', state: 'ok', ageDays: 10 },
       { service: 'sdlc-worker', credentials: 'worker-credentials', state: 'ok', ageDays: 10 },

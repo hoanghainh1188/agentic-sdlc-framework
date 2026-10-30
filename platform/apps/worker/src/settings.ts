@@ -50,6 +50,9 @@ export const WORKER_ENV = {
   retentionGuardFloor: 'SDLC_WORKER_RETENTION_GUARD_FLOOR',
   retentionArchiveGraceDays: 'SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS',
   retentionOrphanGraceHours: 'SDLC_WORKER_RETENTION_ORPHAN_GRACE_HOURS',
+  housekeepingMode: 'SDLC_WORKER_HOUSEKEEPING_MODE',
+  sessionKeepDays: 'SDLC_WORKER_SESSION_KEEP_DAYS',
+  challengeKeepHours: 'SDLC_WORKER_CHALLENGE_KEEP_HOURS',
   anchorUrl: 'SDLC_WORKER_ANCHOR_URL',
   anchorBucket: 'SDLC_WORKER_ANCHOR_BUCKET',
   anchorSecretPath: 'SDLC_WORKER_ANCHOR_SECRET_PATH',
@@ -186,6 +189,12 @@ const schema = z.object({
   // Days after `project.archived` before its evidence is purged: a mistaken archive is noticed first.
   [WORKER_ENV.retentionArchiveGraceDays]: z.coerce.number().int().min(1).max(365).default(7),
   [WORKER_ENV.retentionOrphanGraceHours]: z.coerce.number().int().min(24).max(720).default(24),
+  // O04 (ADR-M103): ended web sessions and used or expired passkey challenges, removed in the
+  // retention loop at its interval. Needs only the database. The floors are the database's own
+  // (migration 0046): 7 days and 1 hour.
+  [WORKER_ENV.housekeepingMode]: z.enum(['off', 'report', 'remove']).default('remove'),
+  [WORKER_ENV.sessionKeepDays]: z.coerce.number().int().min(7).max(3650).default(30),
+  [WORKER_ENV.challengeKeepHours]: z.coerce.number().int().min(1).max(720).default(24),
   // E05 PR 2 (ADR-M51 §2.9): the daily audit anchor with the identity `worker-anchor`
   // (`kv/worker/anchor`) in the bucket `audit-anchors` (COMPLIANCE). `off`: no anchors. It runs in
   // the retention loop, at its interval.
@@ -303,6 +312,15 @@ export interface WorkerRetentionSettings {
   readonly orphanGraceHours: number;
 }
 
+/** O04: housekeeping of the session tables (ADR-M103), in the retention loop. */
+export interface WorkerHousekeepingSettings {
+  readonly mode: 'report' | 'remove';
+  readonly sessionDays: number;
+  readonly challengeHours: number;
+  /** The retention loop's interval. */
+  readonly intervalMs: number;
+}
+
 /** E05 PR 2: the daily audit anchor (ADR-M51 §2.9). */
 export interface WorkerAnchorSettings {
   readonly url: string;
@@ -416,6 +434,8 @@ export interface WorkerSettings {
   readonly retention: WorkerRetentionSettings | null;
   /** E05 PR 2: the daily audit anchor; null: `SDLC_WORKER_ANCHOR_URL=off`. */
   readonly anchor: WorkerAnchorSettings | null;
+  /** O04: the session tables; null: `SDLC_WORKER_HOUSEKEEPING_MODE=off`. */
+  readonly housekeeping: WorkerHousekeepingSettings | null;
   /** E08: the Langfuse purge; null: `SDLC_WORKER_LANGFUSE_URL=off` (not deployed). */
   readonly langfuse: WorkerLangfuseSettings | null;
   readonly knowledge: WorkerKnowledgeSettings | null;
@@ -563,6 +583,15 @@ export function loadSettings(env: Readonly<Record<string, string | undefined>>):
             url: new URL(v[WORKER_ENV.anchorUrl]).origin,
             bucket: v[WORKER_ENV.anchorBucket],
             secretPath: v[WORKER_ENV.anchorSecretPath],
+            intervalMs: v[WORKER_ENV.retentionIntervalMinutes] * 60_000,
+          },
+    housekeeping:
+      v[WORKER_ENV.housekeepingMode] === 'off'
+        ? null
+        : {
+            mode: v[WORKER_ENV.housekeepingMode] === 'report' ? 'report' : 'remove',
+            sessionDays: v[WORKER_ENV.sessionKeepDays],
+            challengeHours: v[WORKER_ENV.challengeKeepHours],
             intervalMs: v[WORKER_ENV.retentionIntervalMinutes] * 60_000,
           },
     knowledge:

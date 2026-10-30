@@ -213,3 +213,19 @@ describe('E03: the `count` kind and the G8 actions (ADR-M49)', () => {
     ).not.toThrow();
   });
 });
+
+describe('housekeeping.removed (O04, ADR-M103)', () => {
+  it('holds two counts for the tenant, never text', () => {
+    expect(() =>
+      checkAuditEvent('housekeeping.removed', SOME_ID, { sessions: 3, challenges: 0 }),
+    ).not.toThrow();
+    expect(
+      rejection(() => checkAuditEvent('housekeeping.removed', SOME_ID, { sessions: 3 })),
+    ).toBeDefined();
+    expect(
+      rejection(() =>
+        checkAuditEvent('housekeeping.removed', SOME_ID, { sessions: 'three', challenges: 0 }),
+      ),
+    ).toBeDefined();
+  });
+});

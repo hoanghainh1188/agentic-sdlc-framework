@@ -16,6 +16,7 @@ import {
   advanceEscalation,
   checkStoredConfigsAtStart,
   runAnchorPass,
+  runHousekeepingPass,
   runRetentionPass,
   gitHostErrorMessage,
   loadEffectiveConfig,
@@ -295,9 +296,13 @@ async function main(): Promise<void> {
     },
   );
   const retentionSettings = retentionStore ? settings.retention : null;
-  const loopIntervalMs = retentionSettings?.intervalMs ?? settings.anchor?.intervalMs;
+  // O04 (ADR-M103): housekeeping of the session tables needs only the database, so the loop also
+  // runs for it alone.
+  const housekeeping = settings.housekeeping;
+  const loopIntervalMs =
+    retentionSettings?.intervalMs ?? settings.anchor?.intervalMs ?? housekeeping?.intervalMs;
   const retention =
-    loopIntervalMs !== undefined && (retentionSettings || anchorStore)
+    loopIntervalMs !== undefined && (retentionSettings || anchorStore || housekeeping)
       ? new RetentionLoop({
           ...(anchorStore
             ? {
@@ -338,6 +343,22 @@ async function main(): Promise<void> {
                     },
                     orphanCursor,
                   ),
+              }
+            : {}),
+          ...(housekeeping
+            ? {
+                housekeeping: () =>
+                  runHousekeepingPass({
+                    db,
+                    logger,
+                    now: () => new Date(),
+                    settings: {
+                      mode: housekeeping.mode,
+                      sessionDays: housekeeping.sessionDays,
+                      challengeHours: housekeeping.challengeHours,
+                    },
+                  }),
+                housekeepingMode: housekeeping.mode,
               }
             : {}),
           withLock: (fn) => db.system.withRetentionLock(fn),

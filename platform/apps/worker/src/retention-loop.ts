@@ -11,8 +11,14 @@
 // - E05 PR 2 (ADR-M51 §2.9): each pass first runs the daily audit anchor (`runAnchorPass`, core),
 //   under the same lock. The loop runs when either identity is there (`worker-purge`,
 //   `worker-anchor`); each part only with its own. A failed anchor pass never stops the purge.
+// - O04 (ADR-M103): before the evidence pass, housekeeping of the dashboard's session tables
+//   (`runHousekeepingPass`, core). It needs only the database, so the loop runs for it alone too,
+//   and a failing evidence pass (S3 down) never stops it; its own failure is logged and never stops
+//   the other parts.
 import type {
   AnchorPassResult,
+  HousekeepingPassResult,
+  HousekeepingSettings,
   RetentionPassDeps,
   RetentionPassResult,
   SpendSyncLockResult,
@@ -25,6 +31,9 @@ export interface RetentionLoopDeps {
   readonly anchor?: () => Promise<AnchorPassResult>;
   /** `runRetentionPass` (core) bound to its dependencies; absent without `worker-purge`. */
   readonly pass?: (orphanCursor: string | null) => Promise<RetentionPassResult>;
+  /** `runHousekeepingPass` (core) bound to its dependencies; absent with `SDLC_WORKER_HOUSEKEEPING_MODE=off`. */
+  readonly housekeeping?: () => Promise<HousekeepingPassResult>;
+  readonly housekeepingMode?: HousekeepingSettings['mode'];
   /** `SystemScope.withRetentionLock`. */
   withLock<T>(fn: () => Promise<T>): Promise<SpendSyncLockResult<T>>;
   readonly logger: WorkerLogger;
@@ -38,6 +47,8 @@ export type RetentionLoopPass =
       /** Null when the part did not run (no identity) or failed (logged). */
       readonly anchors: AnchorPassResult | null;
       readonly result: RetentionPassResult | null;
+      /** Null when housekeeping is off or failed (logged). */
+      readonly housekeeping: HousekeepingPassResult | null;
     }
   | { readonly outcome: 'busy' }
   | { readonly outcome: 'failed' };
@@ -65,13 +76,15 @@ export class RetentionLoop {
     try {
       const locked = await this.#deps.withLock(async () => ({
         anchors: await this.#anchors(),
+        // Before the evidence pass: it needs only the database, so S3 being down never stops it.
+        housekeeping: await this.#housekeeping(),
         result: this.#deps.pass ? await this.#deps.pass(this.#orphanCursor) : null,
       }));
       if (!locked.ran) {
         this.#deps.logger.log('info', 'worker.retention_busy', {});
         return { outcome: 'busy' };
       }
-      const { anchors, result } = locked.value;
+      const { anchors, result, housekeeping } = locked.value;
       if (result) {
         const { orphanCursor, ...counts } = result;
         this.#orphanCursor = orphanCursor;
@@ -80,7 +93,7 @@ export class RetentionLoop {
           ...counts,
         });
       }
-      return { outcome: 'done', anchors, result };
+      return { outcome: 'done', anchors, result, housekeeping };
     } catch (error) {
       this.#deps.logger.log('error', 'worker.retention_failed', { error: errorCode(error) });
       return { outcome: 'failed' };
@@ -97,6 +110,22 @@ export class RetentionLoop {
       return counts;
     } catch (error) {
       this.#deps.logger.log('error', 'worker.anchor_pass_failed', { error: errorCode(error) });
+      return null;
+    }
+  }
+
+  /** The housekeeping pass; a failure is logged and never stops the other parts. */
+  async #housekeeping(): Promise<HousekeepingPassResult | null> {
+    if (!this.#deps.housekeeping) return null;
+    try {
+      const counts = await this.#deps.housekeeping();
+      this.#deps.logger.log(counts.failed > 0 ? 'warn' : 'info', 'worker.housekeeping_pass', {
+        mode: this.#deps.housekeepingMode ?? 'report',
+        ...counts,
+      });
+      return counts;
+    } catch (error) {
+      this.#deps.logger.log('error', 'worker.housekeeping_failed', { error: errorCode(error) });
       return null;
     }
   }

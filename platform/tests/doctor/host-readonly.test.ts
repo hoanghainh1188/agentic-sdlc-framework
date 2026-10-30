@@ -11,6 +11,7 @@ import {
   isAllowed,
   SQL_MIGRATIONS,
   SQL_PROJECTS,
+  SQL_TABLE_SIZES,
   type ComposeTarget,
 } from '../../deploy/doctor/src/commands.js';
 import { createExec } from '../../deploy/doctor/src/exec.js';
@@ -40,6 +41,7 @@ describe('pnpm doctor is read only', () => {
       commands.logs(target),
       commands.psql(target, SQL_MIGRATIONS),
       commands.psql(target, SQL_PROJECTS),
+      commands.psql(target, SQL_TABLE_SIZES),
       commands.valkey(target),
       commands.workerGitHub(target),
       commands.openbaoStatus(scripts.bootstrap),
@@ -100,7 +102,7 @@ describe('pnpm doctor is read only', () => {
   });
 
   it('the psql session is read only and the queries only select', () => {
-    for (const sql of [SQL_MIGRATIONS, SQL_PROJECTS]) {
+    for (const sql of [SQL_MIGRATIONS, SQL_PROJECTS, SQL_TABLE_SIZES]) {
       expect(sql.trim().toLowerCase().startsWith('select ')).toBe(true);
       expect(sql.toLowerCase()).not.toMatch(
         /\b(insert|update|delete|drop|alter|truncate|grant|create)\b/,

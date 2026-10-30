@@ -13,6 +13,8 @@ export const ENV_ALLOWLIST = [
   'SDLC_BACKUP_FAIL_HOURS',
   // O05 (design/ADR-M102): how many days before a secret ID ends doctor warns.
   'SDLC_APPROLE_WARN_DAYS',
+  // O04 (design/ADR-M103): the size of an append-only table that is a warning, in GiB.
+  'SDLC_DB_TABLE_WARN_GB',
   // Team access (V09, design/ADR-M67): addresses, names, a folder and an origin; none is secret.
   'SDLC_ACCESS_BIND_ADDR',
   'SDLC_ACCESS_HOST_PORT',

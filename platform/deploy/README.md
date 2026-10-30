@@ -773,6 +773,13 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 - Restore, also the recovery drill every 3 months: `pnpm restore <backup folder> <age private key file>` into an empty stack, then two key holders unseal with their original shares: [runbook T11 §7](../../handbook/03-templates/T11-openbao-runbook.md#7-restore-and-the-recovery-drill). `pnpm test:backup` runs the whole drill on throw-away keys.
 - Every backup holds personal data, client code (the evidence) and every password, encrypted: treat it like the server.
 
+## Database growth
+
+Some tables only grow (task O04, `design/ADR-M103-growing-data.md`):
+
+- **The append-only tables** (`audit_log`, `gate_decisions`, `run_events`, `cost_records` and the others of R030) are kept at least 2 years and never deleted. They hold codes, IDs, hashes and counts only: about 300–700 bytes a row with their indexes, so a busy deployment adds well under 1 GiB a year. `pnpm doctor` (`db.table_size`), and so [Alerts](#alerts), warn when one reaches `SDLC_DB_TABLE_WARN_GB` (default 20 GiB, set in the env file). That is years of notice to add monthly partitions; ADR-M103 §2.4 describes how.
+- **The dashboard's sessions and passkey challenges** are removed by the worker's retention loop, also without the evidence identities. A session goes 30 days after it ended (`SDLC_WORKER_SESSION_KEEP_DAYS`, at least 7), a challenge 24 hours after it was used or expired (`SDLC_WORKER_CHALLENGE_KEEP_HOURS`, at least 1). `SDLC_WORKER_HOUSEKEEPING_MODE`: `remove` (default), `report` (counts only, in the log line `worker.housekeeping_pass`) or `off`. Each tenant with removals gets one audit event `housekeeping.removed` with the counts. The database itself refuses any other removal of these rows.
+
 ## Upgrade
 
 Upgrade to a **release tag** (`vX.Y.Z`), and follow the "Upgrade notes" of every release between yours and the new one in the [CHANGELOG](../../CHANGELOG.md): they list the migrations, the credentials commands to run again and the changed settings ([RELEASING.md](../../RELEASING.md)). The first bullet of each release's notes says what every running stack must do; the other bullets are optional or explain one change. `main` is for developers: it may hold changes that are not released yet.
@@ -842,6 +849,7 @@ A tag (`0.2.0`, `sha-<commit>`) never moves, but use the digest anyway: the plat
 | `services.health` | `docker compose ps`: unhealthy or restarting services, a failed one-shot job, a `core` service not running. A stopped stack is a warning and the checks that need it are skipped |
 | `openbao.state`, `openbao.tls_files`, `openbao.tls_expiry` | `pnpm openbao:bootstrap status`; the CA and server certificate in `SDLC_OPENBAO_TLS_DIR` and their end dates (a warning within 30 days). Never the key file |
 | `db.migrations` | The applied migrations (`psql` in the postgres container as `platform`, a read-only session) against the migration files of this checkout |
+| `db.table_size` | The size of each append-only table with its indexes (a read-only `SELECT` of `pg_total_relation_size`): a warning from `SDLC_DB_TABLE_WARN_GB` (20 GiB) per table. See [Database growth](#database-growth) |
 | `credentials.approle` | Each process's AppRole files exist, and the secret ID's age (a warning 14 days before the 90 days end, `SDLC_APPROLE_WARN_DAYS`; failed at 90; renew them all with `pnpm openbao:bootstrap rotate-credentials`): `test -s` and `stat` inside the service, never the content |
 | `credentials.logs` | Event codes of the last 24 hours of the `sdlc-api`, `sdlc-worker` and `sdlc-runner` logs: `…_missing`, `worker.runs_off`, `worker.cost_sync_off`, `worker.cost_sync_gap`, a failed AppRole login, a sealed OpenBao. Only the event field is read; no line is printed |
 | `models.litellm` | The platform runs with the profile `models` (the LiteLLM sidecar) |

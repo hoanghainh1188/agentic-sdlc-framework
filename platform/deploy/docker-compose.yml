@@ -862,6 +862,12 @@ services:
       SDLC_WORKER_RETENTION_BUCKET: evidence
       SDLC_WORKER_RETENTION_MODE: ${SDLC_WORKER_RETENTION_MODE:-report}
       SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS: ${SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS:-7}
+      # O04 (ADR-M103): ended web sessions and used or expired passkey challenges, removed in the
+      # same loop after the days and hours below (database floors: 7 days, 1 hour). `report`
+      # counts, `off` stops it. Needs no credential.
+      SDLC_WORKER_HOUSEKEEPING_MODE: ${SDLC_WORKER_HOUSEKEEPING_MODE:-remove}
+      SDLC_WORKER_SESSION_KEEP_DAYS: ${SDLC_WORKER_SESSION_KEEP_DAYS:-30}
+      SDLC_WORKER_CHALLENGE_KEEP_HOURS: ${SDLC_WORKER_CHALLENGE_KEEP_HOURS:-24}
       # E05 PR 2 (ADR-M51 §2.9): the daily audit anchor in `audit-anchors` with its own identity
       # `worker-anchor` (kv/worker/anchor, `openbao:bootstrap worker-anchor-credentials`).
       # Without the credential: no anchors.
