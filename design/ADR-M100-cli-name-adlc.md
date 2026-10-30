@@ -47,3 +47,4 @@ Three things make a rename more than a search and replace:
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 1.0 | 2026-10-29 | Claude, approved by Harry | The package `@hoanghainh/governed-adlc`, the command `adlc`, the one-release aliases, the login folder, the npm order (QUESTIONS #631) |
+| 1.1 | 2026-10-30 | Claude, approved by Harry | §3: the change task for v0.10.0 is done as planned: the `sdlc` binary, `pnpm sdlc` and the note `cli.renamed` are removed; the old login folder `…/sdlc` is still read (the proposal of §3, accepted by Harry, 2026-10-30); the Bash hook still refuses `pnpm sdlc ops bootstrap\|token` |

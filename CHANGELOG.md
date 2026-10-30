@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Removed
+- **The old command name `sdlc`** (ADR-M100, as announced in 0.9.0): the npm package installs only `adlc`, and a checkout has only `pnpm adlc` (no `pnpm sdlc`). The note `sdlc` printed is gone. `adlc` still reads a login that `sdlc` saved in `~/.config/sdlc/`.
+
 ### Added
 - **Operational alerts: `pnpm alerts`** (task O03, ADR-M101). It runs the checks of `pnpm doctor` on the server and sends what changed to the operator: a chat webhook (the URL in a file of mode 600, `SDLC_ALERT_WEBHOOK_FILE`; formats `text` for Slack, Google Chat, Mattermost and Rocket.Chat, or `json`), e-mail through the server's `sendmail` (`SDLC_ALERT_EMAIL_TO`), or both. A problem is sent when it is new or changes, again every 24 hours while it stays, and as "resolved" when it is fixed. A message holds the host, the check, its subject, doctor's text and fix: never a secret, an env value or a log line. It works while the platform is down or OpenBao is sealed. `--test` sends a test message, `--dry-run` shows what would be sent. The server's timer runs it: `platform/deploy/alerts/sdlc-alerts.service` and `.timer` (every 10 minutes), or cron. Deploy README "Alerts", runbook T11 §6b.
 - `pnpm doctor` checks that a backup ran: `backup.recent` reads the newest complete folder in `SDLC_BACKUP_DIR` and warns after `SDLC_BACKUP_WARN_HOURS` (26), failed after `SDLC_BACKUP_FAIL_HOURS` (50).

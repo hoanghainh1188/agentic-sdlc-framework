@@ -5,8 +5,8 @@
 // 2. no packed file holds an absolute path of the build machine, a source map reference, an API
 //    token or a private key;
 // 3. the tarball installs into an empty folder outside the repository (`npm install -g --prefix`)
-//    and `adlc --version` prints the version, `adlc` alone prints the usage text (exit 2), and the
-//    old name `sdlc --version` prints the same version with the rename note on stderr (ADR-M100).
+//    and `adlc --version` prints the version, `adlc` alone prints the usage text (exit 2), and no
+//    command of the old name `sdlc` is installed (removed in v0.10.0, ADR-M100).
 // `--out <dir>` keeps the tarball there (the tag workflow uploads it). Never publishes.
 import { execFile } from 'node:child_process';
 import { access, copyFile, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -15,6 +15,15 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
+
+async function exists(file) {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
 const ROOT = path.resolve(import.meta.dirname, '..', '..', '..');
 const PKG = path.join(ROOT, 'platform', 'apps', 'cli', 'npm-dist');
 
@@ -24,7 +33,6 @@ const PACKED_FILES = [
   'README.md',
   'THIRD-PARTY-NOTICES',
   'bin/adlc.cjs',
-  'bin/sdlc.cjs',
   'defaults/project-config.default.yaml',
   'package.json',
 ];
@@ -113,12 +121,8 @@ async function checkInstall(version, outDir) {
     if (usageRun.code !== 2 || !usageRun.stderr.startsWith('Usage: adlc')) {
       fail(`adlc without arguments: exit ${usageRun.code}, no usage text`);
     }
-    // ADR-M100 §2.2: the old name runs the same command and says once that it is now `adlc`.
-    const legacyRun = await runBin(legacyBin, ['--version'], home);
-    if (legacyRun.code !== 0 || legacyRun.stdout.trim() !== version) {
-      fail(`sdlc --version: exit ${legacyRun.code}, output "${legacyRun.stdout.trim()}"`);
-    }
-    if (!legacyRun.stderr.includes('`sdlc` is now `adlc`')) fail('sdlc printed no rename note');
+    // ADR-M100: v0.10.0 removed the old name; nothing installs `sdlc` any more.
+    if (await exists(legacyBin)) fail('the package still installs sdlc');
     if (outDir !== undefined) await copyFile(tarball, path.join(outDir, filename));
     process.stdout.write(`cli-package check: ${filename} (${size} bytes) installs and runs\n`);
   } finally {
