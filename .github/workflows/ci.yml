@@ -620,12 +620,13 @@ jobs:
     # Compose project: the newest release tag before this commit (a git worktree, its published
     # images by digest) deployed with an intent at G1, then upgraded to this commit (images built
     # here) with the credentials commands of the CHANGELOG Upgrade notes; the intent goes on and the
-    # audit chain verifies. Same trigger as fresh-deploy (weekly and on demand); before a release
-    # the owner runs it by hand on the version pull request's branch (RELEASING.md §2). Throw-away
-    # keys only, never printed; the images on GHCR are public, so no secret.
+    # audit chain verifies. Same trigger as fresh-deploy (weekly and on demand), and on every
+    # pull request that changes the version (ADR-M104 §2.1): the version pull request tests its
+    # own upgrade before the merge. Throw-away keys only, never printed; the images on GHCR are
+    # public, so no secret.
     name: upgrade from the last release (README)
     needs: [scan, checks]
-    if: needs.scan.outputs.run_fresh_deploy == 'true'
+    if: needs.scan.outputs.run_fresh_deploy == 'true' || needs.scan.outputs.release_version != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 40 # the cap of every job (ci-workflow.test.ts)
     steps:

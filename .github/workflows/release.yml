@@ -19,6 +19,9 @@ name: release
 on:
   push:
     tags: ['v*']
+  # ADR-M104: release-tag.yml creates the tag of a merged version pull request with GITHUB_TOKEN,
+  # which starts no workflow, then dispatches this one on the tag. Any other ref is refused.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -42,6 +45,14 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0 # the ancestry check reads main's history
+      - name: Started on a tag
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          case "$REF" in
+            refs/tags/v*) ;;
+            *) echo "::error::release.yml runs on a tag v*, not on $REF"; exit 1 ;;
+          esac
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
