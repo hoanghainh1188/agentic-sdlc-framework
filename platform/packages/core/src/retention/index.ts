@@ -2,6 +2,7 @@
 // (task E08, design/ADR-M53).
 export * from './errors.js';
 export * from './holds.js';
+export * from './housekeeping.js';
 export * from './knowledge-pass.js';
 export * from './langfuse-pass.js';
 export * from './pass.js';

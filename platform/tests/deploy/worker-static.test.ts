@@ -114,6 +114,10 @@ describe('sdlc-worker service', () => {
       SDLC_WORKER_RETENTION_BUCKET: 'evidence',
       SDLC_WORKER_RETENTION_MODE: '${SDLC_WORKER_RETENTION_MODE:-report}',
       SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS: '${SDLC_WORKER_RETENTION_ARCHIVE_GRACE_DAYS:-7}',
+      // O04 (ADR-M103): housekeeping of the session tables, on by default.
+      SDLC_WORKER_HOUSEKEEPING_MODE: '${SDLC_WORKER_HOUSEKEEPING_MODE:-remove}',
+      SDLC_WORKER_SESSION_KEEP_DAYS: '${SDLC_WORKER_SESSION_KEEP_DAYS:-30}',
+      SDLC_WORKER_CHALLENGE_KEEP_HOURS: '${SDLC_WORKER_CHALLENGE_KEEP_HOURS:-24}',
     });
     const bootstrap = fs.readFileSync(path.join(deployDir, 'openbao/bootstrap.sh'), 'utf8');
     expect(bootstrap).toMatch(/^ {2}worker-purge-credentials\) cmd_worker_purge_credentials ;;$/m);

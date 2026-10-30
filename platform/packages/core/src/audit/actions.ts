@@ -579,6 +579,14 @@ export const AUDIT_ACTIONS = {
     fields: { pack_id: 'uuid', files: 'count', versions: 'count' },
   },
   /**
+   * The retention loop removed ended web sessions and used or expired passkey challenges of this
+   * tenant (O04, migration 0046, ADR-M103). Counts only; the tenant is the entity.
+   */
+  'housekeeping.removed': {
+    entityType: 'tenant',
+    fields: { sessions: 'count', challenges: 'count' },
+  },
+  /**
    * The daily audit anchor check found anchors that do not match this tenant's chain (E05 PR 2,
    * D-05 §7.4, ADR-M51 §2.9). Once per check run. Counts and the first mismatch's `reason`
    * (`hash_mismatch`, `seq_missing`, `anchor_invalid`, `anchor_versions`) and `seq`; **never a

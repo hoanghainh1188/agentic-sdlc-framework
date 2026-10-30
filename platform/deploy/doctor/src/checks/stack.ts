@@ -4,7 +4,7 @@ import type { MessageKey } from '@sdlc/messages';
 
 import { LOG_EVENT_FIXES } from '../logs.js';
 import type { AppRoleFact, CheckResult, OperatorFacts, ServiceState, Text } from '../types.js';
-import { ok, problem, skipped, text } from './result.js';
+import { GIB, ok, problem, skipped, text } from './result.js';
 
 /** Long-running services of the profile `core` (static test against docker-compose.yml). */
 export const CORE_SERVICES = [
@@ -195,6 +195,69 @@ function openbaoCheck(f: OperatorFacts, services: readonly ServiceState[]): Chec
         text('doctor.fix.logs', { service: 'openbao' }),
       );
   }
+}
+
+/** O04 (ADR-M103): an append-only table this large is a warning; `SDLC_DB_TABLE_WARN_GB`. */
+export const DB_TABLE_WARN_GB = 20;
+
+/** `SDLC_DB_TABLE_WARN_GB` (1–10000), or null when it is not a whole number in that range. */
+function tableWarnGb(f: OperatorFacts): number | null {
+  const value = f.envFile.facts?.values.SDLC_DB_TABLE_WARN_GB;
+  if (value === undefined) return DB_TABLE_WARN_GB;
+  return /^[1-9]\d{0,4}$/.test(value) && Number(value) <= 10_000 ? Number(value) : null;
+}
+
+/**
+ * O04 (ADR-M103): the append-only tables only grow and are never deleted; past the size the
+ * README names, plan the monthly partitions. One ok line with the largest table, or one warning per
+ * large table.
+ */
+function tableSizeChecks(f: OperatorFacts, services: readonly ServiceState[]): CheckResult[] {
+  if (!running(services, 'postgres') || f.tableSizes === undefined) {
+    return [skipped('db.table_size', 'doctor.skipped.not_running')];
+  }
+  if (f.tableSizes === null) return [skipped('db.table_size', 'doctor.skipped.table_sizes')];
+  const out: CheckResult[] = [];
+  const configured = tableWarnGb(f);
+  if (configured === null) {
+    out.push(
+      problem(
+        'db.table_size',
+        'warning',
+        text('doctor.db.bad_warn_gb', { default: DB_TABLE_WARN_GB }),
+        readme('Database growth'),
+        'SDLC_DB_TABLE_WARN_GB',
+      ),
+    );
+  }
+  const max = configured ?? DB_TABLE_WARN_GB;
+  const gib = (bytes: number) => (bytes / GIB).toFixed(1);
+  const large = f.tableSizes.filter((t) => t.bytes >= max * GIB);
+  for (const t of large) {
+    out.push(
+      problem(
+        'db.table_size',
+        'warning',
+        text('doctor.db.table_large', { gib: gib(t.bytes), max }),
+        readme('Database growth'),
+        t.table,
+      ),
+    );
+  }
+  if (large.length === 0) {
+    const largest = [...f.tableSizes].sort((x, y) => y.bytes - x.bytes)[0];
+    out.push(
+      ok(
+        'db.table_size',
+        text('doctor.db.tables_ok', {
+          table: largest?.table ?? '-',
+          gib: gib(largest?.bytes ?? 0),
+          max,
+        }),
+      ),
+    );
+  }
+  return out;
 }
 
 function migrationCheck(f: OperatorFacts, services: readonly ServiceState[]): CheckResult {
@@ -419,6 +482,7 @@ export function stackChecks(f: OperatorFacts): CheckResult[] {
     'services.health',
     'openbao.state',
     'db.migrations',
+    'db.table_size',
     'credentials.approle',
     'credentials.logs',
     'models.litellm',
@@ -465,6 +529,7 @@ export function stackChecks(f: OperatorFacts): CheckResult[] {
     openbaoCheck(f, services),
     ...tls,
     migrationCheck(f, services),
+    ...tableSizeChecks(f, services),
     ...approleChecks(f),
     ...logChecks(f),
     modelsCheck(services),

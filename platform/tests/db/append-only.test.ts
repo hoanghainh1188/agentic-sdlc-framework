@@ -3,6 +3,7 @@
 // migrations run; a table with such a trigger that is missing from the list fails too.
 import { describe, expect, it } from 'vitest';
 
+import { APPEND_ONLY_TABLES } from '../../deploy/doctor/src/commands.js';
 import { MIGRATIONS } from '../../packages/core/src/db/migrations/index.js';
 
 const upSql = Object.values(MIGRATIONS)
@@ -41,5 +42,9 @@ describe('W01: append-only tables (R030a)', () => {
       (m) => m[1],
     );
     expect([...new Set(guarded)].sort()).toEqual([...APPEND_ONLY].sort());
+  });
+
+  it('pnpm doctor watches the size of every one of them (O04, db.table_size)', () => {
+    expect([...APPEND_ONLY_TABLES].sort()).toEqual([...APPEND_ONLY].sort());
   });
 });

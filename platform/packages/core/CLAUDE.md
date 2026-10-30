@@ -30,4 +30,5 @@ Rules for `platform/packages/core`, the worker that runs its loops and workflows
 - Langfuse purge: select traces by run tags, check every trace's tags, never request `io`; no Langfuse step unless the key's project equals `SDLC_WORKER_LANGFUSE_PROJECT_ID` (ADR-M53). Never give the ClickHouse user `langfuse` access management (ADR-M63 §6). [R073]
 
 ## Database and audit
+- Ended web sessions and old passkey challenges are removed only through the definer functions of migration 0046, never below their floors (7 days, 1 hour); `platform_app` never gets DELETE on them, and append-only tables are never removed or summarised (ADR-M103). [R145]
 - Migrations are plain SQL (in TypeScript files under `migrations/`); never edit a merged one (a new one adds its SHA-256 to `migrations.lock.json`). Audit events are written only through `TenantScope.audit.append`. A new run event type, audit action or payload field is declared in `run-events/types.ts` / `audit/actions.ts` with a test. [R075]

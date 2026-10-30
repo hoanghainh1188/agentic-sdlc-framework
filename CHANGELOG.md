@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- **Housekeeping of the dashboard's sessions** (task O04, ADR-M103, migration `0046-housekeeping`). The worker's retention loop removes web sessions 30 days after they ended (`SDLC_WORKER_SESSION_KEEP_DAYS`, at least 7) and passkey challenges 24 hours after use or expiry (`SDLC_WORKER_CHALLENGE_KEEP_HOURS`, at least 1). It does this only through two definer functions; the database refuses any other removal. Each tenant with removals gets `housekeeping.removed` (counts). `SDLC_WORKER_HOUSEKEEPING_MODE`: `remove` (default), `report`, `off`.
+- `pnpm doctor` checks the size of the append-only tables (`db.table_size`) and warns at `SDLC_DB_TABLE_WARN_GB` (20 GiB), so `pnpm alerts` tells the operator long before partitions are needed. Deploy README "Database growth".
 - **Key rotation** (task O05, ADR-M102). The Run Contract signing key now rotates by itself every 90 days: `configure` sets `auto_rotate_period` from `TRANSIT_AUTO_ROTATE_PERIOD` in `bootstrap.conf`. Contracts signed before keep verifying until they expire. Runbook T11 §8.4 explains how to revoke a doubtful key version with `min_decryption_version` and how to check that no unexpired contract still uses it.
 - `pnpm openbao:bootstrap rotate-credentials` renews every AppRole secret ID that is set up (api, worker with cost-controller, runner, LiteLLM sidecar, backup) with one admin token. Owner's terminal only.
 

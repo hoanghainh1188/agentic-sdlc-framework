@@ -32,6 +32,7 @@ export const CHECK_IDS = [
   'openbao.tls_files',
   'openbao.tls_expiry',
   'db.migrations',
+  'db.table_size',
   'credentials.approle',
   'credentials.logs',
   'models.litellm',
@@ -95,6 +96,11 @@ export interface AccessFact {
     /** The names the server certificate does not hold (host name, IPs); null: not readable. */
     readonly unnamed: readonly string[] | null;
   };
+}
+
+export interface TableSizeFact {
+  readonly table: string;
+  readonly bytes: number;
 }
 
 export type OpenBaoState = 'uninitialised' | 'sealed' | 'unsealed' | 'unreachable';
@@ -187,6 +193,8 @@ export interface OperatorFacts {
     readonly missing: readonly string[];
     readonly certs: readonly CertFact[];
   };
+  /** O04 (ADR-M103): each append-only table's bytes with indexes; null: could not be read. */
+  readonly tableSizes?: readonly TableSizeFact[] | null;
   /** `applied` null: the table could not be read. */
   readonly migrations?: {
     readonly expected: readonly string[];

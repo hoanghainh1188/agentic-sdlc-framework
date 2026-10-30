@@ -14,6 +14,7 @@ import {
   PINNED_IMAGE,
   SQL_MIGRATIONS,
   SQL_PROJECTS,
+  SQL_TABLE_SIZES,
   type ComposeTarget,
 } from './commands.js';
 import { parseEnvFacts, requiredSecrets } from './env-facts.js';
@@ -31,6 +32,7 @@ import type {
   PublishedPort,
   RepoFact,
   ServiceState,
+  TableSizeFact,
 } from './types.js';
 
 export interface HostPaths {
@@ -120,6 +122,19 @@ export function backupHours(values: Readonly<Record<string, string>>): {
     warnHours: hours(values.SDLC_BACKUP_WARN_HOURS, BACKUP_WARN_HOURS),
     failHours: hours(values.SDLC_BACKUP_FAIL_HOURS, BACKUP_FAIL_HOURS),
   };
+}
+
+/** The rows of `SQL_TABLE_SIZES`, or null when the answer is not that shape. */
+export function parseTableSizes(stdout: string): TableSizeFact[] | null {
+  const rows = jsonArray(stdout);
+  if (rows === null) return null;
+  const out: TableSizeFact[] = [];
+  for (const row of rows) {
+    const r = row as { table?: unknown; bytes?: unknown };
+    if (typeof r?.table !== 'string' || typeof r.bytes !== 'number') return null;
+    out.push({ table: r.table, bytes: r.bytes });
+  }
+  return out;
 }
 
 export function parsePs(text: string): ServiceState[] | null {
@@ -386,6 +401,7 @@ export async function gatherFacts(
 
   let migrations: OperatorFacts['migrations'];
   let projects: OperatorFacts['projects'];
+  let tableSizes: OperatorFacts['tableSizes'];
   if (running(services, 'postgres')) {
     const applied = await exec(commands.psql(target, SQL_MIGRATIONS));
     const names = applied.status === 0 ? jsonArray(applied.stdout) : null;
@@ -396,6 +412,8 @@ export async function gatherFacts(
         (/kysely_migration.*does not exist/.test(applied.stderr) ? [] : null),
     };
     projects = await projectImages(exec, target);
+    const sizes = await exec(commands.psql(target, SQL_TABLE_SIZES));
+    tableSizes = sizes.status === 0 ? parseTableSizes(sizes.stdout) : null;
   }
 
   const approles: AppRoleFact[] = [];
@@ -434,6 +452,7 @@ export async function gatherFacts(
     ...(openbao ? { openbao } : {}),
     ...(migrations ? { migrations } : {}),
     ...(projects !== undefined ? { projects } : {}),
+    ...(tableSizes !== undefined ? { tableSizes } : {}),
     approles,
     ...(logs !== undefined ? { logs } : {}),
     ...(valkey !== undefined ? { valkey } : {}),

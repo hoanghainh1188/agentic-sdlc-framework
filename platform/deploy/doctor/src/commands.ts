@@ -43,6 +43,36 @@ export const SQL_PROJECTS =
   "c.config_yaml) order by t.slug, p.slug), '[]'::json) from projects p join tenants t on " +
   't.id = p.tenant_id left join project_configs c on c.tenant_id = p.tenant_id and ' +
   "c.project_id = p.id where p.status = 'active'";
+/**
+ * O04 (ADR-M103): the size of each append-only table with its indexes. Names and byte counts
+ * only. A plain table counts itself; a partitioned table the sum over its partition tree
+ * (`pg_partition_tree`), and partitions are not listed on their own. The list
+ * equals the one of `platform/tests/db/append-only.test.ts` (a test checks it).
+ */
+export const APPEND_ONLY_TABLES = [
+  'audit_log',
+  'gate_decisions',
+  'run_events',
+  'cost_records',
+  'project_ai_record_versions',
+  'agent_approvals',
+  'tool_approvals',
+  'evaluation_run_contracts',
+  'evaluation_run_results',
+  'evaluation_plan_versions',
+  'evaluation_configurations',
+  'evaluation_task_decisions',
+  'evaluation_task_check_contracts',
+  'knowledge_index_uses',
+] as const;
+export const SQL_TABLE_SIZES =
+  "select coalesce(json_agg(json_build_object('table', c.relname, 'bytes', case c.relkind " +
+  "when 'p' then (select coalesce(sum(pg_total_relation_size(t.relid)), 0)::bigint from " +
+  'pg_partition_tree(c.oid) t) else pg_total_relation_size(c.oid) end) order by c.relname), ' +
+  "'[]'::json) from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in " +
+  "('r', 'p') and not c.relispartition and c.relname in (" +
+  APPEND_ONLY_TABLES.map((t) => `'${t}'`).join(', ') +
+  ')';
 export const PG_READ_ONLY = 'PGOPTIONS=-c default_transaction_read_only=on';
 
 export const VALKEY_SCRIPT = 'REDISCLI_AUTH="$VALKEY_PASSWORD" valkey-cli info memory';
@@ -144,6 +174,7 @@ export function isAllowed(
     commands.logs(target),
     commands.psql(target, SQL_MIGRATIONS),
     commands.psql(target, SQL_PROJECTS),
+    commands.psql(target, SQL_TABLE_SIZES),
     commands.valkey(target),
     commands.workerGitHub(target),
     ...APPROLE_FOLDERS.map((f) => commands.approle(target, f.service, f.folder)),
