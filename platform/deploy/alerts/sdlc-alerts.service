@@ -1,0 +1,17 @@
+# Example systemd unit for the operational alerts (task O03, design/ADR-M101, runbook T11 §6b).
+# Copy to /etc/systemd/system/ on the server with sdlc-alerts.timer, change WorkingDirectory and
+# User, then:
+#   systemctl daemon-reload && systemctl enable --now sdlc-alerts.timer
+# Cron instead (every 10 minutes):
+#   */10 * * * * cd /opt/governed-adlc-fw && pnpm -s alerts >>/var/log/sdlc-alerts.log 2>&1
+[Unit]
+Description=Agentic SDLC platform alerts (pnpm alerts)
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# The checkout of the platform on the server, and the operator account that runs Docker.
+WorkingDirectory=/opt/governed-adlc-fw
+User=sdlc-operator
+ExecStart=/usr/bin/env pnpm -s alerts

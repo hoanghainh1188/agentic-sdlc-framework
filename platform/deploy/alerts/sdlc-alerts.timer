@@ -1,0 +1,12 @@
+# Example systemd timer for the operational alerts (task O03, runbook T11 §6b): every 10 minutes,
+# also while the platform is down (that is when an alert matters most).
+[Unit]
+Description=Agentic SDLC platform alerts every 10 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

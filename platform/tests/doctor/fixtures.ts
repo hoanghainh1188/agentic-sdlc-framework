@@ -11,6 +11,7 @@ import { repoRoot } from '../workspace/helpers';
 export const NOW = new Date('2026-10-12T00:00:00.000Z');
 export const GIB = 1024 ** 3;
 const DAY = 86_400_000;
+export const HOUR = 3_600_000;
 
 export const MANIFEST = manifestPermissions(
   fs.readFileSync(path.join(repoRoot(), 'platform/deploy/github-app/manifest.json'), 'utf8'),
@@ -52,12 +53,24 @@ export function healthyFacts(overrides: Partial<OperatorFacts> = {}): OperatorFa
           COMPOSE_PROJECT_NAME: 'sdlc',
           SDLC_OPENBAO_TLS_DIR: '/srv/sdlc/tls',
           SDLC_RUNNER_LINK_ADDR: LINK,
+          SDLC_BACKUP_DIR: '/mnt/backup',
         },
         secrets: { PLATFORM_DB_PASSWORD: 'set', VALKEY_PASSWORD: 'set' },
       },
     },
     docker: { serverVersion: '29.8.2', composeVersion: '2.30.1', memoryBytes: 16 * GIB },
-    disk: [{ path: '/srv/sdlc', freeBytes: 100 * GIB }],
+    disk: [
+      { path: '/srv/sdlc', freeBytes: 100 * GIB },
+      { path: '/mnt/backup', freeBytes: 500 * GIB },
+    ],
+    // O03: last night's backup, 3 hours ago.
+    backup: {
+      dir: '/mnt/backup',
+      readable: true,
+      newest: new Date(NOW.getTime() - 3 * HOUR).toISOString(),
+      warnHours: 26,
+      failHours: 50,
+    },
     services: RUNNING,
     openbao: 'unsealed',
     tls: {

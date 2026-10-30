@@ -66,6 +66,7 @@ describe('message catalog', () => {
       'platform/deploy/server-setup/src',
       'platform/deploy/steps/src',
       'platform/deploy/doctor/src',
+      'platform/deploy/alerts/src',
       'platform/deploy/github-app/src',
       'platform/eval/src',
     ]

@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.45. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.47. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -877,6 +877,22 @@ The whole platform is backed up by one command, `pnpm backup` (`platform/deploy/
 - Once a week, check that today's folder exists and its files are not empty. Copying the target folder further away (another site) is the company infrastructure's job.
 - Treat every backup like the server: it holds personal data, client code (the evidence) and every password, encrypted.
 
+## 6b. Operational alerts
+
+`pnpm alerts` (task O03, `design/ADR-M101-operational-alerts.md`) runs the checks of `pnpm doctor` and sends what changed to the operator: a stopped or unhealthy service, a sealed OpenBao, a full disk or backup target, a backup that did not run, a TLS certificate near its end. It works while the platform is down and OpenBao is sealed. A message never holds a secret, an env value or a log line. Settings and the message: `platform/deploy/README.md`, section "Alerts".
+
+**Set up once (the infrastructure operator):**
+
+1. Choose the channels: a chat webhook (Slack, Google Chat, Mattermost, Rocket.Chat, or your own receiver with the `json` format), e-mail through the server's `sendmail`, or both.
+2. For a webhook, put the URL alone in a file the operator account reads, mode 600, outside the repository: `install -m 600 /dev/null /etc/sdlc/alert-webhook-url`, then write the URL with an editor (never with `echo` on the command line: the shell history keeps it). Set `SDLC_ALERT_WEBHOOK_FILE` to that file. The URL is a secret: whoever holds it can post to the channel.
+3. For e-mail, set `SDLC_ALERT_EMAIL_TO` (and `SDLC_ALERT_EMAIL_FROM` if your mail relay needs it). The server's mail system sends it; the platform holds no SMTP password.
+4. `pnpm alerts --test`: every channel gets a test message. Then `pnpm alerts --dry-run`: what would be sent now, nothing changed.
+5. Install the timer: copy `platform/deploy/alerts/sdlc-alerts.service` and `sdlc-alerts.timer` to `/etc/systemd/system/`, change `WorkingDirectory` and `User`, then `systemctl enable --now sdlc-alerts.timer` (every 10 minutes). Or the cron line in the unit file.
+
+**When an alert comes:** each line names the check and its fix (a command, a section of this runbook or of the deploy README). Run `pnpm doctor` on the server for the full picture. A sealed OpenBao: section 4. A backup that did not run: `journalctl -u sdlc-backup`, then section 6. A certificate near its end: section 3c or 3d. The same problem comes again every `SDLC_ALERT_REMIND_HOURS` (24) until it is fixed, then a "resolved" line.
+
+**If the webhook URL leaks:** make a new one in the chat tool, remove the old one there, and write the new URL into the file. Nothing else holds it.
+
 ## 7. Restore and the recovery drill
 
 `pnpm restore <backup folder> <age private key file>` (`platform/deploy/backup/restore.sh`) restores a backup into an **empty** stack: a test machine for the drill, or a new server after a loss. It refuses when the env file or the project's volumes exist.
@@ -1040,6 +1056,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.43 | 2026-10-24 | Claude Code (task L01, PR 1) | New section 5d.1: the provider entry `vllm` of the self-hosted model (profile `models-local`, ADR-M71); no key, two values that are not secrets |
 | 0.45 | 2026-10-29 | Claude Code (task V16) | Section 3.2: `pnpm server:setup` runs the initialisation, the shared secrets and every credentials command in one pass: PGP-encrypted shares by default, the screen and scroll-back cleared after each share, the root token only for `configure`, one admin token; the manual steps stay as the fallback |
 | 0.46 | 2026-10-29 | Claude Code (docs, newcomer review) | Section 3.2: heading without "described, not yet done"; the procedure is ready, the company server waits for the key holders and the CA certificate (A10 PR 3) |
+| 0.47 | 2026-10-30 | Claude Code (task O03) | Section 6b: operational alerts with `pnpm alerts` (a webhook URL in a file of mode 600, e-mail through `sendmail`, the systemd timer, what to do when an alert comes and when the URL leaks) |
 | 0.44 | 2026-10-24 | Claude Code (task O01, PR 2) | Section 5g step 3: the runner on its own Docker Engine (`SDLC_RUNNER_DOCKER_HOST`, `SDLC_RUNNER_SOURCE_CIDR`, `runner-host.sh restart`; ADR-M91) |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |

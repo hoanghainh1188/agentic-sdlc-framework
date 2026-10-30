@@ -18,6 +18,40 @@ function composeTooOld(version: string): boolean {
 
 const requirements = text('doctor.fix.readme', { section: 'Requirements' });
 
+const HOUR_MS = 3_600_000;
+const backupFix = text('doctor.fix.backup');
+
+/** O03 (ADR-M101): the newest complete backup is younger than the warning and failure hours. */
+function backupCheck(f: OperatorFacts): CheckResult {
+  const b = f.backup;
+  if (b === undefined) return skipped('backup.recent', 'doctor.skipped.no_env');
+  if (b.dir === null) return skipped('backup.recent', 'doctor.skipped.no_backup_dir');
+  const { warnHours: warn, failHours: fail } = b;
+  if (!Number.isInteger(warn) || !Number.isInteger(fail) || warn >= fail) {
+    return problem(
+      'backup.recent',
+      'warning',
+      text('doctor.backup.bad_hours', { warn, fail }),
+      text('doctor.fix.readme', { section: 'Alerts' }),
+    );
+  }
+  if (!b.readable) {
+    return problem('backup.recent', 'failed', text('doctor.backup.unreadable'), backupFix, b.dir);
+  }
+  if (b.newest === null) {
+    return problem('backup.recent', 'failed', text('doctor.backup.none'), backupFix, b.dir);
+  }
+  const age = Math.max(0, Math.floor((f.now.getTime() - Date.parse(b.newest)) / HOUR_MS));
+  const params = { hours: age, date: b.newest.slice(0, 10) };
+  if (age >= fail) {
+    return problem('backup.recent', 'failed', text('doctor.backup.old', params), backupFix, b.dir);
+  }
+  if (age >= warn) {
+    return problem('backup.recent', 'warning', text('doctor.backup.old', params), backupFix, b.dir);
+  }
+  return ok('backup.recent', text('doctor.backup.ok', params), b.dir);
+}
+
 export function hostChecks(f: OperatorFacts): CheckResult[] {
   const out: CheckResult[] = [];
   if (!f.docker) {
@@ -89,6 +123,7 @@ export function hostChecks(f: OperatorFacts): CheckResult[] {
       out.push(ok('host.disk', text('doctor.disk.ok', { gib }), d.path));
     }
   }
+  out.push(backupCheck(f));
 
   const env = f.envFile;
   if (!env.exists) {

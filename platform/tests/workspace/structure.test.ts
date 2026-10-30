@@ -48,8 +48,8 @@ describe('workspace structure (D-03 section 11)', () => {
       path.join(root, 'tsconfig.json'),
     );
     // Plus `pnpm trial:up` (D-08 V02), `pnpm github-app:create` (V03), `pnpm doctor` (V07),
-    // `pnpm server:setup` and the deployment steps it shares with `trial:up` (V16): TypeScript
-    // projects, not workspace packages.
+    // `pnpm server:setup` and the deployment steps it shares with `trial:up` (V16), `pnpm alerts`
+    // (O03): TypeScript projects, not workspace packages.
     expect(references.map((r) => r.path).sort()).toEqual(
       [
         ...EXPECTED_PACKAGES.map((p) => p.dir),
@@ -58,6 +58,7 @@ describe('workspace structure (D-03 section 11)', () => {
         'platform/deploy/server-setup',
         'platform/deploy/doctor',
         'platform/deploy/github-app',
+        'platform/deploy/alerts',
       ].sort(),
     );
   });

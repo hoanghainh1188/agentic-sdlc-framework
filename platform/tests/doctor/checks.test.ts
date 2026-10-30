@@ -15,7 +15,7 @@ import {
 } from '../../deploy/doctor/src/host.js';
 import { renderText } from '../../deploy/doctor/src/render.js';
 import { CHECK_IDS, type CheckResult, type OperatorFacts } from '../../deploy/doctor/src/types.js';
-import { GIB, healthyFacts, inDays, MANIFEST, NOW, RUNNING, service } from './fixtures.js';
+import { GIB, healthyFacts, HOUR, inDays, MANIFEST, NOW, RUNNING, service } from './fixtures.js';
 
 const of = (results: readonly CheckResult[], id: string, subject?: string) =>
   results.filter((r) => r.id === id && (subject === undefined || r.subject === subject));
@@ -98,6 +98,64 @@ describe('pnpm doctor: the checks', () => {
     expect(one(results, 'host.memory').status).toBe('warning');
     expect(one(results, 'host.disk', '/a').status).toBe('warning');
     expect(one(results, 'host.disk', '/b').status).toBe('failed');
+  });
+
+  describe('backup.recent (O03): the newest complete backup in SDLC_BACKUP_DIR', () => {
+    const backup = (over: Partial<NonNullable<OperatorFacts['backup']>>) =>
+      one(
+        evaluate(healthyFacts({ backup: { ...healthyFacts().backup!, ...over } })),
+        'backup.recent',
+      );
+    const hoursAgo = (h: number) => new Date(NOW.getTime() - h * HOUR).toISOString();
+
+    it('ok within the warning hours, with its age and date', () => {
+      expect(backup({ newest: hoursAgo(25) })).toMatchObject({
+        status: 'ok',
+        text: { key: 'doctor.backup.ok', params: { hours: 25, date: hoursAgo(25).slice(0, 10) } },
+      });
+    });
+
+    it('a warning from SDLC_BACKUP_WARN_HOURS, a failure from SDLC_BACKUP_FAIL_HOURS', () => {
+      expect(backup({ newest: hoursAgo(26) })).toMatchObject({
+        status: 'warning',
+        text: { key: 'doctor.backup.old' },
+        fix: { key: 'doctor.fix.backup' },
+      });
+      expect(backup({ newest: hoursAgo(50) }).status).toBe('failed');
+      expect(backup({ newest: hoursAgo(10), warnHours: 8, failHours: 12 }).status).toBe('warning');
+    });
+
+    it('no complete backup yet, or an unreadable folder, is a failure with its fix', () => {
+      expect(backup({ newest: null })).toMatchObject({
+        status: 'failed',
+        text: { key: 'doctor.backup.none' },
+        fix: { key: 'doctor.fix.backup' },
+      });
+      expect(backup({ readable: false, newest: null })).toMatchObject({
+        status: 'failed',
+        text: { key: 'doctor.backup.unreadable' },
+        subject: '/mnt/backup',
+      });
+    });
+
+    it('thresholds that make no sense are a warning, never ignored', () => {
+      expect(backup({ warnHours: 50, failHours: 26 })).toMatchObject({
+        status: 'warning',
+        text: { key: 'doctor.backup.bad_hours', params: { warn: 50, fail: 26 } },
+      });
+      expect(backup({ warnHours: Number.NaN }).text.key).toBe('doctor.backup.bad_hours');
+    });
+
+    it('skipped without SDLC_BACKUP_DIR (a trial or a dev stack) or without an env file', () => {
+      expect(backup({ dir: null })).toMatchObject({
+        status: 'skipped',
+        text: { key: 'doctor.skipped.no_backup_dir' },
+      });
+      expect(one(evaluate(healthyFacts({ backup: undefined })), 'backup.recent')).toMatchObject({
+        status: 'skipped',
+        text: { key: 'doctor.skipped.no_env' },
+      });
+    });
   });
 
   it('the env file: missing, readable by others, unset secrets (names only)', () => {

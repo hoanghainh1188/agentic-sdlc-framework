@@ -769,6 +769,7 @@ Measured with `docker stats` on a development machine (Docker Desktop, 8 GiB VM)
 
 - Set up once: install `age`, make the key pair away from the server, set the variables, `pnpm openbao:bootstrap backup-credentials`, and the daily systemd timer (`backup/sdlc-backup.service`, `.timer`): [runbook T11 §6](../../handbook/03-templates/T11-openbao-runbook.md#6-daily-backup).
 - SeaweedFS and ClickHouse stop for about a minute during the copy; run it at night (the timer: 02:30).
+- A backup that did not run: `pnpm doctor` (`backup.recent`) and [Alerts](#alerts) say so after `SDLC_BACKUP_WARN_HOURS` (26 hours).
 - Restore, also the recovery drill every 3 months: `pnpm restore <backup folder> <age private key file>` into an empty stack, then two key holders unseal with their original shares: [runbook T11 §7](../../handbook/03-templates/T11-openbao-runbook.md#7-restore-and-the-recovery-drill). `pnpm test:backup` runs the whole drill on throw-away keys.
 - Every backup holds personal data, client code (the evidence) and every password, encrypted: treat it like the server.
 
@@ -836,6 +837,7 @@ A tag (`0.2.0`, `sha-<commit>`) never moves, but use the digest anyway: the plat
 | Check | What it reads |
 |---|---|
 | `host.docker`, `host.memory`, `host.disk` | Docker and Compose versions (Compose 2.24 or later), Docker's memory (8 GiB), free disk next to the env file and in `SDLC_BACKUP_DIR` (a warning below 20 GiB, failed below 5 GiB) |
+| `backup.recent` | The newest complete backup in `SDLC_BACKUP_DIR` (a `<UTC time>` folder with `MANIFEST`; only names are listed): a warning after `SDLC_BACKUP_WARN_HOURS` (26), failed after `SDLC_BACKUP_FAIL_HOURS` (50). Skipped without `SDLC_BACKUP_DIR` (a trial or dev stack) |
 | `env.file`, `env.secrets` | The env file exists with mode 600; every secret `.env.example` marks `CHANGEME` is set (names only, never a value) |
 | `services.health` | `docker compose ps`: unhealthy or restarting services, a failed one-shot job, a `core` service not running. A stopped stack is a warning and the checks that need it are skipped |
 | `openbao.state`, `openbao.tls_files`, `openbao.tls_expiry` | `pnpm openbao:bootstrap status`; the CA and server certificate in `SDLC_OPENBAO_TLS_DIR` and their end dates (a warning within 30 days). Never the key file |
@@ -850,6 +852,36 @@ A tag (`0.2.0`, `sha-<commit>`) never moves, but use the digest anyway: the plat
 | `access.proxy`, `access.tls_files`, `access.tls_expiry`, `access.tls_names`, `access.ports`, `access.public_origin`, `access.trusted_proxy` | Team access (V09): `sdlc-access` runs and is healthy; its CA and certificate in `SDLC_ACCESS_TLS_DIR`, their end dates (a warning within 30 days) and whether the certificate names `SDLC_ACCESS_HOSTNAME` and `SDLC_ACCESS_IPS` (never the key file); every published port of the project on `127.0.0.1` except the proxy's on `SDLC_ACCESS_BIND_ADDR` (a warning on `0.0.0.0`); `SDLC_API_PUBLIC_ORIGIN` is the proxy's origin; `SDLC_API_TRUSTED_PROXY` is the proxy's address. Without team access: one line says it is off, and the ports are still checked |
 
 **Read only.** It runs only the commands of its allowlist (`platform/deploy/doctor/src/commands.ts`): no `up`, `down`, `rm`, `prune`, no OpenBao command other than `status`, no SQL that writes. It prints no secret (never a token, key share, password or key) and works on a stopped or sealed stack: it says so instead of failing. It may run anywhere a person runs commands for the stack, including through Claude Code. Exit 0 when no check failed (warnings included), 1 when one did, 2 for a usage error. A person checks their own login with `adlc doctor` (handbook Ch.19 §19.8c).
+
+## Alerts
+
+`pnpm alerts [--env <file>] [--dry-run | --test]` runs the checks of [`pnpm doctor`](#doctor-pnpm-doctor) and sends what changed to the operator: by a chat webhook, by e-mail, or both (task O03, `design/ADR-M101-operational-alerts.md`). It needs no profile: it works with `observability` off and while the platform is down or OpenBao is sealed, which is when an alert matters most.
+
+**What is sent, and when.** Every `warning` and `failed` line of doctor, including a stopped stack, a sealed OpenBao, a full disk or backup target, a backup that did not run and a TLS certificate near its end:
+
+- a problem when it is new or its status changes (warning to failed);
+- the same problem again after `SDLC_ALERT_REMIND_HOURS` (24) while it stays;
+- a "resolved" line when its check is ok again. A skipped check (for example while the stack is stopped) changes nothing.
+
+A message holds the host name, the check, its subject (a service, a certificate, a folder), doctor's text and its fix. Never an env value, a secret, a log line or a command's output. What was sent is kept in the state file (`alerts-state.json` next to the env file, mode 600: check IDs, statuses and times only). The state is written only when every channel took the message, so a failed delivery is tried again on the next run.
+
+| Setting (env file) | Meaning |
+|---|---|
+| `SDLC_ALERT_WEBHOOK_FILE` | A file, mode 600 and outside the repository, that holds the webhook URL alone. Never the URL itself in the env file: it holds a token. Only `https://`; redirects are not followed |
+| `SDLC_ALERT_WEBHOOK_FORMAT` | `text` (default): `{"text": "…"}` for Slack, Google Chat, Mattermost and Rocket.Chat. `json`: `{version, host, sent_at, items: [{kind, check, subject, status, message, fix}]}` for your own receiver |
+| `SDLC_ALERT_EMAIL_TO`, `SDLC_ALERT_EMAIL_FROM` | Addresses, comma-separated, and an optional sender. The mail goes through the server's `sendmail` (`SDLC_ALERT_SENDMAIL`, default `/usr/sbin/sendmail`): the platform holds no SMTP password |
+| `SDLC_ALERT_REMIND_HOURS` | When a problem that stays is sent again (default 24) |
+| `SDLC_ALERT_HOST_NAME` | The name in each message (default: the machine's name) |
+| `SDLC_ALERT_STATE_FILE` | Another place for the state file (an absolute path) |
+| `SDLC_BACKUP_WARN_HOURS`, `SDLC_BACKUP_FAIL_HOURS` | The age of the newest backup that is a warning (26) or a failure (50); the warning must be smaller |
+
+Set up once, on the server ([runbook T11 §6b](../../handbook/03-templates/T11-openbao-runbook.md#6b-operational-alerts)):
+
+1. Put the webhook URL alone in a file: `install -m 600 /dev/null /etc/sdlc/alert-webhook-url`, then write the URL into it with an editor. Set `SDLC_ALERT_WEBHOOK_FILE`, or `SDLC_ALERT_EMAIL_TO`, or both.
+2. `pnpm alerts --test`: a test message through every channel, without running the checks. `pnpm alerts --dry-run` prints what would be sent and changes nothing.
+3. The schedule is the server's, never the platform's: the systemd timer `alerts/sdlc-alerts.service` and `.timer` (every 10 minutes), or the cron line in the unit file.
+
+Exit 0 when the run is done (sent, or nothing to send), 1 when a channel failed (the line says which one and why, as a code; never the URL), 2 for a usage error or a bad setting (the line names the key).
 
 ## Troubleshooting
 

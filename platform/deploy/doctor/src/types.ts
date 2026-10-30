@@ -24,6 +24,7 @@ export const CHECK_IDS = [
   'host.docker',
   'host.memory',
   'host.disk',
+  'backup.recent',
   'env.file',
   'env.secrets',
   'services.health',
@@ -165,6 +166,19 @@ export interface OperatorFacts {
     readonly memoryBytes: number | null;
   } | null;
   readonly disk: readonly { readonly path: string; readonly freeBytes: number | null }[];
+  /**
+   * O03 (ADR-M101): the newest complete backup of `backup.sh` in `SDLC_BACKUP_DIR` (a `<UTC time>`
+   * folder with `MANIFEST`) and the thresholds. Absent without an env file; `dir` null: not set.
+   */
+  readonly backup?: {
+    readonly dir: string | null;
+    readonly readable: boolean;
+    /** ISO time of the newest complete backup; null: none. */
+    readonly newest: string | null;
+    /** `SDLC_BACKUP_WARN_HOURS`, `SDLC_BACKUP_FAIL_HOURS`; NaN: not a whole number of 1 or more. */
+    readonly warnHours: number;
+    readonly failHours: number;
+  };
   /** null: `docker compose ps` failed; empty: nothing of the project runs. */
   readonly services?: readonly ServiceState[] | null;
   readonly openbao?: OpenBaoState;

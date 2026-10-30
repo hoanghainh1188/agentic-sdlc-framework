@@ -71,6 +71,47 @@ function freeBytes(dir: string): number | null {
 }
 
 /** `docker compose ps --format json`: one array, or one object per line (Compose versions). */
+/** A complete backup of `backup.sh`: its `<UTC time>` folder (`.partial` until every part is done). */
+const BACKUP_FOLDER = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/;
+export const BACKUP_WARN_HOURS = 26;
+export const BACKUP_FAIL_HOURS = 50;
+
+/**
+ * The newest complete backup in a folder (O03, ADR-M101): only names are listed and `MANIFEST`
+ * is only tested for existence; no backup file is opened.
+ */
+export function newestBackup(dir: string): { readable: boolean; newest: string | null } {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return { readable: false, newest: null };
+  }
+  const complete = names
+    .filter((n) => BACKUP_FOLDER.test(n) && fs.existsSync(path.join(dir, n, 'MANIFEST')))
+    .sort();
+  const last = complete.at(-1);
+  if (last === undefined) return { readable: true, newest: null };
+  const [, y, mo, d, h, mi, se] = BACKUP_FOLDER.exec(last)!;
+  return { readable: true, newest: `${y}-${mo}-${d}T${h}:${mi}:${se}.000Z` };
+}
+
+function hours(value: string | undefined, fallback: number): number {
+  if (value === undefined || value === '') return fallback;
+  return /^[1-9]\d*$/.test(value) ? Number(value) : Number.NaN;
+}
+
+/** `SDLC_BACKUP_WARN_HOURS` and `SDLC_BACKUP_FAIL_HOURS`; NaN when a value is not a whole number. */
+export function backupHours(values: Readonly<Record<string, string>>): {
+  warnHours: number;
+  failHours: number;
+} {
+  return {
+    warnHours: hours(values.SDLC_BACKUP_WARN_HOURS, BACKUP_WARN_HOURS),
+    failHours: hours(values.SDLC_BACKUP_FAIL_HOURS, BACKUP_FAIL_HOURS),
+  };
+}
+
 export function parsePs(text: string): ServiceState[] | null {
   const trimmed = text.trim();
   if (trimmed === '') return [];
@@ -285,7 +326,23 @@ export async function gatherFacts(
       ? (mode.stdout.trim() as 'local' | 'published')
       : 'failed';
   const access = accessFact(envFacts?.values ?? {});
-  const base: OperatorFacts = { now, envFile, docker, disk, manifest, imagesMode, access };
+  const backup = envFacts
+    ? {
+        dir: backupDir || null,
+        ...(backupDir ? newestBackup(backupDir) : { readable: true, newest: null }),
+        ...backupHours(envFacts.values),
+      }
+    : undefined;
+  const base: OperatorFacts = {
+    now,
+    envFile,
+    docker,
+    disk,
+    ...(backup ? { backup } : {}),
+    manifest,
+    imagesMode,
+    access,
+  };
   const tlsDir = envFacts?.values.SDLC_OPENBAO_TLS_DIR ?? null;
   const tls = {
     dir: tlsDir,
