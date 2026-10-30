@@ -1549,7 +1549,7 @@ flowchart LR
 **Acceptance criteria**
 
 - [ ] AC1: A tenant admin asks and cancels: `sdlc client request-data-deletion`, `sdlc client cancel-data-deletion`
-- [ ] AC2: A platform operator approves and follows: `pnpm sdlc ops client-data-deletion approve|list|status`; the requester never approves (two-person rule)
+- [ ] AC2: A platform operator approves and follows: `pnpm adlc ops client-data-deletion approve|list|status`; the requester never approves (two-person rule)
 - [ ] AC3: An audit event for each step of the request; every text from the message catalog
 
 > Note: ADR-M97 §2 (two-person rule, 14-day grace period), §3 item 3

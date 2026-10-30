@@ -64,7 +64,6 @@
     "db:migrate": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js latest",
     "db:status": "tsc -b platform/packages/core && node platform/packages/core/dist/db/migrate-cli.js status",
     "adlc": "tsc -b platform/apps/cli && node platform/apps/cli/dist/main.js",
-    "sdlc": "tsc -b platform/apps/cli && node platform/apps/cli/dist/sdlc.js",
     "api:start": "tsc -b platform/apps/api && node platform/apps/api/dist/main.js",
     "worker:start": "tsc -b platform/apps/worker && node platform/apps/worker/dist/main.js",
     "compose:env": "platform/deploy/scripts/init-env.sh",

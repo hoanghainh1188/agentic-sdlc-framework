@@ -1,6 +1,6 @@
 // Builds the npm package `@hoanghainh/governed-adlc` (task V05, design/ADR-M72, ADR-M100) into
 // platform/apps/cli/npm-dist/: the compiled CLI and every package it uses bundled into one CommonJS
-// file (Rolldown, `bin/adlc.cjs`; `bin/sdlc.cjs` runs it under the old name until v0.10.0), the
+// file (Rolldown, `bin/adlc.cjs`), the
 // shipped default project configuration, the licences of the bundled packages, and package.json
 // from the template with the platform version. Run after `tsc -b platform/apps/cli`
 // (`pnpm cli:pack` does both). Nothing is published here: only the tag workflow publishes.
@@ -22,10 +22,6 @@ const ALLOWED_LICENCES = new Set([
   'BSD-3-Clause',
   '0BSD',
 ]);
-
-/** `bin/sdlc.cjs`: the old command name runs the same bundle (ADR-M100 §2.2). */
-const LEGACY_BIN =
-  "#!/usr/bin/env node\n'use strict';\n// `sdlc` is now `adlc` (ADR-M100); removed in v0.10.0.\nrequire('./adlc.cjs');\n";
 
 /** Optional `pg` modules, loaded only inside guarded `require` calls; never needed by the CLI. */
 const EXTERNAL = ['pg-native', 'pg-cloudflare'];
@@ -110,10 +106,6 @@ async function main() {
   await bundle.close();
   const chunk = output.find((item) => item.type === 'chunk');
   if (chunk === undefined) throw new Error('rolldown wrote no chunk');
-  // ADR-M100 §2.2: the old command name, until v0.10.0. The CLI sees the script name and prints
-  // its note; everything else is the same file.
-  await writeFile(path.join(OUT, 'bin', 'sdlc.cjs'), LEGACY_BIN, { mode: 0o755 });
-
   await copyFile(
     path.join(ROOT, 'platform', 'packages', 'config', 'defaults', 'project-config.default.yaml'),
     path.join(OUT, 'defaults', 'project-config.default.yaml'),

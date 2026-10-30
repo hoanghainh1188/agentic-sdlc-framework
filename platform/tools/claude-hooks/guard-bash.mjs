@@ -168,7 +168,7 @@ function checkPackageManager(cmd, args) {
     if (['init', 'unseal', 'root-token'].includes(action) || action.endsWith('-credentials'))
       return 'R035';
   }
-  // `pnpm adlc …`; `pnpm sdlc …` is its alias until v0.10.0 and stays refused (ADR-M100 §2.5).
+  // `pnpm adlc …`; `pnpm sdlc …`, its alias in v0.9.x, stays refused for older checkouts (ADR-M100 §2.5).
   if (CLI_NAMES.has(script) && printsOperatorSecret(scriptArgs)) return 'R035';
   if (script === 'github-app:create') return 'R035';
   // `pnpm server:setup` shows key shares and asks for tokens (D-08 V16, QUESTIONS #616).
