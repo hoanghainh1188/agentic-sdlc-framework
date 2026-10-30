@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-31
+
+**Operations on a server, part 2: key rotation (O05) and data that only grows (O04).** The Run Contract signing key rotates by itself every 90 days, and one command renews every AppRole secret ID. `pnpm doctor` and `pnpm alerts` now warn 14 days before a secret ID ends and when an append-only table grows large. The worker removes the dashboard's old sessions and passkey challenges. `run_events` are kept at least 2 years, like every append-only table.
+
+### Upgrade notes
+- **On a running stack:** (1) `pnpm install`; (2) `pnpm compose:env --add-missing`: it appends `SDLC_APPROLE_WARN_DAYS`, `SDLC_DB_TABLE_WARN_GB`, `SDLC_WORKER_HOUSEKEEPING_MODE`, `SDLC_WORKER_SESSION_KEEP_DAYS` and `SDLC_WORKER_CHALLENGE_KEEP_HOURS` with their defaults; (3) `pnpm db:migrate`: migration `0046-housekeeping`; (4) `pnpm openbao:bootstrap configure` once more, with a root token from two key holders (README "Upgrade" step 8): it sets the signing key's rotation period (`TRANSIT_AUTO_ROTATE_PERIOD`, 2160h); no credentials command to run again; (5) on a checkout of the tag `v0.11.0` the published images are pulled (`pnpm images mode`); on any other checkout rebuild `sdlc-api`, `sdlc-worker` and `sdlc-runner`, and deploy the three together; (6) start the platform again as usual (`platform/deploy/scripts/up.sh …`): volumes are kept.
+- **Old sessions go on the first pass:** the retention loop now runs also without the evidence identities. Its first pass removes web sessions that ended more than 30 days ago and passkey challenges older than 24 hours, and writes one `housekeeping.removed` (counts) per tenant that had some. `SDLC_WORKER_HOUSEKEEPING_MODE=report` only counts; `off` stops it.
+- **`pnpm doctor` may show two new warnings:** an AppRole secret ID older than 76 days (renew them all with `pnpm openbao:bootstrap rotate-credentials`, in your terminal; runbook T11 §8.1), and an append-only table over 20 GiB (deploy README "Database growth").
+- **A trial stack** set up before this release keeps working. Its signing key gets the rotation period only after `pnpm trial:down --wipe` and `pnpm trial:up` (a trial stack has no root token to run `configure`). Nothing else is needed.
+- The command: `npm install -g @hoanghainh/governed-adlc@0.11.0`.
+
 ### Added
 - **Housekeeping of the dashboard's sessions** (task O04, ADR-M103, migration `0046-housekeeping`). The worker's retention loop removes web sessions 30 days after they ended (`SDLC_WORKER_SESSION_KEEP_DAYS`, at least 7) and passkey challenges 24 hours after use or expiry (`SDLC_WORKER_CHALLENGE_KEEP_HOURS`, at least 1). It does this only through two definer functions; the database refuses any other removal. Each tenant with removals gets `housekeeping.removed` (counts). `SDLC_WORKER_HOUSEKEEPING_MODE`: `remove` (default), `report`, `off`.
 - `pnpm doctor` checks the size of the append-only tables (`db.table_size`) and warns at `SDLC_DB_TABLE_WARN_GB` (20 GiB), so `pnpm alerts` tells the operator long before partitions are needed. Deploy README "Database growth".
