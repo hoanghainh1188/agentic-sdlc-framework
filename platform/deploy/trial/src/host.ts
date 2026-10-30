@@ -97,6 +97,12 @@ async function gitIgnored(file: string): Promise<boolean | null> {
   return r.status === 0;
 }
 
+/** `openssl version`, or `null` when there is no `openssl` command (preflight refuses both). */
+async function opensslVersion(): Promise<string | null> {
+  const r = await exec('openssl', ['version']);
+  return r.status === 0 ? r.stdout.trim() : null;
+}
+
 export async function gatherFacts(
   settings: TrialSettings,
   envFile: string,
@@ -114,6 +120,7 @@ export async function gatherFacts(
     existingVolumes: docker ? await volumes(composeProject, devStack) : [],
     docker,
     hostMemoryBytes: os.totalmem(),
+    opensslVersion: await opensslVersion(),
     ollamaTags:
       settings.model.provider === 'ollama' ? await ollamaTags(settings.model.ollamaUrl) : undefined,
     secretFiles: secretFiles(settings).map(fileFact),

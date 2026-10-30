@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- `pnpm trial:up` ended with "Use pnpm sdlc as usual", and `adlc help` started with "sdlc:". Both now say `adlc`. A test checks that no message of the catalog tells a person to run the old command; only the note of `sdlc` names it (ADR-M100).
+- `pnpm trial:up` refuses at the start when `openssl` is missing or is not OpenSSL 3 or later (on macOS, `/usr/bin/openssl` is LibreSSL). Before, it stopped at step 2 (`init-env.sh`), after the passphrase was typed twice.
+
 ## [0.9.1] - 2026-10-29
 
 **The first version of `@hoanghainh/governed-adlc` published by the release workflow, with npm provenance.** Version 0.9.0 of the new package was published by hand (ADR-M100 §2.6); this patch checks the whole publish path again and corrects the npm page.

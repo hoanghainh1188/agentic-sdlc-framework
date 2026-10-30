@@ -63,6 +63,7 @@ function facts(over: Partial<HostFacts> = {}): HostFacts {
     existingVolumes: [],
     docker: { composeVersion: '2.39.1', memoryBytes: 12 * GIB },
     hostMemoryBytes: 32 * GIB,
+    opensslVersion: 'OpenSSL 3.5.1 1 Jul 2025 (Library: OpenSSL 3.5.1 1 Jul 2025)',
     ollamaTags: undefined,
     secretFiles: [{ path: '/secure/app.pem', mode: 0o100600 }],
     forkInstructions: true,
@@ -180,6 +181,9 @@ describe('V02 AC2: refusals before anything is touched', () => {
       'trial.refused.docker_memory',
     ],
     ['little host memory', { hostMemoryBytes: 8 * GIB }, 'trial.refused.host_memory'],
+    ['no openssl', { opensslVersion: null }, 'trial.refused.openssl'],
+    ['LibreSSL as openssl', { opensslVersion: 'LibreSSL 3.3.6' }, 'trial.refused.openssl'],
+    ['OpenSSL 1.1', { opensslVersion: 'OpenSSL 1.1.1w  11 Sep 2023' }, 'trial.refused.openssl'],
     [
       'a readable key file',
       { secretFiles: [{ path: '/k', mode: 0o100644 }] },
@@ -228,12 +232,13 @@ describe('V02 AC2: refusals before anything is touched', () => {
         existingVolumes: ['sdlc_x'],
         docker: { composeVersion: '2.1.0', memoryBytes: GIB },
         hostMemoryBytes: GIB,
+        opensslVersion: null,
         secretFiles: [{ path: '/k', mode: 0o100666 }],
         forkInstructions: false,
         existingCredentials: ['/c'],
       }),
     );
-    expect(all.length).toBe(9);
+    expect(all.length).toBe(10);
     for (const r of all) expect(t(r.key, r.params)).not.toMatch(/\{[a-z_]+\}/);
   });
 });

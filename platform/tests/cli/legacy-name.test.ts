@@ -35,6 +35,18 @@ describe('the old name sdlc (ADR-M100 §2.2)', () => {
     expect(t('cli.renamed')).toContain('v0.10.0');
   });
 
+  it('no message tells a person to run the old command (only the note names it)', () => {
+    const catalog = json('platform/packages/messages/src/locales/en.json') as Record<
+      string,
+      string
+    >;
+    // `sdlc:intent=` is the machine marker of the platform's GitHub comments, not a command.
+    const oldCommand = /(?:^|[\s`(])(?:pnpm )?sdlc(?=[ :])(?!:intent=)/;
+    const found = Object.entries(catalog).filter(([, text]) => oldCommand.test(text));
+    expect(found.map(([key]) => key)).toEqual([]);
+    expect(t('cli.help.overview')).toMatch(/^adlc: /);
+  });
+
   it('the workspace package installs both names; the root has pnpm adlc and the alias pnpm sdlc', () => {
     expect(json('platform/apps/cli/package.json').bin).toEqual({
       adlc: 'dist/main.js',

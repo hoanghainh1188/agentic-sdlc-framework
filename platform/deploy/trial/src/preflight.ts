@@ -14,6 +14,8 @@ export const MIN_HOST_MEMORY_GIB: Readonly<Record<'ollama' | 'anthropic', number
 };
 /** `docker compose` 2.24 or later (platform/deploy/README.md, Requirements). */
 const MIN_COMPOSE: readonly [number, number] = [2, 24];
+/** `openssl version` of OpenSSL 3 or later, the check of `scripts/init-env.sh` (never LibreSSL). */
+const OPENSSL_3 = /^OpenSSL [3-9]/;
 /** The Ollama tag behind the gateway name `gpt-oss-20b` (never a `:cloud` model). */
 export const OLLAMA_TAG = 'gpt-oss:20b';
 
@@ -32,6 +34,8 @@ export interface HostFacts {
   /** `null`: no Docker, or the daemon does not answer. */
   readonly docker: { readonly composeVersion: string | null; readonly memoryBytes: number } | null;
   readonly hostMemoryBytes: number;
+  /** `openssl version` on the PATH; `null`: no `openssl` command. */
+  readonly opensslVersion: string | null;
   /** Local Ollama tags, or `null` when Ollama does not answer (only asked for the local model). */
   readonly ollamaTags: readonly string[] | null | undefined;
   readonly secretFiles: readonly FileFact[];
@@ -88,6 +92,9 @@ export function preflight(settings: TrialSettings, facts: HostFacts): Refusal[] 
         need: MIN_DOCKER_MEMORY_GIB,
       });
     }
+  }
+  if (facts.opensslVersion === null || !OPENSSL_3.test(facts.opensslVersion)) {
+    no('trial.refused.openssl', { version: facts.opensslVersion ?? '-' });
   }
   const hostNeed = MIN_HOST_MEMORY_GIB[settings.model.provider];
   // Machines sold as "16 GB" report a little less: allow 5 %.
