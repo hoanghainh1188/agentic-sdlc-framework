@@ -12,15 +12,9 @@
   "bugs": "https://github.com/hoanghainh1188/governed-adlc-fw/issues",
   "keywords": ["agentic", "adlc", "sdlc", "ai-agents", "governance", "cli"],
   "bin": {
-    "adlc": "bin/adlc.cjs",
-    "sdlc": "bin/sdlc.cjs"
+    "adlc": "bin/adlc.cjs"
   },
-  "files": [
-    "bin/adlc.cjs",
-    "bin/sdlc.cjs",
-    "defaults/project-config.default.yaml",
-    "THIRD-PARTY-NOTICES"
-  ],
+  "files": ["bin/adlc.cjs", "defaults/project-config.default.yaml", "THIRD-PARTY-NOTICES"],
   "engines": {
     "node": ">=24 <25"
   },

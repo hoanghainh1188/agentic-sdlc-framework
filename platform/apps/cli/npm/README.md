@@ -66,6 +66,6 @@ adlc next INT-2026-0001
 - Every release from v0.9.1 on is published from a tag of the repository by GitHub Actions, with npm provenance (npm shows the commit and the workflow that built it). Version 0.9.0, the first of this package, was published by hand, without provenance. The old package `agentic-sdlc-cli` had provenance from v0.2.0 to v0.8.0; its 0.1.1 was published by hand.
 - The platform's web dashboard is at `<address from step 2>/dashboard/`; on the platform machine itself use `http://localhost:8090/dashboard/` (`localhost`, not `127.0.0.1`, for the GitHub sign-in).
 - To update: `npm install -g @hoanghainh/governed-adlc@<new version>`. To remove: `npm uninstall -g @hoanghainh/governed-adlc`.
-- **Coming from `agentic-sdlc-cli`** (the name up to v0.8.0, command `sdlc`): run `npm uninstall -g agentic-sdlc-cli`, then install this package. You stay logged in: `adlc` reads the login that `sdlc` saved in `~/.config/sdlc/` until it saves its own in `~/.config/adlc/`. Until v0.10.0 this package also installs `sdlc`, which prints a note and runs `adlc`.
+- **Coming from `agentic-sdlc-cli`** (the name up to v0.8.0, command `sdlc`): run `npm uninstall -g agentic-sdlc-cli`, then install this package. You stay logged in: `adlc` reads the login that `sdlc` saved in `~/.config/sdlc/` until it saves its own in `~/.config/adlc/`. Versions 0.9.x also installed `sdlc`; from 0.10.0 the command is `adlc` only, so change your scripts.
 
 MIT licence. The bundled third-party packages and their licences are listed in `THIRD-PARTY-NOTICES`.

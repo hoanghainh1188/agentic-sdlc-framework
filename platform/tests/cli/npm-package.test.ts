@@ -39,9 +39,9 @@ const publish = parse(read('.github/workflows/npm-publish.yml')) as Workflow;
 const publishText = read('.github/workflows/npm-publish.yml');
 
 describe('package template', () => {
-  it('names the package and its command, with the old name until v0.10.0 (ADR-M100)', () => {
+  it('names the package and its one command, adlc (ADR-M100; sdlc removed in v0.10.0)', () => {
     expect(template.name).toBe('@hoanghainh/governed-adlc');
-    expect(template.bin).toEqual({ adlc: 'bin/adlc.cjs', sdlc: 'bin/sdlc.cjs' });
+    expect(template.bin).toEqual({ adlc: 'bin/adlc.cjs' });
     expect(template.license).toBe('MIT');
     expect(template.engines).toEqual({ node: '>=24 <25' });
   });
@@ -55,7 +55,6 @@ describe('package template', () => {
   it('allows only the bundle, the shipped defaults and the notices (npm adds the rest)', () => {
     expect(template.files).toEqual([
       'bin/adlc.cjs',
-      'bin/sdlc.cjs',
       'defaults/project-config.default.yaml',
       'THIRD-PARTY-NOTICES',
     ]);

@@ -793,7 +793,6 @@
   "cli.admin.ai_record.saved": "The AI record of project {project} is now version {version} (consent {consent}, allowed classes {classes}).",
   "cli.admin.ai_record.detail": "AI record of project {project}\n  version: {version}\n  AI use allowed: {ai_allowed}\n  allowed data classes: {classes}\n  production logs and data: {prod_logs}\n  disclosure format: {disclosure}\n  confirmed at: {confirmed_at} (consent {consent})\n  human record: {record_ref}\n  record sha256: {record_sha256}\n  updated by: {updated_by}",
   "cli.failed": "The command failed: {reason}",
-  "cli.renamed": "Note: `sdlc` is now `adlc` (npm package @hoanghainh/governed-adlc). `sdlc` keeps working until v0.10.0.",
   "audit.verify.missing_url": "SDLC_DB_URL is not set.",
   "audit.verify.tenant_not_found": "No tenant with the slug {slug}.",
   "audit.verify.no_tenants": "There are no tenants to check.",

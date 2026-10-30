@@ -568,7 +568,7 @@ t("H03b","Server","Client data deletion 2: the worker's purge of files, traces a
 t("H03c","Server","Client data deletion 3: the request, the approval and the status commands","S",["H03b"],"FR-44, NFR-08",
  "platform/apps/cli, platform/apps/api (admin), platform/packages/messages, platform/tests/*, handbook Ch.19",
  ["A tenant admin asks and cancels: `sdlc client request-data-deletion`, `sdlc client cancel-data-deletion`",
-  "A platform operator approves and follows: `pnpm sdlc ops client-data-deletion approve|list|status`; the requester never approves (two-person rule)",
+  "A platform operator approves and follows: `pnpm adlc ops client-data-deletion approve|list|status`; the requester never approves (two-person rule)",
   "An audit event for each step of the request; every text from the message catalog"],
  "ADR-M97 §2 (two-person rule, 14-day grace period), §3 item 3")
 t("H04","Server","A secret scan of a run's diff before G5","S",["C07"],"FR-33, NFR-03",
