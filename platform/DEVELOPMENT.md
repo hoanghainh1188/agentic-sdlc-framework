@@ -140,7 +140,7 @@ Each row: the backlog task, its design record, and the tests that prove it. "uni
 |---|---|---|
 | Workspace, module boundaries, CI | A01, A09; ADR-M16 | unit: `workspace/boundaries.test.ts`, `workspace/structure.test.ts`, `workspace/ci-workflow.test.ts`, `workspace/ignores.test.ts`, `workspace/diagrams.test.ts`, `workspace/development-doc.test.ts` (this document) |
 | Docker Compose | A02; ADR-M17 | unit: the static Compose checks; `pnpm test:compose`; `pnpm test:integration` |
-| OpenBao bootstrap and client | A03, A04, A11; ADR-M19, ADR-M21 | `pnpm test:openbao` |
+| OpenBao bootstrap and client | A03, A04, A11, O05; ADR-M19, ADR-M21, ADR-M102 | `pnpm test:openbao` (also the signing key's rotation period and a revoked version, `run-contract-signing.test.ts`); unit: `deploy/openbao-static.test.ts` (`rotate-credentials`, `auto_rotate_period`), `doctor/checks.test.ts` (the secret ID warning days) |
 | OpenBao TLS | A10 PR 1; ADR-M63 | unit: `deploy/openbao-tls-static.test.ts`; `pnpm test:openbao` (`openbao/tls.test.ts`: wrong CA, an IP, plain HTTP refused; renewal without a restart; a missing file stops OpenBao) |
 | Backups | A10 PR 2; ADR-M63 §5 | unit: `deploy/backup-static.test.ts`; `pnpm test:backup` |
 | Database, migrations | A06; ADR-M09 | db: `migrations.test.ts` and the tenant guard tests |

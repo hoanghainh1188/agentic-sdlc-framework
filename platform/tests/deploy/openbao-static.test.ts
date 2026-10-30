@@ -134,6 +134,10 @@ describe('OpenBao bootstrap settings (bootstrap.conf)', () => {
     expect(settings.get('TRANSIT_KEY_TYPE')).toBe('ed25519');
   });
 
+  it('rotates the Run Contract signing key every 90 days by itself (O05, ADR-M102)', () => {
+    expect(settings.get('TRANSIT_AUTO_ROTATE_PERIOD')).toBe('2160h');
+  });
+
   it('has the approved token and secret ID lifetimes', () => {
     expect(settings.get('APPROLE_TOKEN_TTL')).toBe('1h');
     expect(settings.get('APPROLE_TOKEN_MAX_TTL')).toBe('4h');
@@ -145,6 +149,61 @@ describe('OpenBao bootstrap settings (bootstrap.conf)', () => {
   it('has one AppRole per platform process (AC2), the LiteLLM sidecar (C03), the backup job (A10), one policy each', () => {
     expect(roles).toEqual(['api', 'worker', 'runner', 'cost-controller', 'litellm', 'backup']);
     expect(policyNames).toEqual([...roles, 'platform-admin'].sort());
+  });
+});
+
+describe('the signing key rotates on its own (configure.sh, O05, ADR-M102)', () => {
+  const configure = readDeployFile('openbao/bootstrap/configure.sh');
+
+  it('sets auto_rotate_period on the key, also on an existing key, and checks it', () => {
+    expect(configure).toContain('rotate_period="$(setting TRANSIT_AUTO_ROTATE_PERIOD)"');
+    expect(configure).toMatch(
+      /bao write "\$key_path\/config" auto_rotate_period="\$rotate_period"/,
+    );
+    expect(configure).toMatch(/bao read -field=auto_rotate_period "\$key_path"/);
+  });
+
+  it('refuses a period that is not whole hours of at least 1h', () => {
+    expect(configure).toMatch(/TRANSIT_AUTO_ROTATE_PERIOD must be/);
+  });
+
+  it("never raises min_decryption_version: revoking an old version is a person's step (T11 §8.4)", () => {
+    expect(configure).not.toMatch(/min_decryption_version/);
+  });
+});
+
+describe('rotate-credentials (bootstrap.sh, O05, ADR-M102)', () => {
+  const bootstrap = fs.readFileSync(BOOTSTRAP, 'utf8');
+  const body = bootstrap.slice(
+    bootstrap.indexOf('cmd_rotate_credentials() {'),
+    bootstrap.indexOf('\n}\n', bootstrap.indexOf('cmd_rotate_credentials() {')),
+  );
+
+  it('is a command of bootstrap.sh, listed in its usage', () => {
+    expect(bootstrap).toMatch(/^\s+rotate-credentials\)\s+cmd_rotate_credentials ;;$/m);
+    expect(bootstrap).toMatch(/\| rotate-credentials[ )|]/);
+    expect(bootstrap).toMatch(/^ {2}rotate-credentials {2,}\S/m);
+  });
+
+  it('asks for the admin token once and renews exactly the AppRole secret IDs doctor watches', () => {
+    expect(body.match(/read_secret '/g)).toHaveLength(1);
+    const calls = [...body.matchAll(/\b(cmd_[a-z_]+_credentials)\b/g)]
+      .map((m) => m[1])
+      .filter((name) => name !== 'cmd_rotate_credentials');
+    expect([...new Set(calls)]).toEqual([
+      'cmd_api_credentials',
+      'cmd_worker_credentials',
+      'cmd_runner_credentials',
+      'cmd_litellm_credentials',
+      'cmd_backup_credentials',
+    ]);
+  });
+
+  it('skips an AppRole that has no secret ID yet (a profile or feature not set up)', () => {
+    expect(bootstrap).toMatch(/secret_id_state\(\) \{[\s\S]*?auth\/approle\/role\/\$1\/secret-id/);
+    expect(body).toMatch(/not set up here; skipped/);
+    // A wrong token must not look like "nothing set up": it is checked first.
+    expect(body.indexOf('bao token lookup')).toBeLessThan(body.indexOf('for role in'));
   });
 });
 

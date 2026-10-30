@@ -67,6 +67,15 @@ esac
 
 transit_key="$(setting TRANSIT_KEY)"
 transit_type="$(setting TRANSIT_KEY_TYPE)"
+rotate_period="$(setting TRANSIT_AUTO_ROTATE_PERIOD)"
+rotate_hours="${rotate_period%h}"
+case "$rotate_period" in
+  *h) ;;
+  *) rotate_hours=x ;;
+esac
+case "$rotate_hours" in
+  '' | 0* | *[!0-9]*) fail "TRANSIT_AUTO_ROTATE_PERIOD must be whole hours of at least 1h, for example 2160h" ;;
+esac
 roles="$(setting APPROLE_ROLES)"
 token_ttl="$(setting APPROLE_TOKEN_TTL)"
 token_max_ttl="$(setting APPROLE_TOKEN_MAX_TTL)"
@@ -120,6 +129,12 @@ fi
   fail "transit key $transit_key allows plaintext backup"
 [ "$(bao read -field=deletion_allowed "$key_path")" = false ] ||
   fail "transit key $transit_key allows deletion"
+# O05 (ADR-M102): OpenBao rotates the key by itself; set on a new and on an existing key. Old
+# versions keep verifying; revoking an old version is a person's step (T11 §8.4).
+bao write "$key_path/config" auto_rotate_period="$rotate_period" >/dev/null
+[ "$(bao read -field=auto_rotate_period "$key_path")" = "$((rotate_hours * 3600))" ] ||
+  fail "transit key $transit_key does not rotate every $rotate_period"
+say "transit key $transit_key rotates every $rotate_period"
 
 # --- Policies (the files in policies/ are the source of truth) -------------------------------
 for file in "$dir"/policies/*.hcl; do

@@ -11,6 +11,8 @@ export const ENV_ALLOWLIST = [
   // O03 (design/ADR-M101): how old the newest backup may be, in hours.
   'SDLC_BACKUP_WARN_HOURS',
   'SDLC_BACKUP_FAIL_HOURS',
+  // O05 (design/ADR-M102): how many days before a secret ID ends doctor warns.
+  'SDLC_APPROLE_WARN_DAYS',
   // Team access (V09, design/ADR-M67): addresses, names, a folder and an origin; none is secret.
   'SDLC_ACCESS_BIND_ADDR',
   'SDLC_ACCESS_HOST_PORT',
