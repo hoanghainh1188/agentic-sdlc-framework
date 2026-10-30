@@ -2,9 +2,9 @@
 
 | Item | Value |
 |---|---|
-| Status | **Accepted** |
+| Status | **Accepted**, version 1.1 |
 | Date | 2026-10-31 |
-| Decided by | Harry (the three changes approved on 2026-10-31; QUESTIONS #651–#653) |
+| Decided by | Harry (the three changes approved on 2026-10-31; QUESTIONS #651–#653; 1.1: no `npm` approval, QUESTIONS #654) |
 | Related | ADR-M94 (the release on the tag), ADR-M72 (the CLI on npm), O02 (the upgrade test); `RELEASING.md` 3.0; rules R040, R089, R090, R146 |
 
 ## 1. Context
@@ -39,7 +39,7 @@ release-please writes the CHANGELOG from conventional commits. This repository h
    A tag made with `GITHUB_TOKEN` starts no workflow, but a `workflow_dispatch` may; `npm-publish.yml` is already started this way.
    - `release.yml` gains the `workflow_dispatch` trigger. Its first step after the checkout refuses any ref that is not `refs/tags/v*`. Run on the tag, the signer stays `release-images.yml@refs/tags/vX.Y.Z` (ADR-M94 §2.6, `verify-images.sh` unchanged).
    - The tag ruleset `v*` gets **GitHub Actions** as a second bypass actor (the owner's setting, `RELEASING.md` §4). It needs `contents: write` and `actions: write`, in that job only. The workflow test lists it as the second job allowed to write contents.
-   - The owner's merge is the release decision. The approval of `npm` stays (R089). R040 still holds: Claude never tags; the tag follows Harry's merge.
+   - The owner's merge is the release decision. R040 still holds: Claude never tags; the tag follows Harry's merge.
 3. **The version pull request is mechanical** (QUESTIONS #653). Each pull request that needs an upgrade step writes its bullet under `[Unreleased]` → `### Upgrade notes` when it is made, while its author knows the step (R146). `pnpm release:prepare X.Y.Z [--tasks …] [--summary …]` refuses without those notes and changes nothing then. Otherwise it:
    - sets `package.json` and `PLATFORM_VERSION`;
    - turns `[Unreleased]` into the dated section and leaves an empty `[Unreleased]`;
@@ -49,9 +49,13 @@ release-please writes the CHANGELOG from conventional commits. This repository h
 
    The `CLAUDE.md` state line and a milestone's text stay words a person writes; the script says so. release-please is not used: it cannot write Upgrade notes, and its own CHANGELOG would fight R090 and the upgrade test.
 
+4. **No approval of `npm`** (version 1.1, QUESTIONS #654, Harry, 2026-10-31). The environment `npm` keeps its name and its rule "tags `v*` only", because npm's trusted publisher names the environment (R089). It loses its required reviewer. GitHub lets no workflow approve its own deployment, so "automatic" means no reviewer, which is the owner's setting (`RELEASING.md` §4).
+   - **The owner's one decision** is the merge of the version pull request. After it, these run with no person: the release gate, the tag, the images (built, scanned, signed and attested), the immutable Release, the image check in `npm-publish.yml`, then `npm publish`.
+   - **What is given up:** a last look before an npm version, which can never be unpublished, only deprecated. A broken release is then fixed by the next patch version (`RELEASING.md` §3).
+
 ## 3. Consequences
 
-- The owner's steps: **merge** the version pull request once CI (with `release-images` and `upgrade`) is green, **approve `npm`**, check the result. Once: add GitHub Actions to the tag ruleset's bypass list.
+- The owner's steps: **merge** the version pull request once CI (with `release-images` and `upgrade`) is green, then check the result. Once: add GitHub Actions to the tag ruleset's bypass list, and remove the required reviewer of the environment `npm`.
 - A version pull request runs two long jobs (the image scan and the upgrade test, up to 40 minutes each), as before, but without the manual step.
 - If `release-tag.yml` fails before the tag (the gate, the ruleset), nothing is tagged: re-run it, or the owner tags by hand as before (`RELEASING.md` §2, step 2b, §3). If it fails after the tag, re-running it starts the release. A tag pushed by hand starts `release.yml` itself, and the workflow then finds its run and does nothing.
 - A merge that changes the version without a CHANGELOG section is refused by the gate before any tag.
@@ -62,10 +66,11 @@ release-please writes the CHANGELOG from conventional commits. This repository h
 - **release-please** (komagu): see §2.3.
 - **A personal access token** for the tag (komagu's `RELEASE_PLEASE_TOKEN`): a long-lived secret in the repository settings, when a dispatch with `GITHUB_TOKEN` starts `release.yml` on the tag.
 - **Running `release.yml` on the push to `main`:** the images would be signed on `refs/heads/main`, not on the tag, and `verify-images.sh` checks the tag.
-- **Dropping the `npm` approval:** it is the last human gate before a public, permanent npm version.
+- **A workflow that approves the `npm` deployment itself:** GitHub does not let a workflow token approve a deployment, and a personal token for that would be a long-lived secret. Removing the reviewer does the same, openly (§2.4).
 
 ## Version history
 
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 1.0 | 2026-10-31 | Claude, approved by Harry | The upgrade test on the version pull request, `release-tag.yml`, `pnpm release:prepare` and Upgrade notes by each pull request (QUESTIONS #651–#653) |
+| 1.1 | 2026-10-31 | Claude, approved by Harry | §2.4: no approval of `npm`; the environment keeps its name and its tag rule, without a reviewer (QUESTIONS #654) |

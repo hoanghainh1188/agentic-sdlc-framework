@@ -63,7 +63,7 @@ Always loaded:
 - GitHub events are read by polling (GitHub App + API) in v0.1; webhooks come later. Both must feed the same event handler. Users are matched by numeric GitHub account ID only; bots never decide. [R037]
 - Object storage: SeaweedFS (S3 API). Cache/rate limit: Valkey. Never MinIO, Redis or Elasticsearch (license/maintenance reasons). Pin every image to an exact version; images we publish or depend on are used by digest. [R038]
 - Never run `docker volume prune` or `docker system prune --volumes` on a machine with a dev stack. Never run anything against the owner's dev stack without being asked. [R039]
-- Releases, tags, `push: true` image runs and npm publishes are public actions done by Harry (he merges the version PR; `release-tag.yml` tags it). Claude never pushes a tag, creates a release, runs a workflow with `push: true`, publishes to npm or adds an npm token. [R040]
+- Releases, tags, `push: true` image runs and npm publishes are public actions done by Harry (he merges the version PR; `release-tag.yml` tags it, npm follows). Claude never pushes a tag, creates a release, runs a workflow with `push: true`, publishes to npm or adds an npm token. [R040]
 - Target host is a modest internal server: keep concurrent sandboxes configurable (default 1–2); heavy observability stack is an optional Compose profile. [R041]
 - Every FR in D-02 gets automated tests matching its acceptance criteria. [R042]
 
@@ -119,7 +119,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - Database (ADR-M09): `pnpm db:migrate` / `pnpm db:status` (`SDLC_DB_MIGRATION_URL`, owner role `platform`; processes connect as `platform_app`).
 - Dev mode without Compose: `pnpm api:start`, `pnpm worker:start` (ADR-M26, ADR-M27; refused with `NODE_ENV=production`).
 - Operator commands on the server: `pnpm adlc ops bootstrap|token|audit verify|tenant-admin|role|ai-record|agent|run kill|retention report|eval start` (`SDLC_DB_URL`, actor `system`; ADR-M26, ADR-M37; deploy README "Fresh deployment" step 8). A token is printed once: owner's terminal only.
-- Releases (`RELEASING.md`, ADR-M94, ADR-M104): `pnpm release:prepare X.Y.Z`, `pnpm images mode|get|export|verify`, `pnpm cli:pack-check`. Order: version PR → merge (Harry) → `release-tag.yml` → `release.yml` → `npm-publish.yml` (Harry approves `npm`).
+- Releases (`RELEASING.md`, ADR-M94, ADR-M104): `pnpm release:prepare X.Y.Z`, `pnpm images mode|get|export|verify`, `pnpm cli:pack-check`. Order: version PR → merge (Harry) → `release-tag.yml` → `release.yml` → `npm-publish.yml`.
 - Claude Code hook (W01, ADR-M84 §2.3): `.claude/settings.json` runs `platform/tools/claude-hooks/guard-bash.mjs` before every Bash call and refuses the commands this file forbids for Claude (rule IDs in `design/RULES.md`); never weaken or bypass it. [R132]
 - CI: `.github/workflows/ci.yml` (A09; jobs, triggers and path filters in `platform/DEVELOPMENT.md` §2). Actions pinned by commit SHA; thresholds in the workflow `env:`. Short checks share the `scan` job; do not add a job for a check under a minute; every job has `timeout-minutes`.
 

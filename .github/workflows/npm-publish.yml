@@ -2,12 +2,12 @@
 # #365–#367; the name since v0.9.0: ADR-M100, QUESTIONS #631; before it `agentic-sdlc-cli`).
 #
 # Only a released tag `vX.Y.Z` starts it: release.yml dispatches it on the tag after the GitHub
-# Release exists (ADR-M94 §2.3), and a person always makes the tag. The job runs in the
-# GitHub environment `npm` (required reviewer: Harry), so nothing is published without a second
-# yes. npm trusted publishing (OIDC, `id-token: write`) proves the workflow to npm: there is no
+# Release exists (ADR-M94 §2.3), after the owner merged the version pull request (ADR-M104). The
+# job runs in the GitHub environment `npm`: no reviewer since ADR-M104 1.1 (the merge is the
+# owner's yes), tags `v*` only, and npm's trusted publisher names it. npm trusted publishing (OIDC, `id-token: write`) proves the workflow to npm: there is no
 # npm token in the repository or its secrets, and every version carries npm provenance.
-# Before the first run: create the environment `npm` with its reviewer (GitHub would otherwise
-# create it without protection) and add this workflow as the package's trusted publisher on
+# Before the first run: create the environment `npm`, tags `v*` only (GitHub would otherwise
+# create it without a branch rule) and add this workflow as the package's trusted publisher on
 # npmjs.com (platform/GETTING-STARTED.md, "Publishing the CLI on npm").
 # V12, V15 (RELEASING.md, ADR-M94): this stays its own workflow, next to release.yml, with the same
 # release gate and image check (job verify-images, before the environment approval), on the
@@ -30,8 +30,8 @@ env:
 
 jobs:
   # The same image check as release.yml (V12 review): npm never publishes a release whose images
-  # fail their signature or attestation check. Read only; `publish` waits for it, so the owner is
-  # asked to approve the environment `npm` only after it passed.
+  # fail their signature or attestation check. Read only; `publish` waits for it and runs only
+  # after it passed.
   verify-images:
     name: verify the release gate and the release images
     runs-on: ubuntu-24.04

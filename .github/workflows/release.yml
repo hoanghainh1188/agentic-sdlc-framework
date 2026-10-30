@@ -13,7 +13,7 @@
 #   images.lock, publishes it and checks that it is immutable; a published release is never changed;
 # - npm: starts npm-publish.yml on the tag (workflow_dispatch, the one event a GITHUB_TOKEN may
 #   start). npm-publish.yml stays its own file: npm's trusted publisher names that file and the
-#   environment `npm` (ADR-M72 §2.3), and the owner approves that environment.
+#   environment `npm` (ADR-M72 §2.3); since ADR-M104 1.1 it needs no approval there.
 name: release
 
 on:
@@ -184,7 +184,7 @@ jobs:
     permissions:
       actions: write # gh workflow run; nothing else
     steps:
-      - name: Start npm-publish.yml (the owner approves the environment npm)
+      - name: Start npm-publish.yml (environment npm, no approval since ADR-M104 1.1)
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
