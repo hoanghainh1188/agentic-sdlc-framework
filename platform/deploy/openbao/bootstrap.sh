@@ -119,6 +119,13 @@ Commands:
                        knowledge and "configure" first. Prints no secret. Run it again to repair or
                        rotate (runbook T11 section 5o).
 
+  rotate-credentials   Ask for an admin token (hidden) once and renew every AppRole secret ID
+                       that is set up here: api-credentials, worker-credentials (worker and
+                       cost-controller), runner-credentials, litellm-credentials and
+                       backup-credentials; an AppRole with no secret ID yet is skipped. The other
+                       credentials do not expire and are not touched. Prints no secret. Then
+                       restart the services it names (O05, runbook T11 section 8.1).
+
 Runbook: handbook/03-templates/T11-openbao-runbook.md
 EOF
 }
@@ -174,7 +181,7 @@ case "$command" in
     usage
     exit 0
     ;;
-  status | init | unseal | configure | root-token | litellm-credentials | backup-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials | worker-knowledge-credentials | knowledge-issuer-credentials | api-github-oauth-credentials) ;;
+  status | init | unseal | configure | root-token | litellm-credentials | backup-credentials | api-credentials | worker-credentials | runner-credentials | runner-evidence-credentials | api-evidence-credentials | worker-evidence-credentials | worker-purge-credentials | worker-anchor-credentials | worker-langfuse-credentials | worker-knowledge-credentials | knowledge-issuer-credentials | api-github-oauth-credentials | rotate-credentials) ;;
   *)
     usage >&2
     exit 2
@@ -846,6 +853,55 @@ cmd_backup_credentials() {
 }
 
 cmd_api_evidence_credentials() { pack_evidence_credentials api sdlcapiev sdlc-api; }
+
+# Every AppRole secret ID in one pass, with one admin token (O05, ADR-M102, runbook T11 §8.1):
+# the five commands doctor watches (`credentials.approle`). An AppRole with no secret ID yet is
+# skipped (its profile or feature is not set up here); any other answer (a token without the
+# right, a missing role) stops the pass, so "renewed" is never claimed for nothing. A failing
+# command stops the pass with its own message; running it again is safe. The S3, ClickHouse and
+# database credentials do not expire.
+secret_id_state() {
+  printf '%s\n' "$rotate_token" | bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN
+    out="$(bao list -format=json "auth/approle/role/$1/secret-id" 2>&1)"
+    case "$out" in
+      "{}") echo none ;;
+      "["*) echo some ;;
+      *) echo error ;;
+    esac' sh "$1"
+}
+
+cmd_rotate_credentials() {
+  require_unsealed
+  token="$(read_secret 'Admin or root token (hidden)')"
+  [ -n "$token" ] || fail "no token given"
+  printf '%s\n' "$token" |
+    bao_exec sh -c 'IFS= read -r BAO_TOKEN && export BAO_TOKEN && bao token lookup >/dev/null' ||
+    fail "the token is not valid (expired, revoked or mistyped)"
+  rotate_token="$token"
+  # Each credentials command below asks for the token again: it gets the one given here.
+  read_secret() { printf '%s' "$rotate_token"; }
+  renewed=""
+  for role in api worker runner litellm backup; do
+    case "$(secret_id_state "$role")" in
+      none)
+        say "$role: no secret ID yet, so it is not set up here; skipped"
+        continue
+        ;;
+      some) ;;
+      *) fail "could not list the secret IDs of the AppRole $role (an admin token? OpenBao configured?); renewed so far:${renewed:- none}" ;;
+    esac
+    case "$role" in
+      api) cmd_api_credentials ;;
+      worker) cmd_worker_credentials ;;
+      runner) cmd_runner_credentials ;;
+      litellm) cmd_litellm_credentials ;;
+      backup) cmd_backup_credentials ;;
+    esac
+    renewed="$renewed $role"
+  done
+  [ -n "$renewed" ] || fail "no AppRole has a secret ID here, so nothing was renewed"
+  say "secret IDs renewed:$renewed; restart the services named above to log in with them at once (runbook T11 section 8.1)"
+}
 cmd_worker_evidence_credentials() { pack_evidence_credentials worker sdlcwrkev sdlc-worker; }
 
 case "$command" in
@@ -868,4 +924,5 @@ case "$command" in
   worker-knowledge-credentials) cmd_worker_knowledge_credentials ;;
   knowledge-issuer-credentials) cmd_knowledge_issuer_credentials ;;
   api-github-oauth-credentials) cmd_api_github_oauth_credentials ;;
+  rotate-credentials) cmd_rotate_credentials ;;
 esac

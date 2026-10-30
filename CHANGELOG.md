@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+- **Key rotation** (task O05, ADR-M102). The Run Contract signing key now rotates by itself every 90 days: `configure` sets `auto_rotate_period` from `TRANSIT_AUTO_ROTATE_PERIOD` in `bootstrap.conf`. Contracts signed before keep verifying until they expire. Runbook T11 §8.4 explains how to revoke a doubtful key version with `min_decryption_version` and how to check that no unexpired contract still uses it.
+- `pnpm openbao:bootstrap rotate-credentials` renews every AppRole secret ID that is set up (api, worker with cost-controller, runner, LiteLLM sidecar, backup) with one admin token. Owner's terminal only.
+
+### Changed
+- `pnpm doctor` (and so `pnpm alerts`) warns 14 days before an AppRole secret ID ends, not 10 (`SDLC_APPROLE_WARN_DAYS`), and names `rotate-credentials` as the fix.
+
 ## [0.10.0] - 2026-10-30
 
 **Operational alerts (O03), and the old command name `sdlc` is gone.** `pnpm alerts` tells the operator, by a chat webhook or e-mail, when a service is not healthy, OpenBao is sealed, a disk or the backup target fills up, a backup did not run or a certificate nears its end. `pnpm doctor` gains the check `backup.recent`. As announced in 0.9.0, only `adlc` is installed now.

@@ -4,7 +4,9 @@
 //
 // The worker AppRole signs the canonical bytes of a Run Contract; the runner AppRole verifies them
 // through Transit and locally; the runner cannot sign. After a key rotation (throw-away root
-// token), new contracts are signed with version 2 and version-1 contracts still verify.
+// token), new contracts are signed with version 2 and version-1 contracts still verify. O05
+// (ADR-M102): configure sets the key's auto-rotation period; revoking version 1 with
+// min_decryption_version makes Transit refuse it while version 2 still verifies.
 // Own throw-away Compose project with only the openbao service; the client runs in a node
 // container on the Compose network (secrets-driver.mjs). Key shares, tokens and secret IDs are
 // THROW-AWAY TEST KEYS: kept in variables of this process, never printed or asserted on.
@@ -59,6 +61,7 @@ describe.skipIf(!enabled)(
     const roleIds = new Map<Role, string>();
     const secretIds = new Map<Role, string>();
     let v1Signature = '';
+    let v2Signature = '';
 
     const keep = (value: string): string => {
       if (value) secrets.push(value);
@@ -211,10 +214,22 @@ describe.skipIf(!enabled)(
       ]);
     });
 
+    it('configure makes the key rotate every 2160h, also when the key exists (O05, ADR-M102)', () => {
+      expect(admin('bao read -field=auto_rotate_period transit/keys/run-contract')).toBe('7776000');
+      admin('bao write transit/keys/run-contract/config auto_rotate_period=1h >/dev/null');
+      ok(
+        run(bootstrap, ['configure', '--keep-token'], `${rootToken}\n`, { SDLC_OPENBAO_TEST: '1' }),
+        'configure again',
+      );
+      expect(admin('bao read -field=auto_rotate_period transit/keys/run-contract')).toBe('7776000');
+    });
+
+    // O05 AC1: a contract issued (signed) before the rotation is started (verified) after it.
     it('after a key rotation: new contracts use version 2, version-1 contracts still verify', () => {
       admin('bao write -f transit/keys/run-contract/rotate >/dev/null');
       const [signed] = steps('worker', [{ name: 'sign', payload: CANONICAL }]);
       const v2 = signed?.value as { signature: string; keyVersion: number };
+      v2Signature = v2.signature;
       expect(v2.keyVersion).toBe(2);
       expect(v2.signature).toMatch(/^vault:v2:/);
       const relabelled = v1Signature.replace(/^vault:v1:/, 'vault:v2:');
@@ -226,6 +241,23 @@ describe.skipIf(!enabled)(
         { name: 'publicKeyLength', version: 2 },
       ]);
       expect(r.map((s) => s.value ?? s.key)).toEqual([true, true, true, false, 32]);
+    });
+
+    // O05 AC3, runbook T11 §8.4: a leaked or doubtful version is revoked by a person (root token).
+    it('revoking version 1 (min_decryption_version=2): v1 is refused, v2 still verifies', () => {
+      admin('bao write transit/keys/run-contract/config min_decryption_version=2 >/dev/null');
+      const r = steps('runner', [
+        { name: 'verify', payload: CANONICAL, signature: v1Signature },
+        { name: 'verify', payload: CANONICAL, signature: v2Signature },
+        { name: 'verifyLocally', payload: CANONICAL, signature: v2Signature },
+        { name: 'verifyLocally', payload: CANONICAL, signature: v1Signature },
+      ]);
+      expect(r.map((s) => s.value ?? s.key)).toEqual([
+        false,
+        true,
+        true,
+        'secrets.transit.unknown_key_version',
+      ]);
     });
   },
 );

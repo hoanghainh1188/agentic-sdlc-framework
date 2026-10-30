@@ -315,6 +315,71 @@ describe('pnpm doctor: the checks', () => {
     ).toBe('warning');
   });
 
+  describe('secret ID age (O05, ADR-M102): a warning 14 days before the 90 days end', () => {
+    const age = (ageDays: number, values: Record<string, string> = {}) => {
+      const base = healthyFacts();
+      return evaluate(
+        healthyFacts({
+          envFile: {
+            ...base.envFile,
+            facts: { ...base.envFile.facts!, values: { ...base.envFile.facts!.values, ...values } },
+          },
+          approles: [{ service: 'sdlc-api', credentials: 'api-credentials', state: 'ok', ageDays }],
+        }),
+      );
+    };
+
+    it('ok until day 75, a warning from day 76, failed from day 90; renewal names rotate-credentials', () => {
+      expect(one(age(75), 'credentials.approle', 'sdlc-api').status).toBe('ok');
+      expect(one(age(76), 'credentials.approle', 'sdlc-api')).toMatchObject({
+        status: 'warning',
+        text: { key: 'doctor.approle.old', params: { days: 76, max: 90 } },
+        fix: { key: 'doctor.fix.credentials', params: { command: 'rotate-credentials' } },
+      });
+      expect(one(age(90), 'credentials.approle', 'sdlc-api')).toMatchObject({
+        status: 'failed',
+        fix: { params: { command: 'rotate-credentials' } },
+      });
+    });
+
+    it('SDLC_APPROLE_WARN_DAYS moves the warning', () => {
+      expect(
+        one(age(60, { SDLC_APPROLE_WARN_DAYS: '30' }), 'credentials.approle', 'sdlc-api').status,
+      ).toBe('warning');
+      expect(
+        one(age(59, { SDLC_APPROLE_WARN_DAYS: '30' }), 'credentials.approle', 'sdlc-api').status,
+      ).toBe('ok');
+    });
+
+    it('a value that is not a whole number of 1 to 89 is a warning of its own; the default is used', () => {
+      for (const bad of ['0', '90', 'soon', '7.5']) {
+        const results = age(76, { SDLC_APPROLE_WARN_DAYS: bad });
+        expect(one(results, 'credentials.approle', 'SDLC_APPROLE_WARN_DAYS'), bad).toMatchObject({
+          status: 'warning',
+          text: { key: 'doctor.approle.bad_warn_days' },
+        });
+        expect(one(results, 'credentials.approle', 'sdlc-api').status, bad).toBe('warning');
+      }
+    });
+  });
+
+  it('a bad SDLC_APPROLE_WARN_DAYS on a stopped stack: its warning and the skip line', () => {
+    const base = healthyFacts();
+    const results = evaluate(
+      healthyFacts({
+        envFile: {
+          ...base.envFile,
+          facts: {
+            ...base.envFile.facts!,
+            values: { ...base.envFile.facts!.values, SDLC_APPROLE_WARN_DAYS: 'soon' },
+          },
+        },
+        approles: [],
+      }),
+    );
+    expect(of(results, 'credentials.approle').map((r) => r.status)).toEqual(['warning', 'skipped']);
+  });
+
   it('AppRole credentials: missing fails, 80 days warns, 90 days fails, each with its command', () => {
     const results = evaluate(
       healthyFacts({

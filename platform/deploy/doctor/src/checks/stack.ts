@@ -3,7 +3,7 @@
 import type { MessageKey } from '@sdlc/messages';
 
 import { LOG_EVENT_FIXES } from '../logs.js';
-import type { CheckResult, OperatorFacts, ServiceState, Text } from '../types.js';
+import type { AppRoleFact, CheckResult, OperatorFacts, ServiceState, Text } from '../types.js';
 import { ok, problem, skipped, text } from './result.js';
 
 /** Long-running services of the profile `core` (static test against docker-compose.yml). */
@@ -26,9 +26,10 @@ export const JOBS = [
   'temporal-schema',
   'vllm-pull',
 ] as const;
-/** The AppRole secret ID lifetime (runbook T11 §8): 90 days; a warning 10 days before. */
+/** The AppRole secret ID lifetime (runbook T11 §8): 90 days. */
 export const SECRET_ID_DAYS = 90;
-export const SECRET_ID_WARNING_DAYS = 80;
+/** O05 (ADR-M102): the warning comes this many days before the end; `SDLC_APPROLE_WARN_DAYS`. */
+export const SECRET_ID_WARN_DAYS_BEFORE = 14;
 export const TLS_WARNING_DAYS = 30;
 export const VALKEY_WARNING_SHARE = 0.9;
 
@@ -220,8 +221,58 @@ function migrationCheck(f: OperatorFacts, services: readonly ServiceState[]): Ch
   return ok('db.migrations', text('doctor.migrations.ok', { count: applied.size }));
 }
 
+/** Days before the end that warn: `SDLC_APPROLE_WARN_DAYS` (1–89), or null when it is not valid. */
+function warnDaysBefore(f: OperatorFacts): number | null {
+  const value = f.envFile.facts?.values.SDLC_APPROLE_WARN_DAYS;
+  if (value === undefined) return SECRET_ID_WARN_DAYS_BEFORE;
+  const days = /^[1-9]\d?$/.test(value) ? Number(value) : Number.NaN;
+  return days < SECRET_ID_DAYS ? days : null;
+}
+
+/** The age of one delivered secret ID; renewing every one at once: `rotate-credentials` (O05). */
+function secretIdAge(a: AppRoleFact, warnAt: number): CheckResult {
+  const days = a.ageDays ?? 0;
+  const params = { days, max: SECRET_ID_DAYS };
+  const renew = text('doctor.fix.credentials', {
+    command: 'rotate-credentials',
+    section: 'T11 §8.1',
+  });
+  if (days >= SECRET_ID_DAYS) {
+    return problem(
+      'credentials.approle',
+      'failed',
+      text('doctor.approle.expired', params),
+      renew,
+      a.service,
+    );
+  }
+  if (days >= warnAt) {
+    return problem(
+      'credentials.approle',
+      'warning',
+      text('doctor.approle.old', params),
+      renew,
+      a.service,
+    );
+  }
+  return ok('credentials.approle', text('doctor.approle.ok', params), a.service);
+}
+
 function approleChecks(f: OperatorFacts): CheckResult[] {
   const out: CheckResult[] = [];
+  const before = warnDaysBefore(f);
+  if (before === null) {
+    out.push(
+      problem(
+        'credentials.approle',
+        'warning',
+        text('doctor.approle.bad_warn_days', { default: SECRET_ID_WARN_DAYS_BEFORE }),
+        readme('Doctor (`pnpm doctor`)'),
+        'SDLC_APPROLE_WARN_DAYS',
+      ),
+    );
+  }
+  const warnAt = SECRET_ID_DAYS - (before ?? SECRET_ID_WARN_DAYS_BEFORE);
   for (const a of f.approles ?? []) {
     const fix = text('doctor.fix.credentials', { command: a.credentials, section: 'T11 §8' });
     if (a.state === 'not_running') continue;
@@ -239,33 +290,12 @@ function approleChecks(f: OperatorFacts): CheckResult[] {
           a.service,
         ),
       );
-    else {
-      const days = a.ageDays ?? 0;
-      const params = { days, max: SECRET_ID_DAYS };
-      if (days >= SECRET_ID_DAYS)
-        out.push(
-          problem(
-            'credentials.approle',
-            'failed',
-            text('doctor.approle.expired', params),
-            fix,
-            a.service,
-          ),
-        );
-      else if (days >= SECRET_ID_WARNING_DAYS)
-        out.push(
-          problem(
-            'credentials.approle',
-            'warning',
-            text('doctor.approle.old', params),
-            fix,
-            a.service,
-          ),
-        );
-      else out.push(ok('credentials.approle', text('doctor.approle.ok', params), a.service));
-    }
+    else out.push(secretIdAge(a, warnAt));
   }
-  return out.length > 0 ? out : [skipped('credentials.approle', 'doctor.skipped.platform_stopped')];
+  const checked = out.some((r) => r.subject !== 'SDLC_APPROLE_WARN_DAYS');
+  return checked
+    ? out
+    : [...out, skipped('credentials.approle', 'doctor.skipped.platform_stopped')];
 }
 
 const LOG_EVENT_KEYS: Readonly<Record<string, MessageKey>> = {

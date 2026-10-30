@@ -67,6 +67,8 @@ const REFUSED: [string, string][] = [
   ['pnpm openbao:bootstrap unseal', 'R035'],
   ['pnpm openbao:bootstrap root-token', 'R035'],
   ['pnpm openbao:bootstrap worker-credentials', 'R035'],
+  // O05: one admin token for every AppRole secret ID.
+  ['pnpm openbao:bootstrap rotate-credentials', 'R035'],
   ['pnpm run openbao:bootstrap init', 'R035'],
   ['platform/deploy/openbao/bootstrap.sh init', 'R035'],
   ['pnpm sdlc ops bootstrap --tenant t1', 'R035'],

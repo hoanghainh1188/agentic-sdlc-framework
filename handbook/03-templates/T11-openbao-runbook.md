@@ -1,6 +1,6 @@
 # T11 Runbook: operating OpenBao (unseal, root token, the processes' credentials, backup, restore)
 
-> Status: **v0.47. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
+> Status: **v0.48. Tested on a development machine with throw-away keys (tasks A03, 2026-09-25, and C03, 2026-09-26): sections 3.1, 4, 5, 5b, 5d and 8.1.** Sections 6 and 7 (backup, restore) are tested by `pnpm test:backup` on throw-away keys; section 8.3 (rekey) gives the commands; the drill on the real server is task A10 PR 3.
 > Readers: key holders, infrastructure operator, the OpenBao admin (the operator who holds the admin token, section 5.1).
 > The real initialisation on the internal server **has not been done**. It waits until leadership names the three key holders.
 
@@ -916,12 +916,12 @@ The whole platform is backed up by one command, `pnpm backup` (`platform/deploy/
 
 Every 3 months, and when someone changes project:
 - check the list of key holders and people with Docker access on the server;
-- **rotate every AppRole secret ID** with the credentials commands: `api-credentials`, `worker-credentials` (AppRoles `worker` and `cost-controller`), `runner-credentials`, `litellm-credentials`, `backup-credentials` and the evidence, purge, anchor and Langfuse credentials (sections 5d–5m and 6; the full list: `platform/deploy/README.md`, Fresh deployment step 5). Each command:
+- **rotate every AppRole secret ID** in one pass: `pnpm openbao:bootstrap rotate-credentials` asks for the admin token once and runs `api-credentials`, `worker-credentials`, `runner-credentials`, `litellm-credentials` and `backup-credentials` for every AppRole that has a secret ID here (task O05, `design/ADR-M102-key-rotation.md`). `pnpm doctor` and `pnpm alerts` warn 14 days before a secret ID ends (`SDLC_APPROLE_WARN_DAYS`). The single commands stay, one per credential: `worker-credentials` (AppRoles `worker` and `cost-controller`), `runner-credentials`, `litellm-credentials`, `backup-credentials` and the evidence, purge, anchor and Langfuse credentials (sections 5d–5m and 6; the full list: `platform/deploy/README.md`, Fresh deployment step 5). Each command:
   1. issues a new secret ID;
   2. writes it with the role ID into the service's volume;
   3. then destroys **every other** secret ID of the AppRole. It keeps the one named by the accessor of the new secret ID, never the newest by time (`design/QUESTIONS.md` #140).
 
-  If the delivery fails, nothing is destroyed. If destroying fails, the command fails with a message; run it again. Then restart the service and check it logs in.
+  If the delivery fails, nothing is destroyed. If destroying fails, the command fails with a message; run it again. Then restart the service and check it logs in. If `rotate-credentials` stops in the middle, it names what it renewed so far: running it again is safe, and every service it named as written needs a restart.
 - record the review in the operations log.
 
 Secret IDs expire after 90 days in any case, so a missed rotation shows up as a failed login.
@@ -965,6 +965,34 @@ When a key holder leaves or changes role, create a **new set of shares** and des
 5. Unseal test: restart the `openbao` container and unseal with two **new** shares.
 6. Destroy the old envelopes in front of a witness. Record it in the safe log and the operations log.
 7. Run a recovery drill (section 7) with the new shares.
+
+### 8.4. The Run Contract signing key: rotation and revocation
+
+The worker signs every Run Contract, every evaluation contract and every task-check contract with the Transit key `run-contract`; the runner checks the signature through Transit (task O05, `design/ADR-M102-key-rotation.md`, ADR-M22 §2.4). Each signature names its key version (`vault:v<N>:…`), and `run_contracts.key_version` keeps it.
+
+**Rotation (automatic).** `configure` sets `auto_rotate_period` on the key (`TRANSIT_AUTO_ROTATE_PERIOD` in `bootstrap.conf`, default 2160h = 90 days). OpenBao then makes a new key version by itself; nobody needs to act. New contracts use the new version. Contracts signed before keep verifying until they expire (`run.contract_validity_minutes`, minutes). The key never leaves OpenBao, so there is no key file to replace anywhere.
+
+- A deployment set up before O05: run `configure` once more (a root token, two key holders, section 5) to set the period.
+- Check the period: `bao read -field=auto_rotate_period transit/keys/run-contract` (seconds; 7776000 = 90 days), with the admin token inside the OpenBao container.
+- Rotate at once by hand (for example after an access review): `bao write -f transit/keys/run-contract/rotate` with a root token.
+
+**Revocation of a leaked or doubtful key version.** The key cannot be exported, so a leak means someone could make OpenBao sign: treat it as a leaked root or worker token first (section 8.2). Then, with a root token:
+
+1. Rotate: `bao write -f transit/keys/run-contract/rotate`. Note the new version: `bao read -field=latest_version transit/keys/run-contract`.
+2. Refuse every older version: `bao write transit/keys/run-contract/config min_decryption_version=<new version>`. From now on Transit refuses every signature of an older version, and the runner refuses those contracts (`bad_signature`). A run or an evaluation whose contract was issued before this step does not start; start the intent's run, or the evaluation, again.
+3. Record it in the operations log with the old and the new version.
+
+**Check that nothing still uses an old version.** Contracts that have not expired, by key version (read only, as the operator):
+
+```sql
+select 'run' as kind, key_version, count(*) from run_contracts where expires_at > now() group by key_version
+union all
+select 'evaluation', key_version, count(*) from evaluation_run_contracts where expires_at > now() group by key_version
+union all
+select 'task check', key_version, count(*) from evaluation_task_check_contracts where expires_at > now() group by key_version;
+```
+
+After a revocation only the new version may appear. After an automatic rotation older versions disappear within `run.contract_validity_minutes`.
 
 ## 9. Troubleshooting
 
@@ -1057,6 +1085,7 @@ Keep one log per installation. Never write a share, a token or a secret ID in it
 | 0.45 | 2026-10-29 | Claude Code (task V16) | Section 3.2: `pnpm server:setup` runs the initialisation, the shared secrets and every credentials command in one pass: PGP-encrypted shares by default, the screen and scroll-back cleared after each share, the root token only for `configure`, one admin token; the manual steps stay as the fallback |
 | 0.46 | 2026-10-29 | Claude Code (docs, newcomer review) | Section 3.2: heading without "described, not yet done"; the procedure is ready, the company server waits for the key holders and the CA certificate (A10 PR 3) |
 | 0.47 | 2026-10-30 | Claude Code (task O03) | Section 6b: operational alerts with `pnpm alerts` (a webhook URL in a file of mode 600, e-mail through `sendmail`, the systemd timer, what to do when an alert comes and when the URL leaks) |
+| 0.48 | 2026-10-30 | Claude Code (task O05) | Section 8.1: `rotate-credentials` renews every AppRole secret ID with one admin token; the warning 14 days before. New section 8.4: the signing key rotates by itself every 90 days; revoking a version with `min_decryption_version`; how to check that nothing uses an old version |
 | 0.44 | 2026-10-24 | Claude Code (task O01, PR 2) | Section 5g step 3: the runner on its own Docker Engine (`SDLC_RUNNER_DOCKER_HOST`, `SDLC_RUNNER_SOURCE_CIDR`, `runner-host.sh restart`; ADR-M91) |
 | 0.39 | 2026-10-12 | Claude Code (task V08) | New section 3.1b: the trial stack's key file (the two shares encrypted with a passphrase, `pnpm trial:start`, its limits; never on a server; QUESTIONS #356, #415–#419, ADR-M76) |
 | 0.38 | 2026-10-12 | Claude Code (task V09, PR 2) | New section 3d: the team access proxy's certificate (company CA `import`, internal CA `server`, throw-away `dev`, `check`, renewal with `reload` without a restart, the 30-day reminder). Tested with throw-away certificates (`pnpm test:access`, `access-static.test.ts`) |

@@ -61,7 +61,10 @@ describe('E07: README "Fresh deployment (operator)"', () => {
       .map((line) => /pnpm openbao:bootstrap ([a-z-]+)/.exec(line)?.[1])
       .filter((name): name is string => name !== undefined);
     for (const name of named) expect(bootstrapCommands, name).toContain(name);
-    const credentials = bootstrapCommands.filter((c) => c.endsWith('-credentials'));
+    // `rotate-credentials` (O05) renews the AppRole secret IDs later; it is not a deployment step.
+    const credentials = bootstrapCommands.filter(
+      (c) => c.endsWith('-credentials') && c !== 'rotate-credentials',
+    );
     expect(credentials.length).toBeGreaterThanOrEqual(9);
     expect(named.filter((n) => n.endsWith('-credentials')).sort()).toEqual([...credentials].sort());
   });

@@ -180,7 +180,7 @@ The commands in T11 §5b and §5d end with `stored` or `FAILED`; the master key 
 
 ### 5. Credentials of every process
 
-Each command asks for the admin token, delivers one AppRole's role ID and a new secret ID into the service's volume, and prints no secret:
+Each command asks for the admin token, delivers one AppRole's role ID and a new secret ID into the service's volume, and prints no secret. Later, every 90 days, the bootstrap command `rotate-credentials` renews all the AppRole secret IDs with one admin token ([T11 §8.1](../../handbook/03-templates/T11-openbao-runbook.md#81-access-review-every-3-months-handbook-ch3)):
 
 ```bash
 pnpm openbao:bootstrap litellm-credentials          # T11 §5d
@@ -842,7 +842,7 @@ A tag (`0.2.0`, `sha-<commit>`) never moves, but use the digest anyway: the plat
 | `services.health` | `docker compose ps`: unhealthy or restarting services, a failed one-shot job, a `core` service not running. A stopped stack is a warning and the checks that need it are skipped |
 | `openbao.state`, `openbao.tls_files`, `openbao.tls_expiry` | `pnpm openbao:bootstrap status`; the CA and server certificate in `SDLC_OPENBAO_TLS_DIR` and their end dates (a warning within 30 days). Never the key file |
 | `db.migrations` | The applied migrations (`psql` in the postgres container as `platform`, a read-only session) against the migration files of this checkout |
-| `credentials.approle` | Each process's AppRole files exist, and the secret ID's age (a warning at 80 days, failed at 90): `test -s` and `stat` inside the service, never the content |
+| `credentials.approle` | Each process's AppRole files exist, and the secret ID's age (a warning 14 days before the 90 days end, `SDLC_APPROLE_WARN_DAYS`; failed at 90; renew them all with `pnpm openbao:bootstrap rotate-credentials`): `test -s` and `stat` inside the service, never the content |
 | `credentials.logs` | Event codes of the last 24 hours of the `sdlc-api`, `sdlc-worker` and `sdlc-runner` logs: `…_missing`, `worker.runs_off`, `worker.cost_sync_off`, `worker.cost_sync_gap`, a failed AppRole login, a sealed OpenBao. Only the event field is read; no line is printed |
 | `models.litellm` | The platform runs with the profile `models` (the LiteLLM sidecar) |
 | `valkey.memory` | Valkey's used memory against its limit (a warning at 90 %) |
