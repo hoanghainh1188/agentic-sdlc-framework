@@ -1,0 +1,361 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 700" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="neoBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070B12" />
+      <stop offset="50%" stop-color="#0A101D" />
+      <stop offset="100%" stop-color="#050811" />
+    </linearGradient>
+
+    <linearGradient id="neoBorderGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F5D4" stop-opacity="0.6" />
+      <stop offset="50%" stop-color="#38BDF8" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#818CF8" stop-opacity="0.6" />
+    </linearGradient>
+
+    <linearGradient id="cardBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111B2B" />
+      <stop offset="100%" stop-color="#0B121E" />
+    </linearGradient>
+
+    <linearGradient id="platformCoreBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#081E27" />
+      <stop offset="100%" stop-color="#061320" />
+    </linearGradient>
+
+    <!-- Grid Pattern -->
+    <pattern id="neoGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#1E293B" stroke-width="0.6" stroke-opacity="0.45" />
+    </pattern>
+
+    <!-- Arrowhead Markers -->
+    <marker id="arrowCyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#00F5D4" />
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#38BDF8" />
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#A855F7" />
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#F59E0B" />
+    </marker>
+    <marker id="arrowEmerald" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#10B981" />
+    </marker>
+  </defs>
+
+  <style>
+    .font-sans { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace; }
+    .title { font-size: 15.5px; font-weight: 700; fill: #F8FAFC; letter-spacing: 1.2px; }
+    .subtitle { font-size: 11.5px; font-weight: 500; fill: #94A3B8; }
+    .zone-title { font-size: 10.5px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; }
+    .node-title { font-size: 12.5px; font-weight: 700; fill: #F1F5F9; }
+    .node-sub { font-size: 10px; font-weight: 400; fill: #94A3B8; }
+    .node-badge { font-size: 9px; font-weight: 700; }
+    .edge-label { font-size: 9px; font-weight: 600; fill: #CBD5E1; }
+  </style>
+
+  <!-- Canvas Background -->
+  <rect x="2" y="2" width="1136" height="696" rx="14" fill="url(#neoBg)" stroke="url(#neoBorderGlow)" stroke-width="1.5" />
+  <rect x="4" y="4" width="1132" height="692" rx="12" fill="url(#neoGrid)" />
+
+  <!-- Top Header Banner -->
+  <rect x="20" y="16" width="1100" height="46" rx="8" fill="#0D1522" stroke="#1E293B" stroke-width="1" />
+  <circle cx="42" cy="39" r="6" fill="#00F5D4" />
+  <text x="58" y="36" class="font-sans title">SYSTEM CONTEXT &amp; EXTERNAL POSITIONING</text>
+  <text x="58" y="52" class="font-sans subtitle">How the Governed Agentic SDLC Platform interfaces with Human Roles, Git Forges, LLM Gateways, and Infrastructure</text>
+
+  <!-- Header Flow Legend -->
+  <g transform="translate(740, 24)" class="font-mono">
+    <line x1="0" y1="10" x2="20" y2="10" stroke="#38BDF8" stroke-width="2" marker-end="url(#arrowBlue)" />
+    <text x="25" y="13" class="node-sub" fill="#E2E8F0">User/Forge</text>
+
+    <line x1="120" y1="10" x2="140" y2="10" stroke="#A855F7" stroke-width="2" marker-end="url(#arrowPurple)" />
+    <text x="145" y="13" class="node-sub" fill="#E2E8F0">LLM Inference</text>
+
+    <line x1="250" y1="10" x2="270" y2="10" stroke="#10B981" stroke-width="2" marker-end="url(#arrowEmerald)" />
+    <text x="275" y="13" class="node-sub" fill="#E2E8F0">State/Vault</text>
+  </g>
+
+  <!-- ======================================================================= -->
+  <!-- LEFT COLUMN: 2+N HUMAN ROLES & PROJECT REPOSITORY                       -->
+  <!-- ======================================================================= -->
+
+  <!-- Zone 1: 2+N Team Roles -->
+  <rect x="20" y="74" width="260" height="236" rx="10" fill="#090E17" stroke="#38BDF8" stroke-opacity="0.35" stroke-width="1.2" />
+  <text x="34" y="94" class="font-mono zone-title" fill="#38BDF8">01 · 2+N TEAM ROLES</text>
+
+  <!-- Card: Person A -->
+  <rect x="32" y="104" width="236" height="56" rx="7" fill="url(#cardBg)" stroke="#1E293B" stroke-width="1" />
+  <rect x="32" y="104" width="4" height="56" rx="2" fill="#38BDF8" />
+  <text x="44" y="122" class="font-sans node-title">Person A (Intent Owner)</text>
+  <rect x="194" y="108" width="68" height="15" rx="3" fill="#0C2D48" />
+  <text x="228" y="119" text-anchor="middle" class="font-mono node-badge" fill="#38BDF8">G1 / Spec / Plan</text>
+  <text x="44" y="137" class="font-sans node-sub">Creates intents, specs, task plans;</text>
+  <text x="44" y="150" class="font-sans node-sub">guides autonomous agent execution</text>
+
+  <!-- Card: Person B -->
+  <rect x="32" y="166" width="236" height="66" rx="7" fill="url(#cardBg)" stroke="#1E293B" stroke-width="1" />
+  <rect x="32" y="166" width="4" height="66" rx="2" fill="#F43F5E" />
+  <text x="44" y="184" class="font-sans node-title">Person B (Independent Approver)</text>
+  <rect x="180" y="170" width="82" height="15" rx="3" fill="#3B0715" />
+  <text x="221" y="181" text-anchor="middle" class="font-mono node-badge" fill="#FB7185">G3 / G7 / G8 HITL</text>
+  <text x="44" y="199" class="font-sans node-sub">Separation of Duties: never producers;</text>
+  <text x="44" y="213" class="font-sans node-sub">approves plans (G3), reviews &amp; merges</text>
+  <text x="44" y="226" class="font-sans node-sub">PRs (G7), seals release pack (G8)</text>
+
+  <!-- Card: PM / BrSE & 2nd Approver -->
+  <rect x="32" y="238" width="236" height="62" rx="7" fill="url(#cardBg)" stroke="#1E293B" stroke-width="1" />
+  <rect x="32" y="238" width="4" height="62" rx="2" fill="#A855F7" />
+  <text x="44" y="256" class="font-sans node-title">PM / BrSE &amp; Dual Approver</text>
+  <text x="44" y="272" class="font-sans node-sub">• PM/BrSE: Client AI record consent</text>
+  <text x="44" y="287" class="font-sans node-sub">• 2nd Approver: Critical risk / migrations</text>
+
+  <!-- Zone 2: Project Repositories & CI -->
+  <rect x="20" y="322" width="260" height="236" rx="10" fill="#090E17" stroke="#38BDF8" stroke-opacity="0.35" stroke-width="1.2" />
+  <text x="34" y="342" class="font-mono zone-title" fill="#38BDF8">02 · PROJECT REPO &amp; FORGES</text>
+
+  <!-- Card: Project Git Repository -->
+  <rect x="32" y="352" width="236" height="74" rx="7" fill="url(#cardBg)" stroke="#1E293B" stroke-width="1" />
+  <rect x="32" y="352" width="4" height="74" rx="2" fill="#38BDF8" />
+  <text x="44" y="371" class="font-sans node-title">Project Code Repository</text>
+  <rect x="184" y="357" width="78" height="15" rx="3" fill="#0C2D48" />
+  <text x="223" y="368" text-anchor="middle" class="font-mono node-badge" fill="#38BDF8">Zero Local Copy</text>
+  <text x="44" y="388" class="font-sans node-sub">• GitHub / GitLab repository</text>
+  <text x="44" y="403" class="font-sans node-sub">• Specs in Markdown, Plans in YAML</text>
+  <text x="44" y="417" class="font-mono node-sub" fill="#38BDF8">Protected default branch (main)</text>
+
+  <!-- Card: GitHub App & Pull Requests -->
+  <rect x="32" y="432" width="236" height="62" rx="7" fill="url(#cardBg)" stroke="#1E293B" stroke-width="1" />
+  <rect x="32" y="432" width="4" height="62" rx="2" fill="#00F5D4" />
+  <text x="44" y="451" class="font-sans node-title">GitHub App &amp; Webhooks/Poll</text>
+  <text x="44" y="468" class="font-sans node-sub">Short-lived scoped tokens for push</text>
+  <text x="44" y="483" class="font-mono node-sub" fill="#00F5D4">Opens PRs · branch agent/INT-&lt;id&gt;</text>
+
+  <!-- Card: Actions CI & Code Scanning -->
+  <rect x="32" y="500" width="236" height="50" rx="7" fill="url(#cardBg)" stroke="#1E293B" stroke-width="1" />
+  <rect x="32" y="500" width="4" height="50" rx="2" fill="#EAB308" />
+  <text x="44" y="519" class="font-sans node-title">Actions CI &amp; Security Scans</text>
+  <text x="44" y="536" class="font-sans node-sub">G6 Gate checks: CI pass + security scan</text>
+
+  <!-- ======================================================================= -->
+  <!-- CENTER COLUMN: PLATFORM BOUNDARY (GOVERNED AGENTIC SDLC)                -->
+  <!-- ======================================================================= -->
+
+  <rect x="302" y="74" width="536" height="484" rx="12" fill="url(#platformCoreBg)" stroke="#00F5D4" stroke-opacity="0.75" stroke-width="1.8" />
+  <rect x="314" y="86" width="235" height="22" rx="5" fill="#042F2E" stroke="#00F5D4" stroke-width="0.8" />
+  <text x="431" y="101" text-anchor="middle" class="font-mono zone-title" fill="#00F5D4">🛡️ GOVERNED AGENTIC SDLC PLATFORM</text>
+  <text x="824" y="101" text-anchor="end" class="font-mono node-sub" fill="#00F5D4">Self-Hosted v0.11.0</text>
+
+  <!-- Top Clients: adlc CLI & Dashboard -->
+  <rect x="316" y="116" width="246" height="58" rx="8" fill="#0F1D2E" stroke="#38BDF8" stroke-opacity="0.5" stroke-width="1" />
+  <text x="328" y="136" class="font-mono node-title" fill="#00F5D4">adlc CLI (@sdlc/cli)</text>
+  <text x="328" y="152" class="font-sans node-sub">Terminal interface for devs &amp; operators</text>
+  <text x="328" y="165" class="font-mono node-sub" fill="#38BDF8">intent · plan draft/submit · gate · doctor</text>
+
+  <rect x="578" y="116" width="246" height="58" rx="8" fill="#0F1D2E" stroke="#38BDF8" stroke-opacity="0.5" stroke-width="1" />
+  <text x="590" y="136" class="font-mono node-title" fill="#00F5D4">Preact SSR Dashboard</text>
+  <text x="590" y="152" class="font-sans node-sub">GitHub OAuth &amp; WebAuthn Passkeys</text>
+  <text x="590" y="165" class="font-mono node-sub" fill="#38BDF8">Gate decisions · Kill switch · Evidence Pack</text>
+
+  <!-- Central Box: Control Plane (NestJS + Temporal) -->
+  <rect x="316" y="184" width="508" height="198" rx="9" fill="#091422" stroke="#00F5D4" stroke-opacity="0.5" stroke-width="1.3" />
+  <text x="328" y="204" class="font-mono node-title" fill="#00F5D4">Control Plane (Modular Monolith)</text>
+  <rect x="686" y="190" width="128" height="18" rx="4" fill="#042F2E" />
+  <text x="750" y="202" text-anchor="middle" class="font-mono node-badge" fill="#00F5D4">NestJS + Temporal</text>
+
+  <!-- Control Plane Modules Grid -->
+  <rect x="326" y="214" width="238" height="74" rx="6" fill="#111D2E" stroke="#1E293B" />
+  <text x="336" y="232" class="font-sans node-title" font-size="11.5">Gate Engine &amp; Policy Matrix</text>
+  <text x="336" y="248" class="font-sans node-sub">• 8 Gates (G1–G8) × Risk Tiers</text>
+  <text x="336" y="262" class="font-sans node-sub">• HITL / HOTL (4h Block Window) / AUDIT</text>
+  <text x="336" y="276" class="font-sans node-sub">• Separation of duties &amp; dual approval</text>
+
+  <rect x="574" y="214" width="240" height="74" rx="6" fill="#111D2E" stroke="#1E293B" />
+  <text x="584" y="232" class="font-sans node-title" font-size="11.5">Cost Controller &amp; Evidence Builder</text>
+  <text x="584" y="248" class="font-sans node-sub">• Virtual keys, spend sync, 80%/100% caps</text>
+  <text x="584" y="262" class="font-sans node-sub">• Sealed Evidence Packs (release hash)</text>
+  <text x="584" y="276" class="font-sans node-sub">• RFC 8785 canonical JSON + SHA-256 chain</text>
+
+  <!-- Gate Flow Strip Inside Control Plane -->
+  <rect x="326" y="296" width="488" height="76" rx="6" fill="#0C1726" stroke="#00BBF9" stroke-opacity="0.4" />
+  <text x="336" y="313" class="font-sans node-title" font-size="11.5" fill="#38BDF8">G1–G8 Workflow Pipeline (Temporal Orchestrator)</text>
+  <g transform="translate(336, 323)" class="font-mono">
+    <!-- G1 -->
+    <rect x="0" y="0" width="54" height="40" rx="4" fill="#1E293B" stroke="#38BDF8" stroke-width="1" />
+    <text x="27" y="16" text-anchor="middle" class="node-badge" fill="#38BDF8">G1</text>
+    <text x="27" y="31" text-anchor="middle" font-size="8" fill="#94A3B8">Intent</text>
+    <!-- G2 -->
+    <rect x="60" y="0" width="54" height="40" rx="4" fill="#1E293B" stroke="#38BDF8" stroke-width="1" />
+    <text x="87" y="16" text-anchor="middle" class="node-badge" fill="#38BDF8">G2</text>
+    <text x="87" y="31" text-anchor="middle" font-size="8" fill="#94A3B8">Spec</text>
+    <!-- G3 -->
+    <rect x="120" y="0" width="54" height="40" rx="4" fill="#1E293B" stroke="#FB7185" stroke-width="1.2" />
+    <text x="147" y="16" text-anchor="middle" class="node-badge" fill="#FB7185">G3</text>
+    <text x="147" y="31" text-anchor="middle" font-size="8" fill="#94A3B8">Plan</text>
+    <!-- G4 -->
+    <rect x="180" y="0" width="54" height="40" rx="4" fill="#1E293B" stroke="#00F5D4" stroke-width="1" />
+    <text x="207" y="16" text-anchor="middle" class="node-badge" fill="#00F5D4">G4</text>
+    <text x="207" y="31" text-anchor="middle" font-size="8" fill="#94A3B8">Contract</text>
+    <!-- G5 -->
+    <rect x="240" y="0" width="54" height="40" rx="4" fill="#1E293B" stroke="#F59E0B" stroke-width="1" />
+    <text x="267" y="16" text-anchor="middle" class="node-badge" fill="#FBBF24">G5</text>
+    <text x="267" y="31" text-anchor="middle" font-size="8" fill="#94A3B8">Sandbox</text>
+    <!-- G6 -->
+    <rect x="300" y="0" width="54" height="40" rx="4" fill="#1E293B" stroke="#EAB308" stroke-width="1" />
+    <text x="327" y="16" text-anchor="middle" class="node-badge" fill="#FDE047">G6</text>
+    <text x="327" y="31" text-anchor="middle" font-size="8" fill="#94A3B8">CI / Scan</text>
+    <!-- G7 -->
+    <rect x="360" y="0" width="54" height="40" rx="4" fill="#1E293B" stroke="#FB7185" stroke-width="1.2" />
+    <text x="387" y="16" text-anchor="middle" class="node-badge" fill="#FB7185">G7</text>
+    <text x="387" y="31" text-anchor="middle" font-size="8" fill="#94A3B8">Review</text>
+    <!-- G8 -->
+    <rect x="420" y="0" width="54" height="40" rx="4" fill="#1E293B" stroke="#FB7185" stroke-width="1.2" />
+    <text x="447" y="16" text-anchor="middle" class="node-badge" fill="#FB7185">G8</text>
+    <text x="447" y="31" text-anchor="middle" font-size="8" fill="#94A3B8">Release</text>
+  </g>
+
+  <!-- Bottom Box: Execution Plane & Rootless Runner -->
+  <rect x="316" y="392" width="508" height="154" rx="9" fill="#0A1524" stroke="#F59E0B" stroke-opacity="0.6" stroke-width="1.3" />
+  <text x="328" y="412" class="font-mono node-title" fill="#FBBF24">Execution Plane (Isolated Runner &amp; Sandboxes)</text>
+  <rect x="668" y="398" width="146" height="18" rx="4" fill="#451A03" />
+  <text x="741" y="410" text-anchor="middle" class="font-mono node-badge" fill="#FBBF24">Rootless Docker / VM</text>
+
+  <!-- Runner details -->
+  <rect x="326" y="422" width="220" height="114" rx="6" fill="#111B2A" stroke="#1E293B" />
+  <text x="336" y="440" class="font-sans node-title" font-size="11.5">Runner Daemon</text>
+  <text x="336" y="456" class="font-sans node-sub">• Receives signed Run Contract</text>
+  <text x="336" y="470" class="font-sans node-sub">• Gitleaks scan &amp; diff limit check</text>
+  <text x="336" y="484" class="font-sans node-sub">• Clones repo &amp; pushes agent/*</text>
+  <text x="336" y="498" class="font-sans node-sub">• Pre-G6 dependency analysis</text>
+  <text x="336" y="512" class="font-mono node-sub" fill="#F59E0B">Emergency Kill Switch (&lt;5 min)</text>
+
+  <rect x="556" y="422" width="258" height="114" rx="6" fill="#111B2A" stroke="#F59E0B" stroke-opacity="0.4" />
+  <text x="566" y="440" class="font-sans node-title" font-size="11.5" fill="#FBBF24">Air-Gapped Agent Sandbox</text>
+  <text x="566" y="456" class="font-sans node-sub">• Pluggable: OpenHands, OpenCode</text>
+  <text x="566" y="470" class="font-sans node-sub">• MCP Gateway (read_documents, tools)</text>
+  <text x="566" y="484" class="font-sans node-sub">• Network: LiteLLM + package proxy only</text>
+  <text x="566" y="498" class="font-mono node-sub" fill="#F59E0B">• Zero real provider keys in container</text>
+  <text x="566" y="512" class="font-mono node-sub" fill="#F59E0B">• High risk: proposal patch only (L1)</text>
+
+  <!-- ======================================================================= -->
+  <!-- RIGHT COLUMN: AI PROVIDERS & MODEL GATEWAYS                             -->
+  <!-- ======================================================================= -->
+
+  <rect x="858" y="74" width="262" height="484" rx="10" fill="#090E17" stroke="#A855F7" stroke-opacity="0.4" stroke-width="1.2" />
+  <text x="872" y="94" class="font-mono zone-title" fill="#C084FC">03 · MODEL GATEWAY &amp; LLMS</text>
+  <text x="872" y="109" class="font-mono node-sub" fill="#A855F7">via LiteLLM Proxy &amp; Valkey</text>
+
+  <!-- Card: LiteLLM Proxy Gateway -->
+  <rect x="870" y="118" width="238" height="90" rx="7" fill="url(#cardBg)" stroke="#A855F7" stroke-opacity="0.5" stroke-width="1" />
+  <rect x="870" y="118" width="4" height="90" rx="2" fill="#A855F7" />
+  <text x="882" y="137" class="font-sans node-title">LiteLLM Proxy + Valkey</text>
+  <rect x="1022" y="123" width="76" height="15" rx="3" fill="#2E1065" />
+  <text x="1060" y="134" text-anchor="middle" class="font-mono node-badge" fill="#C084FC">Virtual Keys</text>
+  <text x="882" y="154" class="font-sans node-sub">• Per-run ephemeral virtual keys</text>
+  <text x="882" y="168" class="font-sans node-sub">• Budget caps &amp; rate limiting</text>
+  <text x="882" y="182" class="font-sans node-sub">• Automatic key revocation after run</text>
+  <text x="882" y="196" class="font-mono node-sub" fill="#C084FC">OTLP trace export to Langfuse</text>
+
+  <!-- Card: Cloud LLMs -->
+  <rect x="870" y="218" width="238" height="112" rx="7" fill="url(#cardBg)" stroke="#1E293B" stroke-width="1" />
+  <rect x="870" y="218" width="4" height="112" rx="2" fill="#38BDF8" />
+  <text x="882" y="238" class="font-sans node-title">Cloud LLMs (Commercial APIs)</text>
+  <text x="882" y="256" class="font-sans node-sub">Anthropic Claude API (Direct / Bedrock)</text>
+  <text x="882" y="271" class="font-mono node-sub" fill="#38BDF8">• claude-3-5-sonnet / haiku / opus</text>
+  <text x="882" y="286" class="font-sans node-sub">OpenAI GPT-4o / Azure OpenAI</text>
+  <text x="882" y="302" class="font-sans node-sub">Google Gemini Pro via Vertex AI</text>
+  <text x="882" y="318" class="font-mono node-sub" fill="#38BDF8">Prompt caching &amp; regional constraints</text>
+
+  <!-- Card: Local / Self-Hosted Models -->
+  <rect x="870" y="340" width="238" height="104" rx="7" fill="url(#cardBg)" stroke="#1E293B" stroke-width="1" />
+  <rect x="870" y="340" width="4" height="104" rx="2" fill="#10B981" />
+  <text x="882" y="360" class="font-sans node-title">Self-Hosted / Local Models</text>
+  <text x="882" y="378" class="font-sans node-sub">vLLM on Server GPU (profile models-local)</text>
+  <text x="882" y="393" class="font-mono node-sub" fill="#34D399">• Qwen 2.5 Coder 32B / DeepSeek</text>
+  <text x="882" y="408" class="font-sans node-sub">Ollama (100% free offline community trial)</text>
+  <text x="882" y="424" class="font-mono node-sub" fill="#34D399">Zero cloud egress / complete privacy</text>
+
+  <!-- Card: Langfuse Traces -->
+  <rect x="870" y="454" width="238" height="92" rx="7" fill="url(#cardBg)" stroke="#1E293B" stroke-width="1" />
+  <rect x="870" y="454" width="4" height="92" rx="2" fill="#EC4899" />
+  <text x="882" y="473" class="font-sans node-title">Langfuse v4 &amp; ClickHouse</text>
+  <text x="882" y="490" class="font-sans node-sub">• LLM call observability &amp; token spend</text>
+  <text x="882" y="504" class="font-sans node-sub">• OpenTelemetry Collector pipeline</text>
+  <text x="882" y="519" class="font-sans node-sub">• Retention loop purges traces on due</text>
+  <text x="882" y="533" class="font-mono node-sub" fill="#F472B6">Tenant-isolated trace tags</text>
+
+  <!-- ======================================================================= -->
+  <!-- BOTTOM ROW: INFRASTRUCTURE, PERSISTENCE & SECRETS                       -->
+  <!-- ======================================================================= -->
+
+  <rect x="20" y="574" width="1100" height="106" rx="10" fill="#090E17" stroke="#10B981" stroke-opacity="0.4" stroke-width="1.2" />
+  <text x="34" y="594" class="font-mono zone-title" fill="#34D399">04 · PERSISTENCE, CRYPTOGRAPHIC SECRETS &amp; AUDIT INFRASTRUCTURE</text>
+
+  <!-- Infra 1: PostgreSQL -->
+  <rect x="32" y="604" width="255" height="64" rx="8" fill="url(#cardBg)" stroke="#1E293B" />
+  <rect x="32" y="604" width="4" height="64" rx="2" fill="#10B981" />
+  <text x="44" y="623" class="font-sans node-title">PostgreSQL (Relational Store)</text>
+  <text x="44" y="639" class="font-sans node-sub">Multi-tenant schema, intents, gate decisions,</text>
+  <text x="44" y="653" class="font-mono node-sub" fill="#34D399">Append-only audit_log with SHA-256 chain</text>
+
+  <!-- Infra 2: OpenBao (Vault-Compatible) -->
+  <rect x="306" y="604" width="265" height="64" rx="8" fill="url(#cardBg)" stroke="#1E293B" />
+  <rect x="306" y="604" width="4" height="64" rx="2" fill="#F59E0B" />
+  <text x="318" y="623" class="font-sans node-title">OpenBao (Transit &amp; Secrets)</text>
+  <text x="318" y="639" class="font-sans node-sub">Transit Ed25519 signs Run Contracts;</text>
+  <text x="318" y="653" class="font-mono node-sub" fill="#FBBF24">AppRole, KV v2, single-use wrapped tokens</text>
+
+  <!-- Infra 3: SeaweedFS (S3 API) -->
+  <rect x="590" y="604" width="255" height="64" rx="8" fill="url(#cardBg)" stroke="#1E293B" />
+  <rect x="590" y="604" width="4" height="64" rx="2" fill="#38BDF8" />
+  <text x="602" y="623" class="font-sans node-title">SeaweedFS S3 Storage</text>
+  <text x="602" y="639" class="font-sans node-sub">WORM Governance Object Lock (≥180 days),</text>
+  <text x="602" y="653" class="font-mono node-sub" fill="#38BDF8">Stores Evidence Packs, audit anchors, diffs</text>
+
+  <!-- Infra 4: Temporal & Observability -->
+  <rect x="864" y="604" width="246" height="64" rx="8" fill="url(#cardBg)" stroke="#1E293B" />
+  <rect x="864" y="604" width="4" height="64" rx="2" fill="#818CF8" />
+  <text x="876" y="623" class="font-sans node-title">Temporal &amp; Operations</text>
+  <text x="876" y="639" class="font-sans node-sub">Long-lived stateful workflows, pnpm doctor,</text>
+  <text x="876" y="653" class="font-mono node-sub" fill="#818CF8">rotate-credentials &amp; pnpm alerts webhook</text>
+
+  <!-- ======================================================================= -->
+  <!-- CONNECTORS & FLOW ARROWS                                                -->
+  <!-- ======================================================================= -->
+
+  <!-- Devs -> adlc CLI & Dashboard -->
+  <path d="M 268 132 L 314 136" fill="none" stroke="#00F5D4" stroke-width="1.8" marker-end="url(#arrowCyan)" />
+  <path d="M 268 198 L 576 142" fill="none" stroke="#38BDF8" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arrowBlue)" />
+
+  <!-- Person B -> GitHub Review -->
+  <path d="M 150 232 L 150 348" fill="none" stroke="#FB7185" stroke-width="1.5" stroke-dasharray="3 2" marker-end="url(#arrowBlue)" />
+  <text x="156" y="316" class="font-mono edge-label" fill="#FB7185">Review/Merge</text>
+
+  <!-- Repo & GitHub App <-> Control Plane -->
+  <line x1="268" y1="452" x2="314" y2="280" stroke="#38BDF8" stroke-width="1.8" marker-end="url(#arrowBlue)" />
+  <line x1="316" y1="288" x2="270" y2="460" stroke="#00F5D4" stroke-width="1.6" stroke-dasharray="4 2" marker-end="url(#arrowCyan)" />
+
+  <!-- Control Plane -> Execution Plane (Run Contract) -->
+  <line x1="430" y1="382" x2="430" y2="420" stroke="#00F5D4" stroke-width="2" marker-end="url(#arrowCyan)" />
+  <text x="436" y="405" class="font-mono edge-label" fill="#00F5D4">Run Contract</text>
+
+  <!-- Runner -> Push to Repo -->
+  <path d="M 326 480 L 270 470" fill="none" stroke="#F59E0B" stroke-width="1.6" marker-end="url(#arrowAmber)" />
+
+  <!-- Sandbox -> LiteLLM -->
+  <path d="M 814 470 L 868 180" fill="none" stroke="#A855F7" stroke-width="1.8" marker-end="url(#arrowPurple)" />
+
+  <!-- LiteLLM -> Models -->
+  <line x1="980" y1="208" x2="980" y2="216" stroke="#A855F7" stroke-width="1.6" marker-end="url(#arrowPurple)" />
+  <path d="M 1080 208 L 1080 338" fill="none" stroke="#10B981" stroke-width="1.6" stroke-dasharray="4 2" marker-end="url(#arrowEmerald)" />
+
+  <!-- Control Plane -> Bottom Infra -->
+  <path d="M 380 558 L 220 602" fill="none" stroke="#10B981" stroke-width="1.5" marker-end="url(#arrowEmerald)" />
+  <path d="M 450 558 L 440 602" fill="none" stroke="#F59E0B" stroke-width="1.5" marker-end="url(#arrowAmber)" />
+  <path d="M 640 558 L 680 602" fill="none" stroke="#38BDF8" stroke-width="1.5" marker-end="url(#arrowBlue)" />
+  <path d="M 750 558 L 920 602" fill="none" stroke="#818CF8" stroke-width="1.5" marker-end="url(#arrowBlue)" />
+</svg>
