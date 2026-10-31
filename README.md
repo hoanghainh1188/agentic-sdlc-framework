@@ -12,7 +12,7 @@
 **Human-in-the-Loop AI Software Delivery Platform**  
 *Autonomous AI Agents • 8 Quality Gates • Cryptographic Audit Trail • Multi-Agent Sandboxes*
 
-[![Release](https://img.shields.io/badge/release-v0.10.0-blue.svg)](CHANGELOG.md)
+[![Release](https://img.shields.io/badge/release-v0.11.0-blue.svg)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Docs: CC BY 4.0](https://img.shields.io/badge/Docs-CC%20BY%204.0-lightgrey.svg)](LICENSE-docs.md)
 [![Node: 24 LTS](https://img.shields.io/badge/node-24%20LTS-brightgreen.svg)](package.json)
@@ -33,7 +33,7 @@ The handbook says **what must happen and why**. The platform **makes sure it hap
 
 Built for small and medium software companies, including those working for Japanese clients. Everything is in plain English, written for non-native readers; the platform's messages go through a catalog, so Vietnamese and Japanese can be added.
 
-**Status (2026-10-30): v0.10.0 is released ([CHANGELOG](CHANGELOG.md)); built, tested, and trial-ready.** The platform supports multiple agent adapters (OpenHands, OpenCode), an isolated MCP tool gateway, a runner on its own rootless Docker Engine or VM, secret scanning and a size limit before review, a dependency check of every agent change, decisions in the dashboard confirmed with a passkey, a guided server set-up (`pnpm server:setup`), and operational alerts by webhook or e-mail (`pnpm alerts`).
+**Status (2026-10-31): v0.11.0 is released ([CHANGELOG](CHANGELOG.md)); built, tested, and trial-ready.** The platform supports multiple agent adapters (OpenHands, OpenCode), an isolated MCP tool gateway, a runner on its own rootless Docker Engine or VM, secret scanning and a size limit before review, a dependency check of every agent change, decisions in the dashboard confirmed with a passkey, a guided server set-up (`pnpm server:setup`), operational alerts by webhook or e-mail (`pnpm alerts`), and key rotation (`rotate-credentials`).
 
 ---
 
@@ -47,7 +47,7 @@ The trial runs the whole platform on your own machine with a fictional sample pr
 # 1. Get the latest release and its tools
 git clone https://github.com/hoanghainh1188/governed-adlc-fw.git
 cd governed-adlc-fw
-git checkout v0.10.0
+git checkout v0.11.0
 corepack enable && pnpm install
 
 # 2. On GitHub: fork harryforge/pilot-order-inventory, turn on Actions,
@@ -128,7 +128,7 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 
 ## 4. Supported Capabilities & Architecture
 
-| Area | Supported today (v0.10.0) |
+| Area | Supported today (v0.11.0) |
 |---|---|
 | **Agents** | OpenHands, OpenCode (pluggable via Agent Adapter Kit) |
 | **Agent Tools** | MCP Gateway (`agentgateway`) per run with isolated containers (`read_documents`) |
@@ -138,7 +138,7 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 | **Sandboxes** | Node.js / TypeScript (`node24`), network restricted to LiteLLM & package proxy |
 | **Models** | Cloud LLMs via LiteLLM; self-hosted local models via vLLM on server GPU |
 | **Set-up** | `pnpm server:setup` (a guided fresh deployment on a server), `pnpm trial:up` (a trial on one machine), `adlc admin project apply` (a project and its team from one file) |
-| **Operations** | `pnpm doctor` (read-only checks of a deployment, including the last backup), `pnpm alerts` (what changed, to a chat webhook or e-mail, from the server's timer), `pnpm backup` / `pnpm restore` (encrypted with age) |
+| **Operations** | `pnpm doctor` (read-only checks of a deployment, including the last backup, secret ID ages and table sizes), `pnpm alerts` (what changed, to a chat webhook or e-mail, from the server's timer), `pnpm backup` / `pnpm restore` (encrypted with age), the signing key rotating by itself and `rotate-credentials` |
 | **Audit & Evidence** | RFC 8785 canonical JSON + SHA-256 tamper-evident hash chain; exportable sealed Evidence Pack |
 | **Dashboard** | Preact SPA with GitHub OAuth, server-side sessions and CSRF protection; gate and escalation decisions confirmed with a passkey, the kill switch, intents with their spec, plans and Evidence Packs |
 

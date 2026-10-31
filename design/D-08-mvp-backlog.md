@@ -49,7 +49,7 @@
 | EVAL | Evaluation for managers: they plan evaluations, get reports and recommendations to improve agents, prompts and models; on the server and on developer machines. After v0.3.0, before EXT (QUESTIONS #450) | 7 | S×2 · M×4 · L×1 |
 | EXT | Other Git hosts first, then other agents, tools for agents, document knowledge: v0.6.0, X12 in v0.7.0 (QUESTIONS #361, #420, #424; v0.5.0 has the X09 spike) | 9 | S×5 · M×2 · L×2 |
 | Models | Self-hosted models: L01 PR 1 and L03 in v0.6.0; then L01 PR 2 and the L03b measurement (QUESTIONS #362, #424) | 3 | S×2 · M×1 |
-| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; O03 in v0.10.0; toward v1.0 (QUESTIONS #363) | 16 | S×5 · M×11 |
+| Server | A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; O03 in v0.10.0; O04, O05 in v0.11.0; toward v1.0 (QUESTIONS #363) | 16 | S×5 · M×11 |
 | Later | Not scheduled yet (was "MVP+1"; U01–U03 were started early there and are done; U07 and U08 are done in v0.8.0) | 16 | S×4 · M×6 · L×6 |
 | **Total** | | **122** | |
 
@@ -67,7 +67,7 @@ flowchart LR
     UX --> EV["EVAL L04–L10: evaluations, reports, recommendations for managers"]
     EV --> EXT["EXT X09 (v0.5.0), X01–X04, X14, X07, X11 (v0.6.0), X12 (v0.7.0)"]
     EXT --> MO["Models L01 PR 1, L03 (v0.6.0), then L01 PR 2, L03b"]
-    MO --> SV["Server O01, O02, H04, H05, V15 (v0.7.0), H02, H03, V16 (v0.8.0), O03 (v0.10.0), then A10 (v1.0)"]
+    MO --> SV["Server O01, O02, H04, H05, V15 (v0.7.0), H02, H03, V16 (v0.8.0), O03 (v0.10.0), O04, O05 (v0.11.0), then A10 (v1.0)"]
     ME --> MF["M-F Adjustment (from trial data)"]
     MD --> MU["U01–U03 read-only dashboard, done; U07, U08 decisions in the dashboard (v0.8.0) (Later)"]
 ```
@@ -1430,7 +1430,7 @@ flowchart LR
 > Note: QUESTIONS #566, #567 (Harry, 2026-10-24): the harness gets a `vllm` provider; only the model service runs on the rented machine; fictional sample repository only, never client data; the owner runs it (R035)
 
 
-### Server — A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; O03 in v0.10.0; toward v1.0 (QUESTIONS #363)
+### Server — A team on a server: v0.7.0 with O01, O02, H04, H05, V15; v0.8.0 with H02, H03, V16; O03 in v0.10.0; O04, O05 in v0.11.0; toward v1.0 (QUESTIONS #363)
 
 #### A10. Resource measurement + backup / restore drill + internal CA / TLS
 
@@ -2011,6 +2011,7 @@ If a doc is missing or contradictory: add the question to design/QUESTIONS.md an
 | 1.66 | 2026-10-29 | Claude, approved by Harry | New tasks H03a, H03b, H03c: the implementation of client data deletion, as ADR-M97 §3 splits it |
 | 1.67 | 2026-10-29 | Claude, approved by Harry | Release v0.8.0 with H02, H03, U07, U08, V16 and V17 |
 | 1.68 | 2026-10-30 | Claude, approved by Harry | Release v0.10.0 with O03 |
+| 1.69 | 2026-10-31 | Claude, approved by Harry | Release v0.11.0 with O04 and O05 |
 | 1.48 | 2026-10-13 | Claude (task L02, PR 4), approved by Harry | L02 note: the first result table is in D-07 §9; the evaluation was stopped at 53 of 80 runs (QUESTIONS #447) |
 | 1.28 | 2026-10-09 | Claude (task A10), approved by Harry | A10 note: ClickHouse access management done (`sdlc_admin`, ADR-M63 §6, QUESTIONS #330) |
 | 1.27 | 2026-10-09 | Claude (task A10, PR 1), approved by Harry | A10 note: three PRs (TLS everywhere, backups and the drill, the server with the operator; ADR-M63, QUESTIONS #325–#327); code area `openbao/tls.sh` |
