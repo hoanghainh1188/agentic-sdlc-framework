@@ -6,7 +6,7 @@
 - **On a running stack:** no migration, no changed setting, no credentials command to run again.
 
 ### Changed
-- **A simpler release** (ADR-M104, `RELEASING.md` 3.0). The owner merges the version pull request; nothing else. The environment `npm` has no required reviewer any more: the merge is the release decision, and npm publishes after the same checks (ADR-M104 1.1). CI runs the upgrade test on a version pull request by itself. `release-tag.yml` tags the merge commit and starts `release.yml` on the tag; GitHub Actions is a bypass actor of the tag ruleset for that (the owner's setting). `pnpm release:prepare X.Y.Z` prepares the version pull request and refuses without Upgrade notes under `[Unreleased]`, which each pull request now writes (rule R146).
+- **A simpler release** (ADR-M104, `RELEASING.md` 3.0). The owner merges the version pull request; nothing else. The environment `npm` has no required reviewer any more: the merge is the release decision, and npm publishes after the same checks (ADR-M104 1.1). CI runs the upgrade test on a version pull request by itself. `release-tag.yml` tags the merge commit and starts `release.yml` on the tag; for that the tag ruleset blocks updates and deletions but no longer creation (the owner's setting; turn "Restrict creations" on again before giving anyone else write access). `pnpm release:prepare X.Y.Z` prepares the version pull request and refuses without Upgrade notes under `[Unreleased]`, which each pull request now writes (rule R146).
 
 ## [0.11.0] - 2026-10-31
 

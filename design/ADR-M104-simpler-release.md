@@ -38,7 +38,7 @@ release-please writes the CHANGELOG from conventional commits. This repository h
 
    A tag made with `GITHUB_TOKEN` starts no workflow, but a `workflow_dispatch` may; `npm-publish.yml` is already started this way.
    - `release.yml` gains the `workflow_dispatch` trigger. Its first step after the checkout refuses any ref that is not `refs/tags/v*`. Run on the tag, the signer stays `release-images.yml@refs/tags/vX.Y.Z` (ADR-M94 §2.6, `verify-images.sh` unchanged).
-   - The tag ruleset `v*` gets **GitHub Actions** as a second bypass actor (the owner's setting, `RELEASING.md` §4). It needs `contents: write` and `actions: write`, in that job only. The workflow test lists it as the second job allowed to write contents.
+   - The tag ruleset `v*` keeps "Restrict updates", "Restrict deletions" and "Block force pushes" and drops **"Restrict creations"** (the owner's setting, `RELEASING.md` §4): a personal repository cannot list GitHub Actions as a bypass actor (Harry, 2026-10-31). A tag still never moves and is never deleted. Who can create a tag: people with write access (today only the owner) and the two jobs with `contents: write`. Before anyone else gets write access, "Restrict creations" goes back on, or a GitHub App of the owner's becomes the bypass actor. The job needs `contents: write` and `actions: write`, in that job only. The workflow test lists it as the second job allowed to write contents.
    - The owner's merge is the release decision. R040 still holds: Claude never tags; the tag follows Harry's merge.
 3. **The version pull request is mechanical** (QUESTIONS #653). Each pull request that needs an upgrade step writes its bullet under `[Unreleased]` → `### Upgrade notes` when it is made, while its author knows the step (R146). `pnpm release:prepare X.Y.Z [--tasks …] [--summary …]` refuses without those notes and changes nothing then. Otherwise it:
    - sets `package.json` and `PLATFORM_VERSION`;
@@ -55,9 +55,9 @@ release-please writes the CHANGELOG from conventional commits. This repository h
 
 ## 3. Consequences
 
-- The owner's steps: **merge** the version pull request once CI (with `release-images` and `upgrade`) is green, then check the result. Once: add GitHub Actions to the tag ruleset's bypass list, and remove the required reviewer of the environment `npm`.
+- The owner's steps: **merge** the version pull request once CI (with `release-images` and `upgrade`) is green, then check the result. Once: turn "Restrict creations" off in the tag ruleset, and remove the required reviewer of the environment `npm`.
 - A version pull request runs two long jobs (the image scan and the upgrade test, up to 40 minutes each), as before, but without the manual step.
-- If `release-tag.yml` fails before the tag (the gate, the ruleset), nothing is tagged: re-run it, or the owner tags by hand as before (`RELEASING.md` §2, step 2b, §3). If it fails after the tag, re-running it starts the release. A tag pushed by hand starts `release.yml` itself, and the workflow then finds its run and does nothing.
+- If `release-tag.yml` fails before the tag (the gate, a ruleset that still restricts creation), nothing is tagged: re-run it, or the owner tags by hand as before (`RELEASING.md` §2, step 2b, §3). If it fails after the tag, re-running it starts the release. A tag pushed by hand starts `release.yml` itself, and the workflow then finds its run and does nothing.
 - A merge that changes the version without a CHANGELOG section is refused by the gate before any tag.
 - Tests: `platform/tests/workspace/ci-workflow.test.ts` (the upgrade job's trigger, the second contents writer), `release.test.ts` (`release.yml` on a dispatch refuses a branch; `release-tag.yml` and `tag-release.mjs`: the gate before the tag, the API, the dispatch, no push, no token on disk), `tag-release.test.ts` (the decision from the state, the commit that set the version), `release-prepare.test.ts` (the script on a copy of the files).
 
@@ -73,4 +73,4 @@ release-please writes the CHANGELOG from conventional commits. This repository h
 | Version | Date | Author | Notes |
 |---|---|---|---|
 | 1.0 | 2026-10-31 | Claude, approved by Harry | The upgrade test on the version pull request, `release-tag.yml`, `pnpm release:prepare` and Upgrade notes by each pull request (QUESTIONS #651–#653) |
-| 1.1 | 2026-10-31 | Claude, approved by Harry | §2.4: no approval of `npm`; the environment keeps its name and its tag rule, without a reviewer (QUESTIONS #654) |
+| 1.1 | 2026-10-31 | Claude, approved by Harry | §2.2: the tag ruleset drops "Restrict creations" instead of a GitHub Actions bypass (not offered on a personal repository); §2.4: no approval of `npm`; the environment keeps its name and its tag rule, without a reviewer (QUESTIONS #654) |
