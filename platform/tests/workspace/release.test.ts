@@ -36,7 +36,8 @@ interface Job {
   steps?: Step[];
 }
 interface Workflow {
-  on: Record<string, { tags?: string[] } | null>;
+  on: Record<string, { tags?: string[]; branches?: string[] } | null>;
+  concurrency?: Record<string, unknown>;
   permissions: Record<string, string>;
   env?: Record<string, string>;
   jobs: Record<string, Job>;
@@ -283,8 +284,13 @@ describe('V15: release.yml makes the release on the tag (ADR-M94 §2.2)', () => 
       .map((s) => s.run ?? '')
       .join('\n');
 
-  it('runs only on a pushed tag v*: never by hand, on a branch or a pull request', () => {
-    expect(wf.on).toEqual({ push: { tags: ['v*'] } });
+  it('runs on a pushed tag v*, or dispatched on a tag (release-tag.yml, ADR-M104); never on a branch', () => {
+    expect(wf.on).toEqual({ push: { tags: ['v*'] }, workflow_dispatch: null });
+    const refCheck = steps(job('check')).find((s) => s.name === 'Started on a tag');
+    expect(refCheck?.run).toContain('refs/tags/v*) ;;');
+    expect(refCheck?.run).toContain('exit 1');
+    // It is the first step after the checkout: nothing else runs on a branch.
+    expect(steps(job('check')).indexOf(refCheck!)).toBe(1);
   });
 
   it('has the five jobs in order: check, images, verify-images, release, npm', () => {
@@ -562,5 +568,46 @@ describe('install-cosign.sh: cosign for the release workflows', () => {
     const r = spawnSync('bash', [path.join(root, SCRIPT), 'v0.0.1'], { encoding: 'utf8' });
     expect(r.status).toBe(1);
     expect(r.stdout + r.stderr).toMatch(/no pinned checksum|unsupported architecture/);
+  });
+});
+
+describe('ADR-M104: release-tag.yml tags a merged version pull request', () => {
+  const wf = parse(read('.github/workflows/release-tag.yml')) as Workflow;
+  const tag = wf.jobs.tag!;
+
+  it('runs on a push to main only, one at a time, and only reads by default', () => {
+    expect(wf.on).toEqual({ push: { branches: ['main'] } });
+    expect(wf.permissions).toEqual({ contents: 'read' });
+    expect(wf.concurrency).toEqual({ group: 'release-tag', 'cancel-in-progress': false });
+    expect(Object.keys(wf.jobs)).toEqual(['tag']);
+    expect(tag.permissions).toEqual({ contents: 'write', actions: 'write' });
+  });
+
+  it('runs tag-release.mjs with the whole history and the token in the environment only', () => {
+    const step = steps(tag).find((s) => s.run?.includes('tag-release.mjs'));
+    expect(step?.run).toBe('node platform/tools/release/tag-release.mjs');
+    expect(step?.env?.GH_TOKEN).toBe('${{ github.token }}');
+    const checkout = steps(tag).find((s) => s.uses?.startsWith('actions/checkout@'));
+    expect(checkout?.with?.['fetch-depth']).toBe(0);
+  });
+
+  it('tag-release.mjs gates, then tags through the API, then dispatches; it never pushes', () => {
+    const script = read('platform/tools/release/tag-release.mjs');
+    const gate = script.indexOf("'release-check.mjs'), 'tag', `v${version}`]");
+    const create = script.indexOf('`repos/${repo}/git/refs`');
+    const dispatch = script.indexOf(
+      "run('gh', ['workflow', 'run', 'release.yml', '--ref', `v${version}`])",
+    );
+    expect(gate).toBeGreaterThan(0);
+    expect(create).toBeGreaterThan(gate);
+    expect(dispatch).toBeGreaterThan(create);
+    expect(script).not.toContain('git push');
+    expect(script).not.toMatch(/'tag', '-f'|--force/);
+  });
+
+  it('keeps no token on disk and reads no expression inline', () => {
+    const checkout = steps(tag).find((s) => s.uses?.startsWith('actions/checkout@'));
+    expect(checkout?.with?.['persist-credentials']).toBe(false);
+    for (const s of steps(tag)) expect(s.run ?? '').not.toMatch(/\$\{\{/);
   });
 });

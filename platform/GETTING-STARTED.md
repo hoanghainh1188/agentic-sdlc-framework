@@ -282,7 +282,7 @@ The `adlc` command is published as `@hoanghainh/governed-adlc` by `.github/workf
 
 **Once, before the first tag** (🧑; done for v0.1.1, kept for a new machine or a new owner):
 
-1. GitHub → the repository → Settings → Environments → **New environment** `npm`. Add yourself under **Required reviewers**, and under **Deployment branches and tags** allow only tags `v*`. Create it before the first tag: a workflow that names a missing environment creates it without protection.
+1. GitHub → the repository → Settings → Environments → **New environment** `npm`. Under **Deployment branches and tags** allow only tags `v*`; no required reviewer (ADR-M104 1.1: the merge of the version pull request is the release decision). Create it before the first tag: a workflow that names a missing environment creates it without protection.
 2. Turn on two-factor authentication on your npm account first (npmjs.com → Account → Two-Factor Authentication; a passkey or an authenticator app; mode **Authorization and writes**; keep the recovery codes in your password manager). Without it `npm publish` answers `403 … Two-factor authentication … is required`; never create a token that bypasses 2FA.
 
 **The first version of `@hoanghainh/governed-adlc` (v0.9.0)** (npm adds a trusted publisher only to a package that exists; QUESTIONS #365, #631). The steps are the ones of `agentic-sdlc-cli` v0.1.1, in this order:
@@ -298,11 +298,11 @@ The `adlc` command is published as `@hoanghainh/governed-adlc` by `.github/workf
 
 The images on GHCR need no step for the CLI.
 
-**Every later release:** follow [RELEASING.md](../RELEASING.md) (the whole release); for npm, approve the `npm` environment when GitHub asks, and the workflow publishes with provenance after the same release gate as `release.yml`. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
+**Every later release:** follow [RELEASING.md](../RELEASING.md) (the whole release); the workflow publishes to npm by itself with provenance after the same release gate as `release.yml`. A failed publish: fix the cause, then re-run the workflow (a version can never be published twice; a broken version is deprecated with `npm deprecate`, never unpublished).
 
 What v0.2.0 (2026-10-12, the first publish by the workflow) and v0.8.0 taught:
 
-- **`npm error code ENEEDAUTH` in the step `npm publish`**: npm did not accept the workflow, so it asked for a login. Check the trusted publisher (npmjs.com → the package → **Settings** → **Trusted publishing**). It can **expire**: the page then says "This trusted publisher configuration has expired. Delete it and create a new one." Delete it and add it again with exactly the values of step 6 above, with "Allow npm publish" ticked. Then **Re-run failed jobs** and approve the `npm` environment again. Nothing was published, so the re-run is safe.
+- **`npm error code ENEEDAUTH` in the step `npm publish`**: npm did not accept the workflow, so it asked for a login. Check the trusted publisher (npmjs.com → the package → **Settings** → **Trusted publishing**). It can **expire**: the page then says "This trusted publisher configuration has expired. Delete it and create a new one." Delete it and add it again with exactly the values of step 6 above, with "Allow npm publish" ticked. Then **Re-run failed jobs**. Nothing was published, so the re-run is safe.
 - **After a successful publish** npm answers "Your package is being processed" and shows the version as **validating** on npmjs.com for a few minutes (about 15 for v0.2.0). Wait: the version then appears (`npm view @hoanghainh/governed-adlc dist-tags`). If npmjs.com shows it as waiting for approval (staged publishing), approve it.
 - Check the new version: `npm view @hoanghainh/governed-adlc@X.Y.Z dist.attestations.provenance.predicateType` prints `https://slsa.dev/provenance/v1`, and after an install `npm audit signatures` reports a verified attestation.
 

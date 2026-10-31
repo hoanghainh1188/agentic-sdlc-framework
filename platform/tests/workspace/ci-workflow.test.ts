@@ -130,13 +130,18 @@ describe('workflow hardening (all workflows)', () => {
   // Every change to main goes through a reviewed pull request (CLAUDE.md "Current constraints"),
   // and no workflow commits to a pull request branch either: a commit pushed by a workflow waits
   // for approval and leaves the PR head without ci-ok (the render-diagrams bot, removed).
-  // One exception (V12, RELEASING.md): release.yml's job `release` writes contents to create the
-  // GitHub Release of a tag a person pushed; it pushes nothing (release.test.ts).
+  // Two exceptions: release.yml's job `release` writes contents to create the GitHub Release of a
+  // tag (V12, RELEASING.md), and release-tag.yml's job `tag` creates the tag of a merged version
+  // pull request through the API (ADR-M104). Neither pushes (release.test.ts).
+  const WRITES_CONTENTS = new Set([
+    '.github/workflows/release.yml:release',
+    '.github/workflows/release-tag.yml:tag',
+  ]);
   it.each(workflows)('$file never writes contents and never pushes', ({ file, wf }) => {
     const grants = [
       wf.permissions,
       ...Object.entries(wf.jobs)
-        .filter(([name]) => !(file === '.github/workflows/release.yml' && name === 'release'))
+        .filter(([name]) => !WRITES_CONTENTS.has(`${file}:${name}`))
         .map(([, job]) => job.permissions),
     ];
     for (const grant of grants) {
@@ -301,10 +306,13 @@ describe('AC2: integration job runs the Compose core profile', () => {
     expect(job('ci-ok').needs).toContain('fresh-deploy');
   });
 
-  it('O02: the upgrade job has the same trigger as the fresh deployment, the release tags, and cleans up', () => {
+  it('O02: the upgrade job runs with the fresh deployment and on a version pull request, and cleans up', () => {
     const upgrade = job('upgrade');
     expect(upgrade.needs).toEqual(['scan', 'checks']);
-    expect(upgrade.if).toBe("needs.scan.outputs.run_fresh_deploy == 'true'");
+    // ADR-M104 §2.1: a pull request that changes the version runs it by itself.
+    expect(upgrade.if).toBe(
+      "needs.scan.outputs.run_fresh_deploy == 'true' || needs.scan.outputs.release_version != ''",
+    );
     expect(upgrade['timeout-minutes']).toBeGreaterThan(0);
     expect(upgrade.steps[0]?.with?.['fetch-depth']).toBe(0);
     expect(upgrade.steps.map((s) => s.run ?? '')).toContain('pnpm test:upgrade');

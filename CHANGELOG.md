@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Upgrade notes
+- **On a running stack:** no migration, no changed setting, no credentials command to run again.
+
+### Changed
+- **A simpler release** (ADR-M104, `RELEASING.md` 3.0). The owner merges the version pull request; nothing else. The environment `npm` has no required reviewer any more: the merge is the release decision, and npm publishes after the same checks (ADR-M104 1.1). CI runs the upgrade test on a version pull request by itself. `release-tag.yml` tags the merge commit and starts `release.yml` on the tag; for that the tag ruleset blocks updates and deletions but no longer creation (the owner's setting; turn "Restrict creations" on again before giving anyone else write access). `pnpm release:prepare X.Y.Z` prepares the version pull request and refuses without Upgrade notes under `[Unreleased]`, which each pull request now writes (rule R146).
+
 ## [0.11.0] - 2026-10-31
 
 **Operations on a server, part 2: key rotation (O05) and data that only grows (O04).** The Run Contract signing key rotates by itself every 90 days, and one command renews every AppRole secret ID. `pnpm doctor` and `pnpm alerts` now warn 14 days before a secret ID ends and when an append-only table grows large. The worker removes the dashboard's old sessions and passkey challenges. `run_events` are kept at least 2 years, like every append-only table.

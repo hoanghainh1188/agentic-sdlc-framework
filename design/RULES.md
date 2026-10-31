@@ -63,6 +63,7 @@ This register lists every rule of the root `CLAUDE.md` and the check that enforc
 | R093 | Diagrams: render and commit SVG | ci+test | ci.yml:169; tests/workspace/diagrams.test.ts:46 | partial | pointer-only | CLAUDE.md |
 | R094 | Handbook split: what Claude may edit | text-only | – | none | move:handbook | CLAUDE.md |
 | R095 | Keep CHANGELOG updated | ci | release-check at release time | partial | keep-root | CLAUDE.md |
+| R146 | A pull request with an upgrade step writes its Upgrade notes under [Unreleased] (added by ADR-M104) | test | tests/workspace/release-prepare.test.ts (release:prepare refuses without them); platform/tools/release/prepare.mjs | partial | keep-root | CLAUDE.md |
 | R096a | Keep CLAUDE.md short | text-only | – | none | keep-root | CLAUDE.md |
 | R096b | One DEVELOPMENT.md row per test script | test | tests/workspace/development-doc.test.ts:25 | full | pointer-only | CLAUDE.md |
 | R121 | At most 2 sessions at once | text-only | – | none | drop-or-move-to-doc | CLAUDE.md |
@@ -284,3 +285,4 @@ Some rows group several rules with the same check (for example R082a–f).
 | 0.17 | 2026-10-29 | Claude (CLI rename, ADR-M100) | R035: the hook refuses `pnpm adlc ops bootstrap\|token` and the bare `adlc`/`sdlc` binaries as it refuses `pnpm sdlc …` |
 | 0.18 | 2026-10-30 | Claude (task O03) | New row R144 (`pnpm alerts`, `platform/deploy/CLAUDE.md`) |
 | 0.19 | 2026-10-31 | Claude (task O04) | New row R145 (housekeeping of the session tables, `platform/packages/core/CLAUDE.md`) |
+| 0.20 | 2026-10-31 | Claude (ADR-M104) | New row R146 (Upgrade notes under [Unreleased]); R040: the tag comes from `release-tag.yml` after Harry's merge |

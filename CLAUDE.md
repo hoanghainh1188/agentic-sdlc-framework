@@ -63,7 +63,7 @@ Always loaded:
 - GitHub events are read by polling (GitHub App + API) in v0.1; webhooks come later. Both must feed the same event handler. Users are matched by numeric GitHub account ID only; bots never decide. [R037]
 - Object storage: SeaweedFS (S3 API). Cache/rate limit: Valkey. Never MinIO, Redis or Elasticsearch (license/maintenance reasons). Pin every image to an exact version; images we publish or depend on are used by digest. [R038]
 - Never run `docker volume prune` or `docker system prune --volumes` on a machine with a dev stack. Never run anything against the owner's dev stack without being asked. [R039]
-- Releases, tags, `push: true` image runs and npm publishes are public actions done by Harry: Claude never pushes a tag, creates a release, runs a workflow with `push: true`, publishes to npm or adds an npm token. [R040]
+- Releases, tags, `push: true` image runs and npm publishes are public actions done by Harry (he merges the version PR; `release-tag.yml` tags it, npm follows). Claude never pushes a tag, creates a release, runs a workflow with `push: true`, publishes to npm or adds an npm token. [R040]
 - Target host is a modest internal server: keep concurrent sandboxes configurable (default 1–2); heavy observability stack is an optional Compose profile. [R041]
 - Every FR in D-02 gets automated tests matching its acceptance criteria. [R042]
 
@@ -89,6 +89,7 @@ Claude Code reads a folder's `CLAUDE.md` when it opens a file in that folder. Be
 - Diagrams D9–D13 mirror Mermaid blocks in design docs: if you change one, update the other. After editing a `.mmd`, run `pnpm diagrams:render` and commit the SVG in the same PR (CI only checks it; `diagrams/README.md`). [R093]
 - Handbook split: policies and generic process chapters are written outside Claude Code. **You own** the handbook parts that describe platform behaviour: Ch.13–16 and Ch.18–20 usage sections (CLI, `/approve` commands, config, troubleshooting) and runbooks (e.g. T11 OpenBao). When a task changes user-visible behaviour, update the matching handbook chapter in the same PR. Never edit template T13 or the policy chapters. [R094]
 - Keep `CHANGELOG.md` updated for notable changes. [R095]
+- A PR with an upgrade step writes it under `[Unreleased]` → `### Upgrade notes` (ADR-M104). [R146]
 - **Keep this file short** (QUESTIONS #425): a new task adds at most one line to "Commands" and one line per new never/always rule to the matching folder's `CLAUDE.md` (or "Platform-wide module rules"). Its detail goes in its ADR, the deploy README, the runbook or `platform/DEVELOPMENT.md` (tests: one row there per new `pnpm test:*` script, checked by a test). [R096]
 - `design/RULES.md` lists every rule of every `CLAUDE.md`, the file it lives in and the check that enforces it: a new rule gets a row and an ID tag (`[R…]`) in the same PR, and a check (lint, test, hook) comes before text (ADR-M84). [R133]
 
@@ -118,7 +119,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - Database (ADR-M09): `pnpm db:migrate` / `pnpm db:status` (`SDLC_DB_MIGRATION_URL`, owner role `platform`; processes connect as `platform_app`).
 - Dev mode without Compose: `pnpm api:start`, `pnpm worker:start` (ADR-M26, ADR-M27; refused with `NODE_ENV=production`).
 - Operator commands on the server: `pnpm adlc ops bootstrap|token|audit verify|tenant-admin|role|ai-record|agent|run kill|retention report|eval start` (`SDLC_DB_URL`, actor `system`; ADR-M26, ADR-M37; deploy README "Fresh deployment" step 8). A token is printed once: owner's terminal only.
-- Releases (`RELEASING.md`, ADR-M94, ADR-M72): `pnpm images mode|get|export|verify`, `pnpm cli:pack` / `pnpm cli:pack-check`. Order: version PR → tag (Harry) → `release.yml` (images, Release with `images.lock`) → `npm-publish.yml` (Harry approves `npm`).
+- Releases (`RELEASING.md`, ADR-M94, ADR-M104): `pnpm release:prepare X.Y.Z`, `pnpm images mode|get|export|verify`, `pnpm cli:pack-check`. Order: version PR → merge (Harry) → `release-tag.yml` → `release.yml` → `npm-publish.yml`.
 - Claude Code hook (W01, ADR-M84 §2.3): `.claude/settings.json` runs `platform/tools/claude-hooks/guard-bash.mjs` before every Bash call and refuses the commands this file forbids for Claude (rule IDs in `design/RULES.md`); never weaken or bypass it. [R132]
 - CI: `.github/workflows/ci.yml` (A09; jobs, triggers and path filters in `platform/DEVELOPMENT.md` §2). Actions pinned by commit SHA; thresholds in the workflow `env:`. Short checks share the `scan` job; do not add a job for a check under a minute; every job has `timeout-minutes`.
 
@@ -128,7 +129,7 @@ Run from the repo root. Node.js 24, pnpm 10 (pinned in `package.json` → `packa
 - State (2026-10-31): **v0.11.0 in release** (version PR; then the tag and the `npm` approval by Harry): O04 (data that only grows, ADR-M103), O05 (key rotation, ADR-M102); v0.10.0 (2026-10-30): O03 (operational alerts, ADR-M101), the old command `sdlc` removed (ADR-M100), the newcomer fixes; v0.9.1 (2026-10-29): the first publish of `@hoanghainh/governed-adlc` through `npm-publish.yml`, with provenance; v0.9.0 (2026-10-29): the CLI rename to `adlc` (ADR-M100); v0.8.0 (2026-10-29): H02, H03 (design, ADR-M97), U07, U08, V16, V17; v0.7.0 (2026-10-26): X12, O01, O02, H04, H05, V15; earlier releases: `CHANGELOG.md`. Next: H03a–H03c, H07; L01 PR 2 (QUESTIONS #546). Waiting: E07 (API-model run, QUESTIONS #81), L03b and L01 PR 1 (no GPU run yet), A10 PR 3 (the company server's first real run, with `pnpm server:setup`), X10 (a real project). Parked: K02. No trial report yet; bugs from trial reports come first. The two-person rule stays (no single-person mode). Plan: `ROADMAP.md`, D-08. [R123]
 - Open docs follow-ups: align D-02 §3 and handbook Ch.2 §2.5 on who owns the project AI record (QUESTIONS #103); align template T13 with the plan schema v1 (handbook authors, never in Claude Code). [R124]
 - Conflicts with `main` on a branch under review: merge `origin/main` into the branch. Never rebase or force-push it. [R125]
-- `design/QUESTIONS.md` and ADR numbers: each session gets its own block when it is queued and uses only numbers from that block (history: `design/README.md` "Number blocks"; update both places). **Next free: QUESTIONS #651–#655; ADR-M104**. [R126]
+- `design/QUESTIONS.md` and ADR numbers: each session gets its own block when it is queued and uses only numbers from that block (history: `design/README.md` "Number blocks"; update both places). **Next free: QUESTIONS #656–#660; ADR-M105**. [R126]
 - Development uses throw-away OpenBao keys only. The real OpenBao initialisation on the internal server waits until the three key holders are named and the company CA's certificate is issued (QUESTIONS #20, task A10 PR 3; runbook T11 §3c) (remove this line when both are done). [R127]
 
 ## Decisions (see design/D-02 section 11)

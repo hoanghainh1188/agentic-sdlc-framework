@@ -57,7 +57,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.mjs', '**/*.js'],
+    // Plain scripts, and the declaration files that give tests the types of a script (for
+    // example platform/tools/release/tag-release.d.mts): no tsconfig project holds them.
+    files: ['**/*.mjs', '**/*.js', '**/*.d.mts'],
     ...tseslint.configs.disableTypeChecked,
   },
 

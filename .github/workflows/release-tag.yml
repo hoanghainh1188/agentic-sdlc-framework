@@ -1,0 +1,48 @@
+# The tag of a merged version pull request (ADR-M104, RELEASING.md §2). The owner merges the
+# version pull request; this workflow then runs platform/tools/release/tag-release.mjs, which
+# decides from the state of the repository (the version, the tags, the release runs), so a run
+# that GitHub cancels while it waits, a push of several commits, or a run that failed after the
+# tag, still ends in one release:
+# - the version has no tag: it must be above every tag; the release gate runs; the tag vX.Y.Z is
+#   created through the API (never git push; a tag never moves) at the commit that set the
+#   version; release.yml is dispatched on the tag;
+# - the version has a tag but no release.yml run: release.yml is dispatched on it;
+# - otherwise nothing.
+# A tag made with GITHUB_TOKEN starts no workflow, but a dispatch may; release.yml then runs on
+# refs/tags/vX.Y.Z, so the image signer stays release-images.yml at that tag (ADR-M94 §2.6). The
+# tag ruleset `v*` blocks updates, deletions and force pushes but not creation, so this job may
+# create the tag (a personal repository cannot list GitHub Actions as a bypass actor; RELEASING.md
+# §4). npm then publishes by itself in the environment `npm` (ADR-M104 1.1).
+name: release-tag
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: tag a merged version pull request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write # create the tag ref
+      actions: write # dispatch release.yml on it
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # the history of package.json: the commit that set the version
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - name: Tag the version and start the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node platform/tools/release/tag-release.mjs
