@@ -126,7 +126,60 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 - Never give an agent a real model provider key, direct access to secrets, or push rights to the default branch.
 - Never change or delete an audit record.
 
-## 4. Supported Capabilities & Architecture
+## 4. System Architecture & Topology
+
+The platform is designed as an **orchestration + policy + cryptographic evidence layer** built on top of existing developer tools and cloud infrastructure, enforcing strict separation between control and execution planes.
+
+### 4.1 System Context & External Positioning (Ecosystem Boundary)
+
+How the platform interfaces with **2+N team members**, external **Git forges / CI**, **LiteLLM model gateways**, and **underlying infrastructure**:
+
+<p align="center">
+  <img src="assets/architecture-context.svg" alt="Governed Agentic SDLC System Context & External Positioning" width="100%" />
+</p>
+
+| External / Peer Boundary | Protocol / Mechanism | Role & Security Boundary | Handled By |
+|---|---|---|---|
+| **2+N Human Roles** | HTTPS / WebAuthn, Terminal REST | Person A guides and plans; Person B independently reviews and approves (G3/G7/G8); PM/BrSE manages client AI consent. | `adlc` CLI, Dashboard, GitHub UI |
+| **Project Git Repository** | GitHub App, Git refspec push | Temporary clones inside runner; pushes `agent/INT-...` branches with single-use tokens; zero persistent code storage on platform. | `runner`, `git-github` adapter |
+| **Actions CI & Scanners** | Checks API & Code Scanning | G6 gate reads CI check runs and security alerts; critical findings trigger mandatory escalation. | `worker`, `git-github` adapter |
+| **LiteLLM Model Gateway** | REST / OTLP (OpenTelemetry) | Per-run virtual keys with strict budget ceilings (80% warn, 100% stop); auto-revocation; streaming traces to Langfuse. | `model-litellm` adapter, LiteLLM |
+| **Cloud & Local LLMs** | Anthropic / OpenAI / vLLM / Ollama | Models execute code reasoning; never receive long-lived cloud credentials or direct default-branch push rights. | LiteLLM, vLLM, Ollama |
+| **OpenBao Transit & Secrets** | Ed25519 Transit Engine, AppRole | Cryptographically signs Run Contracts; provides single-use wrapped tokens for runner operations. | `@sdlc/secrets`, OpenBao |
+| **PostgreSQL & SeaweedFS** | TCP / SQL, S3 WORM Object Lock | Append-only audit log with SHA-256 hash chains; sealed Evidence Packs locked for ≥180 days. | `@sdlc/core`, SeaweedFS |
+
+---
+
+### 4.2 Internal Architecture & Component Topology (Inside the Platform)
+
+Inside the platform monorepo (`platform/`), services and packages are organized into **5 clean architectural layers**:
+
+<p align="center">
+  <img src="assets/architecture-internal.svg" alt="Governed Agentic SDLC Internal Component & Package Topology" width="100%" />
+</p>
+
+1. **Layer 1 – Entrypoints & User Clients (`platform/apps/*`):**
+   * **`adlc` CLI:** Interactive CLI for developers and platform operators (`intent`, `plan draft`, `gate status`, `doctor`).
+   * **Preact Web Dashboard:** SSR governance portal with GitHub OAuth, server-side sessions, and WebAuthn passkey-confirmed decisions.
+   * **GitHub App Poller:** Regular pollers that ingest GitHub issue comments (`/approve G3`, `/kill`), PR reviews, and CI status.
+2. **Layer 2 – Control Plane Services (`platform/apps/api` & `worker`):**
+   * **`api` (NestJS):** REST API endpoints for user actions, agent registry, intent proposals, and dashboard static file hosting.
+   * **`worker` (Temporal):** Stateful G1–G8 orchestrator, HITL/HOTL block window coordinator, database escalation SLA clocks, and retention purge loops.
+3. **Layer 3 – Core Governance Modules (`@sdlc/core` & `@sdlc/config`):**
+   * **Gate Engine & Policy:** Enforces canonical risk tiers, oversight modes, separation of duties (Rule M21: producer never approves), and dual approval.
+   * **Intent & Plan Registry:** Verifies Markdown specs (≥1 acceptance criterion required) and validates path scopes in submitted YAML plans.
+   * **Cost Controller:** Issues per-run virtual keys, tracks real-time token spend, and revokes credentials immediately upon completion.
+   * **Evidence Builder & Audit Log:** RFC 8785 canonical JSON + SHA-256 tamper-evident hash chains, sealed Evidence Packs, and daily compliance anchors.
+4. **Layer 4 – Execution Plane & Isolated Runner (`platform/apps/runner`):**
+   * **Runner Daemon:** Operates on the dedicated `sdlc-runner` task queue; verifies Ed25519 Run Contracts; injects plan constraints into agent prompts.
+   * **Safety Gates:** Performs pre-G5 Gitleaks secret scanning (fail-closed), checks diff review size limits (40 files / 1500 lines), and checks added dependencies.
+   * **Air-Gapped Docker Sandboxes:** Network restricted exclusively to LiteLLM and local package proxy (`verdaccio`); zero host credentials or cloud keys in containers.
+5. **Layer 5 – Adapter Plugins & Shared Contracts (`@sdlc/adapters/*`):**
+   * Decoupled connectors conforming to `@sdlc/contracts`: `git-github`, `model-litellm`, `evidence-s3`, `agent-openhands`, `agent-opencode`, and `traces-langfuse`.
+
+---
+
+## 5. Supported Capabilities & Matrix
 
 | Area | Supported today (v0.11.0) |
 |---|---|
@@ -142,7 +195,7 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 | **Audit & Evidence** | RFC 8785 canonical JSON + SHA-256 tamper-evident hash chain; exportable sealed Evidence Pack |
 | **Dashboard** | Preact SPA with GitHub OAuth, server-side sessions and CSRF protection; gate and escalation decisions confirmed with a passkey, the kill switch, intents with their spec, plans and Evidence Packs |
 
-## 5. Technology Stack
+## 6. Technology Stack
 
 | Layer | Choice |
 |---|---|
@@ -152,7 +205,7 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 | Deployment | Docker Compose on self-hosted servers; no mandatory cloud vendor lock-in |
 | Licences | Code: [MIT](LICENSE); Documentation: [CC BY 4.0](LICENSE-docs.md). All 3rd-party dependencies permit commercial use ([D-01](design/D-01-build-vs-buy.md)). |
 
-## 6. Repository Layout
+## 7. Repository Layout
 
 ```text
 .
@@ -169,7 +222,7 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 └── scripts/         # Backlog and validation tools
 ```
 
-## 7. Key Documents
+## 8. Key Documents
 
 - [Codes Table](handbook/00-introduction/05-codes.md): Canonical codes (G1–G8, L0–L4, HITL/HOTL, risk tiers)
 - [Glossary](handbook/00-introduction/02-glossary.md): Clear definitions for intent, block window, producer, etc.
@@ -178,13 +231,13 @@ What it does keep: each run's diff, as evidence, for at least 180 days. Tracing 
 - [Operator Deployment Guide](platform/deploy/README.md) & [Rollout Guide](platform/ROLLOUT-GUIDE.md)
 - [Security Policy](SECURITY.md) & [Contributing Guidelines](CONTRIBUTING.md)
 
-## 8. Help & Community
+## 9. Help & Community
 
 - **Questions & Discussions**: [GitHub Discussions](https://github.com/hoanghainh1188/governed-adlc-fw/discussions)
 - **Issues & Bug Reports**: [Open an issue](https://github.com/hoanghainh1188/governed-adlc-fw/issues/new/choose) (never include tokens, credentials, or client code).
 - **Security Inquiries**: Follow the coordinated disclosure guidelines in [SECURITY.md](SECURITY.md).
 - **Operator Runbooks**: [Troubleshooting](platform/deploy/README.md#troubleshooting) & [OpenBao Runbook (T11)](handbook/03-templates/T11-openbao-runbook.md).
 
-## 9. Licence
+## 10. Licence
 
 The code is [MIT](LICENSE). The documentation (`handbook/`, `design/`, `diagrams/`) is [CC BY 4.0](LICENSE-docs.md): reuse it, also commercially, with credit. Both stay open. The components the platform reuses keep their own licences; every one allows commercial use ([build vs buy](design/D-01-build-vs-buy.md)).

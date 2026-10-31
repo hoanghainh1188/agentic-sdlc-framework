@@ -1,0 +1,263 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 760" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="neoBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070B12" />
+      <stop offset="50%" stop-color="#0A101D" />
+      <stop offset="100%" stop-color="#050811" />
+    </linearGradient>
+
+    <linearGradient id="neoBorderGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F5D4" stop-opacity="0.6" />
+      <stop offset="50%" stop-color="#38BDF8" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#818CF8" stop-opacity="0.6" />
+    </linearGradient>
+
+    <linearGradient id="crateCard" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111B2B" />
+      <stop offset="100%" stop-color="#0B121E" />
+    </linearGradient>
+
+    <linearGradient id="pipelineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#042F2E" />
+      <stop offset="50%" stop-color="#0C2D48" />
+      <stop offset="100%" stop-color="#1E1B4B" />
+    </linearGradient>
+
+    <!-- Grid Pattern -->
+    <pattern id="neoGrid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#1E293B" stroke-width="0.6" stroke-opacity="0.45" />
+    </pattern>
+
+    <!-- Arrow Markers -->
+    <marker id="arrCyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#00F5D4" />
+    </marker>
+    <marker id="arrBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#38BDF8" />
+    </marker>
+    <marker id="arrPurple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#A855F7" />
+    </marker>
+    <marker id="arrAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8.5 5 L 0 8.5 z" fill="#F59E0B" />
+    </marker>
+  </defs>
+
+  <style>
+    .font-sans { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace; }
+    .title { font-size: 15.5px; font-weight: 700; fill: #F8FAFC; letter-spacing: 1.2px; }
+    .subtitle { font-size: 11.5px; font-weight: 500; fill: #94A3B8; }
+    .layer-tag { font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; }
+    .crate-name { font-size: 12.5px; font-weight: 700; fill: #00F5D4; }
+    .crate-role { font-size: 11px; font-weight: 600; fill: #E2E8F0; }
+    .crate-desc { font-size: 10px; font-weight: 400; fill: #94A3B8; }
+    .badge { font-size: 9px; font-weight: 700; }
+  </style>
+
+  <!-- Canvas Background -->
+  <rect x="2" y="2" width="1136" height="756" rx="14" fill="url(#neoBg)" stroke="url(#neoBorderGlow)" stroke-width="1.5" />
+  <rect x="4" y="4" width="1132" height="752" rx="12" fill="url(#neoGrid)" />
+
+  <!-- Top Header Banner -->
+  <rect x="20" y="16" width="1100" height="46" rx="8" fill="#0D1522" stroke="#1E293B" stroke-width="1" />
+  <circle cx="42" cy="39" r="6" fill="#00BBF9" />
+  <text x="58" y="36" class="font-sans title">INTERNAL PLATFORM SUBSYSTEMS &amp; PACKAGE TOPOLOGY</text>
+  <text x="58" y="52" class="font-sans subtitle">Detailed view of the 5 internal architectural planes: Apps, Core Modules, G1–G8 Pipeline, Adapters, and Isolation Runner</text>
+
+  <!-- ======================================================================= -->
+  <!-- LAYER 1: CLIENTS & ENTRYPOINT APPLICATIONS (platform/apps/*)            -->
+  <!-- ======================================================================= -->
+  <rect x="20" y="74" width="1100" height="86" rx="10" fill="#090E17" stroke="#38BDF8" stroke-opacity="0.35" stroke-width="1.2" />
+  <text x="34" y="92" class="font-mono layer-tag" fill="#38BDF8">LAYER 1 · ENTRYPOINTS &amp; USER CLIENTS (platform/apps/*)</text>
+
+  <!-- App: cli (adlc) -->
+  <rect x="34" y="100" width="340" height="50" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="34" y="100" width="4" height="50" rx="2" fill="#38BDF8" />
+  <text x="48" y="118" class="font-mono crate-name" fill="#38BDF8">platform/apps/cli</text>
+  <rect x="260" y="105" width="104" height="15" rx="3" fill="#0C2D48" />
+  <text x="312" y="116" text-anchor="middle" class="font-mono badge" fill="#38BDF8">CLI: adlc</text>
+  <text x="48" y="133" class="font-sans crate-role">Command Line Interface for Teams &amp; Operators</text>
+  <text x="48" y="145" class="font-sans crate-desc">intent submit/watch · plan draft · gate status · doctor · alerts</text>
+
+  <!-- App: dashboard -->
+  <rect x="390" y="100" width="340" height="50" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="390" y="100" width="4" height="50" rx="2" fill="#00F5D4" />
+  <text x="404" y="118" class="font-mono crate-name">platform/apps/dashboard</text>
+  <rect x="635" y="105" width="85" height="15" rx="3" fill="#042F2E" />
+  <text x="677" y="116" text-anchor="middle" class="font-mono badge" fill="#00F5D4">Preact SPA</text>
+  <text x="404" y="133" class="font-sans crate-role">Decision Dashboard &amp; Governance Portal</text>
+  <text x="404" y="145" class="font-sans crate-desc">GitHub OAuth · WebAuthn passkey decisions · kill switch · packs</text>
+
+  <!-- GitHub App Events & Pollers -->
+  <rect x="746" y="100" width="362" height="50" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="746" y="100" width="4" height="50" rx="2" fill="#A855F7" />
+  <text x="760" y="118" class="font-mono crate-name" fill="#C084FC">GitHub App Ingress &amp; Poller</text>
+  <rect x="995" y="105" width="102" height="15" rx="3" fill="#2E1065" />
+  <text x="1046" y="116" text-anchor="middle" class="font-mono badge" fill="#C084FC">REST / Events</text>
+  <text x="760" y="133" class="font-sans crate-role">Forge Comment Commands &amp; CI Ingestion</text>
+  <text x="760" y="145" class="font-sans crate-desc">Polls issues, PR reviews, CI check runs &amp; /approve commands</text>
+
+  <!-- ======================================================================= -->
+  <!-- LAYER 2: CONTROL PLANE SERVICES (api & worker)                          -->
+  <!-- ======================================================================= -->
+  <rect x="20" y="174" width="1100" height="126" rx="10" fill="#090E17" stroke="#00F5D4" stroke-opacity="0.4" stroke-width="1.2" />
+  <text x="34" y="192" class="font-mono layer-tag" fill="#00F5D4">LAYER 2 · CONTROL PLANE SERVICES (platform/apps/api &amp; worker)</text>
+
+  <!-- App: api -->
+  <rect x="34" y="200" width="440" height="90" rx="7" fill="url(#crateCard)" stroke="#00F5D4" stroke-opacity="0.5" />
+  <rect x="34" y="200" width="4" height="90" rx="2" fill="#00F5D4" />
+  <text x="48" y="218" class="font-mono crate-name">platform/apps/api (NestJS Engine)</text>
+  <rect x="336" y="205" width="128" height="16" rx="3" fill="#042F2E" />
+  <text x="400" y="216" text-anchor="middle" class="font-mono badge" fill="#00F5D4">REST API &amp; Host</text>
+  <text x="48" y="235" class="font-sans crate-role">Central HTTP API &amp; Dashboard Static Host</text>
+  <text x="48" y="250" class="font-sans crate-desc">• REST endpoints for intents, specs, plans, approvals, run proposals</text>
+  <text x="48" y="264" class="font-sans crate-desc">• GitHub OAuth authentication &amp; server-side session management</text>
+  <text x="48" y="278" class="font-sans crate-desc">• Serves dashboard static assets at /dashboard/ with CSRF defense</text>
+
+  <!-- App: worker -->
+  <rect x="490" y="200" width="618" height="90" rx="7" fill="url(#crateCard)" stroke="#38BDF8" stroke-opacity="0.5" />
+  <rect x="490" y="200" width="4" height="90" rx="2" fill="#38BDF8" />
+  <text x="504" y="218" class="font-mono crate-name" fill="#38BDF8">platform/apps/worker (Temporal Orchestration Engine)</text>
+  <rect x="976" y="205" width="122" height="16" rx="3" fill="#0C2D48" />
+  <text x="1037" y="216" text-anchor="middle" class="font-mono badge" fill="#38BDF8">Stateful Workflow</text>
+  <text x="504" y="235" class="font-sans crate-role">Long-Lived Workflow Engine, Escalation Clocks &amp; Background Pollers</text>
+  <text x="504" y="250" class="font-sans crate-desc">• Executes G1–G8 state machine workflows; coordinates HITL &amp; HOTL block windows</text>
+  <text x="504" y="264" class="font-sans crate-desc">• Database escalation timers (acknowledge &amp; resolve SLAs) &amp; reconcile loops</text>
+  <text x="504" y="278" class="font-sans crate-desc">• Retention loop (≥180d WORM purge, Langfuse OTLP trace sweep, daily audit anchors)</text>
+
+  <!-- ======================================================================= -->
+  <!-- LAYER 3: CORE GOVERNANCE MODULES (@sdlc/core & packages)                -->
+  <!-- ======================================================================= -->
+  <rect x="20" y="314" width="1100" height="142" rx="10" fill="url(#pipelineGrad)" stroke="#00F5D4" stroke-opacity="0.75" stroke-width="1.5" />
+  <text x="36" y="334" class="font-mono crate-name" font-size="13">LAYER 3 · CORE GOVERNANCE MODULES (@sdlc/core, @sdlc/contracts, @sdlc/config)</text>
+  <rect x="918" y="322" width="190" height="18" rx="4" fill="#091320" stroke="#00F5D4" stroke-width="0.8" />
+  <text x="1013" y="334" text-anchor="middle" class="font-mono badge" fill="#00F5D4">Shared Domain Core</text>
+
+  <!-- 4 Core Submodules -->
+  <rect x="34" y="348" width="258" height="96" rx="6" fill="#0C1726" stroke="#1E293B" />
+  <rect x="34" y="348" width="4" height="96" rx="2" fill="#00F5D4" />
+  <text x="48" y="366" class="font-mono crate-name">Gate Engine &amp; Policy</text>
+  <text x="48" y="382" class="font-sans crate-role">Oversight Matrix &amp; Separation of Duties</text>
+  <text x="48" y="398" class="font-sans crate-desc">• Evaluates G1–G8 gate conditions</text>
+  <text x="48" y="412" class="font-sans crate-desc">• Enforces rule M21: Producer never approves</text>
+  <text x="48" y="426" class="font-sans crate-desc">• Resolves HITL / HOTL (block window) / AUDIT</text>
+
+  <rect x="306" y="348" width="258" height="96" rx="6" fill="#0C1726" stroke="#1E293B" />
+  <rect x="306" y="348" width="4" height="96" rx="2" fill="#38BDF8" />
+  <text x="320" y="366" class="font-mono crate-name" fill="#38BDF8">Intent / Spec / Plan Registry</text>
+  <text x="320" y="382" class="font-sans crate-role">Default Branch Content-Hash Verification</text>
+  <text x="320" y="398" class="font-sans crate-desc">• Reads Spec Kit / BMAD criteria at head</text>
+  <text x="320" y="412" class="font-sans crate-desc">• Requires ≥1 acceptance criteria (G2 pass)</text>
+  <text x="320" y="426" class="font-sans crate-desc">• Validates submitted plan YAML (path scopes)</text>
+
+  <rect x="578" y="348" width="258" height="96" rx="6" fill="#0C1726" stroke="#1E293B" />
+  <rect x="578" y="348" width="4" height="96" rx="2" fill="#F59E0B" />
+  <text x="592" y="366" class="font-mono crate-name" fill="#FBBF24">Cost Controller &amp; Key Lifecycle</text>
+  <text x="592" y="382" class="font-sans crate-role">Per-Run Budget &amp; Virtual Key Revocation</text>
+  <text x="592" y="398" class="font-sans crate-desc">• Issues ephemeral LiteLLM key per run</text>
+  <text x="592" y="412" class="font-sans crate-desc">• Real-time spend tracking &amp; caps (80%/100%)</text>
+  <text x="592" y="426" class="font-sans crate-desc">• Automatic key revocation on run termination</text>
+
+  <rect x="850" y="348" width="258" height="96" rx="6" fill="#0C1726" stroke="#1E293B" />
+  <rect x="850" y="348" width="4" height="96" rx="2" fill="#10B981" />
+  <text x="864" y="366" class="font-mono crate-name" fill="#34D399">Evidence &amp; Audit Log Engine</text>
+  <text x="864" y="382" class="font-sans crate-role">Cryptographic Tamper-Evident Records</text>
+  <text x="864" y="398" class="font-sans crate-desc">• RFC 8785 canonical JSON + SHA-256 chain</text>
+  <text x="864" y="412" class="font-sans crate-desc">• Sealed Evidence Pack (release hash binding)</text>
+  <text x="864" y="426" class="font-sans crate-desc">• Daily audit anchors in COMPLIANCE bucket</text>
+
+  <!-- ======================================================================= -->
+  <!-- LAYER 4: EXECUTION PLANE & RUNNER (platform/apps/runner)                -->
+  <!-- ======================================================================= -->
+  <rect x="20" y="470" width="1100" height="136" rx="10" fill="#090E17" stroke="#F59E0B" stroke-opacity="0.45" stroke-width="1.2" />
+  <text x="34" y="488" class="font-mono layer-tag" fill="#FBBF24">LAYER 4 · EXECUTION PLANE &amp; AIR-GAPPED SANDBOXES (platform/apps/runner)</text>
+
+  <!-- Runner Core -->
+  <rect x="34" y="498" width="370" height="96" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="34" y="498" width="4" height="96" rx="2" fill="#F59E0B" />
+  <text x="48" y="516" class="font-mono crate-name" fill="#FBBF24">Runner Daemon (Task Queue: sdlc-runner)</text>
+  <text x="48" y="533" class="font-sans crate-role">Provisions Sandboxes &amp; Manages Execution Lifecycles</text>
+  <text x="48" y="549" class="font-sans crate-desc">• Verifies Ed25519 Signed Run Contract via OpenBao Transit</text>
+  <text x="48" y="563" class="font-sans crate-desc">• Injects plan tasks into agent prompt (nonce delimited, framed)</text>
+  <text x="48" y="577" class="font-sans crate-desc">• Clones repo on host; pushes agent/* branch after G5 passes</text>
+
+  <!-- Runner Security & Pre-G5 Scans -->
+  <rect x="418" y="498" width="340" height="96" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="418" y="498" width="4" height="96" rx="2" fill="#EF4444" />
+  <text x="432" y="516" class="font-mono crate-name" fill="#F87171">Safety Gates &amp; Threat Defenses</text>
+  <text x="432" y="533" class="font-sans crate-role">Automated Pre-G5 Scans &amp; Boundary Enforcement</text>
+  <text x="432" y="549" class="font-sans crate-desc">• Pre-G5 secret scanning via Gitleaks (fail-closed)</text>
+  <text x="432" y="563" class="font-sans crate-desc">• Diff review size threshold (40 files / 1500 lines limit)</text>
+  <text x="432" y="577" class="font-sans crate-desc">• Pre-G6 dependency analysis (typosquatting &amp; scripts)</text>
+
+  <!-- Sandbox Instance -->
+  <rect x="772" y="498" width="336" height="96" rx="7" fill="url(#crateCard)" stroke="#F59E0B" stroke-opacity="0.4" />
+  <rect x="772" y="498" width="4" height="96" rx="2" fill="#00F5D4" />
+  <text x="786" y="516" class="font-mono crate-name">Docker Sandbox (--network restricted)</text>
+  <text x="786" y="533" class="font-sans crate-role">Pluggable Agent Adapters &amp; Tool Isolation</text>
+  <text x="786" y="549" class="font-sans crate-desc">• OpenHands Agent Server &amp; OpenCode integration</text>
+  <text x="786" y="563" class="font-sans crate-desc">• MCP Tool Gateway (isolated read_documents container)</text>
+  <text x="786" y="577" class="font-sans crate-desc">• Network: LiteLLM + package proxy only; zero cloud keys</text>
+
+  <!-- ======================================================================= -->
+  <!-- LAYER 5: ADAPTER KIT & INFRASTRUCTURE CONNECTORS                        -->
+  <!-- ======================================================================= -->
+  <rect x="20" y="620" width="1100" height="124" rx="10" fill="#090E17" stroke="#10B981" stroke-opacity="0.4" stroke-width="1.2" />
+  <text x="34" y="638" class="font-mono layer-tag" fill="#34D399">LAYER 5 · ADAPTER PLUGINS &amp; REUSABLE INFRASTRUCTURE (@sdlc/adapters/*)</text>
+
+  <!-- Adapter: git-github -->
+  <rect x="34" y="648" width="206" height="84" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="34" y="648" width="4" height="84" rx="2" fill="#38BDF8" />
+  <text x="46" y="666" class="font-mono crate-name" fill="#38BDF8">adapters/git-github</text>
+  <text x="46" y="682" class="font-sans crate-role">GitHub App Connector</text>
+  <text x="46" y="698" class="font-sans crate-desc">• Poller &amp; Webhooks</text>
+  <text x="46" y="711" class="font-sans crate-desc">• PR &amp; CI checks reader</text>
+  <text x="46" y="724" class="font-sans crate-desc">• Git host boundary adapter</text>
+
+  <!-- Adapter: model-litellm -->
+  <rect x="252" y="648" width="206" height="84" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="252" y="648" width="4" height="84" rx="2" fill="#A855F7" />
+  <text x="264" y="666" class="font-mono crate-name" fill="#C084FC">adapters/model-litellm</text>
+  <text x="264" y="682" class="font-sans crate-role">Model Gateway Client</text>
+  <text x="264" y="698" class="font-sans crate-desc">• Virtual key lifecycle</text>
+  <text x="264" y="711" class="font-sans crate-desc">• Budget synchronizer</text>
+  <text x="264" y="724" class="font-sans crate-desc">• Master key isolation</text>
+
+  <!-- Adapter: evidence-s3 -->
+  <rect x="470" y="648" width="206" height="84" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="470" y="648" width="4" height="84" rx="2" fill="#10B981" />
+  <text x="482" y="666" class="font-mono crate-name" fill="#34D399">adapters/evidence-s3</text>
+  <text x="482" y="682" class="font-sans crate-role">Object Storage Connector</text>
+  <text x="482" y="698" class="font-sans crate-desc">• SeaweedFS S3 interface</text>
+  <text x="482" y="711" class="font-sans crate-desc">• WORM object locks</text>
+  <text x="482" y="724" class="font-sans crate-desc">• Retention purge loop</text>
+
+  <!-- Package: secrets & openbao -->
+  <rect x="688" y="648" width="206" height="84" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="688" y="648" width="4" height="84" rx="2" fill="#F59E0B" />
+  <text x="700" y="666" class="font-mono crate-name" fill="#FBBF24">packages/secrets</text>
+  <text x="700" y="682" class="font-sans crate-role">OpenBao Security Client</text>
+  <text x="700" y="698" class="font-sans crate-desc">• Transit Ed25519 signer</text>
+  <text x="700" y="711" class="font-sans crate-desc">• AppRole token broker</text>
+  <text x="700" y="724" class="font-sans crate-desc">• Short-lived wrapping</text>
+
+  <!-- Adapter: traces-langfuse -->
+  <rect x="906" y="648" width="202" height="84" rx="7" fill="url(#crateCard)" stroke="#1E293B" />
+  <rect x="906" y="648" width="4" height="84" rx="2" fill="#EC4899" />
+  <text x="918" y="666" class="font-mono crate-name" fill="#F472B6">adapters/traces-langfuse</text>
+  <text x="918" y="682" class="font-sans crate-role">OTLP Observability Adapter</text>
+  <text x="918" y="698" class="font-sans crate-desc">• OpenTelemetry exporter</text>
+  <text x="918" y="711" class="font-sans crate-desc">• Langfuse v4 integration</text>
+  <text x="918" y="724" class="font-sans crate-desc">• ClickHouse purge helper</text>
+
+  <!-- Inter-layer Flow Connectors -->
+  <line x1="200" y1="150" x2="200" y2="198" stroke="#38BDF8" stroke-width="1.6" marker-end="url(#arrBlue)" />
+  <line x1="560" y1="150" x2="560" y2="198" stroke="#00F5D4" stroke-width="1.6" marker-end="url(#arrCyan)" />
+  <line x1="380" y1="290" x2="380" y2="346" stroke="#00F5D4" stroke-width="1.8" marker-end="url(#arrCyan)" />
+  <line x1="680" y1="290" x2="680" y2="346" stroke="#38BDF8" stroke-width="1.8" marker-end="url(#arrBlue)" />
+  <line x1="500" y1="456" x2="500" y2="496" stroke="#F59E0B" stroke-width="1.8" marker-end="url(#arrAmber)" />
+  <line x1="860" y1="456" x2="860" y2="496" stroke="#00F5D4" stroke-width="1.6" marker-end="url(#arrCyan)" />
+  <line x1="420" y1="606" x2="420" y2="646" stroke="#10B981" stroke-width="1.6" marker-end="url(#arrCyan)" />
+</svg>
